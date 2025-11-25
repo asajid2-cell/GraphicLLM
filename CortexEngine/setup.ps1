@@ -101,6 +101,11 @@ try {
     exit 1
 }
 
+if (-not $generator) {
+    Write-Info "Visual Studio generator not detected; defaulting to Visual Studio 16 2019"
+    $generator = "Visual Studio 16 2019"
+}
+
 # Check for CUDA toolkit (for GPU LLM acceleration) and install if missing
 function Find-CudaPath {
     $paths = @()

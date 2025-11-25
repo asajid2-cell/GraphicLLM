@@ -31,14 +31,9 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
-# Prefer CUDA acceleration when available, but fall back to CPU cleanly
-find_package(CUDAToolkit QUIET)
-if(CUDAToolkit_FOUND)
-    set(GGML_CUDA ON CACHE BOOL "" FORCE)
-else()
-    message(STATUS "CUDA toolkit not found; building llama.cpp without CUDA (set CUDAToolkit_ROOT or install CUDA to enable GGML_CUDA)")
-    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
-endif()
+find_package(CUDAToolkit REQUIRED)
+set(GGML_CUDA ON CACHE BOOL "" FORCE)
+message(STATUS "CUDA toolkit found at: ${CUDAToolkit_LIBRARY_ROOT}")
 
 add_subdirectory(vendor/llama.cpp)
 

@@ -89,14 +89,45 @@ try {
 }
 
 # Check for CUDA toolkit (for GPU LLM acceleration) and install if missing
-function Test-CudaInstalled {
-    try {
-        $nvccVersion = & nvcc --version 2>&1 | Select-String "release" | Select-Object -First 1
-        if ($nvccVersion) {
-            Write-Success "CUDA toolkit detected ($nvccVersion) - will enable GPU acceleration"
-            return $true
+function Find-CudaPath {
+    $paths = @()
+    if ($env:CUDAToolkit_ROOT) { $paths += $env:CUDAToolkit_ROOT }
+    $defaultRoot = Join-Path ${env:ProgramFiles} "NVIDIA GPU Computing Toolkit\CUDA"
+    if (Test-Path $defaultRoot) {
+        $paths += (Get-ChildItem $defaultRoot -Directory | Sort-Object Name -Descending | ForEach-Object { $_.FullName })
+    }
+    foreach ($p in $paths) {
+        $nvcc = Join-Path $p "bin\nvcc.exe"
+        if (Test-Path $nvcc) {
+            return $p
         }
-    } catch { }
+    }
+    return $null
+}
+
+function Set-CudaEnv($cudaPath) {
+    if (-not $cudaPath) { return }
+    $env:CUDAToolkit_ROOT = $cudaPath
+    $nvBin = Join-Path $cudaPath "bin"
+    if ($env:PATH.Split(';') -notcontains $nvBin) {
+        $env:PATH = "$nvBin;$env:PATH"
+    }
+}
+
+function Test-CudaInstalled {
+    # Try PATH nvcc first
+    if (Get-Command nvcc -ErrorAction SilentlyContinue) {
+        $nvccVersion = & nvcc --version 2>&1 | Select-String "release" | Select-Object -First 1
+        Write-Success "CUDA toolkit detected ($nvccVersion) - will enable GPU acceleration"
+        return $true
+    }
+    $cudaPath = Find-CudaPath
+    if ($cudaPath) {
+        Set-CudaEnv $cudaPath
+        $nvccVersion = & (Join-Path $cudaPath "bin\nvcc.exe") --version 2>&1 | Select-String "release" | Select-Object -First 1
+        Write-Success "CUDA toolkit detected at $cudaPath ($nvccVersion) - will enable GPU acceleration"
+        return $true
+    }
     return $false
 }
 
@@ -130,12 +161,17 @@ function Install-CudaIfMissing {
     }
 
     if (-not $installed) {
-        Write-Info "CUDA toolkit not installed automatically. Please install from https://developer.nvidia.com/cuda-downloads then re-run setup.ps1"
+        Write-Error "CUDA toolkit not installed. Install from https://developer.nvidia.com/cuda-downloads then re-run setup.ps1"
+        exit 1
     }
 }
 
 Install-CudaIfMissing
-$cudaFound = Test-CudaInstalled
+if (-not (Test-CudaInstalled)) {
+    Write-Error "CUDA toolkit not detected after install attempt. Please install manually and re-run setup."
+    exit 1
+}
+$cudaFound = $true
 
 # ============================================================================
 # STEP 2: Initialize Git Submodules (llama.cpp)

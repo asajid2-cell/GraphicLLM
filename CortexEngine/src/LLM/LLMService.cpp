@@ -434,17 +434,24 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
         auto startPos = generatedText.find('{');
         auto endPos = generatedText.rfind('}');
         if (!generationDecodeFailed) {
+            // Prefer JSON if we see balanced braces
             if (startPos != std::string::npos && endPos != std::string::npos && endPos > startPos) {
                 response.text = generatedText.substr(startPos, endPos - startPos + 1);
                 response.success = true;
             } else {
-                // If we generated nothing usable, surface an explicit error instead of empty text
-                if (generatedText.find_first_not_of(" \t\r\n") == std::string::npos) {
+                // Trim whitespace to decide if we got anything meaningful
+                auto first = generatedText.find_first_not_of(" \t\r\n");
+                auto last = generatedText.find_last_not_of(" \t\r\n");
+                if (first != std::string::npos && last != std::string::npos) {
+                    response.text = generatedText.substr(first, last - first + 1);
+                    response.success = true; // accept raw text even if not JSON
+                } else if (n_decode > 0) {
+                    // Generated tokens but only whitespace/control pieces; treat as empty but non-fatal
+                    response.text = "";
+                    response.success = true;
+                } else {
                     response.text = "Error: Empty generation";
                     response.success = false;
-                } else {
-                    response.text = generatedText; // raw fallback (may be partial)
-                    response.success = true;
                 }
             }
         } else {

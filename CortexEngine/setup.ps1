@@ -97,6 +97,15 @@ try {
             Set-Item -Path "env:$name" -Value $value
         }
     }
+    # Explicitly set C and CXX to MSVC from the imported env
+    if (-not $env:CC -and $env:VSINSTALLDIR) {
+        $clPath = Get-Command cl.exe -ErrorAction SilentlyContinue
+        if ($clPath) {
+            $env:CC = $clPath.Source
+            $env:CXX = $clPath.Source
+            Write-Info "MSVC detected as C/CXX: $($clPath.Source)"
+        }
+    }
 
 } catch {
     Write-Error "Could not detect Visual Studio!"

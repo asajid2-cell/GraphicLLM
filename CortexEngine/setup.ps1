@@ -67,53 +67,39 @@ try {
     exit 1
 }
 
-# Check for Visual Studio / MSBuild
-$generator = $null
+# Check for Visual Studio / MSBuild and import environment (vswhere + VsDevCmd)
 try {
-    # Try to find vswhere (comes with VS 2017+)
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-
-    if (Test-Path $vswhere) {
-        # Prefer latest VS with Desktop C++ workload
-        $installJson = & $vswhere -latest -requires Microsoft.Component.MSBuild -property installationPath
-        if (-not $installJson) {
-            $installJson = & $vswhere -latest -property installationPath
-        }
-        $vsPath = $installJson
-        $vsDisplay = & $vswhere -latest -property catalog_productDisplayVersion
-        $vsVersion = & $vswhere -latest -property installationVersion
-        $vsMajor = 0
-        if ($vsVersion) {
-            $vsMajor = [int](($vsVersion -split '\.')[0])
-        }
-        Write-Success "Visual Studio found: $vsDisplay"
-        Write-Info "Path: $vsPath"
-        if ($vsMajor -ge 17) {
-            $generator = "Visual Studio 17 2022"
-        } elseif ($vsMajor -ge 16) {
-            $generator = "Visual Studio 16 2019"
-        } else {
-            Write-Info "Older Visual Studio detected (v$vsMajor), falling back to VS2019 generator"
-            $generator = "Visual Studio 16 2019"
-        }
-    } else {
-        Write-Error "Visual Studio not found!"
-        Write-Info "Install Visual Studio (Desktop development with C++) then rerun setup."
+    if (-not (Test-Path $vswhere)) {
+        Write-Error "Visual Studio not found! Install the Desktop development with C++ workload."
         exit 1
+    }
+
+    $vsPath = & $vswhere -latest -requires Microsoft.Component.MSBuild -property installationPath
+    if (-not $vsPath) {
+        $vsPath = & $vswhere -latest -property installationPath
+    }
+    $vsDisplay = & $vswhere -latest -property catalog_productDisplayVersion
+    Write-Success "Visual Studio found: $vsDisplay"
+    Write-Info "Path: $vsPath"
+
+    $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+    if (-not (Test-Path $vsDevCmd)) {
+        Write-Error "VsDevCmd.bat not found at $vsDevCmd"
+        exit 1
+    }
+    Write-Info "Importing VS environment..."
+    $envOutput = & cmd /c "call `"$vsDevCmd`" -arch=amd64 -host_arch=amd64 >nul && set"
+    foreach ($line in $envOutput) {
+        if ($line -match "^(.*?)=(.*)$") {
+            $name = $matches[1]
+            $value = $matches[2]
+            Set-Item -Path "env:$name" -Value $value
+        }
     }
 } catch {
     Write-Error "Could not detect Visual Studio!"
     exit 1
-}
-
-if (-not $generator) {
-    Write-Info "Visual Studio generator not detected; defaulting to Visual Studio 16 2019"
-    $generator = "Visual Studio 16 2019"
-}
-
-$cmakeGeneratorArg = ""
-if ($generator) {
-    $cmakeGeneratorArg = "-G `"$generator`""
 }
 
 # Check for CUDA toolkit (for GPU LLM acceleration) and install if missing
@@ -422,9 +408,6 @@ $cmakeCmd = @(
     "-DCMAKE_CUDA_COMPILER=$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')",
     "-A", "x64"
 )
-if ($cmakeGeneratorArg) {
-    $cmakeCmd += $cmakeGeneratorArg
-}
 & $cmakeCmd
 
 if ($LASTEXITCODE -ne 0) {

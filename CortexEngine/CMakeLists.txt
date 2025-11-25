@@ -30,8 +30,16 @@ find_package(glm CONFIG REQUIRED)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-# Prefer CUDA acceleration when available
-set(GGML_CUDA ON CACHE BOOL "" FORCE)
+
+# Prefer CUDA acceleration when available, but fall back to CPU cleanly
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+    set(GGML_CUDA ON CACHE BOOL "" FORCE)
+else()
+    message(STATUS "CUDA toolkit not found; building llama.cpp without CUDA (set CUDAToolkit_ROOT or install CUDA to enable GGML_CUDA)")
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+endif()
+
 add_subdirectory(vendor/llama.cpp)
 
 # Fix llama.cpp C++20 char8_t issues with MSVC

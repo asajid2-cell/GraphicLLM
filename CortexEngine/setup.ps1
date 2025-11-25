@@ -135,6 +135,7 @@ function Install-CudaIfMissing {
 }
 
 Install-CudaIfMissing
+$cudaFound = Test-CudaInstalled
 
 # ============================================================================
 # STEP 2: Initialize Git Submodules (llama.cpp)
@@ -348,7 +349,7 @@ Write-Info "Running CMake configure..."
 # Let CMake auto-detect the generator (works with any VS version including previews)
 & cmake .. `
     -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
-    -DGGML_CUDA=ON `
+    -DGGML_CUDA=$(if ($cudaFound) {"ON"} else {"OFF"}) `
     -A x64
 
 if ($LASTEXITCODE -ne 0) {

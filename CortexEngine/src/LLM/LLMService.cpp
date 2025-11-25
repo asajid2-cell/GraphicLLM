@@ -57,6 +57,7 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
 
     // Load model with new API
     llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = std::max(0, m_config.gpuLayers);
     m_model = llama_model_load_from_file(config.modelPath.c_str(), model_params);
 
     if (!m_model) {
@@ -68,7 +69,6 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
     ctx_params.n_ctx = config.contextSize;
     ctx_params.n_threads = config.threads;
     ctx_params.n_threads_batch = config.threads;
-    ctx_params.n_gpu_layers = std::max(0, m_config.gpuLayers);
 
     m_context = llama_init_from_model(static_cast<llama_model*>(m_model), ctx_params);
 

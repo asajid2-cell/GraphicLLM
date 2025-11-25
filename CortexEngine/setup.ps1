@@ -68,6 +68,7 @@ try {
 }
 
 # Check for Visual Studio / MSBuild
+$generator = "Visual Studio 17 2022"
 try {
     # Try to find vswhere (comes with VS 2017+)
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -75,8 +76,12 @@ try {
     if (Test-Path $vswhere) {
         $vsPath = & $vswhere -latest -property installationPath
         $vsVersion = & $vswhere -latest -property catalog_productDisplayVersion
+        $vsMajor = [int]($vsVersion -split '\.')[0]
         Write-Success "Visual Studio found: $vsVersion"
         Write-Info "Path: $vsPath"
+        if ($vsMajor -lt 17) {
+            $generator = "Visual Studio 16 2019"
+        }
     } else {
         Write-Error "Visual Studio 2022 not found!"
         Write-Info "Download from: https://visualstudio.microsoft.com/downloads/"
@@ -391,6 +396,7 @@ Write-Info "Running CMake configure..."
     -DGGML_CUDA=ON `
     -DCUDAToolkit_ROOT="$env:CUDAToolkit_ROOT" `
     -DCMAKE_CUDA_COMPILER="$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')" `
+    -G "$generator" `
     -A x64
 
 if ($LASTEXITCODE -ne 0) {

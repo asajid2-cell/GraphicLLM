@@ -31,7 +31,7 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 # Prefer CUDA acceleration when available
-set(LLAMA_CUBLAS ON CACHE BOOL "" FORCE)
+set(GGML_CUDA ON CACHE BOOL "" FORCE)
 add_subdirectory(vendor/llama.cpp)
 
 # Fix llama.cpp C++20 char8_t issues with MSVC

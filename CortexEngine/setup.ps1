@@ -93,7 +93,7 @@ function Test-CudaInstalled {
     try {
         $nvccVersion = & nvcc --version 2>&1 | Select-String "release" | Select-Object -First 1
         if ($nvccVersion) {
-            Write-Success "CUDA toolkit detected ($nvccVersion) - will enable LLAMA_CUBLAS"
+            Write-Success "CUDA toolkit detected ($nvccVersion) - will enable GPU acceleration"
             return $true
         }
     } catch { }
@@ -112,7 +112,7 @@ function Install-CudaIfMissing {
         Write-Info "Trying winget install (NVIDIA CUDA)..."
         try {
             & winget install -e --id NVIDIA.CUDA -h
-            if ($LASTEXITCODE -eq 0 -and Test-CudaInstalled) {
+            if ($LASTEXITCODE -eq 0 -and (Test-CudaInstalled)) {
                 $installed = $true
             }
         } catch { Write-Info "winget install failed: $_" }
@@ -123,7 +123,7 @@ function Install-CudaIfMissing {
         Write-Info "Trying Chocolatey install (cuda)..."
         try {
             & choco install cuda -y
-            if ($LASTEXITCODE -eq 0 -and Test-CudaInstalled) {
+            if ($LASTEXITCODE -eq 0 -and (Test-CudaInstalled)) {
                 $installed = $true
             }
         } catch { Write-Info "choco install failed: $_" }
@@ -348,7 +348,7 @@ Write-Info "Running CMake configure..."
 # Let CMake auto-detect the generator (works with any VS version including previews)
 & cmake .. `
     -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
-    -DLLAMA_CUBLAS=ON `
+    -DGGML_CUDA=ON `
     -A x64
 
 if ($LASTEXITCODE -ne 0) {

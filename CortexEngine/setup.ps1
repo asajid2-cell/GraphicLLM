@@ -385,7 +385,7 @@ Write-Info "Running CMake configure..."
 # Let CMake auto-detect the generator (works with any VS version including previews)
 & cmake .. `
     -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
-    -DGGML_CUDA=$(if ($cudaFound) {"ON"} else {"OFF"}) `
+    -DGGML_CUDA=ON `
     -A x64
 
 if ($LASTEXITCODE -ne 0) {

@@ -112,6 +112,7 @@ function Set-CudaEnv($cudaPath) {
     if ($env:PATH.Split(';') -notcontains $nvBin) {
         $env:PATH = "$nvBin;$env:PATH"
     }
+    $script:GlobalCudaBin = $nvBin
 }
 
 function Test-CudaInstalled {
@@ -172,6 +173,8 @@ if (-not (Test-CudaInstalled)) {
     exit 1
 }
 $cudaFound = $true
+$cudaPath = Find-CudaPath
+if ($cudaPath) { Set-CudaEnv $cudaPath }
 
 # ============================================================================
 # STEP 2: Initialize Git Submodules (llama.cpp)
@@ -386,6 +389,8 @@ Write-Info "Running CMake configure..."
 & cmake .. `
     -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
     -DGGML_CUDA=ON `
+    -DCUDAToolkit_ROOT="$env:CUDAToolkit_ROOT" `
+    -DCMAKE_CUDA_COMPILER="$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')" `
     -A x64
 
 if ($LASTEXITCODE -ne 0) {

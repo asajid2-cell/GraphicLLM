@@ -74,7 +74,12 @@ try {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 
     if (Test-Path $vswhere) {
-        $vsPath = & $vswhere -latest -property installationPath
+        # Prefer latest VS with Desktop C++ workload
+        $installJson = & $vswhere -latest -requires Microsoft.Component.MSBuild -property installationPath
+        if (-not $installJson) {
+            $installJson = & $vswhere -latest -property installationPath
+        }
+        $vsPath = $installJson
         $vsDisplay = & $vswhere -latest -property catalog_productDisplayVersion
         $vsVersion = & $vswhere -latest -property installationVersion
         $vsMajor = 0
@@ -104,6 +109,11 @@ try {
 if (-not $generator) {
     Write-Info "Visual Studio generator not detected; defaulting to Visual Studio 16 2019"
     $generator = "Visual Studio 16 2019"
+}
+
+$cmakeGeneratorArg = ""
+if ($generator) {
+    $cmakeGeneratorArg = "-G `"$generator`""
 }
 
 # Check for CUDA toolkit (for GPU LLM acceleration) and install if missing
@@ -404,13 +414,18 @@ Push-Location $buildDir
 
 Write-Info "Running CMake configure..."
 # Let CMake auto-detect the generator (works with any VS version including previews)
-& cmake .. `
-    -DCMAKE_TOOLCHAIN_FILE="$toolchainFile" `
-    -DGGML_CUDA=ON `
-    -DCUDAToolkit_ROOT="$env:CUDAToolkit_ROOT" `
-    -DCMAKE_CUDA_COMPILER="$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')" `
-    -G "$generator" `
-    -A x64
+$cmakeCmd = @(
+    "cmake", "..",
+    "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
+    "-DGGML_CUDA=ON",
+    "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT",
+    "-DCMAKE_CUDA_COMPILER=$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')",
+    "-A", "x64"
+)
+if ($cmakeGeneratorArg) {
+    $cmakeCmd += $cmakeGeneratorArg
+}
+& $cmakeCmd
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "CMake configuration failed!"

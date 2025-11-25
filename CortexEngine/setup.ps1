@@ -401,14 +401,14 @@ Push-Location $buildDir
 Write-Info "Running CMake configure..."
 # Let CMake auto-detect the generator (works with any VS version including previews)
 $cmakeCmd = @(
-    "cmake", "..",
+    "..",
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
     "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT",
     "-DCMAKE_CUDA_COMPILER=$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')",
     "-A", "x64"
 )
-& $cmakeCmd
+& cmake @cmakeCmd
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "CMake configuration failed!"

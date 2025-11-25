@@ -98,19 +98,6 @@ try {
         }
     }
 
-    # Resolve MSVC host compiler path (cl.exe) for CUDA host compiler hint
-    $vcToolsRoot = Join-Path $vsPath "VC\Tools\MSVC"
-    $script:VcHostCompiler = $null
-    if (Test-Path $vcToolsRoot) {
-        $vcVersions = Get-ChildItem $vcToolsRoot -Directory | Sort-Object Name -Descending
-        if ($vcVersions.Count -gt 0) {
-            $vcBin = Join-Path $vcVersions[0].FullName "bin\Hostx64\x64\cl.exe"
-            if (Test-Path $vcBin) {
-                $script:VcHostCompiler = $vcBin
-                Write-Info "Using MSVC host compiler for CUDA: $vcBin"
-            }
-        }
-    }
 } catch {
     Write-Error "Could not detect Visual Studio!"
     exit 1
@@ -136,6 +123,14 @@ function Find-CudaPath {
 function Set-CudaEnv($cudaPath) {
     if (-not $cudaPath) { return }
     $env:CUDAToolkit_ROOT = $cudaPath
+    $env:CUDA_PATH = $cudaPath
+    # Set versioned CUDA_PATH if we can derive it
+    $dirName = Split-Path $cudaPath -Leaf
+    if ($dirName -match "^v?(?<ver>\d+\.\d+)") {
+        $ver = $matches['ver']
+        $envName = "CUDA_PATH_V$($ver -replace '\.','_')"
+        Set-Item -Path "env:$envName" -Value $cudaPath
+    }
     $nvBin = Join-Path $cudaPath "bin"
     if ($env:PATH.Split(';') -notcontains $nvBin) {
         $env:PATH = "$nvBin;$env:PATH"
@@ -419,11 +414,11 @@ $cmakeCmd = @(
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
     "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT",
-    "-DCMAKE_CUDA_COMPILER=`"$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')`"",
     "-A", "x64"
 )
-if ($VcHostCompiler) {
-    $cmakeCmd += "-DCMAKE_CUDA_HOST_COMPILER=`"$VcHostCompiler`""
+if ($generator) {
+    $cmakeCmd += "-G"
+    $cmakeCmd += $generator
 }
 & cmake @cmakeCmd
 

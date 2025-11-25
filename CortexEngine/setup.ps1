@@ -219,9 +219,10 @@ $cudaPath = Find-CudaPath
 if ($cudaPath) { Set-CudaEnv $cudaPath }
 $cudaVersion = Split-Path $env:CUDAToolkit_ROOT -Leaf
 
-# If using VS2019 with CUDA 13.x (which only supports VS2022), switch to Ninja to avoid MSBuild CUDA integration issues
-if ($generator -like "Visual Studio 16*" -and $cudaVersion -match "13") {
-    Write-Info "CUDA $cudaVersion with VS2019 is unsupported; switching to Ninja generator"
+# If using CUDA 13.x (requires VS2022) or VS2019, switch to Ninja to avoid MSBuild CUDA toolset issues
+$cudaMajor = ($cudaVersion -replace '[^\d\.]', '').Split('.')[0]
+if (($cudaMajor -ge 13) -or ($generator -like "Visual Studio 16*")) {
+    Write-Info "Switching to Ninja generator to bypass MSBuild CUDA integration (CUDA $cudaVersion, generator=$generator)"
     Ensure-Ninja
     $generator = "Ninja"
 }
@@ -440,12 +441,15 @@ $cmakeCmd = @(
     "..",
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
-    "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT",
-    "-A", "x64"
+    "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT"
 )
 if ($generator) {
     $cmakeCmd += "-G"
     $cmakeCmd += $generator
+}
+if ($generator -ne "Ninja") {
+    $cmakeCmd += "-A"
+    $cmakeCmd += "x64"
 }
 & cmake @cmakeCmd
 

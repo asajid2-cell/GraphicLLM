@@ -124,6 +124,7 @@ function Set-CudaEnv($cudaPath) {
     if (-not $cudaPath) { return }
     $env:CUDAToolkit_ROOT = $cudaPath
     $env:CUDA_PATH = $cudaPath
+    $env:CudaToolkitDir = $cudaPath
     # Set versioned CUDA_PATH if we can derive it
     $dirName = Split-Path $cudaPath -Leaf
     if ($dirName -match "^v?(?<ver>\d+\.\d+)") {

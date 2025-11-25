@@ -2,11 +2,14 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace Cortex::Graphics {
     class DX12Texture;
+    struct MeshBuffers;
+    struct MaterialGPUState;
 }
 
 namespace Cortex::Scene {
@@ -39,15 +42,28 @@ struct MeshData {
     std::vector<glm::vec2> texCoords;
     std::vector<uint32_t> indices;
 
-    // GPU buffer handles (to be filled by renderer)
-    void* vertexBuffer = nullptr;  // ID3D12Resource*
-    void* indexBuffer = nullptr;   // ID3D12Resource*
+    // GPU buffer handles (renderer-owned)
+    std::shared_ptr<Cortex::Graphics::MeshBuffers> gpuBuffers;
+
+    void ResetGPUResources() {
+        gpuBuffers.reset();
+    }
 };
 
 // Renderable Component - What to draw
 struct RenderableComponent {
     std::shared_ptr<MeshData> mesh;
-    std::shared_ptr<Graphics::DX12Texture> texture;
+    struct MaterialTextures {
+        std::shared_ptr<Cortex::Graphics::DX12Texture> albedo;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> normal;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> metallic;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> roughness;
+        std::string albedoPath;
+        std::string normalPath;
+        std::string metallicPath;
+        std::string roughnessPath;
+        std::shared_ptr<Cortex::Graphics::MaterialGPUState> gpuState;
+    } textures;
 
     // Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);

@@ -108,10 +108,10 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.RegisterSpace = 0;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 3: Descriptor table for texture (t0)
+    // Parameter 3: Descriptor table for textures (t0 - t3)
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 1;
+    descriptorRange.NumDescriptors = 4;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -123,12 +123,12 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
 
     // Static sampler (s0)
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
     samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     samplerDesc.MipLODBias = 0.0f;
-    samplerDesc.MaxAnisotropy = 16;
+    samplerDesc.MaxAnisotropy = 8;
     samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
     samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
     samplerDesc.MinLOD = 0.0f;

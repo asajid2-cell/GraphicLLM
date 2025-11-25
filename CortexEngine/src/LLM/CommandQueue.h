@@ -3,9 +3,11 @@
 #include "SceneCommands.h"
 #include "Scene/ECS_Registry.h"
 #include "Graphics/Renderer.h"
+#include "SceneLookup.h"
 #include <queue>
 #include <mutex>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 namespace Cortex::LLM {
@@ -38,9 +40,25 @@ public:
     // Clear all pending commands
     void Clear();
 
+    // Drain status messages generated during execution
+    std::vector<CommandStatus> ConsumeStatus();
+
+    // Get the last spawned entity name (if still valid)
+    std::optional<std::string> GetLastSpawnedName(Scene::ECS_Registry* registry) const;
+
+    // Rebuild lookup cache from registry (call after scene boot)
+    void RefreshLookup(Scene::ECS_Registry* registry);
+
+    // Build a compact scene summary for prompt conditioning
+    std::string BuildSceneSummary(Scene::ECS_Registry* registry, size_t maxChars = 1200) const;
+
 private:
     std::queue<std::shared_ptr<SceneCommand>> m_commands;
     mutable std::mutex m_mutex;
+    std::queue<CommandStatus> m_status;
+    mutable std::mutex m_statusMutex;
+    SceneLookup m_lookup;
+    uint32_t m_spawnIndex = 0;
 
     // Execute a single command
     void ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
@@ -54,6 +72,8 @@ private:
 
     // Shared mesh cache so repeated shapes reuse GPU buffers
     std::unordered_map<AddEntityCommand::EntityType, std::shared_ptr<Scene::MeshData>> m_meshCache;
+
+    void PushStatus(bool success, const std::string& message);
 };
 
 } // namespace Cortex::LLM

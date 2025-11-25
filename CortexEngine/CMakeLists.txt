@@ -53,6 +53,7 @@ set(CORTEX_SOURCES
     src/Graphics/RHI/DX12CommandQueue.cpp
     src/Graphics/RHI/DescriptorHeap.cpp
     src/Graphics/RHI/DX12Pipeline.cpp
+    src/Graphics/TextureLoader.cpp
     src/Graphics/Renderer.cpp
 
     src/Scene/ECS_Registry.cpp
@@ -65,6 +66,7 @@ set(CORTEX_SOURCES
     src/LLM/LLMService.cpp
     src/LLM/SceneCommands.cpp
     src/LLM/CommandQueue.cpp
+    src/LLM/SceneLookup.cpp
 
     # UI helpers
     src/UI/TextPrompt.cpp
@@ -81,6 +83,8 @@ set(CORTEX_HEADERS
     src/Graphics/RHI/DescriptorHeap.h
     src/Graphics/RHI/DX12Pipeline.h
     src/Graphics/RHI/d3dx12.h
+    src/Graphics/MaterialState.h
+    src/Graphics/TextureLoader.h
     src/Graphics/Renderer.h
     src/Graphics/ShaderTypes.h
 
@@ -95,6 +99,7 @@ set(CORTEX_HEADERS
     src/LLM/LLMService.h
     src/LLM/SceneCommands.h
     src/LLM/CommandQueue.h
+    src/LLM/SceneLookup.h
     src/LLM/Prompts.h
 
     # UI helpers

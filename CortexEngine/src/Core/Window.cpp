@@ -45,6 +45,8 @@ Result<void> Window::Initialize(const WindowConfig& config, Graphics::DX12Device
 }
 
 Result<void> Window::InitializeSwapChain(Graphics::DX12Device* device, Graphics::DX12CommandQueue* commandQueue) {
+    m_device = device;
+    m_commandQueue = commandQueue;
     return CreateSwapChain(device, commandQueue);
 }
 
@@ -192,11 +194,38 @@ void Window::OnResize(uint32_t width, uint32_t height) {
         return;
     }
 
+    if (!m_device || !m_commandQueue || !m_swapChain) {
+        return;
+    }
+
+    // Flush GPU work before resizing resources
+    m_commandQueue->Flush();
+
+    ReleaseRenderTargetViews();
+    HRESULT hr = m_swapChain->ResizeBuffers(
+        BUFFER_COUNT,
+        width,
+        height,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        m_device->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0
+    );
+    if (FAILED(hr)) {
+        spdlog::error("ResizeBuffers failed: 0x{:08X}", static_cast<unsigned int>(hr));
+        return;
+    }
+
+    m_width = width;
+    m_height = height;
+    m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+    auto rtvResult = CreateRenderTargetViews(m_device);
+    if (rtvResult.IsErr()) {
+        spdlog::error("Failed to recreate RTVs after resize: {}", rtvResult.Error());
+    }
+
     m_width = width;
     m_height = height;
 
-    // TODO: Resize swap chain buffers
-    // This requires flushing GPU work and recreating RTVs
     spdlog::info("Window resized: {}x{}", m_width, m_height);
 }
 

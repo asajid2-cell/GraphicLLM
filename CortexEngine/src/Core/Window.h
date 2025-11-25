@@ -70,6 +70,8 @@ private:
     uint32_t m_height = 0;
     bool m_vsync = true;
     HWND m_hwnd = nullptr;
+    Graphics::DX12Device* m_device = nullptr;
+    Graphics::DX12CommandQueue* m_commandQueue = nullptr;
 
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Resource> m_backBuffers[BUFFER_COUNT];

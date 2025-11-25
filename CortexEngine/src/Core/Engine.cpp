@@ -10,6 +10,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <algorithm>
+#include <cmath>
+#include <optional>
 
 namespace Cortex {
 
@@ -57,6 +59,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     if (config.enableLLM) {
         m_llmService = std::make_unique<LLM::LLMService>();
         m_commandQueue = std::make_unique<LLM::CommandQueue>();
+        m_commandQueue->RefreshLookup(m_registry.get());
 
         auto llmResult = m_llmService->Initialize(config.llmConfig);
         if (llmResult.IsErr()) {
@@ -215,6 +218,16 @@ void Engine::Update(float deltaTime) {
     if (m_commandQueue && m_commandQueue->HasPending()) {
         m_commandQueue->ExecuteAll(m_registry.get(), m_renderer.get());
     }
+    if (m_commandQueue) {
+        auto statuses = m_commandQueue->ConsumeStatus();
+        for (const auto& s : statuses) {
+            if (s.success) {
+                spdlog::info("[Architect] {}", s.message);
+            } else {
+                spdlog::warn("[Architect] {}", s.message);
+            }
+        }
+    }
 
     // Update all rotation components (spinning cube)
     auto view = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
@@ -241,27 +254,72 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
     std::string lower = text;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
 
-    const bool wantsAdd = lower.find("add") != std::string::npos ||
-                          lower.find("spawn") != std::string::npos ||
-                          lower.find("create") != std::string::npos ||
-                          lower.find("place") != std::string::npos ||
-                          lower.find("drop") != std::string::npos;
-    const bool wantsColorChange = lower.find("color") != std::string::npos ||
-                                  lower.find("make it") != std::string::npos ||
-                                  lower.find("turn it") != std::string::npos ||
-                                  lower.find("turn") != std::string::npos;
+    auto contains = [&lower](const std::string& token) {
+        return lower.find(token) != std::string::npos;
+    };
+
+    const bool wantsAdd = contains("add") || contains("spawn") || contains("create") || contains("place") || contains("drop");
+    const bool wantsColorChange = contains("color") || contains("make it") || contains("turn it") || contains("turn") || contains("paint");
+    const bool refersToIt = contains(" it") || lower.rfind("it", 0) == 0 || contains("that") || contains("them");
+    auto lastName = m_commandQueue ? m_commandQueue->GetLastSpawnedName(m_registry.get()) : std::nullopt;
+
+    auto typeFromText = [&]() {
+        using Type = LLM::AddEntityCommand::EntityType;
+        if (contains("sphere")) return Type::Sphere;
+        if (contains("plane")) return Type::Plane;
+        if (contains("cylinder")) return Type::Cylinder;
+        if (contains("pyramid")) return Type::Pyramid;
+        if (contains("cone")) return Type::Cone;
+        if (contains("torus")) return Type::Torus;
+        return Type::Cube;
+    };
+    auto typeToString = [](LLM::AddEntityCommand::EntityType t) {
+        switch (t) {
+            case LLM::AddEntityCommand::EntityType::Sphere: return "Sphere";
+            case LLM::AddEntityCommand::EntityType::Plane: return "Plane";
+            case LLM::AddEntityCommand::EntityType::Cylinder: return "Cylinder";
+            case LLM::AddEntityCommand::EntityType::Pyramid: return "Pyramid";
+            case LLM::AddEntityCommand::EntityType::Cone: return "Cone";
+            case LLM::AddEntityCommand::EntityType::Torus: return "Torus";
+            default: return "Cube";
+        }
+    };
+
+    auto colorFromText = [&]() -> std::optional<glm::vec4> {
+        if (contains("red")) return glm::vec4(1,0,0,1);
+        if (contains("green")) return glm::vec4(0,1,0,1);
+        if (contains("blue")) return glm::vec4(0,0,1,1);
+        if (contains("orange")) return glm::vec4(1.0f, 0.5f, 0.1f, 1);
+        if (contains("purple")) return glm::vec4(0.5f, 0.2f, 0.8f, 1);
+        if (contains("yellow")) return glm::vec4(1.0f, 0.9f, 0.2f, 1);
+        if (contains("white")) return glm::vec4(1,1,1,1);
+        if (contains("black")) return glm::vec4(0.1f,0.1f,0.1f,1);
+        return std::nullopt;
+    };
+
+    auto parseCount = [&]() -> int {
+        // Cap to avoid flooding
+        const int maxCount = 5;
+        for (int digit = 5; digit >= 2; --digit) {
+            if (lower.find(std::to_string(digit)) != std::string::npos) return std::min(digit, maxCount);
+        }
+        if (contains("five")) return 5;
+        if (contains("four")) return 4;
+        if (contains("three")) return 3;
+        if (contains("pair") || contains("two") || contains("couple")) return 2;
+        return 1;
+    };
 
     // If the user is not clearly asking to add, prefer to modify the existing showcase cube
     if (!wantsAdd && wantsColorChange) {
         auto cmd = std::make_shared<LLM::ModifyMaterialCommand>();
-        cmd->targetName = "SpinningCube";
+        if (refersToIt) {
+            cmd->targetName = lastName.value_or("it");
+        } else {
+            cmd->targetName = "SpinningCube";
+        }
         cmd->setColor = true;
-        if (lower.find("red") != std::string::npos) cmd->color = {1,0,0,1};
-        else if (lower.find("green") != std::string::npos) cmd->color = {0,1,0,1};
-        else if (lower.find("blue") != std::string::npos) cmd->color = {0,0,1,1};
-        else if (lower.find("orange") != std::string::npos) cmd->color = {1.0f, 0.5f, 0.1f, 1};
-        else if (lower.find("purple") != std::string::npos) cmd->color = {0.5f, 0.2f, 0.8f, 1};
-        else if (lower.find("yellow") != std::string::npos) cmd->color = {1.0f, 0.9f, 0.2f, 1};
+        if (auto color = colorFromText()) cmd->color = *color;
         else cmd->color = {0.8f, 0.8f, 0.8f, 1};
         out.push_back(cmd);
         return out;
@@ -272,19 +330,25 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         return out;
     }
 
-    auto cmd = std::make_shared<LLM::AddEntityCommand>();
-    cmd->name = "LLM_Object_" + std::to_string(++m_heuristicCounter);
+    const int count = parseCount();
+    const float angleStep = 2.39996323f;
+    const float radius = 1.6f;
+    auto type = typeFromText();
+    std::string typeName = typeToString(type);
+    auto chosenColor = colorFromText();
+    glm::vec3 basePos{0.0f, 1.0f, -3.0f};
 
-    if (lower.find("sphere") != std::string::npos) cmd->entityType = LLM::AddEntityCommand::EntityType::Sphere;
-    else if (lower.find("plane") != std::string::npos) cmd->entityType = LLM::AddEntityCommand::EntityType::Plane;
-    else cmd->entityType = LLM::AddEntityCommand::EntityType::Cube;
-
-    if (lower.find("red") != std::string::npos) cmd->color = {1,0,0,1};
-    else if (lower.find("green") != std::string::npos) cmd->color = {0,1,0,1};
-    else if (lower.find("blue") != std::string::npos) cmd->color = {0,0,1,1};
-
-    cmd->autoPlace = true;
-    out.push_back(cmd);
+    for (int i = 0; i < count; ++i) {
+        auto cmd = std::make_shared<LLM::AddEntityCommand>();
+        cmd->entityType = type;
+        cmd->name = "LLM_" + typeName + "_" + std::to_string(++m_heuristicCounter);
+        float angle = (static_cast<float>(i) + 1.0f) * angleStep;
+        glm::vec3 offset = glm::vec3(std::cos(angle) * radius, 0.0f, std::sin(angle) * radius);
+        cmd->position = basePos + offset;
+        cmd->autoPlace = true;
+        if (chosenColor) cmd->color = *chosenColor;
+        out.push_back(cmd);
+    }
     return out;
 }
 
@@ -307,7 +371,10 @@ void Engine::InitializeScene() {
     // Set up renderable component
     auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(cubeEntity);
     renderable.mesh = cubeMesh;
-    renderable.texture = m_renderer->GetPlaceholderTexture();
+    renderable.textures.albedo = m_renderer->GetPlaceholderTexture();
+    renderable.textures.normal = m_renderer->GetPlaceholderNormal();
+    renderable.textures.metallic = m_renderer->GetPlaceholderMetallic();
+    renderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
     renderable.albedoColor = glm::vec4(0.8f, 0.3f, 0.2f, 1.0f);  // Orange-red color
     renderable.roughness = 0.6f;
     renderable.metallic = 0.1f;
@@ -332,7 +399,10 @@ void Engine::InitializeScene() {
         entt::entity e = m_registry->CreateCube(extraPositions[i], "InstancedCube" + std::to_string(i));
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
         r.mesh = cubeMesh;
-        r.texture = m_renderer->GetPlaceholderTexture();
+        r.textures.albedo = m_renderer->GetPlaceholderTexture();
+        r.textures.normal = m_renderer->GetPlaceholderNormal();
+        r.textures.metallic = m_renderer->GetPlaceholderMetallic();
+        r.textures.roughness = m_renderer->GetPlaceholderRoughness();
         r.albedoColor = extraColors[i % extraColors.size()];
         r.roughness = 0.5f;
         r.metallic = 0.2f;
@@ -368,7 +438,23 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
     }
 
     // Submit to The Architect
-    m_llmService->SubmitPrompt(command, [this, command](const LLM::LLMResponse& response) {
+    std::string sceneSummary;
+    bool hasShowcase = false;
+    if (m_commandQueue) {
+        sceneSummary = m_commandQueue->BuildSceneSummary(m_registry.get());
+    }
+    if (m_registry) {
+        auto view = m_registry->View<Scene::TagComponent>();
+        for (auto entity : view) {
+            const auto& tag = view.get<Scene::TagComponent>(entity);
+            if (tag.tag == "SpinningCube") {
+                hasShowcase = true;
+                break;
+            }
+        }
+    }
+
+    m_llmService->SubmitPrompt(command, sceneSummary, hasShowcase, [this, command](const LLM::LLMResponse& response) {
         if (!response.success) {
             spdlog::error("LLM inference failed: {}", response.text);
             return;

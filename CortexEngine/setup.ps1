@@ -232,7 +232,7 @@ $cmakeArgs = @(
     "-G", "Ninja",
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
-    "-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler",
+    "-DCMAKE_CUDA_FLAGS=--use-local-env -allow-unsupported-compiler",
     "-DCMAKE_BUILD_TYPE=$BuildConfig",
     "-DCMAKE_MAKE_PROGRAM=$ninjaExe"
 )

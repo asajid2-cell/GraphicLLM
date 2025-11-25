@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
         }
 
         config.llmConfig.modelPath = modelPath.string();
-        config.llmConfig.contextSize = 4096;  // Llama 3.2 supports larger context
+        config.llmConfig.contextSize = 8192;  // Larger context for richer scene summaries
         config.llmConfig.threads = 4;
         config.llmConfig.temperature = 0.1f; // deterministic JSON commands
         config.llmConfig.maxTokens = 128;    // short, avoids runaway loops

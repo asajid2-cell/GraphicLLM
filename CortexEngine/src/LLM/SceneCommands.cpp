@@ -1,10 +1,56 @@
 #include "SceneCommands.h"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 using json = nlohmann::json;
 
 namespace Cortex::LLM {
+namespace {
+constexpr float kWorldClamp = 50.0f;
+
+float ReadNumber(const json& value, const char* fieldName, float fallback = 0.0f) {
+    if (!value.is_number_float() && !value.is_number_integer()) {
+        spdlog::warn("Command field '{}' is not numeric, using fallback {}", fieldName, fallback);
+        return fallback;
+    }
+    float v = value.get<float>();
+    if (!std::isfinite(v)) {
+        spdlog::warn("Command field '{}' is not finite, using fallback {}", fieldName, fallback);
+        return fallback;
+    }
+    return std::clamp(v, -kWorldClamp, kWorldClamp);
+}
+
+bool ReadVec3(const json& arr, const char* fieldName, glm::vec3& out) {
+    if (!arr.is_array() || arr.size() < 3) {
+        spdlog::warn("Command field '{}' expects 3 numbers", fieldName);
+        return false;
+    }
+    out = glm::vec3(
+        ReadNumber(arr[0], fieldName),
+        ReadNumber(arr[1], fieldName),
+        ReadNumber(arr[2], fieldName)
+    );
+    return true;
+}
+
+bool ReadVec4(const json& arr, const char* fieldName, glm::vec4& out) {
+    if (!arr.is_array() || arr.size() < 4) {
+        spdlog::warn("Command field '{}' expects 4 numbers", fieldName);
+        return false;
+    }
+    out = glm::vec4(
+        ReadNumber(arr[0], fieldName),
+        ReadNumber(arr[1], fieldName),
+        ReadNumber(arr[2], fieldName),
+        ReadNumber(arr[3], fieldName, 1.0f)
+    );
+    return true;
+}
+} // namespace
 
 std::string AddEntityCommand::ToString() const {
     return "AddEntity: " + name + " at (" +
@@ -56,82 +102,74 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     if (entityType == "cube") cmd->entityType = AddEntityCommand::EntityType::Cube;
                     else if (entityType == "sphere") cmd->entityType = AddEntityCommand::EntityType::Sphere;
                     else if (entityType == "plane") cmd->entityType = AddEntityCommand::EntityType::Plane;
+                    else if (entityType == "cylinder") cmd->entityType = AddEntityCommand::EntityType::Cylinder;
+                    else if (entityType == "pyramid") cmd->entityType = AddEntityCommand::EntityType::Pyramid;
+                    else if (entityType == "cone") cmd->entityType = AddEntityCommand::EntityType::Cone;
+                    else if (entityType == "torus") cmd->entityType = AddEntityCommand::EntityType::Torus;
                 }
 
-                if (cmdJson.contains("name")) cmd->name = cmdJson["name"];
-                if (cmdJson.contains("position") && cmdJson["position"].is_array() && cmdJson["position"].size() >= 3) {
-                    cmd->position = glm::vec3(
-                        cmdJson["position"][0].get<float>(),
-                        cmdJson["position"][1].get<float>(),
-                        cmdJson["position"][2].get<float>()
-                    );
+                if (cmdJson.contains("name") && cmdJson["name"].is_string()) cmd->name = cmdJson["name"];
+                if (cmdJson.contains("position")) {
+                    ReadVec3(cmdJson["position"], "position", cmd->position);
                 }
-                if (cmdJson.contains("scale") && cmdJson["scale"].is_array() && cmdJson["scale"].size() >= 3) {
-                    cmd->scale = glm::vec3(
-                        cmdJson["scale"][0].get<float>(),
-                        cmdJson["scale"][1].get<float>(),
-                        cmdJson["scale"][2].get<float>()
-                    );
+                if (cmdJson.contains("scale")) {
+                    ReadVec3(cmdJson["scale"], "scale", cmd->scale);
                 }
-                if (cmdJson.contains("color") && cmdJson["color"].is_array() && cmdJson["color"].size() >= 4) {
-                    cmd->color = glm::vec4(
-                        cmdJson["color"][0].get<float>(),
-                        cmdJson["color"][1].get<float>(),
-                        cmdJson["color"][2].get<float>(),
-                        cmdJson["color"][3].get<float>()
-                    );
+                if (cmdJson.contains("color")) {
+                    ReadVec4(cmdJson["color"], "color", cmd->color);
+                }
+                if (cmdJson.contains("metallic")) {
+                    cmd->metallic = std::clamp(ReadNumber(cmdJson["metallic"], "metallic"), 0.0f, 1.0f);
+                }
+                if (cmdJson.contains("roughness")) {
+                    cmd->roughness = std::clamp(ReadNumber(cmdJson["roughness"], "roughness"), 0.0f, 1.0f);
+                }
+                if (cmdJson.contains("ao")) {
+                    cmd->ao = std::clamp(ReadNumber(cmdJson["ao"], "ao"), 0.0f, 1.0f);
                 }
 
                 commands.push_back(cmd);
             }
             else if (type == "remove_entity") {
                 auto cmd = std::make_shared<RemoveEntityCommand>();
-                if (cmdJson.contains("target")) cmd->targetName = cmdJson["target"];
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
+                    cmd->targetName = cmdJson["target"];
+                } else {
+                    spdlog::warn("remove_entity missing string 'target' field, skipping");
+                    continue;
+                }
                 commands.push_back(cmd);
             }
             else if (type == "modify_transform") {
                 auto cmd = std::make_shared<ModifyTransformCommand>();
-                if (cmdJson.contains("target")) cmd->targetName = cmdJson["target"];
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) cmd->targetName = cmdJson["target"];
 
-                if (cmdJson.contains("position") && cmdJson["position"].is_array() && cmdJson["position"].size() >= 3) {
-                    cmd->setPosition = true;
-                    cmd->position = glm::vec3(
-                        cmdJson["position"][0].get<float>(),
-                        cmdJson["position"][1].get<float>(),
-                        cmdJson["position"][2].get<float>()
-                    );
+                if (cmdJson.contains("position")) {
+                    cmd->setPosition = ReadVec3(cmdJson["position"], "position", cmd->position);
                 }
-                if (cmdJson.contains("scale") && cmdJson["scale"].is_array() && cmdJson["scale"].size() >= 3) {
-                    cmd->setScale = true;
-                    cmd->scale = glm::vec3(
-                        cmdJson["scale"][0].get<float>(),
-                        cmdJson["scale"][1].get<float>(),
-                        cmdJson["scale"][2].get<float>()
-                    );
+                if (cmdJson.contains("rotation")) {
+                    cmd->setRotation = ReadVec3(cmdJson["rotation"], "rotation", cmd->rotation);
+                }
+                if (cmdJson.contains("scale")) {
+                    cmd->setScale = ReadVec3(cmdJson["scale"], "scale", cmd->scale);
                 }
 
                 commands.push_back(cmd);
             }
             else if (type == "modify_material") {
                 auto cmd = std::make_shared<ModifyMaterialCommand>();
-                if (cmdJson.contains("target")) cmd->targetName = cmdJson["target"];
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) cmd->targetName = cmdJson["target"];
 
-                if (cmdJson.contains("color") && cmdJson["color"].is_array() && cmdJson["color"].size() >= 4) {
-                    cmd->setColor = true;
-                    cmd->color = glm::vec4(
-                        cmdJson["color"][0].get<float>(),
-                        cmdJson["color"][1].get<float>(),
-                        cmdJson["color"][2].get<float>(),
-                        cmdJson["color"][3].get<float>()
-                    );
+                if (cmdJson.contains("color")) {
+                    cmd->setColor = ReadVec4(cmdJson["color"], "color", cmd->color);
                 }
                 if (cmdJson.contains("metallic")) {
                     cmd->setMetallic = true;
-                    cmd->metallic = cmdJson["metallic"].get<float>();
+                    cmd->metallic = std::clamp(ReadNumber(cmdJson["metallic"], "metallic"), 0.0f, 1.0f);
                 }
                 if (cmdJson.contains("roughness")) {
                     cmd->setRoughness = true;
-                    cmd->roughness = cmdJson["roughness"].get<float>();
+                    cmd->roughness = std::clamp(ReadNumber(cmdJson["roughness"], "roughness"), 0.0f, 1.0f);
                 }
 
                 commands.push_back(cmd);
@@ -139,17 +177,12 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             else if (type == "modify_camera") {
                 auto cmd = std::make_shared<ModifyCameraCommand>();
 
-                if (cmdJson.contains("position") && cmdJson["position"].is_array() && cmdJson["position"].size() >= 3) {
-                    cmd->setPosition = true;
-                    cmd->position = glm::vec3(
-                        cmdJson["position"][0].get<float>(),
-                        cmdJson["position"][1].get<float>(),
-                        cmdJson["position"][2].get<float>()
-                    );
+                if (cmdJson.contains("position")) {
+                    cmd->setPosition = ReadVec3(cmdJson["position"], "position", cmd->position);
                 }
                 if (cmdJson.contains("fov")) {
                     cmd->setFOV = true;
-                    cmd->fov = cmdJson["fov"].get<float>();
+                    cmd->fov = ReadNumber(cmdJson["fov"], "fov", 60.0f);
                 }
 
                 commands.push_back(cmd);

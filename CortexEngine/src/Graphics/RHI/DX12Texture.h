@@ -2,7 +2,8 @@
 
 #include <d3d12.h>
 #include <wrl/client.h>
-#include <cstdint>
+#include <vector>
+#include <cstdint> // For uint8_t
 #include <string>
 #include "DescriptorHeap.h"
 #include "Utils/Result.h"
@@ -46,18 +47,30 @@ public:
     // Create texture from raw pixel data (RGBA8)
     Result<void> InitializeFromData(
         ID3D12Device* device,
-        ID3D12CommandQueue* commandQueue,
+        ID3D12CommandQueue* copyQueue,
+        ID3D12CommandQueue* graphicsQueue,
         const uint8_t* data,
         uint32_t width,
         uint32_t height,
         DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM,
         const std::string& debugName = ""
     );
+    Result<void> InitializeFromMipChain(
+        ID3D12Device* device,
+        ID3D12CommandQueue* copyQueue,
+        ID3D12CommandQueue* graphicsQueue,
+        const std::vector<std::vector<uint8_t>>& mipData,
+        uint32_t width,
+        uint32_t height,
+        DXGI_FORMAT format,
+        const std::string& debugName = ""
+    );
 
     // Create a "placeholder" texture (solid color)
     static Result<DX12Texture> CreatePlaceholder(
         ID3D12Device* device,
-        ID3D12CommandQueue* commandQueue,
+        ID3D12CommandQueue* copyQueue,
+        ID3D12CommandQueue* graphicsQueue,
         uint32_t width,
         uint32_t height,
         const float color[4] = nullptr  // nullptr = white

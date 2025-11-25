@@ -46,12 +46,49 @@ std::string BuildHeuristicJson(const std::string& prompt) {
     };
 
     struct Color { float r,g,b,a; };
+    // Expanded color palette
     std::map<std::string, Color> colors = {
-        {"red",{1,0,0,1}}, {"blue",{0,0,1,1}}, {"green",{0,1,0,1}}, {"yellow",{1,0.9f,0.2f,1}},
-        {"orange",{1,0.5f,0.1f,1}}, {"purple",{0.6f,0.2f,0.9f,1}}, {"pink",{1,0.4f,0.7f,1}},
-        {"white",{1,1,1,1}}, {"black",{0,0,0,1}}, {"gray",{0.5f,0.5f,0.5f,1}}, {"grey",{0.5f,0.5f,0.5f,1}}
+        // Primary colors
+        {"red",{1,0,0,1}}, {"blue",{0,0,1,1}}, {"green",{0,1,0,1}},
+        {"yellow",{1,1,0,1}}, {"cyan",{0,1,1,1}}, {"magenta",{1,0,1,1}},
+        // Secondary colors
+        {"orange",{1,0.5f,0,1}}, {"purple",{0.5f,0,0.5f,1}}, {"pink",{1,0.75f,0.8f,1}},
+        {"lime",{0.5f,1,0,1}}, {"teal",{0,0.5f,0.5f,1}}, {"violet",{0.93f,0.51f,0.93f,1}},
+        // Tertiary colors
+        {"brown",{0.6f,0.3f,0.1f,1}}, {"tan",{0.82f,0.71f,0.55f,1}}, {"beige",{0.96f,0.96f,0.86f,1}},
+        {"maroon",{0.5f,0,0,1}}, {"olive",{0.5f,0.5f,0,1}}, {"navy",{0,0,0.5f,1}},
+        {"aqua",{0,1,1,1}}, {"turquoise",{0.25f,0.88f,0.82f,1}}, {"gold",{1,0.84f,0,1}},
+        {"silver",{0.75f,0.75f,0.75f,1}}, {"bronze",{0.8f,0.5f,0.2f,1}},
+        // Grayscale
+        {"white",{1,1,1,1}}, {"black",{0.1f,0.1f,0.1f,1}}, {"gray",{0.5f,0.5f,0.5f,1}},
+        {"grey",{0.5f,0.5f,0.5f,1}}, {"lightgray",{0.83f,0.83f,0.83f,1}}, {"darkgray",{0.33f,0.33f,0.33f,1}}
     };
 
+    // Check for material keywords first
+    struct MaterialPreset { float metallic; float roughness; };
+    std::map<std::string, MaterialPreset> materials = {
+        {"shiny", {1.0f, 0.1f}},
+        {"glossy", {1.0f, 0.15f}},
+        {"metallic", {1.0f, 0.2f}},
+        {"mirror", {1.0f, 0.0f}},
+        {"reflective", {1.0f, 0.05f}},
+        {"matte", {0.0f, 0.9f}},
+        {"dull", {0.0f, 1.0f}},
+        {"rough", {0.0f, 0.85f}},
+        {"soft", {0.0f, 0.4f}},
+        {"smooth", {0.0f, 0.3f}},
+    };
+
+    for (const auto& [name, mat] : materials) {
+        if (contains(name)) {
+            std::ostringstream ss;
+            ss << R"({"commands":[{"type":"modify_material","target":"SpinningCube","metallic":)"
+               << mat.metallic << R"(,"roughness":)" << mat.roughness << R"(}]})";
+            return ss.str();
+        }
+    }
+
+    // Check for color modification
     for (const auto& [name, c] : colors) {
         if (contains(name)) {
             std::ostringstream ss;
@@ -61,8 +98,38 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         }
     }
 
-    if (contains("sphere")) {
-        return R"({"commands":[{"type":"add_entity","entity_type":"sphere","name":"LLM_Sphere_1","position":[0,1,0],"scale":[1,1,1],"color":[0.7,0.7,0.7,1]}]})";
+    // Shape detection with smart positioning and materials
+    struct ShapeInfo {
+        std::string type;
+        float x, y, z;
+        float scale;
+        Color color;
+        float metallic;
+        float roughness;
+    };
+
+    std::map<std::string, ShapeInfo> shapes = {
+        {"sphere", {"sphere", 2.5f, 1.0f, 0.0f, 1.0f, {0.7f,0.7f,0.7f,1}, 1.0f, 0.1f}},  // Shiny sphere
+        {"cube", {"cube", -2.5f, 1.0f, 0.0f, 1.0f, {0.8f,0.6f,0.4f,1}, 0.0f, 0.5f}},     // Smooth cube
+        {"plane", {"plane", 0.0f, -0.5f, 0.0f, 5.0f, {0.3f,0.3f,0.3f,1}, 0.0f, 0.9f}},   // Matte plane
+        {"cylinder", {"cylinder", 0.0f, 1.0f, -3.0f, 1.0f, {0.5f,0.8f,0.9f,1}, 1.0f, 0.2f}}, // Metallic cylinder
+        {"pyramid", {"pyramid", 3.0f, 0.5f, 0.0f, 1.0f, {0.9f,0.7f,0.3f,1}, 0.0f, 0.6f}},    // Rough pyramid
+        {"cone", {"cone", -3.0f, 0.5f, -2.0f, 1.0f, {0.9f,0.5f,0.2f,1}, 0.0f, 0.7f}},        // Rough cone
+        {"torus", {"torus", 0.0f, 1.0f, 3.0f, 1.0f, {0.8f,0.3f,0.8f,1}, 1.0f, 0.15f}},       // Glossy torus
+    };
+
+    for (const auto& [name, info] : shapes) {
+        if (contains(name)) {
+            std::ostringstream ss;
+            ss << R"({"commands":[{"type":"add_entity","entity_type":")" << info.type
+               << R"(","name":"LLM_)" << info.type << R"(_1","position":[)"
+               << info.x << "," << info.y << "," << info.z << R"(],"scale":[)"
+               << info.scale << "," << info.scale << "," << info.scale << R"(],"color":[)"
+               << info.color.r << "," << info.color.g << "," << info.color.b << "," << info.color.a
+               << R"(],"metallic":)" << info.metallic << R"(,"roughness":)" << info.roughness
+               << R"(}]})";
+            return ss.str();
+        }
     }
 
     return R"({"commands":[]})";
@@ -155,14 +222,14 @@ void LLMService::Shutdown() {
     spdlog::info("LLM Service shut down");
 }
 
-void LLMService::SubmitPrompt(const std::string& prompt, LLMCallback callback) {
+void LLMService::SubmitPrompt(const std::string& prompt, const std::string& sceneSummary, bool hasShowcase, LLMCallback callback) {
     if (m_shuttingDown.load()) {
         spdlog::warn("LLM is shutting down, request rejected");
         return;
     }
 
     // Build the full prompt with system instructions
-    std::string fullPrompt = Prompts::BuildPrompt(prompt);
+    std::string fullPrompt = Prompts::BuildPrompt(prompt, sceneSummary, hasShowcase);
 
     spdlog::debug("LLM Prompt:\n{}", fullPrompt);
 

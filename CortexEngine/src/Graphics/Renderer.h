@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <array>
 #include <unordered_map>
 #include "RHI/DX12Device.h"
 #include "RHI/DX12CommandQueue.h"
@@ -12,6 +13,7 @@
 #endif
 #include "ShaderTypes.h"
 #include "Utils/Result.h"
+#include "../Scene/Components.h"
 
 namespace Cortex {
     class Window;
@@ -22,6 +24,11 @@ namespace Cortex {
 }
 
 namespace Cortex::Graphics {
+
+struct MeshBuffers {
+    ComPtr<ID3D12Resource> vertexBuffer;
+    ComPtr<ID3D12Resource> indexBuffer;
+};
 
 // Constant buffer wrapper
 template<typename T>
@@ -112,7 +119,13 @@ public:
     Result<void> UploadMesh(std::shared_ptr<Scene::MeshData> mesh);
 
     // Get default placeholder texture
-    std::shared_ptr<DX12Texture> GetPlaceholderTexture() const { return m_placeholderTexture; }
+    std::shared_ptr<DX12Texture> GetPlaceholderTexture() const { return m_placeholderAlbedo; }
+    std::shared_ptr<DX12Texture> GetPlaceholderNormal() const { return m_placeholderNormal; }
+    std::shared_ptr<DX12Texture> GetPlaceholderMetallic() const { return m_placeholderMetallic; }
+    std::shared_ptr<DX12Texture> GetPlaceholderRoughness() const { return m_placeholderRoughness; }
+
+    // Load texture from disk (sRGB aware)
+    Result<std::shared_ptr<DX12Texture>> LoadTextureFromFile(const std::string& path, bool useSRGB);
 
 private:
     void BeginFrame();
@@ -129,12 +142,15 @@ private:
     Result<void> CompileShaders();
     Result<void> CreatePipeline();
     Result<void> CreatePlaceholderTexture();
+    void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
+    void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
 
     // Graphics resources
     DX12Device* m_device = nullptr;
     Window* m_window = nullptr;
 
     std::unique_ptr<DX12CommandQueue> m_commandQueue;
+    std::unique_ptr<DX12CommandQueue> m_uploadQueue;
     std::unique_ptr<DescriptorHeapManager> m_descriptorManager;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     std::unique_ptr<HyperGeometry::HyperGeometryEngine> m_hyperGeometry;
@@ -153,12 +169,23 @@ private:
     ConstantBuffer<ObjectConstants> m_objectConstantBuffer;
     ConstantBuffer<MaterialConstants> m_materialConstantBuffer;
 
+    // Upload helpers
+    static constexpr uint32_t kUploadPoolSize = 4;
+    std::array<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>, kUploadPoolSize> m_uploadCommandAllocators;
+    std::array<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>, kUploadPoolSize> m_uploadCommandLists;
+    uint32_t m_uploadAllocatorIndex = 0;
+    std::array<uint64_t, kUploadPoolSize> m_uploadFences{0, 0, 0, 0};
+    uint64_t m_pendingUploadFence = 0;
+
     // Depth buffer
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorHandle m_depthStencilView;
 
     // Default resources
-    std::shared_ptr<DX12Texture> m_placeholderTexture;
+    std::shared_ptr<DX12Texture> m_placeholderAlbedo;
+    std::shared_ptr<DX12Texture> m_placeholderNormal;
+    std::shared_ptr<DX12Texture> m_placeholderMetallic;
+    std::shared_ptr<DX12Texture> m_placeholderRoughness;
 
     // Frame state
     float m_totalTime = 0.0f;

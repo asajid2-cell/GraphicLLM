@@ -15,7 +15,7 @@ namespace Cortex::LLM {
 // Configuration for LLM inference
 struct LLMConfig {
     std::string modelPath;
-    int contextSize = 2048;
+    int contextSize = 8192;
     int threads = 4;
     float temperature = 0.1f;
     int maxTokens = 128;
@@ -53,9 +53,9 @@ public:
     // Shutdown and cleanup
     void Shutdown();
 
-    // Submit a prompt for async inference
+    // Submit a prompt for async inference (sceneSummary is injected into the system prompt)
     // Returns immediately, calls callback when done
-    void SubmitPrompt(const std::string& prompt, LLMCallback callback);
+    void SubmitPrompt(const std::string& prompt, const std::string& sceneSummary, bool hasShowcase, LLMCallback callback);
 
     // Pump completed jobs on the calling thread (main thread) to execute callbacks safely
     void PumpCallbacks();

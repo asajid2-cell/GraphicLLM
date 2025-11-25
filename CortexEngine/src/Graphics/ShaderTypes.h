@@ -16,11 +16,12 @@ namespace Cortex::Graphics {
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
+    glm::vec4 tangent; // xyz = tangent, w = bitangent sign
     glm::vec2 texCoord;
 
     Vertex() = default;
-    Vertex(glm::vec3 pos, glm::vec3 norm, glm::vec2 uv)
-        : position(pos), normal(norm), texCoord(uv) {}
+    Vertex(glm::vec3 pos, glm::vec3 norm, glm::vec3 tan, glm::vec2 uv)
+        : position(pos), normal(norm), tangent(glm::vec4(tan, 1.0f)), texCoord(uv) {}
 };
 
 // Per-object constant buffer (changes per draw call)
@@ -46,7 +47,7 @@ struct MaterialConstants {
     float metallic;
     float roughness;
     float ao;  // Ambient occlusion
-    float _padding;
+    alignas(16) glm::uvec4 mapFlags; // x: albedo, y: normal, z: metallic, w: roughness
 };
 
 } // namespace Cortex::Graphics

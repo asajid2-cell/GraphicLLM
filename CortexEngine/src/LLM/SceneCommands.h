@@ -26,12 +26,15 @@ struct SceneCommand {
 
 // Add a new entity to the scene
 struct AddEntityCommand : public SceneCommand {
-    enum class EntityType { Cube, Sphere, Plane };
+    enum class EntityType { Cube, Sphere, Plane, Cylinder, Pyramid, Cone, Torus };
 
     EntityType entityType = EntityType::Cube;
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
     glm::vec4 color = glm::vec4(1.0f);
+    float metallic = 0.0f;
+    float roughness = 0.5f;
+    float ao = 1.0f;
     std::string name;
     bool autoPlace = false; // let the executor pick a spawn position if true
 

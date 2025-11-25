@@ -88,17 +88,26 @@ try {
         Write-Error "VsDevCmd.bat not found at $vsDevCmd"
         exit 1
     }
+    
     Write-Info "Importing VS environment..."
-    $envOutput = & cmd /c "call `"$vsDevCmd`" -arch=amd64 -host_arch=amd64 >nul && set"
-    foreach ($line in $envOutput) {
-        if ($line -match "^(.*?)=(.*)$") {
+    # ROBUST IMPORT: Use a temp file to avoid buffer overflows with large environments
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    cmd /c " `"$vsDevCmd`" -arch=amd64 -host_arch=amd64 > NUL && set > `"$tempFile`" "
+    
+    Get-Content $tempFile | ForEach-Object {
+        if ($_ -match "^(.*?)=(.*)$") {
             $name = $matches[1]
             $value = $matches[2]
-            Set-Item -Path "env:$name" -Value $value
+            # Only set if not already set or if specific key variables
+            if (-not (Test-Path "env:$name") -or $name -match "^(PATH|INCLUDE|LIB|LIBPATH|VC|WindowsSDK)") {
+                Set-Item -Path "env:$name" -Value $value
+            }
         }
     }
+    Remove-Item $tempFile -Force
+
     # Explicitly set C and CXX to MSVC from the imported env
-    if (-not $env:CC -and $env:VSINSTALLDIR) {
+    if ($env:VSINSTALLDIR) {
         $clPath = Get-Command cl.exe -ErrorAction SilentlyContinue
         if ($clPath) {
             $env:CC = $clPath.Source
@@ -131,16 +140,35 @@ function Find-CudaPath {
 
 function Set-CudaEnv($cudaPath) {
     if (-not $cudaPath) { return }
+
+    # Surface CUDA paths to child processes (needed by MSBuild CUDA targets)
     $env:CUDAToolkit_ROOT = $cudaPath
+    [System.Environment]::SetEnvironmentVariable("CUDAToolkit_ROOT", $cudaPath, [System.EnvironmentVariableTarget]::Process)
     $env:CUDA_PATH = $cudaPath
+    [System.Environment]::SetEnvironmentVariable("CUDA_PATH", $cudaPath, [System.EnvironmentVariableTarget]::Process)
     $env:CudaToolkitDir = $cudaPath
+    [System.Environment]::SetEnvironmentVariable("CudaToolkitDir", $cudaPath, [System.EnvironmentVariableTarget]::Process)
+
     # Set versioned CUDA_PATH if we can derive it
+    $ver = $null
     $dirName = Split-Path $cudaPath -Leaf
     if ($dirName -match "^v?(?<ver>\d+\.\d+)") {
         $ver = $matches['ver']
+    } else {
+        try {
+            $nvccPath = Join-Path $cudaPath "bin\nvcc.exe"
+            $nvccInfo = & $nvccPath --version 2>&1 | Select-String "release" | Select-Object -First 1
+            if ($nvccInfo -and ($nvccInfo.ToString() -match "release\s+(\d+\.\d+)")) {
+                $ver = $matches[1]
+            }
+        } catch { }
+    }
+    if ($ver) {
         $envName = "CUDA_PATH_V$($ver -replace '\.','_')"
         Set-Item -Path "env:$envName" -Value $cudaPath
+        [System.Environment]::SetEnvironmentVariable($envName, $cudaPath, [System.EnvironmentVariableTarget]::Process)
     }
+
     $nvBin = Join-Path $cudaPath "bin"
     if ($env:PATH.Split(';') -notcontains $nvBin) {
         $env:PATH = "$nvBin;$env:PATH"
@@ -152,14 +180,19 @@ function Ensure-Ninja {
     if (Get-Command ninja -ErrorAction SilentlyContinue) { return }
     $ninjaUrl = "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip"
     $zipPath = Join-Path $env:TEMP "ninja-win.zip"
-    $ninjaDir = Join-Path $env:TEMP "ninja"
+    $installDir = Join-Path ${env:ProgramFiles} "Ninja"
+    $ninjaExe = Join-Path $installDir "ninja.exe"
     try {
-        Write-Info "Downloading ninja build tool..."
-        Invoke-WebRequest -Uri $ninjaUrl -OutFile $zipPath
-        if (-not (Test-Path $ninjaDir)) { New-Item -ItemType Directory -Path $ninjaDir | Out-Null }
-        Expand-Archive -Path $zipPath -DestinationPath $ninjaDir -Force
-        $env:PATH = "$ninjaDir;$env:PATH"
-        Write-Success "Ninja available at $ninjaDir"
+        Write-Info "Ensuring Ninja build tool is installed..."
+        if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
+        if (-not (Test-Path $ninjaExe)) {
+            Invoke-WebRequest -Uri $ninjaUrl -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+        }
+        if ($env:PATH.Split(';') -notcontains $installDir) {
+            $env:PATH = "$installDir;$env:PATH"
+        }
+        Write-Success "Ninja available at $installDir"
     } catch {
         Write-Error "Failed to download ninja: $_"
         exit 1
@@ -227,14 +260,6 @@ $cudaFound = $true
 $cudaPath = Find-CudaPath
 if ($cudaPath) { Set-CudaEnv $cudaPath }
 $cudaVersion = Split-Path $env:CUDAToolkit_ROOT -Leaf
-
-# If using CUDA 13.x (requires VS2022) or VS2019, switch to Ninja to avoid MSBuild CUDA toolset issues
-$cudaMajor = ($cudaVersion -replace '[^\d\.]', '').Split('.')[0]
-if (($cudaMajor -ge 13) -or ($generator -like "Visual Studio 16*")) {
-    Write-Info "Switching to Ninja generator to bypass MSBuild CUDA integration (CUDA $cudaVersion, generator=$generator)"
-    Ensure-Ninja
-    $generator = "Ninja"
-}
 
 # ============================================================================
 # STEP 2: Initialize Git Submodules (llama.cpp)
@@ -380,35 +405,54 @@ if (-not $SkipVcpkg) {
     }
 
     # ============================================================================
-    # STEP 3: Install Dependencies
+    # STEP 3: Install Dependencies (manifest-aware)
     # ============================================================================
     Write-Step "Installing dependencies via vcpkg..."
     Write-Info "This may take 10-20 minutes on first run..."
 
-    $packages = @(
-        "sdl3:x64-windows",
-        "entt:x64-windows",
-        "nlohmann-json:x64-windows",
-        "spdlog:x64-windows",
-        "directx-headers:x64-windows",
-        "directxtk12:x64-windows",
-        "glm:x64-windows"
-    )
+    $vcpkgExe = Join-Path $vcpkgRoot "vcpkg.exe"
+    if (-not (Test-Path $vcpkgExe)) { $vcpkgExe = "vcpkg" }
 
-    Push-Location $vcpkgRoot
+    $manifestPath = Join-Path $projectRoot "vcpkg.json"
 
-    foreach ($package in $packages) {
-        Write-Info "Installing $package..."
-        & .\vcpkg install $package
+    if (Test-Path $manifestPath) {
+        Write-Info "Using manifest at $manifestPath"
+        Push-Location $projectRoot
+        & $vcpkgExe install --triplet x64-windows --vcpkg-root $vcpkgRoot
+        $exit = $LASTEXITCODE
+        Pop-Location
 
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to install $package"
-            Pop-Location
+        if ($exit -ne 0) {
+            Write-Error "vcpkg manifest install failed"
             exit 1
         }
+    } else {
+        Write-Info "Manifest not found; falling back to explicit package list"
+
+        $packages = @(
+            "sdl3:x64-windows",
+            "entt:x64-windows",
+            "nlohmann-json:x64-windows",
+            "spdlog:x64-windows",
+            "directx-headers:x64-windows",
+            "directxtk12:x64-windows",
+            "glm:x64-windows"
+        )
+
+        Push-Location $vcpkgRoot
+        foreach ($package in $packages) {
+            Write-Info "Installing $package..."
+            & $vcpkgExe install $package
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to install $package"
+                Pop-Location
+                exit 1
+            }
+        }
+        Pop-Location
     }
 
-    Pop-Location
     Write-Success "All dependencies installed!"
 
 } else {
@@ -425,6 +469,9 @@ if (-not $SkipVcpkg) {
 # STEP 5: Configure CMake
 # ============================================================================
 Write-Step "Configuring CMake build..."
+
+Ensure-Ninja
+$generator = "Ninja"
 
 $projectRoot = $PSScriptRoot
 $buildDir = Join-Path $projectRoot "build"
@@ -445,21 +492,17 @@ New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 Push-Location $buildDir
 
 Write-Info "Running CMake configure..."
-# Let CMake auto-detect the generator (works with any VS version including previews)
 $cmakeCmd = @(
     "..",
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
-    "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT"
+    "-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler",
+    "-DCMAKE_BUILD_TYPE=$BuildConfig"
 )
-if ($generator) {
-    $cmakeCmd += "-G"
-    $cmakeCmd += $generator
-}
-if ($generator -ne "Ninja") {
-    $cmakeCmd += "-A"
-    $cmakeCmd += "x64"
-}
+if ($env:CUDAToolkit_ROOT) { $cmakeCmd += "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT" }
+$cmakeCmd += "-G"
+$cmakeCmd += $generator
+
 & cmake @cmakeCmd
 
 if ($LASTEXITCODE -ne 0) {
@@ -480,7 +523,11 @@ if (-not $SkipBuild) {
     Push-Location $buildDir
 
     Write-Info "Compiling (this may take a few minutes)..."
-    & cmake --build . --config $BuildConfig --parallel
+    if ($generator -eq "Ninja") {
+        & cmake --build . --parallel
+    } else {
+        & cmake --build . --config $BuildConfig --parallel
+    }
 
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Build failed!"
@@ -541,7 +588,7 @@ if (Test-Path $assetsSource) {
 Write-Host @"
 
 ===============================================================
-                   SETUP COMPLETE!
+                    SETUP COMPLETE!
 ===============================================================
 "@ -ForegroundColor Green
 

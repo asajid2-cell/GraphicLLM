@@ -139,6 +139,24 @@ function Set-CudaEnv($cudaPath) {
     $script:GlobalCudaBin = $nvBin
 }
 
+function Ensure-Ninja {
+    if (Get-Command ninja -ErrorAction SilentlyContinue) { return }
+    $ninjaUrl = "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip"
+    $zipPath = Join-Path $env:TEMP "ninja-win.zip"
+    $ninjaDir = Join-Path $env:TEMP "ninja"
+    try {
+        Write-Info "Downloading ninja build tool..."
+        Invoke-WebRequest -Uri $ninjaUrl -OutFile $zipPath
+        if (-not (Test-Path $ninjaDir)) { New-Item -ItemType Directory -Path $ninjaDir | Out-Null }
+        Expand-Archive -Path $zipPath -DestinationPath $ninjaDir -Force
+        $env:PATH = "$ninjaDir;$env:PATH"
+        Write-Success "Ninja available at $ninjaDir"
+    } catch {
+        Write-Error "Failed to download ninja: $_"
+        exit 1
+    }
+}
+
 function Test-CudaInstalled {
     # Try PATH nvcc first
     if (Get-Command nvcc -ErrorAction SilentlyContinue) {
@@ -199,6 +217,14 @@ if (-not (Test-CudaInstalled)) {
 $cudaFound = $true
 $cudaPath = Find-CudaPath
 if ($cudaPath) { Set-CudaEnv $cudaPath }
+$cudaVersion = Split-Path $env:CUDAToolkit_ROOT -Leaf
+
+# If using VS2019 with CUDA 13.x (which only supports VS2022), switch to Ninja to avoid MSBuild CUDA integration issues
+if ($generator -like "Visual Studio 16*" -and $cudaVersion -match "13") {
+    Write-Info "CUDA $cudaVersion with VS2019 is unsupported; switching to Ninja generator"
+    Ensure-Ninja
+    $generator = "Ninja"
+}
 
 # ============================================================================
 # STEP 2: Initialize Git Submodules (llama.cpp)

@@ -68,24 +68,32 @@ try {
 }
 
 # Check for Visual Studio / MSBuild
-$generator = "Visual Studio 17 2022"
+$generator = $null
 try {
     # Try to find vswhere (comes with VS 2017+)
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 
     if (Test-Path $vswhere) {
         $vsPath = & $vswhere -latest -property installationPath
-        $vsVersion = & $vswhere -latest -property catalog_productDisplayVersion
-        $vsMajor = [int]($vsVersion -split '\.')[0]
-        Write-Success "Visual Studio found: $vsVersion"
+        $vsDisplay = & $vswhere -latest -property catalog_productDisplayVersion
+        $vsVersion = & $vswhere -latest -property installationVersion
+        $vsMajor = 0
+        if ($vsVersion) {
+            $vsMajor = [int](($vsVersion -split '\.')[0])
+        }
+        Write-Success "Visual Studio found: $vsDisplay"
         Write-Info "Path: $vsPath"
-        if ($vsMajor -lt 17) {
+        if ($vsMajor -ge 17) {
+            $generator = "Visual Studio 17 2022"
+        } elseif ($vsMajor -ge 16) {
+            $generator = "Visual Studio 16 2019"
+        } else {
+            Write-Info "Older Visual Studio detected (v$vsMajor), falling back to VS2019 generator"
             $generator = "Visual Studio 16 2019"
         }
     } else {
-        Write-Error "Visual Studio 2022 not found!"
-        Write-Info "Download from: https://visualstudio.microsoft.com/downloads/"
-        Write-Info "Required workload: Desktop development with C++"
+        Write-Error "Visual Studio not found!"
+        Write-Info "Install Visual Studio (Desktop development with C++) then rerun setup."
         exit 1
     }
 } catch {

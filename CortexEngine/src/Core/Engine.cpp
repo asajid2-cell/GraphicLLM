@@ -367,16 +367,6 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
         return;
     }
 
-    // Immediate deterministic add so the user sees something even if LLM is slow
-    auto heuristic = BuildHeuristicCommands(command);
-    if (!heuristic.empty()) {
-        spdlog::info("Heuristic: adding {} immediate commands based on text", heuristic.size());
-        for (const auto& c : heuristic) {
-            spdlog::info("  {}", c->ToString());
-        }
-        m_commandQueue->PushBatch(heuristic);
-    }
-
     // Submit to The Architect
     m_llmService->SubmitPrompt(command, [this, command](const LLM::LLMResponse& response) {
         if (!response.success) {

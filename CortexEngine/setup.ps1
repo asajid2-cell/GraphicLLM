@@ -97,6 +97,20 @@ try {
             Set-Item -Path "env:$name" -Value $value
         }
     }
+
+    # Resolve MSVC host compiler path (cl.exe) for CUDA host compiler hint
+    $vcToolsRoot = Join-Path $vsPath "VC\Tools\MSVC"
+    $script:VcHostCompiler = $null
+    if (Test-Path $vcToolsRoot) {
+        $vcVersions = Get-ChildItem $vcToolsRoot -Directory | Sort-Object Name -Descending
+        if ($vcVersions.Count -gt 0) {
+            $vcBin = Join-Path $vcVersions[0].FullName "bin\Hostx64\x64\cl.exe"
+            if (Test-Path $vcBin) {
+                $script:VcHostCompiler = $vcBin
+                Write-Info "Using MSVC host compiler for CUDA: $vcBin"
+            }
+        }
+    }
 } catch {
     Write-Error "Could not detect Visual Studio!"
     exit 1
@@ -405,9 +419,12 @@ $cmakeCmd = @(
     "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile",
     "-DGGML_CUDA=ON",
     "-DCUDAToolkit_ROOT=$env:CUDAToolkit_ROOT",
-    "-DCMAKE_CUDA_COMPILER=$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')",
+    "-DCMAKE_CUDA_COMPILER=`"$(Join-Path $env:CUDAToolkit_ROOT 'bin\nvcc.exe')`"",
     "-A", "x64"
 )
+if ($VcHostCompiler) {
+    $cmakeCmd += "-DCMAKE_CUDA_HOST_COMPILER=`"$VcHostCompiler`""
+}
 & cmake @cmakeCmd
 
 if ($LASTEXITCODE -ne 0) {

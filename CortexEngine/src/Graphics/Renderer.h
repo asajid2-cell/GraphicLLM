@@ -35,19 +35,26 @@ template<typename T>
 struct ConstantBuffer {
     ComPtr<ID3D12Resource> buffer;
     D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = 0;
-    T* mappedData = nullptr;
+    uint8_t* mappedBytes = nullptr;
+    size_t bufferSize = 0;
+    size_t alignedSize = 0;
+    size_t offset = 0;
 
-    Result<void> Initialize(ID3D12Device* device) {
-        // Create upload heap buffer
+    static constexpr size_t Align256(size_t value) {
+        return (value + 255) & ~static_cast<size_t>(255);
+    }
+
+    Result<void> Initialize(ID3D12Device* device, size_t elementCount = 1) {
+        // Create upload heap buffer sized for the requested element count
+        alignedSize = Align256(sizeof(T));
+        bufferSize = Align256(alignedSize * elementCount);
+
         D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
         heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
         heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
-
-        // Align to 256 bytes (required for CBVs)
-        size_t bufferSize = (sizeof(T) + 255) & ~255;
 
         D3D12_RESOURCE_DESC bufferDesc = {};
         bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -77,24 +84,42 @@ struct ConstantBuffer {
 
         // Map persistently (upload heap allows this)
         D3D12_RANGE readRange = { 0, 0 };
-        hr = buffer->Map(0, &readRange, reinterpret_cast<void**>(&mappedData));
+        hr = buffer->Map(0, &readRange, reinterpret_cast<void**>(&mappedBytes));
         if (FAILED(hr)) {
             return Result<void>::Err("Failed to map constant buffer");
         }
 
+        offset = 0;
         return Result<void>::Ok();
     }
 
+    void ResetOffset() { offset = 0; }
+
+    // Write data into the next slice of the buffer and return the GPU address
+    D3D12_GPU_VIRTUAL_ADDRESS AllocateAndWrite(const T& data) {
+        if (!mappedBytes || alignedSize == 0) {
+            return gpuAddress;
+        }
+        if (offset + alignedSize > bufferSize) {
+            offset = 0; // wrap for simplicity; safe because we fence per frame
+        }
+        memcpy(mappedBytes + offset, &data, sizeof(T));
+        D3D12_GPU_VIRTUAL_ADDRESS addr = gpuAddress + offset;
+        offset += alignedSize;
+        return addr;
+    }
+
+    // Convenience for single-slot buffers (frame constants)
     void UpdateData(const T& data) {
-        if (mappedData) {
-            memcpy(mappedData, &data, sizeof(T));
+        if (mappedBytes) {
+            memcpy(mappedBytes, &data, sizeof(T));
         }
     }
 
     ~ConstantBuffer() {
-        if (buffer && mappedData) {
+        if (buffer && mappedBytes) {
             buffer->Unmap(0, nullptr);
-            mappedData = nullptr;
+            mappedBytes = nullptr;
         }
     }
 };

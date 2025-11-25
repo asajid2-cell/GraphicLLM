@@ -128,12 +128,12 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create frame constant buffer: " + cbResult.Error());
     }
 
-    cbResult = m_objectConstantBuffer.Initialize(device->GetDevice());
+    cbResult = m_objectConstantBuffer.Initialize(device->GetDevice(), 1024); // enough for typical scenes per frame
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create object constant buffer: " + cbResult.Error());
     }
 
-    cbResult = m_materialConstantBuffer.Initialize(device->GetDevice());
+    cbResult = m_materialConstantBuffer.Initialize(device->GetDevice(), 1024);
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create material constant buffer: " + cbResult.Error());
     }
@@ -221,6 +221,13 @@ void Renderer::BeginFrame() {
             spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
         }
     }
+    // Reset dynamic constant buffer offsets (safe because we fence each frame)
+    m_objectConstantBuffer.ResetOffset();
+    m_materialConstantBuffer.ResetOffset();
+
+    // Reset descriptor heap ring buffer to prevent descriptor aliasing (matches CB approach)
+    m_descriptorManager->ResetFrameHeaps();
+
     // Ensure outstanding uploads are complete before reusing upload allocator
     if (m_uploadQueue) {
         for (uint64_t fence : m_uploadFences) {
@@ -391,12 +398,6 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             continue;
         }
 
-        // Update object constants
-        ObjectConstants objectData = {};
-        objectData.modelMatrix = transform.GetMatrix();
-        objectData.normalMatrix = transform.GetNormalMatrix();
-        m_objectConstantBuffer.UpdateData(objectData);
-
         EnsureMaterialTextures(renderable);
 
         // Update material constants
@@ -416,11 +417,18 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u
         );
-        m_materialConstantBuffer.UpdateData(materialData);
+
+        // Update object constants
+        ObjectConstants objectData = {};
+        objectData.modelMatrix = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
 
         // Bind constants
-        m_commandList->SetGraphicsRootConstantBufferView(0, m_objectConstantBuffer.gpuAddress);
-        m_commandList->SetGraphicsRootConstantBufferView(2, m_materialConstantBuffer.gpuAddress);
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
 
         RefreshMaterialDescriptors(renderable);
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
@@ -805,18 +813,16 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         tex.gpuState = std::make_shared<MaterialGPUState>();
     }
     auto& state = *tex.gpuState;
-    if (!state.descriptorsReady) {
-        // If descriptors exist, reuse them; otherwise allocate new ones.
-        if (!state.descriptors[0].IsValid()) {
-            for (int i = 0; i < 4; ++i) {
-                auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-                if (handleResult.IsErr()) {
-                    spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
-                    return;
-                }
-                state.descriptors[i] = handleResult.Value();
-            }
+
+    // ALWAYS allocate fresh descriptors each frame (ring buffer approach - matches constant buffers)
+    // This prevents descriptor aliasing since we reset the heap at frame start
+    for (int i = 0; i < 4; ++i) {
+        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (handleResult.IsErr()) {
+            spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
+            return;
         }
+        state.descriptors[i] = handleResult.Value();
     }
 
     std::array<std::shared_ptr<DX12Texture>, 4> sources = {
@@ -832,10 +838,7 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
                         (i == 2) ? m_placeholderMetallic :
                                    m_placeholderRoughness;
         auto srcHandle = sources[i] && sources[i]->GetSRV().IsValid() ? sources[i]->GetSRV() : fallback->GetSRV();
-        if (!state.descriptors[i].IsValid()) {
-            spdlog::error("Material descriptor handle {} is invalid", i);
-            return;
-        }
+
         m_device->GetDevice()->CopyDescriptorsSimple(
             1,
             state.descriptors[i].cpu,
@@ -843,8 +846,6 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
     }
-
-    state.descriptorsReady = true;
 }
 
 Result<void> Renderer::CreateDepthBuffer() {

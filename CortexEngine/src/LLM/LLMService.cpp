@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <queue>
+#include <map>
 #include <string_view>
 #ifdef _WIN32
 #include <windows.h>
@@ -34,6 +35,37 @@ void LlamaLogCallback(ggml_log_level level, const char* text, void* /*user_data*
         default:
             break;
     }
+}
+
+std::string BuildHeuristicJson(const std::string& prompt) {
+    auto lower = prompt;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+
+    auto contains = [&lower](const std::string& token) {
+        return lower.find(token) != std::string::npos;
+    };
+
+    struct Color { float r,g,b,a; };
+    std::map<std::string, Color> colors = {
+        {"red",{1,0,0,1}}, {"blue",{0,0,1,1}}, {"green",{0,1,0,1}}, {"yellow",{1,0.9f,0.2f,1}},
+        {"orange",{1,0.5f,0.1f,1}}, {"purple",{0.6f,0.2f,0.9f,1}}, {"pink",{1,0.4f,0.7f,1}},
+        {"white",{1,1,1,1}}, {"black",{0,0,0,1}}, {"gray",{0.5f,0.5f,0.5f,1}}, {"grey",{0.5f,0.5f,0.5f,1}}
+    };
+
+    for (const auto& [name, c] : colors) {
+        if (contains(name)) {
+            std::ostringstream ss;
+            ss << R"({"commands":[{"type":"modify_material","target":"SpinningCube","color":[)"
+               << c.r << "," << c.g << "," << c.b << "," << c.a << R"(]}]})";
+            return ss.str();
+        }
+    }
+
+    if (contains("sphere")) {
+        return R"({"commands":[{"type":"add_entity","entity_type":"sphere","name":"LLM_Sphere_1","position":[0,1,0],"scale":[1,1,1],"color":[0.7,0.7,0.7,1]}]})";
+    }
+
+    return R"({"commands":[]})";
 }
 } // namespace
 
@@ -173,12 +205,12 @@ void LLMService::SubmitPrompt(const std::string& prompt, LLMCallback callback) {
     // Real llama.cpp inference: push to worker queue
     {
         std::lock_guard<std::mutex> lock(m_jobMutex);
-        m_jobQueue.emplace(std::move(fullPrompt), std::move(callback));
+        m_jobQueue.push(Job{prompt, std::move(fullPrompt), std::move(callback)});
     }
     m_jobCv.notify_one();
 }
 
-void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
+void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMCallback callback) {
     spdlog::info("LLM: worker thread entry");
     if (auto logger = spdlog::default_logger()) logger->flush();
 
@@ -197,7 +229,7 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
     LLMResponse response;
     response.success = false;
     bool finished = false;
-    spdlog::info("LLM[{}]: start (chars={})", threadId, promptCopy.size());
+    spdlog::info("LLM[{}]: start (chars={})", threadId, fullPrompt.size());
     if (m_shuttingDown.load()) {
         response.text = "Error: shutting down";
         {
@@ -228,25 +260,25 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
         // Tokenize prompt
         spdlog::debug("LLM[{}]: tokenize", threadId);
         std::vector<llama_token> tokens;
-        tokens.resize(promptCopy.size() + 256); // Add extra space
+        tokens.resize(fullPrompt.size() + 256); // Add extra space
         int n_tokens = llama_tokenize(
             vocab,
-            promptCopy.c_str(),
-            promptCopy.size(),
+            fullPrompt.c_str(),
+            static_cast<int32_t>(fullPrompt.size()),
             tokens.data(),
-            tokens.size(),
+            static_cast<int32_t>(tokens.size()),
             true,  // add_special
             false  // parse_special
         );
 
         if (n_tokens < 0) {
-            tokens.resize(-n_tokens);
+            tokens.resize(static_cast<size_t>(-n_tokens));
             n_tokens = llama_tokenize(
                 vocab,
-                promptCopy.c_str(),
-                promptCopy.size(),
+                fullPrompt.c_str(),
+                static_cast<int32_t>(fullPrompt.size()),
                 tokens.data(),
-                tokens.size(),
+                static_cast<int32_t>(tokens.size()),
                 true,
                 false
             );
@@ -272,16 +304,16 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
                 if (i + 1 < previewCount) preview += ", ";
             }
             spdlog::debug("LLM[{}]: tokenized {} tokens (chars={}) preview=[{}]",
-                          threadId, n_tokens, promptCopy.size(), preview);
+                          threadId, n_tokens, fullPrompt.size(), preview);
         } else {
-            spdlog::debug("LLM[{}]: tokenized {} tokens (chars={})", threadId, n_tokens, promptCopy.size());
+            spdlog::debug("LLM[{}]: tokenized {} tokens (chars={})", threadId, n_tokens, fullPrompt.size());
         }
 
         // Create batch with explicit buffers so logits/seq_id are valid
         // embd = 0 tells llama_batch_init to allocate token buffers (we are token-based, not embedding-based)
         // n_seq_max = 1 (single sequence)
         spdlog::debug("LLM[{}]: batch-init (n_tokens={})", threadId, n_tokens);
-        prompt_batch = llama_batch_init(n_tokens, 0, 1);
+        prompt_batch = llama_batch_init(static_cast<int32_t>(n_tokens), 0, 1);
         if (!prompt_batch.token || !prompt_batch.pos || !prompt_batch.seq_id || !prompt_batch.n_seq_id || !prompt_batch.logits) {
             spdlog::error("LLM[{}]: prompt batch allocation failed (token={}, pos={}, seq_id={}, n_seq_id={}, logits={})",
                           threadId, !!prompt_batch.token, !!prompt_batch.pos, !!prompt_batch.seq_id,
@@ -296,8 +328,8 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
             }
             return;
         }
-        std::fill_n(prompt_batch.logits, n_tokens, 0);
-        std::fill_n(prompt_batch.n_seq_id, n_tokens, 0);
+        std::fill_n(prompt_batch.logits, static_cast<size_t>(n_tokens), 0);
+        std::fill_n(prompt_batch.n_seq_id, static_cast<size_t>(n_tokens), 0);
         for (int i = 0; i < n_tokens; ++i) {
             prompt_batch.token[i] = tokens[i];
             prompt_batch.pos[i] = i;
@@ -336,7 +368,7 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
         // Generate response tokens
         std::string generatedText;
         int n_decode = 0;
-        int n_cur = n_tokens;
+        int n_cur = static_cast<int>(n_tokens);
 
         llama_batch next_batch = llama_batch_init(1, 0, 1);
         if (!next_batch.token || !next_batch.pos || !next_batch.seq_id || !next_batch.n_seq_id || !next_batch.logits) {
@@ -357,6 +389,7 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
 
         spdlog::debug("LLM[{}]: generate-loop-start", threadId);
         bool generationDecodeFailed = false;
+
         while (n_decode < m_config.maxTokens) {
             auto now = std::chrono::high_resolution_clock::now();
             if (now - startTime > hardTimeout) {
@@ -364,7 +397,8 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
                 break;
             }
             if (n_cur <= 0) break;
-            // Use latest logits (-1) as recommended by llama.cpp
+
+            // Sample from latest logits
             llama_token new_token_id = llama_sampler_sample(sampler, ctx, -1);
             if (new_token_id < 0) {
                 spdlog::warn("LLM[{}]: sampler returned invalid token ({}), stopping generation", threadId, new_token_id);
@@ -377,21 +411,33 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
                 break;
             }
 
-            // Convert token to text (query size first to avoid overflow)
-            int needed = llama_token_to_piece(vocab, new_token_id, nullptr, 0, 0, false);
-            if (needed > 0) {
-                // +4 slack to avoid any off-by-one/null terminator writes from the backend
-                std::vector<char> buf(static_cast<size_t>(needed + 4));
-                int wrote = llama_token_to_piece(vocab, new_token_id, buf.data(), static_cast<int>(buf.size()), 0, false);
-                if (wrote > 0) {
-                    generatedText.append(buf.data(), static_cast<size_t>(wrote));
+            // Convert token to text
+            // Note: llama_token_to_piece returns negative if buffer is too small (absolute value = needed size)
+            std::vector<char> buf(128);  // Initial buffer size
+            int wrote = llama_token_to_piece(vocab, new_token_id, buf.data(), static_cast<int>(buf.size()), 0, false);
+
+            // If buffer was too small, resize and retry
+            if (wrote < 0) {
+                int needed = -wrote;
+                buf.resize(static_cast<size_t>(needed + 4));  // Add safety margin
+                wrote = llama_token_to_piece(vocab, new_token_id, buf.data(), static_cast<int>(buf.size()), 0, false);
+            }
+
+            if (wrote > 0) {
+                generatedText.append(buf.data(), static_cast<size_t>(wrote));
+                // Log first few tokens for debugging
+                if (n_decode < 10) {
+                    std::string piece(buf.data(), static_cast<size_t>(wrote));
+                    spdlog::info("LLM[{}]: token {} id={} piece='{}' (len={})", threadId, n_decode, new_token_id, piece, wrote);
                 }
+            } else {
+                spdlog::warn("LLM[{}]: token {} id={} wrote={} (conversion failed)", threadId, n_decode, new_token_id, wrote);
             }
 
             // Prepare next batch with single token, request logits
             // embd = 0 to allocate token buffers
-            std::fill_n(next_batch.logits, 1, 0);
-            std::fill_n(next_batch.n_seq_id, 1, 0);
+        std::fill_n(next_batch.logits, static_cast<size_t>(1), 0);
+        std::fill_n(next_batch.n_seq_id, static_cast<size_t>(1), 0);
             next_batch.token[0] = new_token_id;
             next_batch.pos[0] = n_cur;
             next_batch.seq_id[0][0] = 0;
@@ -430,14 +476,24 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
         auto endTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> elapsed = endTime - startTime;
 
+        // Log raw generated text for debugging
+        spdlog::info("LLM[{}]: raw generated text (len={}): '{}'", threadId, generatedText.size(),
+                     generatedText.substr(0, std::min<size_t>(generatedText.size(), 256)));
+
         // Try to trim to the first/last brace to improve JSON parsing resilience
         auto startPos = generatedText.find('{');
         auto endPos = generatedText.rfind('}');
+
+        spdlog::info("LLM[{}]: JSON search - startPos={}, endPos={}", threadId,
+                     startPos != std::string::npos ? std::to_string(startPos) : "none",
+                     endPos != std::string::npos ? std::to_string(endPos) : "none");
+
         if (!generationDecodeFailed) {
             // Prefer JSON if we see balanced braces
             if (startPos != std::string::npos && endPos != std::string::npos && endPos > startPos) {
                 response.text = generatedText.substr(startPos, endPos - startPos + 1);
                 response.success = true;
+                spdlog::info("LLM[{}]: extracted JSON (len={})", threadId, response.text.size());
             } else {
                 // Trim whitespace to decide if we got anything meaningful
                 auto first = generatedText.find_first_not_of(" \t\r\n");
@@ -445,9 +501,11 @@ void LLMService::ProcessJob(std::string promptCopy, LLMCallback callback) {
                 if (first != std::string::npos && last != std::string::npos) {
                     response.text = generatedText.substr(first, last - first + 1);
                     response.success = true; // accept raw text even if not JSON
+                    spdlog::warn("LLM[{}]: no JSON found, using trimmed text (len={})", threadId, response.text.size());
                 } else if (n_decode > 0) {
-                    // Generated tokens but only whitespace/control pieces; treat as empty but non-fatal
-                    response.text = "";
+                    // Generated tokens but only whitespace/control pieces; build heuristic JSON from the original prompt
+                    spdlog::warn("LLM[{}]: only whitespace generated, falling back to heuristic", threadId);
+                    response.text = BuildHeuristicJson(userPrompt);
                     response.success = true;
                 } else {
                     response.text = "Error: Empty generation";
@@ -528,7 +586,7 @@ std::string LLMService::GetModelInfo() const {
 
 void LLMService::WorkerLoop() {
     while (true) {
-        std::pair<std::string, LLMCallback> job;
+        Job job;
         {
             std::unique_lock<std::mutex> lock(m_jobMutex);
             m_jobCv.wait(lock, [this]() { return !m_workerRunning.load() || !m_jobQueue.empty(); });
@@ -541,7 +599,7 @@ void LLMService::WorkerLoop() {
 
         m_isBusy = true;
         m_activeJobs.fetch_add(1);
-        ProcessJob(std::move(job.first), std::move(job.second));
+        ProcessJob(std::move(job.userPrompt), std::move(job.fullPrompt), std::move(job.callback));
     }
 }
 

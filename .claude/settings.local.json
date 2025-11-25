@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build:*)",
+      "Bash(ninja:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File build.ps1 -Config Release)",
+      "Bash(tasklist:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

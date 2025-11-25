@@ -150,14 +150,14 @@ Pop-Location
 # ============================================================================
 Write-Step "Downloading LLM model..."
 $modelDir = Join-Path $projectRoot "models"
-$modelFile = Join-Path $modelDir "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+$modelFile = Join-Path $modelDir "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 if (-not (Test-Path $modelDir)) { New-Item -ItemType Directory -Force -Path $modelDir | Out-Null }
 
 if (Test-Path $modelFile) {
     Write-Success "Model already exists"
 } else {
-    Write-Info "Downloading Llama 3.2 3B..."
-    $url = "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+    Write-Info "Downloading Llama 3.1 8B Instruct (Q4_K_M)..."
+    $url = "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
     try {
         $webClient = New-Object System.Net.WebClient
         $webClient.DownloadFile($url, $modelFile)

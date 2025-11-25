@@ -75,16 +75,22 @@ private:
     std::atomic<bool> m_shuttingDown{false};
     std::mutex m_waitMutex;
     std::condition_variable m_waitCv;
+    struct Job {
+        std::string userPrompt;     // Original user input
+        std::string fullPrompt;     // Full prompt with template
+        LLMCallback callback;
+    };
+
     std::mutex m_callbackMutex;
     std::queue<std::pair<LLMCallback, LLMResponse>> m_pendingCallbacks;
-    std::queue<std::pair<std::string, LLMCallback>> m_jobQueue;
+    std::queue<Job> m_jobQueue;
     std::mutex m_jobMutex;
     std::condition_variable m_jobCv;
     std::thread m_workerThread;
     std::atomic<bool> m_workerRunning{false};
 
     // Worker entry point (runs on background thread)
-    void ProcessJob(std::string promptCopy, LLMCallback callback);
+    void ProcessJob(std::string userPrompt, std::string fullPrompt, LLMCallback callback);
     void WorkerLoop();
 
     // System prompt for scene understanding

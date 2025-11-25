@@ -65,6 +65,7 @@ Response:
         const std::string bos = "<|begin_of_text|>";
         const std::string soh = "<|start_header_id|>";
         const std::string eoh = "<|end_header_id|>";
+        const std::string eot = "<|eot_id|>";
 
         std::string prompt;
         prompt.reserve(1024 + userInput.size());
@@ -74,10 +75,13 @@ Response:
         prompt += "\n\nFew-shot:\n";
         prompt += GetFewShotExamples();
         prompt += "\n";
+        prompt += eot; prompt += "\n";
         prompt += soh; prompt += "user"; prompt += eoh; prompt += "\n";
         prompt += userInput;
         prompt += "\n";
+        prompt += eot; prompt += "\n";
         prompt += soh; prompt += "assistant"; prompt += eoh; prompt += "\n";
+        // Do not append eot here; we expect the model to finish the assistant turn.
         return prompt;
     }
 };

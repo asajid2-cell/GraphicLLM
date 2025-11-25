@@ -83,11 +83,11 @@ int main(int argc, char* argv[]) {
         // Resolve model path relative to the executable directory (works when run from build/bin/<cfg>)
         namespace fs = std::filesystem;
         fs::path exeDir = fs::current_path();
-        fs::path modelPath = exeDir / "models" / "Llama-3.2-3B-Instruct-Q4_K_M.gguf";
+        fs::path modelPath = exeDir / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
 
         // If not found, fall back to repo root models directory
         if (!fs::exists(modelPath)) {
-            modelPath = exeDir / ".." / ".." / ".." / "models" / "Llama-3.2-3B-Instruct-Q4_K_M.gguf";
+            modelPath = exeDir / ".." / ".." / ".." / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
         }
 
         config.llmConfig.modelPath = modelPath.string();

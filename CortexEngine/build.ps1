@@ -10,6 +10,40 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "`n==> Building Project Cortex ($Config)" -ForegroundColor Cyan
 
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path $vswhere)) {
+    Write-Host "[ERROR] vswhere not found; please install Visual Studio with C++ workload." -ForegroundColor Red
+    exit 1
+}
+
+$vsPath = & $vswhere -latest -requires Microsoft.Component.MSBuild -property installationPath
+if (-not $vsPath) { $vsPath = & $vswhere -latest -property installationPath }
+
+if (-not $vsPath) {
+    Write-Host "[ERROR] Visual Studio not found; install VS 2022/2026 with C++ workload." -ForegroundColor Red
+    exit 1
+}
+
+$vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+if (-not (Test-Path $vsDevCmd)) {
+    Write-Host "[ERROR] VsDevCmd.bat not found at $vsDevCmd" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Importing Visual Studio build environment..." -ForegroundColor Gray
+$tempFile = [System.IO.Path]::GetTempFileName()
+cmd /c " `"$vsDevCmd`" -arch=amd64 -host_arch=amd64 > NUL && set > `"$tempFile`" "
+Get-Content $tempFile | ForEach-Object {
+    if ($_ -match "^(.*?)=(.*)$") {
+        $name = $matches[1]; $value = $matches[2]
+        if ($name -match "^(PATH|INCLUDE|LIB|LIBPATH|VC|WindowsSDK)") {
+            Set-Item -Path "env:$name" -Value $value
+        }
+    }
+}
+Remove-Item $tempFile -Force
+Write-Host "VS environment imported from $vsPath" -ForegroundColor Gray
+
 $buildDir = Join-Path $PSScriptRoot "build"
 
 if (-not (Test-Path $buildDir)) {

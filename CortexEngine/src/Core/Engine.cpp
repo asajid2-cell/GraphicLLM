@@ -3,8 +3,10 @@
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
 #include "LLM/SceneCommands.h"
+#include "LLM/RegressionTests.h"
 #include "UI/TextPrompt.h"
 #include "UI/DebugMenu.h"
+#include <windows.h>
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -90,6 +92,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_llmEnabled = true;
             spdlog::info("The Architect is online!");
             spdlog::info("Press T to enter text input mode for natural language commands");
+
+            // Run a small regression suite once at startup (logs only)
+            LLM::RunRegressionTests();
         }
     }
 
@@ -159,6 +164,150 @@ void Engine::Shutdown() {
     m_device.reset();
 
     spdlog::info("Cortex Engine shut down");
+}
+
+void Engine::RenderHUD() {
+    if (!m_window || !m_registry || !m_renderer) {
+        return;
+    }
+
+    // Gather camera information
+    glm::vec3 camPos(0.0f);
+    float camFov = 60.0f;
+    bool haveCamera = false;
+
+    if (m_activeCameraEntity != entt::null &&
+        m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) &&
+        m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+        auto& camera = m_registry->GetComponent<Scene::CameraComponent>(m_activeCameraEntity);
+        camPos = transform.position;
+        camFov = camera.fov;
+        haveCamera = true;
+    }
+
+    // Renderer state
+    auto* renderer = m_renderer.get();
+    float exposure = renderer->GetExposure();
+    bool shadows = renderer->GetShadowsEnabled();
+    int debugMode = renderer->GetDebugViewMode();
+    float shadowBias = renderer->GetShadowBias();
+    float shadowPCF = renderer->GetShadowPCFRadius();
+    float cascadeLambda = renderer->GetCascadeSplitLambda();
+    float cascade0Scale = renderer->GetCascadeResolutionScale(0);
+    float bloomIntensity = renderer->GetBloomIntensity();
+    bool pcss = renderer->IsPCSS();
+    bool fxaa = renderer->IsFXAAEnabled();
+
+    // Approximate FPS from last frame time
+    float fps = (m_frameTime > 0.0f) ? (1.0f / m_frameTime) : 0.0f;
+
+    HWND hwnd = m_window->GetHWND();
+    if (!hwnd) {
+        return;
+    }
+
+    HDC dc = GetDC(hwnd);
+    if (!dc) {
+        return;
+    }
+
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, RGB(0, 255, 0));
+
+    int lineY = 8;
+    auto drawLine = [&](const wchar_t* text) {
+        TextOutW(dc, 8, lineY, text, static_cast<int>(wcslen(text)));
+        lineY += 16;
+    };
+
+    wchar_t buffer[256];
+
+    swprintf_s(buffer, L"FPS: %.1f  Frame: %.2f ms", fps, m_frameTime * 1000.0f);
+    drawLine(buffer);
+
+    if (haveCamera) {
+        swprintf_s(buffer, L"Camera: (%.2f, %.2f, %.2f) FOV: %.1f",
+                   camPos.x, camPos.y, camPos.z, camFov);
+        drawLine(buffer);
+    } else {
+        drawLine(L"Camera: <none>");
+    }
+
+    swprintf_s(buffer, L"Exposure: %.2f  Bloom: %.2f", exposure, bloomIntensity);
+    drawLine(buffer);
+
+    swprintf_s(buffer, L"Shadows: %s  DebugView: %d  PCSS: %s  FXAA: %s",
+               shadows ? L"ON" : L"OFF",
+               debugMode,
+               pcss ? L"ON" : L"OFF",
+               fxaa ? L"ON" : L"OFF");
+    drawLine(buffer);
+
+    swprintf_s(buffer, L"Shadow Bias: %.6f  PCF: %.2f  Lambda: %.2f  Casc0Scale: %.2f",
+               shadowBias, shadowPCF, cascadeLambda, cascade0Scale);
+    drawLine(buffer);
+
+    // Light count (from registry)
+    size_t lightCount = 0;
+    if (m_registry) {
+        auto lightView = m_registry->View<Scene::LightComponent>();
+        lightCount = static_cast<size_t>(lightView.size());
+    }
+    swprintf_s(buffer, L"Lights: %zu", lightCount);
+    drawLine(buffer);
+
+    // Per-light summary (up to two lights)
+    if (m_registry && lightCount > 0) {
+        drawLine(L"Light details:");
+        auto view = m_registry->View<Scene::LightComponent>();
+        size_t shown = 0;
+        for (auto entity : view) {
+            const auto& light = view.get<Scene::LightComponent>(entity);
+
+            const wchar_t* typeLabel = L"Point";
+            if (light.type == Scene::LightType::Directional) typeLabel = L"Dir";
+            else if (light.type == Scene::LightType::Spot)   typeLabel = L"Spot";
+
+            glm::vec3 pos(0.0f);
+            if (m_registry->HasComponent<Scene::TransformComponent>(entity)) {
+                pos = m_registry->GetComponent<Scene::TransformComponent>(entity).position;
+            }
+
+            std::wstring name;
+            if (m_registry->HasComponent<Scene::TagComponent>(entity)) {
+                const auto& tag = m_registry->GetComponent<Scene::TagComponent>(entity).tag;
+                name.assign(tag.begin(), tag.end());
+            } else {
+                name = L"<unnamed>";
+            }
+
+            swprintf_s(buffer, L"  %s (%s) I=%.2f Pos=(%.1f, %.1f, %.1f)",
+                       name.c_str(),
+                       typeLabel,
+                       light.intensity,
+                       pos.x, pos.y, pos.z);
+            drawLine(buffer);
+
+            if (++shown >= 2) {
+                break;
+            }
+        }
+    }
+
+    if (!m_recentCommandMessages.empty()) {
+        drawLine(L"Last commands:");
+        for (const auto& msg : m_recentCommandMessages) {
+            std::wstring wmsg(msg.begin(), msg.end());
+            if (wmsg.size() > 80) {
+                wmsg.resize(80);
+            }
+            TextOutW(dc, 16, lineY, wmsg.c_str(), static_cast<int>(wmsg.size()));
+            lineY += 16;
+        }
+    }
+
+    ReleaseDC(hwnd, dc);
 }
 
 void Engine::Run() {
@@ -254,6 +403,24 @@ void Engine::ProcessInput() {
                     // Reset camera to default position/orientation
                     InitializeCameraController();
                     spdlog::info("Camera reset to default");
+                }
+                else if (event.key.key == SDLK_H) {
+                    m_showHUD = !m_showHUD;
+                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
+                }
+                else if (event.key.key == SDLK_P) {
+                    if (m_renderer) {
+                        bool enabled = !m_renderer->IsPCSS();
+                        m_renderer->SetPCSS(enabled);
+                        spdlog::info("PCSS contact-hardening {}", enabled ? "ENABLED" : "DISABLED");
+                    }
+                }
+                else if (event.key.key == SDLK_X) {
+                    if (m_renderer) {
+                        bool enabled = !m_renderer->IsFXAAEnabled();
+                        m_renderer->SetFXAAEnabled(enabled);
+                        spdlog::info("FXAA {}", enabled ? "ENABLED" : "DISABLED");
+                    }
                 }
                 else if (event.key.key == SDLK_F2) {
                     // Toggle debug slider menu
@@ -360,6 +527,12 @@ void Engine::Update(float deltaTime) {
             } else {
                 spdlog::warn("[Architect] {}", s.message);
             }
+            // Track recent command results for HUD display
+            m_recentCommandMessages.push_back(s.message);
+            constexpr size_t kMaxMessages = 5;
+            while (m_recentCommandMessages.size() > kMaxMessages) {
+                m_recentCommandMessages.pop_front();
+            }
         }
     }
 
@@ -394,6 +567,11 @@ void Engine::Update(float deltaTime) {
 
 void Engine::Render(float deltaTime) {
     m_renderer->Render(m_registry.get(), deltaTime);
+
+    // Render HUD overlay using GDI on top of the swap chain
+    if (m_showHUD) {
+        RenderHUD();
+    }
 }
 
 std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(const std::string& text) {
@@ -474,6 +652,31 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         return 1;
     };
 
+    // Heuristics for global renderer tweaks when the user talks about brightness or shadows
+    const bool wantsBrighter = contains("brighter") || contains("too dark") || contains("increase brightness") || contains("more light");
+    const bool wantsDarker  = contains("darker") || contains("too bright") || contains("dim it") || contains("less bright");
+    const bool wantsShadowsOff = contains("no shadows") || contains("turn off shadows") || contains("disable shadows");
+    const bool wantsShadowsOn  = contains("cast shadows") || contains("turn on shadows") || contains("enable shadows");
+
+    if (m_renderer && !wantsAdd && (wantsBrighter || wantsDarker || wantsShadowsOff || wantsShadowsOn)) {
+        auto cmd = std::make_shared<LLM::ModifyRendererCommand>();
+        if (wantsBrighter || wantsDarker) {
+            cmd->setExposure = true;
+            float current = m_renderer->GetExposure();
+            if (wantsBrighter) {
+                cmd->exposure = std::max(current * 1.5f, current + 0.25f);
+            } else {
+                cmd->exposure = std::max(current * 0.65f, 0.1f);
+            }
+        }
+        if (wantsShadowsOff || wantsShadowsOn) {
+            cmd->setShadowsEnabled = true;
+            cmd->shadowsEnabled = wantsShadowsOn;
+        }
+        out.push_back(cmd);
+        return out;
+    }
+
     // If the user is not clearly asking to add, prefer to modify the existing showcase cube
     if (!wantsAdd && wantsColorChange) {
         auto cmd = std::make_shared<LLM::ModifyMaterialCommand>();
@@ -489,8 +692,25 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         return out;
     }
 
-    // Default path: add new entity if user hinted at creation
+    // Default path: add new entity or light if user hinted at creation
     if (!wantsAdd) {
+        return out;
+    }
+
+    // Heuristic spotlight helper ("add a spotlight")
+    if (contains("spotlight") || contains("spot light")) {
+        auto cmd = std::make_shared<LLM::AddLightCommand>();
+        cmd->lightType = LLM::AddLightCommand::LightType::Spot;
+        cmd->name = "HeuristicSpotLight";
+        cmd->position = glm::vec3(0.0f, 4.0f, -3.0f);
+        cmd->direction = glm::vec3(0.0f, -1.0f, 0.3f);
+        cmd->color = glm::vec3(1.0f, 0.95f, 0.8f);
+        cmd->intensity = 12.0f;
+        cmd->range = 20.0f;
+        cmd->innerConeDegrees = 20.0f;
+        cmd->outerConeDegrees = 35.0f;
+        cmd->castsShadows = false;
+        out.push_back(cmd);
         return out;
     }
 

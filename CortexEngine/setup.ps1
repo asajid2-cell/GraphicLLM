@@ -207,6 +207,16 @@ if (-not $SkipVcpkg) {
     Pop-Location
     Write-Success "All dependencies installed!"
 }
+else {
+    # When skipping vcpkg installation, try to infer vcpkg root from environment or default location.
+    if (-not $vcpkgRoot) {
+        if ($env:VCPKG_ROOT) {
+            $vcpkgRoot = $env:VCPKG_ROOT
+        } else {
+            $vcpkgRoot = "C:\vcpkg"
+        }
+    }
+}
 
 # ============================================================================
 # STEP 5: Configure & Build
@@ -220,7 +230,13 @@ Write-Info "Ninja Path: $ninjaExe"
 Write-Info "Toolchain:  $toolchainFile"
 
 # Clean build directory
-if (Test-Path $buildDir) { Remove-Item -Recurse -Force $buildDir }
+if (Test-Path $buildDir) {
+    try {
+        Remove-Item -Recurse -Force $buildDir -ErrorAction Stop
+    } catch {
+        Write-Info "Build directory is in use; reusing existing folder instead of deleting it."
+    }
+}
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 Push-Location $buildDir
 

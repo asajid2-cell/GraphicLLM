@@ -3,6 +3,8 @@
 #include <memory>
 #include <array>
 #include <unordered_map>
+#include <spdlog/spdlog.h>
+#include "Core/Window.h"
 #include "RHI/DX12Device.h"
 #include "RHI/DX12CommandQueue.h"
 #include "RHI/DX12Pipeline.h"
@@ -180,6 +182,10 @@ public:
     void SetShadowPCFRadius(float radius);
     void SetCascadeSplitLambda(float lambda);
     void SetBloomIntensity(float intensity);
+    void SetPCSS(bool enabled) { m_pcssEnabled = enabled; }
+    void SetFXAAEnabled(bool enabled) { m_fxaaEnabled = enabled; }
+    [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
+    [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
 
 private:
     static constexpr uint32_t kShadowCascadeCount = 3;
@@ -201,9 +207,11 @@ private:
     Result<void> CreatePlaceholderTexture();
     Result<void> CreateShadowMapResources();
     Result<void> CreateHDRTarget();
+    Result<void> CreateBloomResources();
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
+    void RenderBloom();
     void RenderPostProcess();
 
     // Graphics resources
@@ -226,6 +234,9 @@ private:
     std::unique_ptr<DX12Pipeline> m_pipeline;
     std::unique_ptr<DX12Pipeline> m_shadowPipeline;
     std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
+    std::unique_ptr<DX12Pipeline> m_bloomDownsamplePipeline;
+    std::unique_ptr<DX12Pipeline> m_bloomBlurHPipeline;
+    std::unique_ptr<DX12Pipeline> m_bloomBlurVPipeline;
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
@@ -258,6 +269,16 @@ private:
     DescriptorHandle m_hdrRTV;
     DescriptorHandle m_hdrSRV;
     D3D12_RESOURCE_STATES m_hdrState = D3D12_RESOURCE_STATE_COMMON;
+
+    // Bloom textures (quarter resolution ping-pong)
+    ComPtr<ID3D12Resource> m_bloomTexA;
+    ComPtr<ID3D12Resource> m_bloomTexB;
+    DescriptorHandle m_bloomRTV[2];
+    DescriptorHandle m_bloomSRV[2];
+    D3D12_RESOURCE_STATES m_bloomState[2] = {
+        D3D12_RESOURCE_STATE_COMMON,
+        D3D12_RESOURCE_STATE_COMMON
+    };
 
     // Default resources
     std::shared_ptr<DX12Texture> m_placeholderAlbedo;
@@ -292,6 +313,8 @@ private:
     float m_cascadeResolutionScale[kShadowCascadeCount] = { 1.0f, 1.0f, 1.0f };
 
     uint32_t m_debugViewMode = 0;
+    bool m_pcssEnabled = false;
+    bool m_fxaaEnabled = true;
 
     // Frame state
     float m_totalTime = 0.0f;

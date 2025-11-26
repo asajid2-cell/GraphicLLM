@@ -27,14 +27,17 @@ public:
         }
         ss << "You may receive a scene summary; use it to target existing entities by name instead of inventing new ones.\n\n";
         ss << "Allowed commands:\n"
-           << "- add_entity: cube|sphere|plane|cylinder|pyramid|cone|torus with name, position[3], scale[3], color[4], metallic (0-1), roughness (0-1), ao (0-1).\n"
+           << "- add_entity: cube|sphere|plane|cylinder|pyramid|cone|torus with name, position[3], scale[3], color[4], metallic (0-1), roughness (0-1), ao (0-1). You may also set \"segments\" or \"detail\":\"low|medium|high\" on curved shapes.\n"
            << "- remove_entity: target name.\n"
            << "- modify_transform: target name, position[3], rotation[3] (Euler angles in degrees), scale[3].\n"
            << "- modify_material: target name, color[4], metallic (0-1), roughness (0-1).\n"
            << "- modify_camera: position[3], fov.\n"
            << "- add_light: light_type (\"point\"|\"spot\"|\"directional\"), name, position[3], optional direction[3], color[4], intensity (>0), range (>0), inner_cone (degrees), outer_cone (degrees), casts_shadows (bool).\n"
            << "- modify_light: target name, optional light_type, position[3], direction[3], color[4], intensity (>0), range (>0), inner_cone, outer_cone, casts_shadows.\n"
-           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-5), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1).\n\n";
+           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-5), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1).\n"
+           << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...]}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element.\n"
+           << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|house|tree|pillar|grass_blade\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...]}. A compound spawns multiple primitives as one logical object.\n"
+           << "- modify_group / modify_pattern: {\"type\":\"modify_group\",\"group\":\"Bird_A\" or \"Field_Grass\",\"position_offset\":[dx,dy,dz],\"scale_multiplier\":[sx,sy,sz]}. This edits all entities whose names start with that group prefix. Prefer distinctive group names (e.g. Bird_A, Field_Grass) to avoid overlapping prefixes.\n\n";
         ss << "Positioning guidelines:\n"
            << "- Origin (0,0,0) may already have an object; consult the scene summary before placing on top of it\n"
            << "- Place new objects offset: left (-2 to -4, Y, Z), right (2 to 4, Y, Z), or forward/back (X, Y, -3 to 3)\n"
@@ -47,10 +50,12 @@ public:
            << "- Rough/textured: metallic=0, roughness=0.7-1.0 (coarse surface)\n"
            << "- Mirror-like: metallic=1, roughness=0 (perfect reflection)\n"
            << "- Glossy metal: metallic=1, roughness=0.1-0.3 (polished metal)\n\n";
-        ss << "Supported shapes: cube, sphere, plane, cylinder, pyramid, cone, torus (NOT triangle/square - use cube/plane instead)\n\n";
+        ss << "Supported shapes: cube, sphere, plane, cylinder, pyramid, cone, torus (NOT triangle/square - use cube/plane instead).\n"
+           << "You may also refer to simple variants like capsule, rounded box, wedge, arch, pillar, or grass_blade; these map onto the core primitives (cylinder/sphere/plane/etc.).\n\n";
         ss << "Supported colors (RGBA 0-1): red, blue, green, yellow, cyan, magenta, orange, purple, pink,\n"
            << "lime, teal, violet, brown, tan, maroon, olive, navy, turquoise, gold, silver, bronze,\n"
            << "white, black, gray, lightgray, darkgray.\n\n";
+        ss << "You can build larger objects (like birds, houses, or trees) by combining primitives. Prefer using add_compound and add_pattern macros instead of emitting hundreds of raw add_entity commands.\n\n";
         ss << "Example response:\n";
         ss << "{\"commands\":[{\"type\":\"modify_material\",\"target\":\"" << preferredTarget << "\",\"color\":[1,0,0,1]}]}\n\n";
         ss << "Rules:\n"
@@ -103,6 +108,18 @@ public:
 
         addExample("Example 12:\nUser: \"Add a bright point light above the cube\"",
                    "{\"commands\":[{\"type\":\"add_light\",\"light_type\":\"point\",\"name\":\"OverheadLight\",\"position\":[0,4,-2],\"color\":[1,0.95,0.8,1],\"intensity\":12,\"range\":15}]}");
+
+        addExample("Example 13:\nUser: \"Create a row of 6 lanterns\"",
+                   "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"row\",\"element\":\"pillar\",\"count\":6,"
+                   "\"region\":[0,1,-4,0,1,-4],\"spacing\":[1.5,0,0]}]}");
+
+        addExample("Example 14:\nUser: \"Make a grassy field\"",
+                   "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"grid\",\"element\":\"grass_blade\",\"count\":64,"
+                   "\"region\":[-8,0,-8,8,0,8],\"spacing\":[2,0,2]}]}");
+
+        addExample("Example 15:\nUser: \"Add a giant bird on the right\"",
+                   "{\"commands\":[{\"type\":\"add_compound\",\"template\":\"bird\",\"name\":\"BigBird\","
+                   "\"position\":[4,1,0],\"scale\":[2,2,2]}]}");
 
         return ss.str();
     }

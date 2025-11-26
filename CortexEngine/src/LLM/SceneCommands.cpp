@@ -90,6 +90,25 @@ std::string ModifyRendererCommand::ToString() const {
     return "ModifyRenderer";
 }
 
+std::string AddPatternCommand::ToString() const {
+    std::string patternStr;
+    switch (pattern) {
+        case AddPatternCommand::PatternType::Row:   patternStr = "row"; break;
+        case AddPatternCommand::PatternType::Grid:  patternStr = "grid"; break;
+        case AddPatternCommand::PatternType::Ring:  patternStr = "ring"; break;
+        case AddPatternCommand::PatternType::Random:patternStr = "random"; break;
+    }
+    return "AddPattern: " + patternStr + " of " + element;
+}
+
+std::string AddCompoundCommand::ToString() const {
+    return "AddCompound: " + templateName + " as " + instanceName;
+}
+
+std::string ModifyGroupCommand::ToString() const {
+    return "ModifyGroup: " + groupName;
+}
+
 std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
 
@@ -112,13 +131,35 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
 
                 if (cmdJson.contains("entity_type")) {
                     std::string entityType = cmdJson["entity_type"];
-                    if (entityType == "cube") cmd->entityType = AddEntityCommand::EntityType::Cube;
-                    else if (entityType == "sphere") cmd->entityType = AddEntityCommand::EntityType::Sphere;
-                    else if (entityType == "plane") cmd->entityType = AddEntityCommand::EntityType::Plane;
-                    else if (entityType == "cylinder") cmd->entityType = AddEntityCommand::EntityType::Cylinder;
-                    else if (entityType == "pyramid") cmd->entityType = AddEntityCommand::EntityType::Pyramid;
-                    else if (entityType == "cone") cmd->entityType = AddEntityCommand::EntityType::Cone;
-                    else if (entityType == "torus") cmd->entityType = AddEntityCommand::EntityType::Torus;
+                    std::string lowered = entityType;
+                    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    // Allow richer vocabulary by mapping synonyms onto existing primitives.
+                    if (lowered == "cube" || lowered == "box" || lowered == "rounded_box") {
+                        cmd->entityType = AddEntityCommand::EntityType::Cube;
+                    } else if (lowered == "sphere" || lowered == "ball" ||
+                               lowered == "lowpoly_sphere" || lowered == "highpoly_sphere") {
+                        cmd->entityType = AddEntityCommand::EntityType::Sphere;
+                        // Heuristic detail hints from name
+                        if (lowered == "lowpoly_sphere") {
+                            cmd->segmentsPrimary = 16;
+                            cmd->segmentsSecondary = 8;
+                        } else if (lowered == "highpoly_sphere") {
+                            cmd->segmentsPrimary = 48;
+                            cmd->segmentsSecondary = 32;
+                        }
+                    } else if (lowered == "plane" || lowered == "thin_plane" ||
+                               lowered == "leaf" || lowered == "wing") {
+                        cmd->entityType = AddEntityCommand::EntityType::Plane;
+                    } else if (lowered == "cylinder" || lowered == "capsule" || lowered == "pillar") {
+                        cmd->entityType = AddEntityCommand::EntityType::Cylinder;
+                    } else if (lowered == "pyramid" || lowered == "wedge") {
+                        cmd->entityType = AddEntityCommand::EntityType::Pyramid;
+                    } else if (lowered == "cone") {
+                        cmd->entityType = AddEntityCommand::EntityType::Cone;
+                    } else if (lowered == "torus" || lowered == "arch") {
+                        cmd->entityType = AddEntityCommand::EntityType::Torus;
+                    }
                 }
 
                 if (cmdJson.contains("name") && cmdJson["name"].is_string()) cmd->name = cmdJson["name"];
@@ -131,6 +172,37 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("color")) {
                     ReadVec4(cmdJson["color"], "color", cmd->color);
                 }
+                // Optional geometry detail knobs
+                if (cmdJson.contains("segments")) {
+                    float s = ReadNumber(cmdJson["segments"], "segments", 32.0f);
+                    uint32_t seg = static_cast<uint32_t>(std::clamp(s, 8.0f, 96.0f));
+                    cmd->segmentsPrimary = seg;
+                    cmd->segmentsSecondary = std::max<uint32_t>(8u, seg / 2u);
+                }
+                if (cmdJson.contains("segments_primary")) {
+                    float s = ReadNumber(cmdJson["segments_primary"], "segments_primary", static_cast<float>(cmd->segmentsPrimary));
+                    cmd->segmentsPrimary = static_cast<uint32_t>(std::clamp(s, 8.0f, 96.0f));
+                }
+                if (cmdJson.contains("segments_secondary")) {
+                    float s = ReadNumber(cmdJson["segments_secondary"], "segments_secondary", static_cast<float>(cmd->segmentsSecondary));
+                    cmd->segmentsSecondary = static_cast<uint32_t>(std::clamp(s, 4.0f, 64.0f));
+                }
+                if (cmdJson.contains("detail") && cmdJson["detail"].is_string()) {
+                    std::string d = cmdJson["detail"];
+                    std::transform(d.begin(), d.end(), d.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (d == "low") {
+                        cmd->segmentsPrimary = 16;
+                        cmd->segmentsSecondary = 8;
+                    } else if (d == "medium") {
+                        cmd->segmentsPrimary = 24;
+                        cmd->segmentsSecondary = 12;
+                    } else if (d == "high" || d == "smooth") {
+                        cmd->segmentsPrimary = 48;
+                        cmd->segmentsSecondary = 32;
+                    }
+                }
+                // Macros may set this flag later; JSON field is intentionally not exposed.
                 if (cmdJson.contains("metallic")) {
                     cmd->metallic = std::clamp(ReadNumber(cmdJson["metallic"], "metallic"), 0.0f, 1.0f);
                 }
@@ -141,6 +213,72 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     cmd->ao = std::clamp(ReadNumber(cmdJson["ao"], "ao"), 0.0f, 1.0f);
                 }
 
+                commands.push_back(cmd);
+            }
+            else if (type == "add_pattern") {
+                auto cmd = std::make_shared<AddPatternCommand>();
+                if (cmdJson.contains("pattern") && cmdJson["pattern"].is_string()) {
+                    std::string p = cmdJson["pattern"];
+                    std::transform(p.begin(), p.end(), p.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (p == "row") cmd->pattern = AddPatternCommand::PatternType::Row;
+                    else if (p == "grid") cmd->pattern = AddPatternCommand::PatternType::Grid;
+                    else if (p == "ring") cmd->pattern = AddPatternCommand::PatternType::Ring;
+                    else if (p == "random") cmd->pattern = AddPatternCommand::PatternType::Random;
+                }
+                if (cmdJson.contains("element") && cmdJson["element"].is_string()) {
+                    cmd->element = cmdJson["element"];
+                }
+                if (cmdJson.contains("count")) {
+                    int c = static_cast<int>(ReadNumber(cmdJson["count"], "count", 1.0f));
+                    cmd->count = std::max(1, c);
+                }
+                if (cmdJson.contains("region") && cmdJson["region"].is_array()) {
+                    const auto& arr = cmdJson["region"];
+                    if (arr.size() >= 6) {
+                        cmd->hasRegionBox = true;
+                        cmd->regionMin = glm::vec3(
+                            ReadNumber(arr[0], "region_x0"),
+                            ReadNumber(arr[1], "region_y0"),
+                            ReadNumber(arr[2], "region_z0"));
+                        cmd->regionMax = glm::vec3(
+                            ReadNumber(arr[3], "region_x1"),
+                            ReadNumber(arr[4], "region_y1"),
+                            ReadNumber(arr[5], "region_z1"));
+                    } else if (arr.size() >= 3) {
+                        cmd->hasRegionBox = false;
+                        ReadVec3(arr, "region_center", cmd->regionMin);
+                        cmd->regionMax = cmd->regionMin;
+                    }
+                }
+                if (cmdJson.contains("spacing") && cmdJson["spacing"].is_array()) {
+                    cmd->hasSpacing = ReadVec3(cmdJson["spacing"], "spacing", cmd->spacing);
+                }
+                if (cmdJson.contains("name_prefix") && cmdJson["name_prefix"].is_string()) {
+                    cmd->namePrefix = cmdJson["name_prefix"];
+                }
+                if (cmdJson.contains("group") && cmdJson["group"].is_string()) {
+                    cmd->groupName = cmdJson["group"];
+                }
+                if (cmdJson.contains("element_scale") && cmdJson["element_scale"].is_array()) {
+                    cmd->hasElementScale = ReadVec3(cmdJson["element_scale"], "element_scale", cmd->elementScale);
+                }
+                commands.push_back(cmd);
+            }
+            else if (type == "add_compound") {
+                auto cmd = std::make_shared<AddCompoundCommand>();
+                if (cmdJson.contains("template") && cmdJson["template"].is_string()) {
+                    cmd->templateName = cmdJson["template"];
+                }
+                if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                    cmd->instanceName = cmdJson["name"];
+                }
+                if (cmdJson.contains("position")) {
+                    ReadVec3(cmdJson["position"], "position", cmd->position);
+                }
+                if (cmdJson.contains("scale")) {
+                    ReadVec3(cmdJson["scale"], "scale", cmd->scale);
+                }
                 commands.push_back(cmd);
             }
             else if (type == "remove_entity") {
@@ -281,6 +419,21 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     cmd->cascadeSplitLambda = std::clamp(v, 0.0f, 1.0f);
                 }
 
+                commands.push_back(cmd);
+            }
+            else if (type == "modify_group" || type == "modify_pattern") {
+                auto cmd = std::make_shared<ModifyGroupCommand>();
+                if (cmdJson.contains("group") && cmdJson["group"].is_string()) {
+                    cmd->groupName = cmdJson["group"];
+                } else if (cmdJson.contains("pattern") && cmdJson["pattern"].is_string()) {
+                    cmd->groupName = cmdJson["pattern"];
+                }
+                if (cmdJson.contains("position_offset")) {
+                    cmd->hasPositionOffset = ReadVec3(cmdJson["position_offset"], "position_offset", cmd->positionOffset);
+                }
+                if (cmdJson.contains("scale_multiplier")) {
+                    cmd->hasScaleMultiplier = ReadVec3(cmdJson["scale_multiplier"], "scale_multiplier", cmd->scaleMultiplier);
+                }
                 commands.push_back(cmd);
             }
             else if (type == "add_light") {

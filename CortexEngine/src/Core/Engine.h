@@ -3,6 +3,7 @@
 #include <memory>
 #include <chrono>
 #include <string>
+#include <deque>
 #include <entt/entt.hpp>
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
@@ -90,6 +91,11 @@ private:
     float m_frameTime = 0.0f;
     uint32_t m_frameCount = 0;
     float m_fpsTimer = 0.0f;
+
+    // HUD / debug overlay
+    void RenderHUD();
+    bool m_showHUD = true;
+    std::deque<std::string> m_recentCommandMessages;
 
     // Camera control state
     void ShowCameraHelpOverlay();

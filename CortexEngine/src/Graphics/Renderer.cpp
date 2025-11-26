@@ -241,6 +241,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         RenderScene(registry);
     }
 
+    // Bloom passes operating on HDR buffer (if available)
+    RenderBloom();
+
     // Post-process HDR -> back buffer (or no-op if HDR disabled)
     RenderPostProcess();
     EndFrame();
@@ -441,8 +444,9 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
     }
 
-    // Time/exposure and lighting state (w = bloom intensity)
-    frameData.timeAndExposure = glm::vec4(m_totalTime, deltaTime, m_exposure, m_bloomIntensity);
+    // Time/exposure and lighting state (w = bloom intensity, disabled if bloom SRV missing)
+    float bloom = (m_bloomSRV[0].IsValid() ? m_bloomIntensity : 0.0f);
+    frameData.timeAndExposure = glm::vec4(m_totalTime, deltaTime, m_exposure, bloom);
 
     glm::vec3 ambient = m_ambientLightColor * m_ambientLightIntensity;
     frameData.ambientColor = glm::vec4(ambient, 0.0f);
@@ -604,8 +608,13 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         frameData.lightViewProjection[cascadeIndex] = m_lightViewProjectionMatrices[cascadeIndex];
     }
 
-    frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, 0.0f);
+    frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
     frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
+
+    // Post-process parameters: reciprocal resolution and FXAA flag
+    float invWidth = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetWidth()));
+    float invHeight = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetHeight()));
+    frameData.postParams = glm::vec4(invWidth, invHeight, m_fxaaEnabled ? 1.0f : 0.0f, 0.0f);
 
     m_frameDataCPU = frameData;
     m_frameConstantBuffer.UpdateData(m_frameDataCPU);
@@ -1420,6 +1429,13 @@ Result<void> Renderer::CreateHDRTarget() {
     );
 
     spdlog::info("HDR target created: {}x{}", width, height);
+
+    // (Re)create bloom render targets that depend on HDR size
+    auto bloomResult = CreateBloomResources();
+    if (bloomResult.IsErr()) {
+        spdlog::warn("Failed to create bloom resources: {}", bloomResult.Error());
+    }
+
     return Result<void>::Ok();
 }
 
@@ -1577,6 +1593,58 @@ Result<void> Renderer::CompileShaders() {
 
     if (postPipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
+    }
+
+    // Bloom pipelines (fullscreen passes reusing VSMain)
+    // Downsample + bright-pass
+    m_bloomDownsamplePipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc bloomDownDesc = postDesc;
+    bloomDownDesc.pixelShader = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "BloomDownsamplePS",
+        "ps_5_1"
+    ).ValueOr(postPsResult.Value());
+    auto bloomDownResult = m_bloomDownsamplePipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        bloomDownDesc
+    );
+    if (bloomDownResult.IsErr()) {
+        return Result<void>::Err("Failed to create bloom downsample pipeline: " + bloomDownResult.Error());
+    }
+
+    // Horizontal blur
+    m_bloomBlurHPipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc bloomBlurHDesc = postDesc;
+    bloomBlurHDesc.pixelShader = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "BloomBlurHPS",
+        "ps_5_1"
+    ).ValueOr(postPsResult.Value());
+    auto bloomBlurHResult = m_bloomBlurHPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        bloomBlurHDesc
+    );
+    if (bloomBlurHResult.IsErr()) {
+        return Result<void>::Err("Failed to create bloom horizontal blur pipeline: " + bloomBlurHResult.Error());
+    }
+
+    // Vertical blur
+    m_bloomBlurVPipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc bloomBlurVDesc = postDesc;
+    bloomBlurVDesc.pixelShader = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "BloomBlurVPS",
+        "ps_5_1"
+    ).ValueOr(postPsResult.Value());
+    auto bloomBlurVResult = m_bloomBlurVPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        bloomBlurVDesc
+    );
+    if (bloomBlurVResult.IsErr()) {
+        return Result<void>::Err("Failed to create bloom vertical blur pipeline: " + bloomBlurVResult.Error());
     }
 
     return Result<void>::Ok();
@@ -1824,12 +1892,53 @@ void Renderer::RenderPostProcess() {
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Bind the persistent HDR SRV directly at table (t0)
+    // Allocate transient descriptors for HDR (t0) and bloom (t1)
     if (!m_hdrSRV.IsValid()) {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
     }
-    m_commandList->SetGraphicsRootDescriptorTable(3, m_hdrSRV.gpu);
+
+    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (hdrHandleResult.IsErr()) {
+        spdlog::error("RenderPostProcess: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+        return;
+    }
+    DescriptorHandle hdrHandle = hdrHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        hdrHandle.cpu,
+        m_hdrSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // Optional bloom SRV (t1) – use final blurred bloom texture if available
+    DescriptorHandle bloomHandle = {};
+    if (m_bloomSRV[0].IsValid()) {
+        auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (bloomAllocResult.IsOk()) {
+            bloomHandle = bloomAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                bloomHandle.cpu,
+                m_bloomSRV[0].cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient bloom SRV, disabling bloom for this frame");
+            // Ensure post-process shader sees bloomIntensity = 0 so it won't sample t1.
+            m_frameDataCPU.timeAndExposure.w = 0.0f;
+            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+        }
+    }
+
+    // Bind SRV table starting at t0
+    m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
+
+    // Bind shadow map SRV for cascade visualization (if available)
+    if (m_shadowMapSRV.IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowMapSRV.gpu);
+    }
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawInstanced(3, 1, 0, 0);

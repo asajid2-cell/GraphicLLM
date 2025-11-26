@@ -17,6 +17,9 @@ enum class CommandType {
     AddLight,
     ModifyLight,
     ModifyRenderer,
+    AddPattern,
+    AddCompound,
+    ModifyGroup,
     Unknown
 };
 
@@ -39,9 +42,64 @@ struct AddEntityCommand : public SceneCommand {
     float roughness = 0.5f;
     float ao = 1.0f;
     std::string name;
-    bool autoPlace = false; // let the executor pick a spawn position if true
+    bool autoPlace = false;       // let the executor pick a spawn position if true
+
+    // Geometry detail controls for high/low poly variants
+    // Used primarily for spheres, cylinders, cones, and tori.
+    // Interpreted as "segments around" and "segments along" (or minor segments).
+    uint32_t segmentsPrimary = 32;
+    uint32_t segmentsSecondary = 16;
+
+    // When false, the executor will not add random jitter around the requested
+    // position. Patterns/compounds use this to keep layouts crisp.
+    bool allowPlacementJitter = true;
+
+    // When true, the executor will skip collision avoidance for this entity
+    // and place it exactly at the requested position (clamped to world bounds).
+    bool disableCollisionAvoidance = false;
 
     AddEntityCommand() { type = CommandType::AddEntity; }
+    std::string ToString() const override;
+};
+
+// Add a high-level spatial pattern of repeated elements (row, grid, ring, random scatter)
+struct AddPatternCommand : public SceneCommand {
+    enum class PatternType { Row, Grid, Ring, Random };
+
+    PatternType pattern = PatternType::Row;
+    std::string element;          // "cube", "sphere", "tree", "grass_blade", etc.
+    int count = 1;
+
+    // Optional region hint. If hasRegionBox is false, regionMin is treated as a center.
+    glm::vec3 regionMin = glm::vec3(0.0f);
+    glm::vec3 regionMax = glm::vec3(0.0f);
+    bool hasRegionBox = false;
+
+    // Optional spacing hint for rows/grids.
+    glm::vec3 spacing = glm::vec3(1.0f);
+    bool hasSpacing = false;
+
+    // Optional naming/group hints so the LLM can later modify groups.
+    std::string namePrefix;       // e.g. "Lantern", "GrassBlade"
+    std::string groupName;        // e.g. "Row_Lanterns", "Field_Grass"
+
+    // Optional per-element scale for compounds/primitives spawned by this pattern.
+    // If not set, compounds default to scale 1 and primitives keep their own defaults.
+    glm::vec3 elementScale = glm::vec3(1.0f);
+    bool hasElementScale = false;
+
+    AddPatternCommand() { type = CommandType::AddPattern; }
+    std::string ToString() const override;
+};
+
+// Add a compound prefab like "tree", "house", or "bird"
+struct AddCompoundCommand : public SceneCommand {
+    std::string templateName;     // e.g. "tree", "house", "bird"
+    std::string instanceName;     // Optional user-facing name, e.g. "BigBird"
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 scale = glm::vec3(1.0f);
+
+    AddCompoundCommand() { type = CommandType::AddCompound; }
     std::string ToString() const override;
 };
 
@@ -157,6 +215,21 @@ struct ModifyRendererCommand : public SceneCommand {
     float cascadeSplitLambda = 0.5f;
 
     ModifyRendererCommand() { type = CommandType::ModifyRenderer; }
+    std::string ToString() const override;
+};
+
+// Modify a logical group or pattern of entities identified by a shared prefix
+// in their TagComponent (e.g. "Bird_A.", "Field_Grass").
+struct ModifyGroupCommand : public SceneCommand {
+    std::string groupName;        // prefix or exact name of the group
+
+    // Offsets / multipliers applied to every member of the group.
+    bool hasPositionOffset = false;
+    bool hasScaleMultiplier = false;
+    glm::vec3 positionOffset = glm::vec3(0.0f);   // additive offset
+    glm::vec3 scaleMultiplier = glm::vec3(1.0f);  // multiplicative scale
+
+    ModifyGroupCommand() { type = CommandType::ModifyGroup; }
     std::string ToString() const override;
 };
 

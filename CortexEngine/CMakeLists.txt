@@ -31,9 +31,17 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
-find_package(CUDAToolkit REQUIRED)
+# Enable CUDA backend for ggml / llama.cpp. We let llama.cpp's
+# own CMake handle CUDAToolkit detection, but we ensure the
+# Windows resource compiler is defined so CMake's CUDA/RC logic
+# can configure correctly even when RC isn't auto-detected.
 set(GGML_CUDA ON CACHE BOOL "" FORCE)
-message(STATUS "CUDA toolkit found at: ${CUDAToolkit_LIBRARY_ROOT}")
+
+if (WIN32 AND MSVC AND NOT CMAKE_RC_COMPILER)
+    # rc.exe is provided by the Windows SDK / MSVC toolset and
+    # should be on PATH when using the VS developer environment.
+    set(CMAKE_RC_COMPILER "rc.exe" CACHE FILEPATH "Resource compiler" FORCE)
+endif()
 
 add_subdirectory(vendor/llama.cpp)
 
@@ -55,6 +63,7 @@ set(CORTEX_SOURCES
     src/Graphics/RHI/DX12Pipeline.cpp
     src/Graphics/TextureLoader.cpp
     src/Graphics/Renderer.cpp
+    src/Graphics/Renderer_Bloom.cpp
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
@@ -67,6 +76,8 @@ set(CORTEX_SOURCES
     src/LLM/SceneCommands.cpp
     src/LLM/CommandQueue.cpp
     src/LLM/SceneLookup.cpp
+    src/LLM/RegressionTests.cpp
+    src/LLM/CompoundLibrary.cpp
 
     # UI helpers
     src/UI/TextPrompt.cpp
@@ -102,6 +113,8 @@ set(CORTEX_HEADERS
     src/LLM/CommandQueue.h
     src/LLM/SceneLookup.h
     src/LLM/Prompts.h
+    src/LLM/RegressionTests.h
+    src/LLM/CompoundLibrary.h
 
     # UI helpers
     src/UI/TextPrompt.h

@@ -103,7 +103,7 @@ void SceneLookup::TrackEntity(entt::entity entity,
 
     m_recent.push_back(e);
     m_nameToEntity[e.normalizedTag] = entity;
-    while (m_recent.size() > 32) {
+    while (m_recent.size() > 128) {
         auto oldest = m_recent.front();
         m_recent.pop_front();
         // Only erase if this tag still points to that entity
@@ -318,8 +318,39 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
     if (!registry) return {};
     PruneInvalid(registry);
 
+    struct GroupStats {
+        int count = 0;
+        glm::vec3 minPos{0.0f};
+        glm::vec3 maxPos{0.0f};
+        bool hasBounds = false;
+    };
+
+    auto deriveGroupId = [](const std::string& tag) -> std::string {
+        // "Bird_A.Body" -> "Bird_A"
+        auto dotPos = tag.find('.');
+        if (dotPos != std::string::npos && dotPos > 0) {
+            return tag.substr(0, dotPos);
+        }
+        // "Field_Grass_12" -> "Field_Grass"
+        auto underscore = tag.find_last_of('_');
+        if (underscore != std::string::npos && underscore + 1 < tag.size()) {
+            bool allDigits = true;
+            for (size_t i = underscore + 1; i < tag.size(); ++i) {
+                if (!std::isdigit(static_cast<unsigned char>(tag[i]))) {
+                    allDigits = false;
+                    break;
+                }
+            }
+            if (allDigits && underscore > 0) {
+                return tag.substr(0, underscore);
+            }
+        }
+        return {};
+    };
+
     std::map<std::string, int> typeCounts;
-    std::ostringstream ss;
+    std::map<std::string, GroupStats> groupStats;
+    std::ostringstream perEntity;
     size_t written = 0;
 
     auto view = registry->View<Scene::TagComponent, Scene::RenderableComponent, Scene::TransformComponent>();
@@ -339,6 +370,20 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
         typeCounts[type]++;
         total++;
 
+        // Grouping by tag prefix to support compounds/patterns like Bird_A.Body, Field_Grass_12, etc.
+        std::string groupId = deriveGroupId(tag.tag);
+        if (!groupId.empty()) {
+            auto& g = groupStats[groupId];
+            g.count++;
+            if (!g.hasBounds) {
+                g.minPos = g.maxPos = transform.position;
+                g.hasBounds = true;
+            } else {
+                g.minPos = glm::min(g.minPos, transform.position);
+                g.maxPos = glm::max(g.maxPos, transform.position);
+            }
+        }
+
         std::ostringstream line;
         line << tag.tag << "(" << type;
         if (!color.empty()) line << "," << color;
@@ -347,14 +392,15 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
         line << std::round(transform.position.y * 10.0f) / 10.0f << ",";
         line << std::round(transform.position.z * 10.0f) / 10.0f << ")";
 
-        if (written + line.str().size() + 2 < maxChars) {
+        const std::string lineStr = line.str();
+        if (written + lineStr.size() + 2 < maxChars) {
             if (written == 0) {
-                ss << "Entities: ";
+                perEntity << "Entities: ";
             } else {
-                ss << "; ";
+                perEntity << "; ";
             }
-            ss << line.str();
-            written += line.str().size() + 2;
+            perEntity << lineStr;
+            written += lineStr.size() + 2;
         }
     }
 
@@ -367,7 +413,145 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
     }
     if (!typeCounts.empty()) header << ". ";
 
-    std::string summary = header.str() + ss.str();
+    // Summarize logical groups (compounds/patterns)
+    if (!groupStats.empty()) {
+        header << "Groups ";
+        size_t printed = 0;
+        for (const auto& [name, g] : groupStats) {
+            if (g.count < 2) continue; // ignore singletons
+            if (printed > 0) header << ", ";
+            header << name << "(" << g.count << ")";
+            if (++printed >= 4) {
+                header << ", ...";
+                break;
+            }
+        }
+        if (header.tellp() > 0) header << ". ";
+    }
+
+    // Simple spatial structure hints for rows/grids based on group bounds
+    std::ostringstream structures;
+    size_t structuresWritten = 0;
+    for (const auto& [name, g] : groupStats) {
+        if (g.count < 3 || !g.hasBounds) continue;
+        glm::vec3 extents = g.maxPos - g.minPos;
+        float ex = std::abs(extents.x);
+        float ez = std::abs(extents.z);
+        float ey = std::abs(extents.y);
+
+        std::ostringstream line;
+        if (ex > 2.0f * ez && ez < ex * 0.25f) {
+            float zMid = (g.minPos.z + g.maxPos.z) * 0.5f;
+            line << "Row '" << name << "' of " << g.count << " parts along X near z="
+                 << std::round(zMid * 10.0f) / 10.0f;
+        } else if (ex > 1.5f && ez > 1.5f) {
+            int approxX = static_cast<int>(std::round(std::sqrt(static_cast<float>(g.count))));
+            approxX = std::max(1, approxX);
+            int approxZ = std::max(1, g.count / approxX);
+            line << "Grid '" << name << "' approx " << approxX << "x" << approxZ
+                 << " spanning x=[" << std::round(g.minPos.x) << "," << std::round(g.maxPos.x)
+                 << "], z=[" << std::round(g.minPos.z) << "," << std::round(g.maxPos.z) << "]";
+        } else {
+            continue;
+        }
+
+        const std::string s = line.str();
+        if (structuresWritten + s.size() + 2 < maxChars / 2) {
+            if (structuresWritten == 0) {
+                structures << " Patterns: ";
+            } else {
+                structures << "; ";
+            }
+            structures << s;
+            structuresWritten += s.size() + 2;
+        }
+    }
+
+#if 0
+    // Summarize lights separately so the LLM can reason about lighting
+    std::ostringstream lights;
+    size_t lightsWritten = 0;
+    auto lightView = registry->View<Scene::TagComponent, Scene::LightComponent, Scene::TransformComponent>();
+    int lightCount = 0;
+    for (auto entity : lightView) {
+        const auto& tag = lightView.get<Scene::TagComponent>(entity);
+        const auto& light = lightView.get<Scene::LightComponent>(entity);
+        const auto& transform = lightView.get<Scene::TransformComponent>(entity);
+
+        std::string typeStr = "point";
+        switch (light.type) {
+            case Scene::LightType::Directional: typeStr = "directional"; break;
+            case Scene::LightType::Spot:        typeStr = "spot"; break;
+            case Scene::LightType::Point:       typeStr = "point"; break;
+        }
+
+        std::ostringstream line;
+        line << tag.tag << "(" << typeStr << ",int≈"
+             << std::round(light.intensity * 10.0f) / 10.0f << ")@("
+             << std::round(transform.position.x * 10.0f) / 10.0f << ","
+             << std::round(transform.position.y * 10.0f) / 10.0f << ","
+             << std::round(transform.position.z * 10.0f) / 10.0f << ")";
+
+        const std::string s = line.str();
+        if (lightsWritten + s.size() + 2 < maxChars / 4) {
+            if (lightsWritten == 0) {
+                lights << " Lights: ";
+            } else {
+                lights << "; ";
+            }
+            lights << s;
+            lightsWritten += s.size() + 2;
+        }
+        ++lightCount;
+        if (lightCount >= 4) {
+            break;
+        }
+    }
+#endif
+
+    // Build a cleaned light summary used in the final text
+    std::ostringstream lights2;
+    {
+        auto viewLights = registry->View<Scene::TagComponent, Scene::LightComponent, Scene::TransformComponent>();
+        size_t written = 0;
+        size_t count = 0;
+        for (auto entity : viewLights) {
+            const auto& tag2 = viewLights.get<Scene::TagComponent>(entity);
+            const auto& light2 = viewLights.get<Scene::LightComponent>(entity);
+            const auto& transform2 = viewLights.get<Scene::TransformComponent>(entity);
+
+            std::string typeStr2 = "point";
+            switch (light2.type) {
+                case Scene::LightType::Directional: typeStr2 = "directional"; break;
+                case Scene::LightType::Spot:        typeStr2 = "spot"; break;
+                case Scene::LightType::Point:       typeStr2 = "point"; break;
+            }
+
+            std::ostringstream line2;
+            line2 << tag2.tag << "(" << typeStr2 << ",I="
+                  << std::round(light2.intensity * 10.0f) / 10.0f << ")@("
+                  << std::round(transform2.position.x * 10.0f) / 10.0f << ","
+                  << std::round(transform2.position.y * 10.0f) / 10.0f << ","
+                  << std::round(transform2.position.z * 10.0f) / 10.0f << ")";
+
+            const std::string s2 = line2.str();
+            if (written + s2.size() + 2 < maxChars / 4) {
+                if (written == 0) {
+                    lights2 << " Lights: ";
+                } else {
+                    lights2 << "; ";
+                }
+                lights2 << s2;
+                written += s2.size() + 2;
+            }
+
+            if (++count >= 4) {
+                break;
+            }
+        }
+    }
+
+    std::string summary = header.str() + lights2.str() + perEntity.str() + structures.str();
     if (summary.size() > maxChars) {
         summary.resize(maxChars);
     }

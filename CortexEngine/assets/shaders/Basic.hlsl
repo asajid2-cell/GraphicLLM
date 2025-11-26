@@ -36,6 +36,8 @@ cbuffer FrameConstants : register(b1)
     float4 g_ShadowParams;
     // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index), others reserved
     float4 g_DebugMode;
+    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
+    float4 g_PostParams;
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -164,6 +166,29 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
+float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius, uint cascadeIndex)
+{
+    float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+
+    float shadow = 0.0f;
+    int samples = 0;
+
+    [unroll]
+    for (int x = -1; x <= 1; ++x)
+    {
+        [unroll]
+        for (int y = -1; y <= 1; ++y)
+        {
+            float2 offset = float2(x, y) * texelSize * pcfRadius;
+            float depthSample = g_ShadowMap.Sample(g_Sampler, float3(shadowUV + offset, cascadeIndex)).r;
+            shadow += (currentDepth - bias > depthSample) ? 0.0f : 1.0f;
+            samples++;
+        }
+    }
+
+    return shadow / max(samples, 1);
+}
+
 float ComputeShadow(float3 worldPos, float3 normal)
 {
     // Shadow disabled
@@ -201,30 +226,45 @@ float ComputeShadow(float3 worldPos, float3 normal)
     float bias = g_ShadowParams.x;
     float pcfRadius = g_ShadowParams.y;
 
-    float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-
     // Simple slope-scaled bias to reduce acne
     float3 lightDirWS = normalize(g_Lights[0].direction_cosInner.xyz);
     float ndotl = saturate(dot(normal, lightDirWS));
     bias *= lerp(1.5f, 0.5f, ndotl);
 
-    float shadow = 0.0f;
-    int samples = 0;
-
-    [unroll]
-    for (int x = -1; x <= 1; ++x)
+    // Optional PCSS-style contact-hardening
+    if (g_ShadowParams.w > 0.5f)
     {
+        float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        float searchRadius = pcfRadius * 2.5f;
+
+        float avgBlocker = 0.0f;
+        int blockerCount = 0;
+
         [unroll]
-        for (int y = -1; y <= 1; ++y)
+        for (int x = -1; x <= 1; ++x)
         {
-            float2 offset = float2(x, y) * texelSize * pcfRadius;
-            float depthSample = g_ShadowMap.Sample(g_Sampler, float3(shadowUV + offset, cascadeIndex)).r;
-            shadow += (currentDepth - bias > depthSample) ? 0.0f : 1.0f;
-            samples++;
+            [unroll]
+            for (int y = -1; y <= 1; ++y)
+            {
+                float2 offset = float2(x, y) * texelSize * searchRadius;
+                float depthSample = g_ShadowMap.Sample(g_Sampler, float3(shadowUV + offset, cascadeIndex)).r;
+                if (depthSample + bias < currentDepth)
+                {
+                    avgBlocker += depthSample;
+                    blockerCount++;
+                }
+            }
+        }
+
+        if (blockerCount > 0)
+        {
+            avgBlocker /= blockerCount;
+            float penumbra = saturate((currentDepth - avgBlocker) / max(avgBlocker, 1e-4f));
+            pcfRadius *= (1.0f + penumbra * 4.0f);
         }
     }
 
-    return shadow / max(samples, 1);
+    return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, cascadeIndex);
 }
 
 float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao)

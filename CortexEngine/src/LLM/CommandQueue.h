@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <functional>
 
 namespace Cortex {
     namespace Graphics {
@@ -77,9 +78,33 @@ private:
     void ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer);
+    void ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
+    void ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
+    void ExecuteModifyGroup(ModifyGroupCommand* cmd, Scene::ECS_Registry* registry);
 
     // Shared mesh cache so repeated shapes reuse GPU buffers
-    std::unordered_map<AddEntityCommand::EntityType, std::shared_ptr<Scene::MeshData>> m_meshCache;
+    struct MeshKey {
+        AddEntityCommand::EntityType type;
+        uint32_t segmentsPrimary;
+        uint32_t segmentsSecondary;
+
+        bool operator==(const MeshKey& other) const noexcept {
+            return type == other.type &&
+                   segmentsPrimary == other.segmentsPrimary &&
+                   segmentsSecondary == other.segmentsSecondary;
+        }
+    };
+
+    struct MeshKeyHasher {
+        size_t operator()(const MeshKey& key) const noexcept {
+            size_t h1 = std::hash<int>{}(static_cast<int>(key.type));
+            size_t h2 = std::hash<uint32_t>{}(key.segmentsPrimary);
+            size_t h3 = std::hash<uint32_t>{}(key.segmentsSecondary);
+            return ((h1 * 251u) ^ (h2 * 131u)) ^ h3;
+        }
+    };
+
+    std::unordered_map<MeshKey, std::shared_ptr<Scene::MeshData>, MeshKeyHasher> m_meshCache;
 
     void PushStatus(bool success, const std::string& message);
 };

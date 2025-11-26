@@ -53,7 +53,7 @@ struct FrameConstants {
     glm::mat4 projectionMatrix;
     glm::mat4 viewProjectionMatrix;
     glm::vec4 cameraPosition;
-    // x = time, y = deltaTime, z = exposure, w = unused
+    // x = time, y = deltaTime, z = exposure, w = bloom intensity
     glm::vec4 timeAndExposure;
     // rgb: ambient color * intensity, w unused
     glm::vec4 ambientColor;
@@ -64,10 +64,12 @@ struct FrameConstants {
     alignas(16) glm::mat4 lightViewProjection[4];
     // x,y,z = cascade split depths in view space, w = far plane
     glm::vec4 cascadeSplits;
-    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w unused
+    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     glm::vec4 shadowParams;
     // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index), others reserved
     glm::vec4 debugMode;
+    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
+    glm::vec4 postParams;
 };
 
 // Material properties

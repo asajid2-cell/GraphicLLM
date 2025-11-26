@@ -4,6 +4,8 @@
 #include <chrono>
 #include <string>
 #include <deque>
+#include <atomic>
+#include <thread>
 #include <entt/entt.hpp>
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
@@ -79,6 +81,8 @@ private:
     std::unique_ptr<LLM::LLMService> m_llmService;
     std::unique_ptr<LLM::CommandQueue> m_commandQueue;
     bool m_llmEnabled = false;
+    std::atomic<bool> m_llmInitializing{false};
+    std::thread m_llmInitThread;
 
     // Text input state
     bool m_textInputMode = false;

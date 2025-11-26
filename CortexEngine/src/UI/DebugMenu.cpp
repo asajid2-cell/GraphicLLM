@@ -37,6 +37,7 @@ struct DebugMenuInternalState {
     HWND content = nullptr;
     int contentHeight = 0;
     int scrollPos = 0;
+    WNDPROC contentOrigProc = nullptr;
 
     // Section headers
     HWND headerExposurePost = nullptr;
@@ -113,6 +114,21 @@ struct DebugMenuInternalState {
 };
 
 DebugMenuInternalState g_state;
+
+LRESULT CALLBACK ContentWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    // Forward scroll messages to the main debug window so sliders behave as before.
+    if (msg == WM_HSCROLL || msg == WM_VSCROLL) {
+        HWND parent = GetParent(hwnd);
+        if (parent) {
+            return SendMessageW(parent, msg, wParam, lParam);
+        }
+    }
+
+    if (g_state.contentOrigProc) {
+        return CallWindowProcW(g_state.contentOrigProc, hwnd, msg, wParam, lParam);
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
 
 float SliderToExposure(int pos) {
     // 10..500 -> 0.1 .. 5.0
@@ -441,6 +457,8 @@ LRESULT CALLBACK DebugMenuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
             nullptr,
             nullptr);
         SendMessageW(g_state.content, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        g_state.contentOrigProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(g_state.content, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ContentWndProc)));
 
         int marginX = 10;
         int marginY = 10;
@@ -694,10 +712,10 @@ LRESULT CALLBACK DebugMenuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         // Noise type
         makeSliderRow(
             y,
-            L"Noise Type (0=FBM,1=Ridged,2=Turb)",
+            L"Noise Type (0=FBM,1=Ridged,2=Turb,3=Cell)",
             ID_SLIDER_FRACTAL_TYPE,
-            0, 2,
-            static_cast<int>(std::clamp(g_state.state.fractalNoiseType, 0.0f, 2.0f) + 0.5f),
+            0, 3,
+            static_cast<int>(std::clamp(g_state.state.fractalNoiseType, 0.0f, 3.0f) + 0.5f),
             g_state.labelFractalType,
             g_state.sliderFractalType,
             g_state.valueFractalType);
@@ -946,12 +964,13 @@ LRESULT CALLBACK DebugMenuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         } else if (src == g_state.sliderFractalType) {
             int mode = pos;
             if (mode < 0) mode = 0;
-            if (mode > 2) mode = 2;
+            if (mode > 3) mode = 3;
             g_state.state.fractalNoiseType = static_cast<float>(mode);
             if (g_state.valueFractalType) {
                 const wchar_t* label = L"FBM";
                 if (mode == 1) label = L"Ridged";
                 else if (mode == 2) label = L"Turbulence";
+                else if (mode == 3) label = L"Cellular";
                 SetWindowTextW(g_state.valueFractalType, label);
             }
         }

@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <vector>
 #include <dbghelp.h>
+#include <cstdlib>
 
 using namespace Cortex;
 
@@ -80,6 +81,27 @@ int main(int argc, char* argv[]) {
 
         // Phase 2: Configure The Architect (LLM)
         config.enableLLM = true;
+
+        // Lightweight CLI / environment toggles so you can speed up startup:
+        //   --no-llm                 : disable Architect entirely
+        //   CORTEX_DISABLE_LLM=1     : same as --no-llm
+        //   --llm-model=<path.gguf>  : force a specific model file
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--no-llm") {
+                config.enableLLM = false;
+            } else if (arg.rfind("--llm-model=", 0) == 0) {
+                config.enableLLM = true;
+                config.llmConfig.modelPath = arg.substr(std::string("--llm-model=").size());
+            }
+        }
+
+        if (const char* envDisable = std::getenv("CORTEX_DISABLE_LLM")) {
+            std::string value = envDisable;
+            if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+                config.enableLLM = false;
+            }
+        }
         // Resolve model path relative to the executable location (robust to working directory)
         namespace fs = std::filesystem;
 
@@ -99,22 +121,24 @@ int main(int argc, char* argv[]) {
             "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
         };
 
-        fs::path modelPath;
-        for (const char* name : kPreferredModels) {
-            fs::path candidate = exeDir / "models" / name;
-            if (fs::exists(candidate)) {
-                modelPath = candidate;
-                break;
+        if (config.enableLLM && config.llmConfig.modelPath.empty()) {
+            fs::path modelPath;
+            for (const char* name : kPreferredModels) {
+                fs::path candidate = exeDir / "models" / name;
+                if (fs::exists(candidate)) {
+                    modelPath = candidate;
+                    break;
+                }
             }
-        }
 
-        if (!modelPath.empty()) {
-            spdlog::info("LLM model path resolved to: {}", modelPath.string());
-            config.llmConfig.modelPath = modelPath.string();
-        } else {
-            // No model found on disk; run the LLM service in mock mode so Architect input still works.
-            spdlog::warn("No GGUF model found for The Architect; running in MOCK MODE (no real LLM).");
-            config.llmConfig.modelPath.clear();
+            if (!modelPath.empty()) {
+                spdlog::info("LLM model path resolved to: {}", modelPath.string());
+                config.llmConfig.modelPath = modelPath.string();
+            } else {
+                // No model found on disk; run the LLM service in mock mode so Architect input still works.
+                spdlog::warn("No GGUF model found for The Architect; running in MOCK MODE (no real LLM).");
+                config.llmConfig.modelPath.clear();
+            }
         }
         config.llmConfig.contextSize = 8192;  // Larger context for richer scene summaries
         config.llmConfig.threads = 4;

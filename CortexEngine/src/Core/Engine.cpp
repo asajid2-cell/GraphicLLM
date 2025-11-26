@@ -17,6 +17,7 @@
 #include <optional>
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 #include <nlohmann/json.hpp>
 
 namespace Cortex {
@@ -118,6 +119,9 @@ namespace {
 }
 
 Result<void> Engine::Initialize(const EngineConfig& config) {
+    using clock = std::chrono::high_resolution_clock;
+    const auto tStart = clock::now();
+
     spdlog::info("Initializing Cortex Engine...");
     spdlog::info("Version: 0.1.0 - Phase 1: Iron Foundation");
 
@@ -127,6 +131,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     if (deviceResult.IsErr()) {
         return Result<void>::Err("Failed to initialize device: " + deviceResult.Error());
     }
+    const auto tAfterDevice = clock::now();
+    spdlog::info("  DX12 device initialized in {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(tAfterDevice - tStart).count());
 
     // Create window
     m_window = std::make_unique<Window>();
@@ -134,6 +141,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     if (windowResult.IsErr()) {
         return Result<void>::Err("Failed to initialize window: " + windowResult.Error());
     }
+    const auto tAfterWindow = clock::now();
+    spdlog::info("  Window created in {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(tAfterWindow - tAfterDevice).count());
 
     // Create renderer
     m_renderer = std::make_unique<Graphics::Renderer>();
@@ -141,6 +151,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     if (rendererResult.IsErr()) {
         return Result<void>::Err("Failed to initialize renderer: " + rendererResult.Error());
     }
+    const auto tAfterRenderer = clock::now();
+    spdlog::info("  Renderer initialized in {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(tAfterRenderer - tAfterWindow).count());
 
     // Create ECS registry
     m_registry = std::make_unique<Scene::ECS_Registry>();
@@ -154,30 +167,47 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     InitializeScene();
     InitializeCameraController();
     ShowCameraHelpOverlay();
+    const auto tAfterScene = clock::now();
+    spdlog::info("  Scene and camera initialized in {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(tAfterScene - tAfterRenderer).count());
 
     // Apply camera config
     m_cameraBaseSpeed = config.cameraBaseSpeed;
     m_cameraSprintMultiplier = config.cameraSprintMultiplier;
     m_mouseSensitivity = config.mouseSensitivity;
 
-    // Phase 2: Initialize The Architect (LLM)
+    // Phase 2: Initialize The Architect (LLM) asynchronously so the window appears sooner
     if (config.enableLLM) {
         m_llmService = std::make_unique<LLM::LLMService>();
         m_commandQueue = std::make_unique<LLM::CommandQueue>();
         m_commandQueue->RefreshLookup(m_registry.get());
 
-        auto llmResult = m_llmService->Initialize(config.llmConfig);
-        if (llmResult.IsErr()) {
-            spdlog::warn("LLM initialization failed: {}", llmResult.Error());
-            spdlog::info("Continuing without LLM support");
-        } else {
-            m_llmEnabled = true;
-            spdlog::info("The Architect is online!");
-            spdlog::info("Press T to enter text input mode for natural language commands");
+        m_llmInitializing = true;
+        auto llmConfig = config.llmConfig; // copy for the background thread
+        spdlog::info("  Starting LLM initialization on a background thread...");
 
-            // Run a small regression suite once at startup (logs only)
-            LLM::RunRegressionTests();
-        }
+        m_llmInitThread = std::thread([this, llmConfig]() {
+            using clock_local = std::chrono::high_resolution_clock;
+            const auto tLLMStart = clock_local::now();
+
+            auto llmResult = m_llmService->Initialize(llmConfig);
+            if (llmResult.IsErr()) {
+                spdlog::warn("LLM initialization failed: {}", llmResult.Error());
+                spdlog::info("Continuing without LLM support");
+            } else {
+                const auto tLLMEnd = clock_local::now();
+                const auto llmMs = std::chrono::duration_cast<std::chrono::milliseconds>(tLLMEnd - tLLMStart).count();
+
+                m_llmEnabled = true;
+                spdlog::info("The Architect is online! (LLM ready in {} ms)", llmMs);
+                spdlog::info("Press T to enter text input mode for natural language commands");
+
+                // Run a small regression suite once after LLM is ready (logs only)
+                LLM::RunRegressionTests();
+            }
+
+            m_llmInitializing = false;
+        });
     }
 
     // Initialize debug menu with current / persisted renderer & camera parameters
@@ -230,7 +260,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_running = true;
     m_lastFrameTime = std::chrono::high_resolution_clock::now();
 
-    spdlog::info("Cortex Engine initialized successfully!");
+    const auto tEnd = clock::now();
+    spdlog::info("Cortex Engine initialized successfully in {} ms (without LLM load).",
+        std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart).count());
     spdlog::info("Ready to render. Press ESC to exit.");
 
     return Result<void>::Ok();
@@ -273,6 +305,11 @@ void Engine::ShowCameraHelpOverlay() {
 void Engine::Shutdown() {
     // Make shutdown idempotent and safe even if initialization failed early.
     m_running = false;
+
+    // Ensure any asynchronous LLM initialization has completed before tearing down.
+    if (m_llmInitThread.joinable()) {
+        m_llmInitThread.join();
+    }
 
     // Persist last used debug menu state
     SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
@@ -854,6 +891,58 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         return out;
     }
 
+    // If the user asks to "add" something that sounds like an animal,
+    // vehicle, or structure but did not mention a primitive shape, route
+    // this through the compound/motif system so we avoid spawning plain
+    // cubes for things like "pig", "monster", or "fridge".
+    auto emitCompound = [&](const std::string& templ, const std::string& baseName) {
+        auto cmd = std::make_shared<LLM::AddCompoundCommand>();
+        cmd->templateName = templ;
+        cmd->instanceName = baseName + "_" + std::to_string(++m_heuristicCounter);
+        cmd->position = glm::vec3(0.0f, 1.0f, -3.0f);
+        float scale = (contains("giant") || contains("huge") || contains("massive") || contains("big")) ? 2.5f : 1.0f;
+        cmd->scale = glm::vec3(scale);
+        out.push_back(cmd);
+    };
+
+    auto maybeEmitCompound = [&]() -> bool {
+        // Creatures / animals
+        if (contains("pig"))       { emitCompound("pig", "Pig"); return true; }
+        if (contains("cow"))       { emitCompound("cow", "Cow"); return true; }
+        if (contains("horse"))     { emitCompound("horse", "Horse"); return true; }
+        if (contains("dragon"))    { emitCompound("dragon", "Dragon"); return true; }
+        if (contains("monster") || contains("godzilla")) {
+            emitCompound("monster", "Monster"); return true;
+        }
+        if (contains("dog"))       { emitCompound("dog", "Dog"); return true; }
+        if (contains("cat"))       { emitCompound("cat", "Cat"); return true; }
+        if (contains("monkey"))    { emitCompound("monkey", "Monkey"); return true; }
+
+        // Vehicles
+        if (contains("car"))       { emitCompound("car", "Car"); return true; }
+        if (contains("truck"))     { emitCompound("truck", "Truck"); return true; }
+        if (contains("bus"))       { emitCompound("bus", "Bus"); return true; }
+        if (contains("tank"))      { emitCompound("tank", "Tank"); return true; }
+        if (contains("spaceship") || contains("ship") || contains("rocket")) {
+            emitCompound("spaceship", "Spaceship"); return true;
+        }
+        if (contains("vehicle"))   { emitCompound("vehicle", "Vehicle"); return true; }
+
+        // Structures / objects
+        if (contains("tower"))     { emitCompound("tower", "Tower"); return true; }
+        if (contains("castle"))    { emitCompound("castle", "Castle"); return true; }
+        if (contains("arch"))      { emitCompound("arch", "Arch"); return true; }
+        if (contains("bridge"))    { emitCompound("bridge", "Bridge"); return true; }
+        if (contains("house"))     { emitCompound("house", "House"); return true; }
+        if (contains("fridge"))    { emitCompound("fridge", "Fridge"); return true; }
+
+        return false;
+    };
+
+    if (maybeEmitCompound()) {
+        return out;
+    }
+
     const int count = parseCount();
     const float angleStep = 2.39996323f;
     const float radius = 1.6f;
@@ -978,8 +1067,10 @@ void Engine::UpdateCameraController(float deltaTime) {
         if (keyDown(SDL_SCANCODE_S)) move -= forward;
         if (keyDown(SDL_SCANCODE_D)) move += right;
         if (keyDown(SDL_SCANCODE_A)) move -= right;
-        if (keyDown(SDL_SCANCODE_E)) move += up;
-        if (keyDown(SDL_SCANCODE_Q)) move -= up;
+        if (keyDown(SDL_SCANCODE_E) || keyDown(SDL_SCANCODE_SPACE)) move += up;
+        if (keyDown(SDL_SCANCODE_Q) ||
+            keyDown(SDL_SCANCODE_LCTRL) ||
+            keyDown(SDL_SCANCODE_RCTRL)) move -= up;
 
         if (glm::length(move) > 0.0f) {
             float speed = m_cameraBaseSpeed;
@@ -1160,12 +1251,19 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
         spdlog::info("Architect response received ({:.2f}s)", response.inferenceTime);
         spdlog::debug("Architect raw text: {}", response.text);
 
-        // Parse JSON commands
-        auto commands = LLM::CommandParser::ParseJSON(response.text);
+        // Parse JSON commands directly; SceneCommands::ParseJSON handles any
+        // necessary salvage. We only fall back to heuristics when the LLM
+        // output is clearly not structured JSON (i.e., no "commands" key).
+        const std::string& jsonText = response.text;
+        auto commands = LLM::CommandParser::ParseJSON(jsonText);
 
-        // Fallback: naive keyword add if no commands parsed
-        if (commands.empty()) {
-            spdlog::warn("No valid commands parsed from LLM response, applying heuristic add");
+        bool sawCommandsKey = jsonText.find("\"commands\"") != std::string::npos;
+
+        // Fallback: naive keyword add only if there was no structured "commands"
+        // block at all. If the LLM attempted JSON, we prefer to do nothing over
+        // silently injecting heuristic cubes on parse failure.
+        if (commands.empty() && !sawCommandsKey) {
+            spdlog::warn("No valid commands parsed and no 'commands' key; applying heuristic add");
             auto fallback = BuildHeuristicCommands(command);
             commands.insert(commands.end(), fallback.begin(), fallback.end());
         }

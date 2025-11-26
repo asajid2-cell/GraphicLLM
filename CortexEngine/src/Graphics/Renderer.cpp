@@ -1161,7 +1161,7 @@ void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
     float warp = glm::clamp(warpStrength, 0.0f, 1.0f);
     int nt = static_cast<int>(noiseType + 0.5f);
     if (nt < 0) nt = 0;
-    if (nt > 2) nt = 2;
+    if (nt > 3) nt = 3;
 
     if (std::abs(amp - m_fractalAmplitude) < 1e-6f &&
         std::abs(freq - m_fractalFrequency) < 1e-6f &&
@@ -1187,7 +1187,7 @@ void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
     m_fractalWarpStrength = warp;
     m_fractalNoiseType = static_cast<float>(nt);
 
-    const char* typeLabel = (nt == 0) ? "FBM" : (nt == 1 ? "Ridged" : "Turbulence");
+    const char* typeLabel = (nt == 0) ? "FBM" : (nt == 1 ? "Ridged" : (nt == 2 ? "Turbulence" : "Cellular"));
     spdlog::info("Fractal params: amp={} freq={} oct={} mode={} scale=({}, {}), lacunarity={}, gain={}, warp={}, type={}",
                  m_fractalAmplitude, m_fractalFrequency, m_fractalOctaves,
                  (m_fractalCoordMode > 0.5f ? "WorldXZ" : "UV"),

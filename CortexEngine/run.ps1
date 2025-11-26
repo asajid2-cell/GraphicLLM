@@ -1,7 +1,9 @@
 # Project Cortex - Quick Run Script (PowerShell)
 
 param(
-    [string]$Config = "Release"
+    [string]$Config = "Release",
+    [switch]$ForceSync,
+    [switch]$NoLLM
 )
 
 $exeCandidates = @(
@@ -60,17 +62,28 @@ $repoRoot = $PSScriptRoot
 $exeDir = Split-Path $exePath -Parent
 $assetSource = Join-Path $repoRoot "assets"
 $modelSource = Join-Path $repoRoot "models"
+$assetDest = Join-Path $exeDir "assets"
+$modelDest = Join-Path $exeDir "models"
+$forceSync = $ForceSync.IsPresent -or ($env:CORTEX_FORCE_SYNC -and $env:CORTEX_FORCE_SYNC -ne "0")
 
 if (Test-Path $assetSource) {
-    Write-Host "Syncing assets to $exeDir" -ForegroundColor Gray
-    Copy-Item -Path $assetSource -Destination $exeDir -Recurse -Force
+    if ($forceSync -or -not (Test-Path $assetDest)) {
+        Write-Host "Syncing assets to $exeDir" -ForegroundColor Gray
+        Copy-Item -Path $assetSource -Destination $exeDir -Recurse -Force
+    } else {
+        Write-Host "Assets already present in $exeDir; skipping asset sync" -ForegroundColor Gray
+    }
 } else {
     Write-Host "Warning: assets folder not found at $assetSource" -ForegroundColor Yellow
 }
 
 if (Test-Path $modelSource) {
-    Write-Host "Syncing models to $exeDir" -ForegroundColor Gray
-    Copy-Item -Path $modelSource -Destination $exeDir -Recurse -Force
+    if ($forceSync -or -not (Test-Path $modelDest)) {
+        Write-Host "Syncing models to $exeDir" -ForegroundColor Gray
+        Copy-Item -Path $modelSource -Destination $exeDir -Recurse -Force
+    } else {
+        Write-Host "Models already present in $exeDir; skipping model sync" -ForegroundColor Gray
+    }
 } else {
     Write-Host "Warning: models folder not found at $modelSource" -ForegroundColor Yellow
 }
@@ -86,5 +99,9 @@ if ($cudaBins) {
 
 Push-Location (Split-Path $exePath -Parent)
 $exeName = Split-Path $exePath -Leaf
-& ".\${exeName}"
+$argsList = @()
+if ($NoLLM.IsPresent) {
+    $argsList += "--no-llm"
+}
+& ".\${exeName}" @argsList
 Pop-Location

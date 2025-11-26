@@ -131,19 +131,50 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             std::string type = cmdJson["type"];
 
             if (type == "add_entity") {
-                auto cmd = std::make_shared<AddEntityCommand>();
-
-                if (cmdJson.contains("entity_type")) {
+                // If the model uses entity_type equal to a compound prefab like "house",
+                // reinterpret this as an add_compound instead of a single primitive so
+                // that houses stay rich multi-part objects.
+                if (cmdJson.contains("entity_type") && cmdJson["entity_type"].is_string()) {
                     std::string entityType = cmdJson["entity_type"];
                     std::string lowered = entityType;
+                    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (lowered == "house") {
+                        auto house = std::make_shared<AddCompoundCommand>();
+                        house->templateName = "house";
+                        if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                            house->instanceName = cmdJson["name"];
+                        }
+                        if (cmdJson.contains("position")) {
+                            ReadVec3(cmdJson["position"], "position", house->position);
+                        }
+                        if (cmdJson.contains("scale")) {
+                            ReadVec3(cmdJson["scale"], "scale", house->scale);
+                        }
+                        commands.push_back(house);
+                        continue;
+                    }
+                }
+
+                auto cmd = std::make_shared<AddEntityCommand>();
+
+                bool recognizedPrimitive = false;
+                std::string entityType;
+                std::string lowered;
+
+                if (cmdJson.contains("entity_type") && cmdJson["entity_type"].is_string()) {
+                    entityType = cmdJson["entity_type"];
+                    lowered = entityType;
                     std::transform(lowered.begin(), lowered.end(), lowered.begin(),
                                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                     // Allow richer vocabulary by mapping synonyms onto existing primitives.
                     if (lowered == "cube" || lowered == "box" || lowered == "rounded_box") {
                         cmd->entityType = AddEntityCommand::EntityType::Cube;
+                        recognizedPrimitive = true;
                     } else if (lowered == "sphere" || lowered == "ball" ||
                                lowered == "lowpoly_sphere" || lowered == "highpoly_sphere") {
                         cmd->entityType = AddEntityCommand::EntityType::Sphere;
+                        recognizedPrimitive = true;
                         // Heuristic detail hints from name
                         if (lowered == "lowpoly_sphere") {
                             cmd->segmentsPrimary = 16;
@@ -155,15 +186,50 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     } else if (lowered == "plane" || lowered == "thin_plane" ||
                                lowered == "leaf" || lowered == "wing") {
                         cmd->entityType = AddEntityCommand::EntityType::Plane;
+                        recognizedPrimitive = true;
                     } else if (lowered == "cylinder" || lowered == "capsule" || lowered == "pillar") {
                         cmd->entityType = AddEntityCommand::EntityType::Cylinder;
+                        recognizedPrimitive = true;
                     } else if (lowered == "pyramid" || lowered == "wedge") {
                         cmd->entityType = AddEntityCommand::EntityType::Pyramid;
+                        recognizedPrimitive = true;
                     } else if (lowered == "cone") {
                         cmd->entityType = AddEntityCommand::EntityType::Cone;
+                        recognizedPrimitive = true;
                     } else if (lowered == "torus" || lowered == "arch") {
                         cmd->entityType = AddEntityCommand::EntityType::Torus;
+                        recognizedPrimitive = true;
                     }
+                }
+
+                // If the entity_type is not a known primitive shape, interpret
+                // this as a request for a compound motif instead of silently
+                // falling back to a cube. This lets things like "monkey",
+                // "fridge", or "godzilla" produce structured approximations via
+                // the compound synthesis pipeline.
+                if (!recognizedPrimitive && !entityType.empty()) {
+                    auto compound = std::make_shared<AddCompoundCommand>();
+                    compound->templateName = entityType;
+                    if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                        compound->instanceName = cmdJson["name"];
+                    } else {
+                        compound->instanceName = entityType;
+                    }
+                    if (cmdJson.contains("position")) {
+                        ReadVec3(cmdJson["position"], "position", compound->position);
+                    }
+                    if (cmdJson.contains("scale")) {
+                        ReadVec3(cmdJson["scale"], "scale", compound->scale);
+                    }
+                    if (cmdJson.contains("color")) {
+                        glm::vec4 color4;
+                        if (ReadVec4(cmdJson["color"], "color", color4)) {
+                            compound->hasBodyColor = true;
+                            compound->bodyColor = color4;
+                        }
+                    }
+                    commands.push_back(compound);
+                    continue;
                 }
 
                 if (cmdJson.contains("name") && cmdJson["name"].is_string()) cmd->name = cmdJson["name"];
@@ -561,6 +627,68 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
     }
     catch (const json::exception& e) {
         spdlog::error("JSON parsing error: {}", e.what());
+
+        // First try a conservative salvage that keeps only fully closed
+        // command objects inside the "commands" array. If that succeeds we
+        // return immediately and skip the older fallback logic below.
+        bool conservativelySalvaged = false;
+        try {
+            std::string fixed = jsonStr;
+
+            auto lastNonWs = fixed.find_last_not_of(" \t\r\n");
+            if (lastNonWs != std::string::npos) {
+                fixed.resize(lastNonWs + 1);
+            }
+
+            auto commandsPos2 = fixed.find("\"commands\"");
+            if (commandsPos2 != std::string::npos) {
+                auto arrayStart2 = fixed.find('[', commandsPos2);
+                if (arrayStart2 != std::string::npos) {
+                    int depth = 0;
+                    size_t lastObjEnd = std::string::npos;
+                    for (size_t i = arrayStart2 + 1; i < fixed.size(); ++i) {
+                        char c = fixed[i];
+                        if (c == '{') {
+                            ++depth;
+                        } else if (c == '}') {
+                            if (depth > 0) {
+                                --depth;
+                                if (depth == 0) {
+                                    lastObjEnd = i;
+                                }
+                            }
+                        }
+                    }
+
+                    if (lastObjEnd != std::string::npos && lastObjEnd > arrayStart2) {
+                        std::string rebuilt = fixed.substr(0, lastObjEnd + 1);
+                        if (rebuilt.find(']', arrayStart2) == std::string::npos) {
+                            rebuilt.append("]}");
+                        } else {
+                            auto last = rebuilt.find_last_not_of(" \t\r\n");
+                            if (last != std::string::npos && rebuilt[last] != '}') {
+                                rebuilt.push_back('}');
+                            }
+                        }
+
+                        spdlog::warn("Attempting conservative JSON salvage on LLM response");
+                        auto jFixed = json::parse(rebuilt);
+                        commands.clear();
+                        parseFromJson(jFixed);
+                        spdlog::info("Parsed {} commands from conservatively salvaged JSON", commands.size());
+                        conservativelySalvaged = true;
+                    }
+                }
+            }
+        } catch (const json::exception& e2) {
+            spdlog::error("Conservative JSON salvage parse failed: {}", e2.what());
+        } catch (...) {
+            // Ignore and fall back to legacy salvage below.
+        }
+
+        if (conservativelySalvaged) {
+            return commands;
+        }
 
         // Heuristic salvage for truncated or slightly malformed JSON coming from the LLM.
         // Common failure: missing closing ]}] at the end of the commands array.

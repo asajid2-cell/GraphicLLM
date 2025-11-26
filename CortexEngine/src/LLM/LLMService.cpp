@@ -98,6 +98,111 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         }
     }
 
+    // Motif-based compound fallback for animals, vehicles, and structures.
+    // This is used when we fail to parse JSON from the real model so that
+    // prompts like "add a godzilla monster" or "add a monkey" still produce
+    // structured multi-part objects instead of plain cubes.
+    auto firstColorFromText = [&]() -> std::optional<Color> {
+        for (const auto& [name, c] : colors) {
+            if (contains(name)) return c;
+        }
+        return std::nullopt;
+    };
+
+    bool wantsGiant = contains("giant") || contains("huge") || contains("massive") || contains("big");
+
+    std::string compoundTemplate;
+    std::string compoundName;
+
+    // Creatures / animals
+    if (contains("pig")) {
+        compoundTemplate = "pig";
+        compoundName = "Pig";
+    } else if (contains("cow")) {
+        compoundTemplate = "cow";
+        compoundName = "Cow";
+    } else if (contains("horse")) {
+        compoundTemplate = "horse";
+        compoundName = "Horse";
+    } else if (contains("dragon")) {
+        compoundTemplate = "dragon";
+        compoundName = "Dragon";
+    } else if (contains("monster") || contains("godzilla")) {
+        compoundTemplate = "monster";
+        compoundName = "Monster";
+    } else if (contains("dog")) {
+        compoundTemplate = "dog";
+        compoundName = "Dog";
+    } else if (contains("cat")) {
+        compoundTemplate = "cat";
+        compoundName = "Cat";
+    } else if (contains("monkey")) {
+        compoundTemplate = "monkey";
+        compoundName = "Monkey";
+    }
+
+    // Vehicles
+    if (compoundTemplate.empty()) {
+        if (contains("car")) {
+            compoundTemplate = "car";
+            compoundName = "Car";
+        } else if (contains("truck")) {
+            compoundTemplate = "truck";
+            compoundName = "Truck";
+        } else if (contains("bus")) {
+            compoundTemplate = "bus";
+            compoundName = "Bus";
+        } else if (contains("tank")) {
+            compoundTemplate = "tank";
+            compoundName = "Tank";
+        } else if (contains("spaceship") || contains("ship") || contains("rocket")) {
+            compoundTemplate = "spaceship";
+            compoundName = "Spaceship";
+        } else if (contains("vehicle")) {
+            compoundTemplate = "vehicle";
+            compoundName = "Vehicle";
+        }
+    }
+
+    // Structures / objects
+    if (compoundTemplate.empty()) {
+        if (contains("tower")) {
+            compoundTemplate = "tower";
+            compoundName = "Tower";
+        } else if (contains("castle")) {
+            compoundTemplate = "castle";
+            compoundName = "Castle";
+        } else if (contains("arch")) {
+            compoundTemplate = "arch";
+            compoundName = "Arch";
+        } else if (contains("bridge")) {
+            compoundTemplate = "bridge";
+            compoundName = "Bridge";
+        } else if (contains("house")) {
+            compoundTemplate = "house";
+            compoundName = "House";
+        } else if (contains("fridge")) {
+            compoundTemplate = "fridge";
+            compoundName = "Fridge";
+        }
+    }
+
+    if (!compoundTemplate.empty()) {
+        Color body = {0.8f, 0.7f, 0.7f, 1.0f};
+        if (auto c = firstColorFromText()) {
+            body = *c;
+        }
+        float scale = wantsGiant ? 2.5f : 1.0f;
+
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"add_compound","template":")" << compoundTemplate
+           << R"(","name":")" << compoundName << R"(","position":[0,1,-3],"scale":[)"
+           << scale << "," << scale << "," << scale << R"(],"body_color":[)"
+           << body.r << "," << body.g << "," << body.b << "," << body.a
+           << R"(]}]})";
+        return ss.str();
+    }
+
     // Shape detection with smart positioning and materials
     struct ShapeInfo {
         std::string type;
@@ -143,6 +248,16 @@ LLMService::~LLMService() {
 Result<void> LLMService::Initialize(const LLMConfig& config) {
     m_config = config;
 
+    using clock = std::chrono::high_resolution_clock;
+    const auto tStart = clock::now();
+
+    // If no model specified, stay in lightweight mock mode without touching the llama backend.
+    if (config.modelPath.empty()) {
+        spdlog::info("LLM Service initialized (MOCK MODE - no model loaded)");
+        spdlog::info("  To use real LLM, provide a model path in config");
+        return Result<void>::Ok();
+    }
+
     // Initialize llama.cpp backend once per service lifetime
     if (!m_backendInitialized) {
         llama_backend_init();
@@ -150,14 +265,8 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
         m_backendInitialized = true;
     }
 
-    // If no model specified, use mock mode
-    if (config.modelPath.empty()) {
-        spdlog::info("LLM Service initialized (MOCK MODE - no model loaded)");
-        spdlog::info("  To use real LLM, provide a model path in config");
-        return Result<void>::Ok();
-    }
-
     // Load model with new API
+    const auto tModelStart = clock::now();
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = std::max(0, m_config.gpuLayers);
     m_model = llama_model_load_from_file(config.modelPath.c_str(), model_params);
@@ -167,6 +276,7 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
     }
 
     // Create context with new API
+    const auto tCtxStart = clock::now();
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = config.contextSize;
     ctx_params.n_threads = config.threads;
@@ -184,11 +294,20 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
         return Result<void>::Err("Failed to create llama context");
     }
 
+    const auto tCtxEnd = clock::now();
+
     // Get vocab for logging
     const llama_vocab* vocab = llama_model_get_vocab(static_cast<llama_model*>(m_model));
 
     spdlog::info("LLM Service initialized (model={}, ctx={}, threads={}, vocab={})",
                  config.modelPath, config.contextSize, config.threads, llama_vocab_n_tokens(vocab));
+
+    const auto tEnd = clock::now();
+    const auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart).count();
+    const auto modelMs = std::chrono::duration_cast<std::chrono::milliseconds>(tCtxStart - tModelStart).count();
+    const auto ctxMs = std::chrono::duration_cast<std::chrono::milliseconds>(tCtxEnd - tCtxStart).count();
+    spdlog::info("  LLM timings: model load ~{} ms, context init ~{} ms, total ~{} ms",
+                 modelMs, ctxMs, totalMs);
 
     // Spin up a single background worker for real inference
     m_workerRunning = true;

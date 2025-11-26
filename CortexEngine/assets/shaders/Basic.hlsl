@@ -155,6 +155,31 @@ float Noise2D(float2 p) {
     return lerp(v1, v2, u.y) * 2.0 - 1.0; // -1..1
 }
 
+// Simple 2D cellular (Voronoi-style) noise: high near random cell centers
+float CellNoise2D(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+
+    float minDist = 1.0f;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y) {
+        [unroll]
+        for (int x = -1; x <= 1; ++x) {
+            float2 offset = float2(x, y);
+            float2 h = Hash2(i + offset);
+            float2 cellPos = offset + h; // random point in neighboring cell
+            float2 d = cellPos - f;
+            float dist = dot(d, d);
+            minDist = min(minDist, dist);
+        }
+    }
+
+    // Map distance to 0..1, where 1 is center of a cell, 0 near edges
+    float v = 1.0f - saturate(sqrt(minDist));
+    return v * 2.0f - 1.0f; // -1..1
+}
+
 float FractalHeightBase(float2 p, float amplitude, float frequency, int octaves,
                         float lacunarity, float gain, float warpStrength, int noiseType) {
     // Optional domain warp for richer structure
@@ -182,6 +207,9 @@ float FractalHeightBase(float2 p, float amplitude, float frequency, int octaves,
         } else if (noiseType == 2) {
             // Turbulence: absolute noise
             v = 2.0f * abs(n) - 1.0f;
+        } else if (noiseType == 3) {
+            // Cellular / Voronoi-style fragments
+            v = CellNoise2D(p * freq);
         }
 
         h += v * amp;

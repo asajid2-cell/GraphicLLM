@@ -249,11 +249,19 @@ cd build\bin\Release
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `-Config` | String | "Release" | Configuration to run |
+| `-ForceSync` | Switch | Off | Force re-copy of `assets/` and `models/` into the executable folder |
+| `-NoLLM` | Switch | Off | Run without initializing The Architect (faster startup) |
 
 **Examples:**
 ```powershell
 # Run Debug
 .\run.ps1 -Config Debug
+
+# Run Debug and resync assets/models
+.\run.ps1 -Config Debug -ForceSync
+
+# Run Debug without LLM startup cost
+.\run.ps1 -Config Debug -NoLLM
 ```
 
 ---

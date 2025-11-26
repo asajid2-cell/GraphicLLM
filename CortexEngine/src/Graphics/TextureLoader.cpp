@@ -9,6 +9,23 @@
 #endif
 #include "llama.cpp/vendor/stb/stb_image.h"
 
+// TinyEXR can optionally use the zlib routines from stb_image/stb_image_write.
+// We only need EXR *reading*, so it is safe to provide a minimal stub for the
+// compression function (used only when writing EXR files).
+extern "C" unsigned char* stbi_zlib_compress(unsigned char* data, int data_len, int* out_len, int quality) {
+    if (out_len) {
+        *out_len = 0;
+    }
+    return nullptr;
+}
+
+// Configure TinyEXR to use stb's zlib implementation instead of miniz to avoid
+// external miniz header dependencies.
+#define TINYEXR_USE_MINIZ   0
+#define TINYEXR_USE_STB_ZLIB 1
+#define TINYEXR_IMPLEMENTATION
+#include <tinyexr.h>
+
 namespace Cortex::Graphics {
 
 static std::vector<uint8_t> Downsample2x2(const MipLevel& src) {
@@ -49,6 +66,7 @@ Result<std::vector<MipLevel>> TextureLoader::LoadImageRGBAWithMips(const std::st
 
     // Detect file format by extension
     bool isHDR = false;
+    bool isEXR = false;
     {
         if (path.size() >= 4) {
             std::string ext = path.substr(path.size() - 4);
@@ -57,15 +75,56 @@ Result<std::vector<MipLevel>> TextureLoader::LoadImageRGBAWithMips(const std::st
             }
             if (ext == ".hdr") {
                 isHDR = true;
+            } else if (ext == ".exr") {
+                isEXR = true;
             }
         }
-        if (!isHDR && stbi_is_hdr(path.c_str())) {
+        if (!isHDR && !isEXR && stbi_is_hdr(path.c_str())) {
             isHDR = true;
         }
     }
 
+    // OpenEXR path: load via TinyEXR
+    if (isEXR) {
+        float* rgba = nullptr;
+        const char* err = nullptr;
+
+        int ret = LoadEXR(&rgba, &width, &height, path.c_str(), &err);
+        if (ret != TINYEXR_SUCCESS) {
+            std::string errorMsg = err ? std::string(err) : "Unknown error";
+            if (err) {
+                FreeEXRErrorMessage(err);
+            }
+            return Result<std::vector<MipLevel>>::Err("Failed to load EXR image: " + path + " (" + errorMsg + ")");
+        }
+
+        base.width = static_cast<uint32_t>(width);
+        base.height = static_cast<uint32_t>(height);
+        base.pixels.resize(static_cast<size_t>(base.width) * base.height * 4);
+
+        const size_t pixelCount = static_cast<size_t>(base.width) * base.height;
+
+        auto tonemap = [](float v) -> float {
+            v = std::max(v, 0.0f);
+            return v / (1.0f + v);
+        };
+
+        for (size_t i = 0; i < pixelCount; ++i) {
+            float r = tonemap(rgba[i * 4 + 0]);
+            float g = tonemap(rgba[i * 4 + 1]);
+            float b = tonemap(rgba[i * 4 + 2]);
+            float a = std::clamp(rgba[i * 4 + 3], 0.0f, 1.0f);
+
+            base.pixels[i * 4 + 0] = static_cast<uint8_t>(std::round(std::clamp(r, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 1] = static_cast<uint8_t>(std::round(std::clamp(g, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 2] = static_cast<uint8_t>(std::round(std::clamp(b, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 3] = static_cast<uint8_t>(std::round(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+        }
+
+        free(rgba);
+    }
     // Radiance HDR path: Load using stb_image
-    if (isHDR) {
+    else if (isHDR) {
         float* data = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
         if (!data) {
             return Result<std::vector<MipLevel>>::Err("Failed to load HDR image: " + path);

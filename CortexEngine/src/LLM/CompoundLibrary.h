@@ -32,9 +32,16 @@ public:
     // Find a template by (case-insensitive) name. Returns nullptr if not found.
     static const CompoundTemplate* FindTemplate(const std::string& templateName);
 
+    // Optionally synthesize a template for an unknown name (e.g., "pig", "car")
+    // using simple category heuristics. Returns nullptr if no reasonable
+    // approximation can be built.
+    static const CompoundTemplate* SynthesizeTemplate(
+        const std::string& templateName,
+        const glm::vec4* bodyColor = nullptr,
+        const glm::vec4* accentColor = nullptr);
+
     // Access all registered templates.
     static const std::vector<CompoundTemplate>& GetAllTemplates();
 };
 
 } // namespace Cortex::LLM
-

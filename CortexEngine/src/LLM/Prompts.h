@@ -35,8 +35,9 @@ public:
            << "- add_light: light_type (\"point\"|\"spot\"|\"directional\"), name, position[3], optional direction[3], color[4], intensity (>0), range (>0), inner_cone (degrees), outer_cone (degrees), casts_shadows (bool).\n"
            << "- modify_light: target name, optional light_type, position[3], direction[3], color[4], intensity (>0), range (>0), inner_cone, outer_cone, casts_shadows.\n"
            << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-5), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1).\n"
-           << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...]}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element.\n"
-           << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|house|tree|pillar|grass_blade\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...]}. A compound spawns multiple primitives as one logical object.\n"
+           << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...], \"kind\":\"herd|traffic\"}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element. When kind=\"herd\" with animal elements (cow, pig, horse, etc.) the engine will spawn a small herd of quadrupeds; when kind=\"traffic\" with vehicle elements (car, truck, spaceship, etc.) it will spawn a line of vehicles.\n"
+           << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|tree|house|pillar|grass_blade|quadruped|vehicle|tower\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...],\"body_color\":[r,g,b,a],\"accent_color\":[r,g,b,a]}. A compound spawns multiple primitives as one logical object. For creatures/animals (pig, cow, horse, dragon, monster), vehicles (car, truck, spaceship), and tall structures (tower, castle), prefer add_compound with template equal to the noun; the engine will approximate it from a generic quadruped/vehicle/structure motif using the colors you provide. If you need very fine control, you can still build shapes from multiple add_entity/add_pattern commands.\n"
+           << "- scene_plan: {\"type\":\"scene_plan\",\"regions\":[{\"name\":\"Field_Grass\",\"kind\":\"field\",\"center\":[0,0,0],\"size\":[16,0,16]},{\"name\":\"Road_A\",\"kind\":\"road\",\"center\":[0,0,-6],\"size\":[20,0,4]}]}. Use this to describe high-level layout (fields, roads, yards, etc.) before emitting add_pattern/add_compound commands.\n"
            << "- modify_group / modify_pattern: {\"type\":\"modify_group\",\"group\":\"Bird_A\" or \"Field_Grass\",\"position_offset\":[dx,dy,dz],\"scale_multiplier\":[sx,sy,sz]}. This edits all entities whose names start with that group prefix. Prefer distinctive group names (e.g. Bird_A, Field_Grass) to avoid overlapping prefixes.\n\n";
         ss << "Positioning guidelines:\n"
            << "- Origin (0,0,0) may already have an object; consult the scene summary before placing on top of it\n"
@@ -120,6 +121,54 @@ public:
         addExample("Example 15:\nUser: \"Add a giant bird on the right\"",
                    "{\"commands\":[{\"type\":\"add_compound\",\"template\":\"bird\",\"name\":\"BigBird\","
                    "\"position\":[4,1,0],\"scale\":[2,2,2]}]}");
+
+        addExample("Example 16:\nUser: \"Make a pig\"",
+                   "{\"commands\":["
+                   "{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"Pig.Body\",\"position\":[0,1,-3],\"scale\":[1.4,0.9,2.0],\"color\":[0.9,0.7,0.7,1]},"
+                   "{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"Pig.Head\",\"position\":[0,1.7,-2],\"scale\":[0.7,0.7,0.7],\"color\":[0.95,0.8,0.8,1]},"
+                   "{\"type\":\"add_entity\",\"entity_type\":\"cylinder\",\"name\":\"Pig.LegFL\",\"position\":[-0.8,0.3,-2.3],\"scale\":[0.2,0.8,0.2],\"color\":[0.85,0.6,0.6,1]},"
+                   "{\"type\":\"add_entity\",\"entity_type\":\"cylinder\",\"name\":\"Pig.LegFR\",\"position\":[0.8,0.3,-2.3],\"scale\":[0.2,0.8,0.2],\"color\":[0.85,0.6,0.6,1]},"
+                   "{\"type\":\"add_entity\",\"entity_type\":\"cylinder\",\"name\":\"Pig.LegBL\",\"position\":[-0.8,0.3,-3.7],\"scale\":[0.2,0.8,0.2],\"color\":[0.85,0.6,0.6,1]},"
+                   "{\"type\":\"add_entity\",\"entity_type\":\"cylinder\",\"name\":\"Pig.LegBR\",\"position\":[0.8,0.3,-3.7],\"scale\":[0.2,0.8,0.2],\"color\":[0.85,0.6,0.6,1]}"
+                   "]}");
+
+        addExample("Example 17:\nUser: \"Create a small farm scene\"",
+                   "{\"commands\":["
+                   "{\"type\":\"scene_plan\",\"regions\":["
+                   "{\"name\":\"Field_Grass\",\"kind\":\"field\",\"center\":[0,0,0],\"size\":[16,0,16]},"
+                   "{\"name\":\"Road_A\",\"kind\":\"road\",\"center\":[0,0,-6],\"size\":[20,0,4]}"
+                   "]},"
+                   "{\"type\":\"add_compound\",\"template\":\"cow\",\"name\":\"Cow_A\",\"position\":[-2,1,-2],\"scale\":[1,1,1]},"
+                   "{\"type\":\"add_compound\",\"template\":\"pig\",\"name\":\"Pig_A\",\"position\":[2,1,-2],\"scale\":[1,1,1]}"
+                   "]}");
+
+        addExample("Example 18:\nUser: \"Extend the field and slightly grow all grass\"",
+                   "{\"commands\":["
+                   "{\"type\":\"scene_plan\",\"regions\":["
+                   "{\"name\":\"Field_Grass\",\"kind\":\"field\",\"attach_to_group\":\"Field_Grass\",\"offset\":[0,0,0],\"size\":[20,0,20]}"
+                   "]},"
+                   "{\"type\":\"modify_group\",\"group\":\"Field_Grass\",\"scale_multiplier\":[1.5,1,1.5]}"
+                   "]}");
+
+        addExample("Example 19:\nUser: \"Make a huge silver cow\"",
+                   "{\"commands\":[{\"type\":\"add_compound\",\"template\":\"cow\",\"name\":\"HugeCow\","
+                   "\"position\":[-2,1,-4],\"scale\":[2.5,2.5,2.5],"
+                   "\"body_color\":[0.9,0.9,0.9,1],\"accent_color\":[0.1,0.1,0.1,1]}]}");
+
+        addExample("Example 20:\nUser: \"Create a small spaceship above the car\"",
+                   "{\"commands\":[{\"type\":\"add_compound\",\"template\":\"spaceship\",\"name\":\"Ship_A\","
+                   "\"position\":[0,5,-6],\"scale\":[1.5,1.5,3],"
+                   "\"body_color\":[0.8,0.8,1,1],\"accent_color\":[0.2,0.2,0.3,1]}]}");
+
+        addExample("Example 21:\nUser: \"Create a small herd of cows in the field\"",
+                   "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"grid\",\"element\":\"cow\","
+                   "\"count\":9,\"region\":[-4,0,-4,4,0,4],\"spacing\":[2,0,2],"
+                   "\"kind\":\"herd\",\"group\":\"Herd_Cows\"}]}");
+
+        addExample("Example 22:\nUser: \"Add some traffic on the road\"",
+                   "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"row\",\"element\":\"car\","
+                   "\"count\":5,\"region\":[-8,0,-6,8,0,-6],\"spacing\":[3,0,0],"
+                   "\"kind\":\"traffic\",\"group\":\"RoadTraffic\"}]}");
 
         return ss.str();
     }

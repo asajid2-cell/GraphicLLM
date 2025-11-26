@@ -68,6 +68,7 @@ private:
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
+    void SyncDebugMenuFromRenderer();
 
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Graphics::DX12Device> m_device;

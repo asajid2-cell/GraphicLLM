@@ -15,11 +15,106 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace Cortex {
 
 Engine::~Engine() {
     Shutdown();
+}
+
+void Engine::SyncDebugMenuFromRenderer() {
+    if (!m_renderer) {
+        return;
+    }
+
+    UI::DebugMenuState dbg{};
+    dbg.exposure = m_renderer->GetExposure();
+    dbg.shadowBias = m_renderer->GetShadowBias();
+    dbg.shadowPCFRadius = m_renderer->GetShadowPCFRadius();
+    dbg.cascadeLambda = m_renderer->GetCascadeSplitLambda();
+    dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
+    dbg.bloomIntensity = m_renderer->GetBloomIntensity();
+    dbg.cameraBaseSpeed = m_cameraBaseSpeed;
+
+    UI::DebugMenu::SyncFromState(dbg);
+}
+
+namespace {
+    using nlohmann::json;
+
+    std::filesystem::path GetDebugMenuStatePath() {
+        namespace fs = std::filesystem;
+        // Store next to the executable / working directory
+        return fs::current_path() / "debug_menu_state.json";
+    }
+
+    UI::DebugMenuState LoadDebugMenuStateOrDefault(const UI::DebugMenuState& defaults) {
+        UI::DebugMenuState state = defaults;
+        const auto path = GetDebugMenuStatePath();
+        try {
+            if (std::filesystem::exists(path)) {
+                std::ifstream in(path);
+                if (in) {
+                    json j;
+                    in >> j;
+                    if (j.contains("exposure")) state.exposure = j.value("exposure", state.exposure);
+                    if (j.contains("shadowBias")) state.shadowBias = j.value("shadowBias", state.shadowBias);
+                    if (j.contains("shadowPCFRadius")) state.shadowPCFRadius = j.value("shadowPCFRadius", state.shadowPCFRadius);
+                    if (j.contains("cascadeLambda")) state.cascadeLambda = j.value("cascadeLambda", state.cascadeLambda);
+                    if (j.contains("cascade0ResolutionScale")) state.cascade0ResolutionScale = j.value("cascade0ResolutionScale", state.cascade0ResolutionScale);
+                    if (j.contains("bloomIntensity")) state.bloomIntensity = j.value("bloomIntensity", state.bloomIntensity);
+                    if (j.contains("cameraBaseSpeed")) state.cameraBaseSpeed = j.value("cameraBaseSpeed", state.cameraBaseSpeed);
+                    if (j.contains("fractalAmplitude")) state.fractalAmplitude = j.value("fractalAmplitude", state.fractalAmplitude);
+                    if (j.contains("fractalFrequency")) state.fractalFrequency = j.value("fractalFrequency", state.fractalFrequency);
+                    if (j.contains("fractalOctaves")) state.fractalOctaves = j.value("fractalOctaves", state.fractalOctaves);
+                    if (j.contains("fractalCoordMode")) state.fractalCoordMode = j.value("fractalCoordMode", state.fractalCoordMode);
+                    if (j.contains("fractalScaleX")) state.fractalScaleX = j.value("fractalScaleX", state.fractalScaleX);
+                    if (j.contains("fractalScaleZ")) state.fractalScaleZ = j.value("fractalScaleZ", state.fractalScaleZ);
+                    if (j.contains("fractalLacunarity")) state.fractalLacunarity = j.value("fractalLacunarity", state.fractalLacunarity);
+                    if (j.contains("fractalGain")) state.fractalGain = j.value("fractalGain", state.fractalGain);
+                    if (j.contains("fractalWarpStrength")) state.fractalWarpStrength = j.value("fractalWarpStrength", state.fractalWarpStrength);
+                    if (j.contains("fractalNoiseType")) state.fractalNoiseType = j.value("fractalNoiseType", state.fractalNoiseType);
+                }
+            }
+        } catch (...) {
+            // On any failure, fall back to defaults
+        }
+        return state;
+    }
+
+    void SaveDebugMenuStateToDisk(const UI::DebugMenuState& state) {
+        const auto path = GetDebugMenuStatePath();
+        try {
+            json j;
+            j["exposure"] = state.exposure;
+            j["shadowBias"] = state.shadowBias;
+            j["shadowPCFRadius"] = state.shadowPCFRadius;
+            j["cascadeLambda"] = state.cascadeLambda;
+            j["cascade0ResolutionScale"] = state.cascade0ResolutionScale;
+            j["bloomIntensity"] = state.bloomIntensity;
+            j["cameraBaseSpeed"] = state.cameraBaseSpeed;
+            j["fractalAmplitude"] = state.fractalAmplitude;
+            j["fractalFrequency"] = state.fractalFrequency;
+            j["fractalOctaves"] = state.fractalOctaves;
+            j["fractalCoordMode"] = state.fractalCoordMode;
+            j["fractalScaleX"] = state.fractalScaleX;
+            j["fractalScaleZ"] = state.fractalScaleZ;
+            j["fractalLacunarity"] = state.fractalLacunarity;
+            j["fractalGain"] = state.fractalGain;
+            j["fractalWarpStrength"] = state.fractalWarpStrength;
+            j["fractalNoiseType"] = state.fractalNoiseType;
+
+            std::ofstream out(path);
+            if (out) {
+                out << j.dump(2);
+            }
+        } catch (...) {
+            // Persistence is best-effort; ignore errors
+        }
+    }
 }
 
 Result<void> Engine::Initialize(const EngineConfig& config) {
@@ -60,19 +155,6 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     InitializeCameraController();
     ShowCameraHelpOverlay();
 
-    // Initialize debug menu with current renderer/camera parameters
-    if (m_renderer) {
-        UI::DebugMenuState dbg{};
-        dbg.exposure = m_renderer->GetExposure();
-        dbg.shadowBias = m_renderer->GetShadowBias();
-        dbg.shadowPCFRadius = m_renderer->GetShadowPCFRadius();
-        dbg.cascadeLambda = m_renderer->GetCascadeSplitLambda();
-        dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
-        dbg.bloomIntensity = m_renderer->GetBloomIntensity();
-        dbg.cameraBaseSpeed = m_cameraBaseSpeed;
-        UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
-    }
-
     // Apply camera config
     m_cameraBaseSpeed = config.cameraBaseSpeed;
     m_cameraSprintMultiplier = config.cameraSprintMultiplier;
@@ -96,6 +178,53 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             // Run a small regression suite once at startup (logs only)
             LLM::RunRegressionTests();
         }
+    }
+
+    // Initialize debug menu with current / persisted renderer & camera parameters
+    if (m_renderer && m_window) {
+        UI::DebugMenuState dbg{};
+        dbg.exposure = m_renderer->GetExposure();
+        dbg.shadowBias = m_renderer->GetShadowBias();
+        dbg.shadowPCFRadius = m_renderer->GetShadowPCFRadius();
+        dbg.cascadeLambda = m_renderer->GetCascadeSplitLambda();
+        dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
+        dbg.bloomIntensity = m_renderer->GetBloomIntensity();
+        dbg.cameraBaseSpeed = m_cameraBaseSpeed;
+        // Initialize fractal debug defaults (can be overridden from JSON)
+        dbg.fractalAmplitude = 0.0f;
+        dbg.fractalFrequency = 0.5f;
+        dbg.fractalOctaves = 4.0f;
+        dbg.fractalCoordMode = 1.0f;
+        dbg.fractalScaleX = 1.0f;
+        dbg.fractalScaleZ = 1.0f;
+        dbg.fractalLacunarity = 2.0f;
+        dbg.fractalGain = 0.5f;
+        dbg.fractalWarpStrength = 0.0f;
+        dbg.fractalNoiseType = 0.0f;
+
+        dbg = LoadDebugMenuStateOrDefault(dbg);
+
+        // Apply persisted values back into renderer / camera so the scene matches the UI
+        m_renderer->SetExposure(dbg.exposure);
+        m_renderer->SetShadowBias(dbg.shadowBias);
+        m_renderer->SetShadowPCFRadius(dbg.shadowPCFRadius);
+        m_renderer->SetCascadeSplitLambda(dbg.cascadeLambda);
+        m_renderer->AdjustCascadeResolutionScale(0, dbg.cascade0ResolutionScale - m_renderer->GetCascadeResolutionScale(0));
+        m_renderer->SetBloomIntensity(dbg.bloomIntensity);
+        m_renderer->SetFractalParams(
+            dbg.fractalAmplitude,
+            dbg.fractalFrequency,
+            dbg.fractalOctaves,
+            dbg.fractalCoordMode,
+            dbg.fractalScaleX,
+            dbg.fractalScaleZ,
+            dbg.fractalLacunarity,
+            dbg.fractalGain,
+            dbg.fractalWarpStrength,
+            dbg.fractalNoiseType);
+        m_cameraBaseSpeed = dbg.cameraBaseSpeed;
+
+        UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
     }
 
     m_running = true;
@@ -145,6 +274,8 @@ void Engine::Shutdown() {
     // Make shutdown idempotent and safe even if initialization failed early.
     m_running = false;
 
+    // Persist last used debug menu state
+    SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
     UI::DebugMenu::Shutdown();
 
     // Phase 2: Shutdown LLM
@@ -223,6 +354,7 @@ void Engine::RenderHUD() {
 
     wchar_t buffer[256];
 
+    // Always show top-level FPS/camera
     swprintf_s(buffer, L"FPS: %.1f  Frame: %.2f ms", fps, m_frameTime * 1000.0f);
     drawLine(buffer);
 
@@ -234,76 +366,79 @@ void Engine::RenderHUD() {
         drawLine(L"Camera: <none>");
     }
 
-    swprintf_s(buffer, L"Exposure: %.2f  Bloom: %.2f", exposure, bloomIntensity);
-    drawLine(buffer);
+    // Only show detailed renderer/light/command information in debug screen mode
+    if (debugMode == 6) {
+        swprintf_s(buffer, L"Exposure (EV): %.2f  Bloom: %.2f", exposure, bloomIntensity);
+        drawLine(buffer);
 
-    swprintf_s(buffer, L"Shadows: %s  DebugView: %d  PCSS: %s  FXAA: %s",
-               shadows ? L"ON" : L"OFF",
-               debugMode,
-               pcss ? L"ON" : L"OFF",
-               fxaa ? L"ON" : L"OFF");
-    drawLine(buffer);
+        swprintf_s(buffer, L"Shadows: %s  DebugView: %d  PCSS: %s  FXAA: %s",
+                   shadows ? L"ON" : L"OFF",
+                   debugMode,
+                   pcss ? L"ON" : L"OFF",
+                   fxaa ? L"ON" : L"OFF");
+        drawLine(buffer);
 
-    swprintf_s(buffer, L"Shadow Bias: %.6f  PCF: %.2f  Lambda: %.2f  Casc0Scale: %.2f",
-               shadowBias, shadowPCF, cascadeLambda, cascade0Scale);
-    drawLine(buffer);
+        swprintf_s(buffer, L"Shadow Bias: %.6f  PCF Radius: %.2f  Cascade \u03bb: %.2f  NearCascScale: %.2f",
+                   shadowBias, shadowPCF, cascadeLambda, cascade0Scale);
+        drawLine(buffer);
 
-    // Light count (from registry)
-    size_t lightCount = 0;
-    if (m_registry) {
-        auto lightView = m_registry->View<Scene::LightComponent>();
-        lightCount = static_cast<size_t>(lightView.size());
-    }
-    swprintf_s(buffer, L"Lights: %zu", lightCount);
-    drawLine(buffer);
+        // Light count (from registry)
+        size_t lightCount = 0;
+        if (m_registry) {
+            auto lightView = m_registry->View<Scene::LightComponent>();
+            lightCount = static_cast<size_t>(lightView.size());
+        }
+        swprintf_s(buffer, L"Lights: %zu", lightCount);
+        drawLine(buffer);
 
-    // Per-light summary (up to two lights)
-    if (m_registry && lightCount > 0) {
-        drawLine(L"Light details:");
-        auto view = m_registry->View<Scene::LightComponent>();
-        size_t shown = 0;
-        for (auto entity : view) {
-            const auto& light = view.get<Scene::LightComponent>(entity);
+        // Per-light summary (up to two lights)
+        if (m_registry && lightCount > 0) {
+            drawLine(L"Light details:");
+            auto view = m_registry->View<Scene::LightComponent>();
+            size_t shown = 0;
+            for (auto entity : view) {
+                const auto& light = view.get<Scene::LightComponent>(entity);
 
-            const wchar_t* typeLabel = L"Point";
-            if (light.type == Scene::LightType::Directional) typeLabel = L"Dir";
-            else if (light.type == Scene::LightType::Spot)   typeLabel = L"Spot";
+                const wchar_t* typeLabel = L"Point";
+                if (light.type == Scene::LightType::Directional) typeLabel = L"Dir";
+                else if (light.type == Scene::LightType::Spot)   typeLabel = L"Spot";
 
-            glm::vec3 pos(0.0f);
-            if (m_registry->HasComponent<Scene::TransformComponent>(entity)) {
-                pos = m_registry->GetComponent<Scene::TransformComponent>(entity).position;
-            }
+                glm::vec3 pos(0.0f);
+                if (m_registry->HasComponent<Scene::TransformComponent>(entity)) {
+                    pos = m_registry->GetComponent<Scene::TransformComponent>(entity).position;
+                }
 
-            std::wstring name;
-            if (m_registry->HasComponent<Scene::TagComponent>(entity)) {
-                const auto& tag = m_registry->GetComponent<Scene::TagComponent>(entity).tag;
-                name.assign(tag.begin(), tag.end());
-            } else {
-                name = L"<unnamed>";
-            }
+                std::wstring name;
+                if (m_registry->HasComponent<Scene::TagComponent>(entity)) {
+                    const auto& tag = m_registry->GetComponent<Scene::TagComponent>(entity).tag;
+                    name.assign(tag.begin(), tag.end());
+                } else {
+                    name = L"<unnamed>";
+                }
 
-            swprintf_s(buffer, L"  %s (%s) I=%.2f Pos=(%.1f, %.1f, %.1f)",
-                       name.c_str(),
-                       typeLabel,
-                       light.intensity,
-                       pos.x, pos.y, pos.z);
-            drawLine(buffer);
+                swprintf_s(buffer, L"  %s (%s) I=%.2f Pos=(%.1f, %.1f, %.1f)",
+                           name.c_str(),
+                           typeLabel,
+                           light.intensity,
+                           pos.x, pos.y, pos.z);
+                drawLine(buffer);
 
-            if (++shown >= 2) {
-                break;
+                if (++shown >= 2) {
+                    break;
+                }
             }
         }
-    }
 
-    if (!m_recentCommandMessages.empty()) {
-        drawLine(L"Last commands:");
-        for (const auto& msg : m_recentCommandMessages) {
-            std::wstring wmsg(msg.begin(), msg.end());
-            if (wmsg.size() > 80) {
-                wmsg.resize(80);
+        if (!m_recentCommandMessages.empty()) {
+            drawLine(L"Last commands:");
+            for (const auto& msg : m_recentCommandMessages) {
+                std::wstring wmsg(msg.begin(), msg.end());
+                if (wmsg.size() > 80) {
+                    wmsg.resize(80);
+                }
+                TextOutW(dc, 16, lineY, wmsg.c_str(), static_cast<int>(wmsg.size()));
+                lineY += 16;
             }
-            TextOutW(dc, 16, lineY, wmsg.c_str(), static_cast<int>(wmsg.size()));
-            lineY += 16;
         }
     }
 
@@ -423,47 +558,56 @@ void Engine::ProcessInput() {
                     }
                 }
                 else if (event.key.key == SDLK_F2) {
-                    // Toggle debug slider menu
-                    UI::DebugMenu::Toggle();
+                    // Reset all debug settings (sliders + view modes) to defaults, then show the menu
+                    UI::DebugMenu::ResetToDefaults();
+                    UI::DebugMenu::SetVisible(true);
                 }
                 else if (event.key.key == SDLK_F5) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(-0.5f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F6) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(0.5f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F7) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(-0.0002f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F8) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(0.0002f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F9) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(-0.05f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F10) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(0.05f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F11) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, -0.1f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F12) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, 0.1f);
+                        SyncDebugMenuFromRenderer();
                     }
                 }
                 else if (event.key.key == SDLK_F3) {
@@ -518,6 +662,8 @@ void Engine::Update(float deltaTime) {
     // Phase 2: Execute pending LLM commands
     if (m_commandQueue && m_commandQueue->HasPending()) {
         m_commandQueue->ExecuteAll(m_registry.get(), m_renderer.get());
+        // Mirror any renderer changes into the debug menu so sliders/numbers stay in sync
+        SyncDebugMenuFromRenderer();
     }
     if (m_commandQueue) {
         auto statuses = m_commandQueue->ConsumeStatus();
@@ -540,12 +686,6 @@ void Engine::Update(float deltaTime) {
     if (m_renderer) {
         UI::DebugMenuState dbg = UI::DebugMenu::GetState();
         m_cameraBaseSpeed = dbg.cameraBaseSpeed;
-        m_renderer->SetExposure(dbg.exposure);
-        m_renderer->SetShadowBias(dbg.shadowBias);
-        m_renderer->SetShadowPCFRadius(dbg.shadowPCFRadius);
-        m_renderer->SetCascadeSplitLambda(dbg.cascadeLambda);
-        m_renderer->AdjustCascadeResolutionScale(0, dbg.cascade0ResolutionScale - m_renderer->GetCascadeResolutionScale(0));
-        m_renderer->SetBloomIntensity(dbg.bloomIntensity);
     }
 
     // Update active camera (fly controls)
@@ -997,6 +1137,16 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
            << ", cascade_lambda=" << m_renderer->GetCascadeSplitLambda();
         extra += ss.str();
     }
+    // Include last scene recipe (from the most recent scene_plan) to help the
+    // LLM reason about prior layouts and extend patterns.
+    if (m_commandQueue) {
+        std::string recipe = m_commandQueue->GetLastSceneRecipe();
+        if (!recipe.empty()) {
+            extra += "\nPrevious scene recipe:\n";
+            extra += recipe;
+        }
+    }
+
     if (!extra.empty()) {
         sceneSummary += extra;
     }

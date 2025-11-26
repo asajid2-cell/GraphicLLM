@@ -1,15 +1,36 @@
 // Fullscreen post-process: exposure, ACES tonemapping, gamma, simple bloom stub
 
+// Frame constants must match ShaderTypes.h / Basic.hlsl exactly
 cbuffer FrameConstants : register(b1)
 {
     float4x4 g_ViewMatrix;
     float4x4 g_ProjectionMatrix;
     float4x4 g_ViewProjectionMatrix;
-    float4 g_CameraPosition;
+    float4   g_CameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
-    float4 g_TimeAndExposure;
+    float4   g_TimeAndExposure;
+    // rgb: ambient color * intensity, w unused
+    float4   g_AmbientColor;
+    uint4    g_LightCount;
+    // Forward lights (light 0 is the sun)
+    struct Light
+    {
+        float4 position_type;        // xyz = position (for point/spot), w = type
+        float4 direction_cosInner;   // xyz = direction, w = inner cone cos (spot)
+        float4 color_range;          // rgb = color * intensity, w = range (point/spot)
+        float4 params;               // x = outer cone cos, y = shadow index, z,w reserved
+    };
+    Light    g_Lights[4];
+    // Cascaded directional light view-projection matrices (we use first 3)
+    float4x4 g_LightViewProjection[4];
+    // x,y,z = cascade split depths in view space, w = far plane
+    float4   g_CascadeSplits;
+    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
+    float4   g_ShadowParams;
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index, 6 = debug screen), others reserved
+    float4   g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
-    float4 g_PostParams;
+    float4   g_PostParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -136,9 +157,11 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Shadow map cascade visualization in the top-right corner.
-    // We show all three cascades side-by-side in a 40% width x 40% height box.
-    if (uv.x > 0.6f && uv.y < 0.4f)
+    // Shadow map cascade visualization in the top-right corner, only when
+    // debug screen mode is active (g_DebugMode.x == 6). We show all three
+    // cascades side-by-side in a 40% width x 40% height box, with an
+    // inverted depth mapping to make geometry stand out (near = bright).
+    if (g_DebugMode.x == 6 && uv.x > 0.6f && uv.y < 0.4f)
     {
         float2 local = float2((uv.x - 0.6f) / 0.4f, uv.y / 0.4f);
         float tiles = 3.0f;
@@ -148,7 +171,11 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float2 tileUV = float2(frac(scaledX), local.y);
 
         float depth = g_ShadowMap.Sample(g_Sampler, float3(tileUV, cascadeIndex)).r;
-        float3 depthVis = depth.xxx;
+
+        // Depth is in [0,1] with 1 = far plane (clear). Invert and scale
+        // to emphasize surfaces near the light; empty space stays dark.
+        float invDepth = saturate((1.0f - depth) * 6.0f);
+        float3 depthVis = invDepth.xxx;
         color = depthVis;
     }
 

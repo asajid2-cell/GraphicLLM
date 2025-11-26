@@ -182,6 +182,10 @@ public:
     void SetShadowPCFRadius(float radius);
     void SetCascadeSplitLambda(float lambda);
     void SetBloomIntensity(float intensity);
+    void SetFractalParams(float amplitude, float frequency, float octaves,
+                          float coordMode, float scaleX, float scaleZ,
+                          float lacunarity = 2.0f, float gain = 0.5f,
+                          float warpStrength = 0.0f, float noiseType = 0.0f);
     void SetPCSS(bool enabled) { m_pcssEnabled = enabled; }
     void SetFXAAEnabled(bool enabled) { m_fxaaEnabled = enabled; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
@@ -315,6 +319,18 @@ private:
     uint32_t m_debugViewMode = 0;
     bool m_pcssEnabled = false;
     bool m_fxaaEnabled = true;
+
+    // Global fractal surface parameters (applied uniformly to all materials)
+    float m_fractalAmplitude = 0.0f;
+    float m_fractalFrequency = 0.5f;
+    float m_fractalOctaves = 4.0f;
+    float m_fractalCoordMode = 1.0f; // 0 = UV, 1 = world XZ
+    float m_fractalScaleX = 1.0f;
+    float m_fractalScaleZ = 1.0f;
+    float m_fractalLacunarity = 2.0f;
+    float m_fractalGain = 0.5f;
+    float m_fractalWarpStrength = 0.0f;
+    float m_fractalNoiseType = 0.0f;
 
     // Frame state
     float m_totalTime = 0.0f;

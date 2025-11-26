@@ -51,7 +51,10 @@ cbuffer MaterialConstants : register(b2)
     float g_Metallic;
     float g_Roughness;
     float g_AO;
-    uint4 g_MapFlags; // x: albedo, y: normal, z: metallic, w: roughness
+    uint4 g_MapFlags;      // x: albedo, y: normal, z: metallic, w: roughness
+    float4 g_FractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
+    float4 g_FractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
+    float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
 };
 
 // Texture and sampler
@@ -127,6 +130,71 @@ static const float SHADOW_MAP_SIZE = 2048.0f;
 static const uint LIGHT_TYPE_DIRECTIONAL = 0;
 static const uint LIGHT_TYPE_POINT       = 1;
 static const uint LIGHT_TYPE_SPOT        = 2;
+
+// --- Fractal noise helpers (2D hash + value noise + fbm) ---
+
+float2 Hash2(float2 p) {
+    float3 p3 = frac(float3(p.x, p.y, p.x) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac(float2(p3.x + p3.y, p3.y + p3.z));
+}
+
+float Noise2D(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+
+    float2 u = f * f * (3.0 - 2.0 * f);
+
+    float2 a = Hash2(i + float2(0, 0));
+    float2 b = Hash2(i + float2(1, 0));
+    float2 c = Hash2(i + float2(0, 1));
+    float2 d = Hash2(i + float2(1, 1));
+
+    float v1 = lerp(a.x, b.x, u.x);
+    float v2 = lerp(c.x, d.x, u.x);
+    return lerp(v1, v2, u.y) * 2.0 - 1.0; // -1..1
+}
+
+float FractalHeightBase(float2 p, float amplitude, float frequency, int octaves,
+                        float lacunarity, float gain, float warpStrength, int noiseType) {
+    // Optional domain warp for richer structure
+    if (warpStrength > 0.0f) {
+        float2 warp;
+        warp.x = Noise2D(p + float2(37.2, 17.4));
+        warp.y = Noise2D(p + float2(-11.1, 8.3));
+        p += warp * warpStrength;
+    }
+
+    float h = 0.0f;
+    float amp = amplitude;
+    float freq = frequency;
+
+    [unroll]
+    for (int i = 0; i < 8; ++i) {
+        if (i >= octaves) break;
+        float n = Noise2D(p * freq);
+
+        // Convert base noise to different fractal flavors while keeping it roughly in [-1,1]
+        float v = n;
+        if (noiseType == 1) {
+            // Ridged fbm: sharp crests
+            v = 2.0f * (1.0f - abs(n)) - 1.0f;
+        } else if (noiseType == 2) {
+            // Turbulence: absolute noise
+            v = 2.0f * abs(n) - 1.0f;
+        }
+
+        h += v * amp;
+        freq *= lacunarity;
+        amp *= gain;
+    }
+    return h;
+}
+
+// Backward-compatible helper with default lacunarity/gain/warp/noiseType
+float FractalHeight(float2 p, float amplitude, float frequency, int octaves) {
+    return FractalHeightBase(p, amplitude, frequency, octaves, 2.0f, 0.5f, 0.0f, 0);
+}
 
 float3 ApplyACESFilm(float3 x)
 {
@@ -384,6 +452,51 @@ float4 PSMain(PSInput input) : SV_TARGET
         normal = normalize(mul(TBN, nSample));
     }
 
+    // Fractal normal perturbation (normal-only "bump" using procedural heightfield)
+    float amplitude  = g_FractalParams0.x;
+    float frequency  = g_FractalParams0.y;
+    int   octaves    = (int)g_FractalParams0.z;
+    bool  useFractal = (g_FractalParams0.w > 0.5f);
+    float lacunarity   = max(g_FractalParams2.x, 1.0f);
+    float gain         = saturate(g_FractalParams2.y);
+    float warpStrength = max(g_FractalParams2.z, 0.0f);
+    int   noiseType    = (int)g_FractalParams2.w;
+
+    if (useFractal && amplitude > 0.0001f && octaves > 0) {
+        float mode = g_FractalParams1.x; // 0 = UV, 1 = world XZ
+        float2 scale = float2(g_FractalParams1.y, g_FractalParams1.z);
+        float2 p;
+
+        if (mode < 0.5f) {
+            p = input.texCoord * scale;
+        } else {
+            p = float2(input.worldPos.x, input.worldPos.z) * scale;
+        }
+
+        float h = FractalHeightBase(p, amplitude, frequency, octaves, lacunarity, gain, warpStrength, noiseType);
+
+        float eps = 0.01f;
+        float hx = FractalHeightBase(p + float2(eps, 0), amplitude, frequency, octaves, lacunarity, gain, warpStrength, noiseType);
+        float hz = FractalHeightBase(p + float2(0, eps), amplitude, frequency, octaves, lacunarity, gain, warpStrength, noiseType);
+
+        float dhdx = (hx - h) / eps;
+        float dhdz = (hz - h) / eps;
+
+        // Build a simple tangent frame from the current normal
+        float3 N = normalize(normal);
+        float3 up = float3(0, 1, 0);
+        float3 T = normalize(cross(up, N));
+        // If N is nearly parallel to up, pick an alternate up vector
+        if (all(abs(T) < 1e-3)) {
+            up = float3(0, 0, 1);
+            T = normalize(cross(up, N));
+        }
+        float3 B = normalize(cross(N, T));
+
+        float3 perturbed = normalize(N - dhdx * T - dhdz * B);
+        normal = perturbed;
+    }
+
     // Debug views
     uint debugMode = (uint)g_DebugMode.x;
     if (debugMode == 1)
@@ -420,6 +533,35 @@ float4 PSMain(PSInput input) : SV_TARGET
             float3(0, 0, 1)
         };
         return float4(colors[cascadeIndex], 1.0f);
+    }
+    else if (debugMode == 7)
+    {
+        // Visualize fractal height as greyscale
+        float amplitude  = g_FractalParams0.x;
+        float frequency  = g_FractalParams0.y;
+        int   octaves    = (int)g_FractalParams0.z;
+        float lacunarity   = max(g_FractalParams2.x, 1.0f);
+        float gain         = saturate(g_FractalParams2.y);
+        float warpStrength = max(g_FractalParams2.z, 0.0f);
+        int   noiseType    = (int)g_FractalParams2.w;
+
+        float mode = g_FractalParams1.x; // 0 = UV, 1 = world XZ
+        float2 scale = float2(g_FractalParams1.y, g_FractalParams1.z);
+
+        float2 p;
+        if (mode < 0.5f) {
+            p = input.texCoord * scale;
+        } else {
+            p = float2(input.worldPos.x, input.worldPos.z) * scale;
+        }
+
+        float amp = max(amplitude, 0.001f);
+        int   oct = max(octaves, 1);
+
+        float h = FractalHeightBase(p, amp, frequency, oct, lacunarity, gain, warpStrength, noiseType);
+        float v = 0.5f + h / (2.0f * amp); // map [-amp,amp] -> [0,1]
+        v = saturate(v);
+        return float4(v, v, v, 1.0f);
     }
 
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao);

@@ -204,6 +204,9 @@ void CommandQueue::ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* re
         case CommandType::ModifyCamera:
             ExecuteModifyCamera(static_cast<ModifyCameraCommand*>(command), registry);
             break;
+        case CommandType::ScenePlan:
+            ExecuteScenePlan(static_cast<ScenePlanCommand*>(command), registry, renderer);
+            break;
         case CommandType::AddPattern:
             ExecuteAddPattern(static_cast<AddPatternCommand*>(command), registry, renderer);
             break;
@@ -738,16 +741,26 @@ void CommandQueue::ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Regist
         return;
     }
 
+    // Look up a built-in prefab first; if not found, try to synthesize a
+    // reasonable approximation (e.g., "pig" -> generic quadruped) so
+    // add_compound never hard-fails for new nouns.
+    bool synthesized = false;
     const CompoundTemplate* templ = CompoundLibrary::FindTemplate(cmd->templateName);
     if (!templ) {
-        PushStatus(false, "add_compound failed: unknown template '" + cmd->templateName + "'");
-        return;
+        const glm::vec4* body = cmd->hasBodyColor ? &cmd->bodyColor : nullptr;
+        const glm::vec4* accent = cmd->hasAccentColor ? &cmd->accentColor : nullptr;
+        templ = CompoundLibrary::SynthesizeTemplate(cmd->templateName, body, accent);
+        if (templ) {
+            synthesized = true;
+        }
     }
 
     // Derive a stable instance name/group prefix
     std::string instanceName = cmd->instanceName;
     if (instanceName.empty()) {
-        instanceName = templ->defaultGroupPrefix + "_" + std::to_string(m_spawnIndex++);
+        const std::string baseName = templ ? templ->defaultGroupPrefix : cmd->templateName;
+        instanceName = baseName.empty() ? ("Compound_" + std::to_string(m_spawnIndex++))
+                                        : (baseName + "_" + std::to_string(m_spawnIndex++));
     }
 
     glm::vec3 basePos = SanitizeVec3(cmd->position);
@@ -756,6 +769,31 @@ void CommandQueue::ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Regist
         if (!std::isfinite(baseScale[i]) || std::abs(baseScale[i]) < 0.01f) {
             baseScale[i] = (baseScale[i] >= 0.0f ? 1.0f : -1.0f);
         }
+    }
+
+    if (!templ) {
+        // Final safety net: spawn a single proxy sphere so the engine
+        // always creates something instead of failing.
+        AddEntityCommand proxy;
+        proxy.entityType = AddEntityCommand::EntityType::Sphere;
+        proxy.autoPlace = false;
+        proxy.allowPlacementJitter = false;
+        proxy.disableCollisionAvoidance = true;
+        proxy.segmentsPrimary = 20;
+        proxy.segmentsSecondary = 12;
+        proxy.position = basePos;
+        proxy.scale = glm::vec3(
+            std::max(0.5f, std::abs(baseScale.x)),
+            std::max(0.5f, std::abs(baseScale.y)),
+            std::max(0.5f, std::abs(baseScale.z)));
+        proxy.color = glm::vec4(0.8f, 0.7f, 0.9f, 1.0f);
+        proxy.name = instanceName.empty() ? "CompoundProxy" : instanceName;
+        ExecuteAddEntity(&proxy, registry, renderer);
+
+        std::ostringstream ss;
+        ss << "add_compound '" << cmd->templateName << "' not recognized; spawned proxy sphere '" << proxy.name << "'";
+        PushStatus(true, ss.str());
+        return;
     }
 
     int partIndex = 0;
@@ -783,9 +821,204 @@ void CommandQueue::ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Regist
     }
 
     std::ostringstream ss;
-    ss << "spawned compound " << templ->name << " as " << instanceName
-       << " (" << templ->parts.size() << " parts)";
+    if (synthesized) {
+        ss << "synthesized compound " << cmd->templateName << " as " << instanceName
+           << " (" << templ->parts.size() << " parts)";
+    } else {
+        ss << "spawned compound " << templ->name << " as " << instanceName
+           << " (" << templ->parts.size() << " parts)";
+    }
     PushStatus(true, ss.str());
+}
+
+void CommandQueue::ExecuteScenePlan(ScenePlanCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer) {
+    if (!cmd || !registry || !renderer) {
+        PushStatus(false, "scene_plan failed: missing registry or renderer");
+        return;
+    }
+
+    auto resolveGroupCenter = [&](const std::string& groupName, glm::vec3& outCenter) -> bool {
+        if (groupName.empty() || !registry) return false;
+
+        struct GroupInfo {
+            glm::vec3 minPos{0.0f};
+            glm::vec3 maxPos{0.0f};
+            bool hasBounds = false;
+        };
+
+        std::unordered_map<std::string, GroupInfo> groups;
+        auto view = registry->View<Scene::TagComponent, Scene::TransformComponent>();
+        for (auto entity : view) {
+            const auto& tag = view.get<Scene::TagComponent>(entity);
+            const auto& transform = view.get<Scene::TransformComponent>(entity);
+            const std::string& name = tag.tag;
+
+            // Match either the base group or numbered variants like Field_Grass_2.*
+            if (name == groupName ||
+                name.rfind(groupName + ".", 0) == 0 ||
+                name.rfind(groupName + "_", 0) == 0) {
+                std::string key = groupName;
+                if (name.rfind(groupName + "_", 0) == 0) {
+                    // Extract prefix up to next '.' so Field_Grass_2.Body -> Field_Grass_2
+                    size_t start = groupName.size() + 1;
+                    size_t dot = name.find('.', start);
+                    if (dot == std::string::npos) {
+                        key = name;
+                    } else {
+                        key = name.substr(0, dot);
+                    }
+                }
+
+                auto& g = groups[key];
+                if (!g.hasBounds) {
+                    g.minPos = g.maxPos = transform.position;
+                    g.hasBounds = true;
+                } else {
+                    g.minPos = glm::min(g.minPos, transform.position);
+                    g.maxPos = glm::max(g.maxPos, transform.position);
+                }
+            }
+        }
+
+        float bestArea = -1.0f;
+        bool found = false;
+        for (const auto& [key, g] : groups) {
+            if (!g.hasBounds) continue;
+            glm::vec3 extents = g.maxPos - g.minPos;
+            float ex = std::abs(extents.x);
+            float ez = std::abs(extents.z);
+            float area = ex * ez;
+            if (area > bestArea) {
+                bestArea = area;
+                outCenter = 0.5f * (g.minPos + g.maxPos);
+                found = true;
+            }
+        }
+        return found;
+    };
+
+    std::ostringstream recipe;
+    recipe << "ScenePlan: ";
+
+    for (const auto& region : cmd->regions) {
+        ScenePlanCommand::Region resolved = region;
+        if (!resolved.attachToGroup.empty()) {
+            glm::vec3 baseCenter;
+            if (resolveGroupCenter(resolved.attachToGroup, baseCenter)) {
+                resolved.center = baseCenter;
+                if (resolved.hasOffset) {
+                    resolved.center += resolved.offset;
+                }
+            }
+        }
+
+        std::string kind = region.kind;
+        std::transform(kind.begin(), kind.end(), kind.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (kind == "field") {
+            BuildFieldRegion(resolved, registry, renderer);
+        } else if (kind == "road") {
+            BuildRoadRegion(resolved, registry, renderer);
+        } else {
+            BuildGenericRegion(resolved, registry, renderer);
+        }
+
+        if (!resolved.name.empty()) {
+            recipe << resolved.name << "(" << kind << ",center=("
+                   << std::round(resolved.center.x) << "," << std::round(resolved.center.z)
+                   << "),size=(" << std::round(resolved.size.x) << "," << std::round(resolved.size.z)
+                   << ")); ";
+        }
+    }
+
+    m_lastSceneRecipe = recipe.str();
+    const size_t kMaxRecipeChars = 2048;
+    if (m_lastSceneRecipe.size() > kMaxRecipeChars) {
+        m_lastSceneRecipe.resize(kMaxRecipeChars);
+    }
+
+    PushStatus(true, "scene_plan executed");
+}
+
+void CommandQueue::BuildFieldRegion(const ScenePlanCommand::Region& region,
+                                    Scene::ECS_Registry* registry,
+                                    Graphics::Renderer* renderer) {
+    if (!registry || !renderer) {
+        return;
+    }
+
+    glm::vec3 center = region.center;
+    glm::vec3 size = region.size;
+
+    auto pattern = std::make_shared<AddPatternCommand>();
+    pattern->pattern = AddPatternCommand::PatternType::Grid;
+    pattern->element = "grass_blade";
+    pattern->count = 64;
+    pattern->regionMin = center - 0.5f * size;
+    pattern->regionMax = center + 0.5f * size;
+    pattern->hasRegionBox = true;
+    pattern->groupName = region.name.empty() ? "Field_Grass" : region.name;
+
+    ExecuteAddPattern(pattern.get(), registry, renderer);
+
+    // Optionally add a few trees via compounds so fields feel richer.
+    for (int i = 0; i < 3; ++i) {
+        auto comp = std::make_shared<AddCompoundCommand>();
+        comp->templateName = "tree";
+        comp->instanceName = pattern->groupName + "_Tree" + std::to_string(i);
+        comp->position = center + glm::vec3((i - 1) * 3.0f, 0.0f, size.z * 0.25f);
+        comp->scale = glm::vec3(1.0f);
+        ExecuteAddCompound(comp.get(), registry, renderer);
+    }
+}
+
+void CommandQueue::BuildRoadRegion(const ScenePlanCommand::Region& region,
+                                   Scene::ECS_Registry* registry,
+                                   Graphics::Renderer* renderer) {
+    if (!registry || !renderer) {
+        return;
+    }
+
+    glm::vec3 center = region.center;
+    glm::vec3 size = region.size;
+
+    auto road = std::make_shared<AddEntityCommand>();
+    road->entityType = AddEntityCommand::EntityType::Plane;
+    road->name = region.name.empty() ? "Road" : region.name;
+    road->position = center;
+    road->scale = glm::vec3(size.x, 1.0f, size.z);
+    road->color = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
+    ExecuteAddEntity(road.get(), registry, renderer);
+
+    auto lanes = std::make_shared<AddPatternCommand>();
+    lanes->pattern = AddPatternCommand::PatternType::Row;
+    lanes->element = "plane";
+    lanes->count = 6;
+    lanes->hasRegionBox = false;
+    lanes->regionMin = center + glm::vec3(0.0f, 0.01f, 0.0f);
+    lanes->spacing = glm::vec3(size.x / 6.0f, 0.0f, 0.0f);
+    lanes->hasSpacing = true;
+    lanes->groupName = road->name + "_Lanes";
+    ExecuteAddPattern(lanes.get(), registry, renderer);
+}
+
+void CommandQueue::BuildGenericRegion(const ScenePlanCommand::Region& region,
+                                      Scene::ECS_Registry* registry,
+                                      Graphics::Renderer* renderer) {
+    if (!registry || !renderer) {
+        return;
+    }
+
+    auto pattern = std::make_shared<AddPatternCommand>();
+    pattern->pattern = AddPatternCommand::PatternType::Random;
+    pattern->element = "cube";
+    pattern->count = 8;
+    pattern->regionMin = region.center - 0.5f * region.size;
+    pattern->regionMax = region.center + 0.5f * region.size;
+    pattern->hasRegionBox = true;
+    pattern->groupName = region.name.empty() ? "Region" : region.name;
+    ExecuteAddPattern(pattern.get(), registry, renderer);
 }
 
 void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer) {
@@ -877,6 +1110,12 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
 
     float stepX = cmd->hasSpacing ? safeSpacing(cmd->spacing.x, 1.5f) : 1.5f;
     float stepZ = cmd->hasSpacing ? safeSpacing(cmd->spacing.z, 1.5f) : 1.5f;
+    std::string kindLower = cmd->kind;
+    std::transform(kindLower.begin(), kindLower.end(), kindLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    bool herdMode = (kindLower == "herd");
+    bool trafficMode = (kindLower == "traffic");
+    bool useCompoundPattern = herdMode || trafficMode;
 
     auto sampleHeight = [](const glm::vec3& /*pos*/) {
         // Hook for future terrain support; currently we place patterns slightly above ground plane.
@@ -942,9 +1181,33 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
         worldPos.y = sampleHeight(worldPos);
         worldPos = SanitizeVec3(worldPos);
 
-        if (compoundTempl) {
+        if (herdMode) {
+            // Small positional jitter so herds don't look like perfect lattices.
+            uint32_t h = std::hash<int>{}(i + 1u);
+            float jx = (static_cast<float>(h & 0xFFu) / 255.0f - 0.5f) * 0.6f;
+            float jz = (static_cast<float>((h >> 8) & 0xFFu) / 255.0f - 0.5f) * 0.6f;
+            worldPos.x += jx;
+            worldPos.z += jz;
+            worldPos = SanitizeVec3(worldPos);
+        }
+
+        bool spawnCompound = (compoundTempl != nullptr) || useCompoundPattern;
+        if (spawnCompound) {
             AddCompoundCommand sub;
-            sub.templateName = compoundTempl->name;
+            if (compoundTempl) {
+                sub.templateName = compoundTempl->name;
+            } else {
+                // Use the element name if provided, otherwise fall back to generic motifs.
+                if (!cmd->element.empty()) {
+                    sub.templateName = cmd->element;
+                } else if (herdMode) {
+                    sub.templateName = "quadruped";
+                } else if (trafficMode) {
+                    sub.templateName = "vehicle";
+                } else {
+                    sub.templateName = "compound";
+                }
+            }
             sub.instanceName = groupName + "_" + std::to_string(i);
             sub.position = worldPos;
             sub.scale = cmd->hasElementScale ? cmd->elementScale : glm::vec3(1.0f);

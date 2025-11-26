@@ -29,27 +29,79 @@ namespace {
             state = reinterpret_cast<PromptState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
             HFONT hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 
-            CreateWindowExW(0, L"STATIC", L"Describe the change:",
+            RECT client{};
+            GetClientRect(hwnd, &client);
+            int width = client.right - client.left;
+            int height = client.bottom - client.top;
+
+            int margin = 12;
+            int labelHeight = 20;
+
+            int contentWidth = width - 2 * margin;
+            int y = margin;
+
+            // Title line
+            HWND lblTitle = CreateWindowExW(
+                0, L"STATIC", L"Describe the change:",
                 WS_CHILD | WS_VISIBLE,
-                12, 12, 360, 20,
+                margin, y, contentWidth, labelHeight,
                 hwnd, nullptr, nullptr, nullptr);
+            SendMessage(lblTitle, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+            y += labelHeight + 4;
 
-            state->edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
-                WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                12, 38, 360, 24,
-                hwnd, reinterpret_cast<HMENU>(ID_EDIT), nullptr, nullptr);
+            // Helper text
+            const wchar_t* helperText = L"Example: \"Add a shiny metal sphere next to the cube\"";
+            HWND lblHelper = CreateWindowExW(
+                0, L"STATIC", helperText,
+                WS_CHILD | WS_VISIBLE,
+                margin, y, contentWidth, labelHeight + 4,
+                hwnd, nullptr, nullptr, nullptr);
+            SendMessage(lblHelper, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+            y += labelHeight + 10;
 
-            CreateWindowExW(0, L"BUTTON", L"OK",
+            // Multi-line text box
+            int buttonsHeight = 30;
+            int editHeight = height - y - buttonsHeight - margin * 2;
+            if (editHeight < 60) {
+                editHeight = 60;
+            }
+
+            state->edit = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_AUTOVSCROLL | ES_MULTILINE | ES_WANTRETURN,
+                margin, y,
+                contentWidth, editHeight,
+                hwnd,
+                reinterpret_cast<HMENU>(ID_EDIT),
+                nullptr,
+                nullptr);
+            SendMessage(state->edit, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+
+            // Buttons row
+            int buttonWidth = 90;
+            int buttonHeight = 26;
+            int buttonGap = 12;
+            int totalButtonsWidth = buttonWidth * 2 + buttonGap;
+            int buttonY = height - margin - buttonHeight;
+            int buttonX = (width - totalButtonsWidth) / 2;
+
+            HWND btnOk = CreateWindowExW(
+                0, L"BUTTON", L"OK",
                 WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-                196, 72, 80, 26,
+                buttonX, buttonY, buttonWidth, buttonHeight,
                 hwnd, reinterpret_cast<HMENU>(ID_OK), nullptr, nullptr);
 
-            CreateWindowExW(0, L"BUTTON", L"Cancel",
+            HWND btnCancel = CreateWindowExW(
+                0, L"BUTTON", L"Cancel",
                 WS_CHILD | WS_VISIBLE,
-                292, 72, 80, 26,
+                buttonX + buttonWidth + buttonGap, buttonY, buttonWidth, buttonHeight,
                 hwnd, reinterpret_cast<HMENU>(ID_CANCEL), nullptr, nullptr);
 
-            SendMessage(state->edit, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+            SendMessage(btnOk, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+            SendMessage(btnCancel, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+
             return 0;
         }
         case WM_COMMAND: {
@@ -122,7 +174,7 @@ std::string TextPrompt::Show(HWND parent, const std::string& title, const std::s
     RegisterPromptClass();
 
     PromptState state{};
-    RECT rc = CenterRect(parent, 400, 120);
+    RECT rc = CenterRect(parent, 560, 260);
 
     state.hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW,

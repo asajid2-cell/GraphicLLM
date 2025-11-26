@@ -413,6 +413,109 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
     }
     if (!typeCounts.empty()) header << ". ";
 
+    // Region-style hints for wide groups (e.g., fields, large grids)
+    if (!groupStats.empty()) {
+        bool first = true;
+        for (const auto& [name, g] : groupStats) {
+            if (!g.hasBounds) continue;
+            glm::vec3 extents = g.maxPos - g.minPos;
+            float ex = std::abs(extents.x);
+            float ez = std::abs(extents.z);
+            if (ex <= 5.0f || ez <= 5.0f) continue;
+
+            float cx = (g.minPos.x + g.maxPos.x) * 0.5f;
+            float cz = (g.minPos.z + g.maxPos.z) * 0.5f;
+
+            if (first) {
+                header << "Regions ";
+                first = false;
+            } else {
+                header << ", ";
+            }
+            header << name << ": grid region centered at ("
+                   << std::round(cx) << "," << std::round(cz)
+                   << ") size≈(" << std::round(ex) << "," << std::round(ez) << ")";
+        }
+        if (!first) {
+            header << ". ";
+        }
+    }
+
+    // Simple motif summary based on group names
+    int animals = 0;
+    int vehicles = 0;
+    int towers = 0;
+    for (const auto& [name, g] : groupStats) {
+        std::string lower = name;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (lower.find("cow") != std::string::npos ||
+            lower.find("pig") != std::string::npos) {
+            animals++;
+        }
+        if (lower.find("car") != std::string::npos ||
+            lower.find("ship") != std::string::npos) {
+            vehicles++;
+        }
+        if (lower.find("tower") != std::string::npos) {
+            towers++;
+        }
+    }
+    if (animals > 0 || vehicles > 0 || towers > 0) {
+        header << "Motifs: ";
+        bool first = true;
+        if (animals > 0) {
+            header << "FarmAnimals=" << animals;
+            first = false;
+        }
+        if (vehicles > 0) {
+            if (!first) header << ", ";
+            header << "Vehicles=" << vehicles;
+            first = false;
+        }
+        if (towers > 0) {
+            if (!first) header << ", ";
+            header << "Towers=" << towers;
+        }
+        header << ". ";
+    }
+
+    // Simple overlap warnings between wide regions (e.g., fields vs roads)
+    std::vector<std::pair<std::string, GroupStats>> wideGroups;
+    for (const auto& [name, g] : groupStats) {
+        if (!g.hasBounds) continue;
+        glm::vec3 extents = g.maxPos - g.minPos;
+        float ex = std::abs(extents.x);
+        float ez = std::abs(extents.z);
+        if (ex > 5.0f && ez > 5.0f) {
+            wideGroups.emplace_back(name, g);
+        }
+    }
+    int warnings = 0;
+    const int kMaxWarnings = 2;
+    for (size_t i = 0; i < wideGroups.size() && warnings < kMaxWarnings; ++i) {
+        for (size_t j = i + 1; j < wideGroups.size() && warnings < kMaxWarnings; ++j) {
+            const auto& a = wideGroups[i].second;
+            const auto& b = wideGroups[j].second;
+
+            float overlapMinX = std::max(a.minPos.x, b.minPos.x);
+            float overlapMaxX = std::min(a.maxPos.x, b.maxPos.x);
+            float overlapMinZ = std::max(a.minPos.z, b.minPos.z);
+            float overlapMaxZ = std::min(a.maxPos.z, b.maxPos.z);
+            float ox = overlapMaxX - overlapMinX;
+            float oz = overlapMaxZ - overlapMinZ;
+
+            // Require a meaningful intersection area to avoid noisy warnings.
+            if (ox > 1.0f && oz > 1.0f) {
+                header << "Warning: " << wideGroups[i].first
+                       << " overlaps " << wideGroups[j].first
+                       << "; prefer placing new regions away from each other. ";
+                ++warnings;
+            }
+        }
+    }
+
     // Summarize logical groups (compounds/patterns)
     if (!groupStats.empty()) {
         header << "Groups ";

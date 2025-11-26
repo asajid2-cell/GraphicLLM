@@ -171,6 +171,10 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
     ctx_params.n_ctx = config.contextSize;
     ctx_params.n_threads = config.threads;
     ctx_params.n_threads_batch = config.threads;
+    // Ensure the batch size is at least as large as the context so that
+    // a full prompt can be decoded in a single llama_decode() call
+    // without tripping the internal n_tokens_all <= n_batch assert.
+    ctx_params.n_batch = ctx_params.n_ctx;
 
     m_context = llama_init_from_model(static_cast<llama_model*>(m_model), ctx_params);
 
@@ -296,7 +300,9 @@ void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMC
     std::ostringstream tid;
     tid << std::this_thread::get_id();
     const auto threadId = tid.str();
-    const auto hardTimeout = std::chrono::seconds(10);
+    // Hard ceiling for generation time (does not include initial prompt decode).
+    // 30s gives the model enough room for longer prompts without hanging the app.
+    const auto hardTimeout = std::chrono::seconds(30);
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -466,10 +472,11 @@ void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMC
 
         spdlog::debug("LLM[{}]: generate-loop-start", threadId);
         bool generationDecodeFailed = false;
+        auto genStartTime = std::chrono::high_resolution_clock::now();
 
         while (n_decode < m_config.maxTokens) {
             auto now = std::chrono::high_resolution_clock::now();
-            if (now - startTime > hardTimeout) {
+            if (now - genStartTime > hardTimeout) {
                 spdlog::warn("LLM[{}]: generation timed out after {} tokens", threadId, n_decode);
                 break;
             }
@@ -585,8 +592,11 @@ void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMC
                     response.text = BuildHeuristicJson(userPrompt);
                     response.success = true;
                 } else {
-                    response.text = "Error: Empty generation";
-                    response.success = false;
+                    // No tokens at all (e.g., generation timed out before sampling);
+                    // fall back to heuristic JSON so the engine still responds.
+                    spdlog::warn("LLM[{}]: empty generation, falling back to heuristic", threadId);
+                    response.text = BuildHeuristicJson(userPrompt);
+                    response.success = true;
                 }
             }
         } else {

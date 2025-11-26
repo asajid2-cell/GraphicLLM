@@ -80,17 +80,42 @@ int main(int argc, char* argv[]) {
 
         // Phase 2: Configure The Architect (LLM)
         config.enableLLM = true;
-        // Resolve model path relative to the executable directory (works when run from build/bin/<cfg>)
+        // Resolve model path relative to the executable location (robust to working directory)
         namespace fs = std::filesystem;
-        fs::path exeDir = fs::current_path();
-        fs::path modelPath = exeDir / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
 
-        // If not found, fall back to repo root models directory
-        if (!fs::exists(modelPath)) {
-            modelPath = exeDir / ".." / ".." / ".." / "models" / "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
+        wchar_t exePathW[MAX_PATH];
+        DWORD exeLen = GetModuleFileNameW(nullptr, exePathW, MAX_PATH);
+        fs::path exeDir;
+        if (exeLen > 0 && exeLen < MAX_PATH) {
+            exeDir = fs::path(exePathW).parent_path();
+        } else {
+            exeDir = fs::current_path();
         }
 
-        config.llmConfig.modelPath = modelPath.string();
+        // Preferred models in order (largest first)
+        const char* kPreferredModels[] = {
+            "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+            "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+        };
+
+        fs::path modelPath;
+        for (const char* name : kPreferredModels) {
+            fs::path candidate = exeDir / "models" / name;
+            if (fs::exists(candidate)) {
+                modelPath = candidate;
+                break;
+            }
+        }
+
+        if (!modelPath.empty()) {
+            spdlog::info("LLM model path resolved to: {}", modelPath.string());
+            config.llmConfig.modelPath = modelPath.string();
+        } else {
+            // No model found on disk; run the LLM service in mock mode so Architect input still works.
+            spdlog::warn("No GGUF model found for The Architect; running in MOCK MODE (no real LLM).");
+            config.llmConfig.modelPath.clear();
+        }
         config.llmConfig.contextSize = 8192;  // Larger context for richer scene summaries
         config.llmConfig.threads = 4;
         config.llmConfig.temperature = 0.1f; // deterministic JSON commands

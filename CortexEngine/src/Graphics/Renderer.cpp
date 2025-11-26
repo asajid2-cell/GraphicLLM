@@ -668,6 +668,23 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             hasRoughnessMap ? 1u : 0u
         );
 
+        // Global fractal parameters (applied uniformly to all materials)
+        materialData.fractalParams0 = glm::vec4(
+            m_fractalAmplitude,
+            m_fractalFrequency,
+            m_fractalOctaves,
+            (m_fractalAmplitude > 0.0f ? 1.0f : 0.0f));
+        materialData.fractalParams1 = glm::vec4(
+            m_fractalCoordMode,
+            m_fractalScaleX,
+            m_fractalScaleZ,
+            0.0f);
+        materialData.fractalParams2 = glm::vec4(
+            m_fractalLacunarity,
+            m_fractalGain,
+            m_fractalWarpStrength,
+            m_fractalNoiseType);
+
         // Update object constants
         ObjectConstants objectData = {};
         objectData.modelMatrix = transform.GetMatrix();
@@ -1023,8 +1040,9 @@ void Renderer::ToggleShadows() {
 }
 
 void Renderer::CycleDebugViewMode() {
-    // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascades
-    m_debugViewMode = (m_debugViewMode + 1) % 6;
+    // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
+    // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height
+    m_debugViewMode = (m_debugViewMode + 1) % 8;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -1033,6 +1051,8 @@ void Renderer::CycleDebugViewMode() {
         case 3: label = "Metallic"; break;
         case 4: label = "Albedo"; break;
         case 5: label = "Cascades"; break;
+        case 6: label = "DebugScreen"; break;
+        case 7: label = "FractalHeight"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -1057,44 +1077,122 @@ void Renderer::AdjustCascadeResolutionScale(uint32_t cascadeIndex, float delta) 
     if (cascadeIndex >= kShadowCascadeCount) {
         return;
     }
+    if (std::abs(delta) < 1e-6f) {
+        return;
+    }
     m_cascadeResolutionScale[cascadeIndex] = glm::clamp(m_cascadeResolutionScale[cascadeIndex] + delta, 0.25f, 2.0f);
     spdlog::info("Cascade {} resolution scale set to {}", cascadeIndex, m_cascadeResolutionScale[cascadeIndex]);
 }
 
 void Renderer::SetExposure(float exposure) {
-    m_exposure = std::max(exposure, 0.01f);
+    float clamped = std::max(exposure, 0.01f);
+    if (std::abs(clamped - m_exposure) < 1e-6f) {
+        return;
+    }
+    m_exposure = clamped;
     spdlog::info("Renderer exposure set to {}", m_exposure);
 }
 
 void Renderer::SetShadowsEnabled(bool enabled) {
+    if (m_shadowsEnabled == enabled) {
+        return;
+    }
     m_shadowsEnabled = enabled;
     spdlog::info("Renderer shadows {}", m_shadowsEnabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetDebugViewMode(int mode) {
-    int clamped = std::max(0, std::min(mode, 5));
+    int clamped = std::max(0, std::min(mode, 7));
+    if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
+        return;
+    }
     m_debugViewMode = static_cast<uint32_t>(clamped);
     spdlog::info("Renderer debug view mode set to {}", clamped);
 }
 
 void Renderer::SetShadowBias(float bias) {
-    m_shadowBias = glm::clamp(bias, 0.00001f, 0.01f);
+    float clamped = glm::clamp(bias, 0.00001f, 0.01f);
+    if (std::abs(clamped - m_shadowBias) < 1e-9f) {
+        return;
+    }
+    m_shadowBias = clamped;
     spdlog::info("Renderer shadow bias set to {}", m_shadowBias);
 }
 
 void Renderer::SetShadowPCFRadius(float radius) {
-    m_shadowPCFRadius = glm::clamp(radius, 0.5f, 8.0f);
+    float clamped = glm::clamp(radius, 0.5f, 8.0f);
+    if (std::abs(clamped - m_shadowPCFRadius) < 1e-6f) {
+        return;
+    }
+    m_shadowPCFRadius = clamped;
     spdlog::info("Renderer shadow PCF radius set to {}", m_shadowPCFRadius);
 }
 
 void Renderer::SetCascadeSplitLambda(float lambda) {
-    m_cascadeSplitLambda = glm::clamp(lambda, 0.0f, 1.0f);
+    float clamped = glm::clamp(lambda, 0.0f, 1.0f);
+    if (std::abs(clamped - m_cascadeSplitLambda) < 1e-6f) {
+        return;
+    }
+    m_cascadeSplitLambda = clamped;
     spdlog::info("Renderer cascade split lambda set to {}", m_cascadeSplitLambda);
 }
 
 void Renderer::SetBloomIntensity(float intensity) {
-    m_bloomIntensity = glm::clamp(intensity, 0.0f, 5.0f);
+    float clamped = glm::clamp(intensity, 0.0f, 5.0f);
+    if (std::abs(clamped - m_bloomIntensity) < 1e-6f) {
+        return;
+    }
+    m_bloomIntensity = clamped;
     spdlog::info("Renderer bloom intensity set to {}", m_bloomIntensity);
+}
+
+void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
+                                float coordMode, float scaleX, float scaleZ,
+                                float lacunarity, float gain,
+                                float warpStrength, float noiseType) {
+    float amp = glm::clamp(amplitude, 0.0f, 0.5f);
+    float freq = glm::clamp(frequency, 0.1f, 4.0f);
+    float oct = glm::clamp(octaves, 1.0f, 6.0f);
+    float mode = (coordMode >= 0.5f) ? 1.0f : 0.0f;
+    float sx = glm::clamp(scaleX, 0.1f, 4.0f);
+    float sz = glm::clamp(scaleZ, 0.1f, 4.0f);
+    float lac = glm::clamp(lacunarity, 1.0f, 4.0f);
+    float gn = glm::clamp(gain, 0.1f, 0.9f);
+    float warp = glm::clamp(warpStrength, 0.0f, 1.0f);
+    int nt = static_cast<int>(noiseType + 0.5f);
+    if (nt < 0) nt = 0;
+    if (nt > 2) nt = 2;
+
+    if (std::abs(amp - m_fractalAmplitude) < 1e-6f &&
+        std::abs(freq - m_fractalFrequency) < 1e-6f &&
+        std::abs(oct - m_fractalOctaves) < 1e-6f &&
+        std::abs(mode - m_fractalCoordMode) < 1e-6f &&
+        std::abs(sx - m_fractalScaleX) < 1e-6f &&
+        std::abs(sz - m_fractalScaleZ) < 1e-6f &&
+        std::abs(lac - m_fractalLacunarity) < 1e-6f &&
+        std::abs(gn - m_fractalGain) < 1e-6f &&
+        std::abs(warp - m_fractalWarpStrength) < 1e-6f &&
+        nt == static_cast<int>(m_fractalNoiseType + 0.5f)) {
+        return;
+    }
+
+    m_fractalAmplitude = amp;
+    m_fractalFrequency = freq;
+    m_fractalOctaves = oct;
+    m_fractalCoordMode = mode;
+    m_fractalScaleX = sx;
+    m_fractalScaleZ = sz;
+    m_fractalLacunarity = lac;
+    m_fractalGain = gn;
+    m_fractalWarpStrength = warp;
+    m_fractalNoiseType = static_cast<float>(nt);
+
+    const char* typeLabel = (nt == 0) ? "FBM" : (nt == 1 ? "Ridged" : "Turbulence");
+    spdlog::info("Fractal params: amp={} freq={} oct={} mode={} scale=({}, {}), lacunarity={}, gain={}, warp={}, type={}",
+                 m_fractalAmplitude, m_fractalFrequency, m_fractalOctaves,
+                 (m_fractalCoordMode > 0.5f ? "WorldXZ" : "UV"),
+                 m_fractalScaleX, m_fractalScaleZ,
+                 m_fractalLacunarity, m_fractalGain, m_fractalWarpStrength, typeLabel);
 }
 
 void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {

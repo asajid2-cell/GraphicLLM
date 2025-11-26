@@ -58,6 +58,9 @@ public:
     // Build a compact scene summary for prompt conditioning
     std::string BuildSceneSummary(Scene::ECS_Registry* registry, size_t maxChars = 1200) const;
 
+    // Last high-level scene recipe generated from a scene_plan (if any).
+    std::string GetLastSceneRecipe() const { return m_lastSceneRecipe; }
+
 private:
     std::queue<std::shared_ptr<SceneCommand>> m_commands;
     mutable std::mutex m_mutex;
@@ -65,6 +68,7 @@ private:
     mutable std::mutex m_statusMutex;
     SceneLookup m_lookup;
     uint32_t m_spawnIndex = 0;
+    std::string m_lastSceneRecipe;
 
     // Execute a single command
     void ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
@@ -81,6 +85,18 @@ private:
     void ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
     void ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
     void ExecuteModifyGroup(ModifyGroupCommand* cmd, Scene::ECS_Registry* registry);
+    void ExecuteScenePlan(ScenePlanCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
+
+    // Region builders used by ScenePlanCommand
+    void BuildFieldRegion(const ScenePlanCommand::Region& region,
+                          Scene::ECS_Registry* registry,
+                          Graphics::Renderer* renderer);
+    void BuildRoadRegion(const ScenePlanCommand::Region& region,
+                         Scene::ECS_Registry* registry,
+                         Graphics::Renderer* renderer);
+    void BuildGenericRegion(const ScenePlanCommand::Region& region,
+                            Scene::ECS_Registry* registry,
+                            Graphics::Renderer* renderer);
 
     // Shared mesh cache so repeated shapes reuse GPU buffers
     struct MeshKey {

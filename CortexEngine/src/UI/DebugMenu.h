@@ -12,6 +12,18 @@ struct DebugMenuState {
     float cascade0ResolutionScale = 1.0f;
     float bloomIntensity = 0.25f;
     float cameraBaseSpeed = 5.0f;
+
+    // Fractal surface debug parameters (normal-only bump)
+    float fractalAmplitude = 0.0f;      // 0..0.5
+    float fractalFrequency = 0.5f;      // 0.1..4.0
+    float fractalOctaves = 4.0f;        // 1..6 (treated as int)
+    float fractalCoordMode = 1.0f;      // 0 = UV, 1 = world XZ
+    float fractalScaleX = 1.0f;         // 0.1..4.0
+    float fractalScaleZ = 1.0f;         // 0.1..4.0
+    float fractalLacunarity = 2.0f;     // 1.0..4.0
+    float fractalGain = 0.5f;           // 0.1..0.9
+    float fractalWarpStrength = 0.0f;   // 0.0..1.0
+    float fractalNoiseType = 0.0f;      // 0 = fbm, 1 = ridged, 2 = turbulence
 };
 
 // Simple Win32 debug menu window with sliders for renderer/camera parameters.
@@ -24,6 +36,10 @@ public:
     static void Toggle();
     static void SetVisible(bool visible);
     static bool IsVisible();
+
+    // Reset all renderer/camera debug controls (including debug view/toggles)
+    // back to the defaults captured at initialization time.
+    static void ResetToDefaults();
 
     // Update slider positions from the given state (e.g., if values change externally)
     static void SyncFromState(const DebugMenuState& state);

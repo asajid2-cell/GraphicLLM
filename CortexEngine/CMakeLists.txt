@@ -31,11 +31,13 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
-# Enable CUDA backend for ggml / llama.cpp. We let llama.cpp's
-# own CMake handle CUDAToolkit detection, but we ensure the
-# Windows resource compiler is defined so CMake's CUDA/RC logic
-# can configure correctly even when RC isn't auto-detected.
-set(GGML_CUDA ON CACHE BOOL "" FORCE)
+# Enable CUDA backend for ggml / llama.cpp.
+# We no longer force this OFF here; instead we expose GGML_CUDA as a
+# normal cache option so local builds (including setup.ps1, which
+# passes -DGGML_CUDA=ON) can actually turn on the CUDA backend.
+# On machines where CUDA / nvcc is problematic, you can disable it by
+# configuring with -DGGML_CUDA=OFF.
+option(GGML_CUDA "Enable GGML CUDA backend" ON)
 
 if (WIN32 AND MSVC AND NOT CMAKE_RC_COMPILER)
     # rc.exe is provided by the Windows SDK / MSVC toolset and

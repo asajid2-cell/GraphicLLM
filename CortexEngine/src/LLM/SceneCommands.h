@@ -20,6 +20,7 @@ enum class CommandType {
     AddPattern,
     AddCompound,
     ModifyGroup,
+    ScenePlan,
     Unknown
 };
 
@@ -82,6 +83,7 @@ struct AddPatternCommand : public SceneCommand {
     // Optional naming/group hints so the LLM can later modify groups.
     std::string namePrefix;       // e.g. "Lantern", "GrassBlade"
     std::string groupName;        // e.g. "Row_Lanterns", "Field_Grass"
+    std::string kind;             // optional semantic kind, e.g. "herd", "traffic"
 
     // Optional per-element scale for compounds/primitives spawned by this pattern.
     // If not set, compounds default to scale 1 and primitives keep their own defaults.
@@ -98,6 +100,12 @@ struct AddCompoundCommand : public SceneCommand {
     std::string instanceName;     // Optional user-facing name, e.g. "BigBird"
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
+
+    // Optional motif metadata for synthesized compounds
+    bool hasBodyColor = false;
+    bool hasAccentColor = false;
+    glm::vec4 bodyColor{1.0f};
+    glm::vec4 accentColor{1.0f};
 
     AddCompoundCommand() { type = CommandType::AddCompound; }
     std::string ToString() const override;
@@ -230,6 +238,24 @@ struct ModifyGroupCommand : public SceneCommand {
     glm::vec3 scaleMultiplier = glm::vec3(1.0f);  // multiplicative scale
 
     ModifyGroupCommand() { type = CommandType::ModifyGroup; }
+    std::string ToString() const override;
+};
+
+// High-level description of scene regions (fields, roads, yards, etc.)
+struct ScenePlanCommand : public SceneCommand {
+    struct Region {
+        std::string name;
+        glm::vec3   center{0.0f};
+        glm::vec3   size{0.0f};   // extents in x/y/z
+        std::string kind;         // "field", "road", "yard", etc.
+        std::string attachToGroup; // optional: anchor region to existing group
+        glm::vec3   offset{0.0f};  // optional offset from attached group center
+        bool        hasOffset = false;
+    };
+
+    std::vector<Region> regions;
+
+    ScenePlanCommand() { type = CommandType::ScenePlan; }
     std::string ToString() const override;
 };
 

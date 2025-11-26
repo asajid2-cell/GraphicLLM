@@ -2,6 +2,7 @@
 #include "Utils/FileUtils.h"
 #include <spdlog/spdlog.h>
 #include <d3dcompiler.h>
+#include <filesystem>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -204,8 +205,37 @@ Result<ShaderBytecode> ShaderCompiler::CompileFromFile(
     const std::string& entryPoint,
     const std::string& target)
 {
+    namespace fs = std::filesystem;
+
+    // Resolve shader path relative to common roots so running from either
+    // the repo root or build/bin works without manual asset copying.
+    fs::path requestedPath(filepath);
+    fs::path resolvedPath = requestedPath;
+
+    if (!Utils::FileExists(resolvedPath)) {
+        fs::path cwd = fs::current_path();
+
+        // Try current working directory + relative path
+        fs::path candidate = cwd / requestedPath;
+        if (Utils::FileExists(candidate)) {
+            resolvedPath = candidate;
+        } else {
+            // Try one level up (e.g., running from build/)
+            candidate = cwd.parent_path() / requestedPath;
+            if (Utils::FileExists(candidate)) {
+                resolvedPath = candidate;
+            } else {
+                // Try two levels up (e.g., running from build/bin)
+                candidate = cwd.parent_path().parent_path() / requestedPath;
+                if (Utils::FileExists(candidate)) {
+                    resolvedPath = candidate;
+                }
+            }
+        }
+    }
+
     // Read file
-    auto fileResult = Utils::ReadTextFile(filepath);
+    auto fileResult = Utils::ReadTextFile(resolvedPath);
     if (fileResult.IsErr()) {
         return Result<ShaderBytecode>::Err(fileResult.Error());
     }

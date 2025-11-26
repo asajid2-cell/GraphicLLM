@@ -66,7 +66,7 @@ struct FrameConstants {
     glm::vec4 cascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     glm::vec4 shadowParams;
-    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index), others reserved
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index, 6 = debug screen, 7 = fractal height), others reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     glm::vec4 postParams;
@@ -78,7 +78,10 @@ struct MaterialConstants {
     float metallic;
     float roughness;
     float ao;  // Ambient occlusion
-    alignas(16) glm::uvec4 mapFlags; // x: albedo, y: normal, z: metallic, w: roughness
+    alignas(16) glm::uvec4 mapFlags;      // x: albedo, y: normal, z: metallic, w: roughness
+    alignas(16) glm::vec4 fractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
+    alignas(16) glm::vec4 fractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
+    alignas(16) glm::vec4 fractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
 };
 
 } // namespace Cortex::Graphics

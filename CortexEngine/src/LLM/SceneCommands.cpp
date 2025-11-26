@@ -109,6 +109,10 @@ std::string ModifyGroupCommand::ToString() const {
     return "ModifyGroup: " + groupName;
 }
 
+std::string ScenePlanCommand::ToString() const {
+    return "ScenePlan: " + std::to_string(regions.size()) + " regions";
+}
+
 std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
 
@@ -226,6 +230,9 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     else if (p == "ring") cmd->pattern = AddPatternCommand::PatternType::Ring;
                     else if (p == "random") cmd->pattern = AddPatternCommand::PatternType::Random;
                 }
+                if (cmdJson.contains("kind") && cmdJson["kind"].is_string()) {
+                    cmd->kind = cmdJson["kind"];
+                }
                 if (cmdJson.contains("element") && cmdJson["element"].is_string()) {
                     cmd->element = cmdJson["element"];
                 }
@@ -278,6 +285,48 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 }
                 if (cmdJson.contains("scale")) {
                     ReadVec3(cmdJson["scale"], "scale", cmd->scale);
+                }
+                if (cmdJson.contains("body_color")) {
+                    glm::vec4 c;
+                    if (ReadVec4(cmdJson["body_color"], "body_color", c)) {
+                        cmd->hasBodyColor = true;
+                        cmd->bodyColor = c;
+                    }
+                }
+                if (cmdJson.contains("accent_color")) {
+                    glm::vec4 c;
+                    if (ReadVec4(cmdJson["accent_color"], "accent_color", c)) {
+                        cmd->hasAccentColor = true;
+                        cmd->accentColor = c;
+                    }
+                }
+                commands.push_back(cmd);
+            }
+            else if (type == "scene_plan") {
+                auto cmd = std::make_shared<ScenePlanCommand>();
+                if (cmdJson.contains("regions") && cmdJson["regions"].is_array()) {
+                    for (const auto& r : cmdJson["regions"]) {
+                        ScenePlanCommand::Region reg;
+                        if (r.contains("name") && r["name"].is_string()) {
+                            reg.name = r["name"];
+                        }
+                        if (r.contains("kind") && r["kind"].is_string()) {
+                            reg.kind = r["kind"];
+                        }
+                        if (r.contains("center")) {
+                            ReadVec3(r["center"], "region_center", reg.center);
+                        }
+                        if (r.contains("size")) {
+                            ReadVec3(r["size"], "region_size", reg.size);
+                        }
+                        if (r.contains("attach_to_group") && r["attach_to_group"].is_string()) {
+                            reg.attachToGroup = r["attach_to_group"];
+                        }
+                        if (r.contains("offset") && r["offset"].is_array()) {
+                            reg.hasOffset = ReadVec3(r["offset"], "region_offset", reg.offset);
+                        }
+                        cmd->regions.push_back(reg);
+                    }
                 }
                 commands.push_back(cmd);
             }
@@ -483,8 +532,30 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
         }
     };
 
+    // Pre-flight salvage for a common truncation pattern: the LLM starts a
+    // multi-command "commands" array but the response is cut before the final
+    // closing ']'. In that case, keep all complete objects and drop the
+    // partial tail so we can still execute at least the first commands.
+    std::string jsonToParse = jsonStr;
+    {
+        auto commandsPos = jsonToParse.find("\"commands\"");
+        if (commandsPos != std::string::npos) {
+            auto arrayStart = jsonToParse.find('[', commandsPos);
+            if (arrayStart != std::string::npos) {
+                auto arrayEnd = jsonToParse.find(']', arrayStart);
+                if (arrayEnd == std::string::npos) {
+                    auto lastObjEnd = jsonToParse.find_last_of('}');
+                    if (lastObjEnd != std::string::npos && lastObjEnd > arrayStart) {
+                        jsonToParse = jsonToParse.substr(0, lastObjEnd + 1);
+                        jsonToParse.append("]}");
+                    }
+                }
+            }
+        }
+    }
+
     try {
-        auto j = json::parse(jsonStr);
+        auto j = json::parse(jsonToParse);
         parseFromJson(j);
         spdlog::info("Parsed {} commands from JSON", commands.size());
     }

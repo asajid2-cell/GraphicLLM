@@ -66,6 +66,7 @@ set(CORTEX_SOURCES
     src/Graphics/TextureLoader.cpp
     src/Graphics/Renderer.cpp
     src/Graphics/Renderer_Bloom.cpp
+    src/Graphics/Renderer_SSAO.cpp
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp

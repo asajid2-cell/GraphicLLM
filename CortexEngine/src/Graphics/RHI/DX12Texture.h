@@ -95,6 +95,7 @@ public:
     [[nodiscard]] ID3D12Resource* GetResource() const { return m_resource.Get(); }
     [[nodiscard]] uint32_t GetWidth() const { return m_width; }
     [[nodiscard]] uint32_t GetHeight() const { return m_height; }
+    [[nodiscard]] uint32_t GetMipLevels() const { return m_mipLevels; }
     [[nodiscard]] DXGI_FORMAT GetFormat() const { return m_format; }
     [[nodiscard]] D3D12_RESOURCE_STATES GetCurrentState() const { return m_currentState; }
     [[nodiscard]] const DescriptorHandle& GetSRV() const { return m_srvHandle; }

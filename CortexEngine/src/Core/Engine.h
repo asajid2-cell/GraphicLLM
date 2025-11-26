@@ -60,6 +60,10 @@ public:
     [[nodiscard]] Graphics::Renderer* GetRenderer() { return m_renderer.get(); }
     [[nodiscard]] Scene::ECS_Registry* GetRegistry() { return m_registry.get(); }
 
+    // Logical focus target (most recently spawned or modified group/entity).
+    void SetFocusTarget(const std::string& name) { m_focusTargetName = name; }
+    [[nodiscard]] std::string GetFocusTarget() const { return m_focusTargetName; }
+
 private:
     void ProcessInput();
     void Update(float deltaTime);
@@ -117,6 +121,9 @@ private:
     float m_pendingMouseDeltaX = 0.0f;
     float m_pendingMouseDeltaY = 0.0f;
     entt::entity m_activeCameraEntity = entt::null;
+
+    // Name of the current logical focus object/group (e.g., Pig_1 or SpinningCube).
+    std::string m_focusTargetName;
 };
 
 } // namespace Cortex

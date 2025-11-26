@@ -66,10 +66,21 @@ struct FrameConstants {
     glm::vec4 cascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     glm::vec4 shadowParams;
-    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index, 6 = debug screen, 7 = fractal height), others reserved
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic,
+    //                      4 = albedo, 5 = cascade index, 6 = debug screen,
+    //                      7 = fractal height, 8 = IBL diffuse only,
+    //                      9 = IBL specular only, 10 = env direction/UV,
+    //                      11 = Fresnel (Fibl), 12 = specular mip), others reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     glm::vec4 postParams;
+    // x = diffuse IBL intensity, y = specular IBL intensity,
+    // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
+    glm::vec4 envParams;
+    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    glm::vec4 colorGrade;
+    // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
+    glm::vec4 aoParams;
 };
 
 // Material properties

@@ -38,6 +38,13 @@ cbuffer FrameConstants : register(b1)
     float4 g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     float4 g_PostParams;
+    // x = diffuse IBL intensity, y = specular IBL intensity,
+    // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
+    float4 g_EnvParams;
+    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    float4 g_ColorGrade;
+    // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
+    float4 g_AOParams;
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -63,6 +70,8 @@ Texture2D g_NormalTexture : register(t1);
 Texture2D g_MetallicTexture : register(t2);
 Texture2D g_RoughnessTexture : register(t3);
 Texture2DArray g_ShadowMap : register(t4);
+Texture2D g_EnvDiffuse : register(t5);
+Texture2D g_EnvSpecular : register(t6);
 SamplerState g_Sampler : register(s0);
 
 // Vertex shader input
@@ -262,6 +271,27 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
+// Slightly modified Fresnel for image-based lighting that
+// softens the response at high roughness to avoid overly dark metals.
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    float3 oneMinusR = 1.0f - roughness;
+    float3 F90 = saturate(F0 + (1.0f - F0) * 0.5f);
+    return F0 + (F90 - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
+// Map a direction vector to lat-long environment UVs.
+float2 DirectionToLatLong(float3 dir)
+{
+    dir = normalize(dir);
+    float phi = atan2(dir.z, dir.x);    // [-PI, PI], +Z forward
+    float theta = acos(saturate(dir.y)); // [0, PI]
+    float2 uv;
+    uv.x = (phi / (2.0f * PI)) + 0.5f;
+    uv.y = theta / PI;
+    return uv;
+}
+
 float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius, uint cascadeIndex)
 {
     float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -285,83 +315,150 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
     return shadow / max(samples, 1);
 }
 
-float ComputeShadow(float3 worldPos, float3 normal)
-{
-    // Shadow disabled
-    if (g_ShadowParams.z < 0.5f)
-    {
-        return 1.0f;
-    }
+  // Single-cascade shadow evaluation helper used by the main shadow function.
+  float ComputeShadowCascade(float3 worldPos, float3 normal, uint cascadeIndex)
+  {
+      cascadeIndex = min(cascadeIndex, 2u);
+  
+      float4 lightClip = mul(g_LightViewProjection[cascadeIndex], float4(worldPos, 1.0f));
+      float3 lightNDC = lightClip.xyz / lightClip.w;
+  
+      // Outside light frustum for this cascade
+      if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
+          lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
+          lightNDC.z < 0.0f || lightNDC.z > 1.0f)
+      {
+          return 1.0f;
+      }
+  
+      float2 shadowUV;
+      shadowUV.x = 0.5f * lightNDC.x + 0.5f;
+      shadowUV.y = -0.5f * lightNDC.y + 0.5f;
+  
+      float currentDepth = lightNDC.z;
+  
+      float bias = g_ShadowParams.x;
+      float pcfRadius = g_ShadowParams.y;
 
-    // Determine cascade based on view-space depth
-    float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
-    float depth = viewPos.z;
-
-    uint cascadeIndex = 0;
-    if (depth > g_CascadeSplits.x) cascadeIndex = 1;
-    if (depth > g_CascadeSplits.y) cascadeIndex = 2;
-    cascadeIndex = min(cascadeIndex, 2u);
-
-    float4 lightClip = mul(g_LightViewProjection[cascadeIndex], float4(worldPos, 1.0f));
-    float3 lightNDC = lightClip.xyz / lightClip.w;
-
-    // Outside light frustum
-    if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
-        lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
-        lightNDC.z < 0.0f || lightNDC.z > 1.0f)
-    {
-        return 1.0f;
-    }
-
-    float2 shadowUV;
-    shadowUV.x = 0.5f * lightNDC.x + 0.5f;
-    shadowUV.y = -0.5f * lightNDC.y + 0.5f;
-
-    float currentDepth = lightNDC.z;
-
-    float bias = g_ShadowParams.x;
-    float pcfRadius = g_ShadowParams.y;
-
-    // Simple slope-scaled bias to reduce acne
-    float3 lightDirWS = normalize(g_Lights[0].direction_cosInner.xyz);
-    float ndotl = saturate(dot(normal, lightDirWS));
-    bias *= lerp(1.5f, 0.5f, ndotl);
-
-    // Optional PCSS-style contact-hardening
-    if (g_ShadowParams.w > 0.5f)
-    {
-        float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-        float searchRadius = pcfRadius * 2.5f;
-
-        float avgBlocker = 0.0f;
-        int blockerCount = 0;
-
-        [unroll]
-        for (int x = -1; x <= 1; ++x)
-        {
-            [unroll]
-            for (int y = -1; y <= 1; ++y)
-            {
-                float2 offset = float2(x, y) * texelSize * searchRadius;
-                float depthSample = g_ShadowMap.Sample(g_Sampler, float3(shadowUV + offset, cascadeIndex)).r;
-                if (depthSample + bias < currentDepth)
-                {
-                    avgBlocker += depthSample;
-                    blockerCount++;
-                }
-            }
-        }
-
-        if (blockerCount > 0)
-        {
-            avgBlocker /= blockerCount;
-            float penumbra = saturate((currentDepth - avgBlocker) / max(avgBlocker, 1e-4f));
-            pcfRadius *= (1.0f + penumbra * 4.0f);
-        }
-    }
-
-    return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, cascadeIndex);
-}
+      // Increase bias slightly for farther cascades where depth precision is lower.
+      // This reduces shimmering on large objects that live mostly in mid/far cascades.
+      float cascadeScale = 1.0f + (float)cascadeIndex * 1.5f;
+      bias *= cascadeScale;
+  
+      // Simple slope-scaled bias to reduce acne
+      float3 lightDirWS = normalize(g_Lights[0].direction_cosInner.xyz);
+      float ndotl = saturate(dot(normal, lightDirWS));
+      bias *= lerp(1.5f, 0.5f, ndotl);
+  
+      // Optional PCSS-style contact-hardening
+      if (g_ShadowParams.w > 0.5f)
+      {
+          float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+          float searchRadius = pcfRadius * 2.5f;
+  
+          float avgBlocker = 0.0f;
+          int blockerCount = 0;
+  
+          [unroll]
+          for (int x = -1; x <= 1; ++x)
+          {
+              [unroll]
+              for (int y = -1; y <= 1; ++y)
+              {
+                  float2 offset = float2(x, y) * texelSize * searchRadius;
+                  float depthSample = g_ShadowMap.Sample(g_Sampler, float3(shadowUV + offset, cascadeIndex)).r;
+                  if (depthSample + bias < currentDepth)
+                  {
+                      avgBlocker += depthSample;
+                      blockerCount++;
+                  }
+              }
+          }
+  
+          if (blockerCount > 0)
+          {
+              avgBlocker /= blockerCount;
+              float penumbra = saturate((currentDepth - avgBlocker) / max(avgBlocker, 1e-4f));
+              pcfRadius *= (1.0f + penumbra * 4.0f);
+          }
+      }
+  
+      return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, cascadeIndex);
+  }
+  
+  // Cascaded shadow evaluation with cheap cross-fade between cascades near the split planes
+  // to reduce visible popping/flicker on large objects.
+  float ComputeShadow(float3 worldPos, float3 normal)
+  {
+      // Shadow disabled
+      if (g_ShadowParams.z < 0.5f)
+      {
+          return 1.0f;
+      }
+  
+      // View-space depth (camera looks down +Z)
+      float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
+      float depth = viewPos.z;
+  
+      float split0 = g_CascadeSplits.x;
+      float split1 = g_CascadeSplits.y;
+  
+      // Choose primary cascade and optional secondary cascade to blend with
+      uint primary = 0;
+      uint secondary = 0;
+      float blend = 0.0f;
+  
+      // Blend range in world units around each split; widened slightly so large objects
+      // spanning multiple cascades see a smoother transition.
+      float range0 = max(split0 * 0.2f, 4.0f);
+      float range1 = max(split1 * 0.2f, 8.0f);
+  
+      if (depth <= split0)
+      {
+          primary = 0;
+          secondary = 1;
+          float d = split0 - depth;
+          blend = saturate(1.0f - d / range0);
+      }
+      else if (depth <= split1)
+      {
+          // Between split0 and split1: blend against the closer boundary
+          float d0 = depth - split0;
+          float d1 = split1 - depth;
+          primary = 1;
+          if (d0 < d1)
+          {
+              secondary = 0;
+              blend = saturate(1.0f - d0 / range0);
+          }
+          else
+          {
+              secondary = 2;
+              blend = saturate(1.0f - d1 / range1);
+          }
+      }
+      else
+      {
+          primary = 2;
+          secondary = 1;
+          float d = depth - split1;
+          blend = saturate(1.0f - d / range1);
+      }
+  
+      primary = min(primary, 2u);
+      secondary = min(secondary, 2u);
+  
+      float shadowPrimary = ComputeShadowCascade(worldPos, normal, primary);
+  
+      // Outside blend zones or degenerate case
+      if (blend <= 0.001f || primary == secondary)
+      {
+          return shadowPrimary;
+      }
+  
+      float shadowSecondary = ComputeShadowCascade(worldPos, normal, secondary);
+      return lerp(shadowPrimary, shadowSecondary, blend);
+  }
 
 float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao)
 {
@@ -453,7 +550,67 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         totalLighting += contribution;
     }
 
-    float3 ambient = g_AmbientColor.rgb * albedo * ao;
+    // Image-based lighting (IBL) using environment maps when available.
+    float3 ambient = 0.0f;
+    float3 diffuseIBL = 0.0f;
+    float3 specularIBL = 0.0f;
+    if (g_EnvParams.z > 0.5f)
+    {
+        float3 N = normalize(normal);
+        float3 V = normalize(g_CameraPosition.xyz - worldPos);
+        float NdotV = saturate(dot(N, V));
+
+        // Diffuse IBL from low-frequency irradiance map
+        float2 diffuseUV = DirectionToLatLong(N);
+        float3 irradiance = g_EnvDiffuse.Sample(g_Sampler, diffuseUV).rgb;
+
+        float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
+        diffuseIBL = irradiance * kd * albedo;
+
+        // Specular IBL from prefiltered environment mip chain
+        uint specWidth, specHeight, specMips;
+        g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMips);
+        float maxMip = specMips > 0 ? float(specMips - 1) : 0.0f;
+
+        float3 R = reflect(-V, N);
+        float2 specUV = DirectionToLatLong(R);
+        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, roughness * maxMip).rgb;
+
+        float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
+        specularIBL = prefiltered * Fibl;
+
+        float diffuseIntensity = g_EnvParams.x;
+        float specularIntensity = g_EnvParams.y;
+
+        ambient = (diffuseIBL * diffuseIntensity + specularIBL * specularIntensity) * ao;
+
+        // IBL-only debug modes
+        uint debugMode = (uint)g_DebugMode.x;
+        if (debugMode == 8)
+        {
+            return diffuseIBL * diffuseIntensity * ao;
+        }
+        else if (debugMode == 9)
+        {
+            return specularIBL * specularIntensity * ao;
+        }
+        else if (debugMode == 11)
+        {
+            // Visualize Fresnel term at view angle (metals stay bright at grazing).
+            return saturate(Fibl);
+        }
+        else if (debugMode == 12)
+        {
+            // Visualize roughness -> mip mapping (0 = sharpest, 1 = blurriest).
+            float mipVis = (specMips > 1) ? (roughness * maxMip) / maxMip : roughness;
+            return mipVis.xxx;
+        }
+    }
+    else
+    {
+        // Fallback: flat ambient term
+        ambient = g_AmbientColor.rgb * albedo * ao;
+    }
 
     return totalLighting + ambient;
 }
@@ -591,9 +748,60 @@ float4 PSMain(PSInput input) : SV_TARGET
         v = saturate(v);
         return float4(v, v, v, 1.0f);
     }
+    else if (debugMode == 10)
+    {
+        // DirectionToLatLong debug: visualize env UVs as color
+        float3 N = normalize(normal);
+        float2 uv = DirectionToLatLong(N);
+        return float4(uv.x, uv.y, 0.0f, 1.0f);
+    }
 
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao);
 
     // Output linear HDR color; exposure/tonemapping is applied in a post-process pass
     return float4(color, albedoSample.a * g_Albedo.a);
+}
+
+// === Skybox full-screen pass using the same FrameConstants / IBL maps ===
+struct SkyboxVSOutput
+{
+    float4 position : SV_POSITION;
+    float3 direction : TEXCOORD0;
+};
+
+SkyboxVSOutput SkyboxVS(uint vertexId : SV_VertexID)
+{
+    SkyboxVSOutput output;
+
+    float2 pos;
+    if (vertexId == 0)      pos = float2(-1.0f, -1.0f);
+    else if (vertexId == 1) pos = float2(-1.0f,  3.0f);
+    else                    pos = float2( 3.0f, -1.0f);
+
+    output.position = float4(pos, 0.0f, 1.0f);
+
+    // Approximate view-space ray and rotate by inverse view rotation.
+    // Use +pos.y so that environment "up" maps to world +Y (no vertical flip).
+    float3 dirVS = normalize(float3(pos.x, pos.y, 1.0f));
+    float3x3 viewRot = (float3x3)g_ViewMatrix;
+    float3x3 invViewRot = transpose(viewRot);
+    output.direction = normalize(mul(invViewRot, dirVS));
+
+    return output;
+}
+
+float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
+{
+    // If IBL is disabled, fall back to flat ambient
+    if (g_EnvParams.z <= 0.5f)
+    {
+        return float4(g_AmbientColor.rgb, 1.0f);
+    }
+
+    float3 dir = normalize(input.direction);
+    float2 uv = DirectionToLatLong(dir);
+
+    // Use the specular environment for visible background; scale by specular IBL intensity.
+    float3 color = g_EnvSpecular.Sample(g_Sampler, uv).rgb * g_EnvParams.y;
+    return float4(color, 1.0f);
 }

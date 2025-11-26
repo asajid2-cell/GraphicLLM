@@ -9,7 +9,9 @@
     "spdlog",
     "directx-headers",
     "directxtk12",
-    "glm"
+    "glm",
+    "tinyexr",
+    "miniz"
   ],
   "builtin-baseline": "fca0e6b324d41da363b0e1dc33b0595491250a77"
 }

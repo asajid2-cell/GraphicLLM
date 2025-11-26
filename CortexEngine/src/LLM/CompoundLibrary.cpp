@@ -246,7 +246,7 @@ const CompoundTemplate* CompoundLibrary::SynthesizeTemplate(const std::string& t
             CompoundPartTemplate body;
             body.type = AddEntityCommand::EntityType::Sphere;
             body.localPosition = glm::vec3(0.0f, 1.0f, 0.0f);
-            body.localScale = glm::vec3(1.4f, 0.9f, 2.0f);
+            body.localScale = glm::vec3(1.2f, 0.9f, 1.6f);
             body.color = hasBody ? bodyCol : glm::vec4(0.8f, 0.6f, 0.6f, 1.0f);
             body.partName = "Body";
             body.segmentsPrimary = 24;
@@ -254,8 +254,8 @@ const CompoundTemplate* CompoundLibrary::SynthesizeTemplate(const std::string& t
 
             CompoundPartTemplate head;
             head.type = AddEntityCommand::EntityType::Sphere;
-            head.localPosition = glm::vec3(0.0f, 1.5f, 1.1f);
-            head.localScale = glm::vec3(0.7f, 0.7f, 0.7f);
+            head.localPosition = glm::vec3(0.0f, 1.45f, 0.95f);
+            head.localScale = glm::vec3(0.65f, 0.65f, 0.65f);
             head.color = hasBody ? bodyCol : glm::vec4(0.9f, 0.7f, 0.7f, 1.0f);
             head.partName = "Head";
             head.segmentsPrimary = 20;
@@ -263,8 +263,8 @@ const CompoundTemplate* CompoundLibrary::SynthesizeTemplate(const std::string& t
 
             CompoundPartTemplate legFL;
             legFL.type = AddEntityCommand::EntityType::Cylinder;
-            legFL.localPosition = glm::vec3(-0.8f, 0.1f, 0.9f);
-            legFL.localScale = glm::vec3(0.2f, 0.8f, 0.2f);
+            legFL.localPosition = glm::vec3(-0.65f, 0.1f, 0.75f);
+            legFL.localScale = glm::vec3(0.18f, 0.75f, 0.18f);
             legFL.color = hasAccent ? accentCol : glm::vec4(0.7f, 0.5f, 0.5f, 1.0f);
             legFL.partName = "LegFL";
             legFL.segmentsPrimary = 12;
@@ -274,17 +274,17 @@ const CompoundTemplate* CompoundLibrary::SynthesizeTemplate(const std::string& t
             legFR.partName = "LegFR";
 
             CompoundPartTemplate legBL = legFL;
-            legBL.localPosition.z = -0.9f;
+            legBL.localPosition.z = -0.75f;
             legBL.partName = "LegBL";
 
             CompoundPartTemplate legBR = legFR;
-            legBR.localPosition.z = -0.9f;
+            legBR.localPosition.z = -0.75f;
             legBR.partName = "LegBR";
 
             CompoundPartTemplate tail;
             tail.type = AddEntityCommand::EntityType::Cylinder;
-            tail.localPosition = glm::vec3(0.0f, 1.1f, -1.4f);
-            tail.localScale = glm::vec3(0.15f, 0.6f, 0.15f);
+            tail.localPosition = glm::vec3(0.0f, 1.1f, -1.2f);
+            tail.localScale = glm::vec3(0.14f, 0.55f, 0.14f);
             tail.color = hasAccent ? accentCol : glm::vec4(0.7f, 0.5f, 0.5f, 1.0f);
             tail.partName = "Tail";
             tail.segmentsPrimary = 12;
@@ -336,23 +336,23 @@ const CompoundTemplate* CompoundLibrary::SynthesizeTemplate(const std::string& t
             // Simple tower: base + shaft + top.
             CompoundPartTemplate base;
             base.type = AddEntityCommand::EntityType::Cube;
-            base.localPosition = glm::vec3(0.0f, 0.25f, 0.0f);
-            base.localScale = glm::vec3(2.0f, 0.5f, 2.0f);
+            base.localPosition = glm::vec3(0.0f, 0.3f, 0.0f);
+            base.localScale = glm::vec3(1.8f, 0.6f, 1.8f);
             base.color = hasBody ? bodyCol : glm::vec4(0.7f, 0.7f, 0.75f, 1.0f);
             base.partName = "Base";
 
             CompoundPartTemplate shaft;
             shaft.type = AddEntityCommand::EntityType::Cylinder;
-            shaft.localPosition = glm::vec3(0.0f, 2.0f, 0.0f);
-            shaft.localScale = glm::vec3(0.6f, 2.0f, 0.6f);
+            shaft.localPosition = glm::vec3(0.0f, 1.9f, 0.0f);
+            shaft.localScale = glm::vec3(0.6f, 1.9f, 0.6f);
             shaft.color = hasBody ? bodyCol : glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
             shaft.partName = "Shaft";
             shaft.segmentsPrimary = 16;
 
             CompoundPartTemplate top;
             top.type = AddEntityCommand::EntityType::Sphere;
-            top.localPosition = glm::vec3(0.0f, 4.2f, 0.0f);
-            top.localScale = glm::vec3(0.9f, 0.9f, 0.9f);
+            top.localPosition = glm::vec3(0.0f, 3.5f, 0.0f);
+            top.localScale = glm::vec3(0.8f, 0.8f, 0.8f);
             top.color = hasAccent ? accentCol : glm::vec4(0.9f, 0.9f, 0.95f, 1.0f);
             top.partName = "Top";
             top.segmentsPrimary = 20;

@@ -23,22 +23,23 @@ public:
         if (hasShowcase) {
             ss << "There is currently an object named \"SpinningCube\" at origin. If the user asks to change color/appearance, prefer modify_material on \"SpinningCube\" over adding new objects.\n";
         } else {
-            ss << "If the scene summary lists an existing \"SpinningCube\", prefer modify_material on it over adding new objects. Otherwise, use the most recent object when the user says \"it\".\n";
+            ss << "If the scene summary lists an existing \"SpinningCube\", prefer modify_material on it over adding new objects. Otherwise, use the most recent logical object when the user says \"it\".\n";
         }
-        ss << "You may receive a scene summary; use it to target existing entities by name instead of inventing new ones.\n\n";
+        ss << "You may receive a scene summary; use it to target existing entities by name instead of inventing new ones.\n";
+        ss << "When the user says \"it\", \"that\", or \"make it X\", treat this as a reference to the most recent logical object/group (e.g., Pig_1, SpinningCube, or RecentObject) from the scene summary. When referring to a multi-part compound (like a pig or dragon), prefer using its group name with modify_group so the whole object moves together.\n\n";
         ss << "Allowed commands:\n"
-           << "- add_entity: cube|sphere|plane|cylinder|pyramid|cone|torus with name, position[3], scale[3], color[4], metallic (0-1), roughness (0-1), ao (0-1). You may also set \"segments\" or \"detail\":\"low|medium|high\" on curved shapes.\n"
+           << "- add_entity: cube|sphere|plane|cylinder|pyramid|cone|torus or model (\"entity_type\":\"model\",\"asset\":\"Tree_Oak\") with name, optional position[3], scale[3], color[4], metallic (0-1), roughness (0-1), ao (0-1). You may also set \"segments\" or \"detail\":\"low|medium|high\" on curved shapes. If you omit position, the engine auto-places near the most recent object, avoiding overlap. You can use \"position_offset\":[dx,dy,dz] to nudge the auto placement.\n"
            << "- remove_entity: target name.\n"
            << "- modify_transform: target name, position[3], rotation[3] (Euler angles in degrees), scale[3].\n"
            << "- modify_material: target name, color[4], metallic (0-1), roughness (0-1).\n"
            << "- modify_camera: position[3], fov.\n"
            << "- add_light: light_type (\"point\"|\"spot\"|\"directional\"), name, position[3], optional direction[3], color[4], intensity (>0), range (>0), inner_cone (degrees), outer_cone (degrees), casts_shadows (bool).\n"
            << "- modify_light: target name, optional light_type, position[3], direction[3], color[4], intensity (>0), range (>0), inner_cone, outer_cone, casts_shadows.\n"
-           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-5), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1).\n"
-           << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...], \"kind\":\"herd|traffic\"}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element. When kind=\"herd\" with animal elements (cow, pig, horse, etc.) the engine will spawn a small herd of quadrupeds; when kind=\"traffic\" with vehicle elements (car, truck, spaceship, etc.) it will spawn a line of vehicles.\n"
-           << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|tree|house|pillar|grass_blade|quadruped|vehicle|tower\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...],\"body_color\":[r,g,b,a],\"accent_color\":[r,g,b,a]}. A compound spawns multiple primitives as one logical object. For creatures/animals (pig, cow, horse, dragon, monster), vehicles (car, truck, spaceship), and tall structures (tower, castle), prefer add_compound with template equal to the noun; the engine will approximate it from a generic quadruped/vehicle/structure motif using the colors you provide. If you need very fine control, you can still build shapes from multiple add_entity/add_pattern commands.\n"
+           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-12), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1), environment(\"studio\"|\"sunset\"|\"night\"), ibl_enabled (bool), ibl_intensity (number or [diffuse,specular]), grade_warm (-1 to 1), grade_cool (-1 to 1), ssao_enabled (bool), ssao_radius (0.05-5.0), ssao_bias (0-0.1), ssao_intensity (0-4).\n"
+           << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house|streetlight|rock\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...], \"kind\":\"herd|traffic\",\"jitter\":true,\"jitter_amount\":0.5}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element. When kind=\"herd\" with animal elements (cow, pig, horse, etc.) the engine will spawn a small herd of quadrupeds; when kind=\"traffic\" with vehicle elements (car, truck, spaceship, etc.) it will spawn a line of vehicles. jitter/jitter_amount introduce small offsets so rows/grids/rings look more natural.\n"
+           << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|tree|house|pillar|grass_blade|quadruped|vehicle|tower\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...],\"body_color\":[r,g,b,a],\"accent_color\":[r,g,b,a]}. A compound spawns multiple primitives as one logical object. For creatures/animals (pig, cow, horse, dragon, monster), vehicles (car, truck, spaceship), and tall structures (tower, castle), prefer add_compound with template equal to the noun; the engine will approximate it from a generic quadruped/vehicle/structure motif using the colors you provide. If you omit \"position\", the engine will choose a nearby free spot that avoids overlapping existing objects. If you need very fine control, you can still build shapes from multiple add_entity/add_pattern commands.\n"
            << "- scene_plan: {\"type\":\"scene_plan\",\"regions\":[{\"name\":\"Field_Grass\",\"kind\":\"field\",\"center\":[0,0,0],\"size\":[16,0,16]},{\"name\":\"Road_A\",\"kind\":\"road\",\"center\":[0,0,-6],\"size\":[20,0,4]}]}. Use this to describe high-level layout (fields, roads, yards, etc.) before emitting add_pattern/add_compound commands.\n"
-           << "- modify_group / modify_pattern: {\"type\":\"modify_group\",\"group\":\"Bird_A\" or \"Field_Grass\",\"position_offset\":[dx,dy,dz],\"scale_multiplier\":[sx,sy,sz]}. This edits all entities whose names start with that group prefix. Prefer distinctive group names (e.g. Bird_A, Field_Grass) to avoid overlapping prefixes.\n\n";
+           << "- modify_group / modify_pattern: {\"type\":\"modify_group\",\"group\":\"Bird_A\" or \"Field_Grass\",\"position_offset\":[dx,dy,dz],\"scale_multiplier\":[sx,sy,sz]}. This edits all entities whose names start with that group prefix. Prefer distinctive group names (e.g. Bird_A, Field_Grass) to avoid overlapping prefixes. When referring to a compound like a pig or dragon, use the group name from the summary (e.g. Pig_1, Godzilla) so the whole object moves together.\n\n";
         ss << "Positioning guidelines:\n"
            << "- Origin (0,0,0) may already have an object; consult the scene summary before placing on top of it\n"
            << "- Place new objects offset: left (-2 to -4, Y, Z), right (2 to 4, Y, Z), or forward/back (X, Y, -3 to 3)\n"
@@ -51,6 +52,10 @@ public:
            << "- Rough/textured: metallic=0, roughness=0.7-1.0 (coarse surface)\n"
            << "- Mirror-like: metallic=1, roughness=0 (perfect reflection)\n"
            << "- Glossy metal: metallic=1, roughness=0.1-0.3 (polished metal)\n\n";
+        ss << "Lighting guidelines:\n"
+           << "- For \"better lighting\" or \"studio lighting\", prefer a three-point rig using add_light: a bright key light, a softer fill light, and a dim rim light around the main subject.\n"
+           << "- Use spot lights for focused beams (spotlight), directional lights for sunlight, and point lights for ambient/fill illumination.\n"
+           << "- SSAO adds depth and realism by darkening creases and contact points. Use ssao_enabled to toggle it, ssao_radius to control sample distance, ssao_bias to reduce false occlusion on flat surfaces, and ssao_intensity to control shadow strength (higher = darker contacts).\n\n";
         ss << "Supported shapes: cube, sphere, plane, cylinder, pyramid, cone, torus (NOT triangle/square - use cube/plane instead).\n"
            << "You may also refer to simple variants like capsule, rounded box, wedge, arch, pillar, or grass_blade; these map onto the core primitives (cylinder/sphere/plane/etc.).\n\n";
         ss << "Supported colors (RGBA 0-1): red, blue, green, yellow, cyan, magenta, orange, purple, pink,\n"
@@ -62,6 +67,7 @@ public:
         ss << "Rules:\n"
            << "- Coordinates: X=right, Y=up, Z=forward (left-handed).\n"
            << "- Colors: RGBA floats 0..1.\n"
+           << "- modify_transform may use \"mode\":\"relative\" (or \"relative\":true) to treat position as an offset and scale as a multiplicative factor relative to the current transform.\n"
            << "- Do not include text outside JSON.";
         return ss.str();
     }
@@ -78,13 +84,22 @@ public:
                    "{\"commands\":[{\"type\":\"modify_material\",\"target\":\"" + target + "\",\"color\":[0,0,1,1]}]}");
 
         addExample("Example 2:\nUser: \"Make it bigger\"",
-                   "{\"commands\":[{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"scale\":[2,2,2]}]}");
+                   "{\"commands\":[{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"scale\":[1.3,1.3,1.3],\"mode\":\"relative\"}]}");
 
         addExample("Example 3:\nUser: \"Make it red and move it up\"",
-                   "{\"commands\":[{\"type\":\"modify_material\",\"target\":\"" + target + "\",\"color\":[1,0,0,1]},{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"position\":[0,2,0]}]}");
+                   "{\"commands\":[{\"type\":\"modify_material\",\"target\":\"" + target + "\",\"color\":[1,0,0,1]},{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"position\":[0,1,0],\"mode\":\"relative\"}]}");
+
+        addExample("Example 3b:\nUser: \"Move it down a bit\"",
+                   "{\"commands\":[{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"position\":[0,-1,0],\"mode\":\"relative\"}]}");
+
+        addExample("Example 3c:\nUser: \"Move it to the left\"",
+                   "{\"commands\":[{\"type\":\"modify_transform\",\"target\":\"" + target + "\",\"position\":[-2,0,0],\"mode\":\"relative\"}]}");
 
         addExample("Example 4:\nUser: \"Add a gold sphere on the left\"",
                    "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"GoldSphere\",\"position\":[-3,1,0],\"scale\":[1,1,1],\"color\":[1,0.84,0,1]}]}");
+
+        addExample("Example 4b:\nUser: \"Add a small blue cube next to it\"",
+                   "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"cube\",\"name\":\"SideCube\",\"scale\":[0.7,0.7,0.7],\"color\":[0,0,1,1],\"position_offset\":[1,0,0]}]}");
 
         addExample("Example 5:\nUser: \"Add three spheres: red, green, and blue\"",
                    "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"RedSphere\",\"position\":[-3,1,0],\"scale\":[0.8,0.8,0.8],\"color\":[1,0,0,1]},{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"GreenSphere\",\"position\":[0,1,2],\"scale\":[0.8,0.8,0.8],\"color\":[0,1,0,1]},{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"BlueSphere\",\"position\":[3,1,0],\"scale\":[0.8,0.8,0.8],\"color\":[0,0,1,1]}]}");
@@ -104,6 +119,12 @@ public:
         addExample("Example 10:\nUser: \"Add a matte red sphere\"",
                    "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"sphere\",\"name\":\"MatteRedSphere\",\"position\":[-3,1,0],\"scale\":[1,1,1],\"color\":[1,0,0,1],\"metallic\":0,\"roughness\":0.9}]}");
 
+        addExample("Example 10b:\nUser: \"Make the scene warmer\"",
+                   "{\"commands\":[{\"type\":\"modify_renderer\",\"grade_warm\":0.4,\"grade_cool\":0.0}]}");
+
+        addExample("Example 10c:\nUser: \"Enhance the shadows and contact occlusion\"",
+                   "{\"commands\":[{\"type\":\"modify_renderer\",\"ssao_enabled\":true,\"ssao_intensity\":1.5}]}");
+
         addExample("Example 11:\nUser: \"Create a shiny silver cone\"",
                    "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"cone\",\"name\":\"ShinySilverCone\",\"position\":[3,1,0],\"scale\":[1,1,1],\"color\":[0.75,0.75,0.75,1],\"metallic\":1,\"roughness\":0.05}]}");
 
@@ -116,7 +137,10 @@ public:
 
         addExample("Example 14:\nUser: \"Make a grassy field\"",
                    "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"grid\",\"element\":\"grass_blade\",\"count\":64,"
-                   "\"region\":[-8,0,-8,8,0,8],\"spacing\":[2,0,2]}]}");
+                   "\"region\":[-8,0,-8,8,0,8],\"spacing\":[2,0,2],\"jitter\":true,\"jitter_amount\":0.5}]}");
+
+        addExample("Example 14b:\nUser: \"Make the pig bigger\"",
+                   "{\"commands\":[{\"type\":\"modify_group\",\"group\":\"Pig_1\",\"scale_multiplier\":[1.3,1.3,1.3]}]}");
 
         addExample("Example 15:\nUser: \"Add a giant bird on the right\"",
                    "{\"commands\":[{\"type\":\"add_compound\",\"template\":\"bird\",\"name\":\"BigBird\","

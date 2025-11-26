@@ -113,8 +113,25 @@ std::string ScenePlanCommand::ToString() const {
     return "ScenePlan: " + std::to_string(regions.size()) + " regions";
 }
 
-std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr) {
+std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr,
+                                                                    const std::string& focusTargetName) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
+
+    auto resolveTargetName = [&](const std::string& raw) -> std::string {
+        if (raw.empty()) return raw;
+
+        std::string lowered = raw;
+        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (!focusTargetName.empty()) {
+            if (lowered == "it" || lowered == "this" || lowered == "that" ||
+                lowered == "recentobject" || lowered == "recent_object") {
+                return focusTargetName;
+            }
+        }
+        return raw;
+    };
 
     auto parseFromJson = [&](const json& j) {
         if (!j.contains("commands") || !j["commands"].is_array()) {
@@ -242,6 +259,9 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("color")) {
                     ReadVec4(cmdJson["color"], "color", cmd->color);
                 }
+                if (cmdJson.contains("position_offset") && cmdJson["position_offset"].is_array()) {
+                    cmd->hasPositionOffset = ReadVec3(cmdJson["position_offset"], "position_offset", cmd->positionOffset);
+                }
                 // Optional geometry detail knobs
                 if (cmdJson.contains("segments")) {
                     float s = ReadNumber(cmdJson["segments"], "segments", 32.0f);
@@ -274,13 +294,32 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 }
                 // Macros may set this flag later; JSON field is intentionally not exposed.
                 if (cmdJson.contains("metallic")) {
-                    cmd->metallic = std::clamp(ReadNumber(cmdJson["metallic"], "metallic"), 0.0f, 1.0f);
+                    float raw = ReadNumber(cmdJson["metallic"], "metallic");
+                    float clamped = std::clamp(raw, 0.0f, 1.0f);
+                    if (raw < 0.0f || raw > 1.0f) {
+                        spdlog::warn("add_entity metallic clamped from {} to {}", raw, clamped);
+                    }
+                    cmd->metallic = clamped;
                 }
                 if (cmdJson.contains("roughness")) {
-                    cmd->roughness = std::clamp(ReadNumber(cmdJson["roughness"], "roughness"), 0.0f, 1.0f);
+                    float raw = ReadNumber(cmdJson["roughness"], "roughness");
+                    float clamped = std::clamp(raw, 0.0f, 1.0f);
+                    if (raw < 0.0f || raw > 1.0f) {
+                        spdlog::warn("add_entity roughness clamped from {} to {}", raw, clamped);
+                    }
+                    cmd->roughness = clamped;
                 }
                 if (cmdJson.contains("ao")) {
-                    cmd->ao = std::clamp(ReadNumber(cmdJson["ao"], "ao"), 0.0f, 1.0f);
+                    float raw = ReadNumber(cmdJson["ao"], "ao");
+                    float clamped = std::clamp(raw, 0.0f, 1.0f);
+                    if (raw < 0.0f || raw > 1.0f) {
+                        spdlog::warn("add_entity ao clamped from {} to {}", raw, clamped);
+                    }
+                    cmd->ao = clamped;
+                }
+                if (cmdJson.contains("preset") && cmdJson["preset"].is_string()) {
+                    cmd->hasPreset = true;
+                    cmd->presetName = cmdJson["preset"];
                 }
 
                 commands.push_back(cmd);
@@ -335,6 +374,12 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 }
                 if (cmdJson.contains("element_scale") && cmdJson["element_scale"].is_array()) {
                     cmd->hasElementScale = ReadVec3(cmdJson["element_scale"], "element_scale", cmd->elementScale);
+                }
+                if (cmdJson.contains("jitter") && cmdJson["jitter"].is_boolean()) {
+                    cmd->jitter = cmdJson["jitter"];
+                }
+                if (cmdJson.contains("jitter_amount")) {
+                    cmd->jitterAmount = ReadNumber(cmdJson["jitter_amount"], "jitter_amount", 0.5f);
                 }
                 commands.push_back(cmd);
             }
@@ -399,7 +444,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             else if (type == "remove_entity") {
                 auto cmd = std::make_shared<RemoveEntityCommand>();
                 if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
-                    cmd->targetName = cmdJson["target"];
+                    cmd->targetName = resolveTargetName(cmdJson["target"]);
                 } else {
                     spdlog::warn("remove_entity missing string 'target' field, skipping");
                     continue;
@@ -408,7 +453,25 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             }
             else if (type == "modify_transform") {
                 auto cmd = std::make_shared<ModifyTransformCommand>();
-                if (cmdJson.contains("target") && cmdJson["target"].is_string()) cmd->targetName = cmdJson["target"];
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
+                    cmd->targetName = resolveTargetName(cmdJson["target"]);
+                }
+
+                // Optional relative mode: when enabled, position/scale are treated
+                // as offsets/multipliers relative to the current transform instead
+                // of absolute values.
+                if (cmdJson.contains("mode") && cmdJson["mode"].is_string()) {
+                    std::string mode = cmdJson["mode"];
+                    std::transform(mode.begin(), mode.end(), mode.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (mode == "relative") {
+                        cmd->isRelative = true;
+                    } else if (mode == "absolute") {
+                        cmd->isRelative = false;
+                    }
+                } else if (cmdJson.contains("relative") && cmdJson["relative"].is_boolean()) {
+                    cmd->isRelative = cmdJson["relative"];
+                }
 
                 if (cmdJson.contains("position")) {
                     cmd->setPosition = ReadVec3(cmdJson["position"], "position", cmd->position);
@@ -424,7 +487,9 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             }
             else if (type == "modify_material") {
                 auto cmd = std::make_shared<ModifyMaterialCommand>();
-                if (cmdJson.contains("target") && cmdJson["target"].is_string()) cmd->targetName = cmdJson["target"];
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
+                    cmd->targetName = resolveTargetName(cmdJson["target"]);
+                }
 
                 if (cmdJson.contains("color")) {
                     cmd->setColor = ReadVec4(cmdJson["color"], "color", cmd->color);
@@ -436,6 +501,14 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("roughness")) {
                     cmd->setRoughness = true;
                     cmd->roughness = std::clamp(ReadNumber(cmdJson["roughness"], "roughness"), 0.0f, 1.0f);
+                }
+                if (cmdJson.contains("ao")) {
+                    cmd->setAO = true;
+                    cmd->ao = std::clamp(ReadNumber(cmdJson["ao"], "ao", 1.0f), 0.0f, 1.0f);
+                }
+                if (cmdJson.contains("preset") && cmdJson["preset"].is_string()) {
+                    cmd->setPreset = true;
+                    cmd->presetName = cmdJson["preset"];
                 }
 
                 commands.push_back(cmd);
@@ -456,7 +529,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
             else if (type == "modify_light") {
                 auto cmd = std::make_shared<ModifyLightCommand>();
                 if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
-                    cmd->targetName = cmdJson["target"];
+                    cmd->targetName = resolveTargetName(cmdJson["target"]);
                 }
 
                 if (cmdJson.contains("position")) {
@@ -516,7 +589,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("debug_mode")) {
                     cmd->setDebugMode = true;
                     float v = ReadNumber(cmdJson["debug_mode"], "debug_mode", 0.0f);
-                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 5.0f)));
+                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 12.0f)));
                 }
                 if (cmdJson.contains("shadow_bias")) {
                     cmd->setShadowBias = true;
@@ -532,6 +605,55 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     cmd->setCascadeSplitLambda = true;
                     float v = ReadNumber(cmdJson["cascade_lambda"], "cascade_lambda", 0.5f);
                     cmd->cascadeSplitLambda = std::clamp(v, 0.0f, 1.0f);
+                }
+                if (cmdJson.contains("environment") && cmdJson["environment"].is_string()) {
+                    cmd->setEnvironment = true;
+                    cmd->environment = cmdJson["environment"];
+                }
+                if (cmdJson.contains("ibl_enabled") && cmdJson["ibl_enabled"].is_boolean()) {
+                    cmd->setIBLEnabled = true;
+                    cmd->iblEnabled = cmdJson["ibl_enabled"];
+                }
+                if (cmdJson.contains("ibl_intensity")) {
+                    const auto& val = cmdJson["ibl_intensity"];
+                    cmd->setIBLIntensity = true;
+                    if (val.is_array() && val.size() >= 2) {
+                        cmd->iblDiffuseIntensity = std::max(ReadNumber(val[0], "ibl_intensity[0]", 1.0f), 0.0f);
+                        cmd->iblSpecularIntensity = std::max(ReadNumber(val[1], "ibl_intensity[1]", 1.0f), 0.0f);
+                    } else {
+                        float v = std::max(ReadNumber(val, "ibl_intensity", 1.0f), 0.0f);
+                        cmd->iblDiffuseIntensity = v;
+                        cmd->iblSpecularIntensity = v;
+                    }
+                }
+                if (cmdJson.contains("grade_warm")) {
+                    cmd->setColorGrade = true;
+                    float v = ReadNumber(cmdJson["grade_warm"], "grade_warm", 0.0f);
+                    cmd->colorGradeWarm = std::clamp(v, -1.0f, 1.0f);
+                }
+                if (cmdJson.contains("grade_cool")) {
+                    cmd->setColorGrade = true;
+                    float v = ReadNumber(cmdJson["grade_cool"], "grade_cool", 0.0f);
+                    cmd->colorGradeCool = std::clamp(v, -1.0f, 1.0f);
+                }
+                if (cmdJson.contains("ssao_enabled") && cmdJson["ssao_enabled"].is_boolean()) {
+                    cmd->setSSAOEnabled = true;
+                    cmd->ssaoEnabled = cmdJson["ssao_enabled"];
+                }
+                if (cmdJson.contains("ssao_radius")) {
+                    cmd->setSSAOParams = true;
+                    float v = ReadNumber(cmdJson["ssao_radius"], "ssao_radius", 0.5f);
+                    cmd->ssaoRadius = std::clamp(v, 0.05f, 5.0f);
+                }
+                if (cmdJson.contains("ssao_bias")) {
+                    cmd->setSSAOParams = true;
+                    float v = ReadNumber(cmdJson["ssao_bias"], "ssao_bias", 0.025f);
+                    cmd->ssaoBias = std::clamp(v, 0.0f, 0.1f);
+                }
+                if (cmdJson.contains("ssao_intensity")) {
+                    cmd->setSSAOParams = true;
+                    float v = ReadNumber(cmdJson["ssao_intensity"], "ssao_intensity", 1.0f);
+                    cmd->ssaoIntensity = std::clamp(v, 0.0f, 4.0f);
                 }
 
                 commands.push_back(cmd);
@@ -734,6 +856,58 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
         }
         catch (const json::exception& e2) {
             spdlog::error("JSON salvage parse failed: {}", e2.what());
+        }
+    }
+
+    // As a final fallback, if no commands were parsed but the text clearly
+    // contains a "commands" array, reconstruct a minimal JSON wrapper that
+    // keeps only fully closed command objects and discards any partial tail.
+    if (commands.empty() && jsonStr.find("\"commands\"") != std::string::npos) {
+        try {
+            std::string fixed = jsonStr;
+
+            auto lastNonWs = fixed.find_last_not_of(" \t\r\n");
+            if (lastNonWs != std::string::npos) {
+                fixed.resize(lastNonWs + 1);
+            }
+
+            auto commandsPos = fixed.find("\"commands\"");
+            if (commandsPos != std::string::npos) {
+                auto arrayStart = fixed.find('[', commandsPos);
+                if (arrayStart != std::string::npos) {
+                    int depth = 0;
+                    size_t lastObjEnd = std::string::npos;
+                    for (size_t i = arrayStart + 1; i < fixed.size(); ++i) {
+                        char c = fixed[i];
+                        if (c == '{') {
+                            ++depth;
+                        } else if (c == '}') {
+                            if (depth > 0) {
+                                --depth;
+                                if (depth == 0) {
+                                    lastObjEnd = i;
+                                }
+                            }
+                        }
+                    }
+
+                    if (lastObjEnd != std::string::npos && lastObjEnd > arrayStart) {
+                        std::string elements =
+                            fixed.substr(arrayStart + 1, lastObjEnd - (arrayStart + 1) + 1);
+                        std::string rebuilt = "{\"commands\":[";
+                        rebuilt.append(elements);
+                        rebuilt.append("]}");
+
+                        spdlog::warn("Attempting brace-based JSON salvage on LLM response");
+                        auto jFixed = json::parse(rebuilt);
+                        commands.clear();
+                        parseFromJson(jFixed);
+                        spdlog::info("Parsed {} commands from brace-salvaged JSON", commands.size());
+                    }
+                }
+            }
+        } catch (const json::exception& e2) {
+            spdlog::error("Brace-based JSON salvage parse failed: {}", e2.what());
         }
     }
 

@@ -70,6 +70,8 @@ struct RenderableComponent {
     float metallic = 0.0f;
     float roughness = 0.5f;
     float ao = 1.0f;
+    // Optional logical material preset (e.g. "chrome", "gold") used by LLM commands.
+    std::string presetName;
 
     // Visibility
     bool visible = true;

@@ -64,7 +64,7 @@ struct MaterialConstants {
 
 ### Command Parsing
 
-**JSON Format** (`SceneCommands.cpp:88-96`)
+**JSON Format** (`SceneCommands.cpp: AddEntityCommand`)
 ```json
 {
   "type": "add_entity",
@@ -73,7 +73,8 @@ struct MaterialConstants {
   "color": [1, 0, 0, 1],
   "metallic": 1.0,
   "roughness": 0.1,
-  "ao": 1.0
+  "ao": 1.0,
+  "preset": "chrome"   // optional: named material preset
 }
 ```
 
@@ -87,6 +88,10 @@ if (cmdJson.contains("roughness")) {
 }
 if (cmdJson.contains("ao")) {
     cmd->ao = cmdJson["ao"].get<float>();
+}
+if (cmdJson.contains("preset") && cmdJson["preset"].is_string()) {
+    cmd->hasPreset = true;
+    cmd->presetName = cmdJson["preset"];
 }
 ```
 
@@ -126,6 +131,13 @@ renderable.texture = renderer->GetPlaceholderTexture();
 User: "Make it shiny"
 Response:
 {"commands":[{"type":"modify_material","target":"SpinningCube","metallic":1,"roughness":0.1}]}
+```
+
+**Example 9b: Use a named preset**
+```
+User: "Make it chrome"
+Response:
+{"commands":[{"type":"modify_material","target":"SpinningCube","preset":"chrome"}]}
 ```
 
 **Example 10: Matte Material**
@@ -180,10 +192,12 @@ std::map<std::string, MaterialPreset> materials = {
 
 for (const auto& [name, mat] : materials) {
     if (contains(name)) {
-        return R"({"commands":[{"type":"modify_material","target":"SpinningCube",
+        return R"({"commands":[{"type":"modify_material","target":"RecentObject",
                  "metallic":)" + mat.metallic + R"(,"roughness":)" + mat.roughness + R"(}]})";
     }
 }
+
+Named presets like `"chrome"`, `"gold"`, `"glass"`, etc. are also supported both on `add_entity` and `modify_material` via a `"preset":"name"` field. The engine stores this in `RenderableComponent::presetName` so later edits can reapply consistent settings.
 ```
 
 ---

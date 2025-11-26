@@ -27,14 +27,23 @@ cbuffer FrameConstants : register(b1)
     float4   g_CascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     float4   g_ShadowParams;
-    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index, 6 = debug screen), others reserved
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic,
+    //                      4 = albedo, 5 = cascade index, 6 = debug screen), others reserved
     float4   g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     float4   g_PostParams;
+    // x = diffuse IBL intensity, y = specular IBL intensity,
+    // z = IBL enabled (>0.5), w = environment index (0 = studio, 2 = night)
+    float4   g_EnvParams;
+    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    float4   g_ColorGrade;
+    // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
+    float4   g_AOParams;
 };
 
 Texture2D g_SceneColor : register(t0);
 Texture2D g_BloomSource : register(t1);
+Texture2D g_SSAO : register(t2);
 Texture2DArray g_ShadowMap : register(t4);
 SamplerState g_Sampler : register(s0);
 
@@ -128,6 +137,24 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     color = ApplyACESFilm(color);
     color = pow(color, 1.0f / 2.2f);
+
+    // Simple warm/cool grading driven by g_ColorGrade.xy.
+    // Positive warm shifts towards orange, positive cool shifts towards blue.
+    float warm = saturate(0.5f + g_ColorGrade.x * 0.5f); // map [-1,1] -> [0,1]
+    float cool = saturate(0.5f + g_ColorGrade.y * 0.5f);
+    float3 warmTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(1.05f, 1.0f, 0.95f), warm);
+    float3 coolTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(0.96f, 1.0f, 1.05f), cool);
+    color *= warmTint * coolTint;
+
+    // Screen-space ambient occlusion modulation (applied after tonemapping/grading).
+    float ao = 1.0f;
+    if (g_AOParams.x > 0.5f)
+    {
+        ao = g_SSAO.Sample(g_Sampler, uv).r;
+        ao = saturate(ao);
+        float aoIntensity = saturate(g_AOParams.w);
+        color *= lerp(1.0f, ao, aoIntensity);
+    }
 
     // Optional FXAA-like smoothing (very lightweight approximation)
     if (g_PostParams.z > 0.5f)

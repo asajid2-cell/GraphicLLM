@@ -79,10 +79,60 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         {"smooth", {0.0f, 0.3f}},
     };
 
+    // Named material presets with explicit color + parameters.
+    struct DetailedMaterialPreset { Color color; float metallic; float roughness; };
+    std::map<std::string, DetailedMaterialPreset> namedPresets = {
+        {"chrome",        {{0.8f, 0.8f, 0.85f, 1.0f}, 1.0f, 0.05f}},
+        {"gold",          {{1.0f, 0.85f, 0.3f, 1.0f}, 1.0f, 0.2f}},
+        {"brushed_metal", {{0.7f, 0.7f, 0.7f, 1.0f}, 1.0f, 0.35f}},
+        {"steel",         {{0.75f, 0.75f, 0.8f, 1.0f}, 1.0f, 0.25f}},
+        {"plastic",       {{0.8f, 0.8f, 0.8f, 1.0f}, 0.0f, 0.4f}},
+        {"rubber",        {{0.1f, 0.1f, 0.1f, 1.0f}, 0.0f, 0.9f}},
+        {"wood",          {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
+        {"stone",         {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
+        {"glass",         {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+    };
+
+    // Named preset phrases like "chrome", "gold", etc. These either apply
+    // to the current focus object or, when combined with a shape noun
+    // ("chrome sphere"), spawn a new entity with the preset material.
+    for (const auto& [name, preset] : namedPresets) {
+        if (!contains(name)) continue;
+
+        bool wantsSphere = contains("sphere");
+        bool wantsCube   = contains("cube") || contains("box");
+        bool wantsPlane  = contains("plane") || contains("floor") || contains("wall") || contains("ceiling");
+
+        std::ostringstream ss;
+        if (wantsSphere || wantsCube || wantsPlane) {
+            std::string shape = "sphere";
+            std::string instName = "PresetObject";
+            if (wantsCube) {
+                shape = "cube";
+                instName = "PresetCube";
+            } else if (wantsPlane) {
+                shape = "plane";
+                instName = "PresetPlane";
+            } else {
+                instName = "PresetSphere";
+            }
+
+            ss << R"({"commands":[{"type":"add_entity","entity_type":")" << shape
+               << R"(","name":")" << instName << R"(","position":[0,1,-3],"scale":[1,1,1],"color":[)"
+               << preset.color.r << "," << preset.color.g << "," << preset.color.b << "," << preset.color.a
+               << R"(],"metallic":)" << preset.metallic << R"(,"roughness":)" << preset.roughness
+               << R"(,"preset":")" << name << R"("}]} )";
+        } else {
+            ss << R"({"commands":[{"type":"modify_material","target":"RecentObject","preset":")"
+               << name << R"("}]})";
+        }
+        return ss.str();
+    }
+
     for (const auto& [name, mat] : materials) {
         if (contains(name)) {
             std::ostringstream ss;
-            ss << R"({"commands":[{"type":"modify_material","target":"SpinningCube","metallic":)"
+            ss << R"({"commands":[{"type":"modify_material","target":"RecentObject","metallic":)"
                << mat.metallic << R"(,"roughness":)" << mat.roughness << R"(}]})";
             return ss.str();
         }
@@ -92,10 +142,55 @@ std::string BuildHeuristicJson(const std::string& prompt) {
     for (const auto& [name, c] : colors) {
         if (contains(name)) {
             std::ostringstream ss;
-            ss << R"({"commands":[{"type":"modify_material","target":"SpinningCube","color":[)"
+            ss << R"({"commands":[{"type":"modify_material","target":"RecentObject","color":[)"
                << c.r << "," << c.g << "," << c.b << "," << c.a << R"(]}]})";
             return ss.str();
         }
+    }
+
+    // Lighting heuristics: simple helpers for spotlight, sunlight, ambient, and
+    // studio/three-point lighting setups.
+    if (contains("studio lighting") || contains("studio light") || contains("better lighting")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[)"
+           // Key light - strong, warm spotlight from front-right
+           << R"({"type":"add_light","light_type":"spot","name":"KeyLight","position":[3,4,-4],)"
+           << R"("direction":[-0.6,-0.8,0.7],"color":[1.0,0.95,0.85,1.0],)"
+           << R"("intensity":14.0,"range":25.0,"inner_cone":20.0,"outer_cone":35.0,"casts_shadows":true},)"
+           // Fill light - softer, cooler point light from front-left
+           << R"({"type":"add_light","light_type":"point","name":"FillLight","position":[-3,2,-3],)"
+           << R"("color":[0.8,0.85,1.0,1.0],"intensity":5.0,"range":20.0,"casts_shadows":false},)"
+           // Rim light - dimmer spotlight from behind
+           << R"({"type":"add_light","light_type":"spot","name":"RimLight","position":[0,3,4],)"
+           << R"("direction":[0,-0.5,-1.0],"color":[0.9,0.9,1.0,1.0],"intensity":8.0,)"
+           << R"("range":25.0,"inner_cone":25.0,"outer_cone":40.0,"casts_shadows":false})"
+           << R"(]})";
+        return ss.str();
+    }
+
+    if (contains("spotlight") || contains("spot light")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"add_light","light_type":"spot","name":"SpotLight",)"
+           << R"("position":[0,5,-3],"direction":[0,-1,0.3],)"
+           << R"("color":[1.0,0.95,0.8,1.0],"intensity":12.0,"range":20.0,)"
+           << R"("inner_cone":18.0,"outer_cone":32.0,"casts_shadows":true}]})";
+        return ss.str();
+    }
+
+    if (contains("sunlight") || contains("sun light") || contains("sun beam")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"add_light","light_type":"directional","name":"SunLight",)"
+           << R"("position":[0,10,0],"direction":[-0.3,-1.0,0.1],)"
+           << R"("color":[1.0,0.96,0.85,1.0],"intensity":8.0,"range":100.0,"casts_shadows":true}]})";
+        return ss.str();
+    }
+
+    if (contains("ambient light") || contains("ambient lighting") || contains("fill light")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"add_light","light_type":"point","name":"AmbientFill",)"
+           << R"("position":[0,3,-2],"color":[0.7,0.8,1.0,1.0],)"
+           << R"("intensity":4.0,"range":30.0,"casts_shadows":false}]})";
+        return ss.str();
     }
 
     // Motif-based compound fallback for animals, vehicles, and structures.
@@ -214,13 +309,16 @@ std::string BuildHeuristicJson(const std::string& prompt) {
     };
 
     std::map<std::string, ShapeInfo> shapes = {
-        {"sphere", {"sphere", 2.5f, 1.0f, 0.0f, 1.0f, {0.7f,0.7f,0.7f,1}, 1.0f, 0.1f}},  // Shiny sphere
-        {"cube", {"cube", -2.5f, 1.0f, 0.0f, 1.0f, {0.8f,0.6f,0.4f,1}, 0.0f, 0.5f}},     // Smooth cube
-        {"plane", {"plane", 0.0f, -0.5f, 0.0f, 5.0f, {0.3f,0.3f,0.3f,1}, 0.0f, 0.9f}},   // Matte plane
-        {"cylinder", {"cylinder", 0.0f, 1.0f, -3.0f, 1.0f, {0.5f,0.8f,0.9f,1}, 1.0f, 0.2f}}, // Metallic cylinder
-        {"pyramid", {"pyramid", 3.0f, 0.5f, 0.0f, 1.0f, {0.9f,0.7f,0.3f,1}, 0.0f, 0.6f}},    // Rough pyramid
-        {"cone", {"cone", -3.0f, 0.5f, -2.0f, 1.0f, {0.9f,0.5f,0.2f,1}, 0.0f, 0.7f}},        // Rough cone
-        {"torus", {"torus", 0.0f, 1.0f, 3.0f, 1.0f, {0.8f,0.3f,0.8f,1}, 1.0f, 0.15f}},       // Glossy torus
+        {"sphere",  {"sphere",  2.5f, 1.0f,  0.0f, 1.0f, {0.7f,0.7f,0.7f,1}, 1.0f, 0.1f}},   // Shiny sphere
+        {"cube",    {"cube",   -2.5f, 1.0f,  0.0f, 1.0f, {0.8f,0.6f,0.4f,1}, 0.0f, 0.5f}},   // Smooth cube
+        {"plane",   {"plane",   0.0f,-0.5f,  0.0f, 5.0f, {0.3f,0.3f,0.3f,1}, 0.0f, 0.9f}},   // Matte plane
+        {"floor",   {"plane",   0.0f,-0.5f,  0.0f,12.0f, {0.25f,0.25f,0.25f,1},0.0f,0.9f}},  // Large rough floor
+        {"wall",    {"plane",   0.0f, 2.0f, -8.0f,10.0f, {0.35f,0.35f,0.4f,1},0.0f,0.7f}},   // Back wall plane
+        {"ceiling", {"plane",   0.0f, 5.0f,  0.0f,12.0f, {0.3f,0.3f,0.35f,1},0.0f,0.8f}},   // Overhead ceiling
+        {"cylinder",{"cylinder",0.0f, 1.0f, -3.0f, 1.0f, {0.5f,0.8f,0.9f,1}, 1.0f, 0.2f}},   // Metallic cylinder
+        {"pyramid", {"pyramid", 3.0f, 0.5f,  0.0f, 1.0f, {0.9f,0.7f,0.3f,1}, 0.0f, 0.6f}},   // Rough pyramid
+        {"cone",    {"cone",   -3.0f, 0.5f, -2.0f, 1.0f, {0.9f,0.5f,0.2f,1}, 0.0f, 0.7f}},   // Rough cone
+        {"torus",   {"torus",   0.0f, 1.0f,  3.0f, 1.0f, {0.8f,0.3f,0.8f,1}, 1.0f, 0.15f}},  // Glossy torus
     };
 
     for (const auto& [name, info] : shapes) {

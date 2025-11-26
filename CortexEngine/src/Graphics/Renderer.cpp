@@ -8,6 +8,8 @@
 #include <cmath>
 #include <array>
 #include <limits>
+#include <filesystem>
+#include <algorithm>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
@@ -175,6 +177,19 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return texResult;
     }
 
+    // Environment maps and IBL setup (optional; falls back to flat ambient if assets missing).
+    auto envResult = InitializeEnvironmentMaps();
+    if (envResult.IsErr()) {
+        spdlog::warn("Environment maps not fully initialized: {}", envResult.Error());
+    }
+
+    // SSAO resources (optional; renderer falls back gracefully if creation fails)
+    auto ssaoResult = CreateSSAOResources();
+    if (ssaoResult.IsErr()) {
+        spdlog::warn("SSAO resources not fully initialized: {}", ssaoResult.Error());
+        m_ssaoEnabled = false;
+    }
+
     spdlog::info("Renderer initialized successfully");
     return Result<void>::Ok();
 }
@@ -191,6 +206,7 @@ void Renderer::Shutdown() {
     m_depthBuffer.Reset();
     m_shadowMap.Reset();
     m_hdrColor.Reset();
+    m_ssaoTex.Reset();
     m_commandList.Reset();
     for (auto& allocator : m_commandAllocators) {
         allocator.Reset();
@@ -219,6 +235,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Main scene pass
     PrepareMainPass();
 
+    // Draw environment background (skybox) into the HDR target before geometry.
+    RenderSkybox();
+
     bool drewWithHyper = false;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     if (m_hyperGeometry) {
@@ -240,6 +259,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     if (!drewWithHyper) {
         RenderScene(registry);
     }
+
+    // Screen-space ambient occlusion from depth buffer (if enabled)
+    RenderSSAO();
 
     // Bloom passes operating on HDR buffer (if available)
     RenderBloom();
@@ -264,6 +286,15 @@ void Renderer::BeginFrame() {
         auto hdrResult = CreateHDRTarget();
         if (hdrResult.IsErr()) {
             spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
+        }
+    }
+    // Handle SSAO target resize
+    if (m_ssaoTex && (m_window->GetWidth() != m_ssaoTex->GetDesc().Width || m_window->GetHeight() != m_ssaoTex->GetDesc().Height)) {
+        m_ssaoTex.Reset();
+        auto ssaoResult = CreateSSAOResources();
+        if (ssaoResult.IsErr()) {
+            spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
+            m_ssaoEnabled = false;
         }
     }
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
@@ -309,6 +340,18 @@ void Renderer::PrepareMainPass() {
     // Main pass renders into HDR target when available, otherwise directly to back buffer
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = {};
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+
+    // Ensure depth buffer is in writable state for the main pass
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        D3D12_RESOURCE_BARRIER depthBarrier = {};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
 
     if (m_hdrColor) {
         // Ensure HDR is in render target state
@@ -581,6 +624,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         glm::vec3 extent = (maxLS - minLS) * 0.5f;
         glm::vec3 centerLS = minLS + extent;
 
+        // Slightly expand the light-space extents so large objects near the
+        // camera frustum edges stay inside the shadow map, reducing edge flicker.
+        extent.x *= 1.1f;
+        extent.y *= 1.1f;
+
         // Texel snapping to reduce shimmering (per-cascade resolution scaling)
         float effectiveResX = m_shadowMapSize * m_cascadeResolutionScale[cascadeIndex];
         float effectiveResY = m_shadowMapSize * m_cascadeResolutionScale[cascadeIndex];
@@ -616,8 +664,49 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     float invHeight = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetHeight()));
     frameData.postParams = glm::vec4(invWidth, invHeight, m_fxaaEnabled ? 1.0f : 0.0f, 0.0f);
 
+    // Image-based lighting parameters
+    float iblEnabled = m_iblEnabled ? 1.0f : 0.0f;
+    frameData.envParams = glm::vec4(
+        m_iblDiffuseIntensity,
+        m_iblSpecularIntensity,
+        iblEnabled,
+        static_cast<float>(m_currentEnvironment));
+
+    // Color grading parameters (warm/cool) for post-process
+    frameData.colorGrade = glm::vec4(m_colorGradeWarm, m_colorGradeCool, 0.0f, 0.0f);
+
+    // SSAO parameters packed into aoParams
+    frameData.aoParams = glm::vec4(
+        m_ssaoEnabled ? 1.0f : 0.0f,
+        m_ssaoRadius,
+        m_ssaoBias,
+        m_ssaoIntensity);
+
     m_frameDataCPU = frameData;
     m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+}
+
+void Renderer::RenderSkybox() {
+    // Only render a skybox when HDR + IBL are active and we have a pipeline.
+    if (!m_skyboxPipeline || !m_hdrColor || !m_iblEnabled) {
+        return;
+    }
+
+    // Root signature and descriptor heap should already be bound in PrepareMainPass,
+    // but re-binding the pipeline and critical root params keeps this self-contained.
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_skyboxPipeline->GetPipelineState());
+
+    // Frame constants (b1)
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Shadow + environment descriptor table (t4-t6)
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
 }
 
 void Renderer::RenderScene(Scene::ECS_Registry* registry) {
@@ -628,9 +717,9 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Bind shadow map if available
-    if (m_shadowMapSRV.IsValid()) {
-        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowMapSRV.gpu);
+    // Bind shadow map + environment descriptor table if available (t4-t6)
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
 
     // Render all entities with Renderable and Transform components
@@ -1041,8 +1130,10 @@ void Renderer::ToggleShadows() {
 
 void Renderer::CycleDebugViewMode() {
     // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
-    // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height
-    m_debugViewMode = (m_debugViewMode + 1) % 8;
+    // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height,
+    // 8 = IBL diffuse only, 9 = IBL specular only, 10 = env direction/UV,
+    // 11 = Fresnel (Fibl), 12 = specular mip debug
+    m_debugViewMode = (m_debugViewMode + 1) % 13;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -1053,6 +1144,11 @@ void Renderer::CycleDebugViewMode() {
         case 5: label = "Cascades"; break;
         case 6: label = "DebugScreen"; break;
         case 7: label = "FractalHeight"; break;
+        case 8: label = "IBL_Diffuse"; break;
+        case 9: label = "IBL_Specular"; break;
+        case 10: label = "EnvDirection"; break;
+        case 11: label = "Fresnel"; break;
+        case 12: label = "SpecularMip"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -1102,7 +1198,7 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 }
 
 void Renderer::SetDebugViewMode(int mode) {
-    int clamped = std::max(0, std::min(mode, 7));
+    int clamped = std::max(0, std::min(mode, 12));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -1193,6 +1289,93 @@ void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
                  (m_fractalCoordMode > 0.5f ? "WorldXZ" : "UV"),
                  m_fractalScaleX, m_fractalScaleZ,
                  m_fractalLacunarity, m_fractalGain, m_fractalWarpStrength, typeLabel);
+}
+
+void Renderer::SetEnvironmentPreset(const std::string& name) {
+    if (m_environmentMaps.empty()) {
+        spdlog::warn("No environments loaded");
+        return;
+    }
+
+    // Search for environment by name (case-insensitive partial match)
+    std::string lowerName = name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                  [](unsigned char c) { return std::tolower(c); });
+
+    size_t targetIndex = m_currentEnvironment;
+    bool found = false;
+
+    for (size_t i = 0; i < m_environmentMaps.size(); ++i) {
+        std::string envNameLower = m_environmentMaps[i].name;
+        std::transform(envNameLower.begin(), envNameLower.end(), envNameLower.begin(),
+                      [](unsigned char c) { return std::tolower(c); });
+
+        if (envNameLower.find(lowerName) != std::string::npos) {
+            targetIndex = i;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        spdlog::warn("Environment '{}' not found, keeping current environment", name);
+        return;
+    }
+
+    if (targetIndex == m_currentEnvironment) {
+        return;
+    }
+
+    m_currentEnvironment = targetIndex;
+    UpdateEnvironmentDescriptorTable();
+
+    spdlog::info("Environment preset set to '{}'", m_environmentMaps[m_currentEnvironment].name);
+}
+
+void Renderer::SetIBLIntensity(float diffuseIntensity, float specularIntensity) {
+    float diff = std::max(diffuseIntensity, 0.0f);
+    float spec = std::max(specularIntensity, 0.0f);
+    if (std::abs(diff - m_iblDiffuseIntensity) < 1e-6f &&
+        std::abs(spec - m_iblSpecularIntensity) < 1e-6f) {
+        return;
+    }
+    m_iblDiffuseIntensity = diff;
+    m_iblSpecularIntensity = spec;
+    spdlog::info("IBL intensity set to diffuse={}, specular={}", m_iblDiffuseIntensity, m_iblSpecularIntensity);
+}
+
+void Renderer::SetIBLEnabled(bool enabled) {
+    if (m_iblEnabled == enabled) {
+        return;
+    }
+    m_iblEnabled = enabled;
+    spdlog::info("Image-based lighting {}", m_iblEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::CycleEnvironmentPreset() {
+    if (m_environmentMaps.empty()) {
+        spdlog::warn("No environments loaded to cycle through");
+        return;
+    }
+
+    m_currentEnvironment = (m_currentEnvironment + 1) % m_environmentMaps.size();
+    UpdateEnvironmentDescriptorTable();
+
+    const std::string& name = m_environmentMaps[m_currentEnvironment].name;
+    spdlog::info("Environment cycled to '{}' ({}/{})", name, m_currentEnvironment + 1, m_environmentMaps.size());
+}
+
+void Renderer::SetColorGrade(float warm, float cool) {
+    // Clamp to a reasonable range to keep grading subtle.
+    float clampedWarm = glm::clamp(warm, -1.0f, 1.0f);
+    float clampedCool = glm::clamp(cool, -1.0f, 1.0f);
+    if (std::abs(clampedWarm - m_colorGradeWarm) < 1e-3f &&
+        std::abs(clampedCool - m_colorGradeCool) < 1e-3f) {
+        return;
+    }
+    m_colorGradeWarm = clampedWarm;
+    m_colorGradeCool = clampedCool;
+    spdlog::info("Color grade warm/cool set to ({}, {})", m_colorGradeWarm, m_colorGradeCool);
 }
 
 void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
@@ -1288,7 +1471,7 @@ Result<void> Renderer::CreateDepthBuffer() {
     depthDesc.Height = m_window->GetHeight();
     depthDesc.DepthOrArraySize = 1;
     depthDesc.MipLevels = 1;
-    depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    depthDesc.Format = DXGI_FORMAT_R32_TYPELESS;
     depthDesc.SampleDesc.Count = 1;
     depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -1316,6 +1499,8 @@ Result<void> Renderer::CreateDepthBuffer() {
         return Result<void>::Err("Failed to create depth buffer");
     }
 
+    m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
     // Create DSV
     auto dsvResult = m_descriptorManager->AllocateDSV();
     if (dsvResult.IsErr()) {
@@ -1324,10 +1509,34 @@ Result<void> Renderer::CreateDepthBuffer() {
 
     m_depthStencilView = dsvResult.Value();
 
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+    dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+
     m_device->GetDevice()->CreateDepthStencilView(
         m_depthBuffer.Get(),
-        nullptr,
+        &dsvDesc,
         m_depthStencilView.cpu
+    );
+
+    // Create SRV for depth sampling (SSAO)
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate SRV for depth buffer: " + srvResult.Error());
+    }
+    m_depthSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc = {};
+    depthSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSrvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_depthBuffer.Get(),
+        &depthSrvDesc,
+        m_depthSRV.cpu
     );
 
     spdlog::info("Depth buffer created");
@@ -1436,6 +1645,9 @@ Result<void> Renderer::CreateShadowMapResources() {
     m_shadowScissor.bottom = static_cast<LONG>(shadowDim);
 
     spdlog::info("Shadow map created ({}x{})", shadowDim, shadowDim);
+
+    // Shadow SRV changed; refresh the combined shadow + environment descriptor table.
+    UpdateEnvironmentDescriptorTable();
     return Result<void>::Ok();
 }
 
@@ -1534,6 +1746,12 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("Failed to create bloom resources: {}", bloomResult.Error());
     }
 
+    // SSAO target depends on window size as well
+    auto ssaoResult = CreateSSAOResources();
+    if (ssaoResult.IsErr()) {
+        spdlog::warn("Failed to create SSAO resources: {}", ssaoResult.Error());
+    }
+
     return Result<void>::Ok();
 }
 
@@ -1578,6 +1796,18 @@ Result<void> Renderer::CompileShaders() {
         return Result<void>::Err("Failed to compile pixel shader: " + psResult.Error());
     }
 
+    auto skyboxVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "SkyboxVS",
+        "vs_5_1"
+    );
+
+    auto skyboxPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "SkyboxPS",
+        "ps_5_1"
+    );
+
     auto shadowVsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/Basic.hlsl",
         "VSShadow",
@@ -1606,6 +1836,24 @@ Result<void> Renderer::CompileShaders() {
 
     if (postPsResult.IsErr()) {
         return Result<void>::Err("Failed to compile post-process pixel shader: " + postPsResult.Error());
+    }
+
+    auto ssaoVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/SSAO.hlsl",
+        "VSMain",
+        "vs_5_1"
+    );
+    if (ssaoVsResult.IsErr()) {
+        spdlog::warn("Failed to compile SSAO vertex shader: {}", ssaoVsResult.Error());
+    }
+
+    auto ssaoPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/SSAO.hlsl",
+        "PSMain",
+        "ps_5_1"
+    );
+    if (ssaoPsResult.IsErr()) {
+        spdlog::warn("Failed to compile SSAO pixel shader: {}", ssaoPsResult.Error());
     }
 
     // Store compiled shaders (we'll use them in CreatePipeline)
@@ -1640,6 +1888,35 @@ Result<void> Renderer::CompileShaders() {
 
     if (pipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create pipeline: " + pipelineResult.Error());
+    }
+
+    // Skybox pipeline (fullscreen triangle; no depth)
+    if (skyboxVsResult.IsOk() && skyboxPsResult.IsOk()) {
+        m_skyboxPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc skyDesc = {};
+        skyDesc.vertexShader = skyboxVsResult.Value();
+        skyDesc.pixelShader = skyboxPsResult.Value();
+        skyDesc.inputLayout = {}; // SV_VertexID-driven triangle
+        skyDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        skyDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        skyDesc.numRenderTargets = 1;
+        skyDesc.depthTestEnabled = false;
+        skyDesc.depthWriteEnabled = false;
+        skyDesc.cullMode = D3D12_CULL_MODE_NONE;
+        skyDesc.blendEnabled = false;
+
+        auto skyboxPipelineResult = m_skyboxPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            skyDesc
+        );
+        if (skyboxPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create skybox pipeline: {}", skyboxPipelineResult.Error());
+            m_skyboxPipeline.reset();
+        }
+    } else {
+        spdlog::warn("Skybox shaders did not compile; environment will be lighting-only");
     }
 
     // Depth-only pipeline for directional shadow map
@@ -1691,6 +1968,33 @@ Result<void> Renderer::CompileShaders() {
 
     if (postPipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
+    }
+
+    // SSAO pipeline (fullscreen pass, single-channel target)
+    if (ssaoVsResult.IsOk() && ssaoPsResult.IsOk()) {
+        m_ssaoPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc ssaoDesc = {};
+        ssaoDesc.vertexShader = ssaoVsResult.Value();
+        ssaoDesc.pixelShader  = ssaoPsResult.Value();
+        ssaoDesc.inputLayout = {}; // fullscreen triangle via SV_VertexID
+        ssaoDesc.rtvFormat = DXGI_FORMAT_R8_UNORM;
+        ssaoDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        ssaoDesc.numRenderTargets = 1;
+        ssaoDesc.depthTestEnabled = false;
+        ssaoDesc.depthWriteEnabled = false;
+        ssaoDesc.cullMode = D3D12_CULL_MODE_NONE;
+        ssaoDesc.blendEnabled = false;
+
+        auto ssaoPipelineResult = m_ssaoPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            ssaoDesc
+        );
+        if (ssaoPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create SSAO pipeline: {}", ssaoPipelineResult.Error());
+            m_ssaoPipeline.reset();
+        }
     }
 
     // Bloom pipelines (fullscreen passes reusing VSMain)
@@ -1802,6 +2106,161 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
     spdlog::info("Placeholder textures created");
     return Result<void>::Ok();
+}
+
+Result<void> Renderer::InitializeEnvironmentMaps() {
+    if (!m_descriptorManager || !m_device) {
+        return Result<void>::Err("Renderer not initialized for environment maps");
+    }
+
+    // Clear any existing environments
+    m_environmentMaps.clear();
+
+    // Scan assets directory for all HDR and EXR files
+    namespace fs = std::filesystem;
+    std::vector<fs::path> envFiles;
+
+    const fs::path assetsDir = "assets";
+
+    if (fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
+        for (const auto& entry : fs::directory_iterator(assetsDir)) {
+            if (entry.is_regular_file()) {
+                std::string ext = entry.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(),
+                              [](unsigned char c) { return std::tolower(c); });
+
+                // Now we support both HDR and EXR!
+                if (ext == ".hdr" || ext == ".exr") {
+                    envFiles.push_back(entry.path());
+                }
+            }
+        }
+    }
+
+    // Sort environment files alphabetically for consistent ordering
+    std::sort(envFiles.begin(), envFiles.end());
+
+    // Load all HDR and EXR files
+    int successCount = 0;
+    int failCount = 0;
+    for (const auto& envPath : envFiles) {
+        std::string pathStr = envPath.string();
+        std::string name = envPath.stem().string(); // filename without extension
+
+        if (auto envTex = LoadTextureFromFile(pathStr, /*useSRGB=*/false); envTex.IsOk()) {
+            auto tex = envTex.Value();
+
+            EnvironmentMaps env;
+            env.name = name;
+            env.diffuseIrradiance = tex;
+            env.specularPrefiltered = tex;
+
+            m_environmentMaps.push_back(env);
+
+            spdlog::info(
+                "Environment '{}' loaded from '{}': {}x{}, {} mips",
+                name,
+                pathStr,
+                tex->GetWidth(),
+                tex->GetHeight(),
+                tex->GetMipLevels());
+
+            successCount++;
+        } else {
+            spdlog::warn("Failed to load environment from '{}'", pathStr);
+            failCount++;
+        }
+    }
+
+    // If no environments loaded, create a fallback placeholder environment
+    if (m_environmentMaps.empty()) {
+        spdlog::warn("No HDR environments loaded; using placeholder");
+        EnvironmentMaps fallback;
+        fallback.name = "Placeholder";
+        fallback.diffuseIrradiance = m_placeholderAlbedo;
+        fallback.specularPrefiltered = m_placeholderAlbedo;
+        m_environmentMaps.push_back(fallback);
+    }
+
+    // Ensure current environment index is valid
+    m_currentEnvironment = 0;
+
+    // Allocate persistent descriptors for shadow + IBL (t4-t6) if not already created.
+    if (!m_shadowAndEnvDescriptors[0].IsValid()) {
+        for (int i = 0; i < 3; ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate SRV table for shadow/environment: " + handleResult.Error());
+            }
+            m_shadowAndEnvDescriptors[i] = handleResult.Value();
+        }
+    }
+
+    UpdateEnvironmentDescriptorTable();
+
+    spdlog::info("Environment maps initialized: {} loaded successfully, {} failed",
+                 successCount, failCount);
+    return Result<void>::Ok();
+}
+
+void Renderer::UpdateEnvironmentDescriptorTable() {
+    if (!m_device || !m_descriptorManager) {
+        return;
+    }
+    if (!m_shadowAndEnvDescriptors[0].IsValid()) {
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+
+    // Slot 0 (t4): shadow map array, or a neutral placeholder if shadows are unavailable.
+    DescriptorHandle shadowSrc = m_shadowMapSRV;
+    if (!shadowSrc.IsValid() && m_placeholderRoughness) {
+        shadowSrc = m_placeholderRoughness->GetSRV();
+    }
+    if (shadowSrc.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[0].cpu,
+            shadowSrc.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
+
+    // Environment selection
+    size_t envIndex = m_currentEnvironment;
+    if (m_environmentMaps.empty() || envIndex >= m_environmentMaps.size()) {
+        envIndex = 0;
+    }
+    const EnvironmentMaps& env = m_environmentMaps[envIndex];
+
+    DescriptorHandle diffuseSrc =
+        (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid())
+            ? env.diffuseIrradiance->GetSRV()
+            : (m_placeholderAlbedo ? m_placeholderAlbedo->GetSRV() : DescriptorHandle{});
+
+    DescriptorHandle specularSrc =
+        (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid())
+            ? env.specularPrefiltered->GetSRV()
+            : (m_placeholderAlbedo ? m_placeholderAlbedo->GetSRV() : DescriptorHandle{});
+
+    if (diffuseSrc.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[1].cpu,
+            diffuseSrc.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
+
+    if (specularSrc.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[2].cpu,
+            specularSrc.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
 }
 
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -1936,8 +2395,8 @@ void Renderer::RenderPostProcess() {
         return;
     }
 
-    // Transition HDR to shader resource and back buffer to render target
-    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    // Transition HDR/SSAO to shader resource and back buffer to render target
+    D3D12_RESOURCE_BARRIER barriers[3] = {};
     UINT barrierCount = 0;
 
     if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -1948,6 +2407,16 @@ void Renderer::RenderPostProcess() {
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
         m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_ssaoTex && m_ssaoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_ssaoTex.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssaoState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
     barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1990,7 +2459,7 @@ void Renderer::RenderPostProcess() {
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Allocate transient descriptors for HDR (t0) and bloom (t1)
+    // Allocate transient descriptors for HDR (t0), bloom (t1), and SSAO (t2)
     if (!m_hdrSRV.IsValid()) {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
@@ -2030,12 +2499,34 @@ void Renderer::RenderPostProcess() {
         }
     }
 
+    // Optional SSAO SRV (t2)
+    if (m_ssaoSRV.IsValid() && m_ssaoTex) {
+        auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (ssaoAllocResult.IsOk()) {
+            DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                ssaoHandle.cpu,
+                m_ssaoSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient SSAO SRV, disabling SSAO for this frame");
+            m_frameDataCPU.aoParams.x = 0.0f;
+            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+        }
+    } else {
+        // No SSAO texture; mark AO as disabled so shader skips sampling.
+        m_frameDataCPU.aoParams.x = 0.0f;
+        m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+    }
+
     // Bind SRV table starting at t0
     m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
 
-    // Bind shadow map SRV for cascade visualization (if available)
-    if (m_shadowMapSRV.IsValid()) {
-        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowMapSRV.gpu);
+    // Bind shadow/IBL SRV table (t4-t6) for cascade visualization / skybox, if available
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

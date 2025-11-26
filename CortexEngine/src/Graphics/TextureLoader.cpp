@@ -1,5 +1,7 @@
 #include "TextureLoader.h"
 #include <spdlog/spdlog.h>
+#include <algorithm>
+#include <cctype>
 #ifndef CORTEX_STB_IMAGE_IMPLEMENTED
 #define CORTEX_STB_IMAGE_IMPLEMENTED
 #define STB_IMAGE_IMPLEMENTATION
@@ -42,19 +44,73 @@ Result<std::vector<MipLevel>> TextureLoader::LoadImageRGBAWithMips(const std::st
     int height = 0;
     int channels = 0;
 
-    stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    if (!data) {
-        return Result<std::vector<MipLevel>>::Err("Failed to load image: " + path);
-    }
-
     std::vector<MipLevel> levels;
     MipLevel base{};
-    base.width = static_cast<uint32_t>(width);
-    base.height = static_cast<uint32_t>(height);
-    base.pixels.assign(data, data + static_cast<size_t>(base.width) * base.height * 4);
-    levels.push_back(std::move(base));
 
-    stbi_image_free(data);
+    // Detect file format by extension
+    bool isHDR = false;
+    {
+        if (path.size() >= 4) {
+            std::string ext = path.substr(path.size() - 4);
+            for (char& c : ext) {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            if (ext == ".hdr") {
+                isHDR = true;
+            }
+        }
+        if (!isHDR && stbi_is_hdr(path.c_str())) {
+            isHDR = true;
+        }
+    }
+
+    // Radiance HDR path: Load using stb_image
+    if (isHDR) {
+        float* data = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
+        if (!data) {
+            return Result<std::vector<MipLevel>>::Err("Failed to load HDR image: " + path);
+        }
+
+        base.width = static_cast<uint32_t>(width);
+        base.height = static_cast<uint32_t>(height);
+        base.pixels.resize(static_cast<size_t>(base.width) * base.height * 4);
+
+        const size_t pixelCount = static_cast<size_t>(base.width) * base.height;
+
+        // Tonemap and convert to 8-bit RGBA
+        auto tonemap = [](float v) -> float {
+            v = std::max(v, 0.0f);
+            return v / (1.0f + v);
+        };
+
+        for (size_t i = 0; i < pixelCount; ++i) {
+            float r = tonemap(data[i * 4 + 0]);
+            float g = tonemap(data[i * 4 + 1]);
+            float b = tonemap(data[i * 4 + 2]);
+            float a = std::clamp(data[i * 4 + 3], 0.0f, 1.0f);
+
+            base.pixels[i * 4 + 0] = static_cast<uint8_t>(std::round(std::clamp(r, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 1] = static_cast<uint8_t>(std::round(std::clamp(g, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 2] = static_cast<uint8_t>(std::round(std::clamp(b, 0.0f, 1.0f) * 255.0f));
+            base.pixels[i * 4 + 3] = static_cast<uint8_t>(std::round(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+        }
+
+        stbi_image_free(data);
+    } else {
+        // LDR path (PNG/JPEG/etc.): standard 8-bit load.
+        stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        if (!data) {
+            return Result<std::vector<MipLevel>>::Err("Failed to load image: " + path);
+        }
+
+        base.width = static_cast<uint32_t>(width);
+        base.height = static_cast<uint32_t>(height);
+        base.pixels.assign(data, data + static_cast<size_t>(base.width) * base.height * 4);
+
+        stbi_image_free(data);
+    }
+
+    levels.push_back(std::move(base));
 
     if (generateMips) {
         while (levels.back().width > 1 || levels.back().height > 1) {

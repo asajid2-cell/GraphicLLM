@@ -42,6 +42,10 @@ struct AddEntityCommand : public SceneCommand {
     float metallic = 0.0f;
     float roughness = 0.5f;
     float ao = 1.0f;
+    bool hasPreset = false;
+    std::string presetName;
+    glm::vec3 positionOffset = glm::vec3(0.0f);
+    bool hasPositionOffset = false;
     std::string name;
     bool autoPlace = false;       // let the executor pick a spawn position if true
 
@@ -90,6 +94,10 @@ struct AddPatternCommand : public SceneCommand {
     glm::vec3 elementScale = glm::vec3(1.0f);
     bool hasElementScale = false;
 
+    // Optional jitter to add small random offsets to rows/grids/rings.
+    bool jitter = false;
+    float jitterAmount = 0.0f;
+
     AddPatternCommand() { type = CommandType::AddPattern; }
     std::string ToString() const override;
 };
@@ -125,6 +133,9 @@ struct ModifyTransformCommand : public SceneCommand {
     bool setPosition = false;
     bool setRotation = false;
     bool setScale = false;
+    // When true, position/scale are interpreted as deltas
+    // relative to the current transform instead of absolute.
+    bool isRelative = false;
     glm::vec3 position;
     glm::vec3 rotation;  // Euler angles
     glm::vec3 scale;
@@ -139,9 +150,13 @@ struct ModifyMaterialCommand : public SceneCommand {
     bool setColor = false;
     bool setMetallic = false;
     bool setRoughness = false;
+    bool setAO = false;
+    bool setPreset = false;
     glm::vec4 color;
     float metallic = 0.0f;
     float roughness = 0.5f;
+    float ao = 1.0f;
+    std::string presetName;
 
     ModifyMaterialCommand() { type = CommandType::ModifyMaterial; }
     std::string ToString() const override;
@@ -214,6 +229,12 @@ struct ModifyRendererCommand : public SceneCommand {
     bool setShadowBias = false;
     bool setShadowPCFRadius = false;
     bool setCascadeSplitLambda = false;
+    bool setColorGrade = false;
+    bool setSSAOEnabled = false;
+    bool setSSAOParams = false;
+    bool setEnvironment = false;
+    bool setIBLEnabled = false;
+    bool setIBLIntensity = false;
 
     float exposure = 1.0f;
     bool shadowsEnabled = true;
@@ -221,6 +242,16 @@ struct ModifyRendererCommand : public SceneCommand {
     float shadowBias = 0.0005f;
     float shadowPCFRadius = 1.5f;
     float cascadeSplitLambda = 0.5f;
+    float colorGradeWarm = 0.0f;
+    float colorGradeCool = 0.0f;
+    bool ssaoEnabled = true;
+    float ssaoRadius = 0.5f;
+    float ssaoBias = 0.025f;
+    float ssaoIntensity = 1.0f;
+    std::string environment;       // "studio", "sunset", "night"
+    bool iblEnabled = true;
+    float iblDiffuseIntensity = 1.0f;
+    float iblSpecularIntensity = 1.0f;
 
     ModifyRendererCommand() { type = CommandType::ModifyRenderer; }
     std::string ToString() const override;
@@ -262,7 +293,10 @@ struct ScenePlanCommand : public SceneCommand {
 // Parse LLM response (JSON) into commands
 class CommandParser {
 public:
-    static std::vector<std::shared_ptr<SceneCommand>> ParseJSON(const std::string& json);
+    // Optional focusTargetName is used to resolve symbolic targets like
+    // "RecentObject" or pronouns such as "it" into a concrete group/entity name.
+    static std::vector<std::shared_ptr<SceneCommand>> ParseJSON(const std::string& json,
+                                                                const std::string& focusTargetName = std::string{});
 };
 
 } // namespace Cortex::LLM

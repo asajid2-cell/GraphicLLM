@@ -85,7 +85,10 @@ public:
     DX12RootSignature& operator=(DX12RootSignature&&) = default;
 
     // Create a simple root signature for our basic shader
-    // Layout: [CBV b0, CBV b1, CBV b2, DescriptorTable(SRV t0-t3), DescriptorTable(SRV t4), CBV b3, StaticSampler s0]
+    // Layout: [CBV b0, CBV b1, CBV b2,
+    //          DescriptorTable(SRV t0-t3),
+    //          DescriptorTable(SRV t4-t6),
+    //          CBV b3, StaticSampler s0]
     Result<void> Initialize(ID3D12Device* device);
 
     [[nodiscard]] ID3D12RootSignature* GetRootSignature() const { return m_rootSignature.Get(); }

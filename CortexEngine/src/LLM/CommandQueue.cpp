@@ -12,6 +12,7 @@
 #include <cmath>
 #include <sstream>
 #include <iomanip>
+#include <cctype>
 
 namespace Cortex::LLM {
 
@@ -107,6 +108,48 @@ glm::vec3 SanitizeVec3(const glm::vec3& v, float minAbs = 0.0f, bool clampToWorl
         out[i] = std::clamp(out[i], -kWorldExtent, kWorldExtent);
     }
     return clampToWorldBounds ? ClampToWorld(out) : out;
+}
+
+// Derive a logical group name from a tag so that
+// Pig_1.Body -> Pig_1 and Field_Grass_12 -> Field_Grass.
+std::string DeriveLogicalGroupName(const std::string& tag) {
+    if (tag.empty()) return {};
+
+    auto dotPos = tag.find('.');
+    if (dotPos != std::string::npos && dotPos > 0) {
+        return tag.substr(0, dotPos);
+    }
+
+    auto underscore = tag.find_last_of('_');
+    if (underscore != std::string::npos && underscore + 1 < tag.size()) {
+        bool allDigits = true;
+        for (size_t i = underscore + 1; i < tag.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(tag[i]))) {
+                allDigits = false;
+                break;
+            }
+        }
+        if (allDigits && underscore > 0) {
+            return tag.substr(0, underscore);
+        }
+    }
+
+    return tag;
+}
+
+std::optional<glm::vec3> FindAutoPlaceAnchor(Scene::ECS_Registry* registry, SceneLookup& lookup) {
+    if (!registry) return std::nullopt;
+
+    // Prefer the most recently spawned/edited entity name from the lookup.
+    if (auto lastName = lookup.GetLastSpawnedName(registry)) {
+        std::string hint;
+        entt::entity e = lookup.ResolveTarget(*lastName, registry, hint);
+        if (e != entt::null && registry->HasComponent<Scene::TransformComponent>(e)) {
+            auto& t = registry->GetComponent<Scene::TransformComponent>(e);
+            return t.position;
+        }
+    }
+    return std::nullopt;
 }
 } // namespace
 
@@ -327,8 +370,12 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     }
 
     if (shouldAutoPlace) {
-        // Place new entities around a ring in front of the camera by default
-        desiredPos = glm::vec3(0.0f, 1.0f, -3.0f) + placementBias;
+        glm::vec3 baseOrigin(0.0f, 1.0f, -3.0f);
+        if (auto anchor = FindAutoPlaceAnchor(registry, m_lookup)) {
+            baseOrigin = *anchor;
+            baseOrigin.y = std::max(baseOrigin.y, 0.5f);
+        }
+        desiredPos = baseOrigin + placementBias;
     } else if (cmd->allowPlacementJitter) {
         // Lightly jitter user positions to avoid perfect overlap when reusing same coords
         desiredPos += placementBias * 0.15f;
@@ -341,15 +388,37 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     } else {
         transform.position = FindNonOverlappingPosition(registry, desiredPos, spawnRadius);
     }
+
+    if (cmd->hasPositionOffset) {
+        glm::vec3 offset = SanitizeVec3(cmd->positionOffset, 0.0f, false);
+        transform.position = ClampToWorld(transform.position + offset);
+    }
+
     transform.scale = safeScale;
 
     // Add renderable
     auto& renderable = registry->AddComponent<Scene::RenderableComponent>(entity);
     renderable.mesh = mesh;
     renderable.albedoColor = SanitizeColor(cmd->color);
-    renderable.metallic = SaturateScalar(cmd->metallic);
-    renderable.roughness = SaturateScalar(cmd->roughness);
-    renderable.ao = SaturateScalar(cmd->ao);
+
+    auto sanitizeChannel = [](float value, float defValue, const char* fieldName) {
+        if (!std::isfinite(value) || value < 0.0f || value > 1.0f) {
+            spdlog::warn("AddEntity {} value {} out of range [0,1], using default {}", fieldName, value, defValue);
+            return defValue;
+        }
+        return value;
+    };
+
+    float metallic = sanitizeChannel(cmd->metallic, 0.0f, "metallic");
+    float roughness = sanitizeChannel(cmd->roughness, 0.5f, "roughness");
+    float ao = sanitizeChannel(cmd->ao, 1.0f, "ao");
+
+    renderable.metallic = SaturateScalar(metallic);
+    renderable.roughness = SaturateScalar(roughness);
+    renderable.ao = SaturateScalar(ao);
+    if (cmd->hasPreset) {
+        renderable.presetName = cmd->presetName;
+    }
     renderable.visible = true;
     renderable.textures.albedo = renderer->GetPlaceholderTexture();
     renderable.textures.normal = renderer->GetPlaceholderNormal();
@@ -365,6 +434,11 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         ss << "spawned " << name << " at (" << std::fixed << std::setprecision(2)
            << transform.position.x << "," << transform.position.y << "," << transform.position.z << ")";
         PushStatus(true, ss.str());
+    }
+
+    // Newly spawned entities become the current focus, using their logical group name.
+    if (m_focusCallback) {
+        m_focusCallback(DeriveLogicalGroupName(name));
     }
 }
 
@@ -444,6 +518,75 @@ void CommandQueue::ExecuteRemoveEntity(RemoveEntityCommand* cmd, Scene::ECS_Regi
 }
 
 void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::ECS_Registry* registry) {
+    if (!registry || !cmd) {
+        PushStatus(false, "move/scale failed: missing registry");
+        return;
+    }
+
+    // If the target name looks like a logical group (e.g., "Pig_1") and there
+    // are multiple entities whose tags share that prefix ("Pig_1.Body",
+    // "Pig_1.Head", ...), treat this as a group-level transform so that
+    // commands like "move the pig higher" naturally move the whole compound.
+    auto view = registry->View<Scene::TagComponent, Scene::TransformComponent>();
+    std::vector<entt::entity> groupMembers;
+    std::string groupName = cmd->targetName;
+    if (!groupName.empty() && groupName.find('.') == std::string::npos) {
+        for (auto entity : view) {
+            const auto& tag = view.get<Scene::TagComponent>(entity);
+            const std::string& name = tag.tag;
+            if (name == groupName ||
+                name.rfind(groupName + ".", 0) == 0 ||
+                name.rfind(groupName + "_", 0) == 0) {
+                groupMembers.push_back(entity);
+            }
+        }
+    }
+
+    if (!groupMembers.empty()) {
+        glm::vec3 center(0.0f);
+        int count = 0;
+        for (auto entity : groupMembers) {
+            auto& t = view.get<Scene::TransformComponent>(entity);
+            center += t.position;
+            ++count;
+        }
+        if (count > 0) center /= static_cast<float>(count);
+
+        std::ostringstream summary;
+        summary << "group " << groupName << ": ";
+        bool touchedGroup = false;
+
+        if (cmd->setPosition) {
+            glm::vec3 delta(0.0f);
+            if (cmd->isRelative) {
+                // Treat position as an offset to apply to the current center.
+                delta = SanitizeVec3(cmd->position, 0.0f, false);
+            } else {
+                glm::vec3 newCenter = SanitizeVec3(cmd->position);
+                delta = newCenter - center;
+            }
+            for (auto entity : groupMembers) {
+                auto& t = view.get<Scene::TransformComponent>(entity);
+                t.position = SanitizeVec3(t.position + delta);
+            }
+            summary << "offset(" << std::fixed << std::setprecision(2)
+                    << delta.x << "," << delta.y << "," << delta.z << ") ";
+            touchedGroup = true;
+        }
+
+        // For now, group-level ModifyTransform only handles position; scaling
+        // and rotation of groups are handled via ModifyGroupCommand.
+
+        if (touchedGroup) {
+            PushStatus(true, summary.str());
+            if (m_focusCallback && !groupName.empty()) {
+                m_focusCallback(groupName);
+            }
+            return;
+        }
+        // If nothing was applied, fall through to single-entity behavior.
+    }
+
     std::string hint;
     entt::entity target = m_lookup.ResolveTarget(cmd->targetName, registry, hint);
     if (target == entt::null) {
@@ -469,11 +612,22 @@ void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::EC
     bool touched = false;
 
     if (cmd->setPosition) {
-        transform.position = SanitizeVec3(cmd->position);
+        glm::vec3 delta(0.0f);
+        if (cmd->isRelative) {
+            delta = SanitizeVec3(cmd->position, 0.0f, false);
+            transform.position = SanitizeVec3(transform.position + delta);
+        } else {
+            transform.position = SanitizeVec3(cmd->position);
+        }
         spdlog::info("Moved '{}' to ({}, {}, {})",
                    tagName, transform.position.x, transform.position.y, transform.position.z);
         summary << "pos(" << std::fixed << std::setprecision(2)
                 << transform.position.x << "," << transform.position.y << "," << transform.position.z << ") ";
+        if (cmd->isRelative) {
+            summary << "+d(" << delta.x << "," << delta.y << "," << delta.z << ") ";
+        } else {
+            summary << " ";
+        }
         touched = true;
     }
     if (cmd->setRotation) {
@@ -489,7 +643,23 @@ void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::EC
         touched = true;
     }
     if (cmd->setScale) {
-        glm::vec3 clampedScale = SanitizeVec3(cmd->scale, 0.05f, false);
+        glm::vec3 resultScale;
+        if (cmd->isRelative) {
+            // Treat incoming scale as a multiplicative factor, e.g. [1.3,1.3,1.3]
+            glm::vec3 factor = cmd->scale;
+            for (int i = 0; i < 3; ++i) {
+                if (!std::isfinite(factor[i]) || factor[i] == 0.0f) {
+                    factor[i] = 1.0f;
+                }
+            }
+            // Clamp relative multipliers to a sane range to avoid extreme sizes.
+            factor = glm::clamp(factor, glm::vec3(0.25f), glm::vec3(4.0f));
+            resultScale = transform.scale * factor;
+        } else {
+            resultScale = cmd->scale;
+        }
+
+        glm::vec3 clampedScale = SanitizeVec3(resultScale, 0.05f, false);
         clampedScale = glm::clamp(clampedScale, glm::vec3(-100.0f), glm::vec3(100.0f));
         transform.scale = clampedScale;
         spdlog::info("Scaled '{}' to ({}, {}, {})",
@@ -500,6 +670,9 @@ void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::EC
 
     if (touched) {
         PushStatus(true, summary.str());
+        if (m_focusCallback && !tagName.empty()) {
+            m_focusCallback(DeriveLogicalGroupName(tagName));
+        }
     }
 }
 
@@ -528,6 +701,44 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
     summary << "material " << tagName << ": ";
     bool touched = false;
 
+    // Optional preset application (base), before specific overrides.
+    if (cmd->setPreset && !cmd->presetName.empty()) {
+        std::string name = cmd->presetName;
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        struct MaterialPreset {
+            glm::vec4 color;
+            float metallic;
+            float roughness;
+        };
+
+        static const std::unordered_map<std::string, MaterialPreset> kPresets = {
+            {"chrome",        {{0.8f, 0.8f, 0.85f, 1.0f}, 1.0f, 0.05f}},
+            {"gold",          {{1.0f, 0.85f, 0.3f, 1.0f}, 1.0f, 0.2f}},
+            {"brushed_metal", {{0.7f, 0.7f, 0.7f, 1.0f}, 1.0f, 0.35f}},
+            {"steel",         {{0.75f, 0.75f, 0.8f, 1.0f}, 1.0f, 0.25f}},
+            {"plastic",       {{0.8f, 0.8f, 0.8f, 1.0f}, 0.0f, 0.4f}},
+            {"rubber",        {{0.1f, 0.1f, 0.1f, 1.0f}, 0.0f, 0.9f}},
+            {"wood",          {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
+            {"stone",         {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
+            {"glass",         {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+        };
+
+        auto it = kPresets.find(name);
+        if (it != kPresets.end()) {
+            const auto& preset = it->second;
+            renderable.albedoColor = SanitizeColor(preset.color);
+            renderable.metallic = SaturateScalar(preset.metallic);
+            renderable.roughness = SaturateScalar(preset.roughness);
+            renderable.presetName = name;
+            summary << "preset=" << name << " ";
+            touched = true;
+        } else {
+            spdlog::warn("Unknown material preset '{}'", name);
+        }
+    }
+
     if (cmd->setColor) {
         renderable.albedoColor = SanitizeColor(cmd->color);
         spdlog::info("Changed '{}' color to ({}, {}, {})",
@@ -545,9 +756,17 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
         summary << "roughness ";
         touched = true;
     }
+    if (cmd->setAO) {
+        renderable.ao = SaturateScalar(cmd->ao);
+        summary << "ao ";
+        touched = true;
+    }
 
     if (touched) {
         PushStatus(true, summary.str());
+        if (m_focusCallback && !tagName.empty()) {
+            m_focusCallback(DeriveLogicalGroupName(tagName));
+        }
     }
 }
 
@@ -691,6 +910,36 @@ void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::R
         summary << "lambda=" << cmd->cascadeSplitLambda << " ";
         touched = true;
     }
+    if (cmd->setEnvironment) {
+        renderer->SetEnvironmentPreset(cmd->environment);
+        summary << "environment=" << cmd->environment << " ";
+        touched = true;
+    }
+    if (cmd->setIBLEnabled) {
+        renderer->SetIBLEnabled(cmd->iblEnabled);
+        summary << "ibl=" << (cmd->iblEnabled ? "on" : "off") << " ";
+        touched = true;
+    }
+    if (cmd->setIBLIntensity) {
+        renderer->SetIBLIntensity(cmd->iblDiffuseIntensity, cmd->iblSpecularIntensity);
+        summary << "ibl_intensity=[" << cmd->iblDiffuseIntensity << "," << cmd->iblSpecularIntensity << "] ";
+        touched = true;
+    }
+    if (cmd->setColorGrade) {
+        renderer->SetColorGrade(cmd->colorGradeWarm, cmd->colorGradeCool);
+        summary << "grade=(" << cmd->colorGradeWarm << "," << cmd->colorGradeCool << ") ";
+        touched = true;
+    }
+    if (cmd->setSSAOEnabled) {
+        renderer->SetSSAOEnabled(cmd->ssaoEnabled);
+        summary << "ssao=" << (cmd->ssaoEnabled ? "on" : "off") << " ";
+        touched = true;
+    }
+    if (cmd->setSSAOParams) {
+        renderer->SetSSAOParams(cmd->ssaoRadius, cmd->ssaoBias, cmd->ssaoIntensity);
+        summary << "ssao_params=(r:" << cmd->ssaoRadius << ",b:" << cmd->ssaoBias << ",i:" << cmd->ssaoIntensity << ") ";
+        touched = true;
+    }
 
     if (touched) {
         PushStatus(true, summary.str());
@@ -769,6 +1018,24 @@ void CommandQueue::ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Regist
         if (!std::isfinite(baseScale[i]) || std::abs(baseScale[i]) < 0.01f) {
             baseScale[i] = (baseScale[i] >= 0.0f ? 1.0f : -1.0f);
         }
+    }
+
+    // If no specific location was given (position near zero), treat this as
+    // an auto-placed compound and try to spawn it in free space in front of
+    // the camera, avoiding overlap with existing entities.
+    const bool autoPlace =
+        glm::all(glm::epsilonEqual(cmd->position, glm::vec3(0.0f), 1e-4f));
+    if (autoPlace) {
+        const float spawnRadius = std::max(1.5f, glm::compMax(glm::abs(baseScale)));
+        const float spacing = std::max(1.5f, spawnRadius * 2.2f);
+        glm::vec3 placementBias = NextPlacementOffset(m_spawnIndex++, spacing);
+        glm::vec3 baseOrigin(0.0f, 1.0f, -3.0f);
+        if (auto anchor = FindAutoPlaceAnchor(registry, m_lookup)) {
+            baseOrigin = *anchor;
+            baseOrigin.y = std::max(baseOrigin.y, 0.5f);
+        }
+        glm::vec3 desired = baseOrigin + placementBias;
+        basePos = FindNonOverlappingPosition(registry, desired, spawnRadius);
     }
 
     if (!templ) {
@@ -1180,6 +1447,18 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
         glm::vec3 worldPos = center + localOffset;
         worldPos.y = sampleHeight(worldPos);
         worldPos = SanitizeVec3(worldPos);
+
+        // Optional jitter for structured patterns to avoid perfectly rigid rows/grids/rings.
+        if (cmd->jitter && cmd->jitterAmount > 0.0f &&
+            cmd->pattern != AddPatternCommand::PatternType::Random) {
+            std::string key = groupName.empty() ? "Pattern" : groupName;
+            uint32_t h = std::hash<std::string>{}(key) ^ (0x9E3779B9u + static_cast<uint32_t>(i) * 0x85EBCA6Bu);
+            float jx = (static_cast<float>(h & 0xFFu) / 255.0f - 0.5f) * cmd->jitterAmount;
+            float jz = (static_cast<float>((h >> 8) & 0xFFu) / 255.0f - 0.5f) * cmd->jitterAmount;
+            worldPos.x += jx;
+            worldPos.z += jz;
+            worldPos = SanitizeVec3(worldPos);
+        }
 
         if (herdMode) {
             // Small positional jitter so herds don't look like perfect lattices.

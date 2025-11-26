@@ -181,6 +181,10 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         m_llmService = std::make_unique<LLM::LLMService>();
         m_commandQueue = std::make_unique<LLM::CommandQueue>();
         m_commandQueue->RefreshLookup(m_registry.get());
+        // Keep the engine's logical focus target in sync with LLM-driven edits.
+        m_commandQueue->SetFocusCallback([this](const std::string& name) {
+            SetFocusTarget(name);
+        });
 
         m_llmInitializing = true;
         auto llmConfig = config.llmConfig; // copy for the background thread
@@ -657,6 +661,12 @@ void Engine::ProcessInput() {
                         m_renderer->CycleDebugViewMode();
                     }
                 }
+                else if (event.key.key == SDLK_E) {
+                    if (m_renderer) {
+                        // Cycle environment preset (studio -> sunset -> night -> ...).
+                        m_renderer->CycleEnvironmentPreset();
+                    }
+                }
                 break;
 
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -786,6 +796,17 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
             case LLM::AddEntityCommand::EntityType::Cone: return "Cone";
             case LLM::AddEntityCommand::EntityType::Torus: return "Torus";
             default: return "Cube";
+        }
+    };
+    auto patternElementFromType = [](LLM::AddEntityCommand::EntityType t) {
+        switch (t) {
+            case LLM::AddEntityCommand::EntityType::Sphere:   return std::string("sphere");
+            case LLM::AddEntityCommand::EntityType::Plane:    return std::string("plane");
+            case LLM::AddEntityCommand::EntityType::Cylinder: return std::string("cylinder");
+            case LLM::AddEntityCommand::EntityType::Pyramid:  return std::string("pyramid");
+            case LLM::AddEntityCommand::EntityType::Cone:     return std::string("cone");
+            case LLM::AddEntityCommand::EntityType::Torus:    return std::string("torus");
+            default:                                          return std::string("cube");
         }
     };
 
@@ -943,6 +964,68 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         return out;
     }
 
+    // Heuristic patterns for "messy/scattered row/grid/ring of X"
+    const bool mentionsRow   = contains("row");
+    const bool mentionsGrid  = contains("grid");
+    const bool mentionsRing  = contains("ring") || contains("circle");
+    const bool mentionsMessy =
+        contains("messy") || contains("scattered") || contains("uneven") || contains("a bit random");
+
+    if (mentionsMessy && (mentionsRow || mentionsGrid || mentionsRing)) {
+        auto type = typeFromText();
+        auto elementName = patternElementFromType(type);
+        int count = std::max(1, parseCount());
+
+        auto pattern = std::make_shared<LLM::AddPatternCommand>();
+        if (mentionsGrid)      pattern->pattern = LLM::AddPatternCommand::PatternType::Grid;
+        else if (mentionsRing) pattern->pattern = LLM::AddPatternCommand::PatternType::Ring;
+        else                   pattern->pattern = LLM::AddPatternCommand::PatternType::Row;
+
+        pattern->element = elementName;
+        pattern->count = count;
+        // Center around origin-ish; executor will handle spacing
+        pattern->regionMin = glm::vec3(0.0f, 0.0f, -4.0f);
+        pattern->regionMax = pattern->regionMin;
+        pattern->hasRegionBox = false;
+        pattern->spacing = glm::vec3(2.0f, 0.0f, 2.0f);
+        pattern->hasSpacing = true;
+        pattern->groupName = "HeuristicPattern_" + std::to_string(++m_heuristicCounter);
+        pattern->jitter = true;
+        pattern->jitterAmount = mentionsGrid ? 0.8f : 0.5f;
+        out.push_back(pattern);
+        return out;
+    }
+
+    // Heuristic "next to it / beside it" helper
+    const bool mentionsNextTo = contains("next to") || contains("beside");
+    if (refersToIt && mentionsNextTo) {
+        auto type = typeFromText();
+        std::string typeName = typeToString(type);
+
+        glm::vec3 offset(1.0f, 0.0f, 0.0f);
+        if (contains("left")) {
+            offset = glm::vec3(-1.0f, 0.0f, 0.0f);
+        } else if (contains("right")) {
+            offset = glm::vec3(1.0f, 0.0f, 0.0f);
+        } else if (contains("front") || contains("in front")) {
+            offset = glm::vec3(0.0f, 0.0f, 1.0f);
+        } else if (contains("behind") || contains("back")) {
+            offset = glm::vec3(0.0f, 0.0f, -1.0f);
+        }
+
+        auto cmd = std::make_shared<LLM::AddEntityCommand>();
+        cmd->entityType = type;
+        cmd->name = "LLM_" + typeName + "_" + std::to_string(++m_heuristicCounter);
+        cmd->autoPlace = true;
+        cmd->hasPositionOffset = true;
+        cmd->positionOffset = offset;
+        if (auto color = colorFromText()) {
+            cmd->color = *color;
+        }
+        out.push_back(cmd);
+        return out;
+    }
+
     const int count = parseCount();
     const float angleStep = 2.39996323f;
     const float radius = 1.6f;
@@ -1091,6 +1174,8 @@ void Engine::InitializeScene() {
 
     // Create a spinning cube
     entt::entity cubeEntity = m_registry->CreateCube(glm::vec3(0.0f, 0.0f, 0.0f), "SpinningCube");
+    // Default focus is the showcase cube at startup.
+    SetFocusTarget("SpinningCube");
 
     // Generate cube mesh
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
@@ -1255,7 +1340,7 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
         // necessary salvage. We only fall back to heuristics when the LLM
         // output is clearly not structured JSON (i.e., no "commands" key).
         const std::string& jsonText = response.text;
-        auto commands = LLM::CommandParser::ParseJSON(jsonText);
+        auto commands = LLM::CommandParser::ParseJSON(jsonText, GetFocusTarget());
 
         bool sawCommandsKey = jsonText.find("\"commands\"") != std::string::npos;
 

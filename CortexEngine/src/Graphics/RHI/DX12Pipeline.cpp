@@ -93,7 +93,9 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     }
 
     // Define root parameters
-    // We need: 4 CBVs (b0, b1, b2, b3) + descriptor table for textures (t0-t3) + descriptor table for shadow map (t4)
+    // We need: 4 CBVs (b0, b1, b2, b3) +
+    //          descriptor table for material textures (t0-t3) +
+    //          descriptor table for shadow/IBL textures (t4-t6)
     D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
     // Parameter 0: Object constants (b0)
@@ -127,10 +129,13 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRange;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 4: Shadow map SRV (t4)
+    // Parameter 4: Shadow + IBL SRVs (t4-t6):
+    //   t4 = shadow map array
+    //   t5 = IBL diffuse irradiance
+    //   t6 = IBL specular prefiltered environment
     D3D12_DESCRIPTOR_RANGE shadowRange = {};
     shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    shadowRange.NumDescriptors = 1;
+    shadowRange.NumDescriptors = 3;
     shadowRange.BaseShaderRegister = 4;
     shadowRange.RegisterSpace = 0;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;

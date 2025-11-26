@@ -28,6 +28,12 @@ class CommandQueue {
 public:
     CommandQueue() = default;
 
+    // Set a callback that is invoked when the logical
+    // focus target changes (e.g., last spawned or edited group).
+    void SetFocusCallback(std::function<void(const std::string&)>&& cb) {
+        m_focusCallback = std::move(cb);
+    }
+
     // Push a command to the queue (thread-safe)
     void Push(std::shared_ptr<SceneCommand> command);
 
@@ -69,6 +75,7 @@ private:
     SceneLookup m_lookup;
     uint32_t m_spawnIndex = 0;
     std::string m_lastSceneRecipe;
+    std::function<void(const std::string&)> m_focusCallback;
 
     // Execute a single command
     void ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);

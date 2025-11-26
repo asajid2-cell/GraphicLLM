@@ -3,6 +3,7 @@
 #include <memory>
 #include <array>
 #include <unordered_map>
+#include <string>
 #include <spdlog/spdlog.h>
 #include "Core/Window.h"
 #include "RHI/DX12Device.h"
@@ -186,6 +187,14 @@ public:
                           float coordMode, float scaleX, float scaleZ,
                           float lacunarity = 2.0f, float gain = 0.5f,
                           float warpStrength = 0.0f, float noiseType = 0.0f);
+    // Image-based lighting / environment controls
+    void SetEnvironmentPreset(const std::string& name);
+    void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
+    void SetIBLEnabled(bool enabled);
+    void CycleEnvironmentPreset();
+    void SetColorGrade(float warm, float cool);
+    void SetSSAOEnabled(bool enabled);
+    void SetSSAOParams(float radius, float bias, float intensity);
     void SetPCSS(bool enabled) { m_pcssEnabled = enabled; }
     void SetFXAAEnabled(bool enabled) { m_fxaaEnabled = enabled; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
@@ -212,9 +221,14 @@ private:
     Result<void> CreateShadowMapResources();
     Result<void> CreateHDRTarget();
     Result<void> CreateBloomResources();
+    Result<void> CreateSSAOResources();
+    Result<void> InitializeEnvironmentMaps();
+    void UpdateEnvironmentDescriptorTable();
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
+    void RenderSkybox();
+    void RenderSSAO();
     void RenderBloom();
     void RenderPostProcess();
 
@@ -238,9 +252,11 @@ private:
     std::unique_ptr<DX12Pipeline> m_pipeline;
     std::unique_ptr<DX12Pipeline> m_shadowPipeline;
     std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
+    std::unique_ptr<DX12Pipeline> m_ssaoPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomDownsamplePipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurHPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurVPipeline;
+    std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
@@ -259,11 +275,15 @@ private:
     // Depth buffer
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorHandle m_depthStencilView;
+    DescriptorHandle m_depthSRV;
+    D3D12_RESOURCE_STATES m_depthState = D3D12_RESOURCE_STATE_COMMON;
 
     // Shadow map (directional light, cascaded)
     ComPtr<ID3D12Resource> m_shadowMap;
     std::array<DescriptorHandle, kShadowCascadeCount> m_shadowMapDSVs;
     DescriptorHandle m_shadowMapSRV;
+    // Shadow + environment descriptor table (t4-t6)
+    std::array<DescriptorHandle, 3> m_shadowAndEnvDescriptors{};
     D3D12_VIEWPORT m_shadowViewport{};
     D3D12_RECT m_shadowScissor{};
     D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_COMMON;
@@ -273,6 +293,12 @@ private:
     DescriptorHandle m_hdrRTV;
     DescriptorHandle m_hdrSRV;
     D3D12_RESOURCE_STATES m_hdrState = D3D12_RESOURCE_STATE_COMMON;
+
+    // SSAO target (single-channel occlusion)
+    ComPtr<ID3D12Resource> m_ssaoTex;
+    DescriptorHandle m_ssaoRTV;
+    DescriptorHandle m_ssaoSRV;
+    D3D12_RESOURCE_STATES m_ssaoState = D3D12_RESOURCE_STATE_COMMON;
 
     // Bloom textures (quarter resolution ping-pong)
     ComPtr<ID3D12Resource> m_bloomTexA;
@@ -289,6 +315,19 @@ private:
     std::shared_ptr<DX12Texture> m_placeholderNormal;
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
+
+    // Environment maps for image-based lighting
+    struct EnvironmentMaps {
+        std::string name;                                  // display name
+        std::shared_ptr<DX12Texture> diffuseIrradiance;    // low-frequency env for diffuse
+        std::shared_ptr<DX12Texture> specularPrefiltered;  // mip-chain env for specular
+    };
+
+    std::vector<EnvironmentMaps> m_environmentMaps;
+    size_t m_currentEnvironment = 0;
+    float m_iblDiffuseIntensity = 1.0f;
+    float m_iblSpecularIntensity = 1.0f;
+    bool m_iblEnabled = true;
 
     // Lighting state
     glm::vec3 m_directionalLightDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)); // direction from surface to light
@@ -331,6 +370,16 @@ private:
     float m_fractalGain = 0.5f;
     float m_fractalWarpStrength = 0.0f;
     float m_fractalNoiseType = 0.0f;
+
+    // Simple warm/cool grading applied in post-process
+    float m_colorGradeWarm = 0.0f;
+    float m_colorGradeCool = 0.0f;
+
+    // Screen-space ambient occlusion parameters
+    bool  m_ssaoEnabled = true;
+    float m_ssaoRadius = 0.5f;
+    float m_ssaoBias = 0.025f;
+    float m_ssaoIntensity = 1.0f;
 
     // Frame state
     float m_totalTime = 0.0f;

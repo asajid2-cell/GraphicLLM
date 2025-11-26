@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build:*)",
+      "Bash(\"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\Tools\\VsDevCmd.bat\")",
+      "Bash(cmake:*)",
+      "Bash(cmd /c '\"\"\"\"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\"\"\"\" x64 && cmake -B build -DCMAKE_BUILD_TYPE=Release')",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1)",
+      "Bash(cat:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File full-build.ps1)",
+      "Bash(cmd /c 'rmdir /s /q build 2>nul & mkdir build & set \"\"\"\"PATH=C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja;%PATH%\"\"\"\" & \"\"\"\"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\"\"\"\" >nul 2>&1 & cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja')",
+      "Bash(powershell -Command:*)",
+      "Bash(nvidia-smi)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -143,9 +143,12 @@ LLMService::~LLMService() {
 Result<void> LLMService::Initialize(const LLMConfig& config) {
     m_config = config;
 
-    // Initialize llama.cpp backend
-    llama_backend_init();
-    llama_log_set(LlamaLogCallback, nullptr);
+    // Initialize llama.cpp backend once per service lifetime
+    if (!m_backendInitialized) {
+        llama_backend_init();
+        llama_log_set(LlamaLogCallback, nullptr);
+        m_backendInitialized = true;
+    }
 
     // If no model specified, use mock mode
     if (config.modelPath.empty()) {
@@ -218,7 +221,11 @@ void LLMService::Shutdown() {
         m_workerThread.join();
     }
 
-    llama_backend_free();
+    if (m_backendInitialized) {
+        llama_backend_free();
+        m_backendInitialized = false;
+    }
+
     spdlog::info("LLM Service shut down");
 }
 
@@ -296,15 +303,7 @@ void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMC
     LLMResponse response;
     response.success = false;
     bool finished = false;
-    spdlog::info("LLM[{}]: start (chars={})", threadId, fullPrompt.size());
-    if (m_shuttingDown.load()) {
-        response.text = "Error: shutting down";
-        {
-            std::lock_guard<std::mutex> lock(m_callbackMutex);
-            m_pendingCallbacks.emplace(callback, response);
-        }
-        return;
-    }
+
     auto finish = [this, &finished]() {
         if (!finished) {
             m_isBusy = false;
@@ -313,6 +312,17 @@ void LLMService::ProcessJob(std::string userPrompt, std::string fullPrompt, LLMC
             finished = true;
         }
     };
+
+    spdlog::info("LLM[{}]: start (chars={})", threadId, fullPrompt.size());
+    if (m_shuttingDown.load()) {
+        response.text = "Error: shutting down";
+        {
+            std::lock_guard<std::mutex> lock(m_callbackMutex);
+            m_pendingCallbacks.emplace(callback, response);
+        }
+        finish();
+        return;
+    }
 
     llama_batch prompt_batch{}; // for cleanup on exception
     spdlog::debug("LLM[{}]: pre-tokenize", threadId);

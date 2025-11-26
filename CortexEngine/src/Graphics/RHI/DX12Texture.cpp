@@ -484,9 +484,28 @@ Result<void> DX12Texture::UploadTextureData(
     ID3D12CommandList* commandLists[] = { commandList.Get() };
     commandQueue->ExecuteCommandLists(1, commandLists);
 
-    // Wait for upload to complete
-    // In a real engine, we'd use a fence here, but for simplicity we'll use the command queue's fence
-    // (This is inefficient but works for the prototype)
+    // Ensure the GPU has finished using the upload buffer before we return and let it go out of scope.
+    // This prevents use-after-free on the GPU when hot-swapping textures.
+    ComPtr<ID3D12Fence> fence;
+    HRESULT hrFence = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+    if (FAILED(hrFence)) {
+        return Result<void>::Err("Failed to create fence for texture upload");
+    }
+
+    const uint64_t fenceValue = 1;
+    hrFence = commandQueue->Signal(fence.Get(), fenceValue);
+    if (FAILED(hrFence)) {
+        return Result<void>::Err("Failed to signal fence for texture upload");
+    }
+
+    HANDLE evt = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    if (!evt) {
+        return Result<void>::Err("Failed to create upload completion event");
+    }
+
+    fence->SetEventOnCompletion(fenceValue, evt);
+    WaitForSingleObject(evt, INFINITE);
+    CloseHandle(evt);
 
     return Result<void>::Ok();
 }

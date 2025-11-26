@@ -81,6 +81,24 @@ struct RotationComponent {
     float speed = 1.0f;  // Radians per second
 };
 
+// Light types for forward lighting
+enum class LightType : uint32_t {
+    Directional = 0,
+    Point       = 1,
+    Spot        = 2
+};
+
+// Light Component - Forward lighting sources
+struct LightComponent {
+    LightType type = LightType::Point;
+    glm::vec3 color = glm::vec3(1.0f);
+    float intensity = 5.0f;
+    float range = 10.0f;          // For point/spot
+    float innerConeDegrees = 20.0f; // For spot (ignored for others)
+    float outerConeDegrees = 30.0f; // For spot
+    bool castsShadows = false;    // Reserved for future shadowed lights
+};
+
 // Camera Component
 struct CameraComponent {
     float fov = 60.0f;  // Field of view in degrees

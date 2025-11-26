@@ -14,6 +14,9 @@ enum class CommandType {
     ModifyTransform,
     ModifyMaterial,
     ModifyCamera,
+    AddLight,
+    ModifyLight,
+    ModifyRenderer,
     Unknown
 };
 
@@ -88,6 +91,72 @@ struct ModifyCameraCommand : public SceneCommand {
     float fov = 45.0f;
 
     ModifyCameraCommand() { type = CommandType::ModifyCamera; }
+    std::string ToString() const override;
+};
+
+// Add a new light to the scene
+struct AddLightCommand : public SceneCommand {
+    enum class LightType { Directional, Point, Spot };
+
+    LightType lightType = LightType::Point;
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f); // for dir/spot
+    glm::vec3 color = glm::vec3(1.0f);
+    float intensity = 5.0f;
+    float range = 10.0f;
+    float innerConeDegrees = 20.0f;
+    float outerConeDegrees = 30.0f;
+    bool castsShadows = false;
+    std::string name;
+
+    AddLightCommand() { type = CommandType::AddLight; }
+    std::string ToString() const override;
+};
+
+// Modify an existing light
+struct ModifyLightCommand : public SceneCommand {
+    std::string targetName;
+    bool setPosition = false;
+    bool setDirection = false;
+    bool setColor = false;
+    bool setIntensity = false;
+    bool setRange = false;
+    bool setInnerCone = false;
+    bool setOuterCone = false;
+    bool setType = false;
+    bool setCastsShadows = false;
+
+    glm::vec3 position{0.0f};
+    glm::vec3 direction{0.0f, -1.0f, 0.0f};
+    glm::vec3 color{1.0f};
+    float intensity = 5.0f;
+    float range = 10.0f;
+    float innerConeDegrees = 20.0f;
+    float outerConeDegrees = 30.0f;
+    AddLightCommand::LightType lightType = AddLightCommand::LightType::Point;
+    bool castsShadows = false;
+
+    ModifyLightCommand() { type = CommandType::ModifyLight; }
+    std::string ToString() const override;
+};
+
+// Modify global renderer settings (exposure, shadows, cascades)
+struct ModifyRendererCommand : public SceneCommand {
+    bool setExposure = false;
+    bool setShadowsEnabled = false;
+    bool setDebugMode = false;
+    bool setShadowBias = false;
+    bool setShadowPCFRadius = false;
+    bool setCascadeSplitLambda = false;
+
+    float exposure = 1.0f;
+    bool shadowsEnabled = true;
+    int debugMode = 0;
+    float shadowBias = 0.0005f;
+    float shadowPCFRadius = 1.5f;
+    float cascadeSplitLambda = 0.5f;
+
+    ModifyRendererCommand() { type = CommandType::ModifyRenderer; }
     std::string ToString() const override;
 };
 

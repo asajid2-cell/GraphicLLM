@@ -30,15 +30,44 @@ struct ObjectConstants {
     glm::mat4 normalMatrix;  // For lighting calculations
 };
 
+// Light data for forward lighting
+struct Light {
+    // xyz: position (for point/spot), w: type (0 = directional, 1 = point, 2 = spot)
+    glm::vec4 position_type;
+    // xyz: direction (for dir/spot, normalized), w: inner cone cos (spot)
+    glm::vec4 direction_cosInner;
+    // rgb: color * intensity, w: range (for point/spot)
+    glm::vec4 color_range;
+    // x: outer cone cos (spot), y: shadow index (if used), z,w: reserved
+    glm::vec4 params;
+};
+
+// Shadow-only constants (for cascaded rendering)
+struct ShadowConstants {
+    glm::uvec4 cascadeIndex;
+};
+
 // Per-frame constant buffer (changes per frame)
 struct FrameConstants {
     glm::mat4 viewMatrix;
     glm::mat4 projectionMatrix;
     glm::mat4 viewProjectionMatrix;
     glm::vec4 cameraPosition;
-    float time;
-    float deltaTime;
-    float _padding[2];  // Pad to 16-byte boundary
+    // x = time, y = deltaTime, z = exposure, w = unused
+    glm::vec4 timeAndExposure;
+    // rgb: ambient color * intensity, w unused
+    glm::vec4 ambientColor;
+    // Forward light list (currently up to 4 lights; light[0] is the sun)
+    alignas(16) glm::uvec4 lightCount;
+    alignas(16) Light lights[4];
+    // Cascaded directional light view-projection matrices (we use first 3)
+    alignas(16) glm::mat4 lightViewProjection[4];
+    // x,y,z = cascade split depths in view space, w = far plane
+    glm::vec4 cascadeSplits;
+    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w unused
+    glm::vec4 shadowParams;
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index), others reserved
+    glm::vec4 debugMode;
 };
 
 // Material properties

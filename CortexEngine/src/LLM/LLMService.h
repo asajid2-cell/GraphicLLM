@@ -70,6 +70,7 @@ private:
     void* m_model = nullptr;      // llama_model*
     void* m_context = nullptr;    // llama_context*
     LLMConfig m_config;
+    bool m_backendInitialized = false;
     std::atomic<bool> m_isBusy{false};
     std::atomic<int> m_activeJobs{0};
     std::atomic<bool> m_shuttingDown{false};

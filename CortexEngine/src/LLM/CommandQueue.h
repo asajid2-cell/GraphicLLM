@@ -2,13 +2,18 @@
 
 #include "SceneCommands.h"
 #include "Scene/ECS_Registry.h"
-#include "Graphics/Renderer.h"
 #include "SceneLookup.h"
 #include <queue>
 #include <mutex>
 #include <memory>
 #include <optional>
 #include <unordered_map>
+
+namespace Cortex {
+    namespace Graphics {
+        class Renderer;
+    }
+}
 
 namespace Cortex::LLM {
 
@@ -69,6 +74,9 @@ private:
     void ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteModifyCamera(ModifyCameraCommand* cmd, Scene::ECS_Registry* registry);
+    void ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* registry);
+    void ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Registry* registry);
+    void ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer);
 
     // Shared mesh cache so repeated shapes reuse GPU buffers
     std::unordered_map<AddEntityCommand::EntityType, std::shared_ptr<Scene::MeshData>> m_meshCache;

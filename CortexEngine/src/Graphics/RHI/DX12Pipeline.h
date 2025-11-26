@@ -15,6 +15,9 @@ struct ShaderBytecode {
     std::vector<uint8_t> data;
 
     D3D12_SHADER_BYTECODE GetBytecode() const {
+        if (data.empty()) {
+            return { nullptr, 0 };
+        }
         return { data.data(), data.size() };
     }
 };
@@ -30,6 +33,7 @@ struct PipelineDesc {
     // Render target formats
     DXGI_FORMAT rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    UINT numRenderTargets = 1;
 
     // Rasterizer state
     D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_NONE; // draw both sides to avoid accidental culling
@@ -81,7 +85,7 @@ public:
     DX12RootSignature& operator=(DX12RootSignature&&) = default;
 
     // Create a simple root signature for our basic shader
-    // Layout: [CBV b0, CBV b1, CBV b2, DescriptorTable(SRV t0), StaticSampler s0]
+    // Layout: [CBV b0, CBV b1, CBV b2, DescriptorTable(SRV t0-t3), DescriptorTable(SRV t4), CBV b3, StaticSampler s0]
     Result<void> Initialize(ID3D12Device* device);
 
     [[nodiscard]] ID3D12RootSignature* GetRootSignature() const { return m_rootSignature.Get(); }

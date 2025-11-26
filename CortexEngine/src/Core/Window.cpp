@@ -18,7 +18,7 @@ Result<void> Window::Initialize(const WindowConfig& config, Graphics::DX12Device
     m_height = config.height;
     m_vsync = config.vsync;
 
-    // Initialize SDL
+    // Initialize SDL (SDL3: SDL_Init returns bool: true on success, false on failure)
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         return Result<void>::Err("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }

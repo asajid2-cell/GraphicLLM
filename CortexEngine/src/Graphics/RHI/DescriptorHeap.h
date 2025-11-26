@@ -48,6 +48,10 @@ public:
     // Reset allocation (for ring buffer behavior)
     void Reset();
 
+    // Reset allocation starting from a specific offset (used when reserving
+    // a prefix of persistent descriptors and reusing the rest per frame)
+    void ResetFrom(uint32_t offset);
+
     // Get descriptor at specific index
     [[nodiscard]] DescriptorHandle GetHandle(uint32_t index) const;
 
@@ -91,6 +95,9 @@ public:
         return m_cbvSrvUavHeap.GetCapacity();
     }
 
+    // Allocate transient descriptors (per-frame ring buffer region)
+    Result<DescriptorHandle> AllocateTransientCBV_SRV_UAV();
+
     // Reset allocations (for per-frame ring buffer)
     void ResetFrameHeaps();
 
@@ -102,6 +109,11 @@ private:
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
     DescriptorHeap m_cbvSrvUavHeap;
+
+    // Number of CBV/SRV/UAV descriptors reserved for persistent resources
+    // (textures, shadow maps, HDR targets, etc.). Transient allocations start
+    // after this index and are reset every frame.
+    uint32_t m_cbvSrvUavPersistentCount = 0;
 };
 
 } // namespace Cortex::Graphics

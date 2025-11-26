@@ -70,6 +70,7 @@ set(CORTEX_SOURCES
 
     # UI helpers
     src/UI/TextPrompt.cpp
+    src/UI/DebugMenu.cpp
 )
 
 set(CORTEX_HEADERS
@@ -104,6 +105,7 @@ set(CORTEX_HEADERS
 
     # UI helpers
     src/UI/TextPrompt.h
+    src/UI/DebugMenu.h
 )
 
 # Executable

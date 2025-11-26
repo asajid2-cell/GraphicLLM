@@ -73,6 +73,13 @@ void DescriptorHeap::Reset() {
     m_currentOffset = 0;
 }
 
+void DescriptorHeap::ResetFrom(uint32_t offset) {
+    if (offset > m_numDescriptors) {
+        offset = m_numDescriptors;
+    }
+    m_currentOffset = offset;
+}
+
 DescriptorHandle DescriptorHeap::GetHandle(uint32_t index) const {
     if (index >= m_numDescriptors) {
         return {}; // Invalid handle
@@ -124,13 +131,28 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateDSV() {
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
+    auto result = m_cbvSrvUavHeap.Allocate();
+    if (result.IsErr()) {
+        return result;
+    }
+
+    auto handle = result.Value();
+    if (handle.index + 1 > m_cbvSrvUavPersistentCount) {
+        m_cbvSrvUavPersistentCount = handle.index + 1;
+    }
+
+    return Result<DescriptorHandle>::Ok(handle);
+}
+
+Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
     return m_cbvSrvUavHeap.Allocate();
 }
 
 void DescriptorHeapManager::ResetFrameHeaps() {
-    // Only reset the shader-visible heap per frame (ring buffer behavior)
-    // RTV and DSV heaps are persistent
-    m_cbvSrvUavHeap.Reset();
+    // Only reset the transient region of the shader-visible heap each frame.
+    // Persistent descriptors (textures, shadow maps, HDR targets, etc.) live
+    // in [0, m_cbvSrvUavPersistentCount) and are never overwritten.
+    m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentCount);
 }
 
 } // namespace Cortex::Graphics

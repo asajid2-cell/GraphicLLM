@@ -75,15 +75,28 @@ std::string ModifyCameraCommand::ToString() const {
     return "ModifyCamera";
 }
 
+std::string AddLightCommand::ToString() const {
+    return "AddLight: " + name + " at (" +
+           std::to_string(position.x) + ", " +
+           std::to_string(position.y) + ", " +
+           std::to_string(position.z) + ")";
+}
+
+std::string ModifyLightCommand::ToString() const {
+    return "ModifyLight: " + targetName;
+}
+
+std::string ModifyRendererCommand::ToString() const {
+    return "ModifyRenderer";
+}
+
 std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
 
-    try {
-        auto j = json::parse(jsonStr);
-
+    auto parseFromJson = [&](const json& j) {
         if (!j.contains("commands") || !j["commands"].is_array()) {
             spdlog::error("Invalid JSON: missing 'commands' array");
-            return commands;
+            return;
         }
 
         for (const auto& cmdJson : j["commands"]) {
@@ -187,12 +200,189 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
 
                 commands.push_back(cmd);
             }
-        }
+            else if (type == "modify_light") {
+                auto cmd = std::make_shared<ModifyLightCommand>();
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
+                    cmd->targetName = cmdJson["target"];
+                }
 
+                if (cmdJson.contains("position")) {
+                    cmd->setPosition = ReadVec3(cmdJson["position"], "position", cmd->position);
+                }
+                if (cmdJson.contains("direction")) {
+                    cmd->setDirection = ReadVec3(cmdJson["direction"], "direction", cmd->direction);
+                }
+                if (cmdJson.contains("color")) {
+                    glm::vec4 color4;
+                    if (ReadVec4(cmdJson["color"], "color", color4)) {
+                        cmd->setColor = true;
+                        cmd->color = glm::vec3(color4);
+                    }
+                }
+                if (cmdJson.contains("intensity")) {
+                    cmd->setIntensity = true;
+                    cmd->intensity = std::max(ReadNumber(cmdJson["intensity"], "intensity", 5.0f), 0.0f);
+                }
+                if (cmdJson.contains("range")) {
+                    cmd->setRange = true;
+                    cmd->range = std::max(ReadNumber(cmdJson["range"], "range", 10.0f), 0.0f);
+                }
+                if (cmdJson.contains("inner_cone")) {
+                    cmd->setInnerCone = true;
+                    cmd->innerConeDegrees = ReadNumber(cmdJson["inner_cone"], "inner_cone", 20.0f);
+                }
+                if (cmdJson.contains("outer_cone")) {
+                    cmd->setOuterCone = true;
+                    cmd->outerConeDegrees = ReadNumber(cmdJson["outer_cone"], "outer_cone", 30.0f);
+                }
+                if (cmdJson.contains("light_type") && cmdJson["light_type"].is_string()) {
+                    std::string lt = cmdJson["light_type"];
+                    cmd->setType = true;
+                    if (lt == "directional") cmd->lightType = AddLightCommand::LightType::Directional;
+                    else if (lt == "spot")   cmd->lightType = AddLightCommand::LightType::Spot;
+                    else                     cmd->lightType = AddLightCommand::LightType::Point;
+                }
+                if (cmdJson.contains("casts_shadows") && cmdJson["casts_shadows"].is_boolean()) {
+                    cmd->setCastsShadows = true;
+                    cmd->castsShadows = cmdJson["casts_shadows"];
+                }
+
+                commands.push_back(cmd);
+            }
+            else if (type == "modify_renderer") {
+                auto cmd = std::make_shared<ModifyRendererCommand>();
+
+                if (cmdJson.contains("exposure")) {
+                    cmd->setExposure = true;
+                    cmd->exposure = std::max(ReadNumber(cmdJson["exposure"], "exposure", 1.0f), 0.01f);
+                }
+                if (cmdJson.contains("shadows") && cmdJson["shadows"].is_boolean()) {
+                    cmd->setShadowsEnabled = true;
+                    cmd->shadowsEnabled = cmdJson["shadows"];
+                }
+                if (cmdJson.contains("debug_mode")) {
+                    cmd->setDebugMode = true;
+                    float v = ReadNumber(cmdJson["debug_mode"], "debug_mode", 0.0f);
+                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 5.0f)));
+                }
+                if (cmdJson.contains("shadow_bias")) {
+                    cmd->setShadowBias = true;
+                    float v = ReadNumber(cmdJson["shadow_bias"], "shadow_bias", 0.0005f);
+                    cmd->shadowBias = std::clamp(v, 0.00001f, 0.01f);
+                }
+                if (cmdJson.contains("shadow_pcf_radius")) {
+                    cmd->setShadowPCFRadius = true;
+                    float v = ReadNumber(cmdJson["shadow_pcf_radius"], "shadow_pcf_radius", 1.5f);
+                    cmd->shadowPCFRadius = std::clamp(v, 0.5f, 8.0f);
+                }
+                if (cmdJson.contains("cascade_lambda")) {
+                    cmd->setCascadeSplitLambda = true;
+                    float v = ReadNumber(cmdJson["cascade_lambda"], "cascade_lambda", 0.5f);
+                    cmd->cascadeSplitLambda = std::clamp(v, 0.0f, 1.0f);
+                }
+
+                commands.push_back(cmd);
+            }
+            else if (type == "add_light") {
+                auto cmd = std::make_shared<AddLightCommand>();
+
+                if (cmdJson.contains("light_type") && cmdJson["light_type"].is_string()) {
+                    std::string lt = cmdJson["light_type"];
+                    if (lt == "directional") cmd->lightType = AddLightCommand::LightType::Directional;
+                    else if (lt == "spot")   cmd->lightType = AddLightCommand::LightType::Spot;
+                    else                     cmd->lightType = AddLightCommand::LightType::Point;
+                }
+
+                if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                    cmd->name = cmdJson["name"];
+                }
+
+                if (cmdJson.contains("position")) {
+                    ReadVec3(cmdJson["position"], "position", cmd->position);
+                }
+                if (cmdJson.contains("direction")) {
+                    ReadVec3(cmdJson["direction"], "direction", cmd->direction);
+                }
+                if (cmdJson.contains("color")) {
+                    glm::vec4 color4;
+                    if (ReadVec4(cmdJson["color"], "color", color4)) {
+                        cmd->color = glm::vec3(color4);
+                    }
+                }
+                if (cmdJson.contains("intensity")) {
+                    cmd->intensity = std::max(ReadNumber(cmdJson["intensity"], "intensity", 5.0f), 0.0f);
+                }
+                if (cmdJson.contains("range")) {
+                    cmd->range = std::max(ReadNumber(cmdJson["range"], "range", 10.0f), 0.0f);
+                }
+                if (cmdJson.contains("inner_cone")) {
+                    cmd->innerConeDegrees = ReadNumber(cmdJson["inner_cone"], "inner_cone", 20.0f);
+                }
+                if (cmdJson.contains("outer_cone")) {
+                    cmd->outerConeDegrees = ReadNumber(cmdJson["outer_cone"], "outer_cone", 30.0f);
+                }
+                if (cmdJson.contains("casts_shadows") && cmdJson["casts_shadows"].is_boolean()) {
+                    cmd->castsShadows = cmdJson["casts_shadows"];
+                }
+
+                commands.push_back(cmd);
+            }
+        }
+    };
+
+    try {
+        auto j = json::parse(jsonStr);
+        parseFromJson(j);
         spdlog::info("Parsed {} commands from JSON", commands.size());
     }
     catch (const json::exception& e) {
         spdlog::error("JSON parsing error: {}", e.what());
+
+        // Heuristic salvage for truncated or slightly malformed JSON coming from the LLM.
+        // Common failure: missing closing ]}] at the end of the commands array.
+        try {
+            std::string fixed = jsonStr;
+
+            // Trim trailing whitespace
+            auto lastNonWs = fixed.find_last_not_of(" \t\r\n");
+            if (lastNonWs != std::string::npos) {
+                fixed.resize(lastNonWs + 1);
+            }
+
+            bool attemptedFix = false;
+
+            auto commandsPos = fixed.find("\"commands\"");
+            if (commandsPos != std::string::npos) {
+                auto arrayStart = fixed.find('[', commandsPos);
+                if (arrayStart != std::string::npos) {
+                    auto arrayEnd = fixed.find(']', arrayStart);
+                    if (arrayEnd == std::string::npos) {
+                        // No closing ']' for the commands array – likely truncated after the last object.
+                        // Most robust salvage: assume we ended after a complete object and append "]}".
+                        fixed.append("]}");
+                        attemptedFix = true;
+                    } else {
+                        // There is a closing ']', but maybe the root object '}' is missing.
+                        auto last = fixed.find_last_not_of(" \t\r\n");
+                        if (last != std::string::npos && fixed[last] != '}') {
+                            fixed.push_back('}');
+                            attemptedFix = true;
+                        }
+                    }
+                }
+            }
+
+            if (attemptedFix) {
+                spdlog::warn("Attempting JSON salvage on LLM response");
+                auto jFixed = json::parse(fixed);
+                commands.clear();
+                parseFromJson(jFixed);
+                spdlog::info("Parsed {} commands from salvaged JSON", commands.size());
+            }
+        }
+        catch (const json::exception& e2) {
+            spdlog::error("JSON salvage parse failed: {}", e2.what());
+        }
     }
 
     return commands;

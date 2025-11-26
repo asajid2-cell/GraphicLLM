@@ -4,6 +4,7 @@
 #include "Utils/MeshGenerator.h"
 #include "LLM/SceneCommands.h"
 #include "UI/TextPrompt.h"
+#include "UI/DebugMenu.h"
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -54,6 +55,26 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
     // Initialize scene
     InitializeScene();
+    InitializeCameraController();
+    ShowCameraHelpOverlay();
+
+    // Initialize debug menu with current renderer/camera parameters
+    if (m_renderer) {
+        UI::DebugMenuState dbg{};
+        dbg.exposure = m_renderer->GetExposure();
+        dbg.shadowBias = m_renderer->GetShadowBias();
+        dbg.shadowPCFRadius = m_renderer->GetShadowPCFRadius();
+        dbg.cascadeLambda = m_renderer->GetCascadeSplitLambda();
+        dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
+        dbg.bloomIntensity = m_renderer->GetBloomIntensity();
+        dbg.cameraBaseSpeed = m_cameraBaseSpeed;
+        UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
+    }
+
+    // Apply camera config
+    m_cameraBaseSpeed = config.cameraBaseSpeed;
+    m_cameraSprintMultiplier = config.cameraSprintMultiplier;
+    m_mouseSensitivity = config.mouseSensitivity;
 
     // Phase 2: Initialize The Architect (LLM)
     if (config.enableLLM) {
@@ -81,12 +102,45 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     return Result<void>::Ok();
 }
 
-void Engine::Shutdown() {
-    if (!m_running) {
+void Engine::ShowCameraHelpOverlay() {
+    if (m_cameraHelpShown || !m_window) {
         return;
     }
 
+    const char* message =
+        "Camera controls:\n"
+        "\n"
+        "  Right mouse button  - Enable mouse look\n"
+        "  Move mouse          - Look around\n"
+        "  W / A / S / D       - Move forward / left / back / right\n"
+        "  Q / E               - Move down / up\n"
+        "  Shift (hold)        - Sprint (faster movement)\n"
+        "  F1                  - Reset camera to default\n"
+        "\n"
+        "Lighting & shadows debug:\n"
+        "  F3                  - Toggle shadows\n"
+        "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades)\n"
+        "  F5 / F6             - Decrease / increase shadow PCF radius\n"
+        "  F7 / F8             - Decrease / increase shadow bias\n"
+        "  F9 / F10            - Adjust cascade split lambda\n"
+        "  F11 / F12           - Adjust near cascade resolution scale\n"
+        "\n"
+        "Press OK to continue. Press F2 later to show this help again.";
+
+    SDL_ShowSimpleMessageBox(
+        SDL_MESSAGEBOX_INFORMATION,
+        "Camera & Shadow Controls",
+        message,
+        m_window->GetSDLWindow());
+
+    m_cameraHelpShown = true;
+}
+
+void Engine::Shutdown() {
+    // Make shutdown idempotent and safe even if initialization failed early.
     m_running = false;
+
+    UI::DebugMenu::Shutdown();
 
     // Phase 2: Shutdown LLM
     if (m_llmService) {
@@ -196,6 +250,86 @@ void Engine::ProcessInput() {
                         spdlog::info("Text input cancelled");
                     }
                 }
+                else if (event.key.key == SDLK_F1) {
+                    // Reset camera to default position/orientation
+                    InitializeCameraController();
+                    spdlog::info("Camera reset to default");
+                }
+                else if (event.key.key == SDLK_F2) {
+                    // Toggle debug slider menu
+                    UI::DebugMenu::Toggle();
+                }
+                else if (event.key.key == SDLK_F5) {
+                    if (m_renderer) {
+                        m_renderer->AdjustShadowPCFRadius(-0.5f);
+                    }
+                }
+                else if (event.key.key == SDLK_F6) {
+                    if (m_renderer) {
+                        m_renderer->AdjustShadowPCFRadius(0.5f);
+                    }
+                }
+                else if (event.key.key == SDLK_F7) {
+                    if (m_renderer) {
+                        m_renderer->AdjustShadowBias(-0.0002f);
+                    }
+                }
+                else if (event.key.key == SDLK_F8) {
+                    if (m_renderer) {
+                        m_renderer->AdjustShadowBias(0.0002f);
+                    }
+                }
+                else if (event.key.key == SDLK_F9) {
+                    if (m_renderer) {
+                        m_renderer->AdjustCascadeSplitLambda(-0.05f);
+                    }
+                }
+                else if (event.key.key == SDLK_F10) {
+                    if (m_renderer) {
+                        m_renderer->AdjustCascadeSplitLambda(0.05f);
+                    }
+                }
+                else if (event.key.key == SDLK_F11) {
+                    if (m_renderer) {
+                        m_renderer->AdjustCascadeResolutionScale(0, -0.1f);
+                    }
+                }
+                else if (event.key.key == SDLK_F12) {
+                    if (m_renderer) {
+                        m_renderer->AdjustCascadeResolutionScale(0, 0.1f);
+                    }
+                }
+                else if (event.key.key == SDLK_F3) {
+                    if (m_renderer) {
+                        m_renderer->ToggleShadows();
+                    }
+                }
+                else if (event.key.key == SDLK_F4) {
+                    if (m_renderer) {
+                        m_renderer->CycleDebugViewMode();
+                    }
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                    m_cameraControlActive = true;
+                    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_UP:
+                if (event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                    m_cameraControlActive = false;
+                    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_MOTION:
+                if (m_cameraControlActive) {
+                    m_pendingMouseDeltaX += static_cast<float>(event.motion.xrel);
+                    m_pendingMouseDeltaY += static_cast<float>(event.motion.yrel);
+                }
                 break;
 
             case SDL_EVENT_WINDOW_RESIZED:
@@ -228,6 +362,21 @@ void Engine::Update(float deltaTime) {
             }
         }
     }
+
+    // Apply debug menu slider values to renderer/camera
+    if (m_renderer) {
+        UI::DebugMenuState dbg = UI::DebugMenu::GetState();
+        m_cameraBaseSpeed = dbg.cameraBaseSpeed;
+        m_renderer->SetExposure(dbg.exposure);
+        m_renderer->SetShadowBias(dbg.shadowBias);
+        m_renderer->SetShadowPCFRadius(dbg.shadowPCFRadius);
+        m_renderer->SetCascadeSplitLambda(dbg.cascadeLambda);
+        m_renderer->AdjustCascadeResolutionScale(0, dbg.cascade0ResolutionScale - m_renderer->GetCascadeResolutionScale(0));
+        m_renderer->SetBloomIntensity(dbg.bloomIntensity);
+    }
+
+    // Update active camera (fly controls)
+    UpdateCameraController(deltaTime);
 
     // Update all rotation components (spinning cube)
     auto view = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
@@ -298,11 +447,26 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
     };
 
     auto parseCount = [&]() -> int {
-        // Cap to avoid flooding
-        const int maxCount = 5;
-        for (int digit = 5; digit >= 2; --digit) {
+        // Cap to avoid flooding the scene, but allow reasonably large counts.
+        const int maxCount = 20;
+        for (int digit = maxCount; digit >= 2; --digit) {
             if (lower.find(std::to_string(digit)) != std::string::npos) return std::min(digit, maxCount);
         }
+        if (contains("twenty")) return 20;
+        if (contains("nineteen")) return 19;
+        if (contains("eighteen")) return 18;
+        if (contains("seventeen")) return 17;
+        if (contains("sixteen")) return 16;
+        if (contains("fifteen")) return 15;
+        if (contains("fourteen")) return 14;
+        if (contains("thirteen")) return 13;
+        if (contains("twelve")) return 12;
+        if (contains("eleven")) return 11;
+        if (contains("ten")) return 10;
+        if (contains("nine")) return 9;
+        if (contains("eight")) return 8;
+        if (contains("seven")) return 7;
+        if (contains("six")) return 6;
         if (contains("five")) return 5;
         if (contains("four")) return 4;
         if (contains("three")) return 3;
@@ -350,6 +514,125 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         out.push_back(cmd);
     }
     return out;
+}
+
+void Engine::InitializeCameraController() {
+    if (!m_registry) {
+        return;
+    }
+
+    m_activeCameraEntity = entt::null;
+    m_cameraControllerInitialized = false;
+    m_cameraControlActive = false;
+    m_pendingMouseDeltaX = 0.0f;
+    m_pendingMouseDeltaY = 0.0f;
+
+    // Find active camera
+    auto cameraView = m_registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+    for (auto entity : cameraView) {
+        auto& camera = cameraView.get<Scene::CameraComponent>(entity);
+        if (camera.isActive) {
+            m_activeCameraEntity = entity;
+            break;
+        }
+    }
+
+    if (m_activeCameraEntity == entt::null) {
+        spdlog::warn("InitializeCameraController: no active camera found");
+        return;
+    }
+
+    auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+    // Reset to default position/orientation matching InitializeScene
+    transform.position = glm::vec3(0.0f, 1.5f, -6.0f);
+    glm::vec3 target(0.0f, 0.0f, 0.0f);
+    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    glm::vec3 forward = glm::normalize(target - transform.position);
+    transform.rotation = glm::quatLookAt(forward, up);
+
+    // Derive yaw/pitch from forward vector (LH, +Z forward)
+    forward = glm::normalize(forward);
+    m_cameraYaw = std::atan2(forward.x, forward.z);
+    m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+    float pitchLimit = glm::radians(89.0f);
+    m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+
+    m_cameraControllerInitialized = true;
+}
+
+void Engine::UpdateCameraController(float deltaTime) {
+    if (!m_cameraControllerInitialized || !m_registry) {
+        return;
+    }
+
+    if (m_activeCameraEntity == entt::null ||
+        !m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) ||
+        !m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        m_cameraControllerInitialized = false;
+        return;
+    }
+
+    auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+    // Apply mouse look deltas
+    if (m_cameraControlActive) {
+        float dx = m_pendingMouseDeltaX;
+        float dy = m_pendingMouseDeltaY;
+        m_pendingMouseDeltaX = 0.0f;
+        m_pendingMouseDeltaY = 0.0f;
+
+        m_cameraYaw   += dx * m_mouseSensitivity;
+        m_cameraPitch -= dy * m_mouseSensitivity;
+
+        float pitchLimit = glm::radians(89.0f);
+        m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+    } else {
+        m_pendingMouseDeltaX = 0.0f;
+        m_pendingMouseDeltaY = 0.0f;
+    }
+
+    // Build camera basis from yaw/pitch
+    float cosPitch = std::cos(m_cameraPitch);
+    glm::vec3 forward(
+        std::sin(m_cameraYaw) * cosPitch,
+        std::sin(m_cameraPitch),
+        std::cos(m_cameraYaw) * cosPitch
+    );
+    forward = glm::normalize(forward);
+
+    glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+
+    // Keyboard movement (WASD, QE) in camera-local axes
+    if (m_cameraControlActive) {
+        int numKeys = 0;
+        const bool* keys = SDL_GetKeyboardState(&numKeys);
+        auto keyDown = [&](SDL_Scancode scancode) {
+            return scancode >= 0 && scancode < numKeys && keys[scancode];
+        };
+
+        glm::vec3 move(0.0f);
+        if (keyDown(SDL_SCANCODE_W)) move += forward;
+        if (keyDown(SDL_SCANCODE_S)) move -= forward;
+        if (keyDown(SDL_SCANCODE_D)) move += right;
+        if (keyDown(SDL_SCANCODE_A)) move -= right;
+        if (keyDown(SDL_SCANCODE_E)) move += up;
+        if (keyDown(SDL_SCANCODE_Q)) move -= up;
+
+        if (glm::length(move) > 0.0f) {
+            float speed = m_cameraBaseSpeed;
+            if (keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT)) {
+                speed *= m_cameraSprintMultiplier;
+            }
+            move = glm::normalize(move) * speed * deltaTime;
+            transform.position += move;
+        }
+    }
+
+    // Update camera rotation from forward/up
+    transform.rotation = glm::quatLookAt(glm::normalize(forward), up);
 }
 
 void Engine::InitializeScene() {
@@ -427,6 +710,17 @@ void Engine::InitializeScene() {
     camera.fov = 55.0f;  // Slightly wider FOV for full scene framing
     camera.isActive = true;
 
+    // Add a simple point light above the origin for forward lighting tests
+    entt::entity lightEntity = m_registry->CreateEntity();
+    auto& lightTransform = m_registry->AddComponent<Scene::TransformComponent>(lightEntity);
+    lightTransform.position = glm::vec3(0.0f, 4.0f, -2.0f);
+    auto& lightComp = m_registry->AddComponent<Scene::LightComponent>(lightEntity);
+    lightComp.type = Scene::LightType::Point;
+    lightComp.color = glm::vec3(1.0f, 0.95f, 0.8f);
+    lightComp.intensity = 10.0f;
+    lightComp.range = 15.0f;
+    lightComp.castsShadows = false;
+
     spdlog::info("Scene initialized:");
     spdlog::info("{}", m_registry->DescribeScene());
 }
@@ -452,6 +746,39 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
                 break;
             }
         }
+    }
+
+    // Append camera and renderer state for richer context
+    std::string extra;
+    if (m_registry) {
+        auto cameraView = m_registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+        for (auto entity : cameraView) {
+            auto& camera = cameraView.get<Scene::CameraComponent>(entity);
+            if (!camera.isActive) continue;
+            auto& transform = cameraView.get<Scene::TransformComponent>(entity);
+            std::ostringstream ss;
+            ss << "\nCamera: pos("
+               << std::round(transform.position.x * 10.0f) / 10.0f << ","
+               << std::round(transform.position.y * 10.0f) / 10.0f << ","
+               << std::round(transform.position.z * 10.0f) / 10.0f << "), "
+               << "fov=" << camera.fov;
+            extra += ss.str();
+            break;
+        }
+    }
+    if (m_renderer) {
+        std::ostringstream ss;
+        ss << "\nRenderer: "
+           << "exposure=" << m_renderer->GetExposure()
+           << ", shadows=" << (m_renderer->GetShadowsEnabled() ? "on" : "off")
+           << ", debug_mode=" << m_renderer->GetDebugViewMode()
+           << ", bias=" << m_renderer->GetShadowBias()
+           << ", pcf_radius=" << m_renderer->GetShadowPCFRadius()
+           << ", cascade_lambda=" << m_renderer->GetCascadeSplitLambda();
+        extra += ss.str();
+    }
+    if (!extra.empty()) {
+        sceneSummary += extra;
     }
 
     m_llmService->SubmitPrompt(command, sceneSummary, hasShowcase, [this, command](const LLM::LLMResponse& response) {

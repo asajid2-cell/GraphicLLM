@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 #include <cmath>
 #include <array>
+#include <limits>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
@@ -122,6 +123,20 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return depthResult;
     }
 
+    // Create directional light shadow map
+    auto shadowResult = CreateShadowMapResources();
+    if (shadowResult.IsErr()) {
+        spdlog::warn("Failed to create shadow map resources: {}", shadowResult.Error());
+        m_shadowsEnabled = false;
+    }
+
+    // Create HDR render target for main pass
+    auto hdrResult = CreateHDRTarget();
+    if (hdrResult.IsErr()) {
+        spdlog::warn("Failed to create HDR target: {}", hdrResult.Error());
+        m_hdrColor.Reset();
+    }
+
     // Create constant buffers
     auto cbResult = m_frameConstantBuffer.Initialize(device->GetDevice());
     if (cbResult.IsErr()) {
@@ -136,6 +151,11 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     cbResult = m_materialConstantBuffer.Initialize(device->GetDevice(), 1024);
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create material constant buffer: " + cbResult.Error());
+    }
+
+    cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice());
+    if (cbResult.IsErr()) {
+        return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
 
     // Compile shaders and create pipeline
@@ -169,11 +189,14 @@ void Renderer::Shutdown() {
     m_placeholderMetallic.reset();
     m_placeholderRoughness.reset();
     m_depthBuffer.Reset();
+    m_shadowMap.Reset();
+    m_hdrColor.Reset();
     m_commandList.Reset();
     for (auto& allocator : m_commandAllocators) {
         allocator.Reset();
     }
 
+    m_shadowPipeline.reset();
     m_pipeline.reset();
     m_rootSignature.reset();
     m_descriptorManager.reset();
@@ -187,6 +210,14 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     BeginFrame();
     UpdateFrameConstants(deltaTime, registry);
+
+    // First pass: render depth from directional light
+    if (m_shadowsEnabled && m_shadowMap && m_shadowPipeline) {
+        RenderShadowPass(registry);
+    }
+
+    // Main scene pass
+    PrepareMainPass();
 
     bool drewWithHyper = false;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -209,6 +240,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     if (!drewWithHyper) {
         RenderScene(registry);
     }
+
+    // Post-process HDR -> back buffer (or no-op if HDR disabled)
+    RenderPostProcess();
     EndFrame();
 }
 
@@ -219,6 +253,14 @@ void Renderer::BeginFrame() {
         auto depthResult = CreateDepthBuffer();
         if (depthResult.IsErr()) {
             spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
+        }
+    }
+    // Handle HDR target resize
+    if (m_hdrColor && (m_window->GetWidth() != m_hdrColor->GetDesc().Width || m_window->GetHeight() != m_hdrColor->GetDesc().Height)) {
+        m_hdrColor.Reset();
+        auto hdrResult = CreateHDRTarget();
+        if (hdrResult.IsErr()) {
+            spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
         }
     }
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
@@ -257,21 +299,38 @@ void Renderer::BeginFrame() {
 
     // Reset command allocator and list
     m_commandAllocators[m_frameIndex]->Reset();
-    m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pipeline->GetPipelineState());
+    m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+}
 
-    // Transition back buffer to render target state
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = m_window->GetCurrentBackBuffer();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-    m_commandList->ResourceBarrier(1, &barrier);
-
-    // Set render targets
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
+void Renderer::PrepareMainPass() {
+    // Main pass renders into HDR target when available, otherwise directly to back buffer
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = {};
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+
+    if (m_hdrColor) {
+        // Ensure HDR is in render target state
+        if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_hdrColor.Get();
+            barrier.Transition.StateBefore = m_hdrState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        }
+        rtv = m_hdrRTV.cpu;
+    } else {
+        // Fallback: render directly to back buffer
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_window->GetCurrentBackBuffer();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        rtv = m_window->GetCurrentRTV();
+    }
 
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
@@ -288,6 +347,8 @@ void Renderer::BeginFrame() {
     viewport.MaxDepth = 1.0f;
 
     D3D12_RECT scissorRect = {};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
     scissorRect.right = static_cast<LONG>(m_window->GetWidth());
     scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
 
@@ -330,6 +391,11 @@ void Renderer::EndFrame() {
 
 void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* registry) {
     FrameConstants frameData = {};
+    glm::vec3 cameraPos(0.0f);
+    glm::vec3 cameraForward(0.0f, 0.0f, 1.0f);
+    float camNear = 0.1f;
+    float camFar = 1000.0f;
+    float fovY = glm::radians(60.0f);
 
     // Find active camera
     auto cameraView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
@@ -344,7 +410,12 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             frameData.viewMatrix = camera.GetViewMatrix(transform);
             frameData.projectionMatrix = camera.GetProjectionMatrix(m_window->GetAspectRatio());
             frameData.viewProjectionMatrix = frameData.projectionMatrix * frameData.viewMatrix;
-            frameData.cameraPosition = glm::vec4(transform.position, 1.0f);
+            cameraPos = transform.position;
+            cameraForward = glm::normalize(transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
+            frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
+            camNear = camera.nearPlane;
+            camFar = camera.farPlane;
+            fovY = glm::radians(camera.fov);
             foundCamera = true;
             // Active camera found; skip per-frame debug spam to keep logs clean
             break;
@@ -354,25 +425,190 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     // Default camera if none found
     if (!foundCamera) {
         spdlog::warn("No active camera found, using default");
-        glm::vec3 cameraPos(0.0f, 2.0f, 5.0f);
+        cameraPos = glm::vec3(0.0f, 2.0f, 5.0f);
         glm::vec3 target(0.0f, 0.0f, 0.0f);
         glm::vec3 up(0.0f, 1.0f, 0.0f);
 
         frameData.viewMatrix = glm::lookAtLH(cameraPos, target, up);
         frameData.projectionMatrix = glm::perspectiveLH_ZO(
-            glm::radians(60.0f),
+            fovY,
             m_window->GetAspectRatio(),
-            0.1f,
-            1000.0f
+            camNear,
+            camFar
         );
         frameData.viewProjectionMatrix = frameData.projectionMatrix * frameData.viewMatrix;
+        cameraForward = glm::normalize(target - cameraPos);
         frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
     }
 
-    frameData.time = m_totalTime;
-    frameData.deltaTime = deltaTime;
+    // Time/exposure and lighting state (w = bloom intensity)
+    frameData.timeAndExposure = glm::vec4(m_totalTime, deltaTime, m_exposure, m_bloomIntensity);
 
-    m_frameConstantBuffer.UpdateData(frameData);
+    glm::vec3 ambient = m_ambientLightColor * m_ambientLightIntensity;
+    frameData.ambientColor = glm::vec4(ambient, 0.0f);
+
+    // Fill forward light array (light 0 = directional sun)
+    glm::vec3 dirToLight = glm::normalize(m_directionalLightDirection);
+    glm::vec3 sunColor = m_directionalLightColor * m_directionalLightIntensity;
+
+    uint32_t lightCount = 0;
+
+    // Light 0: directional sun
+    frameData.lightCount = glm::uvec4(0u);
+    frameData.lights[0].position_type = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f); // type 0 = directional
+    frameData.lights[0].direction_cosInner = glm::vec4(dirToLight, 0.0f);
+    frameData.lights[0].color_range = glm::vec4(sunColor, 0.0f);
+    frameData.lights[0].params = glm::vec4(0.0f);
+    lightCount = 1;
+
+    // Populate additional lights from LightComponent (point/spot)
+    auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
+    for (auto entity : lightView) {
+        if (lightCount >= 4) {
+            break;
+        }
+        auto& lightComp = lightView.get<Scene::LightComponent>(entity);
+        auto& lightXform = lightView.get<Scene::TransformComponent>(entity);
+
+        auto type = lightComp.type;
+        if (type == Scene::LightType::Directional) {
+            // Directional lights are handled by the global sun for now
+            continue;
+        }
+
+        glm::vec3 color = glm::max(lightComp.color, glm::vec3(0.0f));
+        float intensity = std::max(lightComp.intensity, 0.0f);
+        glm::vec3 radiance = color * intensity;
+
+        Light& outLight = frameData.lights[lightCount];
+        outLight.position_type = glm::vec4(lightXform.position, type == Scene::LightType::Point ? 1.0f : 2.0f);
+
+        glm::vec3 forwardLS = lightXform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        glm::vec3 dir = glm::normalize(forwardLS);
+        float innerRad = glm::radians(lightComp.innerConeDegrees);
+        float outerRad = glm::radians(lightComp.outerConeDegrees);
+        float cosInner = std::cos(innerRad);
+        float cosOuter = std::cos(outerRad);
+
+        outLight.direction_cosInner = glm::vec4(dir, cosInner);
+        outLight.color_range = glm::vec4(radiance, lightComp.range);
+        outLight.params = glm::vec4(cosOuter, 0.0f, 0.0f, 0.0f);
+
+        ++lightCount;
+    }
+
+    // Zero any remaining lights
+    for (uint32_t i = lightCount; i < 4; ++i) {
+        frameData.lights[i].position_type = glm::vec4(0.0f);
+        frameData.lights[i].direction_cosInner = glm::vec4(0.0f);
+        frameData.lights[i].color_range = glm::vec4(0.0f);
+        frameData.lights[i].params = glm::vec4(0.0f);
+    }
+
+    frameData.lightCount = glm::uvec4(lightCount, 0u, 0u, 0u);
+
+    // Camera-followed light view for cascades
+    glm::vec3 sceneCenter = cameraPos + cameraForward * ((camNear + camFar) * 0.5f);
+    glm::vec3 lightDirFromLightToScene = -dirToLight;
+    float lightDistance = camFar;
+    glm::vec3 lightPos = sceneCenter - lightDirFromLightToScene * lightDistance;
+
+    glm::vec3 lightUp(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(lightUp, lightDirFromLightToScene)) > 0.99f) {
+        lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    m_lightViewMatrix = glm::lookAtLH(lightPos, sceneCenter, lightUp);
+
+    // Compute cascade splits (practical split scheme)
+    const uint32_t cascadeCount = kShadowCascadeCount;
+    float splits[kShadowCascadeCount] = {};
+    for (uint32_t i = 0; i < cascadeCount; ++i) {
+        float si = static_cast<float>(i + 1) / static_cast<float>(cascadeCount);
+        float logSplit = camNear * std::pow(camFar / camNear, si);
+        float linSplit = camNear + (camFar - camNear) * si;
+        splits[i] = m_cascadeSplitLambda * logSplit + (1.0f - m_cascadeSplitLambda) * linSplit;
+        m_cascadeSplits[i] = splits[i];
+    }
+
+    frameData.cascadeSplits = glm::vec4(
+        splits[0],
+        splits[1],
+        splits[2],
+        camFar
+    );
+
+    // Build per-cascade light view-projection matrices
+    const float aspect = m_window->GetAspectRatio();
+    const float tanHalfFovY = std::tan(fovY * 0.5f);
+    const float tanHalfFovX = tanHalfFovY * aspect;
+    glm::mat4 invView = glm::inverse(frameData.viewMatrix);
+
+    for (uint32_t cascadeIndex = 0; cascadeIndex < cascadeCount; ++cascadeIndex) {
+        float cascadeNear = (cascadeIndex == 0) ? camNear : splits[cascadeIndex - 1];
+        float cascadeFar = splits[cascadeIndex];
+
+        float xn = cascadeNear * tanHalfFovX;
+        float yn = cascadeNear * tanHalfFovY;
+        float xf = cascadeFar * tanHalfFovX;
+        float yf = cascadeFar * tanHalfFovY;
+
+        glm::vec3 frustumCornersVS[8] = {
+            { -xn,  yn, cascadeNear },
+            {  xn,  yn, cascadeNear },
+            {  xn, -yn, cascadeNear },
+            { -xn, -yn, cascadeNear },
+            { -xf,  yf, cascadeFar },
+            {  xf,  yf, cascadeFar },
+            {  xf, -yf, cascadeFar },
+            { -xf, -yf, cascadeFar }
+        };
+
+        glm::vec3 minLS( std::numeric_limits<float>::max());
+        glm::vec3 maxLS(-std::numeric_limits<float>::max());
+
+        for (auto& cornerVS : frustumCornersVS) {
+            glm::vec4 world = invView * glm::vec4(cornerVS, 1.0f);
+            glm::vec3 ls = glm::vec3(m_lightViewMatrix * world);
+            minLS = glm::min(minLS, ls);
+            maxLS = glm::max(maxLS, ls);
+        }
+
+        glm::vec3 extent = (maxLS - minLS) * 0.5f;
+        glm::vec3 centerLS = minLS + extent;
+
+        // Texel snapping to reduce shimmering (per-cascade resolution scaling)
+        float effectiveResX = m_shadowMapSize * m_cascadeResolutionScale[cascadeIndex];
+        float effectiveResY = m_shadowMapSize * m_cascadeResolutionScale[cascadeIndex];
+        float texelSizeX = (extent.x * 2.0f) / std::max(effectiveResX, 1.0f);
+        float texelSizeY = (extent.y * 2.0f) / std::max(effectiveResY, 1.0f);
+        if (texelSizeX > 0.0f) {
+            centerLS.x = std::floor(centerLS.x / texelSizeX) * texelSizeX;
+        }
+        if (texelSizeY > 0.0f) {
+            centerLS.y = std::floor(centerLS.y / texelSizeY) * texelSizeY;
+        }
+
+        float minX = centerLS.x - extent.x;
+        float maxX = centerLS.x + extent.x;
+        float minY = centerLS.y - extent.y;
+        float maxY = centerLS.y + extent.y;
+
+        float minZ = minLS.z;
+        float maxZ = maxLS.z;
+        float nearPlane = std::max(0.0f, minZ);
+        float farPlane = maxZ;
+
+        m_lightProjectionMatrices[cascadeIndex] = glm::orthoLH_ZO(minX, maxX, minY, maxY, nearPlane, farPlane);
+        m_lightViewProjectionMatrices[cascadeIndex] = m_lightProjectionMatrices[cascadeIndex] * m_lightViewMatrix;
+        frameData.lightViewProjection[cascadeIndex] = m_lightViewProjectionMatrices[cascadeIndex];
+    }
+
+    frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, 0.0f);
+    frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
+
+    m_frameDataCPU = frameData;
+    m_frameConstantBuffer.UpdateData(m_frameDataCPU);
 }
 
 void Renderer::RenderScene(Scene::ECS_Registry* registry) {
@@ -382,6 +618,11 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
 
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Bind shadow map if available
+    if (m_shadowMapSRV.IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowMapSRV.gpu);
+    }
 
     // Render all entities with Renderable and Transform components
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
@@ -767,10 +1008,91 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(const std::st
     return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
 }
 
+void Renderer::ToggleShadows() {
+    m_shadowsEnabled = !m_shadowsEnabled;
+    spdlog::info("Shadows {}", m_shadowsEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::CycleDebugViewMode() {
+    // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascades
+    m_debugViewMode = (m_debugViewMode + 1) % 6;
+    const char* label = nullptr;
+    switch (m_debugViewMode) {
+        case 0: label = "Shaded"; break;
+        case 1: label = "Normals"; break;
+        case 2: label = "Roughness"; break;
+        case 3: label = "Metallic"; break;
+        case 4: label = "Albedo"; break;
+        case 5: label = "Cascades"; break;
+        default: label = "Unknown"; break;
+    }
+    spdlog::info("Debug view mode: {}", label);
+}
+
+void Renderer::AdjustShadowBias(float delta) {
+    m_shadowBias = glm::clamp(m_shadowBias + delta, 0.00001f, 0.01f);
+    spdlog::info("Shadow bias set to {}", m_shadowBias);
+}
+
+void Renderer::AdjustShadowPCFRadius(float delta) {
+    m_shadowPCFRadius = glm::clamp(m_shadowPCFRadius + delta, 0.5f, 8.0f);
+    spdlog::info("Shadow PCF radius set to {}", m_shadowPCFRadius);
+}
+
+void Renderer::AdjustCascadeSplitLambda(float delta) {
+    m_cascadeSplitLambda = glm::clamp(m_cascadeSplitLambda + delta, 0.0f, 1.0f);
+    spdlog::info("Cascade split lambda set to {}", m_cascadeSplitLambda);
+}
+
+void Renderer::AdjustCascadeResolutionScale(uint32_t cascadeIndex, float delta) {
+    if (cascadeIndex >= kShadowCascadeCount) {
+        return;
+    }
+    m_cascadeResolutionScale[cascadeIndex] = glm::clamp(m_cascadeResolutionScale[cascadeIndex] + delta, 0.25f, 2.0f);
+    spdlog::info("Cascade {} resolution scale set to {}", cascadeIndex, m_cascadeResolutionScale[cascadeIndex]);
+}
+
+void Renderer::SetExposure(float exposure) {
+    m_exposure = std::max(exposure, 0.01f);
+    spdlog::info("Renderer exposure set to {}", m_exposure);
+}
+
+void Renderer::SetShadowsEnabled(bool enabled) {
+    m_shadowsEnabled = enabled;
+    spdlog::info("Renderer shadows {}", m_shadowsEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::SetDebugViewMode(int mode) {
+    int clamped = std::max(0, std::min(mode, 5));
+    m_debugViewMode = static_cast<uint32_t>(clamped);
+    spdlog::info("Renderer debug view mode set to {}", clamped);
+}
+
+void Renderer::SetShadowBias(float bias) {
+    m_shadowBias = glm::clamp(bias, 0.00001f, 0.01f);
+    spdlog::info("Renderer shadow bias set to {}", m_shadowBias);
+}
+
+void Renderer::SetShadowPCFRadius(float radius) {
+    m_shadowPCFRadius = glm::clamp(radius, 0.5f, 8.0f);
+    spdlog::info("Renderer shadow PCF radius set to {}", m_shadowPCFRadius);
+}
+
+void Renderer::SetCascadeSplitLambda(float lambda) {
+    m_cascadeSplitLambda = glm::clamp(lambda, 0.0f, 1.0f);
+    spdlog::info("Renderer cascade split lambda set to {}", m_cascadeSplitLambda);
+}
+
+void Renderer::SetBloomIntensity(float intensity) {
+    m_bloomIntensity = glm::clamp(intensity, 0.0f, 5.0f);
+    spdlog::info("Renderer bloom intensity set to {}", m_bloomIntensity);
+}
+
 void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     auto tryLoad = [&](std::string& path, std::shared_ptr<DX12Texture>& slot, bool useSRGB, const std::shared_ptr<DX12Texture>& placeholder) {
         const bool isPlaceholder = slot == nullptr || slot == placeholder;
-        if (!path.empty()) {
+        // Only load from disk when we currently have no texture or a placeholder.
+        if (!path.empty() && isPlaceholder) {
             auto loaded = LoadTextureFromFile(path, useSRGB);
             if (loaded.IsOk()) {
                 slot = loaded.Value();
@@ -814,15 +1136,17 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
     }
     auto& state = *tex.gpuState;
 
-    // ALWAYS allocate fresh descriptors each frame (ring buffer approach - matches constant buffers)
-    // This prevents descriptor aliasing since we reset the heap at frame start
-    for (int i = 0; i < 4; ++i) {
-        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
-            return;
+    // Allocate descriptors once per material and reuse them; textures can change,
+    // but we simply overwrite the descriptor contents.
+    if (!state.descriptors[0].IsValid()) {
+        for (int i = 0; i < 4; ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
+                return;
+            }
+            state.descriptors[i] = handleResult.Value();
         }
-        state.descriptors[i] = handleResult.Value();
     }
 
     std::array<std::shared_ptr<DX12Texture>, 4> sources = {
@@ -846,6 +1170,8 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
     }
+
+    state.descriptorsReady = true;
 }
 
 Result<void> Renderer::CreateDepthBuffer() {
@@ -901,6 +1227,202 @@ Result<void> Renderer::CreateDepthBuffer() {
     return Result<void>::Ok();
 }
 
+Result<void> Renderer::CreateShadowMapResources() {
+    if (!m_device || !m_descriptorManager) {
+        return Result<void>::Err("Renderer not initialized for shadow map creation");
+    }
+
+    const UINT shadowDim = static_cast<UINT>(m_shadowMapSize);
+
+    D3D12_RESOURCE_DESC shadowDesc = {};
+    shadowDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    shadowDesc.Width = shadowDim;
+    shadowDesc.Height = shadowDim;
+    shadowDesc.DepthOrArraySize = kShadowCascadeCount;
+    shadowDesc.MipLevels = 1;
+    shadowDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+    shadowDesc.SampleDesc.Count = 1;
+    shadowDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    clearValue.DepthStencil.Depth = 1.0f;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &shadowDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &clearValue,
+        IID_PPV_ARGS(&m_shadowMap)
+    );
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create shadow map resource");
+    }
+
+    m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+    // Create DSVs for each cascade slice
+    for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
+        auto dsvResult = m_descriptorManager->AllocateDSV();
+        if (dsvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate DSV for shadow cascade: " + dsvResult.Error());
+        }
+        m_shadowMapDSVs[i] = dsvResult.Value();
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+        dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+        dsvDesc.Texture2DArray.MipSlice = 0;
+        dsvDesc.Texture2DArray.FirstArraySlice = i;
+        dsvDesc.Texture2DArray.ArraySize = 1;
+        dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+        m_device->GetDevice()->CreateDepthStencilView(
+            m_shadowMap.Get(),
+            &dsvDesc,
+            m_shadowMapDSVs[i].cpu
+        );
+    }
+
+    // Create SRV for sampling shadow map
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate SRV for shadow map: " + srvResult.Error());
+    }
+    m_shadowMapSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2DArray.MipLevels = 1;
+    srvDesc.Texture2DArray.MostDetailedMip = 0;
+    srvDesc.Texture2DArray.FirstArraySlice = 0;
+    srvDesc.Texture2DArray.ArraySize = kShadowCascadeCount;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_shadowMap.Get(),
+        &srvDesc,
+        m_shadowMapSRV.cpu
+    );
+
+    // Shadow viewport/scissor
+    m_shadowViewport.TopLeftX = 0.0f;
+    m_shadowViewport.TopLeftY = 0.0f;
+    m_shadowViewport.Width = static_cast<float>(shadowDim);
+    m_shadowViewport.Height = static_cast<float>(shadowDim);
+    m_shadowViewport.MinDepth = 0.0f;
+    m_shadowViewport.MaxDepth = 1.0f;
+
+    m_shadowScissor.left = 0;
+    m_shadowScissor.top = 0;
+    m_shadowScissor.right = static_cast<LONG>(shadowDim);
+    m_shadowScissor.bottom = static_cast<LONG>(shadowDim);
+
+    spdlog::info("Shadow map created ({}x{})", shadowDim, shadowDim);
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateHDRTarget() {
+    if (!m_device || !m_descriptorManager) {
+        return Result<void>::Err("Renderer not initialized for HDR target creation");
+    }
+
+    const UINT width = m_window->GetWidth();
+    const UINT height = m_window->GetHeight();
+
+    if (width == 0 || height == 0) {
+        return Result<void>::Err("Window size is zero; cannot create HDR target");
+    }
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = width;
+    desc.Height = height;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    desc.SampleDesc.Count = 1;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    clearValue.Color[0] = 0.0f;
+    clearValue.Color[1] = 0.0f;
+    clearValue.Color[2] = 0.0f;
+    clearValue.Color[3] = 1.0f;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &clearValue,
+        IID_PPV_ARGS(&m_hdrColor)
+    );
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create HDR color target");
+    }
+
+    m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    // RTV
+    auto rtvResult = m_descriptorManager->AllocateRTV();
+    if (rtvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate RTV for HDR target: " + rtvResult.Error());
+    }
+    m_hdrRTV = rtvResult.Value();
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateRenderTargetView(
+        m_hdrColor.Get(),
+        &rtvDesc,
+        m_hdrRTV.cpu
+    );
+
+    // SRV
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate SRV for HDR target: " + srvResult.Error());
+    }
+    m_hdrSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_hdrColor.Get(),
+        &srvDesc,
+        m_hdrSRV.cpu
+    );
+
+    spdlog::info("HDR target created: {}x{}", width, height);
+    return Result<void>::Ok();
+}
+
 Result<void> Renderer::CreateCommandList() {
     HRESULT hr = m_device->GetDevice()->CreateCommandList(
         0,
@@ -942,6 +1464,36 @@ Result<void> Renderer::CompileShaders() {
         return Result<void>::Err("Failed to compile pixel shader: " + psResult.Error());
     }
 
+    auto shadowVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "VSShadow",
+        "vs_5_1"
+    );
+
+    if (shadowVsResult.IsErr()) {
+        return Result<void>::Err("Failed to compile shadow vertex shader: " + shadowVsResult.Error());
+    }
+
+    auto postVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "VSMain",
+        "vs_5_1"
+    );
+
+    if (postVsResult.IsErr()) {
+        return Result<void>::Err("Failed to compile post-process vertex shader: " + postVsResult.Error());
+    }
+
+    auto postPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "PSMain",
+        "ps_5_1"
+    );
+
+    if (postPsResult.IsErr()) {
+        return Result<void>::Err("Failed to compile post-process pixel shader: " + postPsResult.Error());
+    }
+
     // Store compiled shaders (we'll use them in CreatePipeline)
     // For now, we'll just recreate the root signature and pipeline
 
@@ -974,6 +1526,57 @@ Result<void> Renderer::CompileShaders() {
 
     if (pipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create pipeline: " + pipelineResult.Error());
+    }
+
+    // Depth-only pipeline for directional shadow map
+    m_shadowPipeline = std::make_unique<DX12Pipeline>();
+
+    PipelineDesc shadowDesc = {};
+    shadowDesc.vertexShader = shadowVsResult.Value();
+    // depth-only: no pixel shader, no color target
+    shadowDesc.inputLayout = pipelineDesc.inputLayout;
+    shadowDesc.rtvFormat = DXGI_FORMAT_UNKNOWN;
+    shadowDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    shadowDesc.numRenderTargets = 0;
+    shadowDesc.depthTestEnabled = true;
+    shadowDesc.depthWriteEnabled = true;
+    shadowDesc.cullMode = D3D12_CULL_MODE_BACK;
+    shadowDesc.wireframe = false;
+    shadowDesc.blendEnabled = false;
+
+    auto shadowPipelineResult = m_shadowPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        shadowDesc
+    );
+
+    if (shadowPipelineResult.IsErr()) {
+        return Result<void>::Err("Failed to create shadow pipeline: " + shadowPipelineResult.Error());
+    }
+
+    // Post-process pipeline (fullscreen pass)
+    m_postProcessPipeline = std::make_unique<DX12Pipeline>();
+
+    PipelineDesc postDesc = {};
+    postDesc.vertexShader = postVsResult.Value();
+    postDesc.pixelShader = postPsResult.Value();
+    postDesc.inputLayout = {}; // fullscreen triangle via SV_VertexID
+    postDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    postDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+    postDesc.numRenderTargets = 1;
+    postDesc.depthTestEnabled = false;
+    postDesc.depthWriteEnabled = false;
+    postDesc.cullMode = D3D12_CULL_MODE_NONE;
+    postDesc.blendEnabled = false;
+
+    auto postPipelineResult = m_postProcessPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        postDesc
+    );
+
+    if (postPipelineResult.IsErr()) {
+        return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
     }
 
     return Result<void>::Ok();
@@ -1067,4 +1670,168 @@ Result<void> Renderer::EnsureHyperGeometryScene(Scene::ECS_Registry* registry) {
 }
 #endif
 
+void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
+    if (!registry || !m_shadowMap || !m_shadowPipeline) {
+        return;
+    }
+
+    // Transition shadow map to depth write
+    if (m_shadowMapState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_shadowMap.Get();
+        barrier.Transition.StateBefore = m_shadowMapState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    // Set pipeline / root signature once
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_shadowPipeline->GetPipelineState());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    for (uint32_t cascadeIndex = 0; cascadeIndex < kShadowCascadeCount; ++cascadeIndex) {
+        // Update shadow constants with current cascade index
+        ShadowConstants shadowData{};
+        shadowData.cascadeIndex = glm::uvec4(cascadeIndex, 0u, 0u, 0u);
+        m_shadowConstantBuffer.UpdateData(shadowData);
+
+        // Bind frame constants
+        m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+        // Bind shadow constants (b3)
+        m_commandList->SetGraphicsRootConstantBufferView(5, m_shadowConstantBuffer.gpuAddress);
+
+        // Bind DSV for this cascade
+        D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMapDSVs[cascadeIndex].cpu;
+        m_commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+        // Clear shadow depth
+        m_commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+        // Set viewport and scissor for shadow map
+        m_commandList->RSSetViewports(1, &m_shadowViewport);
+        m_commandList->RSSetScissorRects(1, &m_shadowScissor);
+
+        // Draw all geometry
+        for (auto entity : view) {
+            auto& renderable = view.get<Scene::RenderableComponent>(entity);
+            auto& transform = view.get<Scene::TransformComponent>(entity);
+
+            if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
+                continue;
+            }
+
+            ObjectConstants objectData = {};
+            objectData.modelMatrix = transform.GetMatrix();
+            objectData.normalMatrix = transform.GetNormalMatrix();
+
+            D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+            m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+            if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                D3D12_VERTEX_BUFFER_VIEW vbv = {};
+                vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                vbv.StrideInBytes = sizeof(Vertex);
+
+                D3D12_INDEX_BUFFER_VIEW ibv = {};
+                ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                m_commandList->IASetIndexBuffer(&ibv);
+
+                m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+            }
+        }
+    }
+
+    // Transition shadow map for sampling
+    if (m_shadowMapState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_shadowMap.Get();
+        barrier.Transition.StateBefore = m_shadowMapState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_shadowMapState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+}
+
+void Renderer::RenderPostProcess() {
+    if (!m_postProcessPipeline || !m_hdrColor) {
+        // No HDR/post-process configured; main pass may have rendered directly to back buffer
+        return;
+    }
+
+    // Transition HDR to shader resource and back buffer to render target
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    UINT barrierCount = 0;
+
+    if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_hdrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_hdrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barriers[barrierCount].Transition.pResource = m_window->GetCurrentBackBuffer();
+    barriers[barrierCount].Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ++barrierCount;
+
+    m_commandList->ResourceBarrier(barrierCount, barriers);
+
+    // Set back buffer as render target (no depth)
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    // Set viewport and scissor for fullscreen pass
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(m_window->GetWidth());
+    viewport.Height = static_cast<float>(m_window->GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect = {};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
+    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    // Bind post-process pipeline
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_postProcessPipeline->GetPipelineState());
+
+    // Bind descriptor heap
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // Bind frame constants
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Bind the persistent HDR SRV directly at table (t0)
+    if (!m_hdrSRV.IsValid()) {
+        spdlog::error("RenderPostProcess: HDR SRV is invalid");
+        return;
+    }
+    m_commandList->SetGraphicsRootDescriptorTable(3, m_hdrSRV.gpu);
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
+}
 } // namespace Cortex::Graphics

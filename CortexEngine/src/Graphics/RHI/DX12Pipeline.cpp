@@ -64,8 +64,13 @@ Result<void> DX12Pipeline::Initialize(
     psoDesc.DepthStencilState = depthStencilDesc;
     psoDesc.InputLayout = { desc.inputLayout.data(), static_cast<UINT>(desc.inputLayout.size()) };
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = desc.rtvFormat;
+    psoDesc.NumRenderTargets = desc.numRenderTargets;
+    for (UINT i = 0; i < 8; ++i) {
+        psoDesc.RTVFormats[i] = DXGI_FORMAT_UNKNOWN;
+    }
+    if (desc.numRenderTargets > 0) {
+        psoDesc.RTVFormats[0] = desc.rtvFormat;
+    }
     psoDesc.DSVFormat = desc.dsvFormat;
     psoDesc.SampleDesc.Count = 1;
     psoDesc.SampleDesc.Quality = 0;
@@ -87,8 +92,8 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     }
 
     // Define root parameters
-    // We need: 3 CBVs (b0, b1, b2) + 1 descriptor table for SRV (t0)
-    D3D12_ROOT_PARAMETER rootParameters[4] = {};
+    // We need: 4 CBVs (b0, b1, b2, b3) + descriptor table for textures (t0-t3) + descriptor table for shadow map (t4)
+    D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
     // Parameter 0: Object constants (b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -120,6 +125,25 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
     rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRange;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // Parameter 4: Shadow map SRV (t4)
+    D3D12_DESCRIPTOR_RANGE shadowRange = {};
+    shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    shadowRange.NumDescriptors = 1;
+    shadowRange.BaseShaderRegister = 4;
+    shadowRange.RegisterSpace = 0;
+    shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[4].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[4].DescriptorTable.pDescriptorRanges = &shadowRange;
+    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // Parameter 5: Shadow constants (b3)
+    rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[5].Descriptor.ShaderRegister = 3;
+    rootParameters[5].Descriptor.RegisterSpace = 0;
+    rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Static sampler (s0)
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};

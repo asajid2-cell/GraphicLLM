@@ -152,8 +152,40 @@ public:
     // Load texture from disk (sRGB aware)
     Result<std::shared_ptr<DX12Texture>> LoadTextureFromFile(const std::string& path, bool useSRGB);
 
+    // Debug/inspection controls
+    void ToggleShadows();
+    void CycleDebugViewMode();
+    void AdjustShadowBias(float delta);
+    void AdjustShadowPCFRadius(float delta);
+    void AdjustCascadeSplitLambda(float delta);
+    void AdjustCascadeResolutionScale(uint32_t cascadeIndex, float delta);
+
+    // Introspection for LLM/diagnostics
+    [[nodiscard]] float GetExposure() const { return m_exposure; }
+    [[nodiscard]] bool GetShadowsEnabled() const { return m_shadowsEnabled; }
+    [[nodiscard]] int GetDebugViewMode() const { return static_cast<int>(m_debugViewMode); }
+    [[nodiscard]] float GetShadowBias() const { return m_shadowBias; }
+    [[nodiscard]] float GetShadowPCFRadius() const { return m_shadowPCFRadius; }
+    [[nodiscard]] float GetCascadeSplitLambda() const { return m_cascadeSplitLambda; }
+    [[nodiscard]] float GetBloomIntensity() const { return m_bloomIntensity; }
+    [[nodiscard]] float GetCascadeResolutionScale(uint32_t cascadeIndex) const {
+        return (cascadeIndex < kShadowCascadeCount) ? m_cascadeResolutionScale[cascadeIndex] : 1.0f;
+    }
+
+    // Mutators for renderer-level commands
+    void SetExposure(float exposure);
+    void SetShadowsEnabled(bool enabled);
+    void SetDebugViewMode(int mode);
+    void SetShadowBias(float bias);
+    void SetShadowPCFRadius(float radius);
+    void SetCascadeSplitLambda(float lambda);
+    void SetBloomIntensity(float intensity);
+
 private:
+    static constexpr uint32_t kShadowCascadeCount = 3;
+
     void BeginFrame();
+    void PrepareMainPass();
     void EndFrame();
 
     void RenderScene(Scene::ECS_Registry* registry);
@@ -167,8 +199,12 @@ private:
     Result<void> CompileShaders();
     Result<void> CreatePipeline();
     Result<void> CreatePlaceholderTexture();
+    Result<void> CreateShadowMapResources();
+    Result<void> CreateHDRTarget();
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
+    void RenderShadowPass(Scene::ECS_Registry* registry);
+    void RenderPostProcess();
 
     // Graphics resources
     DX12Device* m_device = nullptr;
@@ -188,11 +224,14 @@ private:
     // Pipeline state
     std::unique_ptr<DX12RootSignature> m_rootSignature;
     std::unique_ptr<DX12Pipeline> m_pipeline;
+    std::unique_ptr<DX12Pipeline> m_shadowPipeline;
+    std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
     ConstantBuffer<ObjectConstants> m_objectConstantBuffer;
     ConstantBuffer<MaterialConstants> m_materialConstantBuffer;
+    ConstantBuffer<ShadowConstants> m_shadowConstantBuffer;
 
     // Upload helpers
     static constexpr uint32_t kUploadPoolSize = 4;
@@ -206,15 +245,58 @@ private:
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorHandle m_depthStencilView;
 
+    // Shadow map (directional light, cascaded)
+    ComPtr<ID3D12Resource> m_shadowMap;
+    std::array<DescriptorHandle, kShadowCascadeCount> m_shadowMapDSVs;
+    DescriptorHandle m_shadowMapSRV;
+    D3D12_VIEWPORT m_shadowViewport{};
+    D3D12_RECT m_shadowScissor{};
+    D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_COMMON;
+
+    // HDR color target for main pass
+    ComPtr<ID3D12Resource> m_hdrColor;
+    DescriptorHandle m_hdrRTV;
+    DescriptorHandle m_hdrSRV;
+    D3D12_RESOURCE_STATES m_hdrState = D3D12_RESOURCE_STATE_COMMON;
+
     // Default resources
     std::shared_ptr<DX12Texture> m_placeholderAlbedo;
     std::shared_ptr<DX12Texture> m_placeholderNormal;
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
 
+    // Lighting state
+    glm::vec3 m_directionalLightDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)); // direction from surface to light
+    glm::vec3 m_directionalLightColor = glm::vec3(1.0f);
+    float m_directionalLightIntensity = 5.0f;
+    glm::vec3 m_ambientLightColor = glm::vec3(0.04f);
+    float m_ambientLightIntensity = 1.0f;
+    float m_exposure = 1.0f;
+    float m_bloomIntensity = 0.25f;
+
+    bool m_shadowsEnabled = true;
+    float m_shadowMapSize = 2048.0f;
+    float m_shadowBias = 0.0005f;
+    float m_shadowPCFRadius = 1.5f;
+
+    // Camera-followed shadow frustum parameters
+    float m_shadowOrthoRange = 20.0f;
+    float m_shadowNearPlane = 1.0f;
+    float m_shadowFarPlane = 100.0f;
+
+    glm::mat4 m_lightViewMatrix{1.0f};
+    glm::mat4 m_lightProjectionMatrices[kShadowCascadeCount]{};
+    glm::mat4 m_lightViewProjectionMatrices[kShadowCascadeCount]{};
+    float m_cascadeSplits[kShadowCascadeCount]{};
+    float m_cascadeSplitLambda = 0.5f;
+    float m_cascadeResolutionScale[kShadowCascadeCount] = { 1.0f, 1.0f, 1.0f };
+
+    uint32_t m_debugViewMode = 0;
+
     // Frame state
     float m_totalTime = 0.0f;
     uint64_t m_fenceValues[3] = { 0, 0, 0 };
+    FrameConstants m_frameDataCPU{};
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     bool m_hyperSceneBuilt = false;
 #endif

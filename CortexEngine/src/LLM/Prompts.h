@@ -31,7 +31,10 @@ public:
            << "- remove_entity: target name.\n"
            << "- modify_transform: target name, position[3], rotation[3] (Euler angles in degrees), scale[3].\n"
            << "- modify_material: target name, color[4], metallic (0-1), roughness (0-1).\n"
-           << "- modify_camera: position[3], fov.\n\n";
+           << "- modify_camera: position[3], fov.\n"
+           << "- add_light: light_type (\"point\"|\"spot\"|\"directional\"), name, position[3], optional direction[3], color[4], intensity (>0), range (>0), inner_cone (degrees), outer_cone (degrees), casts_shadows (bool).\n"
+           << "- modify_light: target name, optional light_type, position[3], direction[3], color[4], intensity (>0), range (>0), inner_cone, outer_cone, casts_shadows.\n"
+           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-5), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1).\n\n";
         ss << "Positioning guidelines:\n"
            << "- Origin (0,0,0) may already have an object; consult the scene summary before placing on top of it\n"
            << "- Place new objects offset: left (-2 to -4, Y, Z), right (2 to 4, Y, Z), or forward/back (X, Y, -3 to 3)\n"
@@ -97,6 +100,9 @@ public:
 
         addExample("Example 11:\nUser: \"Create a shiny silver cone\"",
                    "{\"commands\":[{\"type\":\"add_entity\",\"entity_type\":\"cone\",\"name\":\"ShinySilverCone\",\"position\":[3,1,0],\"scale\":[1,1,1],\"color\":[0.75,0.75,0.75,1],\"metallic\":1,\"roughness\":0.05}]}");
+
+        addExample("Example 12:\nUser: \"Add a bright point light above the cube\"",
+                   "{\"commands\":[{\"type\":\"add_light\",\"light_type\":\"point\",\"name\":\"OverheadLight\",\"position\":[0,4,-2],\"color\":[1,0.95,0.8,1],\"intensity\":12,\"range\":15}]}");
 
         return ss.str();
     }

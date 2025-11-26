@@ -1,4 +1,5 @@
 #include "CommandQueue.h"
+#include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
 #include "Scene/Components.h"
 #include <spdlog/spdlog.h>
@@ -201,6 +202,15 @@ void CommandQueue::ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* re
         case CommandType::ModifyCamera:
             ExecuteModifyCamera(static_cast<ModifyCameraCommand*>(command), registry);
             break;
+        case CommandType::AddLight:
+            ExecuteAddLight(static_cast<AddLightCommand*>(command), registry);
+            break;
+        case CommandType::ModifyLight:
+            ExecuteModifyLight(static_cast<ModifyLightCommand*>(command), registry);
+            break;
+        case CommandType::ModifyRenderer:
+            ExecuteModifyRenderer(static_cast<ModifyRendererCommand*>(command), renderer);
+            break;
         default:
             spdlog::warn("Unknown command type");
             PushStatus(false, "unknown command type");
@@ -316,6 +326,61 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
            << transform.position.x << "," << transform.position.y << "," << transform.position.z << ")";
         PushStatus(true, ss.str());
     }
+}
+
+void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* registry) {
+    if (!registry || !cmd) {
+        PushStatus(false, "AddLight skipped: missing registry");
+        return;
+    }
+
+    entt::entity e = registry->CreateEntity();
+
+    // Tag for lookup/debugging
+    std::string name = cmd->name.empty() ? "Light_" + std::to_string(m_spawnIndex++) : cmd->name;
+    registry->AddComponent<Scene::TagComponent>(e, name);
+
+    auto& transform = registry->AddComponent<Scene::TransformComponent>(e);
+    transform.position = SanitizeVec3(cmd->position, 0.0f, false);
+
+    // Build rotation from direction for spot/directional lights
+    glm::vec3 forward = cmd->direction;
+    if (!std::isfinite(forward.x) || !std::isfinite(forward.y) || !std::isfinite(forward.z) ||
+        glm::length2(forward) < 1e-4f) {
+        forward = glm::vec3(0.0f, -1.0f, 0.0f);
+    }
+    forward = glm::normalize(forward);
+    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(up, forward)) > 0.99f) {
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    transform.rotation = glm::quatLookAt(forward, up);
+
+    auto& light = registry->AddComponent<Scene::LightComponent>(e);
+    switch (cmd->lightType) {
+        case AddLightCommand::LightType::Directional:
+            light.type = Scene::LightType::Directional;
+            break;
+        case AddLightCommand::LightType::Spot:
+            light.type = Scene::LightType::Spot;
+            break;
+        case AddLightCommand::LightType::Point:
+        default:
+            light.type = Scene::LightType::Point;
+            break;
+    }
+
+    light.color = glm::max(cmd->color, glm::vec3(0.0f));
+    light.intensity = std::max(cmd->intensity, 0.0f);
+    light.range = std::max(cmd->range, 0.0f);
+    light.innerConeDegrees = cmd->innerConeDegrees;
+    light.outerConeDegrees = cmd->outerConeDegrees;
+    light.castsShadows = cmd->castsShadows;
+
+    std::ostringstream ss;
+    ss << "spawned light " << name << " at (" << std::fixed << std::setprecision(2)
+       << transform.position.x << "," << transform.position.y << "," << transform.position.z << ")";
+    PushStatus(true, ss.str());
 }
 
 void CommandQueue::ExecuteRemoveEntity(RemoveEntityCommand* cmd, Scene::ECS_Registry* registry) {
@@ -443,6 +508,154 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
 
     if (touched) {
         PushStatus(true, summary.str());
+    }
+}
+
+void CommandQueue::ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Registry* registry) {
+    if (!registry || cmd->targetName.empty()) {
+        PushStatus(false, "modify_light failed: missing registry or target");
+        return;
+    }
+
+    // Resolve by tag name (lights are not tracked in SceneLookup yet)
+    auto view = registry->View<Scene::TagComponent, Scene::LightComponent, Scene::TransformComponent>();
+    entt::entity target = entt::null;
+    for (auto entity : view) {
+        const auto& tag = view.get<Scene::TagComponent>(entity);
+        if (tag.tag == cmd->targetName) {
+            target = entity;
+            break;
+        }
+    }
+
+    if (target == entt::null) {
+        PushStatus(false, "modify_light failed: target '" + cmd->targetName + "' not found");
+        return;
+    }
+
+    auto& light = view.get<Scene::LightComponent>(target);
+    auto& transform = view.get<Scene::TransformComponent>(target);
+
+    std::ostringstream summary;
+    summary << "light " << cmd->targetName << ": ";
+    bool touched = false;
+
+    if (cmd->setPosition) {
+        transform.position = SanitizeVec3(cmd->position, 0.0f, true);
+        summary << "pos ";
+        touched = true;
+    }
+    if (cmd->setDirection) {
+        glm::vec3 forward = cmd->direction;
+        if (!std::isfinite(forward.x) || !std::isfinite(forward.y) || !std::isfinite(forward.z) ||
+            glm::length2(forward) < 1e-4f) {
+            forward = glm::vec3(0.0f, -1.0f, 0.0f);
+        }
+        forward = glm::normalize(forward);
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        if (std::abs(glm::dot(up, forward)) > 0.99f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        transform.rotation = glm::quatLookAt(forward, up);
+        summary << "dir ";
+        touched = true;
+    }
+    if (cmd->setColor) {
+        light.color = glm::max(cmd->color, glm::vec3(0.0f));
+        summary << "color ";
+        touched = true;
+    }
+    if (cmd->setIntensity) {
+        light.intensity = std::max(cmd->intensity, 0.0f);
+        summary << "intensity ";
+        touched = true;
+    }
+    if (cmd->setRange) {
+        light.range = std::max(cmd->range, 0.0f);
+        summary << "range ";
+        touched = true;
+    }
+    if (cmd->setInnerCone) {
+        light.innerConeDegrees = cmd->innerConeDegrees;
+        summary << "inner_cone ";
+        touched = true;
+    }
+    if (cmd->setOuterCone) {
+        light.outerConeDegrees = cmd->outerConeDegrees;
+        summary << "outer_cone ";
+        touched = true;
+    }
+    if (cmd->setType) {
+        switch (cmd->lightType) {
+            case AddLightCommand::LightType::Directional:
+                light.type = Scene::LightType::Directional; break;
+            case AddLightCommand::LightType::Spot:
+                light.type = Scene::LightType::Spot; break;
+            case AddLightCommand::LightType::Point:
+            default:
+                light.type = Scene::LightType::Point; break;
+        }
+        summary << "type ";
+        touched = true;
+    }
+    if (cmd->setCastsShadows) {
+        light.castsShadows = cmd->castsShadows;
+        summary << "casts_shadows ";
+        touched = true;
+    }
+
+    if (touched) {
+        PushStatus(true, summary.str());
+    } else {
+        PushStatus(false, "modify_light had no effect (no fields set)");
+    }
+}
+
+void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer) {
+    if (!renderer || !cmd) {
+        PushStatus(false, "modify_renderer failed: renderer not available");
+        return;
+    }
+
+    std::ostringstream summary;
+    summary << "renderer: ";
+    bool touched = false;
+
+    if (cmd->setExposure) {
+        renderer->SetExposure(cmd->exposure);
+        summary << "exposure=" << cmd->exposure << " ";
+        touched = true;
+    }
+    if (cmd->setShadowsEnabled) {
+        renderer->SetShadowsEnabled(cmd->shadowsEnabled);
+        summary << "shadows=" << (cmd->shadowsEnabled ? "on" : "off") << " ";
+        touched = true;
+    }
+    if (cmd->setDebugMode) {
+        renderer->SetDebugViewMode(cmd->debugMode);
+        summary << "debug_mode=" << cmd->debugMode << " ";
+        touched = true;
+    }
+    if (cmd->setShadowBias) {
+        renderer->SetShadowBias(cmd->shadowBias);
+        summary << "bias=" << cmd->shadowBias << " ";
+        touched = true;
+    }
+    if (cmd->setShadowPCFRadius) {
+        renderer->SetShadowPCFRadius(cmd->shadowPCFRadius);
+        summary << "pcf=" << cmd->shadowPCFRadius << " ";
+        touched = true;
+    }
+    if (cmd->setCascadeSplitLambda) {
+        renderer->SetCascadeSplitLambda(cmd->cascadeSplitLambda);
+        summary << "lambda=" << cmd->cascadeSplitLambda << " ";
+        touched = true;
+    }
+
+    if (touched) {
+        PushStatus(true, summary.str());
+    } else {
+        PushStatus(false, "modify_renderer had no effect (no fields set)");
     }
 }
 

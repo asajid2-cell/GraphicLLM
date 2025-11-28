@@ -1,4 +1,4 @@
-# Phase 2 – “The Architect” (Architecture)
+# Phase 2 - "The Architect" (Architecture)
 
 Phase 2 introduces an asynchronous LLM loop named **The Architect**.  
 Its job is to translate natural-language requests into structured scene commands while
@@ -11,7 +11,7 @@ the renderer continues to run at real-time frame rates.
 There are three cooperating loops:
 
 1. **Main Render Loop**
-   - Runs at 60–120 FPS.
+   - Runs at 60-120 FPS.
    - Processes input events.
    - Updates ECS state (animations, scripted behavior).
    - Pulls commands from the LLM command queue and applies them.
@@ -66,7 +66,7 @@ owns a small FIFO of commands protected by a mutex.
 
 - `src/LLM/LLMService.h/.cpp`
   - Owns the Llama.cpp context and worker thread.
-  - Provides `SubmitPrompt()` and internal generation loop.
+  - Provides `SubmitPrompt()` and the internal generation loop.
 
 - `src/LLM/SceneCommands.h/.cpp`
   - Defines strongly-typed command structs such as:
@@ -74,7 +74,7 @@ owns a small FIFO of commands protected by a mutex.
     - `ModifyTransformCommand`
     - `ModifyMaterialCommand`
     - `ModifyCameraCommand`
-  - Implements JSON parsing for the LLM’s responses.
+  - Implements JSON parsing for the LLM's responses.
 
 - `src/LLM/CommandQueue.h/.cpp`
   - Thread-safe queue holding parsed commands.

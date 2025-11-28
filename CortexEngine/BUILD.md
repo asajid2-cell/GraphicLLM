@@ -10,7 +10,7 @@ This document describes how to build the Cortex engine manually on Windows.
 
 1. **Windows 10/11** with the Windows SDK.
 2. **Visual Studio 2022** (or newer) with:
-   - “Desktop development with C++” workload
+   - "Desktop development with C++" workload
    - CMake tools for Windows
 3. **CMake 3.20+**
 4. **Git**
@@ -75,8 +75,8 @@ cmake --build build --config Release
 
 The main executable is placed under:
 
-- `build\bin\Release\CortexEngine.exe` (multi‑config generators), or
-- `build\bin\CortexEngine.exe` (single‑config generators such as Ninja).
+- `build\bin\Release\CortexEngine.exe` (multi-config generators), or
+- `build\bin\CortexEngine.exe` (single-config generators such as Ninja).
 
 ---
 
@@ -103,5 +103,5 @@ Instead of driving CMake and vcpkg manually, you can use:
 ```
 
 These scripts encapsulate the steps above and are the recommended path for
-day‑to‑day development.
+day-to-day development.
 

@@ -294,8 +294,37 @@ void CommandQueue::ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* re
             ExecuteModifyLight(static_cast<ModifyLightCommand*>(command), registry);
             break;
         case CommandType::ModifyRenderer:
-            ExecuteModifyRenderer(static_cast<ModifyRendererCommand*>(command), renderer);
+            ExecuteModifyRenderer(static_cast<ModifyRendererCommand*>(command), renderer, registry);
             break;
+        case CommandType::SelectEntity: {
+            auto* cmd = static_cast<SelectEntityCommand*>(command);
+            if (m_selectionCallback && !cmd->targetName.empty()) {
+                auto resolved = m_selectionCallback(cmd->targetName);
+                if (resolved.has_value()) {
+                    PushStatus(true, "Selected entity '" + *resolved + "'");
+                } else {
+                    PushStatus(false, "SelectEntity failed (no entity matching '" + cmd->targetName + "')");
+                }
+            } else {
+                PushStatus(false, "SelectEntity ignored (no callback or target)");
+            }
+            break;
+        }
+        case CommandType::FocusCamera: {
+            auto* cmd = static_cast<FocusCameraCommand*>(command);
+            if (m_focusCameraCallback && !cmd->targetName.empty()) {
+                m_focusCameraCallback(cmd->targetName);
+                PushStatus(true, "Requested camera focus on '" + cmd->targetName + "'");
+            } else if (m_focusCameraCallback && cmd->hasTargetPosition) {
+                // For position-only focus, we encode a synthetic name that the
+                // Engine can interpret if desired; for now we just log it.
+                PushStatus(true, "Requested camera focus on explicit position");
+                m_focusCameraCallback(std::string{});
+            } else {
+                PushStatus(false, "FocusCamera ignored (no callback)");
+            }
+            break;
+        }
         default:
             spdlog::warn("Unknown command type");
             PushStatus(false, "unknown command type");
@@ -568,8 +597,7 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
     // direction was provided and we auto-anchored along camera forward, align
     // the light with that forward vector for intuitive spotlights.
     glm::vec3 forward = cmd->direction;
-    if (useAuto && anchorMode == AddLightCommand::AnchorMode::CameraForward &&
-        !registry->View<Scene::CameraComponent, Scene::TransformComponent>().empty()) {
+    if (useAuto && anchorMode == AddLightCommand::AnchorMode::CameraForward) {
         auto camView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
         for (auto entity : camView) {
             auto& camera = camView.get<Scene::CameraComponent>(entity);
@@ -619,7 +647,7 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
 
 void CommandQueue::ExecuteRemoveEntity(RemoveEntityCommand* cmd, Scene::ECS_Registry* registry) {
     std::string hint;
-    entt::entity target = m_lookup.ResolveTarget(cmd->targetName, registry, hint);
+    entt::entity target = ResolveTargetWithFocus(cmd->targetName, registry, hint);
     if (target == entt::null) {
         spdlog::warn("Entity '{}' not found ({})", cmd->targetName, hint);
         PushStatus(false, "remove failed: " + (hint.empty() ? "target not found" : hint));
@@ -708,7 +736,7 @@ void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::EC
     }
 
     std::string hint;
-    entt::entity target = m_lookup.ResolveTarget(cmd->targetName, registry, hint);
+    entt::entity target = ResolveTargetWithFocus(cmd->targetName, registry, hint);
     if (target == entt::null) {
         spdlog::warn("Transform target '{}' not found ({})", cmd->targetName, hint);
         PushStatus(false, "move/scale failed: " + (hint.empty() ? "target not found" : hint));
@@ -798,7 +826,7 @@ void CommandQueue::ExecuteModifyTransform(ModifyTransformCommand* cmd, Scene::EC
 
 void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_Registry* registry) {
     std::string hint;
-    entt::entity target = m_lookup.ResolveTarget(cmd->targetName, registry, hint);
+    entt::entity target = ResolveTargetWithFocus(cmd->targetName, registry, hint);
     if (target == entt::null) {
         spdlog::warn("Material target '{}' not found ({})", cmd->targetName, hint);
         PushStatus(false, "material failed: " + (hint.empty() ? "target not found" : hint));
@@ -990,7 +1018,37 @@ void CommandQueue::ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Regist
     }
 }
 
-void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer) {
+entt::entity CommandQueue::ResolveTargetWithFocus(const std::string& targetName,
+                                                  Scene::ECS_Registry* registry,
+                                                  std::string& outHint) {
+    outHint.clear();
+
+    // Prefer the engine's currently focused entity when the command's
+    // target name matches the advertised focus name. This keeps LLM-driven
+    // edits "locked" onto the same object the user has selected/framed,
+    // even if other entities share similar names.
+    if (!targetName.empty() && !m_currentFocusName.empty() && registry) {
+        auto toLower = [](std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return s;
+        };
+
+        if (toLower(targetName) == toLower(m_currentFocusName)) {
+            auto& reg = registry->GetRegistry();
+            if (m_currentFocusEntity != entt::null && reg.valid(m_currentFocusEntity)) {
+                outHint = "Using focused entity";
+                return m_currentFocusEntity;
+            }
+        }
+    }
+
+    // Otherwise, fall back to the standard lookup logic (pronouns,
+    // color/type hints, exact/partial name matches).
+    return m_lookup.ResolveTarget(targetName, registry, outHint);
+}
+
+void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer, Scene::ECS_Registry* registry) {
     if (!renderer || !cmd) {
         PushStatus(false, "modify_renderer failed: renderer not available");
         return;
@@ -1085,9 +1143,31 @@ void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::R
         summary << "sun_intensity=" << cmd->sunIntensity << " ";
         touched = true;
     }
-    // Note: lighting rig commands are interpreted by the engine via the debug
-    // menu / renderer integration rather than directly in the command queue,
-    // so cmd->setLightingRig is intentionally not handled here.
+    if (cmd->setLightingRig && registry) {
+        // Map string identifiers to renderer rigs. Accept a few aliases to
+        // keep prompts flexible.
+        std::string name = cmd->lightingRig;
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        Graphics::Renderer::LightingRig rig = Graphics::Renderer::LightingRig::Custom;
+        if (name == "studio_three_point" || name == "studio" || name == "three_point") {
+            rig = Graphics::Renderer::LightingRig::StudioThreePoint;
+        } else if (name == "warehouse" || name == "top_down_warehouse" || name == "topdown_warehouse") {
+            rig = Graphics::Renderer::LightingRig::TopDownWarehouse;
+        } else if (name == "horror_side" || name == "horror" || name == "horror_side_light") {
+            rig = Graphics::Renderer::LightingRig::HorrorSideLight;
+        } else if (name == "street_lanterns" || name == "streetlights" || name == "street_lights" ||
+                   name == "alley_lights" || name == "road_lights") {
+            rig = Graphics::Renderer::LightingRig::StreetLanterns;
+        }
+
+        if (rig != Graphics::Renderer::LightingRig::Custom) {
+            renderer->ApplyLightingRig(rig, registry);
+            summary << "lighting_rig=" << name << " ";
+            touched = true;
+        }
+    }
 
     if (touched) {
         PushStatus(true, summary.str());

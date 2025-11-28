@@ -1,4 +1,4 @@
-# Project Cortex – Automation Scripts
+# Project Cortex - Automation Scripts
 
 The engine includes a small set of scripts to streamline setup, build, and run
 operations on Windows.
@@ -27,7 +27,7 @@ These entry points perform a full setup and build on a clean machine.
 
 ## Script Overview
 
-### `setup.ps1` / `setup.bat` – Full setup + build
+### `setup.ps1` / `setup.bat` - Full setup + build
 
 Responsibilities:
 
@@ -47,7 +47,7 @@ Common options (PowerShell version):
 .\setup.ps1 -BuildConfig Debug # build Debug instead of Release
 ```
 
-### `build.ps1` – Rebuild only
+### `build.ps1` - Rebuild only
 
 Runs the build step without re-running the full setup:
 
@@ -57,9 +57,9 @@ Runs the build step without re-running the full setup:
 .\build.ps1 -Clean             # clean first, then build
 ```
 
-### `run.ps1` – Launch the engine
+### `run.ps1` - Launch the engine
 
-Locates the built executable in `build\bin\Release` (or a non‑config path,
+Locates the built executable in `build\bin\Release` (or a non-config path,
 depending on generator) and runs it:
 
 ```powershell
@@ -68,8 +68,8 @@ depending on generator) and runs it:
 
 ### Other helper scripts
 
-- `full-build.ps1` – convenience wrapper that runs setup and then build.
-- `swap.ps1`, `convert_and_clean.py`, `smart_convert.py`, etc. – tools used for
+- `full-build.ps1` - convenience wrapper that runs setup and then build.
+- `swap.ps1`, `convert_and_clean.py`, `smart_convert.py`, etc. - tools used for
   model and asset conversion; see comments in each script for details.
 
 ---

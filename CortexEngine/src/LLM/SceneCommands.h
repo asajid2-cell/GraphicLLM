@@ -23,6 +23,8 @@ enum class CommandType {
     ScenePlan,
     GenerateTexture,
     GenerateEnvmap,
+    SelectEntity,
+    FocusCamera,
     Unknown
 };
 
@@ -275,7 +277,9 @@ struct ModifyRendererCommand : public SceneCommand {
     bool iblEnabled = true;
     float iblDiffuseIntensity = 1.0f;
     float iblSpecularIntensity = 1.0f;
-    std::string lightingRig;       // "studio_three_point", "warehouse", "horror_side"
+    // Lighting rig identifiers understood by the renderer/command queue, e.g.:
+    // "studio_three_point", "warehouse", "horror_side", "street_lanterns".
+    std::string lightingRig;
     bool fogEnabled = false;
     float fogDensity = 0.02f;
     float fogHeight = 0.0f;
@@ -344,6 +348,25 @@ struct GenerateEnvmapCommand : public SceneCommand {
     uint32_t seed   = 0;
 
     GenerateEnvmapCommand() { type = CommandType::GenerateEnvmap; }
+    std::string ToString() const override;
+};
+
+// Select an entity by name/tag so the editor can highlight and manipulate it.
+struct SelectEntityCommand : public SceneCommand {
+    std::string targetName;
+    bool clearOthers = true;
+
+    SelectEntityCommand() { type = CommandType::SelectEntity; }
+    std::string ToString() const override;
+};
+
+// Focus / frame the camera on a specific entity or explicit world position.
+struct FocusCameraCommand : public SceneCommand {
+    std::string targetName;      // preferred: resolve to entity
+    bool hasTargetPosition = false;
+    glm::vec3 targetPosition{0.0f};
+
+    FocusCameraCommand() { type = CommandType::FocusCamera; }
     std::string ToString() const override;
 };
 

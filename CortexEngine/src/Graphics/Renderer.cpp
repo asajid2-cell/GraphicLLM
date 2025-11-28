@@ -43,6 +43,29 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
     spdlog::info("Initializing Renderer...");
 
+    // Detect basic DXR ray tracing support (optional path).
+    m_rayTracingSupported = false;
+    m_rayTracingEnabled = false;
+    {
+        Microsoft::WRL::ComPtr<ID3D12Device5> dxrDevice;
+        HRESULT dxrHr = m_device->GetDevice()->QueryInterface(IID_PPV_ARGS(&dxrDevice));
+        if (SUCCEEDED(dxrHr)) {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5{};
+            HRESULT featHr = dxrDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5,
+                                                            &options5,
+                                                            sizeof(options5));
+            if (SUCCEEDED(featHr) && options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
+                m_rayTracingSupported = true;
+                spdlog::info("DXR ray tracing supported (tier {}).",
+                             static_cast<int>(options5.RaytracingTier));
+            } else {
+                spdlog::info("DXR ray tracing not supported (feature tier not available).");
+            }
+        } else {
+            spdlog::info("DXR ray tracing not supported (ID3D12Device5 not available).");
+        }
+    }
+
     // Create command queue
     m_commandQueue = std::make_unique<DX12CommandQueue>();
     auto queueResult = m_commandQueue->Initialize(device->GetDevice());
@@ -83,6 +106,19 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_hyperGeometry.reset();
     }
 #endif
+
+    // Initialize ray tracing context if DXR is supported. If this fails for any
+    // reason, hard-disable ray tracing so the toggle becomes inert.
+    if (m_rayTracingSupported) {
+        m_rayTracingContext = std::make_unique<DX12RaytracingContext>();
+        auto rtResult = m_rayTracingContext->Initialize(device, m_descriptorManager.get());
+        if (rtResult.IsErr()) {
+            spdlog::warn("DXR context initialization failed: {}", rtResult.Error());
+            m_rayTracingContext.reset();
+            m_rayTracingSupported = false;
+            m_rayTracingEnabled = false;
+        }
+    }
 
     // Create command allocators (one per frame)
     for (uint32_t i = 0; i < 3; ++i) {
@@ -207,6 +243,11 @@ void Renderer::Shutdown() {
         m_commandQueue->Flush();
     }
 
+    if (m_rayTracingContext) {
+        m_rayTracingContext->Shutdown();
+        m_rayTracingContext.reset();
+    }
+
     m_placeholderAlbedo.reset();
     m_placeholderNormal.reset();
     m_placeholderMetallic.reset();
@@ -237,13 +278,20 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     m_totalTime += deltaTime;
 
-    // Opportunistically load a small number of pending environment maps each
-    // frame so that startup remains fast while the full HDR library becomes
-    // available in the background.
-    ProcessPendingEnvironmentMaps(1);
+    // Ensure all environment maps are loaded before rendering the scene. This
+    // trades a slightly longer startup for stable frame times once the scene
+    // becomes interactive.
+    ProcessPendingEnvironmentMaps(std::numeric_limits<uint32_t>::max());
 
     BeginFrame();
     UpdateFrameConstants(deltaTime, registry);
+
+    // Optional ray tracing path (DXR). In this pass we only exercise the
+    // plumbing to build a stub TLAS and dispatch a no-op ray pass when
+    // both support and the runtime toggle are enabled.
+    if (m_rayTracingSupported && m_rayTracingEnabled && m_rayTracingContext) {
+        RenderRayTracing(registry);
+    }
 
     // First pass: render depth from directional light
     if (m_shadowsEnabled && m_shadowMap && m_shadowPipeline) {
@@ -297,7 +345,26 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // Post-process HDR -> back buffer (or no-op if HDR disabled)
     RenderPostProcess();
+
+    // Debug overlay lines rendered after all post-processing so they are not
+    // affected by tone mapping, bloom, or TAA.
+    RenderDebugLines();
+
     EndFrame();
+}
+
+void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
+    if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext || !registry) {
+        return;
+    }
+
+    ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
+    HRESULT hr = m_commandList.As(&rtCmdList);
+    if (SUCCEEDED(hr) && rtCmdList) {
+        // For now, just exercise the plumbing: build a stub TLAS and dispatch.
+        m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
+        m_rayTracingContext->DispatchRayTracing(rtCmdList.Get());
+    }
 }
 
 void Renderer::BeginFrame() {
@@ -331,6 +398,11 @@ void Renderer::BeginFrame() {
             }
         }
     }
+    // Propagate resize to ray tracing context so it can adjust any RT targets.
+    if (m_rayTracingContext && m_window) {
+        m_rayTracingContext->OnResize(m_window->GetWidth(), m_window->GetHeight());
+    }
+
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
     m_objectConstantBuffer.ResetOffset();
     m_materialConstantBuffer.ResetOffset();
@@ -613,10 +685,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     frameData.lights[0].params = glm::vec4(0.0f);
     lightCount = 1;
 
-    // Populate additional lights from LightComponent (point/spot)
+    // Populate additional lights from LightComponent (point/spot). We support
+    // up to kMaxForwardLights-1 additional lights beyond the sun.
     auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
     for (auto entity : lightView) {
-        if (lightCount >= 4) {
+        if (lightCount >= kMaxForwardLights) {
             break;
         }
         auto& lightComp = lightView.get<Scene::LightComponent>(entity);
@@ -672,7 +745,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     }
 
     // Zero any remaining lights
-    for (uint32_t i = lightCount; i < 4; ++i) {
+    for (uint32_t i = lightCount; i < kMaxForwardLights; ++i) {
         frameData.lights[i].position_type = glm::vec4(0.0f);
         frameData.lights[i].direction_cosInner = glm::vec4(0.0f);
         frameData.lights[i].color_range = glm::vec4(0.0f);
@@ -1761,8 +1834,9 @@ void Renderer::CycleDebugViewMode() {
     // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height,
     // 8 = IBL diffuse only, 9 = IBL specular only, 10 = env direction/UV,
     // 11 = Fresnel (Fibl), 12 = specular mip debug,
-    // 13 = SSAO only, 14 = SSAO overlay, 15 = SSR only, 16 = SSR overlay
-    m_debugViewMode = (m_debugViewMode + 1) % 17;
+    // 13 = SSAO only, 14 = SSAO overlay, 15 = SSR only, 16 = SSR overlay,
+    // 17 = forward light debug (heatmap / count), 18 = scene graph / debug lines
+    m_debugViewMode = (m_debugViewMode + 1) % 19;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -1782,6 +1856,8 @@ void Renderer::CycleDebugViewMode() {
         case 14: label = "SSAO_Overlay"; break;
         case 15: label = "SSR_Only"; break;
         case 16: label = "SSR_Overlay"; break;
+        case 17: label = "Light_Debug"; break;
+        case 18: label = "SceneGraph"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -1831,7 +1907,8 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 }
 
 void Renderer::SetDebugViewMode(int mode) {
-    int clamped = std::max(0, std::min(mode, 16));
+    // Clamp to the full range of supported debug modes.
+    int clamped = std::max(0, std::min(mode, 18));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -1873,6 +1950,19 @@ void Renderer::SetBloomIntensity(float intensity) {
     }
     m_bloomIntensity = clamped;
     spdlog::info("Renderer bloom intensity set to {}", m_bloomIntensity);
+}
+
+void Renderer::SetRayTracingEnabled(bool enabled) {
+    bool newValue = enabled && m_rayTracingSupported;
+    if (m_rayTracingEnabled == newValue) {
+        return;
+    }
+    if (enabled && !m_rayTracingSupported) {
+        spdlog::info("Ray tracing toggle requested, but DXR is not supported on this device.");
+        return;
+    }
+    m_rayTracingEnabled = newValue;
+    spdlog::info("Ray tracing {}", m_rayTracingEnabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
@@ -2106,6 +2196,47 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
         }
 
         spdlog::info("Applied lighting rig: HorrorSideLight");
+        break;
+    }
+
+    case LightingRig::StreetLanterns: {
+        // Night-time street / alley rig: dim directional light, subtle ambient,
+        // and a row of strong warm street lanterns that actually light the
+        // environment. A subset of lights cast shadows to keep performance
+        // reasonable while still giving good occlusion cues.
+        m_directionalLightDirection = glm::normalize(glm::vec3(-0.1f, -1.0f, 0.1f));
+        m_directionalLightColor = glm::vec3(0.5f, 0.55f, 0.65f);
+        m_directionalLightIntensity = 1.5f;
+        m_ambientLightColor = glm::vec3(0.02f, 0.03f, 0.05f);
+        m_ambientLightIntensity = 0.7f;
+
+        const int lightCount = 8;
+        const float spacing = 7.5f;
+        const float startX = -((lightCount - 1) * spacing * 0.5f);
+        const float zPos = -6.0f;
+        const float height = 5.0f;
+
+        for (int i = 0; i < lightCount; ++i) {
+            entt::entity e = enttReg.create();
+            std::string name = "StreetLantern_" + std::to_string(i);
+            enttReg.emplace<Scene::TagComponent>(e, name);
+
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(startX + i * spacing, height, zPos);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Point;
+            // Warm sodium-vapor style color
+            l.color = glm::vec3(1.0f, 0.85f, 0.55f);
+            // Strong intensity and generous range so they fill the street.
+            l.intensity = 24.0f;
+            l.range = 18.0f;
+            // Let every second lantern cast shadows; the renderer will pick up
+            // to kMaxShadowedLocalLights of these for actual shadow maps.
+            l.castsShadows = (i % 2 == 0);
+        }
+
+        spdlog::info("Applied lighting rig: StreetLanterns ({} lights)", lightCount);
         break;
     }
     }
@@ -3292,6 +3423,49 @@ Result<void> Renderer::CompileShaders() {
         return Result<void>::Err("Failed to create bloom composite pipeline: " + bloomCompositeResult.Error());
     }
 
+    // Debug line pipeline (world-space lines rendered after post-process).
+    // Reuse Basic.hlsl with a lightweight VS/PS pair that reads FrameConstants.
+    auto debugVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "DebugLineVS",
+        "vs_5_1"
+    );
+    auto debugPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "DebugLinePS",
+        "ps_5_1"
+    );
+    if (debugVsResult.IsOk() && debugPsResult.IsOk()) {
+        m_debugLinePipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc dbgDesc = {};
+        dbgDesc.vertexShader = debugVsResult.Value();
+        dbgDesc.pixelShader  = debugPsResult.Value();
+        dbgDesc.inputLayout = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+        dbgDesc.rtvFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        dbgDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        dbgDesc.numRenderTargets = 1;
+        dbgDesc.depthTestEnabled = false;
+        dbgDesc.depthWriteEnabled = false;
+        dbgDesc.cullMode = D3D12_CULL_MODE_NONE;
+        dbgDesc.blendEnabled = false;
+
+        auto dbgPipelineResult = m_debugLinePipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            dbgDesc
+        );
+        if (dbgPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create debug line pipeline: {}", dbgPipelineResult.Error());
+            m_debugLinePipeline.reset();
+        }
+    } else {
+        spdlog::warn("Failed to compile debug line shaders; debug overlay will be disabled");
+    }
+
     return Result<void>::Ok();
 }
 
@@ -3383,46 +3557,37 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     std::sort(envFiles.begin(), envFiles.end());
 
     int successCount = 0;
-    bool firstLoaded = false;
     for (size_t index = 0; index < envFiles.size(); ++index) {
         const auto& envPath = envFiles[index];
         std::string pathStr = envPath.string();
         std::string name = envPath.stem().string();
 
-        // Load only the first environment synchronously during startup so the
-        // app can become interactive quickly. Remaining environments are queued
-        // for deferred loading on subsequent frames.
-        if (!firstLoaded) {
-            auto texResult = LoadTextureFromFile(pathStr, false);
-            if (texResult.IsErr()) {
-                spdlog::warn("Failed to load primary environment from '{}': {}", pathStr, texResult.Error());
-                continue;
-            }
-
-            auto tex = texResult.Value();
-
-            EnvironmentMaps env;
-            env.name = name;
-            env.diffuseIrradiance = tex;
-            env.specularPrefiltered = tex;
-            m_environmentMaps.push_back(env);
-
-            spdlog::info(
-                "Environment '{}' loaded eagerly from '{}': {}x{}, {} mips",
-                name,
-                pathStr,
-                tex->GetWidth(),
-                tex->GetHeight(),
-                tex->GetMipLevels());
-
-            ++successCount;
-            firstLoaded = true;
-        } else {
-            PendingEnvironment pending;
-            pending.path = pathStr;
-            pending.name = name;
-            m_pendingEnvironments.push_back(std::move(pending));
+        // Load all environments synchronously during startup so that by the
+        // time the scene becomes interactive, HDR backgrounds and IBL are
+        // fully available and won't cause hitches while moving the camera.
+        auto texResult = LoadTextureFromFile(pathStr, false);
+        if (texResult.IsErr()) {
+            spdlog::warn("Failed to load environment from '{}': {}", pathStr, texResult.Error());
+            continue;
         }
+
+        auto tex = texResult.Value();
+
+        EnvironmentMaps env;
+        env.name = name;
+        env.diffuseIrradiance = tex;
+        env.specularPrefiltered = tex;
+        m_environmentMaps.push_back(env);
+
+        spdlog::info(
+            "Environment '{}' loaded at startup from '{}': {}x{}, {} mips",
+            name,
+            pathStr,
+            tex->GetWidth(),
+            tex->GetHeight(),
+            tex->GetMipLevels());
+
+        ++successCount;
     }
 
     // If no environments loaded, create a fallback placeholder environment
@@ -3498,11 +3663,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     UpdateEnvironmentDescriptorTable();
 
-    int pendingCount = static_cast<int>(m_pendingEnvironments.size());
     spdlog::info(
-        "Environment maps initialized: {} loaded eagerly, {} pending for deferred loading",
-        successCount,
-        pendingCount);
+        "Environment maps initialized: {} loaded eagerly, 0 pending for deferred loading",
+        successCount);
     return Result<void>::Ok();
 }
 
@@ -3927,7 +4090,7 @@ void Renderer::RenderPostProcess() {
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
     );
 
-    // Optional bloom SRV (t1) – use final blurred bloom texture if available
+    // Optional bloom SRV (t1) - use final blurred bloom texture if available
     DescriptorHandle bloomHandle = {};
     if (m_bloomCombinedSRV.IsValid()) {
         auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
@@ -4110,5 +4273,135 @@ void Renderer::RenderPostProcess() {
         m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         m_hasHistory = true;
     }
+}
+
+void Renderer::AddDebugLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color) {
+    DebugLineVertex v0{ a, color };
+    DebugLineVertex v1{ b, color };
+    m_debugLines.push_back(v0);
+    m_debugLines.push_back(v1);
+}
+
+void Renderer::ClearDebugLines() {
+    m_debugLines.clear();
+}
+
+void Renderer::RenderDebugLines() {
+    if (m_debugLinesDisabled || !m_debugLinePipeline || m_debugLines.empty() || !m_window) {
+        m_debugLines.clear();
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device || !m_commandList) {
+        m_debugLines.clear();
+        return;
+    }
+
+    const UINT vertexCount = static_cast<UINT>(m_debugLines.size());
+
+    // Lazily allocate or grow the upload buffer used for debug lines. We keep
+    // a single buffer and reuse it across frames to avoid constant heap
+    // allocations, which can cause memory fragmentation or failures on some
+    // drivers.
+    const UINT requiredCapacity = vertexCount;
+    const UINT minCapacity = 4096; // vertices
+    UINT newCapacity = m_debugLineVertexCapacity;
+
+    if (!m_debugLineVertexBuffer || m_debugLineVertexCapacity < requiredCapacity) {
+        newCapacity = std::max(requiredCapacity, minCapacity);
+
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<UINT64>(newCapacity) * sizeof(DebugLineVertex);
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> newBuffer;
+        HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&newBuffer));
+
+        if (FAILED(hr)) {
+            spdlog::warn("RenderDebugLines: failed to allocate vertex buffer (disabling debug lines for this run)");
+            m_debugLinesDisabled = true;
+            m_debugLines.clear();
+            return;
+        }
+
+        m_debugLineVertexBuffer = newBuffer;
+        m_debugLineVertexCapacity = newCapacity;
+    }
+
+    const UINT bufferSize = vertexCount * sizeof(DebugLineVertex);
+
+    // Upload vertex data.
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{ 0, 0 };
+    if (SUCCEEDED(m_debugLineVertexBuffer->Map(0, &readRange, &mapped))) {
+        memcpy(mapped, m_debugLines.data(), bufferSize);
+        m_debugLineVertexBuffer->Unmap(0, nullptr);
+    } else {
+        spdlog::warn("RenderDebugLines: failed to map vertex buffer (disabling debug lines for this run)");
+        m_debugLinesDisabled = true;
+        m_debugLines.clear();
+        return;
+    }
+
+    // Set pipeline state and render target (back buffer).
+    auto* backBuffer = m_window->GetCurrentBackBuffer();
+    if (!backBuffer) {
+        m_debugLines.clear();
+        return;
+    }
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+    // We already transitioned the back buffer in EndFrame; assume it is in
+    // RENDER_TARGET state here after RenderPostProcess.
+
+    m_commandList->SetPipelineState(m_debugLinePipeline->GetPipelineState());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+
+    // Frame constants are already bound; ensure object/material CBVs are valid
+    // by binding identity constants once.
+    ObjectConstants obj{};
+    obj.modelMatrix = glm::mat4(1.0f);
+    obj.normalMatrix = glm::mat4(1.0f);
+    auto objAddr = m_objectConstantBuffer.AllocateAndWrite(obj);
+    m_commandList->SetGraphicsRootConstantBufferView(0, objAddr);
+
+    // IA setup
+    D3D12_VERTEX_BUFFER_VIEW vbv = {};
+    vbv.BufferLocation = m_debugLineVertexBuffer->GetGPUVirtualAddress();
+    vbv.StrideInBytes = sizeof(DebugLineVertex);
+    vbv.SizeInBytes = bufferSize;
+
+    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+    m_commandList->IASetIndexBuffer(nullptr);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+    // Draw all lines in one call.
+    m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
+
+    m_debugLines.clear();
 }
 } // namespace Cortex::Graphics

@@ -13,14 +13,14 @@ layer in Project Cortex.
 
 - Tokens returned from the model were frequently converted to empty strings.
 - The JSON extractor then saw an empty buffer and failed with:
-  “attempting to parse an empty input”.
+  "attempting to parse an empty input".
 
 ### Root Cause
 
 - `llama_token_to_piece()` returns a negative value when the provided buffer
   is too small; the absolute value is the required size.
-- The original code treated negative values as “error, skip this token”
-  instead of “resize and retry”.
+- The original code treated negative values as "error, skip this token"
+  instead of "resize and retry".
 
 ### Fix
 
@@ -39,7 +39,7 @@ if (wrote < 0) {
 
 ### Result
 
-- Tokens are now reliably converted to UTF‑8 text.
+- Tokens are now reliably converted to UTF-8 text.
 - The JSON extractor receives the full model output and can locate the
   command block correctly.
 
@@ -52,12 +52,12 @@ if (wrote < 0) {
 ### Problem
 
 - In rare cases the model produced extra explanation before or after the JSON.
-- The extractor only handled the ideal case: a top‑level object starting at
+- The extractor only handled the ideal case: a top-level object starting at
   the first `{` and ending at the matching `}`.
 
 ### Fix
 
-- Implemented a simple brace‑counting scan that:
+- Implemented a simple brace-counting scan that:
   - Finds the first `{`.
   - Tracks nesting depth until it returns to zero.
   - Extracts that substring as the candidate JSON.

@@ -293,13 +293,10 @@ entt::entity SceneLookup::ResolveTarget(const std::string& rawName,
         return substringCandidate;
     }
 
-    // Fallback to most recent
-    entt::entity fallback = PickMostRecentValid(registry);
-    if (isValid(fallback)) {
-        outHint = "Falling back to last spawned entity";
-        return fallback;
-    }
-
+    // At this point we have no reliable match. To avoid surprising edits to
+    // unrelated objects, do NOT silently fall back to the last spawned
+    // entity; instead, report a clear "not found" error so the caller can
+    // surface this to the user or the LLM.
     makeNotFoundHint("Target '" + rawName + "' not found.");
     return entt::null;
 }
@@ -479,7 +476,7 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
             }
             header << name << ": grid region centered at ("
                    << std::round(cx) << "," << std::round(cz)
-                   << ") size≈(" << std::round(ex) << "," << std::round(ez) << ")";
+                   << ") size~(" << std::round(ex) << "," << std::round(ez) << ")";
         }
         if (!first) {
             header << ". ";
@@ -634,7 +631,7 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
         }
 
         std::ostringstream line;
-        line << tag.tag << "(" << typeStr << ",int≈"
+        line << tag.tag << "(" << typeStr << ",int~"
              << std::round(light.intensity * 10.0f) / 10.0f << ")@("
              << std::round(transform.position.x * 10.0f) / 10.0f << ","
              << std::round(transform.position.y * 10.0f) / 10.0f << ","

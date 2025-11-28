@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <chrono>
 #include <string>
 #include <deque>
@@ -37,6 +36,9 @@ struct EngineConfig {
     float cameraBaseSpeed = 5.0f;
     float cameraSprintMultiplier = 3.0f;
     float mouseSensitivity = 0.003f;
+
+    // Ray tracing config (DXR)
+    bool enableRayTracing = false;
 };
 
 // Main engine class - orchestrates the game loop
@@ -67,7 +69,7 @@ public:
     [[nodiscard]] Scene::ECS_Registry* GetRegistry() { return m_registry.get(); }
 
     // Logical focus target (most recently spawned or modified group/entity).
-    void SetFocusTarget(const std::string& name) { m_focusTargetName = name; }
+    void SetFocusTarget(const std::string& name);
     [[nodiscard]] std::string GetFocusTarget() const { return m_focusTargetName; }
 
 private:
@@ -81,6 +83,25 @@ private:
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
     void SyncDebugMenuFromRenderer();
+    void DebugDrawSceneGraph();
+
+    // Picking / camera helpers
+    bool ComputeCameraRayFromMouse(float mouseX, float mouseY,
+                                   glm::vec3& outOrigin,
+                                   glm::vec3& outDirection);
+    entt::entity PickEntityAt(float mouseX, float mouseY);
+    void FrameSelectedEntity();
+
+    // Translation gizmo helpers
+    enum class GizmoAxis { None, X, Y, Z };
+    void UpdateGizmoHover();
+    bool HitTestGizmoAxis(const glm::vec3& rayOrigin,
+                          const glm::vec3& rayDir,
+                          const glm::vec3& center,
+                          const glm::vec3 axes[3],
+                          float axisLength,
+                          float threshold,
+                          GizmoAxis& outAxis);
 
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Graphics::DX12Device> m_device;
@@ -139,6 +160,25 @@ private:
     float m_cameraRollSpeed = 1.5f;       // radians/s roll rate
     float m_cameraRollDamping = 3.0f;     // how quickly roll recenters when no input
     entt::entity m_activeCameraEntity = entt::null;
+
+    // Current selection for editor-style interactions (picking & framing).
+    entt::entity m_selectedEntity = entt::null;
+
+    // Translation gizmo interaction state
+    GizmoAxis m_gizmoHoveredAxis = GizmoAxis::None;
+    GizmoAxis m_gizmoActiveAxis  = GizmoAxis::None;
+    bool m_gizmoDragging = false;
+    glm::vec2 m_lastMousePos{0.0f, 0.0f};
+    glm::vec3 m_gizmoAxisDir{0.0f};
+    glm::vec3 m_gizmoDragCenter{0.0f};
+    glm::vec3 m_gizmoDragPlaneNormal{0.0f, 1.0f, 0.0f};
+    glm::vec3 m_gizmoDragPlanePoint{0.0f};
+    glm::vec3 m_gizmoDragStartEntityPos{0.0f};
+    float m_gizmoDragStartAxisParam = 0.0f;
+
+    // Engine settings (debug menu) navigation state
+    int m_settingsSection = 0;
+    int m_settingsItem = 0;
 
     // Name of the current logical focus object/group (e.g., Pig_1 or SpinningCube).
     std::string m_focusTargetName;

@@ -5,16 +5,19 @@
 namespace Cortex::Scene {
 
 glm::mat4 TransformComponent::GetMatrix() const {
+    return worldMatrix;
+}
+
+glm::mat4 TransformComponent::GetNormalMatrix() const {
+    return normalMatrix;
+}
+
+glm::mat4 TransformComponent::GetLocalMatrix() const {
     glm::mat4 matrix = glm::mat4(1.0f);
     matrix = glm::translate(matrix, position);
     matrix = matrix * glm::mat4_cast(rotation);
     matrix = glm::scale(matrix, scale);
     return matrix;
-}
-
-glm::mat4 TransformComponent::GetNormalMatrix() const {
-    glm::mat4 modelMatrix = GetMatrix();
-    return glm::transpose(glm::inverse(modelMatrix));
 }
 
 glm::mat4 CameraComponent::GetProjectionMatrix(float aspectRatio) const {

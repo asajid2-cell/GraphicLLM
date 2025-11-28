@@ -121,6 +121,17 @@ std::string GenerateEnvmapCommand::ToString() const {
     return "GenerateEnvmap: " + name;
 }
 
+std::string SelectEntityCommand::ToString() const {
+    return "SelectEntity: " + targetName;
+}
+
+std::string FocusCameraCommand::ToString() const {
+    if (!targetName.empty()) {
+        return "FocusCamera: " + targetName;
+    }
+    return "FocusCamera: position";
+}
+
 std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr,
                                                                     const std::string& focusTargetName) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
@@ -155,7 +166,31 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
 
             std::string type = cmdJson["type"];
 
-            if (type == "add_entity") {
+            if (type == "select_entity") {
+                auto cmd = std::make_shared<SelectEntityCommand>();
+                if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                    cmd->targetName = resolveTargetName(cmdJson["name"]);
+                }
+                if (cmdJson.contains("clear_others") && cmdJson["clear_others"].is_boolean()) {
+                    cmd->clearOthers = cmdJson["clear_others"];
+                }
+                commands.push_back(cmd);
+            }
+            else if (type == "focus_camera") {
+                auto cmd = std::make_shared<FocusCameraCommand>();
+                if (cmdJson.contains("target_entity") && cmdJson["target_entity"].is_string()) {
+                    cmd->targetName = resolveTargetName(cmdJson["target_entity"]);
+                }
+                if (cmdJson.contains("target_position") && cmdJson["target_position"].is_array()) {
+                    glm::vec3 pos;
+                    if (ReadVec3(cmdJson["target_position"], "target_position", pos)) {
+                        cmd->hasTargetPosition = true;
+                        cmd->targetPosition = pos;
+                    }
+                }
+                commands.push_back(cmd);
+            }
+            else if (type == "add_entity") {
                 // If the model uses entity_type equal to a compound prefab like "house",
                 // reinterpret this as an add_compound instead of a single primitive so
                 // that houses stay rich multi-part objects.
@@ -603,7 +638,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("debug_mode")) {
                     cmd->setDebugMode = true;
                     float v = ReadNumber(cmdJson["debug_mode"], "debug_mode", 0.0f);
-                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 16.0f)));
+                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 17.0f)));
                 }
                 if (cmdJson.contains("shadow_bias")) {
                     cmd->setShadowBias = true;
@@ -675,7 +710,9 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("sun_direction")) {
                     glm::vec3 dir;
                     if (ReadVec3(cmdJson["sun_direction"], "sun_direction", dir)) {
-                        if (glm::length2(dir) > 1e-4f) {
+                        // Treat nearly-zero vectors as "no-op" and ignore them.
+                        float len2 = glm::dot(dir, dir);
+                        if (std::isfinite(len2) && len2 > 1e-4f) {
                             cmd->setSunDirection = true;
                             cmd->sunDirection = dir;
                         }
@@ -949,7 +986,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (arrayStart != std::string::npos) {
                     auto arrayEnd = fixed.find(']', arrayStart);
                     if (arrayEnd == std::string::npos) {
-                        // No closing ']' for the commands array – likely truncated after the last object.
+                        // No closing ']' for the commands array - likely truncated after the last object.
                         // Most robust salvage: assume we ended after a complete object and append "]}".
                         fixed.append("]}");
                         attemptedFix = true;

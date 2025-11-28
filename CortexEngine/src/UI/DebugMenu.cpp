@@ -50,6 +50,10 @@ void ApplyStateToRenderer(const DebugMenuState& state) {
         state.fractalGain,
         state.fractalWarpStrength,
         state.fractalNoiseType);
+
+    if (renderer->IsRayTracingSupported()) {
+        renderer->SetRayTracingEnabled(state.rayTracingEnabled);
+    }
 }
 
 } // namespace

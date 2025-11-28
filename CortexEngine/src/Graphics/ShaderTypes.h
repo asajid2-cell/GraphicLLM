@@ -12,6 +12,10 @@
 
 namespace Cortex::Graphics {
 
+// Keep this in sync with the g_Lights array size in the HLSL FrameConstants
+// definitions (Basic.hlsl, PostProcess.hlsl, SSAO.hlsl, SSR.hlsl, MotionVectors.hlsl).
+static constexpr uint32_t kMaxForwardLights = 16;
+
 // Vertex input structure
 struct Vertex {
     glm::vec3 position;
@@ -60,9 +64,9 @@ struct FrameConstants {
     glm::vec4 timeAndExposure;
     // rgb: ambient color * intensity, w unused
     glm::vec4 ambientColor;
-    // Forward light list (currently up to 4 lights; light[0] is the sun)
+// Forward light list (currently up to 4 lights; light[0] is the sun)
     alignas(16) glm::uvec4 lightCount;
-    alignas(16) Light lights[4];
+    alignas(16) Light lights[kMaxForwardLights];
     // Directional + local light view-projection matrices:
     // indices 0-2: cascades for the sun
     // indices 3-5: shadowed local lights (spot)
@@ -76,7 +80,9 @@ struct FrameConstants {
     //                      7 = fractal height, 8 = IBL diffuse only,
     //                      9 = IBL specular only, 10 = env direction/UV,
     //                      11 = Fresnel (Fibl), 12 = specular mip,
-    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
+    //                      13 = SSAO only, 14 = SSAO overlay,
+    //                      15 = SSR only, 16 = SSR overlay,
+    //                      17 = forward light debug), others reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     glm::vec4 postParams;

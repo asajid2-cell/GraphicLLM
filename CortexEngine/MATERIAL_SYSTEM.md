@@ -1,7 +1,7 @@
 # Material System
 
 The Cortex Engine includes a physically based material system that can be driven
-both programmatically and via LLM‑generated commands.
+both programmatically and via LLM-generated commands.
 
 ---
 
@@ -11,18 +11,18 @@ Each material is defined by the following parameters:
 
 | Property     | Range   | Description                           |
 |--------------|---------|---------------------------------------|
-| `metallic`   | 0.0–1.0 | 0 = dielectric, 1 = conductor         |
-| `roughness`  | 0.0–1.0 | 0 = mirror‑smooth, 1 = fully diffuse  |
-| `ao`         | 0.0–1.0 | Ambient occlusion strength            |
+| `metallic`   | 0.0-1.0 | 0 = dielectric, 1 = conductor         |
+| `roughness`  | 0.0-1.0 | 0 = mirror-smooth, 1 = fully diffuse  |
+| `ao`         | 0.0-1.0 | Ambient occlusion strength            |
 | `albedo`     | RGBA    | Base surface color                    |
 
 Typical presets:
 
 ```text
-Shiny metal    = metallic 1.0, roughness 0.0–0.2
-Brushed metal  = metallic 1.0, roughness 0.3–0.5
-Matte plastic  = metallic 0.0, roughness 0.8–1.0
-Smooth plastic = metallic 0.0, roughness 0.2–0.4
+Shiny metal    = metallic 1.0, roughness 0.0-0.2
+Brushed metal  = metallic 1.0, roughness 0.3-0.5
+Matte plastic  = metallic 0.0, roughness 0.8-1.0
+Smooth plastic = metallic 0.0, roughness 0.2-0.4
 ```
 
 ---
@@ -56,7 +56,7 @@ struct MaterialConstants {
     float metallic;
     float roughness;
     float ao;
-    // padding as needed for 16‑byte alignment
+    // padding as needed for 16-byte alignment
 };
 ```
 
@@ -69,9 +69,9 @@ The renderer fills `MaterialConstants` per draw and binds it via a constant buff
 The material system is exposed through the command layer so that prompts can
 describe surface properties in natural language, for example:
 
-- “Make it shiny metal.”
-- “Make it matte plastic.”
-- “Give it a brushed aluminum look.”
+- "Make it shiny metal."
+- "Make it matte plastic."
+- "Give it a brushed aluminum look."
 
 The LLM maps these phrases to concrete parameter values (metallic/roughness/AO)
 inside `AddEntityCommand` or `ModifyMaterialCommand`. The parser:
@@ -89,5 +89,5 @@ Planned enhancements include:
 - Clearcoat and sheen terms for automotive and fabric materials.
 - Emissive intensity and color.
 - Support for normal/roughness/metallic texture maps.
-- Additional presets for common real‑world materials.
+- Additional presets for common real-world materials.
 

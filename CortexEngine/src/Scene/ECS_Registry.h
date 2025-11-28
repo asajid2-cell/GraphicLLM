@@ -54,7 +54,13 @@ public:
     // Phase 4: Scene Description for AI context
     std::string DescribeScene() const;
 
+    // Update world transforms for all entities that have TransformComponent.
+    // Applies parent-child relationships and computes world/normal matrices.
+    void UpdateTransforms();
+
 private:
+    void UpdateTransformRecursive(entt::entity entity, const glm::mat4& parentWorld);
+
     entt::registry m_registry;
 };
 

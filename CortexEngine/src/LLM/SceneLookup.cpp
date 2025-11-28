@@ -354,6 +354,30 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
     std::ostringstream perEntity;
     size_t written = 0;
 
+    // Find active camera (if any) to express spatial relations in camera space.
+    glm::vec3 camPos(0.0f);
+    glm::vec3 camForward(0.0f, 0.0f, 1.0f);
+    glm::vec3 camRight(1.0f, 0.0f, 0.0f);
+    bool haveCamera = false;
+    {
+        auto camView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+        for (auto entity : camView) {
+            const auto& cam = camView.get<Scene::CameraComponent>(entity);
+            if (!cam.isActive) continue;
+            const auto& t = camView.get<Scene::TransformComponent>(entity);
+            camPos = t.position;
+            camForward = glm::normalize(t.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            camRight = glm::normalize(glm::cross(camForward, up));
+            if (glm::dot(camRight, camRight) < 1e-4f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+                camRight = glm::normalize(glm::cross(camForward, up));
+            }
+            haveCamera = true;
+            break;
+        }
+    }
+
     auto view = registry->View<Scene::TagComponent, Scene::RenderableComponent, Scene::TransformComponent>();
     size_t total = 0;
     for (auto entity : view) {
@@ -388,8 +412,28 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
         std::ostringstream line;
         line << tag.tag << "(" << type;
         if (!color.empty()) line << "," << color;
-        line << ")@";
-        line << "(" << std::round(transform.position.x * 10.0f) / 10.0f << ",";
+        line << ")";
+
+        // Camera-relative spatial tags to help the LLM reason about layout.
+        if (haveCamera) {
+            glm::vec3 offset = transform.position - camPos;
+            float dist = glm::length(offset);
+            float along = glm::dot(offset, camForward);
+            float side = glm::dot(offset, camRight);
+            float up = offset.y;
+
+            const char* frontBack = (along >= 0.5f) ? "front" : (along <= -0.5f ? "behind" : "mid");
+            const char* leftRight = (side >= 0.5f) ? "right" : (side <= -0.5f ? "left" : "center");
+            const char* aboveBelow = (up > 0.5f) ? "above" : (up < -0.5f ? "below" : "level");
+            const char* nearFar = "mid";
+            if (dist < 3.0f) nearFar = "near";
+            else if (dist > 12.0f) nearFar = "far";
+
+            line << "[" << frontBack << "," << leftRight << "," << aboveBelow << "," << nearFar << ",d="
+                 << std::round(dist * 10.0f) / 10.0f << "]";
+        }
+
+        line << "@(" << std::round(transform.position.x * 10.0f) / 10.0f << ",";
         line << std::round(transform.position.y * 10.0f) / 10.0f << ",";
         line << std::round(transform.position.z * 10.0f) / 10.0f << ")";
 

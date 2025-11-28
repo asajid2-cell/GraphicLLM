@@ -650,6 +650,28 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     float v = ReadNumber(cmdJson["grade_cool"], "grade_cool", 0.0f);
                     cmd->colorGradeCool = std::clamp(v, -1.0f, 1.0f);
                 }
+                if (cmdJson.contains("lighting_rig") && cmdJson["lighting_rig"].is_string()) {
+                    cmd->setLightingRig = true;
+                    cmd->lightingRig = cmdJson["lighting_rig"];
+                }
+                if (cmdJson.contains("fog_enabled") && cmdJson["fog_enabled"].is_boolean()) {
+                    cmd->setFogEnabled = true;
+                    cmd->fogEnabled = cmdJson["fog_enabled"];
+                }
+                if (cmdJson.contains("fog_density") || cmdJson.contains("fog_height") || cmdJson.contains("fog_falloff")) {
+                    cmd->setFogParams = true;
+                    if (cmdJson.contains("fog_density")) {
+                        float v = ReadNumber(cmdJson["fog_density"], "fog_density", cmd->fogDensity);
+                        cmd->fogDensity = std::max(v, 0.0f);
+                    }
+                    if (cmdJson.contains("fog_height")) {
+                        cmd->fogHeight = ReadNumber(cmdJson["fog_height"], "fog_height", cmd->fogHeight);
+                    }
+                    if (cmdJson.contains("fog_falloff")) {
+                        float v = ReadNumber(cmdJson["fog_falloff"], "fog_falloff", cmd->fogFalloff);
+                        cmd->fogFalloff = std::max(v, 0.0f);
+                    }
+                }
                 if (cmdJson.contains("ssao_enabled") && cmdJson["ssao_enabled"].is_boolean()) {
                     cmd->setSSAOEnabled = true;
                     cmd->ssaoEnabled = cmdJson["ssao_enabled"];

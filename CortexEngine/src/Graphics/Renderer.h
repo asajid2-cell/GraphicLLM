@@ -196,6 +196,16 @@ public:
                           float coordMode, float scaleX, float scaleZ,
                           float lacunarity = 2.0f, float gain = 0.5f,
                           float warpStrength = 0.0f, float noiseType = 0.0f);
+
+    // Lighting rigs / presets
+    enum class LightingRig {
+        Custom = 0,
+        StudioThreePoint = 1,
+        TopDownWarehouse = 2,
+        HorrorSideLight = 3
+    };
+
+    void ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry);
     // Image-based lighting / environment controls
     void SetEnvironmentPreset(const std::string& name);
     void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
@@ -212,6 +222,9 @@ public:
     void SetSSREnabled(bool enabled);
     void ToggleSSR();
     void CycleScreenSpaceEffectsDebug();
+    void SetFogEnabled(bool enabled);
+    void SetFogParams(float density, float height, float falloff);
+    [[nodiscard]] bool IsFogEnabled() const { return m_fogEnabled; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
     [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
     // Dynamically register an environment map from an existing texture (used by Dreamer).
@@ -219,6 +232,9 @@ public:
 
 private:
     static constexpr uint32_t kShadowCascadeCount = 3;
+    // Total shadow-map array slices: cascades (sun) + local lights.
+    static constexpr uint32_t kMaxShadowedLocalLights = 3;
+    static constexpr uint32_t kShadowArraySize = kShadowCascadeCount + kMaxShadowedLocalLights;
     static constexpr uint32_t kBloomLevels = 3;
 
     void BeginFrame();
@@ -242,6 +258,7 @@ private:
     Result<void> CreateSSAOResources();
     Result<void> InitializeEnvironmentMaps();
     void UpdateEnvironmentDescriptorTable();
+    void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
@@ -303,7 +320,7 @@ private:
 
     // Shadow map (directional light, cascaded)
     ComPtr<ID3D12Resource> m_shadowMap;
-    std::array<DescriptorHandle, kShadowCascadeCount> m_shadowMapDSVs;
+    std::array<DescriptorHandle, kShadowArraySize> m_shadowMapDSVs;
     DescriptorHandle m_shadowMapSRV;
     // Shadow + environment descriptor table (t4-t6)
     std::array<DescriptorHandle, 3> m_shadowAndEnvDescriptors{};
@@ -363,6 +380,13 @@ private:
     };
 
     std::vector<EnvironmentMaps> m_environmentMaps;
+
+    struct PendingEnvironment {
+        std::string path;
+        std::string name;
+    };
+    std::vector<PendingEnvironment> m_pendingEnvironments;
+
     size_t m_currentEnvironment = 0;
     float m_iblDiffuseIntensity = 1.0f;
     float m_iblSpecularIntensity = 1.0f;
@@ -397,6 +421,9 @@ private:
     float m_shadowMapSize = 2048.0f;
     float m_shadowBias = 0.0005f;
     float m_shadowPCFRadius = 1.5f;
+    bool  m_hasLocalShadow = false;
+    uint32_t m_localShadowCount = 0;
+    glm::mat4 m_localLightViewProjMatrices[kMaxShadowedLocalLights]{};
 
     // Camera-followed shadow frustum parameters
     float m_shadowOrthoRange = 20.0f;
@@ -436,6 +463,12 @@ private:
     float m_ssaoRadius = 0.5f;
     float m_ssaoBias = 0.025f;
     float m_ssaoIntensity = 1.0f;
+
+    // Exponential height fog parameters
+    bool  m_fogEnabled = false;
+    float m_fogDensity = 0.02f;
+    float m_fogHeight = 0.0f;
+    float m_fogFalloff = 0.5f;
 
     // Frame state
     float m_totalTime = 0.0f;

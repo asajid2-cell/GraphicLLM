@@ -149,22 +149,15 @@ std::string BuildHeuristicJson(const std::string& prompt) {
     }
 
     // Lighting heuristics: simple helpers for spotlight, sunlight, ambient, and
-    // studio/three-point lighting setups.
+    // studio/three-point lighting setups. When possible, prefer using the
+    // renderer's lighting rigs so that keyboard/debug controls stay in sync
+    // with LLM-driven scenes.
     if (contains("studio lighting") || contains("studio light") || contains("better lighting")) {
+        // Use a dedicated modify_renderer macro to request the studio rig;
+        // the engine maps this to Renderer::ApplyLightingRig so hotkeys and
+        // debug UI stay consistent with LLM-driven lighting.
         std::ostringstream ss;
-        ss << R"({"commands":[)"
-           // Key light - strong, warm spotlight from front-right
-           << R"({"type":"add_light","light_type":"spot","name":"KeyLight","position":[3,4,-4],)"
-           << R"("direction":[-0.6,-0.8,0.7],"color":[1.0,0.95,0.85,1.0],)"
-           << R"("intensity":14.0,"range":25.0,"inner_cone":20.0,"outer_cone":35.0,"casts_shadows":true},)"
-           // Fill light - softer, cooler point light from front-left
-           << R"({"type":"add_light","light_type":"point","name":"FillLight","position":[-3,2,-3],)"
-           << R"("color":[0.8,0.85,1.0,1.0],"intensity":5.0,"range":20.0,"casts_shadows":false},)"
-           // Rim light - dimmer spotlight from behind
-           << R"({"type":"add_light","light_type":"spot","name":"RimLight","position":[0,3,4],)"
-           << R"("direction":[0,-0.5,-1.0],"color":[0.9,0.9,1.0,1.0],"intensity":8.0,)"
-           << R"("range":25.0,"inner_cone":25.0,"outer_cone":40.0,"casts_shadows":false})"
-           << R"(]})";
+        ss << R"({"commands":[{"type":"modify_renderer","lighting_rig":"studio_three_point"}]})";
         return ss.str();
     }
 
@@ -190,6 +183,41 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         ss << R"({"commands":[{"type":"add_light","light_type":"point","name":"AmbientFill",)"
            << R"("position":[0,3,-2],"color":[0.7,0.8,1.0,1.0],)"
            << R"("intensity":4.0,"range":30.0,"casts_shadows":false}]})";
+        return ss.str();
+    }
+
+    if (contains("fog") || contains("mist") || contains("haze")) {
+        std::ostringstream ss;
+        // Modest default fog: density and falloff tuned for indoor/medium scenes.
+        ss << R"({"commands":[{"type":"modify_renderer","fog_enabled":true,)" 
+           << R"("fog_density":0.02,"fog_height":0.0,"fog_falloff":0.5}]})";
+        return ss.str();
+    }
+
+    if (contains("sunset") || contains("golden hour") || contains("evening light")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"modify_renderer","environment":"sunset","grade_warm":0.4,"grade_cool":-0.1}]})";
+        return ss.str();
+    }
+
+    if (contains("night") || contains("moonlight") || contains("starlight")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"modify_renderer","environment":"night","grade_warm":-0.1,"grade_cool":0.3,"exposure":0.7}]})";
+        return ss.str();
+    }
+
+    if (contains("torch") || contains("torches") || contains("campfire")) {
+        std::ostringstream ss;
+        ss << R"({"commands":[)"
+           // Left torch
+           << R"({"type":"add_light","light_type":"point","name":"TorchLeft",)"
+           << R"("position":[-1.5,1.5,-3.0],"color":[1.0,0.75,0.4,1.0],)"
+           << R"("intensity":10.0,"range":6.0,"casts_shadows":true},)"
+           // Right torch
+           << R"({"type":"add_light","light_type":"point","name":"TorchRight",)"
+           << R"("position":[1.5,1.5,-3.0],"color":[1.0,0.75,0.4,1.0],)"
+           << R"("intensity":10.0,"range":6.0,"casts_shadows":true})"
+           << R"(]})";
         return ss.str();
     }
 

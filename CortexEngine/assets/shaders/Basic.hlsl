@@ -29,8 +29,10 @@ cbuffer FrameConstants : register(b1)
         float4 params;               // x = outer cone cos, y = shadow index, z,w reserved
     };
     Light g_Lights[4];
-    // Cascaded directional light view-projection matrices (we use first 3)
-    float4x4 g_LightViewProjection[4];
+    // Directional + local light view-projection matrices:
+    // indices 0-2: cascades for the sun
+    // indices 3-5: shadowed local lights (spot)
+    float4x4 g_LightViewProjection[6];
     // x,y,z = cascade split depths in view space, w = far plane
     float4 g_CascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
@@ -49,6 +51,8 @@ cbuffer FrameConstants : register(b1)
     float4 g_EnvParams;
     // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
     float4 g_ColorGrade;
+    // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
+    float4 g_FogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4 g_AOParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
@@ -82,8 +86,8 @@ Texture2D g_RoughnessTexture : register(t3);
 // Shadow map + IBL textures are bound in a separate descriptor table (space1)
 // to avoid overlapping with per-pass textures in space0.
 Texture2DArray g_ShadowMap : register(t0, space1);
-TextureCube g_EnvDiffuse : register(t1, space1);
-TextureCube g_EnvSpecular : register(t2, space1);
+Texture2D g_EnvDiffuse : register(t1, space1);
+Texture2D g_EnvSpecular : register(t2, space1);
 SamplerState g_Sampler : register(s0);
 
 // Vertex shader input
@@ -139,9 +143,11 @@ VSShadowOutput VSShadow(VSInput input)
     VSShadowOutput output;
 
     float4 worldPos = mul(g_ModelMatrix, float4(input.position, 1.0f));
-    uint cascadeIndex = g_ShadowCascadeIndex.x;
-    cascadeIndex = min(cascadeIndex, 2u);
-    output.position = mul(g_LightViewProjection[cascadeIndex], worldPos);
+    uint sliceIndex = g_ShadowCascadeIndex.x;
+    // Support the three cascades (0-2) plus additional slices for local
+    // shadowed lights (3-5). Clamp to the last valid matrix.
+    sliceIndex = min(sliceIndex, 5u);
+    output.position = mul(g_LightViewProjection[sliceIndex], worldPos);
 
     return output;
 }
@@ -292,7 +298,9 @@ float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
     return F0 + (F90 - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
-// Map a direction vector to lat-long environment UVs.
+// Map a direction vector to lat-long environment UVs for an equirectangular
+// panorama (2:1 aspect). Assumes a left-handed coordinate system with +Z
+// forward, +X to the right, +Y up.
 float2 DirectionToLatLong(float3 dir)
 {
     dir = normalize(dir);
@@ -302,21 +310,17 @@ float2 DirectionToLatLong(float3 dir)
         dir = float3(0.0f, 0.0f, 1.0f);
     }
 
-    // Handle poles explicitly to avoid atan2(0,0) instability and to pick a
-    // consistent longitude when looking straight up/down.
-    float absY = abs(dir.y);
-    if (absY > 0.9999f) {
-        float2 uvPole;
-        uvPole.x = 0.5f;                // arbitrary but consistent longitude
-        uvPole.y = (dir.y > 0.0f) ? 0.0f : 1.0f; // north pole at v=0, south at v=1
-        return uvPole;
-    }
+    // Longitude: angle around the Y axis. Using -Z so that looking down +Z
+    // corresponds to the center of the panorama rather than the seam.
+    float phi = atan2(-dir.z, dir.x);              // [-PI, PI]
 
-    float phi = atan2(dir.z, dir.x);       // [-PI, PI], +Z forward
-    float theta = acos(saturate(dir.y));   // [0, PI]
+    // Latitude: angle above/below horizon. asin(y) is numerically stable for
+    // values near 0 and keeps the poles at v = 0/1.
+    float theta = asin(clamp(dir.y, -1.0f, 1.0f)); // [-PI/2, PI/2]
+
     float2 uv;
-    uv.x = (phi / (2.0f * PI)) + 0.5f;
-    uv.y = theta / PI;
+    uv.x = 0.5f + phi / (2.0f * PI);   // wrap around [0,1]
+    uv.y = 0.5f - theta / PI;          // +Y up -> v decreasing
     return uv;
 }
 
@@ -488,6 +492,55 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       return lerp(shadowPrimary, shadowSecondary, blend);
   }
 
+  // Local light shadow evaluation for a shadow-mapped spotlight. The CPU maps
+  // each selected local light to a dedicated slice in the shared shadow-map
+  // array and writes its view-projection matrix into g_LightViewProjection.
+  float ComputeLocalLightShadow(float3 worldPos, float3 normal, float3 lightDir, float shadowIndex)
+  {
+      // Shadows disabled globally
+      if (g_ShadowParams.z < 0.5f)
+      {
+          return 1.0f;
+      }
+
+      // Light has no associated shadow slice
+      if (shadowIndex < 0.0f)
+      {
+          return 1.0f;
+      }
+
+      uint slice = (uint)shadowIndex;
+      // Clamp to the last valid matrix (supports cascades + several local lights).
+      slice = min(slice, 5u);
+
+      float4 lightClip = mul(g_LightViewProjection[slice], float4(worldPos, 1.0f));
+      float3 lightNDC = lightClip.xyz / lightClip.w;
+
+      // Outside the local light frustum
+      if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
+          lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
+          lightNDC.z < 0.0f  || lightNDC.z > 1.0f)
+      {
+          return 1.0f;
+      }
+
+      float2 shadowUV;
+      shadowUV.x = 0.5f * lightNDC.x + 0.5f;
+      shadowUV.y = -0.5f * lightNDC.y + 0.5f;
+
+      float currentDepth = lightNDC.z;
+
+      // Use a slightly reduced bias/PCF radius for local lights so shadows
+      // stay tight and avoid excessive peter-panning.
+      float bias = g_ShadowParams.x * 0.5f;
+      float pcfRadius = g_ShadowParams.y * 0.75f;
+
+      float ndotl = saturate(dot(normalize(normal), normalize(lightDir)));
+      bias *= lerp(1.5f, 0.5f, ndotl);
+
+      return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, slice);
+  }
+
 float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao)
 {
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
@@ -573,11 +626,26 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float3 contribution = (diffuse + specular) * lightColor * NdotL * attenuation;
 
-        // Apply shadowing only for sun (light 0) for now
-        if (i == 0 && type == LIGHT_TYPE_DIRECTIONAL)
+        // Apply shadows from the cascaded directional sun and a single
+        // shadow-mapped local spotlight (if present).
+        if (type == LIGHT_TYPE_DIRECTIONAL)
         {
-            float shadow = ComputeShadow(worldPos, normal);
-            contribution *= shadow;
+            // Sun shadows: only the primary directional light (index 0) uses
+            // cascaded shadow maps.
+            if (i == 0)
+            {
+                float shadow = ComputeShadow(worldPos, normal);
+                contribution *= shadow;
+            }
+        }
+        else
+        {
+            float shadowIndex = light.params.y;
+            if (shadowIndex >= 0.0f)
+            {
+                float shadow = ComputeLocalLightShadow(worldPos, normal, lightDir, shadowIndex);
+                contribution *= shadow;
+            }
         }
 
         totalLighting += contribution;
@@ -593,19 +661,22 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 V = normalize(g_CameraPosition.xyz - worldPos);
         float NdotV = saturate(dot(N, V));
 
-        // Diffuse IBL from low-frequency cubemap irradiance
-        float3 irradiance = g_EnvDiffuse.Sample(g_Sampler, N).rgb;
+        // Diffuse IBL from low-frequency environment in equirectangular form.
+        float2 envUV = DirectionToLatLong(N);
+        float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, 0.0f).rgb;
 
         float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
         diffuseIBL = irradiance * kd * albedo;
 
-        // Specular IBL from prefiltered environment mip chain
+        // Specular IBL from prefiltered environment mip chain (mip-mapped
+        // equirectangular texture).
         uint specWidth, specHeight, specMips;
         g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMips);
         float maxMip = specMips > 0 ? float(specMips - 1) : 0.0f;
 
         float3 R = reflect(-V, N);
-        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, R, roughness * maxMip).rgb;
+        float2 specUV = DirectionToLatLong(R);
+        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, roughness * maxMip).rgb;
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
         specularIBL = prefiltered * Fibl;
@@ -616,27 +687,27 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         ambient = (diffuseIBL * diffuseIntensity + specularIBL * specularIntensity) * ao;
 
         // IBL-only debug modes
-        uint debugMode = (uint)g_DebugMode.x;
-        if (debugMode == 8)
+        uint debugView = (uint)g_DebugMode.x;
+        if (debugView == 8)
         {
             // Diffuse IBL-only debug: clamp to avoid extreme flashes.
             float3 dbg = diffuseIBL * diffuseIntensity * ao;
             dbg = min(dbg, 32.0f.xxx);
             return dbg;
         }
-        else if (debugMode == 9)
+        else if (debugView == 9)
         {
             // Specular IBL-only debug: clamp to avoid extreme flashes.
             float3 dbg = specularIBL * specularIntensity * ao;
             dbg = min(dbg, 32.0f.xxx);
             return dbg;
         }
-        else if (debugMode == 11)
+        else if (debugView == 11)
         {
             // Visualize Fresnel term at view angle (metals stay bright at grazing).
             return saturate(Fibl);
         }
-        else if (debugMode == 12)
+        else if (debugView == 12)
         {
             // Visualize roughness -> mip mapping (0 = sharpest, 1 = blurriest).
             float mipVis = (specMips > 1) ? (roughness * maxMip) / maxMip : roughness;
@@ -742,27 +813,27 @@ PSOutput PSMain(PSInput input)
     }
 
     // Debug views
-    uint debugMode = (uint)g_DebugMode.x;
-    if (debugMode == 1)
+    uint debugView = (uint)g_DebugMode.x;
+    if (debugView == 1)
     {
         float3 nVis = normalize(normal) * 0.5f + 0.5f;
         return MakePSOutput(float4(nVis, 1.0f), normal, roughness);
     }
-    else if (debugMode == 2)
+    else if (debugView == 2)
     {
         float3 rVis = roughness.xxx;
         return MakePSOutput(float4(rVis, 1.0f), normal, roughness);
     }
-    else if (debugMode == 3)
+    else if (debugView == 3)
     {
         float3 mVis = metallic.xxx;
         return MakePSOutput(float4(mVis, 1.0f), normal, roughness);
     }
-    else if (debugMode == 4)
+    else if (debugView == 4)
     {
         return MakePSOutput(float4(albedo, albedoSample.a * g_Albedo.a), normal, roughness);
     }
-    else if (debugMode == 5)
+    else if (debugView == 5)
     {
         float3 viewPos = mul(g_ViewMatrix, float4(input.worldPos, 1.0f)).xyz;
         float depth = viewPos.z;
@@ -778,7 +849,7 @@ PSOutput PSMain(PSInput input)
         };
         return MakePSOutput(float4(colors[cascadeIndex], 1.0f), normal, roughness);
     }
-    else if (debugMode == 7)
+    else if (debugView == 7)
     {
         // Visualize fractal height as greyscale
         float amplitude  = g_FractalParams0.x;
@@ -807,7 +878,7 @@ PSOutput PSMain(PSInput input)
         v = saturate(v);
         return MakePSOutput(float4(v, v, v, 1.0f), normal, roughness);
     }
-    else if (debugMode == 10)
+    else if (debugView == 10)
     {
         // DirectionToLatLong debug: visualize env UVs as color
         float3 N = normalize(normal);
@@ -847,24 +918,50 @@ SkyboxVSOutput SkyboxVS(uint vertexId : SV_VertexID)
 
 float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
 {
+    // Reconstruct a world-space direction from screen UV. We go via inverse
+    // projection (view space) and then undo the view rotation so that the
+    // environment sampling is independent of camera FOV and position.
+    float2 uv = input.uv;
+    float x = uv.x * 2.0f - 1.0f;
+    float y = 1.0f - 2.0f * uv.y;
+    float4 viewH = mul(g_InvProjectionMatrix, float4(x, y, 1.0f, 1.0f));
+    float3 viewDir = normalize(viewH.xyz);
+
+    float3x3 viewRot = (float3x3)g_ViewMatrix;
+    float3x3 invViewRot = transpose(viewRot);
+    float3 dir = normalize(mul(invViewRot, viewDir));
+
+    // Debug: show raw environment textures in screen space to verify they
+    // loaded correctly, without any spherical mapping.
+    if ((uint)g_DebugMode.x == 8)
+    {
+        float3 tex = g_EnvDiffuse.SampleLevel(g_Sampler, input.uv, 0.0f).rgb;
+        return float4(tex, 1.0f);
+    }
+    if ((uint)g_DebugMode.x == 9)
+    {
+        float3 tex = g_EnvSpecular.SampleLevel(g_Sampler, input.uv, 0.0f).rgb;
+        return float4(tex, 1.0f);
+    }
+
+    // Debug mode 10: visualize sky direction as a simple gradient so we can
+    // verify that the view->world reconstruction and mapping agree.
+    if ((uint)g_DebugMode.x == 10)
+    {
+        float3 dbg = 0.5f * (dir + 1.0f);
+        return float4(dbg, 1.0f);
+    }
+
     // If IBL is disabled, fall back to flat ambient
     if (g_EnvParams.z <= 0.5f)
     {
         return float4(g_AmbientColor.rgb, 1.0f);
     }
 
-    // Reconstruct a world-space direction from screen UV using the inverse
-    // view-projection matrix so the skybox matches the camera's FOV/aspect.
-    float2 uv = input.uv;
-    float x = uv.x * 2.0f - 1.0f;
-    float y = 1.0f - 2.0f * uv.y;
-    float4 clip = float4(x, y, 1.0f, 1.0f);
-
-    float4 world = mul(g_InvViewProjMatrix, clip);
-    float3 worldPos = world.xyz / max(world.w, 1.0e-4f);
-    float3 dir = normalize(worldPos - g_CameraPosition.xyz);
-
-    // Sample cubemap directly; hardware handles poles and seams.
-    float3 color = g_EnvSpecular.Sample(g_Sampler, dir).rgb * g_EnvParams.y;
+    // Proper 3D environment sampling: convert the world-space direction to
+    // lat-long UVs for the equirectangular panorama so the background rotates
+    // correctly with the camera.
+    float2 skyUV = DirectionToLatLong(dir);
+    float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, 0.0f).rgb * g_EnvParams.y;
     return float4(color, 1.0f);
 }

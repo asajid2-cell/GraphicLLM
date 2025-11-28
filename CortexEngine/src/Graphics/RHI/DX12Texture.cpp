@@ -169,10 +169,17 @@ Result<void> DX12Texture::InitializeFromMipChain(
         const auto& layout = layouts[i];
         uint8_t* dst = mapped + layout.Offset;
         const uint8_t* src = mip.data();
-        UINT64 rowPitch = layout.Footprint.RowPitch;
-        UINT64 srcPitch = static_cast<UINT64>(rowSizes[i]);
+
+        // Footprint width is the texel width of this mip level. Since all of
+        // our uploaded images are tightly packed RGBA8, the source row pitch
+        // is simply width * 4 bytes. Using this instead of the aggregated
+        // rowSizes[i] avoids subtle mismatches that can smear the image if
+        // the layout ever includes padding.
+        UINT64 rowPitchDst = layout.Footprint.RowPitch;
+        UINT64 rowPitchSrc = static_cast<UINT64>(layout.Footprint.Width) * 4u;
+
         for (UINT row = 0; row < numRows[i]; ++row) {
-            memcpy(dst + rowPitch * row, src + srcPitch * row, srcPitch);
+            memcpy(dst + rowPitchDst * row, src + rowPitchSrc * row, rowPitchSrc);
         }
     }
 
@@ -520,7 +527,6 @@ Result<void> DX12Texture::UploadTextureData(
 
 Result<void> DX12Texture::InitializeCubeFromFaces(
     ID3D12Device* device,
-    ID3D12CommandQueue* copyQueue,
     ID3D12CommandQueue* graphicsQueue,
     const std::vector<std::vector<uint8_t>>& faceData,
     uint32_t faceSize,
@@ -640,8 +646,8 @@ Result<void> DX12Texture::InitializeCubeFromFaces(
 
     uploadBuffer->Unmap(0, nullptr);
 
-    // Create command list (use copy queue if provided, otherwise graphics)
-    ID3D12CommandQueue* queue = copyQueue ? copyQueue : graphicsQueue;
+    // Create command list on graphics queue (direct)
+    ID3D12CommandQueue* queue = graphicsQueue;
 
     ComPtr<ID3D12CommandAllocator> allocator;
     hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
@@ -685,23 +691,28 @@ Result<void> DX12Texture::InitializeCubeFromFaces(
     ID3D12CommandList* lists[] = { cmdList.Get() };
     queue->ExecuteCommandLists(1, lists);
 
-    // Fence to ensure upload completion
+    // Ensure the GPU has finished executing the copy and transition before
+    // we return. This keeps the device in a well-defined state so that
+    // later resource creation (e.g., vertex buffers for scene geometry)
+    // does not see a removed/hung device if something went wrong in the
+    // upload path.
     ComPtr<ID3D12Fence> fence;
-    hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-    if (FAILED(hr)) {
+    HRESULT hrFence = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+    if (FAILED(hrFence)) {
         return Result<void>::Err("Failed to create fence for cubemap upload");
     }
 
     const uint64_t fenceValue = 1;
-    hr = queue->Signal(fence.Get(), fenceValue);
-    if (FAILED(hr)) {
+    hrFence = queue->Signal(fence.Get(), fenceValue);
+    if (FAILED(hrFence)) {
         return Result<void>::Err("Failed to signal fence for cubemap upload");
     }
 
     HANDLE evt = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     if (!evt) {
-        return Result<void>::Err("Failed to create cubemap upload event");
+        return Result<void>::Err("Failed to create upload completion event for cubemap");
     }
+
     fence->SetEventOnCompletion(fenceValue, evt);
     WaitForSingleObject(evt, INFINITE);
     CloseHandle(evt);

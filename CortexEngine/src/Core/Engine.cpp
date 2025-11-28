@@ -41,6 +41,7 @@ void Engine::SyncDebugMenuFromRenderer() {
     dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
     dbg.bloomIntensity = m_renderer->GetBloomIntensity();
     dbg.cameraBaseSpeed = m_cameraBaseSpeed;
+    dbg.lightingRig = 0;
 
     UI::DebugMenu::SyncFromState(dbg);
 }
@@ -80,6 +81,7 @@ namespace {
                     if (j.contains("fractalGain")) state.fractalGain = j.value("fractalGain", state.fractalGain);
                     if (j.contains("fractalWarpStrength")) state.fractalWarpStrength = j.value("fractalWarpStrength", state.fractalWarpStrength);
                     if (j.contains("fractalNoiseType")) state.fractalNoiseType = j.value("fractalNoiseType", state.fractalNoiseType);
+                    if (j.contains("lightingRig")) state.lightingRig = j.value("lightingRig", state.lightingRig);
                 }
             }
         } catch (...) {
@@ -109,6 +111,7 @@ namespace {
             j["fractalGain"] = state.fractalGain;
             j["fractalWarpStrength"] = state.fractalWarpStrength;
             j["fractalNoiseType"] = state.fractalNoiseType;
+            j["lightingRig"] = state.lightingRig;
 
             std::ofstream out(path);
             if (out) {
@@ -177,6 +180,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_cameraBaseSpeed = config.cameraBaseSpeed;
     m_cameraSprintMultiplier = config.cameraSprintMultiplier;
     m_mouseSensitivity = config.mouseSensitivity;
+    // Tie flight dynamics to the current base speed so traversal scales with scene size.
+    m_cameraMaxSpeed = std::max(15.0f, m_cameraBaseSpeed * 8.0f);
 
     // Phase 2: Initialize The Architect (LLM) asynchronously so the window appears sooner
     if (config.enableLLM) {
@@ -273,6 +278,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             dbg.fractalWarpStrength,
             dbg.fractalNoiseType);
         m_cameraBaseSpeed = dbg.cameraBaseSpeed;
+        m_cameraMaxSpeed = std::max(15.0f, m_cameraBaseSpeed * 8.0f);
 
         UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
     }
@@ -296,10 +302,12 @@ void Engine::ShowCameraHelpOverlay() {
     const char* message =
         "Camera controls:\n"
         "\n"
-        "  Right mouse button  - Enable mouse look\n"
+        "  Right mouse button  - Enable mouse look (hold)\n"
         "  Move mouse          - Look around\n"
+        "  F                   - Toggle drone/free-flight camera (auto-forward)\n"
         "  W / A / S / D       - Move forward / left / back / right\n"
-        "  Q / E               - Move down / up\n"
+        "  Space / Ctrl        - Move up / down (drone mode)\n"
+        "  Q / E               - Roll left / right (drone mode)\n"
         "  Shift (hold)        - Sprint (faster movement)\n"
         "  F1                  - Reset camera to default\n"
         "\n"
@@ -589,6 +597,29 @@ void Engine::ProcessInput() {
                 if (event.key.key == SDLK_ESCAPE) {
                     m_running = false;
                 }
+                else if (event.key.key == SDLK_F) {
+                    // Toggle drone/free-flight camera mode. When enabled, the camera
+                    // can be steered continuously without holding the right mouse
+                    // button and the mouse is locked in relative mode.
+                    m_droneFlightEnabled = !m_droneFlightEnabled;
+                    if (m_droneFlightEnabled) {
+                        m_cameraControlActive = true;
+                        m_cameraVelocity = glm::vec3(0.0f);
+                        m_cameraRoll = 0.0f;
+                        if (m_window) {
+                            SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
+                        }
+                        spdlog::info("Drone flight enabled");
+                    } else {
+                        m_cameraControlActive = false;
+                        m_cameraVelocity = glm::vec3(0.0f);
+                        m_cameraRoll = 0.0f;
+                        if (m_window) {
+                            SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
+                        }
+                        spdlog::info("Drone flight disabled");
+                    }
+                }
                 else if (event.key.key == SDLK_T && m_llmEnabled) {
                     // Block to show native prompt; returns empty on cancel
                     auto text = UI::TextPrompt::Show(m_window->GetHWND());
@@ -726,14 +757,14 @@ void Engine::ProcessInput() {
                 break;
 
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                if (event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                if (!m_droneFlightEnabled && event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = true;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
                 }
                 break;
 
             case SDL_EVENT_MOUSE_BUTTON_UP:
-                if (event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                if (!m_droneFlightEnabled && event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = false;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
                 }
@@ -945,6 +976,19 @@ void Engine::Update(float deltaTime) {
     if (m_renderer) {
         UI::DebugMenuState dbg = UI::DebugMenu::GetState();
         m_cameraBaseSpeed = dbg.cameraBaseSpeed;
+        m_cameraMaxSpeed = std::max(15.0f, m_cameraBaseSpeed * 8.0f);
+
+        // Apply lighting rig selection to the scene lights.
+        auto rig = Graphics::Renderer::LightingRig::Custom;
+        switch (dbg.lightingRig) {
+        case 1: rig = Graphics::Renderer::LightingRig::StudioThreePoint; break;
+        case 2: rig = Graphics::Renderer::LightingRig::TopDownWarehouse; break;
+        case 3: rig = Graphics::Renderer::LightingRig::HorrorSideLight; break;
+        default: rig = Graphics::Renderer::LightingRig::Custom; break;
+        }
+        if (rig != Graphics::Renderer::LightingRig::Custom && m_registry) {
+            m_renderer->ApplyLightingRig(rig, m_registry.get());
+        }
     }
 
     // Update active camera (fly controls)
@@ -1270,6 +1314,8 @@ void Engine::InitializeCameraController() {
     m_cameraControlActive = false;
     m_pendingMouseDeltaX = 0.0f;
     m_pendingMouseDeltaY = 0.0f;
+    m_cameraVelocity = glm::vec3(0.0f);
+    m_cameraRoll = 0.0f;
 
     // Find active camera
     auto cameraView = m_registry->View<Scene::CameraComponent, Scene::TransformComponent>();
@@ -1319,7 +1365,7 @@ void Engine::UpdateCameraController(float deltaTime) {
 
     auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
 
-    // Apply mouse look deltas
+    // Apply mouse look deltas (yaw/pitch) from accumulated motion.
     if (m_cameraControlActive) {
         float dx = m_pendingMouseDeltaX;
         float dy = m_pendingMouseDeltaY;
@@ -1349,7 +1395,39 @@ void Engine::UpdateCameraController(float deltaTime) {
     glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
     glm::vec3 up = glm::normalize(glm::cross(right, forward));
 
-    // Keyboard movement (WASD, QE) in camera-local axes
+    // Optional roll for drone-style banking, only in drone mode.
+    if (m_droneFlightEnabled) {
+        int numKeys = 0;
+        const bool* keys = SDL_GetKeyboardState(&numKeys);
+        auto keyDown = [&](SDL_Scancode scancode) {
+            return scancode >= 0 && scancode < numKeys && keys[scancode];
+        };
+
+        float rollInput = 0.0f;
+        // Q/E control roll in drone mode; vertical thrust is Space/Ctrl.
+        if (keyDown(SDL_SCANCODE_Q)) rollInput -= 1.0f;
+        if (keyDown(SDL_SCANCODE_E)) rollInput += 1.0f;
+
+        if (std::abs(rollInput) > 0.0f) {
+            m_cameraRoll += rollInput * m_cameraRollSpeed * deltaTime;
+        } else {
+            // Exponential decay back toward level horizon when no roll input.
+            float decay = std::exp(-m_cameraRollDamping * deltaTime);
+            m_cameraRoll *= decay;
+        }
+
+        // Clamp roll to a reasonable banking range.
+        float maxRoll = glm::radians(75.0f);
+        m_cameraRoll = glm::clamp(m_cameraRoll, -maxRoll, maxRoll);
+
+        if (std::abs(m_cameraRoll) > 1e-4f) {
+            glm::quat rollQuat = glm::angleAxis(m_cameraRoll, forward);
+            right = rollQuat * right;
+            up = rollQuat * up;
+        }
+    }
+
+    // Keyboard movement (WASD, vertical) in camera-local axes
     if (m_cameraControlActive) {
         int numKeys = 0;
         const bool* keys = SDL_GetKeyboardState(&numKeys);
@@ -1357,27 +1435,87 @@ void Engine::UpdateCameraController(float deltaTime) {
             return scancode >= 0 && scancode < numKeys && keys[scancode];
         };
 
-        glm::vec3 move(0.0f);
-        if (keyDown(SDL_SCANCODE_W)) move += forward;
-        if (keyDown(SDL_SCANCODE_S)) move -= forward;
-        if (keyDown(SDL_SCANCODE_D)) move += right;
-        if (keyDown(SDL_SCANCODE_A)) move -= right;
-        if (keyDown(SDL_SCANCODE_E) || keyDown(SDL_SCANCODE_SPACE)) move += up;
-        if (keyDown(SDL_SCANCODE_Q) ||
-            keyDown(SDL_SCANCODE_LCTRL) ||
-            keyDown(SDL_SCANCODE_RCTRL)) move -= up;
+        glm::vec3 moveDir(0.0f);
+        if (keyDown(SDL_SCANCODE_W)) moveDir += forward;
+        if (keyDown(SDL_SCANCODE_S)) moveDir -= forward;
+        if (keyDown(SDL_SCANCODE_D)) moveDir += right;
+        if (keyDown(SDL_SCANCODE_A)) moveDir -= right;
 
-        if (glm::length(move) > 0.0f) {
-            float speed = m_cameraBaseSpeed;
-            if (keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT)) {
-                speed *= m_cameraSprintMultiplier;
+        if (m_droneFlightEnabled) {
+            // In drone mode, vertical thrust is space/ctrl; Q/E are roll.
+            if (keyDown(SDL_SCANCODE_SPACE)) moveDir += up;
+            if (keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL)) moveDir -= up;
+
+            // Auto-forward cruise: when no explicit movement keys are pressed,
+            // keep the camera gliding forward for fast, fluid traversal.
+            const bool hasDirectionalInput =
+                keyDown(SDL_SCANCODE_W) || keyDown(SDL_SCANCODE_S) ||
+                keyDown(SDL_SCANCODE_A) || keyDown(SDL_SCANCODE_D) ||
+                keyDown(SDL_SCANCODE_SPACE) ||
+                keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL);
+            if (!hasDirectionalInput) {
+                moveDir += forward;
             }
-            move = glm::normalize(move) * speed * deltaTime;
-            transform.position += move;
+        } else {
+            // Legacy non-drone mode keeps Q/E as vertical movement.
+            if (keyDown(SDL_SCANCODE_E) || keyDown(SDL_SCANCODE_SPACE)) moveDir += up;
+            if (keyDown(SDL_SCANCODE_Q) ||
+                keyDown(SDL_SCANCODE_LCTRL) ||
+                keyDown(SDL_SCANCODE_RCTRL)) moveDir -= up;
         }
+
+        if (!m_droneFlightEnabled) {
+            // Classic immediate flycam for non-drone mode.
+            if (glm::length(moveDir) > 0.0f) {
+                float speed = m_cameraBaseSpeed;
+                if (keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT)) {
+                    speed *= m_cameraSprintMultiplier;
+                }
+                moveDir = glm::normalize(moveDir) * speed * deltaTime;
+                transform.position += moveDir;
+            }
+        } else {
+            // Drone/free-flight mode: velocity-based movement with acceleration and damping.
+            // Apply exponential damping so the camera coasts and then gently comes to rest.
+            float damping = std::max(0.0f, m_cameraDamping);
+            if (damping > 0.0f) {
+                float decay = std::exp(-damping * deltaTime);
+                m_cameraVelocity *= decay;
+            }
+
+            glm::vec3 accel(0.0f);
+            if (glm::length(moveDir) > 0.0f) {
+                glm::vec3 dir = glm::normalize(moveDir);
+                float thrust = m_cameraAcceleration * m_cameraBaseSpeed;
+                bool sprint = keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT);
+                if (sprint) {
+                    thrust *= m_cameraSprintMultiplier;
+                }
+                accel = dir * thrust;
+            }
+
+            m_cameraVelocity += accel * deltaTime;
+
+            // Clamp velocity magnitude to a maximum cruise speed derived from base speed.
+            float maxSpeed = m_cameraMaxSpeed;
+            bool sprinting = keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT);
+            if (sprinting) {
+                maxSpeed *= m_cameraSprintMultiplier;
+            }
+            float vLen = glm::length(m_cameraVelocity);
+            if (vLen > maxSpeed && vLen > 1e-4f) {
+                m_cameraVelocity = (m_cameraVelocity / vLen) * maxSpeed;
+            }
+
+            transform.position += m_cameraVelocity * deltaTime;
+        }
+    } else {
+        // When camera control is inactive, keep motion state reset.
+        m_cameraVelocity = glm::vec3(0.0f);
+        m_cameraRoll = 0.0f;
     }
 
-    // Update camera rotation from forward/up
+    // Update camera rotation from forward/up (including any roll).
     transform.rotation = glm::quatLookAt(glm::normalize(forward), up);
 }
 
@@ -1523,11 +1661,31 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
             if (!camera.isActive) continue;
             auto& transform = cameraView.get<Scene::TransformComponent>(entity);
             std::ostringstream ss;
+
+            float camSpeed = glm::length(m_cameraVelocity);
+            float aspect = (m_window && m_window->GetHeight() > 0)
+                ? m_window->GetAspectRatio()
+                : 16.0f / 9.0f;
+            float fovRad = glm::radians(camera.fov);
+            float farPlane = camera.farPlane;
+            float midDepth = std::clamp(farPlane * 0.1f, 5.0f, 50.0f);
+            float halfHeight = std::tan(fovRad * 0.5f) * midDepth;
+            float halfWidth = halfHeight * aspect;
+
             ss << "\nCamera: pos("
                << std::round(transform.position.x * 10.0f) / 10.0f << ","
                << std::round(transform.position.y * 10.0f) / 10.0f << ","
                << std::round(transform.position.z * 10.0f) / 10.0f << "), "
-               << "fov=" << camera.fov;
+               << "fov=" << camera.fov
+               << ", near=" << camera.nearPlane
+               << ", far=" << camera.farPlane
+               << ", mode=" << (m_droneFlightEnabled ? "drone" : "orbit")
+               << ", velocity=" << std::round(camSpeed * 10.0f) / 10.0f
+               << ", view_span_at_" << std::round(midDepth * 10.0f) / 10.0f
+               << "m≈("
+               << std::round((halfWidth * 2.0f) * 10.0f) / 10.0f << "x"
+               << std::round((halfHeight * 2.0f) * 10.0f) / 10.0f << ")";
+
             extra += ss.str();
             break;
         }

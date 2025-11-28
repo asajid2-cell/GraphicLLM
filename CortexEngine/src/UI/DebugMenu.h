@@ -24,6 +24,10 @@ struct DebugMenuState {
     float fractalGain = 0.5f;           // 0.1..0.9
     float fractalWarpStrength = 0.0f;   // 0.0..1.0
     float fractalNoiseType = 0.0f;      // 0 = fbm, 1 = ridged, 2 = turbulence
+
+    // Lighting rig selection (0 = none/custom, 1 = studio three-point,
+    // 2 = top-down warehouse, 3 = horror side-light).
+    int lightingRig = 0;
 };
 
 // Simple Win32 debug menu window with sliders for renderer/camera parameters.

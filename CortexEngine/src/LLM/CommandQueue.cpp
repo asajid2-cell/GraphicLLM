@@ -150,6 +150,33 @@ std::optional<glm::vec3> FindAutoPlaceAnchor(Scene::ECS_Registry* registry, Scen
             return t.position;
         }
     }
+
+    // Fallback: use a point in front of the active camera, with distance scaled
+    // by the camera's far plane so that "autoPlace" feels reasonable across
+    // small rooms and large outdoor scenes.
+    auto camView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+    for (auto entity : camView) {
+        auto& camera = camView.get<Scene::CameraComponent>(entity);
+        if (!camera.isActive) continue;
+        auto& t = camView.get<Scene::TransformComponent>(entity);
+        glm::vec3 camPos = t.position;
+        glm::vec3 forward = glm::normalize(t.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
+        if (!std::isfinite(forward.x) || !std::isfinite(forward.y) || !std::isfinite(forward.z) ||
+            glm::length2(forward) < 1e-6f) {
+            forward = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        float distance = 3.0f;
+        if (std::isfinite(camera.farPlane) && camera.farPlane > 0.0f) {
+            // Place new objects roughly a few percent into the view depth,
+            // clamped to sane near/mid distances for traversal.
+            float scaled = camera.farPlane * 0.02f;
+            distance = std::clamp(scaled, 3.0f, 50.0f);
+        }
+        glm::vec3 anchor = camPos + forward * distance;
+        anchor.y = std::max(anchor.y, 0.5f);
+        return anchor;
+    }
+
     return std::nullopt;
 }
 } // namespace
@@ -985,6 +1012,19 @@ void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::R
         summary << "ssao_params=(r:" << cmd->ssaoRadius << ",b:" << cmd->ssaoBias << ",i:" << cmd->ssaoIntensity << ") ";
         touched = true;
     }
+    if (cmd->setFogEnabled) {
+        renderer->SetFogEnabled(cmd->fogEnabled);
+        summary << "fog=" << (cmd->fogEnabled ? "on" : "off") << " ";
+        touched = true;
+    }
+    if (cmd->setFogParams) {
+        renderer->SetFogParams(cmd->fogDensity, cmd->fogHeight, cmd->fogFalloff);
+        summary << "fog_params=(d:" << cmd->fogDensity << ",h:" << cmd->fogHeight << ",f:" << cmd->fogFalloff << ") ";
+        touched = true;
+    }
+    // Note: lighting rig commands are interpreted by the engine via the debug
+    // menu / renderer integration rather than directly in the command queue,
+    // so cmd->setLightingRig is intentionally not handled here.
 
     if (touched) {
         PushStatus(true, summary.str());

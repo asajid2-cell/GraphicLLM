@@ -22,8 +22,8 @@ cbuffer FrameConstants : register(b1)
         float4 params;               // x = outer cone cos, y = shadow index, z,w reserved
     };
     Light    g_Lights[4];
-    // Cascaded directional light view-projection matrices (we use first 3)
-    float4x4 g_LightViewProjection[4];
+    // Directional + local light view-projection matrices (0-2 = cascades, 3-5 = local)
+    float4x4 g_LightViewProjection[6];
     // x,y,z = cascade split depths in view space, w = far plane
     float4   g_CascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
@@ -42,6 +42,8 @@ cbuffer FrameConstants : register(b1)
     float4   g_EnvParams;
     // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
     float4   g_ColorGrade;
+    // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
+    float4   g_FogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
@@ -257,7 +259,120 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Compose bloom after any motion blur so blurred highlights remain
+    // Exponential height fog in HDR space, using the depth buffer and
+    // reconstructed world position. Applied before bloom so fogged highlights
+    // still contribute naturally to bloom.
+    if (g_FogParams.w > 0.5f)
+    {
+        float depth = g_Depth.Sample(g_Sampler, uv).r;
+        if (depth < 1.0f - 1e-4f)
+        {
+            float3 worldPos = ReconstructWorldPosition(uv, depth);
+            float3 camPos = g_CameraPosition.xyz;
+
+            float distance = length(worldPos - camPos);
+            float density = max(g_FogParams.x, 0.0f);
+
+            // Base exponential distance fog
+            float fog = 1.0f - exp(-density * distance);
+
+            // Optional height falloff so fog thickens near a reference plane.
+            float baseHeight = g_FogParams.y;
+            float falloff = max(g_FogParams.z, 0.0f);
+            float h = worldPos.y - baseHeight;
+            // Fog weaker above the base height, stronger below.
+            float heightFactor = exp(-falloff * max(h, 0.0f));
+
+            fog *= heightFactor;
+            fog = saturate(fog);
+
+            float3 fogColor = g_AmbientColor.rgb;
+            hdrBlurred = lerp(hdrBlurred, fogColor, fog);
+        }
+    }
+
+    // Sun god-rays (crepuscular rays) in HDR space. These are only applied
+    // when fog is active so that beams have a plausible medium to scatter in.
+    if (g_FogParams.w > 0.5f && g_LightCount.x > 0)
+    {
+        // Treat the first directional light as the sun.
+        Light sun = g_Lights[0];
+        uint sunType = (uint)sun.position_type.w;
+        if (sunType == 0) // LIGHT_TYPE_DIRECTIONAL
+        {
+            float3 lightDirWS = normalize(sun.direction_cosInner.xyz);
+            // Direction from camera towards the sun (opposite of light direction).
+            float3 sunDirWS = -lightDirWS;
+
+            float3 camPos = g_CameraPosition.xyz;
+            float3 sunWorld = camPos + sunDirWS * 1000.0f;
+
+            float4 sunClip = mul(g_ViewProjectionMatrix, float4(sunWorld, 1.0f));
+            if (sunClip.w > 0.0f)
+            {
+                float2 sunNdc = sunClip.xy / sunClip.w;
+                float2 sunUV;
+                sunUV.x = sunNdc.x * 0.5f + 0.5f;
+                sunUV.y = 0.5f - sunNdc.y * 0.5f;
+
+                // Only bother if the projected sun is at least roughly on-screen.
+                if (sunUV.x > -0.2f && sunUV.x < 1.2f &&
+                    sunUV.y > -0.2f && sunUV.y < 1.2f)
+                {
+                    const int NUM_SAMPLES = 16;
+                    float2 toSun = sunUV - uv;
+                    float distToSun = length(toSun);
+
+                    // Skip pixels very far from the sun projection to keep cost down.
+                    if (distToSun > 0.02f)
+                    {
+                        float2 step = toSun / (float)NUM_SAMPLES;
+                        float2 sampleUV = uv;
+
+                        float3 godAccum = 0.0f;
+                        float illumination = 1.0f;
+
+                        float density = max(g_FogParams.x, 0.0f);
+                        // Base intensity tied to fog density so thicker fog yields
+                        // stronger, more visible beams.
+                        float baseIntensity = saturate(density * 20.0f);
+                        float decay = 0.92f;
+
+                        [unroll]
+                        for (int i = 0; i < NUM_SAMPLES; ++i)
+                        {
+                            sampleUV += step;
+                            if (sampleUV.x < 0.0f || sampleUV.x > 1.0f ||
+                                sampleUV.y < 0.0f || sampleUV.y > 1.0f)
+                            {
+                                break;
+                            }
+
+                            float d = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
+                            // Treat fully-clear depth as sky; anything else occludes.
+                            float unoccluded = (d >= 1.0f - 1e-3f) ? 1.0f : 0.0f;
+                            illumination *= lerp(0.0f, 1.0f, unoccluded * decay);
+
+                            float3 sampleHdr = g_SceneColor.SampleLevel(g_Sampler, sampleUV, 0).rgb;
+                            float lum = dot(sampleHdr, float3(0.299f, 0.587f, 0.114f));
+                            godAccum += lum.xxx * illumination;
+                        }
+
+                        float falloff = saturate(1.0f - distToSun * 1.5f);
+                        float3 godColor = g_AmbientColor.rgb;
+                        float3 godRays = godColor * godAccum * baseIntensity * falloff / (float)NUM_SAMPLES;
+
+                        // Clamp to avoid excessive streak brightness.
+                        godRays = min(godRays, 4.0f.xxx);
+
+                        hdrBlurred += godRays;
+                    }
+                }
+            }
+        }
+    }
+
+    // Compose bloom after any motion blur and fog so blurred highlights remain
     // physically plausible and color-stable.
     float3 hdrCombined = hdrBlurred + bloom;
 

@@ -48,6 +48,8 @@ struct ShadowConstants {
 };
 
 // Per-frame constant buffer (changes per frame)
+// Note: lightViewProjection includes 3 cascades for the directional sun and
+// up to 3 additional local shadow-casting lights (total 6 matrices).
 struct FrameConstants {
     glm::mat4 viewMatrix;
     glm::mat4 projectionMatrix;
@@ -61,8 +63,10 @@ struct FrameConstants {
     // Forward light list (currently up to 4 lights; light[0] is the sun)
     alignas(16) glm::uvec4 lightCount;
     alignas(16) Light lights[4];
-    // Cascaded directional light view-projection matrices (we use first 3)
-    alignas(16) glm::mat4 lightViewProjection[4];
+    // Directional + local light view-projection matrices:
+    // indices 0-2: cascades for the sun
+    // indices 3-5: shadowed local lights (spot)
+    alignas(16) glm::mat4 lightViewProjection[6];
     // x,y,z = cascade split depths in view space, w = far plane
     glm::vec4 cascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
@@ -81,6 +85,9 @@ struct FrameConstants {
     glm::vec4 envParams;
     // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
     glm::vec4 colorGrade;
+    // Exponential height fog parameters:
+    // x = density, y = base height, z = height falloff, w = enabled (>0.5)
+    glm::vec4 fogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved

@@ -15,6 +15,7 @@
 #include "LLM/CommandQueue.h"
 #include "AI/Vision/DreamerService.h"
 #include "Utils/Result.h"
+#include <glm/glm.hpp>
 
 namespace Cortex {
 
@@ -120,6 +121,7 @@ private:
 
     bool m_cameraControlActive = false;
     bool m_cameraControllerInitialized = false;
+    bool m_droneFlightEnabled = false;
     bool m_cameraOrbitMode = false;
     bool m_cameraHelpShown = false;
     float m_cameraYaw = 0.0f;
@@ -129,6 +131,13 @@ private:
     float m_mouseSensitivity = 0.003f;
     float m_pendingMouseDeltaX = 0.0f;
     float m_pendingMouseDeltaY = 0.0f;
+    glm::vec3 m_cameraVelocity{0.0f};
+    float m_cameraAcceleration = 20.0f;   // units/s^2 thrust in drone mode
+    float m_cameraDamping = 2.0f;         // exponential damping factor
+    float m_cameraMaxSpeed = 40.0f;       // base max speed (scaled by sprint)
+    float m_cameraRoll = 0.0f;            // roll angle in radians (drone mode)
+    float m_cameraRollSpeed = 1.5f;       // radians/s roll rate
+    float m_cameraRollDamping = 3.0f;     // how quickly roll recenters when no input
     entt::entity m_activeCameraEntity = entt::null;
 
     // Name of the current logical focus object/group (e.g., Pig_1 or SpinningCube).

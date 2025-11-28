@@ -96,7 +96,6 @@ public:
     // Cubemap initialization from 6 RGBA8 faces (order: +X,-X,+Y,-Y,+Z,-Z)
     Result<void> InitializeCubeFromFaces(
         ID3D12Device* device,
-        ID3D12CommandQueue* copyQueue,
         ID3D12CommandQueue* graphicsQueue,
         const std::vector<std::vector<uint8_t>>& faceData,
         uint32_t faceSize,

@@ -1,0 +1,7 @@
+glTF-Sample-Models/
+src/
+TensorRT/
+
+# Local build / log artifacts that should not be versioned
+CortexEngine/rebuild_log.txt
+.claude/

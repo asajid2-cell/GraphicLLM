@@ -237,6 +237,11 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     m_totalTime += deltaTime;
 
+    // Opportunistically load a small number of pending environment maps each
+    // frame so that startup remains fast while the full HDR library becomes
+    // available in the background.
+    ProcessPendingEnvironmentMaps(1);
+
     BeginFrame();
     UpdateFrameConstants(deltaTime, registry);
 
@@ -497,6 +502,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     float camFar = 1000.0f;
     float fovY = glm::radians(60.0f);
 
+    // Reset per-frame local light shadow state; will be populated below if we
+    // find suitable shadow-casting spotlights.
+    m_hasLocalShadow = false;
+    m_localShadowCount = 0;
+
     // Find active camera
     auto cameraView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
     bool foundCamera = false;
@@ -587,7 +597,15 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 
     uint32_t lightCount = 0;
 
-    // Light 0: directional sun
+    // Track up to kMaxShadowedLocalLights shadow-casting spotlights. Each one
+    // gets its own slice in the shared shadow-map atlas and a matching entry
+    // in the lightViewProjection array for shading.
+    glm::vec3 localLightPos[kMaxShadowedLocalLights]{};
+    glm::vec3 localLightDir[kMaxShadowedLocalLights]{};
+    float     localLightRange[kMaxShadowedLocalLights]{};
+    float     localOuterDegrees[kMaxShadowedLocalLights]{};
+
+    // Light 0: directional sun (unshadowed here; shadows are handled via cascades)
     frameData.lightCount = glm::uvec4(0u);
     frameData.lights[0].position_type = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f); // type 0 = directional
     frameData.lights[0].direction_cosInner = glm::vec4(dirToLight, 0.0f);
@@ -626,7 +644,29 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 
         outLight.direction_cosInner = glm::vec4(dir, cosInner);
         outLight.color_range = glm::vec4(radiance, lightComp.range);
-        outLight.params = glm::vec4(cosOuter, 0.0f, 0.0f, 0.0f);
+
+        // Default to "no local shadow" for this light. We reserve params.y as
+        // a shadow-map slice index when using local light shadows.
+        float shadowIndex = -1.0f;
+
+        if (m_shadowsEnabled &&
+            lightComp.castsShadows &&
+            type == Scene::LightType::Spot &&
+            m_localShadowCount < kMaxShadowedLocalLights)
+        {
+            uint32_t localIndex = m_localShadowCount;
+            uint32_t slice = kShadowCascadeCount + localIndex;
+
+            shadowIndex = static_cast<float>(slice);
+            localLightPos[localIndex] = lightXform.position;
+            localLightDir[localIndex] = dir;
+            localLightRange[localIndex] = lightComp.range;
+            localOuterDegrees[localIndex] = lightComp.outerConeDegrees;
+
+            ++m_localShadowCount;
+        }
+
+        outLight.params = glm::vec4(cosOuter, shadowIndex, 0.0f, 0.0f);
 
         ++lightCount;
     }
@@ -743,6 +783,77 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         frameData.lightViewProjection[cascadeIndex] = m_lightViewProjectionMatrices[cascadeIndex];
     }
 
+    // Build spot-light shadow view-projection matrices for any selected local
+    // lights and store them in the shared lightViewProjection array starting
+    // at index kShadowCascadeCount.
+    if (m_localShadowCount > 0)
+    {
+        m_hasLocalShadow = true;
+
+        for (uint32_t i = 0; i < m_localShadowCount; ++i)
+        {
+            if (localLightRange[i] <= 0.0f)
+            {
+                continue;
+            }
+
+            glm::vec3 dir = glm::normalize(localLightDir[i]);
+            if (!std::isfinite(dir.x) || !std::isfinite(dir.y) || !std::isfinite(dir.z) ||
+                glm::length2(dir) < 1e-6f)
+            {
+                dir = glm::vec3(0.0f, -1.0f, 0.0f);
+            }
+
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            if (std::abs(glm::dot(up, dir)) > 0.99f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+
+            glm::mat4 lightView = glm::lookAtLH(localLightPos[i], localLightPos[i] + dir, up);
+
+            float nearPlane = 0.1f;
+            float farPlane = std::max(localLightRange[i], 1.0f);
+
+            // Treat the outer cone angle as a half-FOV for the spotlight.
+            float outerRad = glm::radians(localOuterDegrees[i]);
+            float fovYLocal = outerRad * 2.0f;
+            fovYLocal = glm::clamp(fovYLocal, glm::radians(10.0f), glm::radians(170.0f));
+
+            glm::mat4 lightProj = glm::perspectiveLH_ZO(fovYLocal, 1.0f, nearPlane, farPlane);
+            glm::mat4 lightViewProj = lightProj * lightView;
+
+            m_localLightViewProjMatrices[i] = lightViewProj;
+
+            uint32_t slice = kShadowCascadeCount + i;
+            if (slice < kShadowArraySize)
+            {
+                frameData.lightViewProjection[slice] = lightViewProj;
+            }
+        }
+
+        // Clear out any unused local shadow slots in the constant buffer.
+        for (uint32_t i = m_localShadowCount; i < kMaxShadowedLocalLights; ++i)
+        {
+            uint32_t slice = kShadowCascadeCount + i;
+            if (slice < kShadowArraySize)
+            {
+                frameData.lightViewProjection[slice] = glm::mat4(1.0f);
+            }
+        }
+    }
+    else
+    {
+        m_hasLocalShadow = false;
+        for (uint32_t i = 0; i < kMaxShadowedLocalLights; ++i)
+        {
+            uint32_t slice = kShadowCascadeCount + i;
+            if (slice < kShadowArraySize)
+            {
+                frameData.lightViewProjection[slice] = glm::mat4(1.0f);
+            }
+        }
+    }
+
     frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
     frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
 
@@ -763,6 +874,13 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 
     // Color grading parameters (warm/cool) for post-process
     frameData.colorGrade = glm::vec4(m_colorGradeWarm, m_colorGradeCool, 0.0f, 0.0f);
+
+    // Exponential height fog parameters
+    frameData.fogParams = glm::vec4(
+        m_fogDensity,
+        m_fogHeight,
+        m_fogFalloff,
+        m_fogEnabled ? 1.0f : 0.0f);
 
     // SSAO parameters packed into aoParams
     frameData.aoParams = glm::vec4(
@@ -1255,6 +1373,14 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     const UINT64 vbSize = static_cast<UINT64>(vertices.size() * sizeof(Vertex));
     const UINT64 ibSize = static_cast<UINT64>(mesh->indices.size() * sizeof(uint32_t));
 
+    if (vbSize == 0 || ibSize == 0) {
+        spdlog::error(
+            "UploadMesh called with empty geometry: vertices={} indices={}",
+            vertices.size(),
+            mesh->indices.size());
+        return Result<void>::Err("Mesh has no vertices or indices");
+    }
+
     // Default heap resources that will be used at draw time
     D3D12_HEAP_PROPERTIES defaultHeap = {};
     defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -1284,6 +1410,22 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         IID_PPV_ARGS(&vertexBuffer)
     );
     if (FAILED(hr)) {
+        spdlog::error(
+            "CreateCommittedResource for vertex buffer failed: hr=0x{:08X}, vbSize={}, vertices={}",
+            static_cast<unsigned int>(hr),
+            vbSize,
+            vertices.size());
+
+        // If the device was removed, log the reason to help diagnosis.
+        if (auto* dxDevice = m_device ? m_device->GetDevice() : nullptr) {
+            HRESULT removed = dxDevice->GetDeviceRemovedReason();
+            if (removed != S_OK) {
+                spdlog::error(
+                    "DX12 device removed before/while creating vertex buffer: reason=0x{:08X}",
+                    static_cast<unsigned int>(removed));
+            }
+        }
+
         return Result<void>::Err("Failed to create default-heap vertex buffer");
     }
 
@@ -1592,6 +1734,28 @@ void Renderer::CycleScreenSpaceEffectsDebug() {
     spdlog::info("Screen-space effects debug state: {}", label);
 }
 
+void Renderer::SetFogEnabled(bool enabled) {
+    if (m_fogEnabled == enabled) {
+        return;
+    }
+    m_fogEnabled = enabled;
+    spdlog::info("Fog {}", m_fogEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::SetFogParams(float density, float height, float falloff) {
+    float d = std::max(density, 0.0f);
+    float f = std::max(falloff, 0.0f);
+    if (std::abs(d - m_fogDensity) < 1e-6f &&
+        std::abs(height - m_fogHeight) < 1e-6f &&
+        std::abs(f - m_fogFalloff) < 1e-6f) {
+        return;
+    }
+    m_fogDensity = d;
+    m_fogHeight = height;
+    m_fogFalloff = f;
+    spdlog::info("Fog params: density={}, height={}, falloff={}", m_fogDensity, m_fogHeight, m_fogFalloff);
+}
+
 void Renderer::CycleDebugViewMode() {
     // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
     // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height,
@@ -1758,6 +1922,193 @@ void Renderer::SetFractalParams(float amplitude, float frequency, float octaves,
                  (m_fractalCoordMode > 0.5f ? "WorldXZ" : "UV"),
                  m_fractalScaleX, m_fractalScaleZ,
                  m_fractalLacunarity, m_fractalGain, m_fractalWarpStrength, typeLabel);
+}
+
+void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) {
+    if (!registry) {
+        spdlog::warn("ApplyLightingRig called with null registry");
+        return;
+    }
+
+    // Clear existing non-directional lights so rigs start from a known state.
+    auto& enttReg = registry->GetRegistry();
+    {
+        auto view = enttReg.view<Scene::LightComponent>();
+        std::vector<entt::entity> toDestroy;
+        for (auto entity : view) {
+            const auto& light = view.get<Scene::LightComponent>(entity);
+            if (light.type == Scene::LightType::Directional) {
+                continue;
+            }
+            toDestroy.push_back(entity);
+        }
+        for (auto e : toDestroy) {
+            enttReg.destroy(e);
+        }
+    }
+
+    // Reset global sun/ambient to reasonable defaults for each rig; this keeps
+    // behavior stable even if previous state was extreme.
+    m_directionalLightDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f));
+    m_directionalLightColor = glm::vec3(1.0f);
+    m_directionalLightIntensity = 5.0f;
+    m_ambientLightColor = glm::vec3(0.04f);
+    m_ambientLightIntensity = 1.0f;
+
+    switch (rig) {
+    case LightingRig::Custom:
+        spdlog::info("Lighting rig: Custom (no preset applied)");
+        return;
+
+    case LightingRig::StudioThreePoint: {
+        // Key light - strong, warm spotlight from front-right
+        {
+            entt::entity e = enttReg.create();
+            enttReg.emplace<Scene::TagComponent>(e, "KeyLight");
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(3.0f, 4.0f, -4.0f);
+            glm::vec3 dir = glm::normalize(glm::vec3(-0.6f, -0.8f, 0.7f));
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            if (std::abs(glm::dot(up, dir)) > 0.99f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+            t.rotation = glm::quatLookAt(dir, up);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Spot;
+            l.color = glm::vec3(1.0f, 0.95f, 0.85f);
+            l.intensity = 14.0f;
+            l.range = 25.0f;
+            l.innerConeDegrees = 20.0f;
+            l.outerConeDegrees = 35.0f;
+            l.castsShadows = true;
+        }
+        // Fill light - softer, cooler point light from front-left
+        {
+            entt::entity e = enttReg.create();
+            enttReg.emplace<Scene::TagComponent>(e, "FillLight");
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(-3.0f, 2.0f, -3.0f);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Point;
+            l.color = glm::vec3(0.8f, 0.85f, 1.0f);
+            l.intensity = 5.0f;
+            l.range = 20.0f;
+            l.castsShadows = false;
+        }
+        // Rim light - dimmer spotlight from behind
+        {
+            entt::entity e = enttReg.create();
+            enttReg.emplace<Scene::TagComponent>(e, "RimLight");
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(0.0f, 3.0f, 4.0f);
+            glm::vec3 dir = glm::normalize(glm::vec3(0.0f, -0.5f, -1.0f));
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            if (std::abs(glm::dot(up, dir)) > 0.99f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+            t.rotation = glm::quatLookAt(dir, up);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Spot;
+            l.color = glm::vec3(0.9f, 0.9f, 1.0f);
+            l.intensity = 8.0f;
+            l.range = 25.0f;
+            l.innerConeDegrees = 25.0f;
+            l.outerConeDegrees = 40.0f;
+            l.castsShadows = false;
+        }
+        spdlog::info("Applied lighting rig: StudioThreePoint");
+        break;
+    }
+
+    case LightingRig::TopDownWarehouse: {
+        // Cooler sun, higher ambient, and a grid of overhead point lights.
+        m_directionalLightDirection = glm::normalize(glm::vec3(0.2f, 1.0f, 0.1f));
+        m_directionalLightColor = glm::vec3(0.9f, 0.95f, 1.0f);
+        m_directionalLightIntensity = 3.5f;
+        m_ambientLightColor = glm::vec3(0.08f, 0.09f, 0.1f);
+        m_ambientLightIntensity = 1.5f;
+
+        const int countX = 3;
+        const int countZ = 3;
+        const float spacing = 6.0f;
+        const float startX = -spacing;
+        const float startZ = -spacing;
+        int index = 0;
+
+        for (int ix = 0; ix < countX; ++ix) {
+            for (int iz = 0; iz < countZ; ++iz) {
+                entt::entity e = enttReg.create();
+                std::string name = "WarehouseLight_" + std::to_string(index++);
+                enttReg.emplace<Scene::TagComponent>(e, name);
+
+                auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+                t.position = glm::vec3(startX + ix * spacing, 8.0f, startZ + iz * spacing);
+
+                auto& l = enttReg.emplace<Scene::LightComponent>(e);
+                l.type = Scene::LightType::Point;
+                l.color = glm::vec3(0.9f, 0.95f, 1.0f);
+                l.intensity = 10.0f;
+                l.range = 10.0f;
+                l.castsShadows = (ix == 1 && iz == 1); // center light may cast shadows
+            }
+        }
+        spdlog::info("Applied lighting rig: TopDownWarehouse");
+        break;
+    }
+
+    case LightingRig::HorrorSideLight: {
+        // Reduce ambient and use a single harsh side light plus a dim back fill.
+        m_directionalLightDirection = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.0f));
+        m_directionalLightColor = glm::vec3(0.8f, 0.7f, 0.6f);
+        m_directionalLightIntensity = 2.0f;
+        m_ambientLightColor = glm::vec3(0.01f, 0.01f, 0.02f);
+        m_ambientLightIntensity = 0.5f;
+
+        // Strong side spotlight
+        {
+            entt::entity e = enttReg.create();
+            enttReg.emplace<Scene::TagComponent>(e, "HorrorKey");
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(-5.0f, 2.0f, 0.0f);
+            glm::vec3 dir = glm::normalize(glm::vec3(1.0f, -0.2f, 0.1f));
+            glm::vec3 up(0.0f, 1.0f, 0.0f);
+            if (std::abs(glm::dot(up, dir)) > 0.99f) {
+                up = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+            t.rotation = glm::quatLookAt(dir, up);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Spot;
+            l.color = glm::vec3(1.0f, 0.85f, 0.7f);
+            l.intensity = 18.0f;
+            l.range = 20.0f;
+            l.innerConeDegrees = 18.0f;
+            l.outerConeDegrees = 30.0f;
+            l.castsShadows = true;
+        }
+
+        // Dim back fill so the dark side isn't completely black
+        {
+            entt::entity e = enttReg.create();
+            enttReg.emplace<Scene::TagComponent>(e, "HorrorFill");
+            auto& t = enttReg.emplace<Scene::TransformComponent>(e);
+            t.position = glm::vec3(3.0f, 1.5f, -4.0f);
+
+            auto& l = enttReg.emplace<Scene::LightComponent>(e);
+            l.type = Scene::LightType::Point;
+            l.color = glm::vec3(0.4f, 0.5f, 0.8f);
+            l.intensity = 3.0f;
+            l.range = 10.0f;
+            l.castsShadows = false;
+        }
+
+        spdlog::info("Applied lighting rig: HorrorSideLight");
+        break;
+    }
+    }
 }
 
 void Renderer::SetEnvironmentPreset(const std::string& name) {
@@ -2043,7 +2394,9 @@ Result<void> Renderer::CreateShadowMapResources() {
     shadowDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     shadowDesc.Width = shadowDim;
     shadowDesc.Height = shadowDim;
-    shadowDesc.DepthOrArraySize = kShadowCascadeCount;
+    // Allocate enough array slices for all cascades plus a small number of
+    // local shadow-casting lights that share the same atlas.
+    shadowDesc.DepthOrArraySize = kShadowArraySize;
     shadowDesc.MipLevels = 1;
     shadowDesc.Format = DXGI_FORMAT_R32_TYPELESS;
     shadowDesc.SampleDesc.Count = 1;
@@ -2075,8 +2428,8 @@ Result<void> Renderer::CreateShadowMapResources() {
 
     m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-    // Create DSVs for each cascade slice
-    for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
+    // Create DSVs for each array slice (cascades + local lights)
+    for (uint32_t i = 0; i < kShadowArraySize; ++i) {
         auto dsvResult = m_descriptorManager->AllocateDSV();
         if (dsvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate DSV for shadow cascade: " + dsvResult.Error());
@@ -2112,7 +2465,7 @@ Result<void> Renderer::CreateShadowMapResources() {
     srvDesc.Texture2DArray.MipLevels = 1;
     srvDesc.Texture2DArray.MostDetailedMip = 0;
     srvDesc.Texture2DArray.FirstArraySlice = 0;
-    srvDesc.Texture2DArray.ArraySize = kShadowCascadeCount;
+    srvDesc.Texture2DArray.ArraySize = kShadowArraySize;
 
     m_device->GetDevice()->CreateShaderResourceView(
         m_shadowMap.Get(),
@@ -2976,6 +3329,7 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     // Clear any existing environments
     m_environmentMaps.clear();
+    m_pendingEnvironments.clear();
 
     // Scan assets directory for all HDR and EXR files
     namespace fs = std::filesystem;
@@ -2988,9 +3342,8 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
             if (entry.is_regular_file()) {
                 std::string ext = entry.path().extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(),
-                              [](unsigned char c) { return std::tolower(c); });
+                               [](unsigned char c) { return std::tolower(c); });
 
-                // Now we support both HDR and EXR!
                 if (ext == ".hdr" || ext == ".exr") {
                     envFiles.push_back(entry.path());
                 }
@@ -2998,170 +3351,48 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         }
     }
 
-    // Sort environment files alphabetically for consistent ordering
     std::sort(envFiles.begin(), envFiles.end());
 
-    // CPU helper: direction -> equirectangular UV consistent with shader mapping.
-    auto DirectionToLatLongCPU = [](const glm::vec3& dirNorm) -> glm::vec2 {
-        glm::vec3 d = glm::normalize(dirNorm);
-        float phi = std::atan2(d.z, d.x);
-        float theta = std::acos(glm::clamp(d.y, -1.0f, 1.0f));
-        glm::vec2 uv;
-        uv.x = (phi / (2.0f * glm::pi<float>())) + 0.5f;
-        uv.y = theta / glm::pi<float>();
-        return uv;
-    };
-
-    auto GenerateCubeFromEquirect = [&](const std::string& path,
-                                        const std::string& name)
-        -> Result<std::shared_ptr<DX12Texture>> {
-        auto imgResult = TextureLoader::LoadImageRGBAWithMips(path, false);
-        if (imgResult.IsErr() || imgResult.Value().empty()) {
-            return Result<std::shared_ptr<DX12Texture>>::Err(
-                "Failed to load environment image for cubemap: " + path);
-        }
-        const auto& base = imgResult.Value().front();
-        uint32_t srcW = base.width;
-        uint32_t srcH = base.height;
-        if (srcW == 0 || srcH == 0) {
-            return Result<std::shared_ptr<DX12Texture>>::Err(
-                "Environment image has zero size: " + path);
-        }
-
-        uint32_t faceSize = std::max(1u, srcH / 2);
-
-        std::vector<std::vector<uint8_t>> faces(6);
-        for (int f = 0; f < 6; ++f) {
-            faces[f].resize(static_cast<size_t>(faceSize) * faceSize * 4);
-        }
-
-        auto sampleEquirect = [&](float u, float v) -> glm::vec4 {
-            u = std::fmod(u, 1.0f);
-            if (u < 0.0f) u += 1.0f;
-            v = glm::clamp(v, 0.0f, 1.0f);
-
-            float x = u * (srcW - 1);
-            float y = v * (srcH - 1);
-            int x0 = static_cast<int>(std::floor(x));
-            int y0 = static_cast<int>(std::floor(y));
-            int x1 = std::min(x0 + 1, static_cast<int>(srcW - 1));
-            int y1 = std::min(y0 + 1, static_cast<int>(srcH - 1));
-            float tx = x - static_cast<float>(x0);
-            float ty = y - static_cast<float>(y0);
-
-            auto texel = [&](int ix, int iy) -> glm::vec4 {
-                size_t idx = (static_cast<size_t>(iy) * srcW + ix) * 4;
-                const auto* p = base.pixels.data() + idx;
-                return glm::vec4(p[0], p[1], p[2], p[3]) * (1.0f / 255.0f);
-            };
-
-            glm::vec4 c00 = texel(x0, y0);
-            glm::vec4 c10 = texel(x1, y0);
-            glm::vec4 c01 = texel(x0, y1);
-            glm::vec4 c11 = texel(x1, y1);
-
-            glm::vec4 cx0 = glm::mix(c00, c10, tx);
-            glm::vec4 cx1 = glm::mix(c01, c11, tx);
-            return glm::mix(cx0, cx1, ty);
-        };
-
-        auto faceDir = [&](int face, float u, float v) -> glm::vec3 {
-            switch (face) {
-                case 0: return glm::normalize(glm::vec3( 1.0f,    v,   -u)); // +X
-                case 1: return glm::normalize(glm::vec3(-1.0f,    v,    u)); // -X
-                case 2: return glm::normalize(glm::vec3(   u,  1.0f,   -v)); // +Y
-                case 3: return glm::normalize(glm::vec3(   u, -1.0f,    v)); // -Y
-                case 4: return glm::normalize(glm::vec3(   u,    v,  1.0f)); // +Z
-                case 5: return glm::normalize(glm::vec3(  -u,    v, -1.0f)); // -Z
-                default: return glm::vec3(0.0f, 0.0f, 1.0f);
-            }
-        };
-
-        for (int face = 0; face < 6; ++face) {
-            auto& dst = faces[face];
-            for (uint32_t y = 0; y < faceSize; ++y) {
-                for (uint32_t x = 0; x < faceSize; ++x) {
-                    float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(faceSize);
-                    float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(faceSize);
-                    float sx = 2.0f * u - 1.0f;
-                    float sy = 2.0f * v - 1.0f;
-
-                    glm::vec3 dir = faceDir(face, sx, sy);
-                    glm::vec2 uv = DirectionToLatLongCPU(dir);
-                    glm::vec4 c = sampleEquirect(uv.x, uv.y);
-
-                    size_t idx = (static_cast<size_t>(y) * faceSize + x) * 4;
-                    dst[idx + 0] = static_cast<uint8_t>(glm::clamp(c.r, 0.0f, 1.0f) * 255.0f + 0.5f);
-                    dst[idx + 1] = static_cast<uint8_t>(glm::clamp(c.g, 0.0f, 1.0f) * 255.0f + 0.5f);
-                    dst[idx + 2] = static_cast<uint8_t>(glm::clamp(c.b, 0.0f, 1.0f) * 255.0f + 0.5f);
-                    dst[idx + 3] = static_cast<uint8_t>(glm::clamp(c.a, 0.0f, 1.0f) * 255.0f + 0.5f);
-                }
-            }
-        }
-
-        DX12Texture tex;
-        auto initCube = tex.InitializeCubeFromFaces(
-            m_device->GetDevice(),
-            m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
-            m_commandQueue->GetCommandQueue(),
-            faces,
-            faceSize,
-            DXGI_FORMAT_R8G8B8A8_UNORM,
-            name
-        );
-        if (initCube.IsErr()) {
-            return Result<std::shared_ptr<DX12Texture>>::Err(initCube.Error());
-        }
-
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            return Result<std::shared_ptr<DX12Texture>>::Err(
-                "Failed to allocate SRV for cubemap environment " + name + ": " + srvResult.Error());
-        }
-
-        auto createSRVResult = tex.CreateSRV(m_device->GetDevice(), srvResult.Value());
-        if (createSRVResult.IsErr()) {
-            return Result<std::shared_ptr<DX12Texture>>::Err(createSRVResult.Error());
-        }
-
-        uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
-        if (m_uploadQueue && fence != 0) {
-            m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
-        }
-
-        return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(tex)));
-    };
-
-    // Load all HDR and EXR files as cubemaps
     int successCount = 0;
-    int failCount = 0;
-    for (const auto& envPath : envFiles) {
+    bool firstLoaded = false;
+    for (size_t index = 0; index < envFiles.size(); ++index) {
+        const auto& envPath = envFiles[index];
         std::string pathStr = envPath.string();
-        std::string name = envPath.stem().string(); // filename without extension
+        std::string name = envPath.stem().string();
 
-        auto cubeResult = GenerateCubeFromEquirect(pathStr, name);
-        if (cubeResult.IsErr()) {
-            spdlog::warn("Failed to load environment from '{}': {}", pathStr, cubeResult.Error());
-            failCount++;
-        } else {
-            auto tex = cubeResult.Value();
+        // Load only the first environment synchronously during startup so the
+        // app can become interactive quickly. Remaining environments are queued
+        // for deferred loading on subsequent frames.
+        if (!firstLoaded) {
+            auto texResult = LoadTextureFromFile(pathStr, false);
+            if (texResult.IsErr()) {
+                spdlog::warn("Failed to load primary environment from '{}': {}", pathStr, texResult.Error());
+                continue;
+            }
+
+            auto tex = texResult.Value();
 
             EnvironmentMaps env;
             env.name = name;
             env.diffuseIrradiance = tex;
             env.specularPrefiltered = tex;
-
             m_environmentMaps.push_back(env);
 
             spdlog::info(
-                "Environment '{}' loaded as cubemap from '{}': {}x{}, {} mips",
+                "Environment '{}' loaded eagerly from '{}': {}x{}, {} mips",
                 name,
                 pathStr,
                 tex->GetWidth(),
                 tex->GetHeight(),
                 tex->GetMipLevels());
 
-            successCount++;
+            ++successCount;
+            firstLoaded = true;
+        } else {
+            PendingEnvironment pending;
+            pending.path = pathStr;
+            pending.name = name;
+            m_pendingEnvironments.push_back(std::move(pending));
         }
     }
 
@@ -3170,8 +3401,55 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         spdlog::warn("No HDR environments loaded; using placeholder");
         EnvironmentMaps fallback;
         fallback.name = "Placeholder";
-        fallback.diffuseIrradiance = m_placeholderAlbedo;
-        fallback.specularPrefiltered = m_placeholderAlbedo;
+
+        // Build a simple 1x1 white cubemap as a safe fallback so that
+        // TextureCube sampling in shaders always has a valid resource.
+        std::vector<std::vector<uint8_t>> faces(6);
+        for (int f = 0; f < 6; ++f) {
+            faces[f].resize(4); // 1x1 RGBA8
+            faces[f][0] = 255;
+            faces[f][1] = 255;
+            faces[f][2] = 255;
+            faces[f][3] = 255;
+        }
+
+        DX12Texture tex;
+        auto initCube = tex.InitializeCubeFromFaces(
+            m_device->GetDevice(),
+            m_commandQueue->GetCommandQueue(),
+            faces,
+            1,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            "EnvPlaceholder"
+        );
+        if (initCube.IsErr()) {
+            spdlog::warn("Failed to create placeholder cubemap environment: {}", initCube.Error());
+            fallback.diffuseIrradiance = m_placeholderAlbedo;
+            fallback.specularPrefiltered = m_placeholderAlbedo;
+        } else {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                spdlog::warn("Failed to allocate SRV for placeholder cubemap: {}", srvResult.Error());
+                fallback.diffuseIrradiance = m_placeholderAlbedo;
+                fallback.specularPrefiltered = m_placeholderAlbedo;
+            } else {
+                auto createSRVResult = tex.CreateSRV(m_device->GetDevice(), srvResult.Value());
+                if (createSRVResult.IsErr()) {
+                    spdlog::warn("Failed to create SRV for placeholder cubemap: {}", createSRVResult.Error());
+                    fallback.diffuseIrradiance = m_placeholderAlbedo;
+                    fallback.specularPrefiltered = m_placeholderAlbedo;
+                } else {
+                    uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
+                    if (m_uploadQueue && fence != 0) {
+                        m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
+                    }
+                    auto cubePtr = std::make_shared<DX12Texture>(std::move(tex));
+                    fallback.diffuseIrradiance = cubePtr;
+                    fallback.specularPrefiltered = cubePtr;
+                }
+            }
+        }
+
         m_environmentMaps.push_back(fallback);
     }
 
@@ -3191,8 +3469,11 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     UpdateEnvironmentDescriptorTable();
 
-    spdlog::info("Environment maps initialized: {} loaded successfully, {} failed",
-                 successCount, failCount);
+    int pendingCount = static_cast<int>(m_pendingEnvironments.size());
+    spdlog::info(
+        "Environment maps initialized: {} loaded eagerly, {} pending for deferred loading",
+        successCount,
+        pendingCount);
     return Result<void>::Ok();
 }
 
@@ -3284,6 +3565,50 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
             specularSrc.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
+    }
+}
+
+void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {
+    if (maxPerFrame == 0 || m_pendingEnvironments.empty()) {
+        return;
+    }
+
+    uint32_t processedThisFrame = 0;
+    while (processedThisFrame < maxPerFrame && !m_pendingEnvironments.empty()) {
+        PendingEnvironment pending = m_pendingEnvironments.back();
+        m_pendingEnvironments.pop_back();
+
+        auto texResult = LoadTextureFromFile(pending.path, false);
+        if (texResult.IsErr()) {
+            spdlog::warn(
+                "Deferred environment load failed for '{}': {}",
+                pending.path,
+                texResult.Error());
+            continue;
+        }
+
+        auto tex = texResult.Value();
+
+        EnvironmentMaps env;
+        env.name = pending.name;
+        env.diffuseIrradiance = tex;
+        env.specularPrefiltered = tex;
+        m_environmentMaps.push_back(env);
+
+        spdlog::info(
+            "Deferred environment '{}' loaded from '{}': {}x{}, {} mips ({} remaining)",
+            env.name,
+            pending.path,
+            tex->GetWidth(),
+            tex->GetHeight(),
+            tex->GetMipLevels(),
+            m_pendingEnvironments.size());
+
+        processedThisFrame++;
+    }
+
+    if (m_pendingEnvironments.empty()) {
+        spdlog::info("All deferred environment maps loaded (total environments: {})", m_environmentMaps.size());
     }
 }
 
@@ -3399,6 +3724,73 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 m_commandList->IASetIndexBuffer(&ibv);
 
                 m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+            }
+        }
+    }
+
+    // Optional local light shadows rendered into atlas slices after the
+    // cascades, using the view-projection matrices prepared in
+    // UpdateFrameConstants.
+    if (m_hasLocalShadow && m_localShadowCount > 0) {
+        uint32_t maxLocal = std::min(m_localShadowCount, kMaxShadowedLocalLights);
+        for (uint32_t i = 0; i < maxLocal; ++i) {
+            uint32_t slice = kShadowCascadeCount + i;
+            if (slice >= kShadowArraySize) {
+                break;
+            }
+
+            ShadowConstants shadowData{};
+            shadowData.cascadeIndex = glm::uvec4(slice, 0u, 0u, 0u);
+            D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_shadowConstantBuffer.AllocateAndWrite(shadowData);
+
+            // Bind frame constants
+            m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+            // Bind shadow constants (b3)
+            m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
+
+            // Bind DSV for this local light slice
+            D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMapDSVs[slice].cpu;
+            m_commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+            // Clear shadow depth
+            m_commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+            // Set viewport and scissor for shadow map
+            m_commandList->RSSetViewports(1, &m_shadowViewport);
+            m_commandList->RSSetScissorRects(1, &m_shadowScissor);
+
+            // Draw all geometry
+            for (auto entity : view) {
+                auto& renderable = view.get<Scene::RenderableComponent>(entity);
+                auto& transform = view.get<Scene::TransformComponent>(entity);
+
+                if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
+                    continue;
+                }
+
+                ObjectConstants objectData = {};
+                objectData.modelMatrix = transform.GetMatrix();
+                objectData.normalMatrix = transform.GetNormalMatrix();
+
+                D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+                m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                    D3D12_VERTEX_BUFFER_VIEW vbv = {};
+                    vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                    vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                    vbv.StrideInBytes = sizeof(Vertex);
+
+                    D3D12_INDEX_BUFFER_VIEW ibv = {};
+                    ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                    ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                    ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                    m_commandList->IASetIndexBuffer(&ibv);
+
+                    m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+                }
             }
         }
     }

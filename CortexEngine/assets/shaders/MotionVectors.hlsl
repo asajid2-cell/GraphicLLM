@@ -19,13 +19,15 @@ cbuffer FrameConstants : register(b1)
         float4 params;
     };
     Light    g_Lights[4];
-    float4x4 g_LightViewProjection[4];
+    // Directional + local light view-projection matrices (0-2 = cascades, 3-5 = local)
+    float4x4 g_LightViewProjection[6];
     float4   g_CascadeSplits;
     float4   g_ShadowParams;
     float4   g_DebugMode;
     float4   g_PostParams;
     float4   g_EnvParams;
     float4   g_ColorGrade;
+    float4   g_FogParams;
     float4   g_AOParams;
     float4   g_BloomParams;
     float4   g_TAAParams;
@@ -99,4 +101,3 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float2 velocity = prevUV - currUV;
     return float4(velocity, 0.0f, 0.0f);
 }
-

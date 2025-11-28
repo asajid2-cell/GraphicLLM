@@ -241,6 +241,9 @@ struct ModifyRendererCommand : public SceneCommand {
     bool setEnvironment = false;
     bool setIBLEnabled = false;
     bool setIBLIntensity = false;
+    bool setLightingRig = false;
+    bool setFogEnabled = false;
+    bool setFogParams = false;
 
     float exposure = 1.0f;
     bool shadowsEnabled = true;
@@ -258,6 +261,11 @@ struct ModifyRendererCommand : public SceneCommand {
     bool iblEnabled = true;
     float iblDiffuseIntensity = 1.0f;
     float iblSpecularIntensity = 1.0f;
+    std::string lightingRig;       // "studio_three_point", "warehouse", "horror_side"
+    bool fogEnabled = false;
+    float fogDensity = 0.02f;
+    float fogHeight = 0.0f;
+    float fogFalloff = 0.5f;
 
     ModifyRendererCommand() { type = CommandType::ModifyRenderer; }
     std::string ToString() const override;

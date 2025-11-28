@@ -866,10 +866,25 @@ void Engine::RenderHUD() {
         for (int i = 0; i < rowCount; ++i) {
             const Row& r = rows[i];
             wchar_t line[256];
-            if (r.sectionIndex == 2 || r.sectionIndex == 3 || r.sectionIndex == 7 ||
-                r.sectionIndex == 8 || r.sectionIndex == 9 || r.sectionIndex == 10 ||
-                r.sectionIndex == 11 || r.sectionIndex == 12 || r.sectionIndex == 14) {
-                swprintf_s(line, L"%s : %s", r.label, (state.rayTracingEnabled ? L"ON" : L"OFF"));
+            bool isBoolRow =
+                (r.sectionIndex == 2 || r.sectionIndex == 3 || r.sectionIndex == 7 ||
+                 r.sectionIndex == 8 || r.sectionIndex == 9 || r.sectionIndex == 10 ||
+                 r.sectionIndex == 11 || r.sectionIndex == 12 || r.sectionIndex == 14);
+            if (isBoolRow) {
+                bool flagValue = false;
+                switch (r.sectionIndex) {
+                    case 2:  flagValue = state.shadowsEnabled;      break;
+                    case 3:  flagValue = state.pcssEnabled;         break;
+                    case 7:  flagValue = state.fxaaEnabled;         break;
+                    case 8:  flagValue = state.taaEnabled;          break;
+                    case 9:  flagValue = state.ssrEnabled;          break;
+                    case 10: flagValue = state.ssaoEnabled;         break;
+                    case 11: flagValue = state.iblEnabled;          break;
+                    case 12: flagValue = state.fogEnabled;          break;
+                    case 14: flagValue = state.rayTracingEnabled;   break;
+                    default: break;
+                }
+                swprintf_s(line, L"%s : %s", r.label, flagValue ? L"ON" : L"OFF");
             } else {
                 swprintf_s(line, L"%s : %.3f", r.label, r.value);
             }

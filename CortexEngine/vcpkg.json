@@ -1,0 +1,17 @@
+{
+  "name": "cortex-engine",
+  "version": "0.1.0",
+  "description": "Neural-Native Rendering Engine with Real-time AI Integration",
+  "dependencies": [
+    "sdl3",
+    "entt",
+    "nlohmann-json",
+    "spdlog",
+    "directx-headers",
+    "directxtk12",
+    "glm",
+    "tinyexr",
+    "miniz"
+  ],
+  "builtin-baseline": "fca0e6b324d41da363b0e1dc33b0595491250a77"
+}

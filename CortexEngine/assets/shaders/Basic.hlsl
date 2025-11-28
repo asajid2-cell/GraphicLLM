@@ -91,6 +91,8 @@ Texture2D g_RoughnessTexture : register(t3);
 Texture2DArray g_ShadowMap : register(t0, space1);
 Texture2D g_EnvDiffuse : register(t1, space1);
 Texture2D g_EnvSpecular : register(t2, space1);
+Texture2D<float> g_RtShadowMask : register(t3, space1);
+Texture2D<float> g_RtShadowMaskHistory : register(t4, space1);
 SamplerState g_Sampler : register(s0);
 
 // Vertex shader input
@@ -641,10 +643,16 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             if (i == 0)
             {
                 float shadow = ComputeShadow(worldPos, normal);
-                if (g_PostParams.w > 0.5f)
-                {
-                    shadow = 1.0f;
-                }
+                // When RT sun shadows are enabled, override the cascaded
+                // factor with a temporally filtered RT mask sampled in
+                // screen space. The mask is authored as 0 = fully shadowed,
+                // 1 = lit.
+                // In DXR-enabled builds, an optional ray-traced shadow mask
+                // can override the cascaded shadow factor in screen space.
+                // That path is currently disabled in this shader variant to
+                // keep the code entry-point agnostic (vertex and pixel
+                // shaders share this file), so we simply use the cascaded
+                // shadow factor computed above.
                 contribution *= shadow;
             }
         }

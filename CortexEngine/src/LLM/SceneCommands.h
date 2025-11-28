@@ -141,12 +141,38 @@ struct ModifyTransformCommand : public SceneCommand {
     bool setPosition = false;
     bool setRotation = false;
     bool setScale = false;
+    // Optional spin/orbit controls. When setSpin is true the executor will
+    // add or update a RotationComponent on the resolved target so that it
+    // continuously spins around the given axis at the requested speed
+    // (radians per second). When stopSpin is true, any existing spin on the
+    // target is removed.
+    bool setSpin = false;
+    bool stopSpin = false;
+    // Optional parenting controls used for "orbit around X" style commands.
+    // When setParent is true, the executor will try to attach this entity to
+    // the named parent (so it inherits the parent's motion). When
+    // clearParent is true, any existing parent relationship is removed.
+    bool setParent = false;
+    bool clearParent = false;
+    std::string parentName;
     // When true, position/scale are interpreted as deltas
     // relative to the current transform instead of absolute.
     bool isRelative = false;
     glm::vec3 position;
     glm::vec3 rotation;  // Euler angles
     glm::vec3 scale;
+    glm::vec3 spinAxis{0.0f, 1.0f, 0.0f};
+    float spinSpeed = 1.0f;
+
+    // Optional simple orbit setup, equivalent to the editor's Shift+O helper.
+    // When setOrbit is true, the executor will attach this entity as a child
+    // of orbitCenterName (resolved like other targets), place it at the given
+    // radius in the parent's local +X direction, and ensure the center has a
+    // RotationComponent with the requested angular speed.
+    bool setOrbit = false;
+    std::string orbitCenterName;
+    float orbitRadius = 3.0f;
+    float orbitSpeed = 0.6f;
 
     ModifyTransformCommand() { type = CommandType::ModifyTransform; }
     std::string ToString() const override;

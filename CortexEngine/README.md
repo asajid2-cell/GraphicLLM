@@ -1,216 +1,165 @@
 # Project Cortex: Neural-Native Rendering Engine
 
-A real-time rendering engine with integrated AI capabilities for Windows, featuring:
-- DirectX 12 rendering with PBR support
-- Real-time AI texture generation via TensorRT (Phase 3)
-- Natural language scene manipulation via Llama.cpp (Phase 2)
-- EnTT-based Entity Component System
-- Zero-copy CUDA-DX12 interop for AI-generated assets
+Project Cortex is a real-time DirectX 12 renderer with integrated AI tooling.  
+It is designed as a portfolio-quality engine that demonstrates:
 
-## 🚀 Quick Start (One Command!)
+- Physically based rendering (PBR) on DX12
+- EnTT-based Entity Component System
+- Natural-language scene control via Llama.cpp
+- Asynchronous diffusion-based texture generation (TensorRT)
+- CUDA and DX12 interop for AI-generated content
+
+---
+
+## Quick Start
+
+From the `CortexEngine` directory:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup.ps1
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+.\run.ps1
 ```
 
-This automatically:
-- ✅ Installs all dependencies (vcpkg, SDL3, EnTT, DirectX, etc.)
-- ✅ Configures CMake build
-- ✅ Compiles the project
-- ✅ Verifies everything is ready to run
+`setup.ps1` installs dependencies, configures CMake, builds the engine, and verifies that
+the executable and shader assets are present.
 
-**Then run:** `.\run.ps1`
+For more detail:
+- `SCRIPTS.md` documents all helper scripts.
+- `BUILD.md` contains manual build instructions.
 
-See [SCRIPTS.md](SCRIPTS.md) for all automation scripts or [BUILD.md](BUILD.md) for manual instructions.
+---
 
-## Architecture Overview
+## High-Level Architecture
 
-### The Three Async Loops
+### Core subsystems
 
-1. **Main Render Loop** (60/120 FPS)
-   - Standard game loop: Input → Update → Render
-   - Deferred renderer with PBR
-   - Uses "placeholder" textures while AI generates
+- **Core**
+  - `Engine` - main loop, frame timing, and orchestration.
+  - `Window` - SDL3 windowing, input, and DX12 swapchain creation.
+  - `ServiceLocator` - central registry for engine-wide services.
 
-2. **The Architect** (LLM - Phase 2)
-   - Llama.cpp running on CPU/GPU
-   - Parses natural language → JSON scene commands
-   - Direct ECS manipulation
+- **Graphics**
+  - DirectX 12 RHI (`DX12Device`, `DX12CommandQueue`, `DX12Texture`,
+    `DX12Pipeline`, `DescriptorHeap`).
+  - `Renderer` - forward PBR lighting, cascaded shadows, SSAO, SSR, bloom,
+    tone mapping, and FXAA/TAA.
+  - HLSL shaders in `assets/shaders` (PBR, SSAO, SSR, post-process, motion vectors).
 
-3. **The Dreamer** (Diffusion - Phase 3)
-   - TensorRT/CoreML image generation
-   - Writes directly to GPU texture memory (zero-copy)
-   - Hot-swaps textures in real-time
+- **Scene**
+  - EnTT-based `ECS_Registry` and component set:
+    `TransformComponent`, `RenderableComponent`, `CameraComponent`,
+    `LightComponent`, tagging and utility components.
 
-## Current Status: Phase 1 - The Iron Foundation ✅
+- **AI / LLM**
+  - `LLMService` - wraps Llama.cpp and runs on a background thread.
+  - `CommandQueue` and `SceneCommands` - parse JSON commands from the model
+    and apply them to the ECS (spawn entities, adjust lights, change materials).
+  - `RegressionTests` - automated command sequences for validation.
 
-### Completed Components
+- **AI / Vision (Diffusion)**
+  - `DiffusionEngine` - TensorRT or CPU stub for SDXL-Turbo.
+  - `DreamerService` - asynchronous texture generation and hand-off into GPU textures.
 
-#### Graphics RHI (Rendering Hardware Interface)
-- [x] `DX12Device` - Device initialization with debug layer support
-- [x] `DX12CommandQueue` - Command submission and GPU synchronization
-- [x] `DescriptorHeap` - Dynamic descriptor allocation (ring buffer)
-- [x] `DX12Texture` - Texture management with hot-swap support
+---
 
-#### Core Systems
-- [x] `Window` - SDL3 integration with DX12 swapchain
-- [x] `ServiceLocator` - Global service access pattern
-- [x] `Result<T>` - Modern error handling (std::expected alternative)
+## Render Pipeline Overview
 
-#### Scene Management
-- [x] `ECS_Registry` - EnTT wrapper with entity management
-- [x] Components:
-  - `TransformComponent` - Position, rotation, scale
-  - `RenderableComponent` - Mesh + texture references
-  - `TagComponent` - Semantic labels for AI (Phase 4)
-  - `CameraComponent` - View/projection matrices
-  - `RotationComponent` - Animation helper
+Per frame the renderer:
 
-#### Shaders
-- [x] `Basic.hlsl` - PBR-style vertex/pixel shaders
-- [x] `ShaderTypes.h` - Shared C++/HLSL structures
+1. Updates frame constants and TAA jitter.
+2. Renders cascaded shadow maps for the main directional light.
+3. Renders the skybox using HDR environment maps (diffuse and specular IBL).
+4. Renders geometry with PBR shading into HDR and normal/roughness targets.
+5. Runs SSAO, SSR, and motion-vector passes.
+6. Applies bloom and tone mapping in a post-process pass.
+7. Presents the final image to the swapchain.
 
-### Directory Structure
+Image-based lighting (IBL) uses:
+- Diffuse irradiance from low-frequency environment maps.
+- Specular reflections from roughness-controlled mips of the environment.
 
+---
+
+## Directory Structure (CortexEngine/)
+
+```text
+assets/             # Shaders and sample textures (large HDR/EXR IBL assets are git-ignored)
+  shaders/
+
+models/             # LLM and diffusion models (gguf, TensorRT engines; git-ignored)
+
+src/
+  Core/             # Engine, Window, ServiceLocator
+  Graphics/         # Renderer, RHI, shaders, post-processing
+    RHI/            # DX12 device, command queue, pipeline, texture, descriptor heap
+  AI/
+    LLM/            # LLMService, CommandQueue, SceneCommands, RegressionTests
+    Vision/         # DiffusionEngine, DreamerService
+  Scene/            # ECS_Registry and components
+  UI/               # Debug HUD and prompt/console UI
+  Utils/            # FileUtils, MeshGenerator, Result<T>, GLTF loader
+
+vendor/             # Third-party libraries (llama.cpp, stb, TinyEXR, etc.)
+build/              # CMake build directory (git-ignored)
 ```
-CortexEngine/
-├── src/
-│   ├── Core/              # Engine core (Window, main loop)
-│   ├── Graphics/
-│   │   ├── RHI/           # DirectX 12 wrappers
-│   │   └── Shaders/       # HLSL shaders
-│   ├── AI/
-│   │   ├── LLM/           # Phase 2: Llama.cpp integration
-│   │   └── Vision/        # Phase 3: TensorRT diffusion
-│   ├── Scene/             # ECS and components
-│   └── Utils/             # Utilities (Result, FileUtils)
-├── assets/
-│   ├── shaders/           # Compiled shader bytecode
-│   ├── textures/          # Texture files
-│   └── models/            # GGUF and TensorRT models
-└── vendor/                # Third-party libraries
-```
 
-## Building
+---
+
+## Building Manually
 
 ### Prerequisites
 
 - Windows 10/11 with Windows SDK
-- Visual Studio 2022 (or newer)
-- CMake 3.20+
-- vcpkg (for package management)
+- Visual Studio 2022 (or newer) with C++ desktop workload
+- CMake 3.20 or later
+- vcpkg for dependency management
 
 ### Dependencies (via vcpkg)
 
-- SDL3 - Windowing
-- EnTT - Entity Component System
-- GLM - Math library
-- spdlog - Logging
+- SDL3 - windowing and input
+- EnTT - ECS
+- GLM - math
+- spdlog - logging
 - nlohmann-json - JSON parsing
 - DirectX-Headers - DX12 headers
-- DirectXTK12 - DirectX helper utilities
+- DirectXTK12 - helper utilities for DX12
 
-### Build Instructions
+### Example build commands
 
-```bash
-# Set vcpkg toolchain (if not in environment)
+```bat
 set VCPKG_ROOT=C:\path\to\vcpkg
 
-# Configure
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
+cmake -B build -S . ^
+  -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
 
-# Build
 cmake --build build --config Release
 
-# Run
 build\bin\Release\CortexEngine.exe
 ```
 
-## Phase Roadmap
+---
 
-### ✅ Phase 1: The Iron Foundation
-**Goal:** Render a textured spinning cube
+## Phase Roadmap (Abbreviated)
 
-- [x] DX12 device and command queue
-- [x] Descriptor heap system
-- [x] Texture management
-- [x] SDL3 windowing
-- [x] EnTT ECS integration
-- [x] Basic PBR shaders
-- [ ] **TODO:** Renderer implementation
-- [ ] **TODO:** Cube mesh generation
-- [ ] **TODO:** Main game loop
-- [ ] **TEST:** Spinning cube milestone
+- **Phase 1 - Iron Foundation**
+  - Bring up DX12 renderer, ECS, and PBR shading on a spinning test mesh.
 
-### Phase 2: The Neuro-Linguistic Link (Next)
-**Goal:** Control engine with text commands
+- **Phase 2 - Neuro-Linguistic Control**
+  - Integrate Llama.cpp, define a constrained JSON command format,
+    and drive the scene from natural-language prompts.
 
-- [ ] Integrate llama.cpp as library
-- [ ] Implement GBNF grammar for strict JSON output
-- [ ] JSON command parser → ECS actions
-- [ ] ImGui console overlay
-- **Milestone:** Type "Add a red light" → red light spawns
+- **Phase 3 - Dream Pipeline**
+  - Integrate SDXL-Turbo via TensorRT, generate textures asynchronously,
+    and stream them into the renderer without stalling the frame.
 
-### Phase 3: The Dream Pipeline
-**Goal:** Generate textures on the fly
+Later phases focus on higher-level semantic scene understanding and polish
+(caching, streaming, and tooling).
 
-- [ ] Install CUDA Toolkit + TensorRT
-- [ ] Convert SDXL-Turbo to ONNX → TensorRT
-- [ ] Implement texture request queue
-- [ ] CUDA-DX12 zero-copy interop
-- **Milestone:** Type "Wood texture" → cube becomes wood
+---
 
-### Phase 4: Semantic Scene Graph
-**Goal:** AI understands scene context
+## License and Usage
 
-- [ ] Scene description serializer
-- [ ] Context-aware generation
-- [ ] Spatial reasoning for LLM
+Project Cortex is a learning and research project.  
+Please review the licenses of the bundled third-party libraries and models
+(llama.cpp, SDXL-Turbo, etc.) before using it in commercial contexts.
 
-### Phase 5: Optimization & Polish
-- [ ] Texture caching (hash-based)
-- [ ] Async texture uploads
-- [ ] PBR material generation (normal/roughness maps)
-
-## Key Technical Features
-
-### Hot-Swappable Textures
-The engine uses a "placeholder → replace" strategy:
-1. Entity created with white placeholder texture
-2. Renderer draws immediately (no stutter)
-3. AI generates texture in background
-4. `UpdateData()` hot-swaps GPU texture memory
-5. Next frame automatically shows new texture
-
-### Zero-Copy CUDA-DX12 Interop (Phase 3)
-```cpp
-// Create DX12 texture with ALLOW_SIMULTANEOUS_ACCESS
-// Get shared handle → Import to CUDA
-// Diffusion writes directly to CUDA array
-// DX12 reads same memory (zero CPU copy)
-```
-
-### Grammar-Constrained LLM (Phase 2)
-Instead of prompt engineering, use GBNF grammars:
-```
-root ::= "{" "action" ":" action "," params "}"
-action ::= "CREATE_LIGHT" | "SET_TEXTURE" | ...
-```
-Guarantees valid JSON output.
-
-## Performance Targets
-
-- Render Loop: 60+ FPS (120 target)
-- LLM Inference: <500ms (Q4_K_M quantization)
-- Texture Generation: 100-200ms (SDXL-Turbo, 1-4 steps)
-
-## License
-
-This is a learning/research project. See individual dependencies for their licenses.
-
-## Acknowledgments
-
-- Microsoft DirectX Team - DX12 samples
-- EnTT - Amazing ECS library
-- llama.cpp - LLM inference engine
-- Stable Diffusion - Image generation models

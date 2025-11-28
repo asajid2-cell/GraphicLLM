@@ -44,8 +44,6 @@ uint8_t ToByte(float v) {
 
 } // namespace
 
-// Destructor is defined unconditionally so non-TensorRT builds link cleanly,
-// with the TensorRT-specific cleanup guarded by CORTEX_ENABLE_TENSORRT.
 DiffusionEngine::~DiffusionEngine() {
 #if CORTEX_ENABLE_TENSORRT
     if (m_vaeLatentDevice) {
@@ -68,6 +66,7 @@ DiffusionEngine::~DiffusionEngine() {
     // standard C++ delete semantics. Guard these calls based on the version
     // so the engine can build against both.
     if (m_vaeContext) {
+// Prefer destroy() on older TensorRT versions; delete on 10.x and later.
 #if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_vaeContext->destroy();
 #else
@@ -76,6 +75,7 @@ DiffusionEngine::~DiffusionEngine() {
         m_vaeContext = nullptr;
     }
     if (m_vaeEngine) {
+// Prefer destroy() on older TensorRT versions; delete on 10.x and later.
 #if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_vaeEngine->destroy();
 #else
@@ -85,6 +85,7 @@ DiffusionEngine::~DiffusionEngine() {
     }
 
     if (m_unetContext) {
+// Prefer destroy() on older TensorRT versions; delete on 10.x and later.
 #if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_unetContext->destroy();
 #else
@@ -93,6 +94,7 @@ DiffusionEngine::~DiffusionEngine() {
         m_unetContext = nullptr;
     }
     if (m_unetEngine) {
+// Prefer destroy() on older TensorRT versions; delete on 10.x and later.
 #if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_unetEngine->destroy();
 #else
@@ -102,6 +104,7 @@ DiffusionEngine::~DiffusionEngine() {
     }
 
     if (m_trtRuntime) {
+// Prefer destroy() on older TensorRT versions; delete on 10.x and later.
 #if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_trtRuntime->destroy();
 #else

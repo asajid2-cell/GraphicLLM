@@ -270,7 +270,6 @@ private:
     Result<void> CreateShadowMapResources();
     Result<void> CreateHDRTarget();
     Result<void> CreateBloomResources();
-    Result<void> CreateRTShadowMask();
     Result<void> CreateSSAOResources();
     Result<void> InitializeEnvironmentMaps();
     void UpdateEnvironmentDescriptorTable();
@@ -347,13 +346,8 @@ public:
     ComPtr<ID3D12Resource> m_shadowMap;
     std::array<DescriptorHandle, kShadowArraySize> m_shadowMapDSVs;
     DescriptorHandle m_shadowMapSRV;
-    // Shadow + environment descriptor table (space1):
-    //   t0 = shadow map array
-    //   t1 = diffuse IBL
-    //   t2 = specular IBL
-    //   t3 = RT sun shadow mask (optional, when DXR is enabled)
-    //   t4 = RT sun shadow mask history (optional, for temporal denoising)
-    std::array<DescriptorHandle, 5> m_shadowAndEnvDescriptors{};
+    // Shadow + environment descriptor table (t4-t6)
+    std::array<DescriptorHandle, 3> m_shadowAndEnvDescriptors{};
     D3D12_VIEWPORT m_shadowViewport{};
     D3D12_RECT m_shadowScissor{};
     D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_COMMON;
@@ -374,16 +368,6 @@ public:
     DescriptorHandle m_ssaoRTV;
     DescriptorHandle m_ssaoSRV;
     D3D12_RESOURCE_STATES m_ssaoState = D3D12_RESOURCE_STATE_COMMON;
-
-    // Ray-traced sun shadow mask (optional, RT path)
-    ComPtr<ID3D12Resource> m_rtShadowMask;
-    DescriptorHandle m_rtShadowMaskSRV;
-    DescriptorHandle m_rtShadowMaskUAV;
-    D3D12_RESOURCE_STATES m_rtShadowMaskState = D3D12_RESOURCE_STATE_COMMON;
-    // History of RT sun shadow mask for simple temporal denoising.
-    ComPtr<ID3D12Resource> m_rtShadowMaskHistory;
-    DescriptorHandle m_rtShadowMaskHistorySRV;
-    D3D12_RESOURCE_STATES m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_COMMON;
 
     // Screen-space reflection color buffer
     ComPtr<ID3D12Resource> m_ssrColor;

@@ -138,12 +138,9 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     //   space1, t0 = shadow map array
     //   space1, t1 = IBL diffuse irradiance
     //   space1, t2 = IBL specular prefiltered environment
-    //   space1, t3 = RT sun shadow mask (optional)
-    //   space1, t4 = RT sun shadow mask history (optional)
-    //   space1, t3 = RT sun shadow mask (optional; remains bound even when RT is disabled)
     D3D12_DESCRIPTOR_RANGE shadowRange = {};
     shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    shadowRange.NumDescriptors = 5;
+    shadowRange.NumDescriptors = 3;
     shadowRange.BaseShaderRegister = 0;
     shadowRange.RegisterSpace = 1;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;

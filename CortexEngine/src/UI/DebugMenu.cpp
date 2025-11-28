@@ -51,6 +51,16 @@ void ApplyStateToRenderer(const DebugMenuState& state) {
         state.fractalWarpStrength,
         state.fractalNoiseType);
 
+    // Feature toggles
+    renderer->SetShadowsEnabled(state.shadowsEnabled);
+    renderer->SetPCSS(state.pcssEnabled);
+    renderer->SetFXAAEnabled(state.fxaaEnabled);
+    renderer->SetTAAEnabled(state.taaEnabled);
+    renderer->SetSSREnabled(state.ssrEnabled);
+    renderer->SetSSAOEnabled(state.ssaoEnabled);
+    renderer->SetIBLEnabled(state.iblEnabled);
+    renderer->SetFogEnabled(state.fogEnabled);
+
     if (renderer->IsRayTracingSupported()) {
         renderer->SetRayTracingEnabled(state.rayTracingEnabled);
     }
@@ -107,16 +117,29 @@ void DebugMenu::ResetToDefaults() {
         return;
     }
 
-    g_state.current = g_state.defaults;
-    ApplyStateToRenderer(g_state.current);
-
     if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
         renderer->SetShadowsEnabled(true);
         renderer->SetDebugViewMode(0);
         renderer->SetPCSS(false);
         renderer->SetFXAAEnabled(true);
+        renderer->SetTAAEnabled(true);
         renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetIBLEnabled(true);
+        renderer->SetFogEnabled(false);
     }
+
+    g_state.current = g_state.defaults;
+    g_state.current.shadowsEnabled = true;
+    g_state.current.pcssEnabled = false;
+    g_state.current.fxaaEnabled = true;
+    g_state.current.taaEnabled = true;
+    g_state.current.ssrEnabled = true;
+    g_state.current.ssaoEnabled = true;
+    g_state.current.iblEnabled = true;
+    g_state.current.fogEnabled = false;
+
+    ApplyStateToRenderer(g_state.current);
 }
 
 } // namespace Cortex::UI

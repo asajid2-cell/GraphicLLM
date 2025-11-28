@@ -46,7 +46,8 @@ cbuffer FrameConstants : register(b1)
     //                      11 = Fresnel (Fibl), 12 = specular mip,
     //                      13 = SSAO only, 14 = SSAO overlay), others reserved
     float4 g_DebugMode;
-    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
+    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5),
+    // w = RT sun shadows enabled (>0.5)
     float4 g_PostParams;
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
@@ -633,10 +634,17 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         if (type == LIGHT_TYPE_DIRECTIONAL)
         {
             // Sun shadows: only the primary directional light (index 0) uses
-            // cascaded shadow maps.
+            // cascaded shadow maps. When the RT path is enabled (toggled via V
+            // and gated on DXR support), we currently treat the sun as
+            // unshadowed in the raster path; upcoming DXR passes will write a
+            // ray-traced shadow mask instead.
             if (i == 0)
             {
                 float shadow = ComputeShadow(worldPos, normal);
+                if (g_PostParams.w > 0.5f)
+                {
+                    shadow = 1.0f;
+                }
                 contribution *= shadow;
             }
         }

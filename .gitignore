@@ -1,5 +1,4 @@
 glTF-Sample-Models/
-src/
 TensorRT/
 
 # Local build / log artifacts that should not be versioned

@@ -1,89 +1,103 @@
-# Phase 2: "The Architect" - Architecture Document
+# Phase 2 – “The Architect” (Architecture)
 
-## Overview
+Phase 2 introduces an asynchronous LLM loop named **The Architect**.  
+Its job is to translate natural-language requests into structured scene commands while
+the renderer continues to run at real-time frame rates.
 
-Phase 2 adds **natural language scene control** through an async LLM loop called "The Architect". This allows users to manipulate the 3D scene using plain English commands.
+---
 
-## Architecture
+## High-Level Design
 
-### Three Async Loops
+There are three cooperating loops:
 
+1. **Main Render Loop**
+   - Runs at 60–120 FPS.
+   - Processes input events.
+   - Updates ECS state (animations, scripted behavior).
+   - Pulls commands from the LLM command queue and applies them.
+   - Renders the scene.
+
+2. **Architect Loop (LLM)**
+   - Runs on a background thread.
+   - Receives text prompts from the UI.
+   - Builds prompts (system instructions + few-shot examples).
+   - Calls Llama.cpp to generate constrained JSON.
+   - Parses the JSON into typed command structs.
+   - Pushes commands into a thread-safe queue.
+
+3. **Dreamer Loop (Diffusion, Phase 3)**
+   - Optional in Phase 2; reserved for texture generation.
+
+The render loop never blocks on the LLM; if the LLM takes several seconds,
+frames keep rendering with the current scene state.
+
+---
+
+## Data Flow
+
+```text
+User text input
+        |
+        v
+UI / TextPrompt -> LLMService::SubmitPrompt()
+        |
+        v
+ [Background Thread]
+   - Llama.cpp inference
+   - Token-to-text conversion
+   - JSON extraction
+        |
+        v
+SceneCommands::ParseJson() -> vector<Command>
+        |
+        v
+CommandQueue::Enqueue()  (thread-safe)
+        |
+        v
+Main thread: CommandQueue::DrainAndApply(ECS_Registry)
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Main Render Loop (60-120 FPS)                             │
-│  - Input processing                                         │
-│  - ECS update (rotation, physics)                          │
-│  - Execute pending commands from queue                      │
-│  - Render scene                                            │
-└─────────────────────────────────────────────────────────────┘
-                           ▲
-                           │ Commands
-                           │
-┌─────────────────────────────────────────────────────────────┐
-│  The Architect Loop (~1-5 seconds)                         │
-│  - Receive text input                                       │
-│  - Build prompt with system instructions + few-shot         │
-│  - Run LLM inference (llama.cpp)                           │
-│  - Parse JSON response                                      │
-│  - Push commands to queue                                   │
-└─────────────────────────────────────────────────────────────┘
-```
 
-### Data Flow
+All communication between threads is done through the `CommandQueue`, which
+owns a small FIFO of commands protected by a mutex.
 
-```
-User Text Input
-    ↓
-LLMService.SubmitPrompt()
-    ↓
-[Async Thread] Llama.cpp Inference
-    ↓
-JSON Response
-    ↓
-CommandParser.ParseJSON()
-    ↓
-CommandQueue.PushBatch()
-    ↓
-[Main Thread] CommandQueue.ExecuteAll()
-    ↓
-Scene Modification (ECS)
-```
+---
 
-## Components
+## Key Types and Files
 
-### 1. LLMService (`src/LLM/LLMService.h/cpp`)
+- `src/LLM/LLMService.h/.cpp`
+  - Owns the Llama.cpp context and worker thread.
+  - Provides `SubmitPrompt()` and internal generation loop.
 
-**Purpose**: Wrapper around llama.cpp for async inference
+- `src/LLM/SceneCommands.h/.cpp`
+  - Defines strongly-typed command structs such as:
+    - `AddEntityCommand`
+    - `ModifyTransformCommand`
+    - `ModifyMaterialCommand`
+    - `ModifyCameraCommand`
+  - Implements JSON parsing for the LLM’s responses.
 
-**Key Methods**:
-- `Initialize(LLMConfig)` - Load model into memory
-- `SubmitPrompt(prompt, callback)` - Async inference
-- `Shutdown()` - Cleanup
+- `src/LLM/CommandQueue.h/.cpp`
+  - Thread-safe queue holding parsed commands.
+  - Exposes `Enqueue()` (LLM thread) and `DrainAndApply()` (render thread).
 
-**Current Status**: ✅ Mock implementation ready
-- Returns hard-coded JSON for testing
-- Real llama.cpp integration pending
+- `src/LLM/RegressionTests.*`
+  - Contains small scripted sequences that exercise the command system
+    and verify that the LLM integration remains stable over time.
 
-### 2. SceneCommands (`src/LLM/SceneCommands.h/cpp`)
+---
 
-**Purpose**: Define scene manipulation commands
+## Prompt and JSON Contract
 
-**Command Types**:
-- `AddEntityCommand` - Spawn cube/sphere/plane
-- `RemoveEntityCommand` - Delete entity by name
-- `ModifyTransformCommand` - Move, rotate, scale
-- `ModifyMaterialCommand` - Change color, metallic, roughness
-- `ModifyCameraCommand` - Move camera, change FOV
+The LLM is instructed to output **only** a JSON object of the form:
 
-**JSON Format**:
 ```json
 {
   "commands": [
     {
       "type": "add_entity",
       "entity_type": "cube",
-      "name": "RedCube",
-      "position": [2, 1, 0],
+      "name": "Example",
+      "position": [0, 1, -3],
       "scale": [1, 1, 1],
       "color": [1, 0, 0, 1]
     }
@@ -91,163 +105,19 @@ Scene Modification (ECS)
 }
 ```
 
-### 3. CommandQueue (`src/LLM/CommandQueue.h/cpp`)
+The grammar is enforced via a GBNF rule set so that the engine can rely
+on well-formed JSON and reject malformed outputs safely.
 
-**Purpose**: Thread-safe queue bridging async LLM and main thread
+---
 
-**Key Methods**:
-- `Push(command)` - Add command (thread-safe)
-- `ExecuteAll(registry, renderer)` - Run all pending (main thread only)
+## Threading and Safety
 
-**Execution**:
-- Finds entities by tag name
-- Modifies ECS components directly
-- Uploads new meshes to GPU
-- Logs all operations
+- LLM inference and tokenization happen entirely on the background thread.
+- The ECS is only touched on the main thread.
+- The `CommandQueue` is the synchronization point; it stores small command
+  objects and uses a mutex to guard access.
 
-### 4. Prompts (`src/LLM/Prompts.h`)
+This design keeps the renderer responsive even when prompts are long or
+the model is slow, and makes it straightforward to extend the command set
+in later phases.
 
-**Purpose**: Prompt engineering for consistent LLM output
-
-**Contains**:
-- System prompt defining role and JSON format
-- Few-shot examples (3 examples)
-- Coordinate system explanation
-- Output format specification
-
-### 5. Engine Integration (`src/Core/Engine.h/cpp`)
-
-**New Features**:
-- `m_llmService` - The Architect instance
-- `m_commandQueue` - Command buffer
-- `SubmitNaturalLanguageCommand(text)` - Public API
-- Text input mode (press T to activate)
-
-## Example Usage
-
-### 1. Add a Red Cube
-
-**User Input**: `"Add a red cube at position 2, 1, 0"`
-
-**LLM Output**:
-```json
-{
-  "commands": [{
-    "type": "add_entity",
-    "entity_type": "cube",
-    "name": "RedCube",
-    "position": [2, 1, 0],
-    "scale": [1, 1, 1],
-    "color": [1, 0, 0, 1]
-  }]
-}
-```
-
-**Result**: Red cube appears in scene
-
-### 2. Change Color and Move
-
-**User Input**: `"Make the cube blue and move it up"`
-
-**LLM Output**:
-```json
-{
-  "commands": [
-    {
-      "type": "modify_material",
-      "target": "RedCube",
-      "color": [0, 0, 1, 1]
-    },
-    {
-      "type": "modify_transform",
-      "target": "RedCube",
-      "position": [2, 2, 0]
-    }
-  ]
-}
-```
-
-**Result**: Cube turns blue and moves up
-
-### 3. Add Shiny Sphere
-
-**User Input**: `"Add a shiny metal sphere next to the cube"`
-
-**LLM Output**:
-```json
-{
-  "commands": [
-    {
-      "type": "add_entity",
-      "entity_type": "sphere",
-      "name": "Sphere1",
-      "position": [3.5, 1, 0],
-      "scale": [0.8, 0.8, 0.8],
-      "color": [0.7, 0.7, 0.7, 1]
-    },
-    {
-      "type": "modify_material",
-      "target": "Sphere1",
-      "metallic": 0.9,
-      "roughness": 0.1
-    }
-  ]
-}
-```
-
-**Result**: Metallic sphere appears
-
-## Implementation Status
-
-### ✅ Completed
-- [x] Command system architecture
-- [x] JSON command format
-- [x] Command parser
-- [x] Thread-safe command queue
-- [x] Scene command execution
-- [x] Prompt engineering system
-- [x] Mock LLM service
-- [x] Engine integration headers
-
-### 🔄 In Progress
-- [ ] Engine.cpp implementation (SubmitNaturalLanguageCommand)
-- [ ] Text input handling (SDL3 text events)
-- [ ] CMakeLists.txt updates
-
-### 📋 TODO
-- [ ] Real llama.cpp integration
-- [ ] Model download/setup
-- [ ] UI overlay for text input
-- [ ] Command history
-- [ ] Error handling improvements
-
-## Next Steps
-
-1. **Update CMakeLists.txt** - Add LLM source files
-2. **Implement Engine methods** - Wire up text input and LLM calls
-3. **Test with mock LLM** - Verify command execution works
-4. **Integrate llama.cpp** - Replace mock with real inference
-5. **Download model** - Get a small model (e.g., Phi-2, TinyLlama)
-6. **Test end-to-end** - Natural language → Scene changes
-
-## Controls (Planned)
-
-- **T** - Enter text input mode
-- **Enter** - Submit command to The Architect
-- **ESC** - Exit text input mode
-- **F1** - Show help overlay
-
-## Performance Targets
-
-- **LLM Inference**: 1-5 seconds (acceptable for creative tool)
-- **Command Execution**: <1ms (immediate scene updates)
-- **Main Render Loop**: Still 60-120 FPS (unaffected)
-
-## Future Enhancements (Phase 3+)
-
-- Conversational context (remember previous commands)
-- Undo/redo system
-- Macro recording
-- Voice input
-- Remote LLM APIs (GPT-4, Claude)
-- The Dreamer integration (AI texture generation)

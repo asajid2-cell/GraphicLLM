@@ -1,0 +1,15 @@
+glTF-Sample-Models/
+src/
+TensorRT/
+
+# Local build / log artifacts that should not be versioned
+CortexEngine/build/
+CortexEngine/vcpkg_installed/
+CortexEngine/build/bin/
+CortexEngine/rebuild_log.txt
+.claude/
+
+# Large engine assets that can be downloaded/generated locally
+CortexEngine/models/
+CortexEngine/assets/**/*.hdr
+CortexEngine/assets/**/*.exr

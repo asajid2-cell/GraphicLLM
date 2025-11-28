@@ -64,26 +64,49 @@ DiffusionEngine::~DiffusionEngine() {
     if (m_unetTimeIdsDevice)      { cudaFree(m_unetTimeIdsDevice);      m_unetTimeIdsDevice = nullptr; }
     if (m_unetOutSampleDevice)    { cudaFree(m_unetOutSampleDevice);    m_unetOutSampleDevice = nullptr; }
 
+    // TensorRT 8/9 exposed explicit destroy() methods; TensorRT 10.x uses
+    // standard C++ delete semantics. Guard these calls based on the version
+    // so the engine can build against both.
     if (m_vaeContext) {
+#if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_vaeContext->destroy();
+#else
+        delete m_vaeContext;
+#endif
         m_vaeContext = nullptr;
     }
     if (m_vaeEngine) {
+#if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_vaeEngine->destroy();
+#else
+        delete m_vaeEngine;
+#endif
         m_vaeEngine = nullptr;
     }
 
     if (m_unetContext) {
+#if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_unetContext->destroy();
+#else
+        delete m_unetContext;
+#endif
         m_unetContext = nullptr;
     }
     if (m_unetEngine) {
+#if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_unetEngine->destroy();
+#else
+        delete m_unetEngine;
+#endif
         m_unetEngine = nullptr;
     }
 
     if (m_trtRuntime) {
+#if defined(NV_TENSORRT_MAJOR) && (NV_TENSORRT_MAJOR < 10)
         m_trtRuntime->destroy();
+#else
+        delete m_trtRuntime;
+#endif
         m_trtRuntime = nullptr;
     }
 #endif

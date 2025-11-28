@@ -91,6 +91,7 @@ private:
                                    glm::vec3& outDirection);
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
+    void ToggleParentToFocus();
 
     // Translation gizmo helpers
     enum class GizmoAxis { None, X, Y, Z };
@@ -102,6 +103,13 @@ private:
                           float axisLength,
                           float threshold,
                           GizmoAxis& outAxis);
+
+    // Per-entity spin/orbit helpers driven by editor hotkeys. These simply
+    // add, update, or remove RotationComponent on the currently selected
+    // entity; the actual rotation is applied each frame in Update().
+    void ToggleSpinOnSelected(const glm::vec3& axis, float defaultSpeed);
+    void AdjustSpinSpeedOnSelected(float deltaSpeed);
+    void SetupSimpleOrbitOnSelected(float radius, float angularSpeed);
 
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Graphics::DX12Device> m_device;
@@ -120,7 +128,6 @@ private:
     bool m_dreamerEnabled = false;
 
     // Text input state
-    bool m_textInputMode = false;
     std::string m_textInputBuffer;
 
     bool m_running = false;

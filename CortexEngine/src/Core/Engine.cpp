@@ -753,7 +753,63 @@ void Engine::RenderHUD() {
                m_droneFlightEnabled ? "Drone" : "Orbit");
     drawLine(buffer);
 
-    drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan");
+    // Parent / spin diagnostics for the selected entity so it's clear how
+    // motion is being driven (self spin vs parent orbit).
+    if (m_selectedEntity != entt::null && m_registry) {
+        auto& reg = m_registry->GetRegistry();
+        if (reg.valid(m_selectedEntity) &&
+            reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+            const auto& tSel = reg.get<Scene::TransformComponent>(m_selectedEntity);
+
+            std::string parentName = "<none>";
+            bool parentSpins = false;
+            if (tSel.parent != entt::null &&
+                reg.valid(tSel.parent) &&
+                reg.all_of<Scene::TransformComponent>(tSel.parent)) {
+                if (m_registry->HasComponent<Scene::TagComponent>(tSel.parent)) {
+                    parentName = m_registry->GetComponent<Scene::TagComponent>(tSel.parent).tag;
+                } else {
+                    parentName = "<id=" + std::to_string(static_cast<uint32_t>(tSel.parent)) + ">";
+                }
+                parentSpins = reg.all_of<Scene::RotationComponent>(tSel.parent);
+            }
+
+            bool selfSpins = m_registry->HasComponent<Scene::RotationComponent>(m_selectedEntity);
+
+            // When the selected entity is parented under a spinning parent
+            // (especially the current focus target), show approximate orbit
+            // radius and angular speed for quick visual confirmation.
+            float orbitRadius = 0.0f;
+            float orbitSpeed = 0.0f;
+            bool hasOrbit = false;
+            if (tSel.parent != entt::null && parentSpins) {
+                orbitRadius = glm::length(tSel.position);
+                if (orbitRadius < 1e-3f) {
+                    orbitRadius = 0.0f;
+                }
+                const auto& parentRot = m_registry->GetComponent<Scene::RotationComponent>(tSel.parent);
+                orbitSpeed = parentRot.speed;
+                hasOrbit = orbitRadius > 0.0f;
+            }
+
+            wchar_t lineParent[256];
+            if (hasOrbit) {
+                swprintf_s(lineParent, L"Parent: %hs  Spin: %hs%hs  Orbit: r=%.2f s=%.2f",
+                           parentName.c_str(),
+                           selfSpins ? L"self" : L"none",
+                           parentSpins ? L" (parent spinning)" : L"",
+                           orbitRadius, orbitSpeed);
+            } else {
+                swprintf_s(lineParent, L"Parent: %hs  Spin: %hs%hs",
+                           parentName.c_str(),
+                           selfSpins ? L"self" : L"none",
+                           parentSpins ? L" (parent spinning)" : L"");
+            }
+            drawLine(lineParent);
+        }
+    }
+
+    drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan  O:[ ] spin  K: parent<->focus");
 
     // Engine settings overlay (toggled with M). Draw a simple side panel with
     // categories and current values inspired by DCC render settings UIs.
@@ -865,42 +921,6 @@ void Engine::Run() {
 void Engine::ProcessInput() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        // Phase 2: Handle text input mode
-        if (m_textInputMode) {
-            switch (event.type) {
-                case SDL_EVENT_TEXT_INPUT:
-                    m_textInputBuffer += event.text.text;
-                    spdlog::info("Input: {}", m_textInputBuffer);
-                    break;
-
-                case SDL_EVENT_KEY_DOWN:
-                    if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
-                        // Submit command to The Architect
-                        if (!m_textInputBuffer.empty() && m_llmEnabled) {
-                            spdlog::info("Submitting to Architect: \"{}\"", m_textInputBuffer);
-                            SubmitNaturalLanguageCommand(m_textInputBuffer);
-                            m_textInputBuffer.clear();
-                        }
-                        m_textInputMode = false;
-                        SDL_StopTextInput(m_window->GetSDLWindow());
-                        spdlog::info("Text input mode: OFF");
-                    }
-                    else if (event.key.key == SDLK_ESCAPE) {
-                        // Cancel text input
-                        m_textInputBuffer.clear();
-                        m_textInputMode = false;
-                        SDL_StopTextInput(m_window->GetSDLWindow());
-                        spdlog::info("Text input cancelled");
-                    }
-                    else if (event.key.key == SDLK_BACKSPACE && !m_textInputBuffer.empty()) {
-                        m_textInputBuffer.pop_back();
-                        spdlog::info("Input: {}", m_textInputBuffer);
-                    }
-                    break;
-            }
-            continue;  // Don't process other events in text input mode
-        }
-
         // Normal event handling
         switch (event.type) {
             case SDL_EVENT_QUIT:
@@ -908,34 +928,115 @@ void Engine::ProcessInput() {
                 break;
 
             case SDL_EVENT_KEY_DOWN: {
-                bool settingsVisible = UI::DebugMenu::IsVisible();
+                const SDL_Keycode key = event.key.key;
+                const bool settingsVisible = UI::DebugMenu::IsVisible() && m_showHUD;
 
-                // When the settings menu is visible, repurpose keys for menu
-                // navigation and parameter adjustments instead of camera
-                // controls. ESC closes the menu rather than quitting.
+                // -----------------------------------------------------------------
+                // Global hotkeys that should always work, regardless of whether the
+                // settings panel is visible. This avoids the feeling that keys like
+                // M or T "stop working" when the debug UI is open.
+                // -----------------------------------------------------------------
+
+                // ESC: close settings if open, otherwise quit.
+                if (key == SDLK_ESCAPE) {
+                    if (settingsVisible) {
+                        UI::DebugMenu::SetVisible(false);
+                    } else {
+                        m_running = false;
+                    }
+                    break;
+                }
+
+                // HUD toggle is independent of the settings panel.
+                if (key == SDLK_H) {
+                    m_showHUD = !m_showHUD;
+                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
+                    break;
+                }
+
+                // Settings menu toggle (M) should always open/close the panel.
+                if (key == SDLK_M) {
+                    UI::DebugMenu::Toggle();
+                    if (UI::DebugMenu::IsVisible()) {
+                        m_settingsSection = 0;
+                    }
+                    spdlog::info("Settings panel {}", UI::DebugMenu::IsVisible() ? "ENABLED" : "DISABLED");
+                    break;
+                }
+
+                // Architect text prompt (T) is allowed whenever the LLM is ready,
+                // even if the settings panel is visible.
+                if (key == SDLK_T) {
+                    if (!m_llmEnabled) {
+                        spdlog::info("LLM not enabled; T key ignored");
+                        break;
+                    }
+
+                    auto text = UI::TextPrompt::Show(m_window ? m_window->GetHWND() : nullptr);
+                    if (!text.empty()) {
+                        spdlog::info("Submitting to Architect: \"{}\"", text);
+                        SubmitNaturalLanguageCommand(text);
+                    } else {
+                        spdlog::info("Text input cancelled");
+                    }
+                    break;
+                }
+
+                // Dreamer prompt (Y) should also bypass settings gating so it
+                // remains reliable.
+                if (key == SDLK_Y) {
+                    if (m_dreamerService && m_dreamerEnabled) {
+                        std::string prompt = UI::TextPrompt::Show(
+                            m_window ? m_window->GetHWND() : nullptr,
+                            "Dreamer Texture Prompt",
+                            "Describe the texture to generate:");
+                        if (!prompt.empty()) {
+                            std::string target = GetFocusTarget();
+                            if (target.empty()) {
+                                target = "SpinningCube";
+                            }
+                            AI::Vision::TextureRequest req;
+                            req.targetName = target;
+                            req.prompt = prompt;
+                            req.usage = AI::Vision::TextureUsage::Albedo;
+                            req.width = 512;
+                            req.height = 512;
+                            m_dreamerService->SubmitRequest(req);
+                            spdlog::info("[Dreamer] Queued texture request for '{}' with prompt: \"{}\"",
+                                         target, prompt);
+                        } else {
+                            spdlog::info("[Dreamer] Texture prompt cancelled");
+                        }
+                    } else {
+                        spdlog::info("[Dreamer] Service not enabled; Y key ignored");
+                    }
+                    break;
+                }
+
+                // -----------------------------------------------------------------
+                // Settings-panel specific navigation. Only handles keys that are
+                // meant to adjust the debug state. Other hotkeys still fall through
+                // below so that F4, G, etc. continue to work when the panel is open.
+                // -----------------------------------------------------------------
                 if (settingsVisible) {
                     UI::DebugMenuState state = UI::DebugMenu::GetState();
                     const float stepSmall = 0.05f;
 
-                    if (event.key.key == SDLK_ESCAPE) {
-                        UI::DebugMenu::SetVisible(false);
-                        break;
-                    }
                     // Section navigation: up/down move the highlight through
                     // the list of settings sections.
-                    if (event.key.key == SDLK_UP) {
+                    if (key == SDLK_UP) {
                         m_settingsSection = std::max(0, m_settingsSection - 1);
                         break;
                     }
-                    if (event.key.key == SDLK_DOWN) {
+                    if (key == SDLK_DOWN) {
                         constexpr int kMaxSection = 14;
                         m_settingsSection = std::min(kMaxSection, m_settingsSection + 1);
                         break;
                     }
 
                     // Adjust the currently highlighted setting with left/right.
-                    if (event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT) {
-                        const float dir = (event.key.key == SDLK_RIGHT) ? 1.0f : -1.0f;
+                    if (key == SDLK_LEFT || key == SDLK_RIGHT) {
+                        const float dir = (key == SDLK_RIGHT) ? 1.0f : -1.0f;
 
                         switch (m_settingsSection) {
                             case 0: // Exposure
@@ -996,13 +1097,22 @@ void Engine::ProcessInput() {
                     }
 
                     // Space/Enter toggle boolean sections such as ray tracing.
-                    if (event.key.key == SDLK_SPACE || event.key.key == SDLK_RETURN) {
+                    if (key == SDLK_SPACE || key == SDLK_RETURN) {
                         if (m_settingsSection >= 2 && m_settingsSection <= 12) {
-                            // Boolean rows: flip the value
-                            // Let LEFT/RIGHT handler handle the actual toggle by
-                            // simulating a small positive delta.
-                            const SDL_Keycode fake = SDLK_RIGHT;
-                            (void)fake; // no-op; we already share logic above.
+                            // Boolean rows: flip the value.
+                            state = UI::DebugMenu::GetState();
+                            switch (m_settingsSection) {
+                                case 2:  state.shadowsEnabled = !state.shadowsEnabled; break;
+                                case 3:  state.pcssEnabled = !state.pcssEnabled; break;
+                                case 7:  state.fxaaEnabled = !state.fxaaEnabled; break;
+                                case 8:  state.taaEnabled = !state.taaEnabled; break;
+                                case 9:  state.ssrEnabled = !state.ssrEnabled; break;
+                                case 10: state.ssaoEnabled = !state.ssaoEnabled; break;
+                                case 11: state.iblEnabled = !state.iblEnabled; break;
+                                case 12: state.fogEnabled = !state.fogEnabled; break;
+                                default: break;
+                            }
+                            UI::DebugMenu::SyncFromState(state);
                         } else if (m_settingsSection == 14) {
                             auto* renderer = m_renderer.get();
                             if (renderer && renderer->IsRayTracingSupported()) {
@@ -1012,21 +1122,17 @@ void Engine::ProcessInput() {
                         }
                         break;
                     }
-
-                    // Unhandled key while menu is visible: do not fall through
-                    // to the rest of the engine hotkeys.
-                    break;
+                    // If settings are visible but the key was not handled above,
+                    // fall through to the normal hotkeys so debug view toggles,
+                    // camera controls, etc. still function.
                 }
 
-                if (event.key.key == SDLK_ESCAPE) {
-                    m_running = false;
-                }
-                else if (event.key.key == SDLK_F) {
+                if (key == SDLK_F) {
                     // Frame the currently selected entity (if any) and mark it
                     // as the logical focus target for LLM/Dreamer edits.
                     FrameSelectedEntity();
                 }
-                else if (event.key.key == SDLK_G) {
+                else if (key == SDLK_G) {
                     // Toggle drone/free-flight camera mode. When enabled, the camera
                     // can be steered continuously without holding the right mouse
                     // button and the mouse is locked in relative mode.
@@ -1049,126 +1155,103 @@ void Engine::ProcessInput() {
                         spdlog::info("Drone flight disabled");
                     }
                 }
-                else if (event.key.key == SDLK_T && m_llmEnabled) {
-                    // Block to show native prompt; returns empty on cancel
-                    auto text = UI::TextPrompt::Show(m_window->GetHWND());
-                    if (!text.empty()) {
-                        spdlog::info("Submitting to Architect: \"{}\"", text);
-                        SubmitNaturalLanguageCommand(text);
-                    } else {
-                        spdlog::info("Text input cancelled");
-                    }
-                }
-                else if (event.key.key == SDLK_Y) {
-                    // Phase 3: Trigger Dreamer texture generation for the current focus target.
-                    if (m_dreamerService && m_dreamerEnabled) {
-                        std::string prompt = UI::TextPrompt::Show(
-                            m_window->GetHWND(),
-                            "Dreamer Texture Prompt",
-                            "Describe the texture to generate:");
-                        if (!prompt.empty()) {
-                            std::string target = GetFocusTarget();
-                            if (target.empty()) {
-                                target = "SpinningCube";
-                            }
-                            AI::Vision::TextureRequest req;
-                            req.targetName = target;
-                            req.prompt = prompt;
-                            req.usage = AI::Vision::TextureUsage::Albedo;
-                            req.width = 512;
-                            req.height = 512;
-                            m_dreamerService->SubmitRequest(req);
-                            spdlog::info("[Dreamer] Queued texture request for '{}' with prompt: \"{}\"",
-                                         target, prompt);
-                        } else {
-                            spdlog::info("[Dreamer] Texture prompt cancelled");
-                        }
-                    } else {
-                        spdlog::info("[Dreamer] Service not enabled; Y key ignored");
-                    }
-                }
-                else if (event.key.key == SDLK_F1) {
+                else if (key == SDLK_F1) {
                     // Reset camera to default position/orientation
                     InitializeCameraController();
                     spdlog::info("Camera reset to default");
                 }
-                else if (event.key.key == SDLK_H) {
-                    m_showHUD = !m_showHUD;
-                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
-                }
-                else if (event.key.key == SDLK_P) {
+                else if (key == SDLK_P) {
                     if (m_renderer) {
                         bool enabled = !m_renderer->IsPCSS();
                         m_renderer->SetPCSS(enabled);
                         spdlog::info("PCSS contact-hardening {}", enabled ? "ENABLED" : "DISABLED");
                     }
                 }
-                else if (event.key.key == SDLK_X) {
+                else if (key == SDLK_X) {
                     if (m_renderer) {
                         bool enabled = !m_renderer->IsFXAAEnabled();
                         m_renderer->SetFXAAEnabled(enabled);
                         spdlog::info("FXAA {}", enabled ? "ENABLED" : "DISABLED");
                     }
                 }
-                else if (event.key.key == SDLK_Z) {
+                else if (key == SDLK_Z) {
                     if (m_renderer) {
                         m_renderer->ToggleTAA();
                     }
                 }
-                else if (event.key.key == SDLK_M) {
-                    UI::DebugMenu::Toggle();
-                    if (UI::DebugMenu::IsVisible()) {
-                        m_settingsSection = 0;
+                else if (key == SDLK_O) {
+                    bool shiftDown = (event.key.mod & SDL_KMOD_SHIFT) != 0;
+                    if (shiftDown) {
+                        // One-shot helper: make the selected entity orbit the
+                        // current focus target at a default radius/speed.
+                        SetupSimpleOrbitOnSelected(3.0f, 0.6f);
+                    } else {
+                        // Toggle continuous spin for the currently selected entity
+                        // around its local Y axis.
+                        ToggleSpinOnSelected(glm::vec3(0.0f, 1.0f, 0.0f), 0.8f);
                     }
                 }
-                else if (event.key.key == SDLK_F2) {
+                else if (key == SDLK_LEFTBRACKET) {
+                    // Slow down spin on the selected entity.
+                    AdjustSpinSpeedOnSelected(-0.2f);
+                }
+                else if (key == SDLK_RIGHTBRACKET) {
+                    // Speed up spin on the selected entity.
+                    AdjustSpinSpeedOnSelected(0.2f);
+                }
+                else if (key == SDLK_K) {
+                    // Attach/detach the selected entity to the current focus
+                    // target so that it inherits the parent's motion.
+                    ToggleParentToFocus();
+                }
+                else if (key == SDLK_F2) {
                     // Reset all debug settings (sliders + view modes) to defaults, then show the menu
                     UI::DebugMenu::ResetToDefaults();
                     UI::DebugMenu::SetVisible(true);
                 }
-                else if (event.key.key == SDLK_F5) {
+                else if (key == SDLK_F5) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(0.5f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F7) {
+                else if (key == SDLK_F7) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(-0.0002f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F8) {
+                else if (key == SDLK_F8) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(0.0002f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F9) {
+                else if (key == SDLK_F9) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(-0.05f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F10) {
+                else if (key == SDLK_F10) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(0.05f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F11) {
+                else if (key == SDLK_F11) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, -0.1f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F12) {
+                else if (key == SDLK_F12) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, 0.1f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_V) {
+                else if (key == SDLK_V) {
                     if (m_renderer) {
                         if (!m_renderer->IsRayTracingSupported()) {
                             spdlog::info("Ray tracing not supported on this GPU; V toggle ignored");
@@ -1181,22 +1264,22 @@ void Engine::ProcessInput() {
                         }
                     }
                 }
-                else if (event.key.key == SDLK_F3) {
+                else if (key == SDLK_F3) {
                     if (m_renderer) {
                         m_renderer->ToggleShadows();
                     }
                 }
-                else if (event.key.key == SDLK_F4) {
+                else if (key == SDLK_F4) {
                     if (m_renderer) {
                         m_renderer->CycleDebugViewMode();
                     }
                 }
-                else if (event.key.key == SDLK_R) {
+                else if (key == SDLK_R) {
                     if (m_renderer) {
                         m_renderer->CycleScreenSpaceEffectsDebug();
                     }
                 }
-                else if (event.key.key == SDLK_C) {
+                else if (key == SDLK_C) {
                     if (m_renderer) {
                         // Cycle environment preset (studio -> sunset -> night -> ...).
                         m_renderer->CycleEnvironmentPreset();
@@ -1312,13 +1395,12 @@ void Engine::ProcessInput() {
                         }
                     }
 
-                    // No gizmo hit; perform standard picking.
+                    // No gizmo hit; perform standard picking. We do not
+                    // automatically change the logical focus target here so
+                    // that the user can maintain a separate "focus" (e.g. the
+                    // planet being orbited) while selecting different child
+                    // entities to attach, detach, or move.
                     m_selectedEntity = PickEntityAt(m_lastMousePos.x, m_lastMousePos.y);
-                    if (m_selectedEntity != entt::null && m_registry &&
-                        m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
-                        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
-                        SetFocusTarget(tag.tag);
-                    }
                 }
                 else if (!m_droneFlightEnabled &&
                          event.button.button == SDL_BUTTON_RIGHT && m_window) {
@@ -2141,6 +2223,254 @@ void Engine::FrameSelectedEntity() {
 
     spdlog::info("Framed entity (distance ~{}, fov={} deg)",
                  distance, camComp->fov);
+}
+
+void Engine::ToggleSpinOnSelected(const glm::vec3& axis, float defaultSpeed) {
+    if (!m_registry || m_selectedEntity == entt::null) {
+        return;
+    }
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(m_selectedEntity) ||
+        !reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+        return;
+    }
+
+    std::string tagName = "<unnamed>";
+    if (m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+        tagName = tag.tag;
+    }
+
+    if (reg.all_of<Scene::RotationComponent>(m_selectedEntity)) {
+        reg.remove<Scene::RotationComponent>(m_selectedEntity);
+        spdlog::info("Stopped spin on selected entity '{}'", tagName);
+        return;
+    }
+
+    glm::vec3 ax = axis;
+    if (!std::isfinite(ax.x) || !std::isfinite(ax.y) || !std::isfinite(ax.z) ||
+        glm::length2(ax) < 1e-4f) {
+        ax = glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+
+    Scene::RotationComponent rot;
+    rot.axis = glm::normalize(ax);
+    rot.speed = defaultSpeed;
+    reg.emplace<Scene::RotationComponent>(m_selectedEntity, rot);
+
+    spdlog::info("Started spin on selected entity '{}' axis ({:.2f},{:.2f},{:.2f}) speed {:.2f} rad/s",
+                 tagName, rot.axis.x, rot.axis.y, rot.axis.z, rot.speed);
+}
+
+void Engine::AdjustSpinSpeedOnSelected(float deltaSpeed) {
+    if (!m_registry || m_selectedEntity == entt::null) {
+        return;
+    }
+    if (!m_registry->HasComponent<Scene::RotationComponent>(m_selectedEntity)) {
+        return;
+    }
+
+    auto& rot = m_registry->GetComponent<Scene::RotationComponent>(m_selectedEntity);
+    float speed = rot.speed;
+    if (!std::isfinite(speed)) {
+        speed = 0.0f;
+    }
+    speed += deltaSpeed;
+    speed = std::clamp(speed, -10.0f, 10.0f);
+    rot.speed = speed;
+
+    std::string tagName = "<unnamed>";
+    if (m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+        tagName = tag.tag;
+    }
+
+    spdlog::info("Adjusted spin speed on '{}' to {:.2f} rad/s", tagName, rot.speed);
+}
+
+void Engine::SetupSimpleOrbitOnSelected(float radius, float angularSpeed) {
+    if (!m_registry || m_selectedEntity == entt::null) {
+        spdlog::info("SetupSimpleOrbitOnSelected: no selected entity");
+        return;
+    }
+
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(m_selectedEntity) ||
+        !reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+        spdlog::info("SetupSimpleOrbitOnSelected: selected entity lacks transform");
+        return;
+    }
+
+    if (m_focusTargetName.empty()) {
+        spdlog::info("SetupSimpleOrbitOnSelected: no focus target set");
+        return;
+    }
+
+    // Resolve orbit center entity by tag (case-insensitive).
+    entt::entity centerEntity = entt::null;
+    std::string focusLower = m_focusTargetName;
+    std::transform(focusLower.begin(), focusLower.end(), focusLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto view = m_registry->View<Scene::TagComponent, Scene::TransformComponent>();
+    std::string centerResolved = m_focusTargetName;
+    for (auto e : view) {
+        const auto& tag = view.get<Scene::TagComponent>(e);
+        std::string tagLower = tag.tag;
+        std::transform(tagLower.begin(), tagLower.end(), tagLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (tagLower == focusLower || tagLower.find(focusLower) != std::string::npos) {
+            centerEntity = e;
+            centerResolved = tag.tag;
+            break;
+        }
+    }
+
+    if (centerEntity == entt::null) {
+        spdlog::info("SetupSimpleOrbitOnSelected: focus target '{}' not found in scene", m_focusTargetName);
+        return;
+    }
+
+    if (centerEntity == m_selectedEntity) {
+        spdlog::info("SetupSimpleOrbitOnSelected: cannot orbit entity around itself");
+        return;
+    }
+
+    auto& satTransform = reg.get<Scene::TransformComponent>(m_selectedEntity);
+
+    // Prevent trivial cycles by ensuring the center is not a descendant of the satellite.
+    entt::entity cur = centerEntity;
+    while (cur != entt::null) {
+        if (cur == m_selectedEntity) {
+            spdlog::warn("SetupSimpleOrbitOnSelected: refusing to create cycle by orbiting '{}' around '{}'",
+                         centerResolved, m_focusTargetName);
+            return;
+        }
+        if (!reg.valid(cur) || !reg.all_of<Scene::TransformComponent>(cur)) {
+            break;
+        }
+        const auto& t = reg.get<Scene::TransformComponent>(cur);
+        cur = t.parent;
+    }
+
+    radius = std::max(radius, 0.1f);
+    float clampedSpeed = angularSpeed;
+    if (!std::isfinite(clampedSpeed)) {
+        clampedSpeed = 0.6f;
+    }
+    clampedSpeed = std::clamp(clampedSpeed, -10.0f, 10.0f);
+
+    // Attach satellite as a child and place it at +X in the parent's local space.
+    satTransform.parent = centerEntity;
+    satTransform.position = glm::vec3(radius, 0.0f, 0.0f);
+    satTransform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    // Ensure the center has a RotationComponent to drive the orbit.
+    Scene::RotationComponent* centerRot = nullptr;
+    if (reg.all_of<Scene::RotationComponent>(centerEntity)) {
+        centerRot = &reg.get<Scene::RotationComponent>(centerEntity);
+    } else {
+        Scene::RotationComponent rot;
+        rot.axis = glm::vec3(0.0f, 1.0f, 0.0f);
+        rot.speed = clampedSpeed;
+        centerRot = &reg.emplace<Scene::RotationComponent>(centerEntity, rot);
+    }
+
+    centerRot->axis = glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f));
+    centerRot->speed = clampedSpeed;
+
+    std::string satName = "<unnamed>";
+    if (m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        satName = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity).tag;
+    }
+
+    spdlog::info("Setup orbit: '{}' orbits '{}' at radius {:.2f}, speed {:.2f} rad/s",
+                 satName, centerResolved, radius, centerRot->speed);
+}
+
+void Engine::ToggleParentToFocus() {
+    if (!m_registry || m_selectedEntity == entt::null) {
+        spdlog::info("ToggleParentToFocus: no selected entity");
+        return;
+    }
+
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(m_selectedEntity) ||
+        !reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+        spdlog::info("ToggleParentToFocus: selected entity lacks transform");
+        return;
+    }
+
+    if (m_focusTargetName.empty()) {
+        spdlog::info("ToggleParentToFocus: no focus target set");
+        return;
+    }
+
+    // Resolve focus entity by tag (case-insensitive).
+    entt::entity focusEntity = entt::null;
+    std::string focusLower = m_focusTargetName;
+    std::transform(focusLower.begin(), focusLower.end(), focusLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto view = m_registry->View<Scene::TagComponent, Scene::TransformComponent>();
+    std::string focusResolved = m_focusTargetName;
+    for (auto e : view) {
+        const auto& tag = view.get<Scene::TagComponent>(e);
+        std::string tagLower = tag.tag;
+        std::transform(tagLower.begin(), tagLower.end(), tagLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (tagLower == focusLower || tagLower.find(focusLower) != std::string::npos) {
+            focusEntity = e;
+            focusResolved = tag.tag;
+            break;
+        }
+    }
+
+    if (focusEntity == entt::null) {
+        spdlog::info("ToggleParentToFocus: focus target '{}' not found in scene", m_focusTargetName);
+        return;
+    }
+
+    if (focusEntity == m_selectedEntity) {
+        spdlog::info("ToggleParentToFocus: cannot parent entity to itself");
+        return;
+    }
+
+    auto& selTransform = reg.get<Scene::TransformComponent>(m_selectedEntity);
+
+    std::string selName = "<unnamed>";
+    if (m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        selName = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity).tag;
+    }
+
+    // Detach if already parented to focus.
+    if (selTransform.parent == focusEntity) {
+        selTransform.parent = entt::null;
+        spdlog::info("Detached '{}' from parent '{}'", selName, focusResolved);
+        return;
+    }
+
+    // Prevent trivial cycles: do not allow parenting to a descendant.
+    entt::entity cur = focusEntity;
+    while (cur != entt::null) {
+        if (cur == m_selectedEntity) {
+            spdlog::warn("ToggleParentToFocus: refusing to create cycle by parenting '{}' under '{}'",
+                         selName, focusResolved);
+            return;
+        }
+        if (!reg.valid(cur) || !reg.all_of<Scene::TransformComponent>(cur)) {
+            break;
+        }
+        const auto& t = reg.get<Scene::TransformComponent>(cur);
+        cur = t.parent;
+    }
+
+    selTransform.parent = focusEntity;
+    // Snap into the parent's local frame; user can then drag it out along an axis.
+    selTransform.position = glm::vec3(0.0f);
+    selTransform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    spdlog::info("Attached '{}' as child of '{}'", selName, focusResolved);
 }
 
 bool Engine::HitTestGizmoAxis(const glm::vec3& rayOrigin,

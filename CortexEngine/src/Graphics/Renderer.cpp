@@ -348,12 +348,65 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Bloom passes operating on HDR buffer (if available)
     RenderBloom();
 
-    // Post-process HDR -> back buffer (or no-op if HDR disabled)
-    RenderPostProcess();
+  // Post-process HDR -> back buffer (or no-op if HDR disabled)
+  RenderPostProcess();
 
-    // Debug overlay lines rendered after all post-processing so they are not
-    // affected by tone mapping, bloom, or TAA.
-    RenderDebugLines();
+  // After lighting and post-processing, copy the current RT shadow mask into
+  // its history buffer for simple temporal denoising on the next frame.
+  if (m_rtShadowMask && m_rtShadowMaskHistory) {
+      ID3D12Resource* src = m_rtShadowMask.Get();
+      ID3D12Resource* dst = m_rtShadowMaskHistory.Get();
+
+      D3D12_RESOURCE_BARRIER barriers[2] = {};
+      UINT barrierCount = 0;
+
+      if (m_rtShadowMaskState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+          barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          barriers[barrierCount].Transition.pResource = src;
+          barriers[barrierCount].Transition.StateBefore = m_rtShadowMaskState;
+          barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+          ++barrierCount;
+      }
+      if (m_rtShadowMaskHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
+          barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          barriers[barrierCount].Transition.pResource = dst;
+          barriers[barrierCount].Transition.StateBefore = m_rtShadowMaskHistoryState;
+          barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+          barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+          ++barrierCount;
+      }
+
+      if (barrierCount > 0) {
+          m_commandList->ResourceBarrier(barrierCount, barriers);
+      }
+
+      m_commandList->CopyResource(dst, src);
+
+      // Restore both resources to shader-resource state for the next frame's
+      // lighting work.
+      D3D12_RESOURCE_BARRIER restore[2] = {};
+      restore[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+      restore[0].Transition.pResource = src;
+      restore[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+      restore[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+      restore[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+      restore[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+      restore[1].Transition.pResource = dst;
+      restore[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+      restore[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+      restore[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+      m_commandList->ResourceBarrier(2, restore);
+
+      m_rtShadowMaskState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+      m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+  }
+
+  // Debug overlay lines rendered after all post-processing so they are not
+  // affected by tone mapping, bloom, or TAA.
+  RenderDebugLines();
 
     EndFrame();
 }
@@ -366,10 +419,28 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
     HRESULT hr = m_commandList.As(&rtCmdList);
     if (SUCCEEDED(hr) && rtCmdList) {
-        // For now we build BLAS/TLAS for the scene; DispatchRayTracing
-        // remains a no-op hook for upcoming RT effects.
+        // Ensure RT shadow mask is ready for UAV writes before the DXR pass.
+        if (m_rtShadowMask && m_rtShadowMaskState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_rtShadowMask.Get();
+            barrier.Transition.StateBefore = m_rtShadowMaskState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            rtCmdList->ResourceBarrier(1, &barrier);
+            m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        }
+
+        // Build BLAS/TLAS for the scene and then dispatch the RT shadow pass
+        // into the dedicated shadow mask when RT is enabled.
         m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
-        m_rayTracingContext->DispatchRayTracing(rtCmdList.Get());
+        if (m_depthSRV.IsValid() && m_rtShadowMaskUAV.IsValid()) {
+            m_rayTracingContext->DispatchRayTracing(
+                rtCmdList.Get(),
+                m_depthSRV,
+                m_rtShadowMaskUAV,
+                m_frameConstantBuffer.gpuAddress);
+        }
     }
 }
 
@@ -467,7 +538,7 @@ void Renderer::PrepareMainPass() {
         m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
-    if (m_hdrColor) {
+  if (m_hdrColor) {
         // Ensure HDR is in render target state
         if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
             D3D12_RESOURCE_BARRIER barrier = {};
@@ -482,7 +553,7 @@ void Renderer::PrepareMainPass() {
         rtvs[numRtvs++] = m_hdrRTV.cpu;
 
         // Ensure G-buffer is in render target state
-        if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+          if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
             D3D12_RESOURCE_BARRIER gbufBarrier = {};
             gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
             gbufBarrier.Transition.pResource = m_gbufferNormalRoughness.Get();
@@ -491,11 +562,24 @@ void Renderer::PrepareMainPass() {
             gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandList->ResourceBarrier(1, &gbufBarrier);
             m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        }
-        if (m_gbufferNormalRoughness) {
-            rtvs[numRtvs++] = m_gbufferNormalRoughnessRTV.cpu;
-        }
-    } else {
+          }
+          if (m_gbufferNormalRoughness) {
+              rtvs[numRtvs++] = m_gbufferNormalRoughnessRTV.cpu;
+          }
+
+          // Ensure RT shadow mask is in shader-resource state when available
+          // so the main PBR pass can safely sample it.
+          if (m_rtShadowMask && m_rtShadowMaskState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+              D3D12_RESOURCE_BARRIER maskBarrier = {};
+              maskBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+              maskBarrier.Transition.pResource = m_rtShadowMask.Get();
+              maskBarrier.Transition.StateBefore = m_rtShadowMaskState;
+              maskBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+              maskBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+              m_commandList->ResourceBarrier(1, &maskBarrier);
+              m_rtShadowMaskState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          }
+      } else {
         // Fallback: render directly to back buffer
         ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
         if (!backBuffer) {
@@ -2657,12 +2741,12 @@ Result<void> Renderer::CreateShadowMapResources() {
     m_shadowScissor.right = static_cast<LONG>(shadowDim);
     m_shadowScissor.bottom = static_cast<LONG>(shadowDim);
 
-    spdlog::info("Shadow map created ({}x{})", shadowDim, shadowDim);
+      spdlog::info("Shadow map created ({}x{})", shadowDim, shadowDim);
 
-    // Shadow SRV changed; refresh the combined shadow + environment descriptor table.
-    UpdateEnvironmentDescriptorTable();
-    return Result<void>::Ok();
-}
+      // Shadow SRV changed; refresh the combined shadow + environment descriptor table.
+      UpdateEnvironmentDescriptorTable();
+      return Result<void>::Ok();
+  }
 
 Result<void> Renderer::CreateHDRTarget() {
     if (!m_device || !m_descriptorManager) {
@@ -2745,13 +2829,13 @@ Result<void> Renderer::CreateHDRTarget() {
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Texture2D.MipLevels = 1;
 
-    m_device->GetDevice()->CreateShaderResourceView(
-        m_hdrColor.Get(),
-        &srvDesc,
-        m_hdrSRV.cpu
-    );
+      m_device->GetDevice()->CreateShaderResourceView(
+          m_hdrColor.Get(),
+          &srvDesc,
+          m_hdrSRV.cpu
+      );
 
-    spdlog::info("HDR target created: {}x{}", width, height);
+      spdlog::info("HDR target created: {}x{}", width, height);
 
     // Normal/roughness G-buffer target (full resolution, matched to HDR)
     m_gbufferNormalRoughness.Reset();
@@ -2769,7 +2853,7 @@ Result<void> Renderer::CreateHDRTarget() {
     gbufClear.Color[2] = 1.0f;
     gbufClear.Color[3] = 1.0f; // Roughness default
 
-    hr = m_device->GetDevice()->CreateCommittedResource(
+      hr = m_device->GetDevice()->CreateCommittedResource(
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &gbufDesc,
@@ -2778,9 +2862,9 @@ Result<void> Renderer::CreateHDRTarget() {
         IID_PPV_ARGS(&m_gbufferNormalRoughness)
     );
 
-    if (FAILED(hr)) {
-        spdlog::warn("Failed to create normal/roughness G-buffer target");
-    } else {
+      if (FAILED(hr)) {
+          spdlog::warn("Failed to create normal/roughness G-buffer target");
+      } else {
         m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
         // RTV for G-buffer
@@ -2814,12 +2898,22 @@ Result<void> Renderer::CreateHDRTarget() {
             gbufSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             gbufSrvDesc.Texture2D.MipLevels = 1;
 
-            m_device->GetDevice()->CreateShaderResourceView(
-                m_gbufferNormalRoughness.Get(),
-                &gbufSrvDesc,
-                m_gbufferNormalRoughnessSRV.cpu
-            );
-        }
+          m_device->GetDevice()->CreateShaderResourceView(
+              m_gbufferNormalRoughness.Get(),
+              &gbufSrvDesc,
+              m_gbufferNormalRoughnessSRV.cpu
+          );
+      }
+
+      // RT sun shadow mask (single-channel 0..1). This is optional and only
+      // used when the DXR path is enabled, but we create it alongside HDR so
+      // the layout stays consistent. The mask is kept in UAV state for
+      // writes; render/compute passes are responsible for transitioning it
+      // when sampling in shaders.
+      auto rtMaskResult = CreateRTShadowMask();
+      if (rtMaskResult.IsErr()) {
+          spdlog::warn("Failed to create RT shadow mask: {}", rtMaskResult.Error());
+      }
     }
 
     // (Re)create history color buffer for temporal AA (LDR, back-buffer format)
@@ -2847,8 +2941,8 @@ Result<void> Renderer::CreateHDRTarget() {
         IID_PPV_ARGS(&m_historyColor)
     );
 
-    if (FAILED(hr)) {
-        spdlog::warn("Failed to create TAA history buffer");
+      if (FAILED(hr)) {
+          spdlog::warn("Failed to create TAA history buffer");
     } else {
         m_historyState = D3D12_RESOURCE_STATE_COPY_DEST;
 
@@ -2870,9 +2964,9 @@ Result<void> Renderer::CreateHDRTarget() {
                     &historySrvDesc,
                     m_historySRV.cpu
                 );
-            }
-        }
-    }
+              }
+          }
+      }
 
     // (Re)create SSR color buffer (matches HDR resolution/format)
     m_ssrColor.Reset();
@@ -2890,7 +2984,7 @@ Result<void> Renderer::CreateHDRTarget() {
     ssrClear.Color[2] = 0.0f;
     ssrClear.Color[3] = 0.0f;
 
-    hr = m_device->GetDevice()->CreateCommittedResource(
+      hr = m_device->GetDevice()->CreateCommittedResource(
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &ssrDesc,
@@ -2899,9 +2993,9 @@ Result<void> Renderer::CreateHDRTarget() {
         IID_PPV_ARGS(&m_ssrColor)
     );
 
-    if (FAILED(hr)) {
-        spdlog::warn("Failed to create SSR color buffer");
-    } else {
+      if (FAILED(hr)) {
+          spdlog::warn("Failed to create SSR color buffer");
+      } else {
         m_ssrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
         auto ssrRtvResult = m_descriptorManager->AllocateRTV();
@@ -2933,12 +3027,12 @@ Result<void> Renderer::CreateHDRTarget() {
             ssrSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             ssrSrvDesc.Texture2D.MipLevels = 1;
 
-            m_device->GetDevice()->CreateShaderResourceView(
-                m_ssrColor.Get(),
-                &ssrSrvDesc,
-                m_ssrSRV.cpu
-            );
-        }
+          m_device->GetDevice()->CreateShaderResourceView(
+              m_ssrColor.Get(),
+              &ssrSrvDesc,
+              m_ssrSRV.cpu
+          );
+      }
     }
 
     // (Re)create motion vector buffer (camera-only velocity in UV space)
@@ -3018,6 +3112,157 @@ Result<void> Renderer::CreateHDRTarget() {
     auto ssaoResult = CreateSSAOResources();
     if (ssaoResult.IsErr()) {
         spdlog::warn("Failed to create SSAO resources: {}", ssaoResult.Error());
+    }
+
+      return Result<void>::Ok();
+  }
+
+Result<void> Renderer::CreateRTShadowMask() {
+    if (!m_device || !m_descriptorManager || !m_window) {
+        return Result<void>::Err("Renderer not initialized for RT shadow mask creation");
+    }
+
+    const UINT width = m_window->GetWidth();
+    const UINT height = m_window->GetHeight();
+    if (width == 0 || height == 0) {
+        return Result<void>::Err("Window size is zero; cannot create RT shadow mask");
+    }
+
+    // Release previous mask and descriptors.
+    m_rtShadowMask.Reset();
+    m_rtShadowMaskSRV = {};
+    m_rtShadowMaskUAV = {};
+    m_rtShadowMaskState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = width;
+    desc.Height = height;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr,
+        IID_PPV_ARGS(&m_rtShadowMask));
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create RT shadow mask texture");
+    }
+
+    m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    // SRV for sampling in the main PBR shader.
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        m_rtShadowMask.Reset();
+        return Result<void>::Err("Failed to allocate SRV for RT shadow mask: " + srvResult.Error());
+    }
+    m_rtShadowMaskSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtShadowMask.Get(),
+        &srvDesc,
+        m_rtShadowMaskSRV.cpu);
+
+    // UAV for DXR/compute writes.
+    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (uavResult.IsErr()) {
+        m_rtShadowMask.Reset();
+        m_rtShadowMaskSRV = {};
+        return Result<void>::Err("Failed to allocate UAV for RT shadow mask: " + uavResult.Error());
+    }
+    m_rtShadowMaskUAV = uavResult.Value();
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = desc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_rtShadowMask.Get(),
+        nullptr,
+        &uavDesc,
+        m_rtShadowMaskUAV.cpu);
+
+    // History texture for simple temporal denoising of RT shadows.
+    m_rtShadowMaskHistory.Reset();
+    m_rtShadowMaskHistorySRV = {};
+    m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC historyDesc = desc;
+    historyDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &historyDesc,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        nullptr,
+        IID_PPV_ARGS(&m_rtShadowMaskHistory));
+    if (FAILED(hr)) {
+        m_rtShadowMaskHistory.Reset();
+        // History is optional; keep mask usable even if this fails.
+        return Result<void>::Ok();
+    }
+
+    m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (historySrvResult.IsErr()) {
+        m_rtShadowMaskHistory.Reset();
+        m_rtShadowMaskHistorySRV = {};
+        return Result<void>::Ok();
+    }
+    m_rtShadowMaskHistorySRV = historySrvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc = {};
+    historySrvDesc.Format = historyDesc.Format;
+    historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    historySrvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtShadowMaskHistory.Get(),
+        &historySrvDesc,
+        m_rtShadowMaskHistorySRV.cpu);
+
+    // If the combined shadow + environment descriptor table has been
+    // allocated, copy the SRVs into slots 3 and 4 (t3, t4, space1) so they
+    // are visible to shaders whenever RT mode is active.
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        ID3D12Device* device = m_device->GetDevice();
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[3].cpu,
+            m_rtShadowMaskSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        if (m_rtShadowMaskHistorySRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                m_shadowAndEnvDescriptors[4].cpu,
+                m_rtShadowMaskHistorySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
     }
 
     return Result<void>::Ok();
@@ -3661,9 +3906,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     // Ensure current environment index is valid
     m_currentEnvironment = 0;
 
-    // Allocate persistent descriptors for shadow + IBL (t4-t6) if not already created.
+    // Allocate persistent descriptors for shadow + IBL (t4-t8) if not already created.
     if (!m_shadowAndEnvDescriptors[0].IsValid()) {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 5; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 return Result<void>::Err("Failed to allocate SRV table for shadow/environment: " + handleResult.Error());
@@ -3698,7 +3943,7 @@ Result<void> Renderer::AddEnvironmentFromTexture(const std::shared_ptr<DX12Textu
 
     // Ensure descriptor table exists, then refresh bindings.
     if (!m_shadowAndEnvDescriptors[0].IsValid() && m_descriptorManager) {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 4; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 return Result<void>::Err("Failed to allocate SRV table for Dreamer environment: " + handleResult.Error());
@@ -3761,14 +4006,32 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
         );
     }
 
-    if (specularSrc.IsValid()) {
-        device->CopyDescriptorsSimple(
-            1,
-            m_shadowAndEnvDescriptors[2].cpu,
-            specularSrc.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-    }
+  if (specularSrc.IsValid()) {
+      device->CopyDescriptorsSimple(
+          1,
+          m_shadowAndEnvDescriptors[2].cpu,
+          specularSrc.cpu,
+          D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+      );
+  }
+
+  // RT shadow mask (t3) and history (t4) are optional; if their SRVs are
+  // valid, keep the combined shadow + environment table up to date so the
+  // PBR shader can sample them when RT sun shadows are enabled.
+  if (m_rtShadowMaskSRV.IsValid()) {
+      device->CopyDescriptorsSimple(
+          1,
+          m_shadowAndEnvDescriptors[3].cpu,
+          m_rtShadowMaskSRV.cpu,
+          D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  }
+  if (m_rtShadowMaskHistorySRV.IsValid()) {
+      device->CopyDescriptorsSimple(
+          1,
+          m_shadowAndEnvDescriptors[4].cpu,
+          m_rtShadowMaskHistorySRV.cpu,
+          D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  }
 }
 
 void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {

@@ -509,6 +509,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 // Optional relative mode: when enabled, position/scale are treated
                 // as offsets/multipliers relative to the current transform instead
                 // of absolute values.
+
                 if (cmdJson.contains("mode") && cmdJson["mode"].is_string()) {
                     std::string mode = cmdJson["mode"];
                     std::transform(mode.begin(), mode.end(), mode.begin(),
@@ -530,6 +531,63 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 }
                 if (cmdJson.contains("scale")) {
                     cmd->setScale = ReadVec3(cmdJson["scale"], "scale", cmd->scale);
+                }
+
+                // Optional parenting semantics so the engine can attach this
+                // entity to another (e.g., "make the moon orbit the earth").
+                if (cmdJson.contains("parent") && cmdJson["parent"].is_string()) {
+                    std::string parentRaw = cmdJson["parent"];
+                    if (!parentRaw.empty()) {
+                        cmd->setParent = true;
+                        cmd->parentName = resolveTargetName(parentRaw);
+                    }
+                }
+                if (cmdJson.contains("clear_parent") && cmdJson["clear_parent"].is_boolean()) {
+                    if (cmdJson["clear_parent"].get<bool>()) {
+                        cmd->clearParent = true;
+                    }
+                }
+
+                // Optional simple orbit helper. This is equivalent to the
+                // editor's Shift+O behavior and uses the same underlying
+                // parenting + spin mechanics.
+                if (cmdJson.contains("orbit") && cmdJson["orbit"].is_object()) {
+                    const auto& orbit = cmdJson["orbit"];
+                    if (orbit.contains("center") && orbit["center"].is_string()) {
+                        std::string centerRaw = orbit["center"];
+                        if (!centerRaw.empty()) {
+                            cmd->setOrbit = true;
+                            cmd->orbitCenterName = resolveTargetName(centerRaw);
+                        }
+                    }
+                    if (orbit.contains("radius")) {
+                        cmd->orbitRadius = std::max(ReadNumber(orbit["radius"], "orbit.radius", 3.0f), 0.1f);
+                    }
+                    if (orbit.contains("speed")) {
+                        cmd->orbitSpeed = ReadNumber(orbit["speed"], "orbit.speed", 0.6f);
+                    }
+                }
+
+                // Optional continuous spin/orbit description. This allows prompts
+                // like "make it slowly spin around the Y axis" to be expressed as:
+                //   "spin": { "axis":[0,1,0], "speed":1.0 }
+                // and stopped via:
+                //   "stop_spin": true
+                if (cmdJson.contains("spin") && cmdJson["spin"].is_object()) {
+                    const auto& spin = cmdJson["spin"];
+                    if (spin.contains("axis")) {
+                        cmd->setSpin = ReadVec3(spin["axis"], "spin.axis", cmd->spinAxis);
+                    } else {
+                        cmd->setSpin = true;
+                    }
+                    if (spin.contains("speed")) {
+                        cmd->spinSpeed = ReadNumber(spin["speed"], "spin.speed", 1.0f);
+                    }
+                }
+                if (cmdJson.contains("stop_spin") && cmdJson["stop_spin"].is_boolean()) {
+                    if (cmdJson["stop_spin"].get<bool>()) {
+                        cmd->stopSpin = true;
+                    }
                 }
 
                 commands.push_back(cmd);

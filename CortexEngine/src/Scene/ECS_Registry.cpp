@@ -55,4 +55,45 @@ std::string ECS_Registry::DescribeScene() const {
     return description;
 }
 
+void ECS_Registry::UpdateTransforms() {
+    auto view = m_registry.view<TransformComponent>();
+
+    // First pass: ensure roots (entities with no valid parent) are updated.
+    for (auto entity : view) {
+        auto& transform = view.get<TransformComponent>(entity);
+        const bool hasParent =
+            transform.parent != entt::null &&
+            m_registry.valid(transform.parent) &&
+            m_registry.all_of<TransformComponent>(transform.parent);
+
+        if (!hasParent) {
+            UpdateTransformRecursive(entity, glm::mat4(1.0f));
+        }
+    }
+}
+
+void ECS_Registry::UpdateTransformRecursive(entt::entity entity, const glm::mat4& parentWorld) {
+    if (!m_registry.all_of<TransformComponent>(entity)) {
+        return;
+    }
+
+    auto& transform = m_registry.get<TransformComponent>(entity);
+    glm::mat4 local = transform.GetLocalMatrix();
+    transform.worldMatrix = parentWorld * local;
+    glm::mat4 invWorld = glm::inverse(transform.worldMatrix);
+    transform.normalMatrix = glm::transpose(invWorld);
+    transform.inverseWorldMatrix = invWorld;
+
+    // Propagate to children. For now, perform a simple scan over all transforms;
+    // if performance becomes an issue, this can be replaced with an explicit
+    // parent->children adjacency structure.
+    auto view = m_registry.view<TransformComponent>();
+    for (auto child : view) {
+        auto& childTransform = view.get<TransformComponent>(child);
+        if (childTransform.parent == entity) {
+            UpdateTransformRecursive(child, transform.worldMatrix);
+        }
+    }
+}
+
 } // namespace Cortex::Scene

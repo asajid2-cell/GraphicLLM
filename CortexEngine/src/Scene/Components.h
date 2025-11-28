@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <entt/entt.hpp>
 
 namespace Cortex::Graphics {
     class DX12Texture;
@@ -14,16 +15,29 @@ namespace Cortex::Graphics {
 
 namespace Cortex::Scene {
 
-// Transform Component - Position, rotation, scale
+// Transform Component - Local transform + simple hierarchy
 struct TransformComponent {
+    // Local transform relative to parent (or world if parent == null)
     glm::vec3 position = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // Identity quaternion
-    glm::vec3 scale = glm::vec3(1.0f);
+    glm::vec3 scale    = glm::vec3(1.0f);
 
-    // Get transformation matrix
+    // Optional parent in the transform hierarchy. When entt::null, this
+    // transform is treated as a root.
+    entt::entity parent = entt::null;
+
+    // Cached world transform and normal matrix, updated by ECS_Registry.
+    glm::mat4 worldMatrix       = glm::mat4(1.0f);
+    glm::mat4 normalMatrix      = glm::mat4(1.0f);
+    glm::mat4 inverseWorldMatrix = glm::mat4(1.0f);
+
+    // Local transformation matrix (no parent applied)
+    [[nodiscard]] glm::mat4 GetLocalMatrix() const;
+
+    // World transformation matrix (after hierarchy update)
     [[nodiscard]] glm::mat4 GetMatrix() const;
 
-    // Get normal matrix (for lighting)
+    // World-space normal matrix (for lighting)
     [[nodiscard]] glm::mat4 GetNormalMatrix() const;
 };
 

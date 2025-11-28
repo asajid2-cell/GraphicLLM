@@ -14,12 +14,14 @@
 #include <spdlog/spdlog.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <algorithm>
 #include <cmath>
 #include <optional>
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <limits>
 #include <nlohmann/json.hpp>
 
 namespace Cortex {
@@ -42,6 +44,7 @@ void Engine::SyncDebugMenuFromRenderer() {
     dbg.bloomIntensity = m_renderer->GetBloomIntensity();
     dbg.cameraBaseSpeed = m_cameraBaseSpeed;
     dbg.lightingRig = 0;
+    dbg.rayTracingEnabled = m_renderer->IsRayTracingSupported() && m_renderer->IsRayTracingEnabled();
 
     UI::DebugMenu::SyncFromState(dbg);
 }
@@ -82,6 +85,7 @@ namespace {
                     if (j.contains("fractalWarpStrength")) state.fractalWarpStrength = j.value("fractalWarpStrength", state.fractalWarpStrength);
                     if (j.contains("fractalNoiseType")) state.fractalNoiseType = j.value("fractalNoiseType", state.fractalNoiseType);
                     if (j.contains("lightingRig")) state.lightingRig = j.value("lightingRig", state.lightingRig);
+                    if (j.contains("rayTracingEnabled")) state.rayTracingEnabled = j.value("rayTracingEnabled", state.rayTracingEnabled);
                 }
             }
         } catch (...) {
@@ -112,6 +116,7 @@ namespace {
             j["fractalWarpStrength"] = state.fractalWarpStrength;
             j["fractalNoiseType"] = state.fractalNoiseType;
             j["lightingRig"] = state.lightingRig;
+            j["rayTracingEnabled"] = state.rayTracingEnabled;
 
             std::ofstream out(path);
             if (out) {
@@ -120,6 +125,114 @@ namespace {
         } catch (...) {
             // Persistence is best-effort; ignore errors
         }
+    }
+
+    // Axis-aligned bounding box ray test in local space (unit cube [-0.5,0.5]^3).
+    bool RayIntersectsAABB(const glm::vec3& rayOrigin,
+                           const glm::vec3& rayDir,
+                           const glm::vec3& aabbMin,
+                           const glm::vec3& aabbMax,
+                           float& outT) {
+        float tMin = 0.0f;
+        float tMax = std::numeric_limits<float>::max();
+
+        for (int i = 0; i < 3; ++i) {
+            float origin = rayOrigin[i];
+            float dir = rayDir[i];
+            if (std::abs(dir) < 1e-6f) {
+                if (origin < aabbMin[i] || origin > aabbMax[i]) {
+                    return false;
+                }
+                continue;
+            }
+
+            float invD = 1.0f / dir;
+            float t0 = (aabbMin[i] - origin) * invD;
+            float t1 = (aabbMax[i] - origin) * invD;
+            if (t0 > t1) std::swap(t0, t1);
+
+            tMin = std::max(tMin, t0);
+            tMax = std::min(tMax, t1);
+            if (tMax < tMin) {
+                return false;
+            }
+        }
+
+        outT = tMin;
+        return tMax >= 0.0f;
+    }
+
+    // Closest approach between mouse ray and gizmo axis.
+    bool RayHitsAxis(const glm::vec3& rayOrigin,
+                     const glm::vec3& rayDir,
+                     const glm::vec3& axisOrigin,
+                     const glm::vec3& axisDir,
+                     float axisLength,
+                     float threshold,
+                     float& outRayT) {
+        glm::vec3 d1 = glm::normalize(rayDir);
+        glm::vec3 d2 = glm::normalize(axisDir);
+        glm::vec3 w0 = rayOrigin - axisOrigin;
+
+        float a = glm::dot(d1, d1);
+        float b = glm::dot(d1, d2);
+        float c = glm::dot(d2, d2);
+        float d = glm::dot(d1, w0);
+        float e = glm::dot(d2, w0);
+        float denom = a * c - b * b;
+        if (std::abs(denom) < 1e-6f) {
+            return false;
+        }
+
+        float tRay = (b * e - c * d) / denom;
+        float tAxis = (a * e - b * d) / denom;
+        tAxis = std::clamp(tAxis, 0.0f, axisLength);
+
+        if (tRay < 0.0f) {
+            return false;
+        }
+
+        glm::vec3 pRay = rayOrigin + d1 * tRay;
+        glm::vec3 pAxis = axisOrigin + d2 * tAxis;
+        float dist = glm::length(pRay - pAxis);
+        if (dist > threshold) {
+            return false;
+        }
+
+        outRayT = tRay;
+        return true;
+    }
+
+    bool RayPlaneIntersection(const glm::vec3& rayOrigin,
+                              const glm::vec3& rayDir,
+                              const glm::vec3& planePoint,
+                              const glm::vec3& planeNormal,
+                              glm::vec3& outPoint) {
+        float denom = glm::dot(rayDir, planeNormal);
+        if (std::abs(denom) < 1e-5f) {
+            return false;
+        }
+        float t = glm::dot(planePoint - rayOrigin, planeNormal) / denom;
+        if (t < 0.0f) {
+            return false;
+        }
+        outPoint = rayOrigin + rayDir * t;
+        return true;
+    }
+
+    // Scale gizmo axis length and hit-test thickness based on distance so the
+    // on-screen size remains usable across a wide range of zoom levels.
+    inline void ComputeGizmoScale(float distance,
+                                  float& outAxisLength,
+                                  float& outThreshold) {
+        distance = std::max(distance, 0.1f);
+        // Choose a base angular size; world size grows with distance.
+        float axisLength = distance * 0.15f;
+        axisLength = std::clamp(axisLength, 0.5f, 10.0f);
+        float threshold = axisLength * 0.15f;
+
+        outAxisLength = axisLength;
+        outThreshold = threshold;
     }
 }
 
@@ -183,6 +296,19 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     // Tie flight dynamics to the current base speed so traversal scales with scene size.
     m_cameraMaxSpeed = std::max(15.0f, m_cameraBaseSpeed * 8.0f);
 
+    // Optional ray tracing (DXR) toggle - off by default unless enabled and supported.
+    if (m_renderer) {
+        if (config.enableRayTracing && m_renderer->IsRayTracingSupported()) {
+            m_renderer->SetRayTracingEnabled(true);
+        } else {
+            m_renderer->SetRayTracingEnabled(false);
+        }
+        spdlog::info("Ray tracing config: requested={}, supported={}, enabled={}",
+                     config.enableRayTracing ? "ON" : "OFF",
+                     m_renderer->IsRayTracingSupported() ? "YES" : "NO",
+                     m_renderer->IsRayTracingEnabled() ? "ON" : "OFF");
+    }
+
     // Phase 2: Initialize The Architect (LLM) asynchronously so the window appears sooner
     if (config.enableLLM) {
         m_llmService = std::make_unique<LLM::LLMService>();
@@ -191,6 +317,68 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         // Keep the engine's logical focus target in sync with LLM-driven edits.
         m_commandQueue->SetFocusCallback([this](const std::string& name) {
             SetFocusTarget(name);
+        });
+        // Allow the Architect to drive editor-style selection. The callback
+        // returns the resolved scene tag when a match is found so that focus
+        // and status messages use a concrete, canonical name.
+        m_commandQueue->SetSelectionCallback([this](const std::string& name) -> std::optional<std::string> {
+            if (!m_registry) return std::nullopt;
+            auto view = m_registry->View<Scene::TagComponent, Scene::TransformComponent>();
+            std::string targetLower = name;
+            std::transform(targetLower.begin(), targetLower.end(), targetLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            entt::entity best = entt::null;
+            std::string resolvedTag;
+
+            for (auto e : view) {
+                const auto& tag = view.get<Scene::TagComponent>(e);
+                std::string tagLower = tag.tag;
+                std::transform(tagLower.begin(), tagLower.end(), tagLower.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (tagLower == targetLower || tagLower.find(targetLower) != std::string::npos) {
+                    best = e;
+                    resolvedTag = tag.tag;
+                    break;
+                }
+            }
+
+            if (best != entt::null) {
+                m_selectedEntity = best;
+                SetFocusTarget(resolvedTag);
+                spdlog::info("[Architect] Selected entity '{}' via LLM (query '{}')", resolvedTag, name);
+                return resolvedTag;
+            }
+
+            return std::nullopt;
+        });
+        // Allow LLM commands to focus the camera on a named entity.
+        m_commandQueue->SetFocusCameraCallback([this](const std::string& name) {
+            if (!m_registry) return;
+            if (!name.empty()) {
+                auto view = m_registry->View<Scene::TagComponent, Scene::TransformComponent>();
+                std::string targetLower = name;
+                std::transform(targetLower.begin(), targetLower.end(), targetLower.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                entt::entity best = entt::null;
+                for (auto e : view) {
+                    const auto& tag = view.get<Scene::TagComponent>(e);
+                    std::string tagLower = tag.tag;
+                    std::transform(tagLower.begin(), tagLower.end(), tagLower.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (tagLower == targetLower || tagLower.find(targetLower) != std::string::npos) {
+                        best = e;
+                        break;
+                    }
+                }
+                if (best != entt::null) {
+                    m_selectedEntity = best;
+                    FrameSelectedEntity();
+                    spdlog::info("[Architect] Framed entity '{}' via LLM", name);
+                }
+            } else {
+                FrameSelectedEntity();
+            }
         });
 
         m_llmInitializing = true;
@@ -302,26 +490,32 @@ void Engine::ShowCameraHelpOverlay() {
     const char* message =
         "Camera controls:\n"
         "\n"
-        "  Right mouse button  - Enable mouse look (hold)\n"
-        "  Move mouse          - Look around\n"
-        "  F                   - Toggle drone/free-flight camera (auto-forward)\n"
+        "  Left mouse button   - Select entity under cursor\n"
+        "  F                   - Frame selected entity (focus camera)\n"
+        "  Right mouse button  - Orbit camera around focus (hold)\n"
+        "  Middle mouse button - Pan focus point (hold)\n"
+        "  Mouse wheel         - Zoom in/out around focus\n"
+        "  G                   - Toggle drone/free-flight camera (auto-forward)\n"
         "  W / A / S / D       - Move forward / left / back / right\n"
         "  Space / Ctrl        - Move up / down (drone mode)\n"
         "  Q / E               - Roll left / right (drone mode)\n"
         "  Shift (hold)        - Sprint (faster movement)\n"
         "  F1                  - Reset camera to default\n"
         "\n"
-        "Lighting & shadows debug:\n"
+        "Lighting & debug:\n"
         "  F3                  - Toggle shadows\n"
-        "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades/SSAO/SSR)\n"
+        "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades/IBL/SSAO/SSR/SceneGraph)\n"
         "  Z                   - Toggle temporal AA (TAA) on/off\n"
         "  R                   - Cycle SSR/SSAO (both on -> SSR only -> SSAO only -> both off)\n"
         "  F5                  - Increase shadow PCF radius\n"
         "  F7 / F8             - Decrease / increase shadow bias\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
         "  F11 / F12           - Adjust near cascade resolution scale\n"
+        "  F2                  - Reset debug settings and show debug menu\n"
+        "  V                   - Toggle ray tracing (if supported)\n"
+        "  C                   - Cycle environment preset\n"
         "\n"
-        "Press OK to continue. Press F2 later to show this help again.";
+        "Press OK to continue.";
 
     SDL_ShowSimpleMessageBox(
         SDL_MESSAGEBOX_INFORMATION,
@@ -368,6 +562,25 @@ void Engine::Shutdown() {
     m_device.reset();
 
     spdlog::info("Cortex Engine shut down");
+}
+
+void Engine::SetFocusTarget(const std::string& name) {
+    m_focusTargetName = name;
+
+    // Keep the LLM command queue's notion of the current focus entity in sync
+    // with the editor-style selection. When the Architect issues commands
+    // targeting this name, they will preferentially operate on this concrete
+    // entity instead of relying solely on name-based lookup.
+    if (m_commandQueue) {
+        entt::entity focusId = entt::null;
+        if (m_registry && m_selectedEntity != entt::null) {
+            auto& reg = m_registry->GetRegistry();
+            if (reg.valid(m_selectedEntity)) {
+                focusId = m_selectedEntity;
+            }
+        }
+        m_commandQueue->SetCurrentFocus(name, focusId);
+    }
 }
 
 void Engine::RenderHUD() {
@@ -515,6 +728,86 @@ void Engine::RenderHUD() {
         }
     }
 
+    // Selection / camera mode / controls hint (always shown)
+    std::wstring selName = L"<none>";
+    if (m_selectedEntity != entt::null &&
+        m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+        selName.assign(tag.tag.begin(), tag.tag.end());
+    }
+
+    swprintf_s(buffer, L"Selected: %s  Focus: %hs  Mode: %hs",
+               selName.c_str(),
+               m_focusTargetName.empty() ? "<none>" : m_focusTargetName.c_str(),
+               m_droneFlightEnabled ? "Drone" : "Orbit");
+    drawLine(buffer);
+
+    drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan");
+
+    // Engine settings overlay (toggled with M). Draw a simple side panel with
+    // categories and current values inspired by DCC render settings UIs.
+    if (UI::DebugMenu::IsVisible()) {
+        UI::DebugMenuState state = UI::DebugMenu::GetState();
+
+        // Panel rectangle on the right side
+        int panelX = static_cast<int>(m_window->GetWidth()) - 320;
+        int panelY = 40;
+        int panelW = 300;
+        int panelH = 260;
+
+        HBRUSH brush = CreateSolidBrush(RGB(10, 10, 10));
+        RECT panelRect{ panelX, panelY, panelX + panelW, panelY + panelH };
+        FillRect(dc, &panelRect, brush);
+        DeleteObject(brush);
+        FrameRect(dc, &panelRect, (HBRUSH)GetStockObject(WHITE_BRUSH));
+
+        int y = panelY + 8;
+        auto drawPanelLine = [&](const wchar_t* text, COLORREF color) {
+            SetTextColor(dc, color);
+            TextOutW(dc, panelX + 12, y, text, static_cast<int>(wcslen(text)));
+            y += 18;
+        };
+
+        drawPanelLine(L"Engine Settings (M to close)", RGB(0, 200, 255));
+        y += 4;
+
+        struct Row {
+            const wchar_t* label;
+            float value;
+            int sectionIndex;
+        };
+
+        Row rows[] = {
+            { L"[Render] Exposure (EV)",          state.exposure,            0 },
+            { L"[Render] Bloom Intensity",        state.bloomIntensity,      1 },
+            { L"[Shadows] Bias",                  state.shadowBias,          2 },
+            { L"[Shadows] PCF Radius",            state.shadowPCFRadius,     3 },
+            { L"[Shadows] Cascade Lambda",        state.cascadeLambda,       4 },
+            { L"[Camera] Base Speed",             state.cameraBaseSpeed,     5 },
+            { L"[Advanced] Ray Tracing",          state.rayTracingEnabled ? 1.0f : 0.0f, 6 }
+        };
+
+        const int rowCount = static_cast<int>(std::size(rows));
+        for (int i = 0; i < rowCount; ++i) {
+            const Row& r = rows[i];
+            wchar_t line[256];
+            if (r.sectionIndex == 6) {
+                swprintf_s(line, L"%s : %s", r.label, (state.rayTracingEnabled ? L"ON" : L"OFF"));
+            } else {
+                swprintf_s(line, L"%s : %.3f", r.label, r.value);
+            }
+            COLORREF color = (m_settingsSection == r.sectionIndex)
+                ? RGB(255, 255, 0)
+                : RGB(200, 200, 200);
+            drawPanelLine(line, color);
+        }
+
+        y += 4;
+        drawPanelLine(L"Use UP/DOWN to select", RGB(180, 180, 180));
+        drawPanelLine(L"LEFT/RIGHT to adjust", RGB(180, 180, 180));
+        drawPanelLine(L"SPACE/ENTER to toggle", RGB(180, 180, 180));
+    }
+
     ReleaseDC(hwnd, dc);
 }
 
@@ -593,11 +886,99 @@ void Engine::ProcessInput() {
                 m_running = false;
                 break;
 
-            case SDL_EVENT_KEY_DOWN:
+            case SDL_EVENT_KEY_DOWN: {
+                bool settingsVisible = UI::DebugMenu::IsVisible();
+
+                // When the settings menu is visible, repurpose keys for menu
+                // navigation and parameter adjustments instead of camera
+                // controls. ESC closes the menu rather than quitting.
+                if (settingsVisible) {
+                    UI::DebugMenuState state = UI::DebugMenu::GetState();
+                    const float stepSmall = 0.05f;
+
+                    if (event.key.key == SDLK_ESCAPE) {
+                        UI::DebugMenu::SetVisible(false);
+                        break;
+                    }
+                    // Section navigation: up/down move the highlight through
+                    // the list of settings sections.
+                    if (event.key.key == SDLK_UP) {
+                        m_settingsSection = std::max(0, m_settingsSection - 1);
+                        break;
+                    }
+                    if (event.key.key == SDLK_DOWN) {
+                        constexpr int kMaxSection = 6;
+                        m_settingsSection = std::min(kMaxSection, m_settingsSection + 1);
+                        break;
+                    }
+
+                    // Adjust the currently highlighted setting with left/right.
+                    if (event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT) {
+                        const float dir = (event.key.key == SDLK_RIGHT) ? 1.0f : -1.0f;
+                        auto* renderer = m_renderer.get();
+
+                        switch (m_settingsSection) {
+                            case 0: // Exposure
+                                state.exposure = glm::clamp(state.exposure + dir * stepSmall, 0.0f, 10.0f);
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 1: // Bloom intensity
+                                state.bloomIntensity = glm::clamp(state.bloomIntensity + dir * stepSmall, 0.0f, 5.0f);
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 2: // Shadow bias
+                                state.shadowBias = glm::clamp(state.shadowBias + dir * stepSmall * 0.0005f, 0.00005f, 0.01f);
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 3: // Shadow PCF radius
+                                state.shadowPCFRadius = glm::clamp(state.shadowPCFRadius + dir * stepSmall, 0.0f, 5.0f);
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 4: // Cascade lambda
+                                state.cascadeLambda = glm::clamp(state.cascadeLambda + dir * stepSmall, 0.0f, 1.0f);
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 5: // Camera base speed
+                                state.cameraBaseSpeed = glm::clamp(state.cameraBaseSpeed + dir * stepSmall * 2.0f, 0.1f, 100.0f);
+                                m_cameraBaseSpeed = state.cameraBaseSpeed;
+                                UI::DebugMenu::SyncFromState(state);
+                                break;
+                            case 6: // Ray tracing toggle (if supported)
+                                if (renderer && renderer->IsRayTracingSupported()) {
+                                    state.rayTracingEnabled = !state.rayTracingEnabled;
+                                    UI::DebugMenu::SyncFromState(state);
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+
+                    // Space/Enter toggle boolean sections such as ray tracing.
+                    if (event.key.key == SDLK_SPACE || event.key.key == SDLK_RETURN) {
+                        auto* renderer = m_renderer.get();
+                        if (m_settingsSection == 6 && renderer && renderer->IsRayTracingSupported()) {
+                            state.rayTracingEnabled = !state.rayTracingEnabled;
+                            UI::DebugMenu::SyncFromState(state);
+                        }
+                        break;
+                    }
+
+                    // Unhandled key while menu is visible: do not fall through
+                    // to the rest of the engine hotkeys.
+                    break;
+                }
+
                 if (event.key.key == SDLK_ESCAPE) {
                     m_running = false;
                 }
                 else if (event.key.key == SDLK_F) {
+                    // Frame the currently selected entity (if any) and mark it
+                    // as the logical focus target for LLM/Dreamer edits.
+                    FrameSelectedEntity();
+                }
+                else if (event.key.key == SDLK_G) {
                     // Toggle drone/free-flight camera mode. When enabled, the camera
                     // can be steered continuously without holding the right mouse
                     // button and the mouse is locked in relative mode.
@@ -609,7 +990,7 @@ void Engine::ProcessInput() {
                         if (m_window) {
                             SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
                         }
-                        spdlog::info("Drone flight enabled");
+                        spdlog::info("Drone flight enabled (G)");
                     } else {
                         m_cameraControlActive = false;
                         m_cameraVelocity = glm::vec3(0.0f);
@@ -686,6 +1067,12 @@ void Engine::ProcessInput() {
                         m_renderer->ToggleTAA();
                     }
                 }
+                else if (event.key.key == SDLK_M) {
+                    UI::DebugMenu::Toggle();
+                    if (UI::DebugMenu::IsVisible()) {
+                        m_settingsSection = 0;
+                    }
+                }
                 else if (event.key.key == SDLK_F2) {
                     // Reset all debug settings (sliders + view modes) to defaults, then show the menu
                     UI::DebugMenu::ResetToDefaults();
@@ -733,6 +1120,19 @@ void Engine::ProcessInput() {
                         SyncDebugMenuFromRenderer();
                     }
                 }
+                else if (event.key.key == SDLK_V) {
+                    if (m_renderer) {
+                        if (!m_renderer->IsRayTracingSupported()) {
+                            spdlog::info("Ray tracing not supported on this GPU; V toggle ignored");
+                        } else {
+                            bool enabled = !m_renderer->IsRayTracingEnabled();
+                            m_renderer->SetRayTracingEnabled(enabled);
+                            // Keep debug menu state in sync with renderer
+                            SyncDebugMenuFromRenderer();
+                            spdlog::info("Ray tracing {}", enabled ? "ENABLED" : "DISABLED");
+                        }
+                    }
+                }
                 else if (event.key.key == SDLK_F3) {
                     if (m_renderer) {
                         m_renderer->ToggleShadows();
@@ -748,30 +1148,182 @@ void Engine::ProcessInput() {
                         m_renderer->CycleScreenSpaceEffectsDebug();
                     }
                 }
-                else if (event.key.key == SDLK_E) {
+                else if (event.key.key == SDLK_C) {
                     if (m_renderer) {
                         // Cycle environment preset (studio -> sunset -> night -> ...).
                         m_renderer->CycleEnvironmentPreset();
                     }
                 }
                 break;
+            }
 
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                if (!m_droneFlightEnabled && event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                // Track last mouse position for hover logic.
+                m_lastMousePos = glm::vec2(static_cast<float>(event.button.x),
+                                           static_cast<float>(event.button.y));
+
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    // If a gizmo axis is under the cursor, begin a drag; otherwise pick entity.
+                    glm::vec3 rayOrigin, rayDir;
+                    if (ComputeCameraRayFromMouse(m_lastMousePos.x, m_lastMousePos.y, rayOrigin, rayDir) &&
+                        m_registry && m_selectedEntity != entt::null) {
+                        auto& reg = m_registry->GetRegistry();
+                        if (reg.valid(m_selectedEntity) &&
+                            reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+                            const auto& t = reg.get<Scene::TransformComponent>(m_selectedEntity);
+                            glm::vec3 center = glm::vec3(t.worldMatrix[3]);
+
+                            glm::vec3 axisWorld[3] = {
+                                glm::vec3(t.worldMatrix * glm::vec4(1,0,0,0)),
+                                glm::vec3(t.worldMatrix * glm::vec4(0,1,0,0)),
+                                glm::vec3(t.worldMatrix * glm::vec4(0,0,1,0))
+                            };
+
+                            glm::vec3 axes[3];
+                            for (int i = 0; i < 3; ++i) {
+                                float len2 = glm::length2(axisWorld[i]);
+                                axes[i] = (len2 > 1e-6f) ? (axisWorld[i] / std::sqrt(len2))
+                                                         : glm::vec3(0.0f);
+                            }
+
+                            float axisLength = 1.0f;
+                            float threshold = 0.15f;
+                            float distance = glm::length(center - rayOrigin);
+                            ComputeGizmoScale(distance, axisLength, threshold);
+
+                            GizmoAxis hitAxis = GizmoAxis::None;
+                            if (HitTestGizmoAxis(rayOrigin, rayDir, center, axes, axisLength, threshold, hitAxis)) {
+                                // Begin drag along this axis.
+                                m_gizmoActiveAxis = hitAxis;
+                                m_gizmoDragging = true;
+                                m_gizmoAxisDir = (hitAxis == GizmoAxis::X) ? axes[0] :
+                                                 (hitAxis == GizmoAxis::Y) ? axes[1] : axes[2];
+                                m_gizmoDragCenter = center;
+
+                                // Build drag plane facing camera but containing the axis.
+                                glm::vec3 planeNormal(0.0f, 1.0f, 0.0f);
+                                if (m_activeCameraEntity != entt::null &&
+                                    m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) &&
+                                    m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+                                    auto& camT = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+                                    glm::vec3 viewDir = glm::normalize(camT.rotation * glm::vec3(0,0,1));
+                                    glm::vec3 n = glm::cross(m_gizmoAxisDir, glm::cross(viewDir, m_gizmoAxisDir));
+                                    if (glm::length2(n) > 1e-4f) {
+                                        planeNormal = glm::normalize(n);
+                                    } else {
+                                        // Fallback: choose a stable plane that still contains the axis.
+                                        switch (hitAxis) {
+                                            case GizmoAxis::X: {
+                                                glm::vec3 ref(0.0f, 1.0f, 0.0f);
+                                                glm::vec3 alt(0.0f, 0.0f, 1.0f);
+                                                glm::vec3 pn = glm::cross(m_gizmoAxisDir, ref);
+                                                if (glm::length2(pn) < 1e-4f) pn = glm::cross(m_gizmoAxisDir, alt);
+                                                if (glm::length2(pn) > 1e-6f) planeNormal = glm::normalize(pn);
+                                                break;
+                                            }
+                                            case GizmoAxis::Y: {
+                                                glm::vec3 ref(0.0f, 0.0f, 1.0f);
+                                                glm::vec3 alt(1.0f, 0.0f, 0.0f);
+                                                glm::vec3 pn = glm::cross(m_gizmoAxisDir, ref);
+                                                if (glm::length2(pn) < 1e-4f) pn = glm::cross(m_gizmoAxisDir, alt);
+                                                if (glm::length2(pn) > 1e-6f) planeNormal = glm::normalize(pn);
+                                                break;
+                                            }
+                                            case GizmoAxis::Z: {
+                                                glm::vec3 ref(0.0f, 1.0f, 0.0f);
+                                                glm::vec3 alt(1.0f, 0.0f, 0.0f);
+                                                glm::vec3 pn = glm::cross(m_gizmoAxisDir, ref);
+                                                if (glm::length2(pn) < 1e-4f) pn = glm::cross(m_gizmoAxisDir, alt);
+                                                if (glm::length2(pn) > 1e-6f) planeNormal = glm::normalize(pn);
+                                                break;
+                                            }
+                                            default:
+                                                break;
+                                        }
+                                    }
+                                }
+                                m_gizmoDragPlaneNormal = planeNormal;
+                                m_gizmoDragPlanePoint = m_gizmoDragCenter;
+
+                                // Cache initial entity position and axis parameter.
+                                auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
+                                m_gizmoDragStartEntityPos = selT.position;
+                                glm::vec3 hitPoint;
+                                if (RayPlaneIntersection(rayOrigin, rayDir,
+                                                         m_gizmoDragPlanePoint,
+                                                         m_gizmoDragPlaneNormal,
+                                                         hitPoint)) {
+                                    glm::vec3 axisN = glm::normalize(m_gizmoAxisDir);
+                                    m_gizmoDragStartAxisParam =
+                                        glm::dot(hitPoint - m_gizmoDragCenter, axisN);
+                                } else {
+                                    m_gizmoDragStartAxisParam = 0.0f;
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // No gizmo hit; perform standard picking.
+                    m_selectedEntity = PickEntityAt(m_lastMousePos.x, m_lastMousePos.y);
+                    if (m_selectedEntity != entt::null && m_registry &&
+                        m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+                        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+                        SetFocusTarget(tag.tag);
+                    }
+                }
+                else if (!m_droneFlightEnabled &&
+                         event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = true;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
                 }
                 break;
 
             case SDL_EVENT_MOUSE_BUTTON_UP:
-                if (!m_droneFlightEnabled && event.button.button == SDL_BUTTON_RIGHT && m_window) {
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    if (m_gizmoDragging) {
+                        m_gizmoDragging = false;
+                        m_gizmoActiveAxis = GizmoAxis::None;
+                    }
+                }
+                if (!m_droneFlightEnabled &&
+                    event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = false;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
                 }
                 break;
 
             case SDL_EVENT_MOUSE_MOTION:
-                if (m_cameraControlActive) {
+                m_lastMousePos = glm::vec2(static_cast<float>(event.motion.x),
+                                           static_cast<float>(event.motion.y));
+                if (m_gizmoDragging && m_registry && m_selectedEntity != entt::null) {
+                    auto& reg = m_registry->GetRegistry();
+                    if (!reg.valid(m_selectedEntity) ||
+                        !reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+                        // Entity was destroyed while dragging; cancel safely.
+                        m_gizmoDragging = false;
+                        m_gizmoActiveAxis = GizmoAxis::None;
+                    } else {
+                        glm::vec3 rayOrigin, rayDir;
+                        if (ComputeCameraRayFromMouse(m_lastMousePos.x, m_lastMousePos.y, rayOrigin, rayDir)) {
+                            glm::vec3 hitPoint;
+                            if (RayPlaneIntersection(rayOrigin, rayDir,
+                                                     m_gizmoDragPlanePoint,
+                                                     m_gizmoDragPlaneNormal,
+                                                     hitPoint)) {
+                                if (glm::length2(m_gizmoAxisDir) > 1e-6f) {
+                                    glm::vec3 axisN = glm::normalize(m_gizmoAxisDir);
+                                    float s = glm::dot(hitPoint - m_gizmoDragCenter, axisN);
+                                    float delta = s - m_gizmoDragStartAxisParam;
+                                    glm::vec3 offset = axisN * delta;
+
+                                    auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
+                                    selT.position = m_gizmoDragStartEntityPos + offset;
+                                }
+                            }
+                        }
+                    }
+                } else if (m_cameraControlActive) {
                     m_pendingMouseDeltaX += static_cast<float>(event.motion.xrel);
                     m_pendingMouseDeltaY += static_cast<float>(event.motion.yrel);
                 }
@@ -995,20 +1547,29 @@ void Engine::Update(float deltaTime) {
     UpdateCameraController(deltaTime);
 
     // Update all rotation components (spinning cube)
-    auto view = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
+    auto viewRot = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
+    for (auto entity : viewRot) {
+        auto& rotation = viewRot.get<Scene::RotationComponent>(entity);
+        auto& transform = viewRot.get<Scene::TransformComponent>(entity);
 
-    for (auto entity : view) {
-        auto& rotation = view.get<Scene::RotationComponent>(entity);
-        auto& transform = view.get<Scene::TransformComponent>(entity);
-
-        // Rotate around the specified axis
         float angle = rotation.speed * deltaTime;
         glm::quat rotationDelta = glm::angleAxis(angle, glm::normalize(rotation.axis));
         transform.rotation = rotationDelta * transform.rotation;
     }
+
+    // Update world matrices for all transforms so picking/gizmos and renderer
+    // operate on consistent world-space data.
+    m_registry->UpdateTransforms();
+
+    // Per-frame gizmo hover detection (editor-style)
+    UpdateGizmoHover();
 }
 
 void Engine::Render(float deltaTime) {
+    // Build debug lines (world axes, selection, gizmos) before issuing the
+    // main render; the renderer will consume these in its debug overlay pass.
+    DebugDrawSceneGraph();
+
     m_renderer->Render(m_registry.get(), deltaTime);
 
     // Render HUD overlay using GDI on top of the swap chain
@@ -1302,6 +1863,415 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         out.push_back(cmd);
     }
     return out;
+}
+
+bool Engine::ComputeCameraRayFromMouse(float mouseX, float mouseY,
+                                       glm::vec3& outOrigin,
+                                       glm::vec3& outDirection) {
+    if (!m_window || !m_registry) {
+        return false;
+    }
+
+    float width = static_cast<float>(m_window->GetWidth());
+    float height = static_cast<float>(m_window->GetHeight());
+    if (width <= 0.0f || height <= 0.0f) {
+        return false;
+    }
+
+    Scene::TransformComponent* camTransform = nullptr;
+    Scene::CameraComponent* camComp = nullptr;
+
+    // Prefer the cached active camera entity when valid; fall back to a scan
+    // to recover if the active flag has changed.
+    if (m_activeCameraEntity != entt::null &&
+        m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) &&
+        m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        camTransform = &m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+        camComp = &m_registry->GetComponent<Scene::CameraComponent>(m_activeCameraEntity);
+    } else {
+        auto camView = m_registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+        for (auto entity : camView) {
+            auto& camera = camView.get<Scene::CameraComponent>(entity);
+            auto& transform = camView.get<Scene::TransformComponent>(entity);
+            if (camera.isActive) {
+                camComp = &camera;
+                camTransform = &transform;
+                m_activeCameraEntity = entity;
+                break;
+            }
+        }
+    }
+
+    if (!camTransform || !camComp) {
+        return false;
+    }
+
+    glm::mat4 view = camComp->GetViewMatrix(*camTransform);
+    glm::mat4 proj = camComp->GetProjectionMatrix(m_window->GetAspectRatio());
+    glm::mat4 invViewProj = glm::inverse(proj * view);
+
+    float ndcX = (2.0f * (mouseX / width)) - 1.0f;
+    float ndcY = 1.0f - (2.0f * (mouseY / height));
+
+    glm::vec4 nearClip(ndcX, ndcY, 0.0f, 1.0f); // LH_ZO: z=0 near
+    glm::vec4 farClip(ndcX, ndcY, 1.0f, 1.0f);  // z=1 far
+
+    glm::vec4 nearWorld = invViewProj * nearClip;
+    glm::vec4 farWorld = invViewProj * farClip;
+    if (std::abs(nearWorld.w) > 1e-6f) nearWorld /= nearWorld.w;
+    if (std::abs(farWorld.w) > 1e-6f) farWorld /= farWorld.w;
+
+    glm::vec3 pNear = glm::vec3(nearWorld);
+    glm::vec3 pFar = glm::vec3(farWorld);
+
+    outOrigin = camTransform->position;
+    outDirection = glm::normalize(pFar - outOrigin);
+    return glm::length2(outDirection) > 0.0f;
+}
+
+entt::entity Engine::PickEntityAt(float mouseX, float mouseY) {
+    if (!m_registry) {
+        return entt::null;
+    }
+
+    glm::vec3 rayOrigin, rayDir;
+    if (!ComputeCameraRayFromMouse(mouseX, mouseY, rayOrigin, rayDir)) {
+        return entt::null;
+    }
+
+    auto view = m_registry->View<Scene::TransformComponent, Scene::RenderableComponent>();
+    const glm::vec3 aabbMin(-0.5f);
+    const glm::vec3 aabbMax(0.5f);
+
+    float bestDist = std::numeric_limits<float>::max();
+    entt::entity best = entt::null;
+
+    for (auto entity : view) {
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        if (!renderable.visible) continue;
+
+        glm::mat4 world = transform.worldMatrix;
+        glm::mat4 invWorld = transform.inverseWorldMatrix;
+        glm::vec3 localOrigin = glm::vec3(invWorld * glm::vec4(rayOrigin, 1.0f));
+        glm::vec3 localDir = glm::vec3(invWorld * glm::vec4(rayDir, 0.0f));
+        if (glm::length2(localDir) < 1e-6f) continue;
+        localDir = glm::normalize(localDir);
+
+        float tLocal = 0.0f;
+        if (!RayIntersectsAABB(localOrigin, localDir, aabbMin, aabbMax, tLocal)) continue;
+        if (tLocal < 0.0f) continue;
+
+        glm::vec3 hitLocal = localOrigin + localDir * tLocal;
+        glm::vec3 hitWorld = glm::vec3(world * glm::vec4(hitLocal, 1.0f));
+        float dist = glm::length(hitWorld - rayOrigin);
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = entity;
+        }
+    }
+
+    if (best != entt::null && m_registry->HasComponent<Scene::TagComponent>(best)) {
+        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(best);
+        spdlog::info("Picked entity '{}' (id={})", tag.tag,
+                     static_cast<uint32_t>(entt::to_integral(best)));
+    } else if (best == entt::null) {
+        spdlog::info("Pick miss (no entity under cursor)");
+    }
+
+    return best;
+}
+
+void Engine::FrameSelectedEntity() {
+    if (!m_registry) return;
+    if (m_selectedEntity == entt::null) return;
+
+    if (!m_registry->HasComponent<Scene::TransformComponent>(m_selectedEntity)) {
+        return;
+    }
+
+    // Find active camera
+    Scene::TransformComponent* camTransform = nullptr;
+    Scene::CameraComponent* camComp = nullptr;
+    auto camView = m_registry->View<Scene::CameraComponent, Scene::TransformComponent>();
+    for (auto entity : camView) {
+        auto& camera = camView.get<Scene::CameraComponent>(entity);
+        auto& transform = camView.get<Scene::TransformComponent>(entity);
+        if (camera.isActive) {
+            camComp = &camera;
+            camTransform = &transform;
+            m_activeCameraEntity = entity;
+            break;
+        }
+    }
+    if (!camTransform || !camComp) return;
+
+    const auto& selTransform = m_registry->GetComponent<Scene::TransformComponent>(m_selectedEntity);
+
+    // Build a world-space bounding sphere from the mesh if available; fall back
+    // to a simple scale-based heuristic otherwise.
+    glm::vec3 focus = glm::vec3(selTransform.worldMatrix[3]);
+    float radius = 0.5f;
+
+    if (m_registry->HasComponent<Scene::RenderableComponent>(m_selectedEntity)) {
+        const auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(m_selectedEntity);
+        if (renderable.mesh && !renderable.mesh->positions.empty()) {
+            glm::vec3 localMin(std::numeric_limits<float>::max());
+            glm::vec3 localMax(-std::numeric_limits<float>::max());
+            for (const auto& p : renderable.mesh->positions) {
+                localMin = glm::min(localMin, p);
+                localMax = glm::max(localMax, p);
+            }
+
+            glm::vec3 localCorners[8] = {
+                glm::vec3(localMin.x, localMin.y, localMin.z),
+                glm::vec3(localMax.x, localMin.y, localMin.z),
+                glm::vec3(localMax.x, localMax.y, localMin.z),
+                glm::vec3(localMin.x, localMax.y, localMin.z),
+                glm::vec3(localMin.x, localMin.y, localMax.z),
+                glm::vec3(localMax.x, localMin.y, localMax.z),
+                glm::vec3(localMax.x, localMax.y, localMax.z),
+                glm::vec3(localMin.x, localMax.y, localMax.z)
+            };
+
+            glm::vec3 worldMin(std::numeric_limits<float>::max());
+            glm::vec3 worldMax(-std::numeric_limits<float>::max());
+            for (const auto& c : localCorners) {
+                glm::vec3 wc = glm::vec3(selTransform.worldMatrix * glm::vec4(c, 1.0f));
+                worldMin = glm::min(worldMin, wc);
+                worldMax = glm::max(worldMax, wc);
+            }
+
+            focus = (worldMin + worldMax) * 0.5f;
+            glm::vec3 extents = (worldMax - worldMin) * 0.5f;
+            radius = glm::length(extents);
+        }
+    }
+
+    if (radius < 0.5f) {
+        glm::vec3 absScale = glm::abs(selTransform.scale);
+        radius = std::max({absScale.x, absScale.y, absScale.z}) * 0.5f;
+        if (radius < 0.5f) radius = 0.5f;
+    }
+
+    float fovRad = glm::radians(camComp->fov);
+    float distance = radius / std::max(std::sin(fovRad * 0.5f), 0.1f);
+    distance = std::clamp(distance, camComp->nearPlane + radius, camComp->farPlane * 0.5f);
+
+    // Position camera behind current view direction looking at focus
+    glm::vec3 forward = glm::normalize(focus - camTransform->position);
+    if (glm::length2(forward) < 1e-6f) {
+        forward = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    // If forward is nearly parallel to worldUp, choose an alternate up vector
+    // to avoid degeneracy in the cross product.
+    if (std::abs(glm::dot(forward, worldUp)) > 0.98f) {
+        worldUp = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    glm::vec3 right = glm::cross(forward, worldUp);
+    if (glm::length2(right) < 1e-6f) {
+        right = glm::vec3(1.0f, 0.0f, 0.0f);
+    } else {
+        right = glm::normalize(right);
+    }
+    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+
+    camTransform->position = focus - forward * distance;
+    camTransform->rotation = glm::quatLookAt(forward, up);
+
+    // Update yaw/pitch to keep flycam in sync.
+    forward = glm::normalize(forward);
+    m_cameraYaw = std::atan2(forward.x, forward.z);
+    m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+
+    // Update logical focus target so LLM/Dreamer edits apply to this object.
+    if (m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+        SetFocusTarget(tag.tag);
+    }
+
+    spdlog::info("Framed entity (distance ~{}, fov={} deg)",
+                 distance, camComp->fov);
+}
+
+bool Engine::HitTestGizmoAxis(const glm::vec3& rayOrigin,
+                              const glm::vec3& rayDir,
+                              const glm::vec3& center,
+                              const glm::vec3 axes[3],
+                              float axisLength,
+                              float threshold,
+                              GizmoAxis& outAxis) {
+    float bestT = std::numeric_limits<float>::max();
+    GizmoAxis best = GizmoAxis::None;
+
+    for (int i = 0; i < 3; ++i) {
+        if (glm::length2(axes[i]) < 1e-6f) {
+            continue;
+        }
+        float tRay = 0.0f;
+        if (RayHitsAxis(rayOrigin, rayDir, center, axes[i], axisLength, threshold, tRay)) {
+            if (tRay < bestT) {
+                bestT = tRay;
+                best = (i == 0 ? GizmoAxis::X : (i == 1 ? GizmoAxis::Y : GizmoAxis::Z));
+            }
+        }
+    }
+
+    outAxis = best;
+    return best != GizmoAxis::None;
+}
+
+void Engine::UpdateGizmoHover() {
+    m_gizmoHoveredAxis = GizmoAxis::None;
+
+    // While dragging we keep the active axis locked and skip hover tests.
+    if (m_gizmoDragging) {
+        return;
+    }
+
+    if (!m_window || !m_registry || m_selectedEntity == entt::null) {
+        return;
+    }
+
+    glm::vec3 rayOrigin, rayDir;
+    if (!ComputeCameraRayFromMouse(m_lastMousePos.x, m_lastMousePos.y, rayOrigin, rayDir)) {
+        return;
+    }
+
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(m_selectedEntity) ||
+        !reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+        return;
+    }
+
+    const auto& t = reg.get<Scene::TransformComponent>(m_selectedEntity);
+    glm::vec3 center = glm::vec3(t.worldMatrix[3]);
+
+    glm::vec3 axisWorld[3] = {
+        glm::vec3(t.worldMatrix * glm::vec4(1,0,0,0)),
+        glm::vec3(t.worldMatrix * glm::vec4(0,1,0,0)),
+        glm::vec3(t.worldMatrix * glm::vec4(0,0,1,0))
+    };
+
+    glm::vec3 axes[3];
+    for (int i = 0; i < 3; ++i) {
+        float len2 = glm::length2(axisWorld[i]);
+        axes[i] = (len2 > 1e-6f) ? (axisWorld[i] / std::sqrt(len2))
+                                 : glm::vec3(0.0f);
+    }
+
+    float axisLength = 1.0f;
+    float threshold = 0.15f;
+    float distance = glm::length(center - rayOrigin);
+    ComputeGizmoScale(distance, axisLength, threshold);
+
+    GizmoAxis axis = GizmoAxis::None;
+    HitTestGizmoAxis(rayOrigin, rayDir, center, axes, axisLength, threshold, axis);
+    m_gizmoHoveredAxis = axis;
+}
+
+void Engine::DebugDrawSceneGraph() {
+    if (!m_renderer || !m_registry) {
+        return;
+    }
+
+    // Clear any lines generated in previous frame.
+    m_renderer->ClearDebugLines();
+
+    // World origin axes
+    const glm::vec3 origin(0.0f);
+    m_renderer->AddDebugLine(origin, origin + glm::vec3(1,0,0), glm::vec4(1,0,0,1));
+    m_renderer->AddDebugLine(origin, origin + glm::vec3(0,1,0), glm::vec4(0,1,0,1));
+    m_renderer->AddDebugLine(origin, origin + glm::vec3(0,0,1), glm::vec4(0,0,1,1));
+
+    auto& reg = m_registry->GetRegistry();
+    auto view = m_registry->View<Scene::TransformComponent>();
+
+    // Selection highlight (simple wireframe box in world space).
+    if (m_selectedEntity != entt::null &&
+        reg.valid(m_selectedEntity) &&
+        reg.all_of<Scene::TransformComponent>(m_selectedEntity)) {
+        const auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
+        glm::vec3 c = glm::vec3(selT.worldMatrix[3]);
+
+        // Use a unit cube in local space and transform it into world space so
+        // the box respects hierarchy and rotation.
+        glm::vec3 localCorners[8] = {
+            glm::vec3(-0.5f, -0.5f, -0.5f),
+            glm::vec3( 0.5f, -0.5f, -0.5f),
+            glm::vec3( 0.5f,  0.5f, -0.5f),
+            glm::vec3(-0.5f,  0.5f, -0.5f),
+            glm::vec3(-0.5f, -0.5f,  0.5f),
+            glm::vec3( 0.5f, -0.5f,  0.5f),
+            glm::vec3( 0.5f,  0.5f,  0.5f),
+            glm::vec3(-0.5f,  0.5f,  0.5f),
+        };
+
+        glm::vec3 corners[8];
+        for (int i = 0; i < 8; ++i) {
+            corners[i] = glm::vec3(selT.worldMatrix * glm::vec4(localCorners[i], 1.0f));
+        }
+
+        auto edge = [&](int a, int b) {
+            m_renderer->AddDebugLine(corners[a], corners[b],
+                                     glm::vec4(1.0f, 1.0f, 0.0f, 0.9f));
+        };
+
+        // Bottom
+        edge(0,1); edge(1,2); edge(2,3); edge(3,0);
+        // Top
+        edge(4,5); edge(5,6); edge(6,7); edge(7,4);
+        // Vertical
+        edge(0,4); edge(1,5); edge(2,6); edge(3,7);
+
+        // Translation gizmo centered at c, using object-space axes in world space.
+        glm::vec3 axisX = glm::vec3(selT.worldMatrix * glm::vec4(1,0,0,0));
+        glm::vec3 axisY = glm::vec3(selT.worldMatrix * glm::vec4(0,1,0,0));
+        glm::vec3 axisZ = glm::vec3(selT.worldMatrix * glm::vec4(0,0,1,0));
+
+        float len = 1.0f;
+        float dummyThreshold = 0.0f;
+        float camDistance = len;
+        if (m_activeCameraEntity != entt::null &&
+            reg.valid(m_activeCameraEntity) &&
+            reg.all_of<Scene::TransformComponent, Scene::CameraComponent>(m_activeCameraEntity)) {
+            const auto& camT = reg.get<Scene::TransformComponent>(m_activeCameraEntity);
+            camDistance = glm::length(c - camT.position);
+        }
+        ComputeGizmoScale(camDistance, len, dummyThreshold);
+
+        auto safeNormalize = [](const glm::vec3& v) {
+            float l2 = glm::length2(v);
+            return (l2 > 1e-6f) ? (v / std::sqrt(l2)) : glm::vec3(0.0f);
+        };
+
+        axisX = safeNormalize(axisX);
+        axisY = safeNormalize(axisY);
+        axisZ = safeNormalize(axisZ);
+
+        auto colorForAxis = [&](GizmoAxis axis, const glm::vec3& base) {
+            if (m_gizmoActiveAxis == axis || m_gizmoHoveredAxis == axis) {
+                return glm::vec4(1.0f);
+            }
+            return glm::vec4(base, 1.0f);
+        };
+
+        glm::vec3 xTip = c + axisX * len;
+        m_renderer->AddDebugLine(c, xTip, colorForAxis(GizmoAxis::X, {1,0,0}));
+        m_renderer->AddDebugLine(xTip - axisY*0.05f, xTip + axisY*0.05f,
+                                 colorForAxis(GizmoAxis::X, {1,0,0}));
+
+        glm::vec3 yTip = c + axisY * len;
+        m_renderer->AddDebugLine(c, yTip, colorForAxis(GizmoAxis::Y, {0,1,0}));
+        m_renderer->AddDebugLine(yTip - axisZ*0.05f, yTip + axisZ*0.05f,
+                                 colorForAxis(GizmoAxis::Y, {0,1,0}));
+
+        glm::vec3 zTip = c + axisZ * len;
+        m_renderer->AddDebugLine(c, zTip, colorForAxis(GizmoAxis::Z, {0,0,1}));
+        m_renderer->AddDebugLine(zTip - axisX*0.05f, zTip + axisX*0.05f,
+                                 colorForAxis(GizmoAxis::Z, {0,0,1}));
+    }
 }
 
 void Engine::InitializeCameraController() {
@@ -1682,7 +2652,7 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
                << ", mode=" << (m_droneFlightEnabled ? "drone" : "orbit")
                << ", velocity=" << std::round(camSpeed * 10.0f) / 10.0f
                << ", view_span_at_" << std::round(midDepth * 10.0f) / 10.0f
-               << "m≈("
+               << "m approx ("
                << std::round((halfWidth * 2.0f) * 10.0f) / 10.0f << "x"
                << std::round((halfHeight * 2.0f) * 10.0f) / 10.0f << ")";
 

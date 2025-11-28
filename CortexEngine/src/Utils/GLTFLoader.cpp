@@ -331,7 +331,7 @@ Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& pathStr
         }
     }
 
-    // Indices (optional – but our renderer expects indexed)
+    // Indices (optional - but our renderer expects indexed)
     std::vector<uint32_t> indices;
     if (prim.contains("indices")) {
         int idxAccIndex = prim["indices"].get<int>();

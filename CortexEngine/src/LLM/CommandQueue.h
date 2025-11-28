@@ -34,6 +34,16 @@ public:
         m_focusCallback = std::move(cb);
     }
 
+    // Keep the queue's notion of the "currently focused" entity in sync with
+    // the engine's editor-style selection. When an LLM command names the
+    // focus target explicitly (e.g., after the user picks an object and the
+    // engine advertises its tag), we prefer to operate on this exact entity
+    // instead of resolving purely by name or falling back to heuristics.
+    void SetCurrentFocus(const std::string& name, entt::entity id) {
+        m_currentFocusName = name;
+        m_currentFocusEntity = id;
+    }
+
     // Push a command to the queue (thread-safe)
     void Push(std::shared_ptr<SceneCommand> command);
 
@@ -67,6 +77,17 @@ public:
     // Last high-level scene recipe generated from a scene_plan (if any).
     std::string GetLastSceneRecipe() const { return m_lastSceneRecipe; }
 
+    // Optional callback invoked when the LLM explicitly selects or focuses
+    // an entity by name. The callback returns the resolved tag (if any) so
+    // status messages can reflect the concrete scene name.
+    void SetSelectionCallback(std::function<std::optional<std::string>(const std::string&)>&& cb) {
+        m_selectionCallback = std::move(cb);
+    }
+
+    void SetFocusCameraCallback(std::function<void(const std::string&)>&& cb) {
+        m_focusCameraCallback = std::move(cb);
+    }
+
 private:
     std::queue<std::shared_ptr<SceneCommand>> m_commands;
     mutable std::mutex m_mutex;
@@ -76,6 +97,14 @@ private:
     uint32_t m_spawnIndex = 0;
     std::string m_lastSceneRecipe;
     std::function<void(const std::string&)> m_focusCallback;
+    std::function<std::optional<std::string>(const std::string&)> m_selectionCallback;
+    std::function<void(const std::string&)> m_focusCameraCallback;
+
+    // Editor-driven focus state (kept in sync by the Engine). This lets us
+    // "lock" LLM edits to the same concrete entity that the user currently
+    // has selected/framed, even when names are ambiguous.
+    std::string m_currentFocusName;
+    entt::entity m_currentFocusEntity{ entt::null };
 
     // Execute a single command
     void ExecuteCommand(SceneCommand* command, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
@@ -88,11 +117,18 @@ private:
     void ExecuteModifyCamera(ModifyCameraCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
     void ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Registry* registry);
-    void ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer);
+    void ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::Renderer* renderer, Scene::ECS_Registry* registry);
     void ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
     void ExecuteAddCompound(AddCompoundCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
     void ExecuteModifyGroup(ModifyGroupCommand* cmd, Scene::ECS_Registry* registry);
     void ExecuteScenePlan(ScenePlanCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer);
+
+    // Helper that prefers the externally provided focus entity when the
+    // target name matches the current focus name; otherwise falls back to
+    // the standard SceneLookup resolution logic.
+    entt::entity ResolveTargetWithFocus(const std::string& targetName,
+                                        Scene::ECS_Registry* registry,
+                                        std::string& outHint);
 
     // Region builders used by ScenePlanCommand
     void BuildFieldRegion(const ScenePlanCommand::Region& region,

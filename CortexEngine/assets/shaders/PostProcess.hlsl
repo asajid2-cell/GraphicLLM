@@ -13,7 +13,7 @@ cbuffer FrameConstants : register(b1)
     // rgb: ambient color * intensity, w unused
     float4   g_AmbientColor;
     uint4    g_LightCount;
-    // Forward lights (light 0 is the sun)
+    // Forward lights (light 0 is the sun). Must match ShaderTypes.h.
     struct Light
     {
         float4 position_type;        // xyz = position (for point/spot), w = type
@@ -21,7 +21,8 @@ cbuffer FrameConstants : register(b1)
         float4 color_range;          // rgb = color * intensity, w = range (point/spot)
         float4 params;               // x = outer cone cos, y = shadow index, z,w reserved
     };
-    Light    g_Lights[4];
+    static const uint LIGHT_MAX = 16;
+    Light    g_Lights[LIGHT_MAX];
     // Directional + local light view-projection matrices (0-2 = cascades, 3-5 = local)
     float4x4 g_LightViewProjection[6];
     // x,y,z = cascade split depths in view space, w = far plane

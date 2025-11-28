@@ -28,6 +28,9 @@ struct DebugMenuState {
     // Lighting rig selection (0 = none/custom, 1 = studio three-point,
     // 2 = top-down warehouse, 3 = horror side-light).
     int lightingRig = 0;
+
+    // Optional DXR ray tracing toggle (0 = off, 1 = on) persisted with other settings.
+    bool rayTracingEnabled = false;
 };
 
 // Simple Win32 debug menu window with sliders for renderer/camera parameters.

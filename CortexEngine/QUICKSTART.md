@@ -1,4 +1,4 @@
-# Project Cortex – Quick Start
+# Project Cortex - Quick Start
 
 This guide walks you from a clean Windows machine to running the engine with a spinning test object.
 
@@ -10,7 +10,7 @@ You need:
 
 - Windows 10 or 11
 - Visual Studio 2022 (Community Edition is fine) with:
-  - “Desktop development with C++” workload
+  - "Desktop development with C++" workload
 - Git
 
 The setup scripts will install and configure the rest (CMake, vcpkg, libraries).
@@ -34,7 +34,7 @@ This script:
 5. Builds the engine (Release by default).
 6. Copies shader assets into the build output.
 
-First run typically takes 15–25 minutes (most of the time is package downloads).  
+First run typically takes 15-25 minutes (most of the time is package downloads).  
 Subsequent builds are much faster.
 
 ---
@@ -56,7 +56,7 @@ cd build\bin\Release
 
 Expected result:
 
-- A 1280×720 window opens.
+- A 1280x720 window opens.
 - The scene shows a test object lit by the PBR pipeline.
 - The console prints frame timing and basic diagnostics.
 - Press `Esc` to exit.
@@ -65,7 +65,7 @@ Expected result:
 
 ## 4. Troubleshooting
 
-### “Execution of scripts is disabled”
+### "Execution of scripts is disabled"
 
 Your PowerShell execution policy is locked down. Use:
 
@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
 This relaxes the policy only for this invocation.
 
-### “Visual Studio not found”
+### "Visual Studio not found"
 
 Install Visual Studio 2022:
 
@@ -83,7 +83,7 @@ Install Visual Studio 2022:
 2. Select the **Desktop development with C++** workload.
 3. After installation, rerun `setup.ps1`.
 
-### “vcpkg not found”
+### "vcpkg not found"
 
 `setup.ps1` will clone and bootstrap vcpkg for you if `VCPKG_ROOT` is not set.  
 If you prefer to manage vcpkg manually, set `VCPKG_ROOT` before running the script.

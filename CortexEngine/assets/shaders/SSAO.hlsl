@@ -21,7 +21,8 @@ cbuffer FrameConstants : register(b1)
         float4 color_range;
         float4 params;
     };
-    Light    g_Lights[4];
+    static const uint LIGHT_MAX = 16;
+    Light    g_Lights[LIGHT_MAX];
     // Directional + local light view-projection matrices (0-2 = cascades, 3-5 = local)
     float4x4 g_LightViewProjection[6];
     float4   g_CascadeSplits;

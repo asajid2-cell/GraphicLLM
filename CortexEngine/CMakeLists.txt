@@ -67,6 +67,7 @@ set(CORTEX_SOURCES
     src/Graphics/RHI/DX12CommandQueue.cpp
     src/Graphics/RHI/DescriptorHeap.cpp
     src/Graphics/RHI/DX12Pipeline.cpp
+    src/Graphics/RHI/DX12Raytracing.cpp
     src/Graphics/TextureLoader.cpp
     src/Graphics/Renderer.cpp
     src/Graphics/Renderer_Bloom.cpp
@@ -106,6 +107,7 @@ set(CORTEX_HEADERS
     src/Graphics/RHI/DX12CommandQueue.h
     src/Graphics/RHI/DescriptorHeap.h
     src/Graphics/RHI/DX12Pipeline.h
+    src/Graphics/RHI/DX12Raytracing.h
     src/Graphics/RHI/d3dx12.h
     src/Graphics/MaterialState.h
     src/Graphics/TextureLoader.h

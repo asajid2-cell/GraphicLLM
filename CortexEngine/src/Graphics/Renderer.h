@@ -11,6 +11,7 @@
 #include "RHI/DX12Pipeline.h"
 #include "RHI/DX12Texture.h"
 #include "RHI/DescriptorHeap.h"
+#include "RHI/DX12Raytracing.h"
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
 #include "Graphics/HyperGeometry/HyperGeometryEngine.h"
 #endif
@@ -202,7 +203,8 @@ public:
         Custom = 0,
         StudioThreePoint = 1,
         TopDownWarehouse = 2,
-        HorrorSideLight = 3
+        HorrorSideLight = 3,
+        StreetLanterns = 4
     };
 
     void ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry);
@@ -227,6 +229,11 @@ public:
     [[nodiscard]] bool IsFogEnabled() const { return m_fogEnabled; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
     [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
+
+    // Ray tracing capability and toggle (DXR)
+    [[nodiscard]] bool IsRayTracingSupported() const { return m_rayTracingSupported; }
+    [[nodiscard]] bool IsRayTracingEnabled() const { return m_rayTracingEnabled; }
+    void SetRayTracingEnabled(bool enabled);
     // Dynamically register an environment map from an existing texture (used by Dreamer).
     Result<void> AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name);
 
@@ -273,6 +280,13 @@ private:
     void RenderSSAO();
     void RenderBloom();
     void RenderPostProcess();
+    void RenderDebugLines();
+    void RenderRayTracing(Scene::ECS_Registry* registry);
+
+    // Debug drawing API
+public:
+    void AddDebugLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color);
+    void ClearDebugLines();
 
     // Graphics resources
     DX12Device* m_device = nullptr;
@@ -284,6 +298,7 @@ private:
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     std::unique_ptr<HyperGeometry::HyperGeometryEngine> m_hyperGeometry;
 #endif
+    std::unique_ptr<DX12RaytracingContext> m_rayTracingContext;
 
     ComPtr<ID3D12CommandAllocator> m_commandAllocators[3];  // One per frame
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
@@ -302,6 +317,7 @@ private:
     std::unique_ptr<DX12Pipeline> m_bloomBlurVPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomCompositePipeline;
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
+    std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
@@ -377,6 +393,18 @@ private:
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
 
+    // Debug line rendering (world-space overlay)
+    struct DebugLineVertex {
+        glm::vec3 position;
+        glm::vec4 color;
+    };
+    std::vector<DebugLineVertex> m_debugLines;
+    // Transient vertex buffer reused across frames to avoid per-frame heap
+    // allocations for debug lines.
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_debugLineVertexBuffer;
+    uint32_t m_debugLineVertexCapacity = 0;
+    bool m_debugLinesDisabled = false;
+
     // Environment maps for image-based lighting
     struct EnvironmentMaps {
         std::string name;                                  // display name
@@ -446,6 +474,8 @@ private:
     bool m_pcssEnabled = false;
     bool m_fxaaEnabled = true;
     bool m_ssrEnabled = true;
+    bool m_rayTracingSupported = false;
+    bool m_rayTracingEnabled = false;
 
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;

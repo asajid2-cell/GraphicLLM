@@ -149,8 +149,8 @@ std::string BuildHeuristicJson(const std::string& prompt) {
     }
 
     // Lighting heuristics: simple helpers for spotlight, sunlight, ambient, and
-    // studio/three-point lighting setups. When possible, prefer using the
-    // renderer's lighting rigs so that keyboard/debug controls stay in sync
+    // studio/three-point / street lighting setups. When possible, prefer using
+    // the renderer's lighting rigs so that keyboard/debug controls stay in sync
     // with LLM-driven scenes.
     if (contains("studio lighting") || contains("studio light") || contains("better lighting")) {
         // Use a dedicated modify_renderer macro to request the studio rig;
@@ -158,6 +158,14 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         // debug UI stay consistent with LLM-driven lighting.
         std::ostringstream ss;
         ss << R"({"commands":[{"type":"modify_renderer","lighting_rig":"studio_three_point"}]})";
+        return ss.str();
+    }
+    if (contains("streetlight") || contains("street light") || contains("street lights") ||
+        contains("street lighting") || contains("alley lights") || contains("road lights")) {
+        // Night-time / alley street lantern rig: rely on the StreetLanterns
+        // lighting preset and leave environment choice to other macros.
+        std::ostringstream ss;
+        ss << R"({"commands":[{"type":"modify_renderer","lighting_rig":"street_lanterns"}]})";
         return ss.str();
     }
 

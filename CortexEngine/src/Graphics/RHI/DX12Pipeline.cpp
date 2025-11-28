@@ -64,6 +64,8 @@ Result<void> DX12Pipeline::Initialize(
     psoDesc.RasterizerState = rasterizerDesc;
     psoDesc.DepthStencilState = depthStencilDesc;
     psoDesc.InputLayout = { desc.inputLayout.data(), static_cast<UINT>(desc.inputLayout.size()) };
+    // Default to triangles; specialized pipelines (e.g. debug lines) can
+    // override this after Initialize if they need line or point topology.
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = desc.numRenderTargets;
     for (UINT i = 0; i < 8; ++i) {

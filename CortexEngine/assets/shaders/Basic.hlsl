@@ -20,7 +20,8 @@ cbuffer FrameConstants : register(b1)
     // rgb: ambient color * intensity, w unused
     float4 g_AmbientColor;
     uint4 g_LightCount;
-    // Forward lights (light 0 is the sun)
+    // Forward lights (light 0 is the sun). Must match the size used in
+    // ShaderTypes.h (kMaxForwardLights).
     struct Light
     {
         float4 position_type;        // xyz = position (for point/spot), w = type
@@ -28,7 +29,8 @@ cbuffer FrameConstants : register(b1)
         float4 color_range;          // rgb = color * intensity, w = range (point/spot)
         float4 params;               // x = outer cone cos, y = shadow index, z,w reserved
     };
-    Light g_Lights[4];
+    static const uint LIGHT_MAX = 16;
+    Light g_Lights[LIGHT_MAX];
     // Directional + local light view-projection matrices:
     // indices 0-2: cascades for the sun
     // indices 3-5: shadowed local lights (spot)
@@ -745,6 +747,34 @@ PSOutput MakePSOutput(float4 color, float3 normal, float roughness)
     return o;
 }
 
+// === Debug line rendering (overlay) ===
+
+struct DebugVSInput
+{
+    float3 position : POSITION;
+    float4 color    : COLOR0;
+};
+
+struct DebugPSInput
+{
+    float4 position : SV_POSITION;
+    float4 color    : COLOR0;
+};
+
+DebugPSInput DebugLineVS(DebugVSInput input)
+{
+    DebugPSInput output;
+    float4 worldPos = float4(input.position, 1.0f);
+    output.position = mul(g_ViewProjectionMatrix, worldPos);
+    output.color = input.color;
+    return output;
+}
+
+float4 DebugLinePS(DebugPSInput input) : SV_TARGET
+{
+    return input.color;
+}
+
 // Pixel Shader
 PSOutput PSMain(PSInput input)
 {
@@ -884,6 +914,90 @@ PSOutput PSMain(PSInput input)
         float3 N = normalize(normal);
         float2 uv = DirectionToLatLong(N);
         return MakePSOutput(float4(uv.x, uv.y, 0.0f, 1.0f), normal, roughness);
+    }
+    else if (debugView == 17)
+    {
+        // Forward-light debug: visualize how many lights significantly affect
+        // this point and the strongest light's color. This helps you see which
+        // LightComponent objects are actually contributing illumination and
+        // how their ranges overlap.
+        uint lightCount = g_LightCount.x;
+        float3 viewDirDbg = normalize(g_CameraPosition.xyz - input.worldPos);
+
+        uint activeLights = 0;
+        float maxLuma = 0.0f;
+        float3 maxColor = 0.0f;
+
+        [loop]
+        for (uint i = 0; i < lightCount; ++i)
+        {
+            Light light = g_Lights[i];
+            uint type = (uint)light.position_type.w;
+
+            float3 lightDir;
+            float attenuation = 1.0f;
+
+            if (type == LIGHT_TYPE_POINT || type == LIGHT_TYPE_SPOT)
+            {
+                float3 toLight = light.position_type.xyz - input.worldPos;
+                float dist = length(toLight);
+                if (dist <= 1e-4f)
+                {
+                    continue;
+                }
+                lightDir = toLight / dist;
+
+                float range = max(light.color_range.w, 0.001f);
+                float falloff = saturate(1.0f - dist / range);
+                attenuation = falloff * falloff;
+
+                if (type == LIGHT_TYPE_SPOT)
+                {
+                    float3 spotDir = normalize(light.direction_cosInner.xyz);
+                    float cosTheta = dot(-lightDir, spotDir);
+                    float cosInner = light.direction_cosInner.w;
+                    float cosOuter = light.params.x;
+                    float spotFactor = saturate((cosTheta - cosOuter) / max(cosInner - cosOuter, 1e-4f));
+                    attenuation *= spotFactor * spotFactor;
+                }
+            }
+            else
+            {
+                // Directional light: treat as always in range.
+                lightDir = normalize(light.direction_cosInner.xyz);
+            }
+
+            float NdotL = saturate(dot(normalize(normal), lightDir));
+            if (NdotL <= 0.0f || attenuation <= 1e-4f)
+            {
+                continue;
+            }
+
+            float3 contrib = light.color_range.rgb * (NdotL * attenuation);
+            float luma = dot(contrib, float3(0.299f, 0.587f, 0.114f));
+            if (luma > 1e-3f)
+            {
+                activeLights++;
+                if (luma > maxLuma)
+                {
+                    maxLuma = luma;
+                    maxColor = light.color_range.rgb;
+                }
+            }
+        }
+
+        float lightsNorm = (LIGHT_MAX > 1) ? (min(activeLights, LIGHT_MAX) / (float)(LIGHT_MAX)) : 0.0f;
+        float brightness = saturate(maxLuma / 10.0f);
+
+        // Encode: R = strongest light color weighted by brightness,
+        // G = normalized active light count,
+        // B = brightness.
+        float3 dbgColor = float3(
+            saturate(maxColor.r * brightness),
+            lightsNorm,
+            brightness);
+
+        return MakePSOutput(float4(dbgColor, 1.0f), normal, roughness);
     }
 
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao);

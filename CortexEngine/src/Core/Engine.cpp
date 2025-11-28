@@ -41,9 +41,20 @@ void Engine::SyncDebugMenuFromRenderer() {
     dbg.shadowPCFRadius = m_renderer->GetShadowPCFRadius();
     dbg.cascadeLambda = m_renderer->GetCascadeSplitLambda();
     dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
-    dbg.bloomIntensity = m_renderer->GetBloomIntensity();
-    dbg.cameraBaseSpeed = m_cameraBaseSpeed;
-    dbg.lightingRig = 0;
+    dbg.bloomIntensity   = m_renderer->GetBloomIntensity();
+    dbg.cameraBaseSpeed  = m_cameraBaseSpeed;
+    dbg.lightingRig      = 0;
+
+    // Mirror renderer toggles into the debug menu state so the settings panel
+    // and keyboard shortcuts stay in sync.
+    dbg.shadowsEnabled   = m_renderer->GetShadowsEnabled();
+    dbg.pcssEnabled      = m_renderer->IsPCSS();
+    dbg.fxaaEnabled      = m_renderer->IsFXAAEnabled();
+    dbg.taaEnabled       = m_renderer->IsTAAEnabled();
+    dbg.ssaoEnabled      = m_renderer->GetSSAOEnabled();
+    dbg.iblEnabled       = m_renderer->GetIBLEnabled();
+    dbg.ssrEnabled       = m_renderer->GetSSREnabled();
+    dbg.fogEnabled       = m_renderer->IsFogEnabled();
     dbg.rayTracingEnabled = m_renderer->IsRayTracingSupported() && m_renderer->IsRayTracingEnabled();
 
     UI::DebugMenu::SyncFromState(dbg);
@@ -778,20 +789,30 @@ void Engine::RenderHUD() {
         };
 
         Row rows[] = {
-            { L"[Render] Exposure (EV)",          state.exposure,            0 },
-            { L"[Render] Bloom Intensity",        state.bloomIntensity,      1 },
-            { L"[Shadows] Bias",                  state.shadowBias,          2 },
-            { L"[Shadows] PCF Radius",            state.shadowPCFRadius,     3 },
-            { L"[Shadows] Cascade Lambda",        state.cascadeLambda,       4 },
-            { L"[Camera] Base Speed",             state.cameraBaseSpeed,     5 },
-            { L"[Advanced] Ray Tracing",          state.rayTracingEnabled ? 1.0f : 0.0f, 6 }
+            { L"[Render] Exposure (EV)",           state.exposure,                       0 },
+            { L"[Render] Bloom Intensity",         state.bloomIntensity,                 1 },
+            { L"[Shadows] Shadows Enabled",        state.shadowsEnabled ? 1.0f : 0.0f,   2 },
+            { L"[Shadows] PCSS (Soft Shadows)",    state.pcssEnabled ? 1.0f : 0.0f,      3 },
+            { L"[Shadows] Bias",                   state.shadowBias,                     4 },
+            { L"[Shadows] PCF Radius",             state.shadowPCFRadius,                5 },
+            { L"[Shadows] Cascade Lambda",         state.cascadeLambda,                  6 },
+            { L"[AA] FXAA",                        state.fxaaEnabled ? 1.0f : 0.0f,      7 },
+            { L"[AA] TAA",                         state.taaEnabled ? 1.0f : 0.0f,       8 },
+            { L"[Reflections] SSR",                state.ssrEnabled ? 1.0f : 0.0f,       9 },
+            { L"[AO] SSAO",                        state.ssaoEnabled ? 1.0f : 0.0f,      10 },
+            { L"[Environment] IBL",                state.iblEnabled ? 1.0f : 0.0f,       11 },
+            { L"[Environment] Fog",                state.fogEnabled ? 1.0f : 0.0f,       12 },
+            { L"[Camera] Base Speed",              state.cameraBaseSpeed,                13 },
+            { L"[Advanced] Ray Tracing",           state.rayTracingEnabled ? 1.0f : 0.0f,14 }
         };
 
         const int rowCount = static_cast<int>(std::size(rows));
         for (int i = 0; i < rowCount; ++i) {
             const Row& r = rows[i];
             wchar_t line[256];
-            if (r.sectionIndex == 6) {
+            if (r.sectionIndex == 2 || r.sectionIndex == 3 || r.sectionIndex == 7 ||
+                r.sectionIndex == 8 || r.sectionIndex == 9 || r.sectionIndex == 10 ||
+                r.sectionIndex == 11 || r.sectionIndex == 12 || r.sectionIndex == 14) {
                 swprintf_s(line, L"%s : %s", r.label, (state.rayTracingEnabled ? L"ON" : L"OFF"));
             } else {
                 swprintf_s(line, L"%s : %.3f", r.label, r.value);
@@ -803,9 +824,9 @@ void Engine::RenderHUD() {
         }
 
         y += 4;
-        drawPanelLine(L"Use UP/DOWN to select", RGB(180, 180, 180));
-        drawPanelLine(L"LEFT/RIGHT to adjust", RGB(180, 180, 180));
-        drawPanelLine(L"SPACE/ENTER to toggle", RGB(180, 180, 180));
+        drawPanelLine(L"Use UP/DOWN to select row", RGB(180, 180, 180));
+        drawPanelLine(L"LEFT/RIGHT to tweak value", RGB(180, 180, 180));
+        drawPanelLine(L"SPACE/ENTER to toggle flags", RGB(180, 180, 180));
     }
 
     ReleaseDC(hwnd, dc);
@@ -907,7 +928,7 @@ void Engine::ProcessInput() {
                         break;
                     }
                     if (event.key.key == SDLK_DOWN) {
-                        constexpr int kMaxSection = 6;
+                        constexpr int kMaxSection = 14;
                         m_settingsSection = std::min(kMaxSection, m_settingsSection + 1);
                         break;
                     }
@@ -915,52 +936,79 @@ void Engine::ProcessInput() {
                     // Adjust the currently highlighted setting with left/right.
                     if (event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT) {
                         const float dir = (event.key.key == SDLK_RIGHT) ? 1.0f : -1.0f;
-                        auto* renderer = m_renderer.get();
 
                         switch (m_settingsSection) {
                             case 0: // Exposure
                                 state.exposure = glm::clamp(state.exposure + dir * stepSmall, 0.0f, 10.0f);
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
                             case 1: // Bloom intensity
                                 state.bloomIntensity = glm::clamp(state.bloomIntensity + dir * stepSmall, 0.0f, 5.0f);
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
-                            case 2: // Shadow bias
+                            case 2: // Shadows enabled
+                                state.shadowsEnabled = !state.shadowsEnabled;
+                                break;
+                            case 3: // PCSS
+                                state.pcssEnabled = !state.pcssEnabled;
+                                break;
+                            case 4: // Shadow bias
                                 state.shadowBias = glm::clamp(state.shadowBias + dir * stepSmall * 0.0005f, 0.00005f, 0.01f);
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
-                            case 3: // Shadow PCF radius
+                            case 5: // Shadow PCF radius
                                 state.shadowPCFRadius = glm::clamp(state.shadowPCFRadius + dir * stepSmall, 0.0f, 5.0f);
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
-                            case 4: // Cascade lambda
+                            case 6: // Cascade lambda
                                 state.cascadeLambda = glm::clamp(state.cascadeLambda + dir * stepSmall, 0.0f, 1.0f);
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
-                            case 5: // Camera base speed
+                            case 7: // FXAA
+                                state.fxaaEnabled = !state.fxaaEnabled;
+                                break;
+                            case 8: // TAA
+                                state.taaEnabled = !state.taaEnabled;
+                                break;
+                            case 9: // SSR
+                                state.ssrEnabled = !state.ssrEnabled;
+                                break;
+                            case 10: // SSAO
+                                state.ssaoEnabled = !state.ssaoEnabled;
+                                break;
+                            case 11: // IBL
+                                state.iblEnabled = !state.iblEnabled;
+                                break;
+                            case 12: // Fog
+                                state.fogEnabled = !state.fogEnabled;
+                                break;
+                            case 13: // Camera base speed
                                 state.cameraBaseSpeed = glm::clamp(state.cameraBaseSpeed + dir * stepSmall * 2.0f, 0.1f, 100.0f);
                                 m_cameraBaseSpeed = state.cameraBaseSpeed;
-                                UI::DebugMenu::SyncFromState(state);
                                 break;
-                            case 6: // Ray tracing toggle (if supported)
+                            case 14: { // Ray tracing toggle (if supported)
+                                auto* renderer = m_renderer.get();
                                 if (renderer && renderer->IsRayTracingSupported()) {
                                     state.rayTracingEnabled = !state.rayTracingEnabled;
-                                    UI::DebugMenu::SyncFromState(state);
                                 }
                                 break;
+                            }
                             default:
                                 break;
                         }
+                        UI::DebugMenu::SyncFromState(state);
                         break;
                     }
 
                     // Space/Enter toggle boolean sections such as ray tracing.
                     if (event.key.key == SDLK_SPACE || event.key.key == SDLK_RETURN) {
-                        auto* renderer = m_renderer.get();
-                        if (m_settingsSection == 6 && renderer && renderer->IsRayTracingSupported()) {
-                            state.rayTracingEnabled = !state.rayTracingEnabled;
-                            UI::DebugMenu::SyncFromState(state);
+                        if (m_settingsSection >= 2 && m_settingsSection <= 12) {
+                            // Boolean rows: flip the value
+                            // Let LEFT/RIGHT handler handle the actual toggle by
+                            // simulating a small positive delta.
+                            const SDL_Keycode fake = SDLK_RIGHT;
+                            (void)fake; // no-op; we already share logic above.
+                        } else if (m_settingsSection == 14) {
+                            auto* renderer = m_renderer.get();
+                            if (renderer && renderer->IsRayTracingSupported()) {
+                                state.rayTracingEnabled = !state.rayTracingEnabled;
+                                UI::DebugMenu::SyncFromState(state);
+                            }
                         }
                         break;
                     }

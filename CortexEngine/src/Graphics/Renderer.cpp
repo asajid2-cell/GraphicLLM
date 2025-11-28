@@ -248,6 +248,11 @@ void Renderer::Shutdown() {
         m_rayTracingContext.reset();
     }
 
+    if (m_rayTracingContext) {
+        m_rayTracingContext->Shutdown();
+        m_rayTracingContext.reset();
+    }
+
     m_placeholderAlbedo.reset();
     m_placeholderNormal.reset();
     m_placeholderMetallic.reset();
@@ -286,9 +291,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     BeginFrame();
     UpdateFrameConstants(deltaTime, registry);
 
-    // Optional ray tracing path (DXR). In this pass we only exercise the
-    // plumbing to build a stub TLAS and dispatch a no-op ray pass when
-    // both support and the runtime toggle are enabled.
+    // Optional ray tracing path (DXR). In this pass we build BLAS/TLAS on
+    // the DXR device when supported; DispatchRayTracing is still a no-op
+    // placeholder for upcoming RT effects.
     if (m_rayTracingSupported && m_rayTracingEnabled && m_rayTracingContext) {
         RenderRayTracing(registry);
     }
@@ -361,7 +366,8 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
     HRESULT hr = m_commandList.As(&rtCmdList);
     if (SUCCEEDED(hr) && rtCmdList) {
-        // For now, just exercise the plumbing: build a stub TLAS and dispatch.
+        // For now we build BLAS/TLAS for the scene; DispatchRayTracing
+        // remains a no-op hook for upcoming RT effects.
         m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
         m_rayTracingContext->DispatchRayTracing(rtCmdList.Get());
     }
@@ -930,12 +936,12 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
     frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
 
-    // Post-process parameters: reciprocal resolution and FXAA flag
-    frameData.postParams = glm::vec4(
-        invWidth,
-        invHeight,
-        (m_taaEnabled ? 0.0f : (m_fxaaEnabled ? 1.0f : 0.0f)),
-        0.0f);
+    // Post-process parameters: reciprocal resolution, FXAA flag, and an extra
+    // channel used as a simple runtime toggle for ray-traced sun shadows in
+    // the shading path (when DXR is available).
+    float fxaaFlag = (m_taaEnabled ? 0.0f : (m_fxaaEnabled ? 1.0f : 0.0f));
+    float rtShadowToggle = (m_rayTracingSupported && m_rayTracingEnabled) ? 1.0f : 0.0f;
+    frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtShadowToggle);
 
     // Image-based lighting parameters
     float iblEnabled = m_iblEnabled ? 1.0f : 0.0f;
@@ -1633,6 +1639,11 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     gpuBuffers->vertexBuffer = vertexBuffer;
     gpuBuffers->indexBuffer = indexBuffer;
     mesh->gpuBuffers = gpuBuffers;
+
+    // Register geometry with the ray tracing context (stubbed in this phase).
+    if (m_rayTracingContext) {
+        m_rayTracingContext->RebuildBLASForMesh(mesh);
+    }
 
     spdlog::info("Mesh uploaded to default heap: {} vertices, {} indices", vertices.size(), mesh->indices.size());
     return Result<void>::Ok();

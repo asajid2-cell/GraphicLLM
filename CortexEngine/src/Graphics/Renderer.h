@@ -229,6 +229,9 @@ public:
     [[nodiscard]] bool IsFogEnabled() const { return m_fogEnabled; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
     [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
+    [[nodiscard]] bool GetSSAOEnabled() const { return m_ssaoEnabled; }
+    [[nodiscard]] bool GetIBLEnabled() const { return m_iblEnabled; }
+    [[nodiscard]] bool GetSSREnabled() const { return m_ssrEnabled; }
 
     // Ray tracing capability and toggle (DXR)
     [[nodiscard]] bool IsRayTracingSupported() const { return m_rayTracingSupported; }

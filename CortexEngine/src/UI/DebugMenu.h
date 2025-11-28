@@ -29,7 +29,18 @@ struct DebugMenuState {
     // 2 = top-down warehouse, 3 = horror side-light).
     int lightingRig = 0;
 
-    // Optional DXR ray tracing toggle (0 = off, 1 = on) persisted with other settings.
+    // High-level feature toggles mirrored from the renderer so that both the
+    // keyboard shortcuts and the settings panel stay in sync.
+    bool shadowsEnabled = true;
+    bool pcssEnabled = false;
+    bool fxaaEnabled = true;
+    bool taaEnabled = true;
+    bool ssrEnabled = true;
+    bool ssaoEnabled = true;
+    bool iblEnabled = true;
+    bool fogEnabled = false;
+
+    // Optional DXR ray tracing toggle persisted with other settings.
     bool rayTracingEnabled = false;
 };
 

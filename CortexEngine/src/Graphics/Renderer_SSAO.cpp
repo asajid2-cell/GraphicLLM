@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "Core/Window.h"
+#include <algorithm>
 
 namespace Cortex::Graphics {
 
@@ -8,12 +9,17 @@ Result<void> Renderer::CreateSSAOResources() {
         return Result<void>::Err("Renderer not initialized for SSAO target creation");
     }
 
-    const UINT width = m_window->GetWidth();
-    const UINT height = m_window->GetHeight();
+    // Render SSAO at half resolution for better performance; results are
+    // bilinearly upsampled in post-process using depth-aware filtering.
+    const UINT fullWidth = m_window->GetWidth();
+    const UINT fullHeight = m_window->GetHeight();
 
-    if (width == 0 || height == 0) {
+    if (fullWidth == 0 || fullHeight == 0) {
         return Result<void>::Err("Window size is zero; cannot create SSAO target");
     }
+
+    const UINT width = std::max<UINT>(1, fullWidth / 2);
+    const UINT height = std::max<UINT>(1, fullHeight / 2);
 
     // Release existing target (descriptor handles remain valid and are reused)
     m_ssaoTex.Reset();
@@ -135,17 +141,19 @@ void Renderer::RenderSSAO() {
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_ssaoRTV.cpu;
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 
+    D3D12_RESOURCE_DESC texDesc = m_ssaoTex->GetDesc();
+
     D3D12_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(m_window->GetWidth());
-    viewport.Height = static_cast<float>(m_window->GetHeight());
+    viewport.Width = static_cast<float>(texDesc.Width);
+    viewport.Height = static_cast<float>(texDesc.Height);
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
 
     D3D12_RECT scissorRect = {};
     scissorRect.left = 0;
     scissorRect.top = 0;
-    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
-    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    scissorRect.right = static_cast<LONG>(texDesc.Width);
+    scissorRect.bottom = static_cast<LONG>(texDesc.Height);
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissorRect);
@@ -212,4 +220,3 @@ void Renderer::SetSSAOParams(float radius, float bias, float intensity) {
 }
 
 } // namespace Cortex::Graphics
-

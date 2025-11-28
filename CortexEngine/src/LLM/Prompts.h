@@ -35,10 +35,12 @@ public:
            << "- modify_camera: position[3], fov.\n"
            << "- add_light: light_type (\"point\"|\"spot\"|\"directional\"), name, position[3], optional direction[3], color[4], intensity (>0), range (>0), inner_cone (degrees), outer_cone (degrees), casts_shadows (bool).\n"
            << "- modify_light: target name, optional light_type, position[3], direction[3], color[4], intensity (>0), range (>0), inner_cone, outer_cone, casts_shadows.\n"
-           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-12), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1), environment(\"studio\"|\"sunset\"|\"night\"), ibl_enabled (bool), ibl_intensity (number or [diffuse,specular]), grade_warm (-1 to 1), grade_cool (-1 to 1), ssao_enabled (bool), ssao_radius (0.05-5.0), ssao_bias (0-0.1), ssao_intensity (0-4).\n"
+           << "- modify_renderer: exposure (>0), shadows (bool), debug_mode (0-16), shadow_bias, shadow_pcf_radius, cascade_lambda (0-1), environment(\"studio\"|\"sunset\"|\"night\"), ibl_enabled (bool), ibl_intensity (number or [diffuse,specular]), grade_warm (-1 to 1), grade_cool (-1 to 1), ssao_enabled (bool), ssao_radius (0.05-5.0), ssao_bias (0-0.1), ssao_intensity (0-4).\n"
            << "- add_pattern: {\"type\":\"add_pattern\",\"pattern\":\"row|grid|ring|random\",\"element\":\"cube|sphere|tree|grass_blade|bird|house|streetlight|rock\", \"count\":N, \"region\":[...], \"spacing\":[...], \"element_scale\":[...], \"kind\":\"herd|traffic\",\"jitter\":true,\"jitter_amount\":0.5}. Use this to create rows, grids, rings, or scattered fields instead of many individual add_entity calls. spacing controls layout; element_scale controls the size of each element. When kind=\"herd\" with animal elements (cow, pig, horse, etc.) the engine will spawn a small herd of quadrupeds; when kind=\"traffic\" with vehicle elements (car, truck, spaceship, etc.) it will spawn a line of vehicles. jitter/jitter_amount introduce small offsets so rows/grids/rings look more natural.\n"
            << "- add_compound: {\"type\":\"add_compound\",\"template\":\"bird|tree|house|pillar|grass_blade|quadruped|vehicle|tower\",\"name\":\"MyThing\",\"position\":[...],\"scale\":[...],\"body_color\":[r,g,b,a],\"accent_color\":[r,g,b,a]}. A compound spawns multiple primitives as one logical object. For creatures/animals (pig, cow, horse, dragon, monster), vehicles (car, truck, spaceship), and tall structures (tower, castle), prefer add_compound with template equal to the noun; the engine will approximate it from a generic quadruped/vehicle/structure motif using the colors you provide. If you omit \"position\", the engine will choose a nearby free spot that avoids overlapping existing objects. If you need very fine control, you can still build shapes from multiple add_entity/add_pattern commands.\n"
            << "- scene_plan: {\"type\":\"scene_plan\",\"regions\":[{\"name\":\"Field_Grass\",\"kind\":\"field\",\"center\":[0,0,0],\"size\":[16,0,16]},{\"name\":\"Road_A\",\"kind\":\"road\",\"center\":[0,0,-6],\"size\":[20,0,4]}]}. Use this to describe high-level layout (fields, roads, yards, etc.) before emitting add_pattern/add_compound commands.\n"
+           << "- generate_texture: {\"type\":\"generate_texture\",\"target\":\"Floor\" or \"" << preferredTarget << "\",\"prompt\":\"wet cobblestone street at night\",\"usage\":\"albedo|normal|roughness|metalness\",\"preset\":\"wet_cobblestone\",\"width\":512,\"height\":512,\"seed\":123}. Use this to ask the Dreamer to generate PBR texture maps for specific entities.\n"
+           << "- generate_envmap: {\"type\":\"generate_envmap\",\"name\":\"CyberpunkNight\",\"prompt\":\"rainy neon-lit city at night\",\"width\":1024,\"height\":512,\"seed\":42}. Use this to request new skybox/IBL environments.\n"
            << "- modify_group / modify_pattern: {\"type\":\"modify_group\",\"group\":\"Bird_A\" or \"Field_Grass\",\"position_offset\":[dx,dy,dz],\"scale_multiplier\":[sx,sy,sz]}. This edits all entities whose names start with that group prefix. Prefer distinctive group names (e.g. Bird_A, Field_Grass) to avoid overlapping prefixes. When referring to a compound like a pig or dragon, use the group name from the summary (e.g. Pig_1, Godzilla) so the whole object moves together.\n\n";
         ss << "Positioning guidelines:\n"
            << "- Origin (0,0,0) may already have an object; consult the scene summary before placing on top of it\n"
@@ -193,6 +195,17 @@ public:
                    "{\"commands\":[{\"type\":\"add_pattern\",\"pattern\":\"row\",\"element\":\"car\","
                    "\"count\":5,\"region\":[-8,0,-6,8,0,-6],\"spacing\":[3,0,0],"
                    "\"kind\":\"traffic\",\"group\":\"RoadTraffic\"}]}");
+
+        addExample("Example 23:\nUser: \"Make the floor wet cobblestone\"",
+                   "{\"commands\":[{\"type\":\"generate_texture\",\"target\":\"Floor\","
+                   "\"prompt\":\"wet cobblestone street at night with reflections\","
+                   "\"usage\":\"albedo\",\"preset\":\"wet_cobblestone\","
+                   "\"width\":512,\"height\":512}]}");
+
+        addExample("Example 24:\nUser: \"Create a rainy night skybox\"",
+                   "{\"commands\":[{\"type\":\"generate_envmap\",\"name\":\"RainyNightSky\","
+                   "\"prompt\":\"rainy neon-lit city at night with wet pavement and glowing signs\","
+                   "\"width\":1024,\"height\":512}]}");
 
         return ss.str();
     }

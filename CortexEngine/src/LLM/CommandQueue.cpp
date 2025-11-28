@@ -1,6 +1,7 @@
 #include "CommandQueue.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
+#include "Utils/GLTFLoader.h"
 #include "Scene/Components.h"
 #include "CompoundLibrary.h"
 #include <spdlog/spdlog.h>
@@ -281,70 +282,114 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         return;
     }
 
-    // Normalize detail values for caching (shapes that don't use segments ignore them)
-    uint32_t segPrimary = cmd->segmentsPrimary;
-    uint32_t segSecondary = cmd->segmentsSecondary;
-    switch (cmd->entityType) {
-        case AddEntityCommand::EntityType::Cube:
-        case AddEntityCommand::EntityType::Plane:
-        case AddEntityCommand::EntityType::Pyramid:
-            segPrimary = 0;
-            segSecondary = 0;
-            break;
-        default:
-            segPrimary = std::clamp<uint32_t>(segPrimary, 8u, 96u);
-            segSecondary = std::clamp<uint32_t>(segSecondary, 4u, 64u);
-            break;
-    }
-
-    MeshKey key{cmd->entityType, segPrimary, segSecondary};
-
-    // Fetch or create cached mesh for this primitive so multiple objects share GPU buffers
     std::shared_ptr<Scene::MeshData> mesh;
-    auto cached = m_meshCache.find(key);
-    if (cached != m_meshCache.end()) {
-        mesh = cached->second;
-    }
 
-    if (!mesh || !mesh->gpuBuffers || !mesh->gpuBuffers->vertexBuffer || !mesh->gpuBuffers->indexBuffer) {
+    if (cmd->entityType == AddEntityCommand::EntityType::Model) {
+        // glTF sample model path: asset name must be provided.
+        if (cmd->asset.empty()) {
+            spdlog::warn("AddEntity model requested without an 'asset' name; falling back to cube");
+        } else {
+            auto it = m_modelMeshCache.find(cmd->asset);
+            if (it != m_modelMeshCache.end()) {
+                mesh = it->second;
+            }
+
+            if (!mesh || !mesh->gpuBuffers || !mesh->gpuBuffers->vertexBuffer || !mesh->gpuBuffers->indexBuffer) {
+                auto meshResult = Utils::LoadSampleModelMesh(cmd->asset);
+                if (meshResult.IsErr()) {
+                    spdlog::warn("Failed to load sample model '{}': {}", cmd->asset, meshResult.Error());
+                } else {
+                    mesh = meshResult.Value();
+                    auto uploadResult = renderer->UploadMesh(mesh);
+                    if (uploadResult.IsErr()) {
+                        spdlog::warn("Failed to upload sample model mesh '{}': {}", cmd->asset, uploadResult.Error());
+                        mesh.reset();
+                    } else {
+                        m_modelMeshCache[cmd->asset] = mesh;
+                    }
+                }
+            }
+        }
+
+        // If anything went wrong, gracefully fall back to a simple sphere so
+        // the command still produces something visible.
+        if (!mesh) {
+            mesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+            auto uploadResult = renderer->UploadMesh(mesh);
+            if (uploadResult.IsErr()) {
+                spdlog::error("Failed to upload fallback mesh for model entity: {}", uploadResult.Error());
+                PushStatus(false, "Failed to upload mesh for model entity");
+                return;
+            }
+        }
+    } else {
+        // Normalize detail values for caching (shapes that don't use segments ignore them)
+        uint32_t segPrimary = cmd->segmentsPrimary;
+        uint32_t segSecondary = cmd->segmentsSecondary;
         switch (cmd->entityType) {
             case AddEntityCommand::EntityType::Cube:
-                mesh = Utils::MeshGenerator::CreateCube();
-                break;
-            case AddEntityCommand::EntityType::Sphere:
-                mesh = Utils::MeshGenerator::CreateSphere(0.5f, segPrimary);
-                break;
             case AddEntityCommand::EntityType::Plane:
-                mesh = Utils::MeshGenerator::CreatePlane(2.0f, 2.0f);
-                break;
-            case AddEntityCommand::EntityType::Cylinder:
-                mesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, segPrimary);
-                break;
             case AddEntityCommand::EntityType::Pyramid:
-                mesh = Utils::MeshGenerator::CreatePyramid(1.0f, 1.0f);
+                segPrimary = 0;
+                segSecondary = 0;
                 break;
-            case AddEntityCommand::EntityType::Cone:
-                mesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, segPrimary);
-                break;
-            case AddEntityCommand::EntityType::Torus:
-                mesh = Utils::MeshGenerator::CreateTorus(0.5f, 0.2f, segPrimary, segSecondary);
+            default:
+                segPrimary = std::clamp<uint32_t>(segPrimary, 8u, 96u);
+                segSecondary = std::clamp<uint32_t>(segSecondary, 4u, 64u);
                 break;
         }
 
-        if (!mesh) {
-            spdlog::error("Failed to generate mesh for entity");
-            PushStatus(false, "Failed to generate mesh for new entity");
-            return;
+        MeshKey key{cmd->entityType, segPrimary, segSecondary};
+
+        // Fetch or create cached mesh for this primitive so multiple objects share GPU buffers
+        auto cached = m_meshCache.find(key);
+        if (cached != m_meshCache.end()) {
+            mesh = cached->second;
         }
 
-        auto uploadResult = renderer->UploadMesh(mesh);
-        if (uploadResult.IsErr()) {
-            spdlog::error("Failed to upload mesh: {}", uploadResult.Error());
-            PushStatus(false, "Failed to upload mesh for new entity");
-            return;
-        }
+        if (!mesh || !mesh->gpuBuffers || !mesh->gpuBuffers->vertexBuffer || !mesh->gpuBuffers->indexBuffer) {
+            switch (cmd->entityType) {
+                case AddEntityCommand::EntityType::Cube:
+                    mesh = Utils::MeshGenerator::CreateCube();
+                    break;
+                case AddEntityCommand::EntityType::Sphere:
+                    mesh = Utils::MeshGenerator::CreateSphere(0.5f, segPrimary);
+                    break;
+                case AddEntityCommand::EntityType::Plane:
+                    mesh = Utils::MeshGenerator::CreatePlane(2.0f, 2.0f);
+                    break;
+                case AddEntityCommand::EntityType::Cylinder:
+                    mesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, segPrimary);
+                    break;
+                case AddEntityCommand::EntityType::Pyramid:
+                    mesh = Utils::MeshGenerator::CreatePyramid(1.0f, 1.0f);
+                    break;
+                case AddEntityCommand::EntityType::Cone:
+                    mesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, segPrimary);
+                    break;
+                case AddEntityCommand::EntityType::Torus:
+                    mesh = Utils::MeshGenerator::CreateTorus(0.5f, 0.2f, segPrimary, segSecondary);
+                    break;
+                case AddEntityCommand::EntityType::Model:
+                    // Handled above.
+                    break;
+            }
 
-        m_meshCache[key] = mesh;
+            if (!mesh) {
+                spdlog::error("Failed to generate mesh for entity");
+                PushStatus(false, "Failed to generate mesh for new entity");
+                return;
+            }
+
+            auto uploadResult = renderer->UploadMesh(mesh);
+            if (uploadResult.IsErr()) {
+                spdlog::error("Failed to upload mesh: {}", uploadResult.Error());
+                PushStatus(false, "Failed to upload mesh for new entity");
+                return;
+            }
+
+            m_meshCache[key] = mesh;
+        }
     }
 
     // Create entity

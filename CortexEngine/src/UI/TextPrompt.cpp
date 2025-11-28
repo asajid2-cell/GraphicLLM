@@ -102,6 +102,9 @@ namespace {
             SendMessage(btnOk, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
             SendMessage(btnCancel, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
+            // Give keyboard focus to the edit control once it exists.
+            SetFocus(state->edit);
+
             return 0;
         }
         case WM_COMMAND: {
@@ -109,8 +112,19 @@ namespace {
             if (id == ID_OK || (id == ID_EDIT && HIWORD(wParam) == EN_MAXTEXT)) {
                 int len = GetWindowTextLengthA(state->edit);
                 if (len > 0) {
-                    state->result.resize(len);
-                    GetWindowTextA(state->edit, state->result.data(), len + 1);
+                    // Allocate space for the characters plus the null terminator,
+                    // then assign only the characters actually read into result.
+                    std::string buffer(static_cast<size_t>(len) + 1, '\0');
+                    int written = GetWindowTextA(
+                        state->edit,
+                        buffer.data(),
+                        len + 1
+                    );
+                    if (written < 0) {
+                        written = 0;
+                    }
+                    state->result.assign(buffer.data(),
+                                         static_cast<size_t>(written));
                 } else {
                     state->result.clear();
                 }
@@ -194,7 +208,6 @@ std::string TextPrompt::Show(HWND parent, const std::string& title, const std::s
 
     ShowWindow(state.hwnd, SW_SHOW);
     UpdateWindow(state.hwnd);
-    SetFocus(state.edit);
 
     MSG msg;
     while (!state.done && GetMessage(&msg, nullptr, 0, 0)) {

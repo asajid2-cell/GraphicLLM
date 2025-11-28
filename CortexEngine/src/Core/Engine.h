@@ -13,6 +13,7 @@
 #include "Scene/ECS_Registry.h"
 #include "LLM/LLMService.h"
 #include "LLM/CommandQueue.h"
+#include "AI/Vision/DreamerService.h"
 #include "Utils/Result.h"
 
 namespace Cortex {
@@ -26,6 +27,10 @@ struct EngineConfig {
     // Phase 2: LLM config
     bool enableLLM = true;
     LLM::LLMConfig llmConfig;
+
+    // Phase 3: Dreamer config
+    bool enableDreamer = true;
+    AI::Vision::DreamerConfig dreamerConfig;
 
     // Camera control config
     float cameraBaseSpeed = 5.0f;
@@ -87,6 +92,10 @@ private:
     bool m_llmEnabled = false;
     std::atomic<bool> m_llmInitializing{false};
     std::thread m_llmInitThread;
+
+    // Phase 3: The Dreamer (async texture generator)
+    std::unique_ptr<AI::Vision::DreamerService> m_dreamerService;
+    bool m_dreamerEnabled = false;
 
     // Text input state
     bool m_textInputMode = false;

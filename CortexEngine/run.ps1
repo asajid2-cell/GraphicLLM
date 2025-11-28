@@ -38,6 +38,33 @@ function Add-CudaBin {
     return $bins
 }
 
+$trtBins = @()
+if ($env:TENSORRT_ROOT) {
+    $trtBin = Join-Path $env:TENSORRT_ROOT "bin"
+    if (Test-Path $trtBin) {
+        if ($env:PATH.Split(';') -notcontains $trtBin) {
+            $env:PATH = "$trtBin;$env:PATH"
+            Write-Host "Adding TensorRT to PATH: $trtBin" -ForegroundColor Gray
+        }
+        $trtBins += $trtBin
+    }
+}
+if (-not $trtBins) {
+    # Common default; adjust if your TensorRT is installed elsewhere.
+    $defaultTrt = "C:\TensorRT"
+    $defaultTrtBin = Join-Path $defaultTrt "bin"
+    if (Test-Path $defaultTrtBin) {
+        if ($env:PATH.Split(';') -notcontains $defaultTrtBin) {
+            $env:PATH = "$defaultTrtBin;$env:PATH"
+            Write-Host "Adding TensorRT to PATH: $defaultTrtBin" -ForegroundColor Gray
+        }
+        $trtBins += $defaultTrtBin
+    }
+    if (-not $trtBins) {
+        Write-Host "Warning: TensorRT bin not found; Dreamer GPU diffusion may fail to load." -ForegroundColor Yellow
+    }
+}
+
 $cudaBins = @()
 if ($env:CUDAToolkit_ROOT) {
     $cudaBins += Add-CudaBin -root $env:CUDAToolkit_ROOT
@@ -91,6 +118,14 @@ if (Test-Path $modelSource) {
 if ($cudaBins) {
     foreach ($binPath in $cudaBins) {
         Write-Host "Copying CUDA DLLs from $binPath" -ForegroundColor Gray
+        Get-ChildItem -Path $binPath -Filter "*.dll" -File | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination $exeDir -Force
+        }
+    }
+}
+if ($trtBins) {
+    foreach ($binPath in $trtBins) {
+        Write-Host "Copying TensorRT DLLs from $binPath" -ForegroundColor Gray
         Get-ChildItem -Path $binPath -Filter "*.dll" -File | ForEach-Object {
             Copy-Item -Path $_.FullName -Destination $exeDir -Force
         }

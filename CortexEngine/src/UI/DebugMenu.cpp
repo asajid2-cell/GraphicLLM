@@ -992,6 +992,7 @@ LRESULT CALLBACK DebugMenuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
                 renderer->SetDebugViewMode(0);
                 renderer->SetPCSS(false);
                 renderer->SetFXAAEnabled(true);
+                renderer->SetSSREnabled(true);
             }
             return 0;
         }

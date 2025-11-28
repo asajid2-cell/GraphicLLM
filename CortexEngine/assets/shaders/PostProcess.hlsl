@@ -6,6 +6,7 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_ViewMatrix;
     float4x4 g_ProjectionMatrix;
     float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
     float4   g_CameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
     float4   g_TimeAndExposure;
@@ -28,7 +29,11 @@ cbuffer FrameConstants : register(b1)
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     float4   g_ShadowParams;
     // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic,
-    //                      4 = albedo, 5 = cascade index, 6 = debug screen), others reserved
+    //                      4 = albedo, 5 = cascade index, 6 = debug screen,
+    //                      7 = fractal height, 8 = IBL diffuse only,
+    //                      9 = IBL specular only, 10 = env direction/UV,
+    //                      11 = Fresnel (Fibl), 12 = specular mip,
+    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
     float4   g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     float4   g_PostParams;
@@ -39,12 +44,25 @@ cbuffer FrameConstants : register(b1)
     float4   g_ColorGrade;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
+    float4   g_BloomParams;
+    // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
+    float4   g_TAAParams;
+    float4x4 g_PrevViewProjMatrix;
+    float4x4 g_InvViewProjMatrix;
 };
 
 Texture2D g_SceneColor : register(t0);
 Texture2D g_BloomSource : register(t1);
 Texture2D g_SSAO : register(t2);
-Texture2DArray g_ShadowMap : register(t4);
+Texture2D g_HistoryColor : register(t3);
+Texture2D g_Depth : register(t4);
+Texture2D g_NormalRoughness : register(t5);
+Texture2D g_SSRColor : register(t6);
+Texture2D g_Velocity : register(t7);
+// Shadow map array is accessed via a separate descriptor table (space1) so
+// that t0-t5 in space0 can be used for post-process textures without aliasing.
+Texture2DArray g_ShadowMap : register(t0, space1);
 SamplerState g_Sampler : register(s0);
 
 struct VSOutput
@@ -88,36 +106,66 @@ float3 ApplyACESFilm(float3 x)
 float4 BloomDownsamplePS(VSOutput input) : SV_TARGET
 {
     float3 hdr = g_SceneColor.Sample(g_Sampler, input.uv).rgb;
-    float3 bright = max(hdr - 1.0f, 0.0f);
-    return float4(bright, 1.0f);
+
+    float threshold = g_BloomParams.x;
+    float softKnee  = g_BloomParams.y;
+
+    // Soft-threshold bloom based on Unity-style formulation.
+    float knee = threshold * softKnee + 1e-4f;
+    float3 delta = max(hdr - threshold.xxx, 0.0f);
+    float3 soft = delta * delta / (delta + knee);
+
+    return float4(soft, 1.0f);
 }
 
-// Horizontal blur of the bloom texture in g_BloomSource
+// Horizontal blur of the bloom texture (source bound at t0)
 float4 BloomBlurHPS(VSOutput input) : SV_TARGET
 {
     float2 texel = float2(g_PostParams.x * 4.0f, 0.0f); // quarter-res approximation
     float3 sum = 0.0f;
     float weights[5] = {0.204164f, 0.304005f, 0.093913f, 0.010381f, 0.000837f};
-    sum += g_BloomSource.Sample(g_Sampler, input.uv).rgb * weights[0];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
     return float4(sum, 1.0f);
 }
 
-// Vertical blur of the bloom texture in g_BloomSource
+// Vertical blur of the bloom texture (source bound at t0)
 float4 BloomBlurVPS(VSOutput input) : SV_TARGET
 {
     float2 texel = float2(0.0f, g_PostParams.y * 4.0f); // quarter-res approximation
     float3 sum = 0.0f;
     float weights[5] = {0.204164f, 0.304005f, 0.093913f, 0.010381f, 0.000837f};
-    sum += g_BloomSource.Sample(g_Sampler, input.uv).rgb * weights[0];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
-    sum += g_BloomSource.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv).rgb * weights[0];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel).rgb * weights[1];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel).rgb * weights[1];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv + texel * 2.0f).rgb * weights[2];
+    sum += g_SceneColor.Sample(g_Sampler, input.uv - texel * 2.0f).rgb * weights[2];
     return float4(sum, 1.0f);
+}
+
+// Simple upsample/composite pass: reads from g_BloomSource and writes color
+// directly. The pipeline uses additive blending when accumulating levels.
+float4 BloomUpsamplePS(VSOutput input) : SV_TARGET
+{
+    float3 src = g_SceneColor.Sample(g_Sampler, input.uv).rgb;
+    return float4(src, 1.0f);
+}
+
+// Reconstruct world-space position from depth and UV using the inverse of the
+// current jittered view-projection matrix. This mirrors the mapping used in
+// VSMain (NDC -> UV with Y flipped).
+float3 ReconstructWorldPosition(float2 uv, float depth)
+{
+    // Convert UV back to clip space (matching VSMain's mapping).
+    float x = uv.x * 2.0f - 1.0f;
+    float y = 1.0f - 2.0f * uv.y;
+    float4 clip = float4(x, y, depth, 1.0f);
+
+    float4 world = mul(g_InvViewProjMatrix, clip);
+    return world.xyz / max(world.w, 1e-4f);
 }
 
 float4 PSMain(VSOutput input) : SV_TARGET
@@ -125,15 +173,101 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float2 uv = input.uv;
     float3 hdrColor = g_SceneColor.Sample(g_Sampler, uv).rgb;
 
+    // Screen-space reflection composite: SSR buffer stores reflection color in
+    // rgb and a roughness-based weight in alpha. Apply it in HDR space so
+    // reflections participate in bloom and tonemapping.
+    float4 ssrSample = g_SSRColor.Sample(g_Sampler, uv);
+    float ssrWeight = saturate(ssrSample.a);
+    if (ssrWeight > 0.0f)
+    {
+        // Clamp extremely bright SSR highlights to avoid harsh color pops when
+        // the ray marches across very hot pixels in the environment or scene.
+        float3 ssrColor = ssrSample.rgb;
+        float  ssrMax   = max(max(ssrColor.r, ssrColor.g), ssrColor.b);
+        const float kMaxSSRIntensity = 32.0f;
+        if (ssrMax > kMaxSSRIntensity)
+        {
+            ssrColor *= (kMaxSSRIntensity / ssrMax);
+        }
+
+        // Moderately limit SSR contribution so we blend towards reflections
+        // without fully replacing the underlying specular/IBL term.
+        const float kMaxSSRWeight = 0.4f;
+        float  w = ssrWeight * kMaxSSRWeight;
+        hdrColor = lerp(hdrColor, ssrColor, w);
+    }
+
     // Bloom: sample blurred bloom texture if available
     float bloomIntensity = max(g_TimeAndExposure.w, 0.0f);
     float3 bloom = 0.0f;
     if (bloomIntensity > 0.001f) {
         bloom = g_BloomSource.Sample(g_Sampler, uv).rgb * bloomIntensity;
+
+        // Clamp bloom contribution to avoid overly blown-out highlights.
+        float maxBloom = max(g_BloomParams.z, 0.0f);
+        if (maxBloom > 0.0f)
+        {
+            bloom = min(bloom, maxBloom.xxx);
+        }
     }
 
+    // Start from base HDR lighting (without bloom); motion blur (when enabled)
+    // operates on this term only so bloom and grading stay stable.
+    float3 hdrBlurred = hdrColor;
+
+    // Simple motion blur based on velocity buffer (camera-only) in HDR space.
+    // Currently gated by the same enable flag as TAA (g_TAAParams.w) so that
+    // motion vectors and temporal filtering always move together.
+    if (g_TAAParams.w > 0.5f)
+    {
+        float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
+        float  speed = length(vel);
+        // Keep blur radius modest to avoid sampling across large portions of
+        // the screen; high-speed motion will still get some streaking, but
+        // we bias towards stability over extremely strong blur.
+        float  blurStrength = saturate(speed * 4.0f);
+
+        if (blurStrength > 0.001f)
+        {
+            float2 dir = vel / max(speed, 1e-4f);
+            const int blurSamples = 5;
+            float3 accum = hdrBlurred;
+            float  total = 1.0f;
+            float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+            float  centerLum = dot(hdrBlurred, lumaWeights);
+
+            [unroll]
+            for (int i = 1; i < blurSamples; ++i)
+            {
+                float t = (float)i / (float)(blurSamples - 1);
+                float2 offset = dir * blurStrength * (t - 0.5f);
+                float2 sampleUV = saturate(uv + offset);
+                float3 sampleHdr = g_SceneColor.Sample(g_Sampler, sampleUV).rgb;
+                // Down-weight samples whose luminance differs strongly from
+                // the center; this reduces hue shifts when crossing very
+                // bright or very dark edges.
+                float sampleLum = dot(sampleHdr, lumaWeights);
+                float lumDiff = abs(sampleLum - centerLum);
+                float  w = saturate(1.0f - lumDiff * 0.25f);
+                accum += sampleHdr * w;
+                total += w;
+            }
+
+            hdrBlurred = accum / max(total, 1e-4f);
+        }
+    }
+
+    // Compose bloom after any motion blur so blurred highlights remain
+    // physically plausible and color-stable.
+    float3 hdrCombined = hdrBlurred + bloom;
+
+    // Clamp HDR before tonemapping to avoid extreme spikes that can show up
+    // as sudden RGB flashes when moving the camera across very bright areas.
+    const float kMaxHdrBeforeTonemap = 32.0f;
+    hdrCombined = min(hdrCombined, kMaxHdrBeforeTonemap.xxx);
+
     float exposure = max(g_TimeAndExposure.z, 0.01f);
-    float3 color = (hdrColor + bloom) * exposure;
+    float3 color = hdrCombined * exposure;
 
     color = ApplyACESFilm(color);
     color = pow(color, 1.0f / 2.2f);
@@ -150,10 +284,82 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float ao = 1.0f;
     if (g_AOParams.x > 0.5f)
     {
-        ao = g_SSAO.Sample(g_Sampler, uv).r;
-        ao = saturate(ao);
+        // Simple 3x3 blur over the SSAO buffer to reduce noise and banding.
+        float2 texel = g_PostParams.xy;
+        float sum = 0.0f;
+        float weight = 1.0f / 9.0f;
+        [unroll]
+        for (int y = -1; y <= 1; ++y)
+        {
+            [unroll]
+            for (int x = -1; x <= 1; ++x)
+            {
+                float2 offset = float2(x, y) * texel;
+                sum += g_SSAO.Sample(g_Sampler, uv + offset).r * weight;
+            }
+        }
+        ao = saturate(sum);
         float aoIntensity = saturate(g_AOParams.w);
         color *= lerp(1.0f, ao, aoIntensity);
+    }
+
+    // Temporal AA with depth-based reprojection. We reproject the current
+    // pixel into the previous frame using g_PrevViewProjMatrix and the
+    // inverse of the current view-projection, then apply the jitter delta
+    // stored in g_TAAParams.xy. When depth is invalid, we fall back to a
+    // simple jitter-based history lookup. History weighting is reduced in
+    // regions with high motion to limit ghosting.
+    float taaBlend = (g_TAAParams.w > 0.5f) ? g_TAAParams.z : 0.0f;
+    if (taaBlend > 0.0f)
+    {
+        // Start with jitter-based UV as a robust fallback.
+        float2 historyUV = uv + g_TAAParams.xy;
+
+        // Sample depth; skip reprojection for background/cleared pixels.
+        float depth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+        if (depth > 0.0f && depth < 1.0f - 1e-4f)
+        {
+            float3 worldPos = ReconstructWorldPosition(uv, depth);
+            float4 prevClip = mul(g_PrevViewProjMatrix, float4(worldPos, 1.0f));
+
+            if (abs(prevClip.w) > 1e-4f)
+            {
+                float invW = 1.0f / prevClip.w;
+                float2 prevNdc = prevClip.xy * invW;
+
+                // Map back to UV space, keeping the same NDC->UV convention
+                // as VSMain (Y inverted).
+                float2 prevUV;
+                prevUV.x = prevNdc.x * 0.5f + 0.5f;
+                prevUV.y = 0.5f - prevNdc.y * 0.5f;
+
+                // Only accept reprojection when it lands on-screen.
+                if (prevUV.x >= 0.0f && prevUV.x <= 1.0f &&
+                    prevUV.y >= 0.0f && prevUV.y <= 1.0f)
+                {
+                    historyUV = prevUV + g_TAAParams.xy;
+                }
+            }
+        }
+
+        historyUV = saturate(historyUV);
+        float3 history = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
+
+        // Motion-aware blending: scale history contribution down when velocity is high.
+        float2 velTaa = g_Velocity.Sample(g_Sampler, uv).xy;
+        float speedTaa = length(velTaa);
+        float motionFactor = saturate(speedTaa * 40.0f); // same scale as blur
+        float finalBlend = saturate(taaBlend * (1.0f - motionFactor));
+
+        // Reduce history weight when the color difference is very large; this
+        // helps avoid strong hue "smears" when the view or lighting changes
+        // abruptly between frames.
+        float3 diff = abs(color - history);
+        float maxDiff = max(max(diff.r, diff.g), diff.b);
+        float diffFactor = saturate(1.0f - maxDiff * 2.0f);
+        finalBlend *= diffFactor;
+
+        color = lerp(color, history, finalBlend);
     }
 
     // Optional FXAA-like smoothing (very lightweight approximation)
@@ -182,6 +388,32 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float3 avg = (cM + cR + cL + cU + cD) * (1.0f / 5.0f);
             color = lerp(cM, avg, 0.6f);
         }
+    }
+
+    // SSAO / SSR debug views in post-process so tuning radius/bias/intensity is easier.
+    if (g_DebugMode.x == 13.0f)
+    {
+        // AO only
+        return float4(ao.xxx, 1.0f);
+    }
+    else if (g_DebugMode.x == 14.0f)
+    {
+        // AO overlay: visualize occlusion on top of final color
+        float3 overlay = color * lerp(1.0f, ao, 0.75f);
+        return float4(saturate(overlay), 1.0f);
+    }
+    else if (g_DebugMode.x == 15.0f)
+    {
+        // SSR-only view (pre-tonemap reflections buffer).
+        float3 ssr = g_SSRColor.Sample(g_Sampler, uv).rgb;
+        return float4(ssr, 1.0f);
+    }
+    else if (g_DebugMode.x == 16.0f)
+    {
+        // SSR overlay: visualize reflections on top of final color.
+        float3 ssr = g_SSRColor.Sample(g_Sampler, uv).rgb;
+        float3 overlay = color * 0.5f + ssr * 0.5f;
+        return float4(saturate(overlay), 1.0f);
     }
 
     // Shadow map cascade visualization in the top-right corner, only when

@@ -52,6 +52,10 @@ if(MSVC AND TARGET llama)
     target_compile_options(llama PRIVATE /Zc:char8_t-)
 endif()
 
+# Phase 3: Optional TensorRT diffusion backend for Dreamer.
+# Disabled by default so the project builds on machines without TensorRT.
+option(CORTEX_ENABLE_TENSORRT "Enable Dreamer GPU diffusion via TensorRT" OFF)
+
 # Source Files
 set(CORTEX_SOURCES
     src/Core/Engine.cpp
@@ -73,6 +77,11 @@ set(CORTEX_SOURCES
 
     src/Utils/FileUtils.cpp
     src/Utils/MeshGenerator.cpp
+    src/Utils/GLTFLoader.cpp
+
+    # Phase 3: The Dreamer (Vision)
+    src/AI/Vision/DreamerService.cpp
+    src/AI/Vision/DiffusionEngine.cpp
 
     # Phase 2: The Architect
     src/LLM/LLMService.cpp
@@ -109,6 +118,11 @@ set(CORTEX_HEADERS
     src/Utils/Result.h
     src/Utils/FileUtils.h
     src/Utils/MeshGenerator.h
+    src/Utils/GLTFLoader.h
+
+    # Phase 3: The Dreamer (Vision)
+    src/AI/Vision/DreamerService.h
+    src/AI/Vision/DiffusionEngine.h
 
     # Phase 2: The Architect
     src/LLM/LLMService.h
@@ -136,6 +150,36 @@ target_include_directories(CortexEngine PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor
 )
+
+# Compile-time defines for optional features
+if(CORTEX_ENABLE_TENSORRT)
+    target_compile_definitions(CortexEngine PRIVATE CORTEX_ENABLE_TENSORRT=1)
+    # Require the CUDA toolkit so that TensorRT headers (which include
+    # cuda_runtime_api.h) compile cleanly, and so we can link against
+    # the proper CUDA runtime library.
+    find_package(CUDAToolkit REQUIRED)
+    target_include_directories(CortexEngine PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+
+    # TensorRT integration expects the user to provide include/lib paths, e.g. via:
+    #   -DTensorRT_INCLUDE_DIR="C:/TensorRT/include"
+    #   -DTensorRT_LIB_DIR="C:/TensorRT/lib"
+    if(DEFINED TensorRT_INCLUDE_DIR)
+        target_include_directories(CortexEngine PRIVATE ${TensorRT_INCLUDE_DIR})
+    endif()
+    if(DEFINED TensorRT_LIB_DIR)
+        target_link_directories(CortexEngine PRIVATE ${TensorRT_LIB_DIR})
+    endif()
+    # Link core TensorRT + CUDA libs. TensorRT 10.x on Windows uses versioned
+    # library names (nvinfer_10.lib), while older versions use nvinfer.lib.
+    # Prefer the versioned name when present, fall back otherwise.
+    set(CORTEX_TRT_CORE_LIB nvinfer)
+    if(DEFINED TensorRT_LIB_DIR)
+        if(EXISTS "${TensorRT_LIB_DIR}/nvinfer_10.lib")
+            set(CORTEX_TRT_CORE_LIB nvinfer_10)
+        endif()
+    endif()
+    target_link_libraries(CortexEngine PRIVATE ${CORTEX_TRT_CORE_LIB} CUDA::cudart)
+endif()
 
 # Link libraries
 target_link_libraries(CortexEngine PRIVATE

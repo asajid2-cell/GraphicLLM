@@ -82,10 +82,15 @@ int main(int argc, char* argv[]) {
         // Phase 2: Configure The Architect (LLM)
         config.enableLLM = true;
 
+        // Phase 3: Configure The Dreamer (async texture generator)
+        config.enableDreamer = true;
+
         // Lightweight CLI / environment toggles so you can speed up startup:
         //   --no-llm                 : disable Architect entirely
         //   CORTEX_DISABLE_LLM=1     : same as --no-llm
         //   --llm-model=<path.gguf>  : force a specific model file
+        //   --no-dreamer             : disable Dreamer texture pipeline
+        //   CORTEX_DISABLE_DREAMER=1 : same as --no-dreamer
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             if (arg == "--no-llm") {
@@ -93,6 +98,8 @@ int main(int argc, char* argv[]) {
             } else if (arg.rfind("--llm-model=", 0) == 0) {
                 config.enableLLM = true;
                 config.llmConfig.modelPath = arg.substr(std::string("--llm-model=").size());
+            } else if (arg == "--no-dreamer") {
+                config.enableDreamer = false;
             }
         }
 
@@ -100,6 +107,12 @@ int main(int argc, char* argv[]) {
             std::string value = envDisable;
             if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
                 config.enableLLM = false;
+            }
+        }
+        if (const char* envDisableDreamer = std::getenv("CORTEX_DISABLE_DREAMER")) {
+            std::string value = envDisableDreamer;
+            if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+                config.enableDreamer = false;
             }
         }
         // Resolve model path relative to the executable location (robust to working directory)
@@ -113,6 +126,11 @@ int main(int argc, char* argv[]) {
         } else {
             exeDir = fs::current_path();
         }
+        // Common model locations:
+        //   - next to the executable: <exeDir>/models
+        //   - project root (two levels up): <exeDir>/../.. /models
+        fs::path modelsDirExe = exeDir / "models";
+        fs::path modelsDirRoot = exeDir.parent_path().parent_path() / "models";
 
         // Preferred models in order (largest first)
         const char* kPreferredModels[] = {
@@ -124,9 +142,14 @@ int main(int argc, char* argv[]) {
         if (config.enableLLM && config.llmConfig.modelPath.empty()) {
             fs::path modelPath;
             for (const char* name : kPreferredModels) {
-                fs::path candidate = exeDir / "models" / name;
-                if (fs::exists(candidate)) {
-                    modelPath = candidate;
+                fs::path candidateExe  = modelsDirExe  / name;
+                fs::path candidateRoot = modelsDirRoot / name;
+                if (fs::exists(candidateExe)) {
+                    modelPath = candidateExe;
+                    break;
+                }
+                if (fs::exists(candidateRoot)) {
+                    modelPath = candidateRoot;
                     break;
                 }
             }
@@ -145,6 +168,46 @@ int main(int argc, char* argv[]) {
         config.llmConfig.temperature = 0.1f; // deterministic JSON commands
         config.llmConfig.maxTokens = 128;    // short, avoids runaway loops
         config.llmConfig.gpuLayers = 999;    // offload all layers to GPU when available
+
+        // Phase 3: Autoconfigure Dreamer diffusion engines if present either
+        // next to the executable or at the project root.
+        if (config.enableDreamer) {
+            auto hasEnginesInDir = [](const fs::path& dir) -> bool {
+                if (!fs::exists(dir) || !fs::is_directory(dir)) {
+                    return false;
+                }
+                for (const auto& entry : fs::directory_iterator(dir)) {
+                    if (entry.is_regular_file() && entry.path().extension() == ".engine") {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            fs::path dreamerDirExe   = modelsDirExe   / "dreamer";
+            fs::path dreamerDirRoot  = modelsDirRoot  / "dreamer";
+            fs::path chosenDreamerDir;
+
+            if (hasEnginesInDir(dreamerDirExe)) {
+                chosenDreamerDir = dreamerDirExe;
+            } else if (hasEnginesInDir(dreamerDirRoot)) {
+                chosenDreamerDir = dreamerDirRoot;
+            }
+
+            if (!chosenDreamerDir.empty()) {
+                // SDXL-Turbo export script defaults to 768x768; clamp Dreamer to that.
+                config.dreamerConfig.defaultWidth = 768;
+                config.dreamerConfig.defaultHeight = 768;
+                config.dreamerConfig.maxWidth = 768;
+                config.dreamerConfig.maxHeight = 768;
+                config.dreamerConfig.useGPU = true;
+                config.dreamerConfig.enginePath = chosenDreamerDir.string();
+                spdlog::info("Dreamer diffusion engines detected at '{}'; GPU diffusion enabled (CORTEX_ENABLE_TENSORRT build required for runtime).",
+                             config.dreamerConfig.enginePath);
+            } else {
+                spdlog::info("Dreamer: no TensorRT .engine files found under 'models/dreamer'; using CPU procedural fallback.");
+            }
+        }
 
         // Initialize engine
         Engine engine;

@@ -69,8 +69,11 @@ Result<void> DX12Pipeline::Initialize(
     for (UINT i = 0; i < 8; ++i) {
         psoDesc.RTVFormats[i] = DXGI_FORMAT_UNKNOWN;
     }
+    // Use the same RTV format for all active render targets in this pipeline.
     if (desc.numRenderTargets > 0) {
-        psoDesc.RTVFormats[0] = desc.rtvFormat;
+        for (UINT i = 0; i < desc.numRenderTargets && i < 8; ++i) {
+            psoDesc.RTVFormats[i] = desc.rtvFormat;
+        }
     }
     psoDesc.DSVFormat = desc.dsvFormat;
     psoDesc.SampleDesc.Count = 1;
@@ -116,10 +119,10 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.RegisterSpace = 0;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 3: Descriptor table for textures (t0 - t3)
+    // Parameter 3: Descriptor table for textures (t0 - t7 in space0)
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 4;
+    descriptorRange.NumDescriptors = 8;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -129,15 +132,15 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRange;
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 4: Shadow + IBL SRVs (t4-t6):
-    //   t4 = shadow map array
-    //   t5 = IBL diffuse irradiance
-    //   t6 = IBL specular prefiltered environment
+    // Parameter 4: Shadow + IBL SRVs in a separate descriptor table/space
+    //   space1, t0 = shadow map array
+    //   space1, t1 = IBL diffuse irradiance
+    //   space1, t2 = IBL specular prefiltered environment
     D3D12_DESCRIPTOR_RANGE shadowRange = {};
     shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     shadowRange.NumDescriptors = 3;
-    shadowRange.BaseShaderRegister = 4;
-    shadowRange.RegisterSpace = 0;
+    shadowRange.BaseShaderRegister = 0;
+    shadowRange.RegisterSpace = 1;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;

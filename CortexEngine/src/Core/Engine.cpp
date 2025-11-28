@@ -2,6 +2,8 @@
 #include "ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
+#include "Utils/GLTFLoader.h"
+#include "Utils/FileUtils.h"
 #include "LLM/SceneCommands.h"
 #include "LLM/RegressionTests.h"
 #include "UI/TextPrompt.h"
@@ -214,6 +216,20 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         });
     }
 
+    // Phase 3: Initialize The Dreamer (async texture generator). This is a lightweight
+    // CPU-only service that produces RGBA8 pixels; the Engine uploads them via the
+    // Renderer on the main thread.
+    if (config.enableDreamer) {
+        m_dreamerService = std::make_unique<AI::Vision::DreamerService>();
+        auto dreamerResult = m_dreamerService->Initialize(config.dreamerConfig);
+        if (dreamerResult.IsErr()) {
+            spdlog::warn("Dreamer initialization failed: {}", dreamerResult.Error());
+        } else {
+            m_dreamerEnabled = true;
+            spdlog::info("The Dreamer is online! (async texture generation ready)");
+        }
+    }
+
     // Initialize debug menu with current / persisted renderer & camera parameters
     if (m_renderer && m_window) {
         UI::DebugMenuState dbg{};
@@ -289,8 +305,10 @@ void Engine::ShowCameraHelpOverlay() {
         "\n"
         "Lighting & shadows debug:\n"
         "  F3                  - Toggle shadows\n"
-        "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades)\n"
-        "  F5 / F6             - Decrease / increase shadow PCF radius\n"
+        "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades/SSAO/SSR)\n"
+        "  Z                   - Toggle temporal AA (TAA) on/off\n"
+        "  R                   - Cycle SSR/SSAO (both on -> SSR only -> SSAO only -> both off)\n"
+        "  F5                  - Increase shadow PCF radius\n"
         "  F7 / F8             - Decrease / increase shadow bias\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
         "  F11 / F12           - Adjust near cascade resolution scale\n"
@@ -325,6 +343,12 @@ void Engine::Shutdown() {
     }
     m_commandQueue.reset();
     m_llmService.reset();
+
+    // Phase 3: Shutdown Dreamer
+    if (m_dreamerService) {
+        m_dreamerService->Shutdown();
+        m_dreamerService.reset();
+    }
 
     ServiceLocator::SetRegistry(nullptr);
     ServiceLocator::SetRenderer(nullptr);
@@ -575,6 +599,34 @@ void Engine::ProcessInput() {
                         spdlog::info("Text input cancelled");
                     }
                 }
+                else if (event.key.key == SDLK_Y) {
+                    // Phase 3: Trigger Dreamer texture generation for the current focus target.
+                    if (m_dreamerService && m_dreamerEnabled) {
+                        std::string prompt = UI::TextPrompt::Show(
+                            m_window->GetHWND(),
+                            "Dreamer Texture Prompt",
+                            "Describe the texture to generate:");
+                        if (!prompt.empty()) {
+                            std::string target = GetFocusTarget();
+                            if (target.empty()) {
+                                target = "SpinningCube";
+                            }
+                            AI::Vision::TextureRequest req;
+                            req.targetName = target;
+                            req.prompt = prompt;
+                            req.usage = AI::Vision::TextureUsage::Albedo;
+                            req.width = 512;
+                            req.height = 512;
+                            m_dreamerService->SubmitRequest(req);
+                            spdlog::info("[Dreamer] Queued texture request for '{}' with prompt: \"{}\"",
+                                         target, prompt);
+                        } else {
+                            spdlog::info("[Dreamer] Texture prompt cancelled");
+                        }
+                    } else {
+                        spdlog::info("[Dreamer] Service not enabled; Y key ignored");
+                    }
+                }
                 else if (event.key.key == SDLK_F1) {
                     // Reset camera to default position/orientation
                     InitializeCameraController();
@@ -598,18 +650,17 @@ void Engine::ProcessInput() {
                         spdlog::info("FXAA {}", enabled ? "ENABLED" : "DISABLED");
                     }
                 }
+                else if (event.key.key == SDLK_Z) {
+                    if (m_renderer) {
+                        m_renderer->ToggleTAA();
+                    }
+                }
                 else if (event.key.key == SDLK_F2) {
                     // Reset all debug settings (sliders + view modes) to defaults, then show the menu
                     UI::DebugMenu::ResetToDefaults();
                     UI::DebugMenu::SetVisible(true);
                 }
                 else if (event.key.key == SDLK_F5) {
-                    if (m_renderer) {
-                        m_renderer->AdjustShadowPCFRadius(-0.5f);
-                        SyncDebugMenuFromRenderer();
-                    }
-                }
-                else if (event.key.key == SDLK_F6) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(0.5f);
                         SyncDebugMenuFromRenderer();
@@ -659,6 +710,11 @@ void Engine::ProcessInput() {
                 else if (event.key.key == SDLK_F4) {
                     if (m_renderer) {
                         m_renderer->CycleDebugViewMode();
+                    }
+                }
+                else if (event.key.key == SDLK_R) {
+                    if (m_renderer) {
+                        m_renderer->CycleScreenSpaceEffectsDebug();
                     }
                 }
                 else if (event.key.key == SDLK_E) {
@@ -725,6 +781,162 @@ void Engine::Update(float deltaTime) {
             constexpr size_t kMaxMessages = 5;
             while (m_recentCommandMessages.size() > kMaxMessages) {
                 m_recentCommandMessages.pop_front();
+            }
+        }
+    }
+
+    // Phase 3: Apply Dreamer-generated textures to their targets on the main thread.
+    if (m_dreamerService && m_renderer && m_registry) {
+        auto results = m_dreamerService->ConsumeFinished();
+        if (!results.empty()) {
+            auto view = m_registry->View<Scene::TagComponent, Scene::RenderableComponent>();
+
+            auto usageToString = [](AI::Vision::TextureUsage u) -> const char* {
+                switch (u) {
+                    case AI::Vision::TextureUsage::Albedo:     return "albedo";
+                    case AI::Vision::TextureUsage::Normal:     return "normal";
+                    case AI::Vision::TextureUsage::Roughness:  return "roughness";
+                    case AI::Vision::TextureUsage::Metalness:  return "metalness";
+                    case AI::Vision::TextureUsage::Environment:return "environment";
+                    case AI::Vision::TextureUsage::Skybox:     return "skybox";
+                    default:                                   return "unknown";
+                }
+            };
+
+            for (auto& tex : results) {
+                if (!tex.success) {
+                    spdlog::warn("[Dreamer] Texture generation failed for '{}': {}",
+                                 tex.targetName, tex.message);
+                    continue;
+                }
+
+                // Environment / skybox jobs do not need an entity; treat them as global.
+                if (tex.usage == AI::Vision::TextureUsage::Environment ||
+                    tex.usage == AI::Vision::TextureUsage::Skybox) {
+                    auto gpuTex = m_renderer->CreateTextureFromRGBA(
+                        tex.pixels.data(),
+                        tex.width,
+                        tex.height,
+                        /*useSRGB=*/true,
+                        tex.targetName.empty() ? "Dreamer_Env" : "Dreamer_" + tex.targetName);
+                    if (gpuTex.IsErr()) {
+                        spdlog::error("[Dreamer] Failed to create GPU env texture for '{}': {}",
+                                      tex.targetName, gpuTex.Error());
+                        continue;
+                    }
+
+                    auto envResult = m_renderer->AddEnvironmentFromTexture(
+                        gpuTex.Value(),
+                        tex.targetName.empty() ? tex.prompt : tex.targetName);
+                    if (envResult.IsErr()) {
+                        spdlog::error("[Dreamer] Failed to register environment '{}': {}",
+                                      tex.targetName, envResult.Error());
+                    } else {
+                        spdlog::info("[Dreamer] Applied {} texture as environment '{}'", usageToString(tex.usage),
+                                     tex.targetName.empty() ? tex.prompt : tex.targetName);
+                    }
+                    continue;
+                }
+
+                // For surface textures, allow both exact tag matches and prefix matches
+                // so that requests like "GiantPig" can hit "GiantPig.Body", etc.
+                std::string targetLower = tex.targetName;
+                std::transform(targetLower.begin(), targetLower.end(), targetLower.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+                std::vector<entt::entity> exactMatches;
+                std::vector<entt::entity> prefixMatches;
+
+                for (auto entity : view) {
+                    const auto& tag = view.get<Scene::TagComponent>(entity);
+                    std::string tagLower = tag.tag;
+                    std::transform(tagLower.begin(), tagLower.end(), tagLower.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+                    if (!targetLower.empty() && tagLower == targetLower) {
+                        exactMatches.push_back(entity);
+                    } else if (!targetLower.empty() &&
+                               tagLower.rfind(targetLower, 0) == 0) {
+                        // Tag starts with the requested name (e.g., GiantPig.*)
+                        prefixMatches.push_back(entity);
+                    }
+                }
+
+                std::vector<entt::entity>* chosen = nullptr;
+                if (!exactMatches.empty()) {
+                    chosen = &exactMatches;
+                } else if (!prefixMatches.empty()) {
+                    chosen = &prefixMatches;
+                }
+
+                if (!chosen || chosen->empty()) {
+                    spdlog::warn("[Dreamer] No entity found with tag or prefix '{}' for generated texture",
+                                 tex.targetName);
+                    continue;
+                }
+
+                auto gpuTex = m_renderer->CreateTextureFromRGBA(
+                    tex.pixels.data(),
+                    tex.width,
+                    tex.height,
+                    /*useSRGB=*/true,
+                    "Dreamer_" + tex.targetName);
+                if (gpuTex.IsErr()) {
+                    spdlog::error("[Dreamer] Failed to create GPU texture for '{}': {}",
+                                  tex.targetName, gpuTex.Error());
+                    continue;
+                }
+
+                for (auto entity : *chosen) {
+                    auto& renderable = view.get<Scene::RenderableComponent>(entity);
+
+                    switch (tex.usage) {
+                        case AI::Vision::TextureUsage::Albedo:
+                            // Override the albedo map and reset supporting maps so the
+                            // Dreamer texture is clearly visible in shaded mode. We set
+                            // a sentinel albedoPath instead of clearing it so that
+                            // EnsureMaterialTextures does not revert back to the
+                            // placeholder texture on subsequent frames.
+                            renderable.textures.albedo = gpuTex.Value();
+                            renderable.textures.albedoPath = "[Dreamer]";
+                            renderable.textures.normal.reset();
+                            renderable.textures.normalPath.clear();
+                            renderable.textures.metallic.reset();
+                            renderable.textures.metallicPath.clear();
+                            renderable.textures.roughness.reset();
+                            renderable.textures.roughnessPath.clear();
+                            // Let the Dreamer-driven albedo texture drive final color
+                            // directly; keep albedoColor neutral so the texture is
+                            // clearly visible.
+                            renderable.albedoColor = glm::vec4(1.0f);
+                            renderable.metallic = 0.0f;
+                            renderable.roughness = 0.7f;
+                            break;
+                        case AI::Vision::TextureUsage::Normal:
+                            renderable.textures.normal = gpuTex.Value();
+                            renderable.textures.normalPath.clear();
+                            break;
+                        case AI::Vision::TextureUsage::Roughness:
+                            renderable.textures.roughness = gpuTex.Value();
+                            renderable.textures.roughnessPath.clear();
+                            break;
+                        case AI::Vision::TextureUsage::Metalness:
+                            renderable.textures.metallic = gpuTex.Value();
+                            renderable.textures.metallicPath.clear();
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (!tex.materialPreset.empty()) {
+                        renderable.presetName = tex.materialPreset;
+                    }
+                }
+
+                spdlog::info("[Dreamer] Applied {} texture to {} entit(ies) for tag '{}'",
+                             usageToString(tex.usage),
+                             chosen->size(),
+                             tex.targetName);
             }
         }
     }
@@ -1077,8 +1289,8 @@ void Engine::InitializeCameraController() {
     auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
 
     // Reset to default position/orientation matching InitializeScene
-    transform.position = glm::vec3(0.0f, 1.5f, -6.0f);
-    glm::vec3 target(0.0f, 0.0f, 0.0f);
+    transform.position = glm::vec3(0.0f, 3.0f, -8.0f);
+    glm::vec3 target(0.0f, 1.0f, 0.0f);
     glm::vec3 up(0.0f, 1.0f, 0.0f);
     glm::vec3 forward = glm::normalize(target - transform.position);
     transform.rotation = glm::quatLookAt(forward, up);
@@ -1172,72 +1384,90 @@ void Engine::UpdateCameraController(float deltaTime) {
 void Engine::InitializeScene() {
     spdlog::info("Initializing scene...");
 
-    // Create a spinning cube
-    entt::entity cubeEntity = m_registry->CreateCube(glm::vec3(0.0f, 0.0f, 0.0f), "SpinningCube");
-    // Default focus is the showcase cube at startup.
-    SetFocusTarget("SpinningCube");
-
-    // Generate cube mesh
-    auto cubeMesh = Utils::MeshGenerator::CreateCube();
-
-    // Upload mesh to GPU
-    auto uploadResult = m_renderer->UploadMesh(cubeMesh);
-    if (uploadResult.IsErr()) {
-        spdlog::error("Failed to upload cube mesh: {}", uploadResult.Error());
+    // --- Metallic sphere (procedural) ---
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.4f, 32);
+    auto sphereUpload = m_renderer->UploadMesh(sphereMesh);
+    if (sphereUpload.IsErr()) {
+        spdlog::error("Failed to upload sphere mesh: {}", sphereUpload.Error());
         return;
     }
 
-    // Set up renderable component
-    auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(cubeEntity);
-    renderable.mesh = cubeMesh;
-    renderable.textures.albedo = m_renderer->GetPlaceholderTexture();
-    renderable.textures.normal = m_renderer->GetPlaceholderNormal();
-    renderable.textures.metallic = m_renderer->GetPlaceholderMetallic();
-    renderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
-    renderable.albedoColor = glm::vec4(0.8f, 0.3f, 0.2f, 1.0f);  // Orange-red color
-    renderable.roughness = 0.6f;
-    renderable.metallic = 0.1f;
+    entt::entity sphereEntity = m_registry->CreateEntity();
+    auto& sphereTransform = m_registry->AddComponent<Scene::TransformComponent>(sphereEntity);
+    sphereTransform.position = glm::vec3(-1.5f, 1.0f, -3.0f);
 
-    // Set up rotation
-    auto& rotation = m_registry->GetComponent<Scene::RotationComponent>(cubeEntity);
-    rotation.axis = glm::vec3(0.3f, 1.0f, 0.2f);  // Rotate on a diagonal axis
-    rotation.speed = 1.5f;  // Radians per second
+    m_registry->AddComponent<Scene::TagComponent>(sphereEntity, "MetalSphere");
 
-    // Additional cubes to exercise the renderer and HyperGeometry
-    std::vector<glm::vec3> extraPositions = {
-        { 2.0f, 0.0f, 0.0f },
-        {-2.0f, 0.0f, 0.0f },
-        { 0.0f, 0.0f, 2.0f }
-    };
-    std::vector<glm::vec4> extraColors = {
-        {0.2f, 0.8f, 1.0f, 1.0f},
-        {0.6f, 0.2f, 0.9f, 1.0f},
-        {0.2f, 0.9f, 0.3f, 1.0f}
-    };
-    for (size_t i = 0; i < extraPositions.size(); ++i) {
-        entt::entity e = m_registry->CreateCube(extraPositions[i], "InstancedCube" + std::to_string(i));
-        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
-        r.mesh = cubeMesh;
-        r.textures.albedo = m_renderer->GetPlaceholderTexture();
-        r.textures.normal = m_renderer->GetPlaceholderNormal();
-        r.textures.metallic = m_renderer->GetPlaceholderMetallic();
-        r.textures.roughness = m_renderer->GetPlaceholderRoughness();
-        r.albedoColor = extraColors[i % extraColors.size()];
-        r.roughness = 0.5f;
-        r.metallic = 0.2f;
+    auto& sphereRenderable = m_registry->AddComponent<Scene::RenderableComponent>(sphereEntity);
+    sphereRenderable.mesh = sphereMesh;
+    sphereRenderable.textures.albedo    = m_renderer->GetPlaceholderTexture();
+    sphereRenderable.textures.normal    = m_renderer->GetPlaceholderNormal();
+    sphereRenderable.textures.metallic  = m_renderer->GetPlaceholderMetallic();
+    sphereRenderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
+    sphereRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+    sphereRenderable.metallic    = 1.0f;
+    sphereRenderable.roughness   = 0.18f;
+    sphereRenderable.ao          = 1.0f;
+    sphereRenderable.presetName  = "chrome";
 
-        auto& rot = m_registry->GetComponent<Scene::RotationComponent>(e);
-        rot.axis = glm::vec3(0.0f, 1.0f, 0.0f);
-        rot.speed = 0.6f + static_cast<float>(i) * 0.3f;
+    auto& sphereRotation = m_registry->AddComponent<Scene::RotationComponent>(sphereEntity);
+    sphereRotation.axis  = glm::vec3(0.0f, 1.0f, 0.0f);
+    sphereRotation.speed = 0.5f;
+
+    // --- Metallic dragon (glTF from glTF-Sample-Models) ---
+    std::shared_ptr<Scene::MeshData> dragonMesh;
+    {
+        auto dragonMeshResult = Utils::LoadSampleModelMesh("DragonAttenuation");
+        if (dragonMeshResult.IsErr()) {
+            spdlog::warn("Failed to load DragonAttenuation sample model: {}", dragonMeshResult.Error());
+        } else {
+            dragonMesh = dragonMeshResult.Value();
+            auto dragonUpload = m_renderer->UploadMesh(dragonMesh);
+            if (dragonUpload.IsErr()) {
+                spdlog::warn("Failed to upload dragon mesh: {}", dragonUpload.Error());
+                dragonMesh.reset();
+            }
+        }
     }
+
+    if (dragonMesh) {
+        entt::entity dragonEntity = m_registry->CreateEntity();
+        auto& dragonTransform = m_registry->AddComponent<Scene::TransformComponent>(dragonEntity);
+        dragonTransform.position = glm::vec3(1.5f, 1.0f, -3.0f);
+        dragonTransform.scale    = glm::vec3(0.6f); // small dragon
+
+        m_registry->AddComponent<Scene::TagComponent>(dragonEntity, "MetalDragon");
+
+        auto& dragonRenderable = m_registry->AddComponent<Scene::RenderableComponent>(dragonEntity);
+        dragonRenderable.mesh = dragonMesh;
+        dragonRenderable.textures.albedo    = m_renderer->GetPlaceholderTexture();
+        dragonRenderable.textures.normal    = m_renderer->GetPlaceholderNormal();
+        dragonRenderable.textures.metallic  = m_renderer->GetPlaceholderMetallic();
+        dragonRenderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
+        dragonRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+        dragonRenderable.metallic    = 1.0f;
+        dragonRenderable.roughness   = 0.22f;
+        dragonRenderable.ao          = 1.0f;
+        dragonRenderable.presetName  = "chrome";
+
+        auto& dragonRotation = m_registry->AddComponent<Scene::RotationComponent>(dragonEntity);
+        dragonRotation.axis  = glm::vec3(0.0f, 1.0f, 0.0f);
+        dragonRotation.speed = 0.3f;
+    }
+
+    // Default focus is the metallic sphere so commands like "make it gold"
+    // have a clear target.
+    SetFocusTarget("MetalSphere");
 
     // Create a camera
     entt::entity cameraEntity = m_registry->CreateEntity();
     m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
 
     auto& cameraTransform = m_registry->AddComponent<Scene::TransformComponent>(cameraEntity);
-    // Place camera behind the origin on -Z to look forward (+Z is forward in our LH system)
-    cameraTransform.position = glm::vec3(0.0f, 1.5f, -6.0f);
+    // Place camera higher and slightly farther back on -Z to look forward
+    // (+Z is forward in our LH system), so the scene starts above the ground
+    // plane instead of hugging the "singularity" at the bottom.
+    cameraTransform.position = glm::vec3(0.0f, 3.0f, -8.0f);
     cameraTransform.rotation = glm::quatLookAt(
         glm::normalize(glm::vec3(0.0f) - cameraTransform.position),  // Look at origin
         glm::vec3(0.0f, 1.0f, 0.0f));
@@ -1249,7 +1479,7 @@ void Engine::InitializeScene() {
     // Add a simple point light above the origin for forward lighting tests
     entt::entity lightEntity = m_registry->CreateEntity();
     auto& lightTransform = m_registry->AddComponent<Scene::TransformComponent>(lightEntity);
-    lightTransform.position = glm::vec3(0.0f, 4.0f, -2.0f);
+    lightTransform.position = glm::vec3(0.0f, 6.0f, -4.0f);
     auto& lightComp = m_registry->AddComponent<Scene::LightComponent>(lightEntity);
     lightComp.type = Scene::LightType::Point;
     lightComp.color = glm::vec3(1.0f, 0.95f, 0.8f);
@@ -1353,12 +1583,83 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
             commands.insert(commands.end(), fallback.begin(), fallback.end());
         }
 
-        // Queue commands for execution on main thread
-        m_commandQueue->PushBatch(commands);
+        // Split Architect output into:
+        //  - normal scene commands executed via CommandQueue
+        //  - Dreamer texture/envmap requests handled directly here.
+        std::vector<std::shared_ptr<LLM::SceneCommand>> queueCommands;
+        if (m_dreamerService && m_dreamerEnabled) {
+            for (const auto& c : commands) {
+                if (!c) continue;
+                switch (c->type) {
+                    case LLM::CommandType::GenerateTexture: {
+                        auto* gen = static_cast<LLM::GenerateTextureCommand*>(c.get());
+                        AI::Vision::TextureRequest req;
+                        req.targetName = !gen->targetName.empty() ? gen->targetName : GetFocusTarget();
+                        req.prompt = gen->prompt;
+                        req.materialPreset = gen->materialPreset;
+                        req.seed = gen->seed;
+                        req.width = gen->width;
+                        req.height = gen->height;
 
-        spdlog::info("Queued {} commands for execution", commands.size());
-        for (const auto& c : commands) {
-            spdlog::info("  {}", c->ToString());
+                        std::string usageLower = gen->usage;
+                        std::transform(usageLower.begin(), usageLower.end(), usageLower.begin(),
+                                       [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                        if (usageLower == "normal") {
+                            req.usage = AI::Vision::TextureUsage::Normal;
+                        } else if (usageLower == "roughness") {
+                            req.usage = AI::Vision::TextureUsage::Roughness;
+                        } else if (usageLower == "metalness" || usageLower == "metallic") {
+                            req.usage = AI::Vision::TextureUsage::Metalness;
+                        } else {
+                            req.usage = AI::Vision::TextureUsage::Albedo;
+                        }
+
+                        // If the Architect requests an albedo map, automatically queue
+                        // companion normal/roughness maps for richer materials.
+                        m_dreamerService->SubmitRequest(req);
+                        if (req.usage == AI::Vision::TextureUsage::Albedo) {
+                            AI::Vision::TextureRequest normalReq = req;
+                            normalReq.usage = AI::Vision::TextureUsage::Normal;
+                            m_dreamerService->SubmitRequest(normalReq);
+
+                            AI::Vision::TextureRequest roughReq = req;
+                            roughReq.usage = AI::Vision::TextureUsage::Roughness;
+                            m_dreamerService->SubmitRequest(roughReq);
+                        }
+                        spdlog::info("[Dreamer] Queued LLM texture job for '{}' (usage={}, preset='{}')",
+                                     req.targetName, gen->usage, req.materialPreset);
+                        break;
+                    }
+                    case LLM::CommandType::GenerateEnvmap: {
+                        auto* gen = static_cast<LLM::GenerateEnvmapCommand*>(c.get());
+                        AI::Vision::TextureRequest req;
+                        req.targetName = !gen->name.empty() ? gen->name : std::string("Envmap");
+                        req.prompt = gen->prompt;
+                        req.materialPreset.clear();
+                        req.seed = gen->seed;
+                        req.width = gen->width ? gen->width : 1024;
+                        req.height = gen->height ? gen->height : 512;
+                        req.usage = AI::Vision::TextureUsage::Environment;
+                        m_dreamerService->SubmitRequest(req);
+                        spdlog::info("[Dreamer] Queued LLM environment job '{}'", req.targetName);
+                        break;
+                    }
+                    default:
+                        queueCommands.push_back(c);
+                        break;
+                }
+            }
+        } else {
+            queueCommands = commands;
+        }
+
+        // Queue non-Dreamer commands for execution on main thread
+        if (m_commandQueue && !queueCommands.empty()) {
+            m_commandQueue->PushBatch(queueCommands);
+            spdlog::info("Queued {} commands for execution", queueCommands.size());
+            for (const auto& c : queueCommands) {
+                spdlog::info("  {}", c->ToString());
+            }
         }
     });
 }

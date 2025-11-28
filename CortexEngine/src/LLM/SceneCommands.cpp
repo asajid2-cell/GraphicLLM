@@ -113,6 +113,14 @@ std::string ScenePlanCommand::ToString() const {
     return "ScenePlan: " + std::to_string(regions.size()) + " regions";
 }
 
+std::string GenerateTextureCommand::ToString() const {
+    return "GenerateTexture: " + targetName + " usage=" + usage + " preset=" + materialPreset;
+}
+
+std::string GenerateEnvmapCommand::ToString() const {
+    return "GenerateEnvmap: " + name;
+}
+
 std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::string& jsonStr,
                                                                     const std::string& focusTargetName) {
     std::vector<std::shared_ptr<SceneCommand>> commands;
@@ -216,6 +224,12 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     } else if (lowered == "torus" || lowered == "arch") {
                         cmd->entityType = AddEntityCommand::EntityType::Torus;
                         recognizedPrimitive = true;
+                    } else if (lowered == "model") {
+                        cmd->entityType = AddEntityCommand::EntityType::Model;
+                        recognizedPrimitive = true;
+                        if (cmdJson.contains("asset") && cmdJson["asset"].is_string()) {
+                            cmd->asset = cmdJson["asset"];
+                        }
                     }
                 }
 
@@ -589,7 +603,7 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                 if (cmdJson.contains("debug_mode")) {
                     cmd->setDebugMode = true;
                     float v = ReadNumber(cmdJson["debug_mode"], "debug_mode", 0.0f);
-                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 12.0f)));
+                    cmd->debugMode = static_cast<int>(std::round(std::clamp(v, 0.0f, 16.0f)));
                 }
                 if (cmdJson.contains("shadow_bias")) {
                     cmd->setShadowBias = true;
@@ -715,6 +729,50 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     cmd->castsShadows = cmdJson["casts_shadows"];
                 }
 
+                commands.push_back(cmd);
+            }
+            else if (type == "generate_texture") {
+                auto cmd = std::make_shared<GenerateTextureCommand>();
+                if (cmdJson.contains("target") && cmdJson["target"].is_string()) {
+                    cmd->targetName = resolveTargetName(cmdJson["target"]);
+                }
+                if (cmdJson.contains("prompt") && cmdJson["prompt"].is_string()) {
+                    cmd->prompt = cmdJson["prompt"];
+                }
+                if (cmdJson.contains("usage") && cmdJson["usage"].is_string()) {
+                    cmd->usage = cmdJson["usage"];
+                }
+                if (cmdJson.contains("preset") && cmdJson["preset"].is_string()) {
+                    cmd->materialPreset = cmdJson["preset"];
+                }
+                if (cmdJson.contains("width")) {
+                    cmd->width = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["width"], "width", 0.0f)));
+                }
+                if (cmdJson.contains("height")) {
+                    cmd->height = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["height"], "height", 0.0f)));
+                }
+                if (cmdJson.contains("seed")) {
+                    cmd->seed = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["seed"], "seed", 0.0f)));
+                }
+                commands.push_back(cmd);
+            }
+            else if (type == "generate_envmap" || type == "generate_environment") {
+                auto cmd = std::make_shared<GenerateEnvmapCommand>();
+                if (cmdJson.contains("name") && cmdJson["name"].is_string()) {
+                    cmd->name = cmdJson["name"];
+                }
+                if (cmdJson.contains("prompt") && cmdJson["prompt"].is_string()) {
+                    cmd->prompt = cmdJson["prompt"];
+                }
+                if (cmdJson.contains("width")) {
+                    cmd->width = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["width"], "width", 0.0f)));
+                }
+                if (cmdJson.contains("height")) {
+                    cmd->height = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["height"], "height", 0.0f)));
+                }
+                if (cmdJson.contains("seed")) {
+                    cmd->seed = static_cast<uint32_t>(std::max(0.0f, ReadNumber(cmdJson["seed"], "seed", 0.0f)));
+                }
                 commands.push_back(cmd);
             }
         }

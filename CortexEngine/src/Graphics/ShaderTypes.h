@@ -52,6 +52,7 @@ struct FrameConstants {
     glm::mat4 viewMatrix;
     glm::mat4 projectionMatrix;
     glm::mat4 viewProjectionMatrix;
+    glm::mat4 invProjectionMatrix;
     glm::vec4 cameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
     glm::vec4 timeAndExposure;
@@ -70,7 +71,8 @@ struct FrameConstants {
     //                      4 = albedo, 5 = cascade index, 6 = debug screen,
     //                      7 = fractal height, 8 = IBL diffuse only,
     //                      9 = IBL specular only, 10 = env direction/UV,
-    //                      11 = Fresnel (Fibl), 12 = specular mip), others reserved
+    //                      11 = Fresnel (Fibl), 12 = specular mip,
+    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     glm::vec4 postParams;
@@ -81,6 +83,13 @@ struct FrameConstants {
     glm::vec4 colorGrade;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
+    glm::vec4 bloomParams;
+    // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
+    glm::vec4 taaParams;
+    // Previous frame jittered view-projection and inverse of current
+    glm::mat4 prevViewProjectionMatrix;
+    glm::mat4 invViewProjectionMatrix;
 };
 
 // Material properties

@@ -61,6 +61,33 @@ if ($Clean) {
 
 Push-Location $buildDir
 
+# Refresh CMake cache with (optional) TensorRT settings so that toggling
+# TENSORRT_ROOT between runs correctly enables/disables Dreamer GPU diffusion.
+$TensorRTIncludeDir = $null
+$TensorRTLibDir = $null
+if ($env:TENSORRT_ROOT) {
+    $candidateRoot = $env:TENSORRT_ROOT
+    $inc = Join-Path $candidateRoot "include"
+    $lib = Join-Path $candidateRoot "lib"
+    if ((Test-Path $inc) -and (Test-Path $lib)) {
+        $TensorRTIncludeDir = $inc
+        $TensorRTLibDir = $lib
+    }
+}
+
+$cmakeConfigureArgs = @("..")
+if ($TensorRTIncludeDir -and $TensorRTLibDir) {
+    Write-Host "Configuring CMake with TensorRT support (CORTEX_ENABLE_TENSORRT=ON)..." -ForegroundColor Gray
+    $cmakeConfigureArgs += "-DCORTEX_ENABLE_TENSORRT=ON"
+    $cmakeConfigureArgs += "-DTensorRT_INCLUDE_DIR=$TensorRTIncludeDir"
+    $cmakeConfigureArgs += "-DTensorRT_LIB_DIR=$TensorRTLibDir"
+} else {
+    Write-Host "Configuring CMake without TensorRT (CORTEX_ENABLE_TENSORRT=OFF)..." -ForegroundColor Gray
+    $cmakeConfigureArgs += "-DCORTEX_ENABLE_TENSORRT=OFF"
+}
+
+& cmake $cmakeConfigureArgs
+
 Write-Host "Compiling..." -ForegroundColor Gray
 $startTime = Get-Date
 
@@ -78,8 +105,16 @@ Pop-Location
 
 Write-Host "`n[OK] Build complete! ($($buildTime.ToString('F1'))s)" -ForegroundColor Green
 
+# Handle both multi-config (VS) and single-config (Ninja) layouts.
 $exePath = Join-Path $PSScriptRoot "build\bin\$Config\CortexEngine.exe"
-$exeSize = (Get-Item $exePath).Length / 1MB
-Write-Host "Executable: $($exeSize.ToString('F2')) MB" -ForegroundColor Gray
+if (-not (Test-Path $exePath)) {
+    $exePath = Join-Path $PSScriptRoot "build\bin\CortexEngine.exe"
+}
+if (Test-Path $exePath) {
+    $exeSize = (Get-Item $exePath).Length / 1MB
+    Write-Host "Executable: $($exeSize.ToString('F2')) MB ($exePath)" -ForegroundColor Gray
+} else {
+    Write-Host "Executable not found in expected locations; build may have used a different output directory." -ForegroundColor Yellow
+}
 
 Write-Host "`nRun with: .\run.ps1" -ForegroundColor Cyan

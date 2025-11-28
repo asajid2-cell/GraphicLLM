@@ -128,6 +128,8 @@ private:
     };
 
     std::unordered_map<MeshKey, std::shared_ptr<Scene::MeshData>, MeshKeyHasher> m_meshCache;
+    // Separate cache for glTF sample models keyed by asset name (e.g., "DamagedHelmet").
+    std::unordered_map<std::string, std::shared_ptr<Scene::MeshData>> m_modelMeshCache;
 
     void PushStatus(bool success, const std::string& message);
 };

@@ -21,6 +21,8 @@ enum class CommandType {
     AddCompound,
     ModifyGroup,
     ScenePlan,
+    GenerateTexture,
+    GenerateEnvmap,
     Unknown
 };
 
@@ -33,7 +35,7 @@ struct SceneCommand {
 
 // Add a new entity to the scene
 struct AddEntityCommand : public SceneCommand {
-    enum class EntityType { Cube, Sphere, Plane, Cylinder, Pyramid, Cone, Torus };
+    enum class EntityType { Cube, Sphere, Plane, Cylinder, Pyramid, Cone, Torus, Model };
 
     EntityType entityType = EntityType::Cube;
     glm::vec3 position = glm::vec3(0.0f);
@@ -48,6 +50,10 @@ struct AddEntityCommand : public SceneCommand {
     bool hasPositionOffset = false;
     std::string name;
     bool autoPlace = false;       // let the executor pick a spawn position if true
+
+    // For entityType == Model, this names the asset from the
+    // glTF-Sample-Models library (e.g., "DamagedHelmet", "DragonAttenuation").
+    std::string asset;
 
     // Geometry detail controls for high/low poly variants
     // Used primarily for spheres, cylinders, cones, and tori.
@@ -287,6 +293,32 @@ struct ScenePlanCommand : public SceneCommand {
     std::vector<Region> regions;
 
     ScenePlanCommand() { type = CommandType::ScenePlan; }
+    std::string ToString() const override;
+};
+
+// Generate a texture via Dreamer for a specific entity or logical target.
+struct GenerateTextureCommand : public SceneCommand {
+    std::string targetName;     // Tag / group to target
+    std::string prompt;         // High-level texture description
+    std::string usage;          // "albedo", "normal", "roughness", "metalness"
+    std::string materialPreset; // e.g. "wet_cobblestone"
+    uint32_t width  = 0;
+    uint32_t height = 0;
+    uint32_t seed   = 0;
+
+    GenerateTextureCommand() { type = CommandType::GenerateTexture; }
+    std::string ToString() const override;
+};
+
+// Generate an environment map / skybox via Dreamer.
+struct GenerateEnvmapCommand : public SceneCommand {
+    std::string name;    // logical name (e.g. "CyberpunkNight")
+    std::string prompt;  // description of the environment
+    uint32_t width  = 0;
+    uint32_t height = 0;
+    uint32_t seed   = 0;
+
+    GenerateEnvmapCommand() { type = CommandType::GenerateEnvmap; }
     std::string ToString() const override;
 };
 

@@ -84,6 +84,7 @@ std::string SceneLookup::TypeToString(AddEntityCommand::EntityType type) {
         case AddEntityCommand::EntityType::Pyramid: return "pyramid";
         case AddEntityCommand::EntityType::Cone: return "cone";
         case AddEntityCommand::EntityType::Torus: return "torus";
+        case AddEntityCommand::EntityType::Model: return "model";
     }
     return "object";
 }

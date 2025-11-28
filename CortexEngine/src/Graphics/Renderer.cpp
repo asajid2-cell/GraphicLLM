@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/norm.hpp>
 
 namespace Cortex::Graphics {
@@ -20,6 +21,18 @@ Renderer::~Renderer() {
     Shutdown();
 }
 
+// Simple Halton sequence helper for TAA jitter
+static float Halton(uint32_t index, uint32_t base) {
+    float f = 1.0f;
+    float result = 0.0f;
+    uint32_t i = index;
+    while (i > 0) {
+        f /= static_cast<float>(base);
+        result += f * static_cast<float>(i % base);
+        i /= base;
+    }
+    return result;
+}
 Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     if (!device || !window) {
         return Result<void>::Err("Invalid device or window pointer");
@@ -155,7 +168,9 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create material constant buffer: " + cbResult.Error());
     }
 
-    cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice());
+    // Shadow constants: one slot per cascade so we can safely
+    // update them independently while recording the shadow pass.
+    cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice(), kShadowCascadeCount);
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
@@ -181,13 +196,6 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     auto envResult = InitializeEnvironmentMaps();
     if (envResult.IsErr()) {
         spdlog::warn("Environment maps not fully initialized: {}", envResult.Error());
-    }
-
-    // SSAO resources (optional; renderer falls back gracefully if creation fails)
-    auto ssaoResult = CreateSSAOResources();
-    if (ssaoResult.IsErr()) {
-        spdlog::warn("SSAO resources not fully initialized: {}", ssaoResult.Error());
-        m_ssaoEnabled = false;
     }
 
     spdlog::info("Renderer initialized successfully");
@@ -222,6 +230,11 @@ void Renderer::Shutdown() {
 }
 
 void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
+    if (!m_window || !m_window->GetCurrentBackBuffer()) {
+        spdlog::error("Renderer::Render called without a valid back buffer; skipping frame");
+        return;
+    }
+
     m_totalTime += deltaTime;
 
     BeginFrame();
@@ -260,6 +273,17 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         RenderScene(registry);
     }
 
+    // Screen-space reflections using HDR + depth + G-buffer (optional).
+    if (m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
+        // Dedicated helper keeps SSR logic contained.
+        RenderSSR();
+    }
+
+    // Camera motion vectors for TAA/motion blur (from depth + matrices).
+    if (m_motionVectorsPipeline && m_velocityBuffer && m_depthBuffer) {
+        RenderMotionVectors();
+    }
+
     // Screen-space ambient occlusion from depth buffer (if enabled)
     RenderSSAO();
 
@@ -288,13 +312,18 @@ void Renderer::BeginFrame() {
             spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
         }
     }
-    // Handle SSAO target resize
-    if (m_ssaoTex && (m_window->GetWidth() != m_ssaoTex->GetDesc().Width || m_window->GetHeight() != m_ssaoTex->GetDesc().Height)) {
-        m_ssaoTex.Reset();
-        auto ssaoResult = CreateSSAOResources();
-        if (ssaoResult.IsErr()) {
-            spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
-            m_ssaoEnabled = false;
+    // Handle SSAO target resize (SSAO is rendered at half resolution).
+    if (m_ssaoTex) {
+        D3D12_RESOURCE_DESC ssaoDesc = m_ssaoTex->GetDesc();
+        UINT expectedWidth  = std::max<UINT>(1, m_window->GetWidth()  / 2);
+        UINT expectedHeight = std::max<UINT>(1, m_window->GetHeight() / 2);
+        if (ssaoDesc.Width != expectedWidth || ssaoDesc.Height != expectedHeight) {
+            m_ssaoTex.Reset();
+            auto ssaoResult = CreateSSAOResources();
+            if (ssaoResult.IsErr()) {
+                spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
+                m_ssaoEnabled = false;
+            }
         }
     }
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
@@ -337,8 +366,10 @@ void Renderer::BeginFrame() {
 }
 
 void Renderer::PrepareMainPass() {
-    // Main pass renders into HDR target when available, otherwise directly to back buffer
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = {};
+    // Main pass renders into HDR + normal/roughness G-buffer when available,
+    // otherwise directly to back buffer.
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2] = {};
+    UINT numRtvs = 0;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
 
     // Ensure depth buffer is in writable state for the main pass
@@ -365,24 +396,47 @@ void Renderer::PrepareMainPass() {
             m_commandList->ResourceBarrier(1, &barrier);
             m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         }
-        rtv = m_hdrRTV.cpu;
+        rtvs[numRtvs++] = m_hdrRTV.cpu;
+
+        // Ensure G-buffer is in render target state
+        if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+            D3D12_RESOURCE_BARRIER gbufBarrier = {};
+            gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            gbufBarrier.Transition.pResource = m_gbufferNormalRoughness.Get();
+            gbufBarrier.Transition.StateBefore = m_gbufferNormalRoughnessState;
+            gbufBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &gbufBarrier);
+            m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        }
+        if (m_gbufferNormalRoughness) {
+            rtvs[numRtvs++] = m_gbufferNormalRoughnessRTV.cpu;
+        }
     } else {
         // Fallback: render directly to back buffer
+        ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
+        if (!backBuffer) {
+            spdlog::error("PrepareMainPass: back buffer is null; skipping frame");
+            return;
+        }
+
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_window->GetCurrentBackBuffer();
+        barrier.Transition.pResource = backBuffer;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        rtv = m_window->GetCurrentRTV();
+        rtvs[numRtvs++] = m_window->GetCurrentRTV();
     }
 
-    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+    m_commandList->OMSetRenderTargets(numRtvs, rtvs, FALSE, &dsv);
 
-    // Clear render target and depth buffer
+    // Clear render targets and depth buffer
     const float clearColor[] = { 0.1f, 0.1f, 0.15f, 1.0f };  // Dark blue
-    m_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    for (UINT i = 0; i < numRtvs; ++i) {
+        m_commandList->ClearRenderTargetView(rtvs[i], clearColor, 0, nullptr);
+    }
     m_commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     // Set viewport and scissor
@@ -455,7 +509,6 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             // Respect camera orientation from its transform
             frameData.viewMatrix = camera.GetViewMatrix(transform);
             frameData.projectionMatrix = camera.GetProjectionMatrix(m_window->GetAspectRatio());
-            frameData.viewProjectionMatrix = frameData.projectionMatrix * frameData.viewMatrix;
             cameraPos = transform.position;
             cameraForward = glm::normalize(transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
             frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
@@ -482,13 +535,47 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             camNear,
             camFar
         );
-        frameData.viewProjectionMatrix = frameData.projectionMatrix * frameData.viewMatrix;
         cameraForward = glm::normalize(target - cameraPos);
         frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
     }
 
+    // Temporal AA jitter (in pixels) and corresponding UV delta for history sampling.
+    float invWidth = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetWidth()));
+    float invHeight = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetHeight()));
+
+    glm::vec2 jitterPixels(0.0f);
+    if (m_taaEnabled) {
+        m_taaJitterPrevPixels = m_taaJitterCurrPixels;
+        float jx = Halton(m_taaSampleIndex + 1, 2) - 0.5f;
+        float jy = Halton(m_taaSampleIndex + 1, 3) - 0.5f;
+        m_taaSampleIndex++;
+        // Scale jitter down so per-frame shifts are smaller and objects
+        // appear more stable while still providing subpixel coverage.
+        const float jitterScale = 0.5f; // 50% of original amplitude
+        jitterPixels = glm::vec2(jx, jy) * jitterScale;
+        m_taaJitterCurrPixels = jitterPixels;
+    } else {
+        m_taaJitterPrevPixels = glm::vec2(0.0f);
+        m_taaJitterCurrPixels = glm::vec2(0.0f);
+    }
+
+    // Apply jitter to projection (NDC space).
+    if (m_taaEnabled) {
+        float jitterNdcX = (2.0f * jitterPixels.x) * invWidth;
+        float jitterNdcY = (2.0f * jitterPixels.y) * invHeight;
+        // Offset projection center; DirectX-style clip space uses [x,y] in row 2, column 0/1.
+        frameData.projectionMatrix[2][0] += jitterNdcX;
+        frameData.projectionMatrix[2][1] += jitterNdcY;
+    }
+
+    // Final view-projection with jitter applied.
+    frameData.viewProjectionMatrix = frameData.projectionMatrix * frameData.viewMatrix;
+
+    // Precompute inverse projection for SSAO and other screen-space effects.
+    frameData.invProjectionMatrix = glm::inverse(frameData.projectionMatrix);
+
     // Time/exposure and lighting state (w = bloom intensity, disabled if bloom SRV missing)
-    float bloom = (m_bloomSRV[0].IsValid() ? m_bloomIntensity : 0.0f);
+    float bloom = (m_bloomCombinedSRV.IsValid() ? m_bloomIntensity : 0.0f);
     frameData.timeAndExposure = glm::vec4(m_totalTime, deltaTime, m_exposure, bloom);
 
     glm::vec3 ambient = m_ambientLightColor * m_ambientLightIntensity;
@@ -660,9 +747,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
 
     // Post-process parameters: reciprocal resolution and FXAA flag
-    float invWidth = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetWidth()));
-    float invHeight = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetHeight()));
-    frameData.postParams = glm::vec4(invWidth, invHeight, m_fxaaEnabled ? 1.0f : 0.0f, 0.0f);
+    frameData.postParams = glm::vec4(
+        invWidth,
+        invHeight,
+        (m_taaEnabled ? 0.0f : (m_fxaaEnabled ? 1.0f : 0.0f)),
+        0.0f);
 
     // Image-based lighting parameters
     float iblEnabled = m_iblEnabled ? 1.0f : 0.0f;
@@ -681,6 +770,38 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_ssaoRadius,
         m_ssaoBias,
         m_ssaoIntensity);
+
+    // Bloom shaping parameters
+    frameData.bloomParams = glm::vec4(
+        m_bloomThreshold,
+        m_bloomSoftKnee,
+        m_bloomMaxContribution,
+        0.0f);
+
+    // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.
+    // Only enable TAA in the shader once we have a valid history buffer;
+    // this avoids sampling uninitialized history and causing color flashes
+    // on the first frame after startup or resize.
+    glm::vec2 jitterDeltaPixels = m_taaJitterPrevPixels - m_taaJitterCurrPixels;
+    glm::vec2 jitterDeltaUV = glm::vec2(jitterDeltaPixels.x * invWidth, jitterDeltaPixels.y * invHeight);
+    const bool taaActiveThisFrame = m_taaEnabled && m_hasHistory;
+    frameData.taaParams = glm::vec4(
+        jitterDeltaUV.x,
+        jitterDeltaUV.y,
+        m_taaBlendFactor,
+        taaActiveThisFrame ? 1.0f : 0.0f);
+
+    // Previous and inverse view-projection matrices for TAA reprojection
+    if (m_hasPrevViewProj) {
+        frameData.prevViewProjectionMatrix = m_prevViewProjMatrix;
+    } else {
+        frameData.prevViewProjectionMatrix = frameData.viewProjectionMatrix;
+    }
+    frameData.invViewProjectionMatrix = glm::inverse(frameData.viewProjectionMatrix);
+
+    // Update history for next frame
+    m_prevViewProjMatrix = frameData.viewProjectionMatrix;
+    m_hasPrevViewProj = true;
 
     m_frameDataCPU = frameData;
     m_frameConstantBuffer.UpdateData(m_frameDataCPU);
@@ -707,6 +828,238 @@ void Renderer::RenderSkybox() {
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+void Renderer::RenderSSR() {
+    if (!m_ssrPipeline || !m_ssrColor || !m_hdrColor || !m_gbufferNormalRoughness || !m_depthBuffer) {
+        return;
+    }
+
+    // Transition resources to appropriate states
+    D3D12_RESOURCE_BARRIER barriers[4] = {};
+    UINT barrierCount = 0;
+
+    if (m_ssrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_ssrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_ssrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_hdrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_hdrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+        barriers[barrierCount].Transition.StateBefore = m_gbufferNormalRoughnessState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (barrierCount > 0) {
+        m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    // Bind SSR render target
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_ssrRTV.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(hdrDesc.Width);
+    viewport.Height = static_cast<float>(hdrDesc.Height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect = {};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(hdrDesc.Width);
+    scissorRect.bottom = static_cast<LONG>(hdrDesc.Height);
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    // Clear SSR buffer
+    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+
+    // Bind pipeline and resources
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_ssrPipeline->GetPipelineState());
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // Frame constants
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Allocate transient descriptors for HDR (t0), depth (t1), normal/roughness (t2)
+    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (hdrHandleResult.IsErr()) {
+        spdlog::warn("RenderSSR: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+        return;
+    }
+    DescriptorHandle hdrHandle = hdrHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        hdrHandle.cpu,
+        m_hdrSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthHandleResult.IsErr()) {
+        spdlog::warn("RenderSSR: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
+        return;
+    }
+    DescriptorHandle depthHandle = depthHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        depthHandle.cpu,
+        m_depthSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    auto gbufHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (gbufHandleResult.IsErr()) {
+        spdlog::warn("RenderSSR: failed to allocate transient normal/roughness SRV: {}", gbufHandleResult.Error());
+        return;
+    }
+    DescriptorHandle gbufHandle = gbufHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        gbufHandle.cpu,
+        m_gbufferNormalRoughnessSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // Bind SRV table at slot 3 (t0-t2)
+    m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
+
+    // Shadow + environment descriptor table (space1) for potential future SSR IBL fallback
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+void Renderer::RenderMotionVectors() {
+    if (!m_motionVectorsPipeline || !m_velocityBuffer || !m_depthBuffer) {
+        return;
+    }
+
+    // Transition resources
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    UINT barrierCount = 0;
+
+    if (m_velocityState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_velocityBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_velocityState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (barrierCount > 0) {
+        m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    // Bind render target
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_velocityRTV.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_RESOURCE_DESC velDesc = m_velocityBuffer->GetDesc();
+
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(velDesc.Width);
+    viewport.Height = static_cast<float>(velDesc.Height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect = {};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(velDesc.Width);
+    scissorRect.bottom = static_cast<LONG>(velDesc.Height);
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+
+    // Bind pipeline/resources
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_motionVectorsPipeline->GetPipelineState());
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthHandleResult.IsErr()) {
+        spdlog::warn("RenderMotionVectors: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
+        return;
+    }
+    DescriptorHandle depthHandle = depthHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        depthHandle.cpu,
+        m_depthSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    m_commandList->SetGraphicsRootDescriptorTable(3, depthHandle.gpu);
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
+
+    // Motion vectors will be sampled in post-process
+    m_velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
 void Renderer::RenderScene(Scene::ECS_Registry* registry) {
@@ -1123,17 +1476,129 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(const std::st
     return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
 }
 
+Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
+    const uint8_t* data,
+    uint32_t width,
+    uint32_t height,
+    bool useSRGB,
+    const std::string& debugName)
+{
+    if (!data || width == 0 || height == 0) {
+        return Result<std::shared_ptr<DX12Texture>>::Err("Invalid texture data for Dreamer texture");
+    }
+
+    if (!m_device || !m_commandQueue || !m_descriptorManager) {
+        return Result<std::shared_ptr<DX12Texture>>::Err("Renderer is not initialized");
+    }
+
+    DX12Texture texture;
+    auto initResult = texture.InitializeFromData(
+        m_device->GetDevice(),
+        m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
+        m_commandQueue->GetCommandQueue(),
+        data,
+        width,
+        height,
+        useSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
+        debugName
+    );
+    if (initResult.IsErr()) {
+        return Result<std::shared_ptr<DX12Texture>>::Err(initResult.Error());
+    }
+
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        return Result<std::shared_ptr<DX12Texture>>::Err(
+            "Failed to allocate SRV for Dreamer texture '" + debugName + "': " + srvResult.Error());
+    }
+
+    auto createResult = texture.CreateSRV(m_device->GetDevice(), srvResult.Value());
+    if (createResult.IsErr()) {
+        return Result<std::shared_ptr<DX12Texture>>::Err(createResult.Error());
+    }
+
+    // Ensure upload completion before using on graphics queue
+    uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
+    if (m_uploadQueue && fence != 0) {
+        m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
+    }
+
+    return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
+}
+
 void Renderer::ToggleShadows() {
     m_shadowsEnabled = !m_shadowsEnabled;
     spdlog::info("Shadows {}", m_shadowsEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::SetTAAEnabled(bool enabled) {
+    if (m_taaEnabled == enabled) {
+        return;
+    }
+    m_taaEnabled = enabled;
+    // When toggling TAA, reset sample index so the Halton sequence
+    // restarts cleanly and avoid sudden large jumps in jitter.
+    m_taaSampleIndex = 0;
+    m_taaJitterPrevPixels = glm::vec2(0.0f);
+    m_taaJitterCurrPixels = glm::vec2(0.0f);
+    spdlog::info("TAA {}", m_taaEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::ToggleTAA() {
+    SetTAAEnabled(!m_taaEnabled);
+}
+
+void Renderer::SetSSREnabled(bool enabled) {
+    if (m_ssrEnabled == enabled) {
+        return;
+    }
+    m_ssrEnabled = enabled;
+    spdlog::info("SSR {}", m_ssrEnabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::ToggleSSR() {
+    SetSSREnabled(!m_ssrEnabled);
+}
+
+void Renderer::CycleScreenSpaceEffectsDebug() {
+    // Determine current state from flags:
+    // 0 = both on, 1 = SSR only, 2 = SSAO only, 3 = both off
+    uint32_t state = 0;
+    if (m_ssrEnabled && m_ssaoEnabled) {
+        state = 0;
+    } else if (m_ssrEnabled && !m_ssaoEnabled) {
+        state = 1;
+    } else if (!m_ssrEnabled && m_ssaoEnabled) {
+        state = 2;
+    } else {
+        state = 3;
+    }
+
+    uint32_t next = (state + 1u) % 4u;
+    bool ssrOn = (next == 0u || next == 1u);
+    bool ssaoOn = (next == 0u || next == 2u);
+
+    SetSSREnabled(ssrOn);
+    SetSSAOEnabled(ssaoOn);
+
+    const char* label = nullptr;
+    switch (next) {
+        case 0: label = "Both SSR and SSAO ENABLED"; break;
+        case 1: label = "SSR ONLY (SSAO disabled)"; break;
+        case 2: label = "SSAO ONLY (SSR disabled)"; break;
+        case 3: label = "Both SSR and SSAO DISABLED"; break;
+        default: label = "Unknown"; break;
+    }
+    spdlog::info("Screen-space effects debug state: {}", label);
 }
 
 void Renderer::CycleDebugViewMode() {
     // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
     // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height,
     // 8 = IBL diffuse only, 9 = IBL specular only, 10 = env direction/UV,
-    // 11 = Fresnel (Fibl), 12 = specular mip debug
-    m_debugViewMode = (m_debugViewMode + 1) % 13;
+    // 11 = Fresnel (Fibl), 12 = specular mip debug,
+    // 13 = SSAO only, 14 = SSAO overlay, 15 = SSR only, 16 = SSR overlay
+    m_debugViewMode = (m_debugViewMode + 1) % 17;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -1149,6 +1614,10 @@ void Renderer::CycleDebugViewMode() {
         case 10: label = "EnvDirection"; break;
         case 11: label = "Fresnel"; break;
         case 12: label = "SpecularMip"; break;
+        case 13: label = "SSAO_Only"; break;
+        case 14: label = "SSAO_Overlay"; break;
+        case 15: label = "SSR_Only"; break;
+        case 16: label = "SSR_Overlay"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -1198,7 +1667,7 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 }
 
 void Renderer::SetDebugViewMode(int mode) {
-    int clamped = std::max(0, std::min(mode, 12));
+    int clamped = std::max(0, std::min(mode, 16));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -1358,11 +1827,31 @@ void Renderer::CycleEnvironmentPreset() {
         return;
     }
 
-    m_currentEnvironment = (m_currentEnvironment + 1) % m_environmentMaps.size();
-    UpdateEnvironmentDescriptorTable();
+    // Treat "no IBL" as an extra preset in the cycle:
+    //   env0 -> env1 -> ... -> envN-1 -> None -> env0 -> ...
+    if (!m_iblEnabled) {
+        // Currently in "no IBL" mode; re-enable and jump to the first environment.
+        SetIBLEnabled(true);
+        m_currentEnvironment = 0;
+        UpdateEnvironmentDescriptorTable();
 
-    const std::string& name = m_environmentMaps[m_currentEnvironment].name;
-    spdlog::info("Environment cycled to '{}' ({}/{})", name, m_currentEnvironment + 1, m_environmentMaps.size());
+        const std::string& name = m_environmentMaps[m_currentEnvironment].name;
+        spdlog::info("Environment cycled to '{}' ({}/{})", name, m_currentEnvironment + 1, m_environmentMaps.size());
+        return;
+    }
+
+    if (m_currentEnvironment + 1 < m_environmentMaps.size()) {
+        // Advance to the next environment preset.
+        m_currentEnvironment++;
+        UpdateEnvironmentDescriptorTable();
+
+        const std::string& name = m_environmentMaps[m_currentEnvironment].name;
+        spdlog::info("Environment cycled to '{}' ({}/{})", name, m_currentEnvironment + 1, m_environmentMaps.size());
+    } else {
+        // Wrapped past the last preset: switch to a neutral "no IBL" mode.
+        SetIBLEnabled(false);
+        spdlog::info("Environment cycled to 'None' (no IBL)");
+    }
 }
 
 void Renderer::SetColorGrade(float warm, float cool) {
@@ -1740,6 +2229,261 @@ Result<void> Renderer::CreateHDRTarget() {
 
     spdlog::info("HDR target created: {}x{}", width, height);
 
+    // Normal/roughness G-buffer target (full resolution, matched to HDR)
+    m_gbufferNormalRoughness.Reset();
+    m_gbufferNormalRoughnessRTV = {};
+    m_gbufferNormalRoughnessSRV = {};
+    m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC gbufDesc = desc;
+    gbufDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+    D3D12_CLEAR_VALUE gbufClear = {};
+    gbufClear.Format = gbufDesc.Format;
+    gbufClear.Color[0] = 0.5f; // Encoded normal (0,0,1) -> (0.5,0.5,1.0)
+    gbufClear.Color[1] = 0.5f;
+    gbufClear.Color[2] = 1.0f;
+    gbufClear.Color[3] = 1.0f; // Roughness default
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &gbufDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &gbufClear,
+        IID_PPV_ARGS(&m_gbufferNormalRoughness)
+    );
+
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create normal/roughness G-buffer target");
+    } else {
+        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        // RTV for G-buffer
+        auto gbufRtvResult = m_descriptorManager->AllocateRTV();
+        if (gbufRtvResult.IsErr()) {
+            spdlog::warn("Failed to allocate RTV for normal/roughness G-buffer: {}", gbufRtvResult.Error());
+        } else {
+            m_gbufferNormalRoughnessRTV = gbufRtvResult.Value();
+
+            D3D12_RENDER_TARGET_VIEW_DESC gbufRtvDesc = {};
+            gbufRtvDesc.Format = gbufDesc.Format;
+            gbufRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+            m_device->GetDevice()->CreateRenderTargetView(
+                m_gbufferNormalRoughness.Get(),
+                &gbufRtvDesc,
+                m_gbufferNormalRoughnessRTV.cpu
+            );
+        }
+
+        // SRV for sampling G-buffer in SSR/post
+        auto gbufSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (gbufSrvResult.IsErr()) {
+            spdlog::warn("Failed to allocate SRV for normal/roughness G-buffer: {}", gbufSrvResult.Error());
+        } else {
+            m_gbufferNormalRoughnessSRV = gbufSrvResult.Value();
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC gbufSrvDesc = {};
+            gbufSrvDesc.Format = gbufDesc.Format;
+            gbufSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            gbufSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            gbufSrvDesc.Texture2D.MipLevels = 1;
+
+            m_device->GetDevice()->CreateShaderResourceView(
+                m_gbufferNormalRoughness.Get(),
+                &gbufSrvDesc,
+                m_gbufferNormalRoughnessSRV.cpu
+            );
+        }
+    }
+
+    // (Re)create history color buffer for temporal AA (LDR, back-buffer format)
+    m_historyColor.Reset();
+    m_historySRV = {};
+    m_historyState = D3D12_RESOURCE_STATE_COMMON;
+    m_hasHistory = false;
+
+    D3D12_RESOURCE_DESC historyDesc = {};
+    historyDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    historyDesc.Width = width;
+    historyDesc.Height = height;
+    historyDesc.DepthOrArraySize = 1;
+    historyDesc.MipLevels = 1;
+    historyDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    historyDesc.SampleDesc.Count = 1;
+    historyDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &historyDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&m_historyColor)
+    );
+
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create TAA history buffer");
+    } else {
+        m_historyState = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        if (!m_historySRV.IsValid()) {
+            auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (historySrvResult.IsErr()) {
+                spdlog::warn("Failed to allocate SRV for TAA history: {}", historySrvResult.Error());
+            } else {
+                m_historySRV = historySrvResult.Value();
+
+                D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc = {};
+                historySrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                historySrvDesc.Texture2D.MipLevels = 1;
+
+                m_device->GetDevice()->CreateShaderResourceView(
+                    m_historyColor.Get(),
+                    &historySrvDesc,
+                    m_historySRV.cpu
+                );
+            }
+        }
+    }
+
+    // (Re)create SSR color buffer (matches HDR resolution/format)
+    m_ssrColor.Reset();
+    m_ssrRTV = {};
+    m_ssrSRV = {};
+    m_ssrState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC ssrDesc = desc;
+    ssrDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+    D3D12_CLEAR_VALUE ssrClear = {};
+    ssrClear.Format = ssrDesc.Format;
+    ssrClear.Color[0] = 0.0f;
+    ssrClear.Color[1] = 0.0f;
+    ssrClear.Color[2] = 0.0f;
+    ssrClear.Color[3] = 0.0f;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &ssrDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &ssrClear,
+        IID_PPV_ARGS(&m_ssrColor)
+    );
+
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create SSR color buffer");
+    } else {
+        m_ssrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        auto ssrRtvResult = m_descriptorManager->AllocateRTV();
+        if (ssrRtvResult.IsErr()) {
+            spdlog::warn("Failed to allocate RTV for SSR buffer: {}", ssrRtvResult.Error());
+        } else {
+            m_ssrRTV = ssrRtvResult.Value();
+
+            D3D12_RENDER_TARGET_VIEW_DESC ssrRtvDesc = {};
+            ssrRtvDesc.Format = ssrDesc.Format;
+            ssrRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+            m_device->GetDevice()->CreateRenderTargetView(
+                m_ssrColor.Get(),
+                &ssrRtvDesc,
+                m_ssrRTV.cpu
+            );
+        }
+
+        auto ssrSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (ssrSrvResult.IsErr()) {
+            spdlog::warn("Failed to allocate SRV for SSR buffer: {}", ssrSrvResult.Error());
+        } else {
+            m_ssrSRV = ssrSrvResult.Value();
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC ssrSrvDesc = {};
+            ssrSrvDesc.Format = ssrDesc.Format;
+            ssrSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            ssrSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            ssrSrvDesc.Texture2D.MipLevels = 1;
+
+            m_device->GetDevice()->CreateShaderResourceView(
+                m_ssrColor.Get(),
+                &ssrSrvDesc,
+                m_ssrSRV.cpu
+            );
+        }
+    }
+
+    // (Re)create motion vector buffer (camera-only velocity in UV space)
+    m_velocityBuffer.Reset();
+    m_velocityRTV = {};
+    m_velocitySRV = {};
+    m_velocityState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC velDesc = desc;
+    velDesc.Format = DXGI_FORMAT_R16G16_FLOAT;
+
+    D3D12_CLEAR_VALUE velClear = {};
+    velClear.Format = velDesc.Format;
+    velClear.Color[0] = 0.0f;
+    velClear.Color[1] = 0.0f;
+    velClear.Color[2] = 0.0f;
+    velClear.Color[3] = 0.0f;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &velDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &velClear,
+        IID_PPV_ARGS(&m_velocityBuffer)
+    );
+
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create motion vector buffer");
+    } else {
+        m_velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        auto velRtvResult = m_descriptorManager->AllocateRTV();
+        if (velRtvResult.IsErr()) {
+            spdlog::warn("Failed to allocate RTV for motion vector buffer: {}", velRtvResult.Error());
+        } else {
+            m_velocityRTV = velRtvResult.Value();
+
+            D3D12_RENDER_TARGET_VIEW_DESC velRtvDesc = {};
+            velRtvDesc.Format = velDesc.Format;
+            velRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+            m_device->GetDevice()->CreateRenderTargetView(
+                m_velocityBuffer.Get(),
+                &velRtvDesc,
+                m_velocityRTV.cpu
+            );
+        }
+
+        auto velSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (velSrvResult.IsErr()) {
+            spdlog::warn("Failed to allocate SRV for motion vector buffer: {}", velSrvResult.Error());
+        } else {
+            m_velocitySRV = velSrvResult.Value();
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC velSrvDesc = {};
+            velSrvDesc.Format = velDesc.Format;
+            velSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            velSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            velSrvDesc.Texture2D.MipLevels = 1;
+
+            m_device->GetDevice()->CreateShaderResourceView(
+                m_velocityBuffer.Get(),
+                &velSrvDesc,
+                m_velocitySRV.cpu
+            );
+        }
+    }
+
     // (Re)create bloom render targets that depend on HDR size
     auto bloomResult = CreateBloomResources();
     if (bloomResult.IsErr()) {
@@ -1856,6 +2600,44 @@ Result<void> Renderer::CompileShaders() {
         spdlog::warn("Failed to compile SSAO pixel shader: {}", ssaoPsResult.Error());
     }
 
+    // SSR shaders (fullscreen reflections pass)
+    auto ssrVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/SSR.hlsl",
+        "VSMain",
+        "vs_5_1"
+    );
+    if (ssrVsResult.IsErr()) {
+        spdlog::warn("Failed to compile SSR vertex shader: {}", ssrVsResult.Error());
+    }
+
+    auto ssrPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/SSR.hlsl",
+        "SSRPS",
+        "ps_5_1"
+    );
+    if (ssrPsResult.IsErr()) {
+        spdlog::warn("Failed to compile SSR pixel shader: {}", ssrPsResult.Error());
+    }
+
+    // Motion vector pass (camera-only velocity)
+    auto motionVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/MotionVectors.hlsl",
+        "VSMain",
+        "vs_5_1"
+    );
+    if (motionVsResult.IsErr()) {
+        spdlog::warn("Failed to compile motion vector vertex shader: {}", motionVsResult.Error());
+    }
+
+    auto motionPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/MotionVectors.hlsl",
+        "PSMain",
+        "ps_5_1"
+    );
+    if (motionPsResult.IsErr()) {
+        spdlog::warn("Failed to compile motion vector pixel shader: {}", motionPsResult.Error());
+    }
+
     // Store compiled shaders (we'll use them in CreatePipeline)
     // For now, we'll just recreate the root signature and pipeline
 
@@ -1871,6 +2653,9 @@ Result<void> Renderer::CompileShaders() {
     PipelineDesc pipelineDesc = {};
     pipelineDesc.vertexShader = vsResult.Value();
     pipelineDesc.pixelShader = psResult.Value();
+    pipelineDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    pipelineDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+    pipelineDesc.numRenderTargets = 2;
 
     // Define input layout
     pipelineDesc.inputLayout = {
@@ -1997,10 +2782,65 @@ Result<void> Renderer::CompileShaders() {
         }
     }
 
+    // SSR pipeline (fullscreen reflections into dedicated buffer)
+    if (ssrVsResult.IsOk() && ssrPsResult.IsOk()) {
+        m_ssrPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc ssrDesc = {};
+        ssrDesc.vertexShader = ssrVsResult.Value();
+        ssrDesc.pixelShader  = ssrPsResult.Value();
+        ssrDesc.inputLayout = {}; // fullscreen triangle via SV_VertexID
+        ssrDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        ssrDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        ssrDesc.numRenderTargets = 1;
+        ssrDesc.depthTestEnabled = false;
+        ssrDesc.depthWriteEnabled = false;
+        ssrDesc.cullMode = D3D12_CULL_MODE_NONE;
+        ssrDesc.blendEnabled = false;
+
+        auto ssrPipelineResult = m_ssrPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            ssrDesc
+        );
+        if (ssrPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create SSR pipeline: {}", ssrPipelineResult.Error());
+            m_ssrPipeline.reset();
+        }
+    }
+
+    // Motion vectors pipeline (fullscreen pass into RG16F buffer)
+    if (motionVsResult.IsOk() && motionPsResult.IsOk()) {
+        m_motionVectorsPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc mvDesc = {};
+        mvDesc.vertexShader = motionVsResult.Value();
+        mvDesc.pixelShader  = motionPsResult.Value();
+        mvDesc.inputLayout = {}; // fullscreen triangle via SV_VertexID
+        mvDesc.rtvFormat = DXGI_FORMAT_R16G16_FLOAT;
+        mvDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        mvDesc.numRenderTargets = 1;
+        mvDesc.depthTestEnabled = false;
+        mvDesc.depthWriteEnabled = false;
+        mvDesc.cullMode = D3D12_CULL_MODE_NONE;
+        mvDesc.blendEnabled = false;
+
+        auto mvPipelineResult = m_motionVectorsPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            mvDesc
+        );
+        if (mvPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create motion vectors pipeline: {}", mvPipelineResult.Error());
+            m_motionVectorsPipeline.reset();
+        }
+    }
+
     // Bloom pipelines (fullscreen passes reusing VSMain)
     // Downsample + bright-pass
     m_bloomDownsamplePipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomDownDesc = postDesc;
+    bloomDownDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     bloomDownDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomDownsamplePS",
@@ -2018,6 +2858,7 @@ Result<void> Renderer::CompileShaders() {
     // Horizontal blur
     m_bloomBlurHPipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomBlurHDesc = postDesc;
+    bloomBlurHDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     bloomBlurHDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomBlurHPS",
@@ -2035,6 +2876,7 @@ Result<void> Renderer::CompileShaders() {
     // Vertical blur
     m_bloomBlurVPipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomBlurVDesc = postDesc;
+    bloomBlurVDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
     bloomBlurVDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomBlurVPS",
@@ -2047,6 +2889,25 @@ Result<void> Renderer::CompileShaders() {
     );
     if (bloomBlurVResult.IsErr()) {
         return Result<void>::Err("Failed to create bloom vertical blur pipeline: " + bloomBlurVResult.Error());
+    }
+
+    // Composite / upsample (additive) into base bloom level
+    m_bloomCompositePipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc bloomCompositeDesc = postDesc;
+    bloomCompositeDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    bloomCompositeDesc.pixelShader = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "BloomUpsamplePS",
+        "ps_5_1"
+    ).ValueOr(postPsResult.Value());
+    bloomCompositeDesc.blendEnabled = true;
+    auto bloomCompositeResult = m_bloomCompositePipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        bloomCompositeDesc
+    );
+    if (bloomCompositeResult.IsErr()) {
+        return Result<void>::Err("Failed to create bloom composite pipeline: " + bloomCompositeResult.Error());
     }
 
     return Result<void>::Ok();
@@ -2140,15 +3001,150 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     // Sort environment files alphabetically for consistent ordering
     std::sort(envFiles.begin(), envFiles.end());
 
-    // Load all HDR and EXR files
+    // CPU helper: direction -> equirectangular UV consistent with shader mapping.
+    auto DirectionToLatLongCPU = [](const glm::vec3& dirNorm) -> glm::vec2 {
+        glm::vec3 d = glm::normalize(dirNorm);
+        float phi = std::atan2(d.z, d.x);
+        float theta = std::acos(glm::clamp(d.y, -1.0f, 1.0f));
+        glm::vec2 uv;
+        uv.x = (phi / (2.0f * glm::pi<float>())) + 0.5f;
+        uv.y = theta / glm::pi<float>();
+        return uv;
+    };
+
+    auto GenerateCubeFromEquirect = [&](const std::string& path,
+                                        const std::string& name)
+        -> Result<std::shared_ptr<DX12Texture>> {
+        auto imgResult = TextureLoader::LoadImageRGBAWithMips(path, false);
+        if (imgResult.IsErr() || imgResult.Value().empty()) {
+            return Result<std::shared_ptr<DX12Texture>>::Err(
+                "Failed to load environment image for cubemap: " + path);
+        }
+        const auto& base = imgResult.Value().front();
+        uint32_t srcW = base.width;
+        uint32_t srcH = base.height;
+        if (srcW == 0 || srcH == 0) {
+            return Result<std::shared_ptr<DX12Texture>>::Err(
+                "Environment image has zero size: " + path);
+        }
+
+        uint32_t faceSize = std::max(1u, srcH / 2);
+
+        std::vector<std::vector<uint8_t>> faces(6);
+        for (int f = 0; f < 6; ++f) {
+            faces[f].resize(static_cast<size_t>(faceSize) * faceSize * 4);
+        }
+
+        auto sampleEquirect = [&](float u, float v) -> glm::vec4 {
+            u = std::fmod(u, 1.0f);
+            if (u < 0.0f) u += 1.0f;
+            v = glm::clamp(v, 0.0f, 1.0f);
+
+            float x = u * (srcW - 1);
+            float y = v * (srcH - 1);
+            int x0 = static_cast<int>(std::floor(x));
+            int y0 = static_cast<int>(std::floor(y));
+            int x1 = std::min(x0 + 1, static_cast<int>(srcW - 1));
+            int y1 = std::min(y0 + 1, static_cast<int>(srcH - 1));
+            float tx = x - static_cast<float>(x0);
+            float ty = y - static_cast<float>(y0);
+
+            auto texel = [&](int ix, int iy) -> glm::vec4 {
+                size_t idx = (static_cast<size_t>(iy) * srcW + ix) * 4;
+                const auto* p = base.pixels.data() + idx;
+                return glm::vec4(p[0], p[1], p[2], p[3]) * (1.0f / 255.0f);
+            };
+
+            glm::vec4 c00 = texel(x0, y0);
+            glm::vec4 c10 = texel(x1, y0);
+            glm::vec4 c01 = texel(x0, y1);
+            glm::vec4 c11 = texel(x1, y1);
+
+            glm::vec4 cx0 = glm::mix(c00, c10, tx);
+            glm::vec4 cx1 = glm::mix(c01, c11, tx);
+            return glm::mix(cx0, cx1, ty);
+        };
+
+        auto faceDir = [&](int face, float u, float v) -> glm::vec3 {
+            switch (face) {
+                case 0: return glm::normalize(glm::vec3( 1.0f,    v,   -u)); // +X
+                case 1: return glm::normalize(glm::vec3(-1.0f,    v,    u)); // -X
+                case 2: return glm::normalize(glm::vec3(   u,  1.0f,   -v)); // +Y
+                case 3: return glm::normalize(glm::vec3(   u, -1.0f,    v)); // -Y
+                case 4: return glm::normalize(glm::vec3(   u,    v,  1.0f)); // +Z
+                case 5: return glm::normalize(glm::vec3(  -u,    v, -1.0f)); // -Z
+                default: return glm::vec3(0.0f, 0.0f, 1.0f);
+            }
+        };
+
+        for (int face = 0; face < 6; ++face) {
+            auto& dst = faces[face];
+            for (uint32_t y = 0; y < faceSize; ++y) {
+                for (uint32_t x = 0; x < faceSize; ++x) {
+                    float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(faceSize);
+                    float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(faceSize);
+                    float sx = 2.0f * u - 1.0f;
+                    float sy = 2.0f * v - 1.0f;
+
+                    glm::vec3 dir = faceDir(face, sx, sy);
+                    glm::vec2 uv = DirectionToLatLongCPU(dir);
+                    glm::vec4 c = sampleEquirect(uv.x, uv.y);
+
+                    size_t idx = (static_cast<size_t>(y) * faceSize + x) * 4;
+                    dst[idx + 0] = static_cast<uint8_t>(glm::clamp(c.r, 0.0f, 1.0f) * 255.0f + 0.5f);
+                    dst[idx + 1] = static_cast<uint8_t>(glm::clamp(c.g, 0.0f, 1.0f) * 255.0f + 0.5f);
+                    dst[idx + 2] = static_cast<uint8_t>(glm::clamp(c.b, 0.0f, 1.0f) * 255.0f + 0.5f);
+                    dst[idx + 3] = static_cast<uint8_t>(glm::clamp(c.a, 0.0f, 1.0f) * 255.0f + 0.5f);
+                }
+            }
+        }
+
+        DX12Texture tex;
+        auto initCube = tex.InitializeCubeFromFaces(
+            m_device->GetDevice(),
+            m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
+            m_commandQueue->GetCommandQueue(),
+            faces,
+            faceSize,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            name
+        );
+        if (initCube.IsErr()) {
+            return Result<std::shared_ptr<DX12Texture>>::Err(initCube.Error());
+        }
+
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<std::shared_ptr<DX12Texture>>::Err(
+                "Failed to allocate SRV for cubemap environment " + name + ": " + srvResult.Error());
+        }
+
+        auto createSRVResult = tex.CreateSRV(m_device->GetDevice(), srvResult.Value());
+        if (createSRVResult.IsErr()) {
+            return Result<std::shared_ptr<DX12Texture>>::Err(createSRVResult.Error());
+        }
+
+        uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
+        if (m_uploadQueue && fence != 0) {
+            m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
+        }
+
+        return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(tex)));
+    };
+
+    // Load all HDR and EXR files as cubemaps
     int successCount = 0;
     int failCount = 0;
     for (const auto& envPath : envFiles) {
         std::string pathStr = envPath.string();
         std::string name = envPath.stem().string(); // filename without extension
 
-        if (auto envTex = LoadTextureFromFile(pathStr, /*useSRGB=*/false); envTex.IsOk()) {
-            auto tex = envTex.Value();
+        auto cubeResult = GenerateCubeFromEquirect(pathStr, name);
+        if (cubeResult.IsErr()) {
+            spdlog::warn("Failed to load environment from '{}': {}", pathStr, cubeResult.Error());
+            failCount++;
+        } else {
+            auto tex = cubeResult.Value();
 
             EnvironmentMaps env;
             env.name = name;
@@ -2158,7 +3154,7 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
             m_environmentMaps.push_back(env);
 
             spdlog::info(
-                "Environment '{}' loaded from '{}': {}x{}, {} mips",
+                "Environment '{}' loaded as cubemap from '{}': {}x{}, {} mips",
                 name,
                 pathStr,
                 tex->GetWidth(),
@@ -2166,9 +3162,6 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                 tex->GetMipLevels());
 
             successCount++;
-        } else {
-            spdlog::warn("Failed to load environment from '{}'", pathStr);
-            failCount++;
         }
     }
 
@@ -2200,6 +3193,37 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     spdlog::info("Environment maps initialized: {} loaded successfully, {} failed",
                  successCount, failCount);
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name) {
+    if (!tex) {
+        return Result<void>::Err("AddEnvironmentFromTexture called with null texture");
+    }
+
+    EnvironmentMaps env;
+    env.name = name.empty() ? "DreamerEnv" : name;
+    env.diffuseIrradiance = tex;
+    env.specularPrefiltered = tex;
+
+    m_environmentMaps.push_back(env);
+    m_currentEnvironment = m_environmentMaps.size() - 1;
+
+    spdlog::info("Environment '{}' registered from Dreamer texture ({}x{}, {} mips)",
+                 env.name, tex->GetWidth(), tex->GetHeight(), tex->GetMipLevels());
+
+    // Ensure descriptor table exists, then refresh bindings.
+    if (!m_shadowAndEnvDescriptors[0].IsValid() && m_descriptorManager) {
+        for (int i = 0; i < 3; ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate SRV table for Dreamer environment: " + handleResult.Error());
+            }
+            m_shadowAndEnvDescriptors[i] = handleResult.Value();
+        }
+    }
+
+    UpdateEnvironmentDescriptorTable();
     return Result<void>::Ok();
 }
 
@@ -2320,15 +3344,18 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     for (uint32_t cascadeIndex = 0; cascadeIndex < kShadowCascadeCount; ++cascadeIndex) {
-        // Update shadow constants with current cascade index
+        // Update shadow constants with current cascade index. Use a
+        // per-cascade slice in the constant buffer so each cascade
+        // sees the correct index even though all draws share a single
+        // command list and execution happens later on the GPU.
         ShadowConstants shadowData{};
         shadowData.cascadeIndex = glm::uvec4(cascadeIndex, 0u, 0u, 0u);
-        m_shadowConstantBuffer.UpdateData(shadowData);
+        D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_shadowConstantBuffer.AllocateAndWrite(shadowData);
 
         // Bind frame constants
         m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
         // Bind shadow constants (b3)
-        m_commandList->SetGraphicsRootConstantBufferView(5, m_shadowConstantBuffer.gpuAddress);
+        m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
         // Bind DSV for this cascade
         D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMapDSVs[cascadeIndex].cpu;
@@ -2459,7 +3486,7 @@ void Renderer::RenderPostProcess() {
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Allocate transient descriptors for HDR (t0), bloom (t1), and SSAO (t2)
+    // Allocate transient descriptors for HDR (t0), bloom (t1), SSAO (t2), and optional TAA history (t3)
     if (!m_hdrSRV.IsValid()) {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
@@ -2481,14 +3508,14 @@ void Renderer::RenderPostProcess() {
 
     // Optional bloom SRV (t1) – use final blurred bloom texture if available
     DescriptorHandle bloomHandle = {};
-    if (m_bloomSRV[0].IsValid()) {
+    if (m_bloomCombinedSRV.IsValid()) {
         auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
         if (bloomAllocResult.IsOk()) {
             bloomHandle = bloomAllocResult.Value();
             m_device->GetDevice()->CopyDescriptorsSimple(
                 1,
                 bloomHandle.cpu,
-                m_bloomSRV[0].cpu,
+                m_bloomCombinedSRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
             );
         } else {
@@ -2521,6 +3548,91 @@ void Renderer::RenderPostProcess() {
         m_frameConstantBuffer.UpdateData(m_frameDataCPU);
     }
 
+    // Optional TAA history SRV (t3)
+    if (m_taaEnabled && m_hasHistory && m_historySRV.IsValid()) {
+        auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (historyAllocResult.IsOk()) {
+            DescriptorHandle historyHandle = historyAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                historyHandle.cpu,
+                m_historySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            // Descriptor heap exhaustion is rare, but if it happens we must
+            // ensure the shader does not sample an uninitialized history SRV.
+            spdlog::warn("RenderPostProcess: failed to allocate transient history SRV, disabling TAA for this frame");
+            m_hasHistory = false;
+            m_frameDataCPU.taaParams.w = 0.0f;
+            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+        }
+    }
+
+    // Depth SRV (t4) for TAA reprojection and debug visualizations.
+    if (m_depthSRV.IsValid() && m_depthBuffer) {
+        auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (depthAllocResult.IsOk()) {
+            DescriptorHandle depthHandle = depthAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                depthHandle.cpu,
+                m_depthSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient depth SRV; TAA reprojection will fall back to jitter-only");
+        }
+    }
+
+    // Normal/roughness G-buffer SRV (t5) for SSR/compositing.
+    if (m_gbufferNormalRoughnessSRV.IsValid() && m_gbufferNormalRoughness) {
+        auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (gbufAllocResult.IsOk()) {
+            DescriptorHandle gbufHandle = gbufAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                gbufHandle.cpu,
+                m_gbufferNormalRoughnessSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient normal/roughness SRV; SSR compositing debug will be limited");
+        }
+    }
+
+    // SSR color buffer SRV (t6) holding reflection color (rgb) and weight (a).
+    if (m_ssrSRV.IsValid() && m_ssrColor) {
+        auto ssrAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (ssrAllocResult.IsOk()) {
+            DescriptorHandle ssrHandle = ssrAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                ssrHandle.cpu,
+                m_ssrSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient SSR SRV; reflections will be disabled this frame");
+        }
+    }
+
+    // Motion vector buffer SRV (t7) for motion-aware TAA and blur.
+    if (m_velocitySRV.IsValid() && m_velocityBuffer) {
+        auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (velAllocResult.IsOk()) {
+            DescriptorHandle velHandle = velAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                velHandle.cpu,
+                m_velocitySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient velocity SRV; motion-aware TAA/blur will be disabled this frame");
+        }
+    }
+
     // Bind SRV table starting at t0
     m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
 
@@ -2531,5 +3643,51 @@ void Renderer::RenderPostProcess() {
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawInstanced(3, 1, 0, 0);
+
+    // After post-process, copy the LDR back buffer into the history buffer for next frame's TAA.
+    if (m_taaEnabled && m_historyColor && m_historySRV.IsValid()) {
+        D3D12_RESOURCE_BARRIER barriers[2] = {};
+        UINT barrierCountHistory = 0;
+
+        if (m_historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            barriers[barrierCountHistory].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCountHistory].Transition.pResource = m_historyColor.Get();
+            barriers[barrierCountHistory].Transition.StateBefore = m_historyState;
+            barriers[barrierCountHistory].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            barriers[barrierCountHistory].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCountHistory;
+        }
+
+        // Back buffer RT -> COPY_SOURCE for the copy
+        barriers[barrierCountHistory].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCountHistory].Transition.pResource = m_window->GetCurrentBackBuffer();
+        barriers[barrierCountHistory].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[barrierCountHistory].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        barriers[barrierCountHistory].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCountHistory;
+
+        m_commandList->ResourceBarrier(barrierCountHistory, barriers);
+
+        m_commandList->CopyResource(m_historyColor.Get(), m_window->GetCurrentBackBuffer());
+
+        // Transition back buffer back to RENDER_TARGET and history to PIXEL_SHADER_RESOURCE
+        D3D12_RESOURCE_BARRIER postCopyBarriers[2] = {};
+
+        postCopyBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postCopyBarriers[0].Transition.pResource = m_window->GetCurrentBackBuffer();
+        postCopyBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        postCopyBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        postCopyBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        postCopyBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postCopyBarriers[1].Transition.pResource = m_historyColor.Get();
+        postCopyBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        postCopyBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        postCopyBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        m_commandList->ResourceBarrier(2, postCopyBarriers);
+        m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_hasHistory = true;
+    }
 }
 } // namespace Cortex::Graphics

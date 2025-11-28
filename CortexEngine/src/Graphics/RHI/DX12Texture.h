@@ -24,6 +24,8 @@ struct TextureDesc {
     D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
     D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
     bool allowCudaInterop = false;  // For Phase 3: AI texture generation
+    // Optional array size / cubemap support (arraySize=6 => cube)
+    uint32_t arraySize = 1;
 };
 
 // DX12 Texture wrapper - supports hot-swapping via replaceRegion-style updates
@@ -91,6 +93,17 @@ public:
     // Create Shader Resource View (SRV) for binding to shaders
     Result<void> CreateSRV(ID3D12Device* device, DescriptorHandle handle);
 
+    // Cubemap initialization from 6 RGBA8 faces (order: +X,-X,+Y,-Y,+Z,-Z)
+    Result<void> InitializeCubeFromFaces(
+        ID3D12Device* device,
+        ID3D12CommandQueue* copyQueue,
+        ID3D12CommandQueue* graphicsQueue,
+        const std::vector<std::vector<uint8_t>>& faceData,
+        uint32_t faceSize,
+        DXGI_FORMAT format,
+        const std::string& debugName = ""
+    );
+
     // Accessors
     [[nodiscard]] ID3D12Resource* GetResource() const { return m_resource.Get(); }
     [[nodiscard]] uint32_t GetWidth() const { return m_width; }
@@ -112,6 +125,7 @@ private:
     D3D12_RESOURCE_STATES m_currentState = D3D12_RESOURCE_STATE_COMMON;
 
     DescriptorHandle m_srvHandle;  // Shader Resource View handle
+    bool m_isCubeMap = false;
 
     // Helper for uploading data via upload buffer
     Result<void> UploadTextureData(

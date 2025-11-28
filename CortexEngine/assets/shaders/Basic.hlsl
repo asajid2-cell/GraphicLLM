@@ -13,6 +13,7 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_ViewMatrix;
     float4x4 g_ProjectionMatrix;
     float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
     float4 g_CameraPosition;
     // x = time, y = deltaTime, z = exposure, w = unused
     float4 g_TimeAndExposure;
@@ -32,9 +33,14 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_LightViewProjection[4];
     // x,y,z = cascade split depths in view space, w = far plane
     float4 g_CascadeSplits;
-    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w unused
+    // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     float4 g_ShadowParams;
-    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo, 5 = cascade index), others reserved
+    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic,
+    //                      4 = albedo, 5 = cascade index, 6 = debug screen,
+    //                      7 = fractal height, 8 = IBL diffuse only,
+    //                      9 = IBL specular only, 10 = env direction/UV,
+    //                      11 = Fresnel (Fibl), 12 = specular mip,
+    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
     float4 g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
     float4 g_PostParams;
@@ -45,6 +51,10 @@ cbuffer FrameConstants : register(b1)
     float4 g_ColorGrade;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4 g_AOParams;
+    // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
+    float4 g_TAAParams;
+    float4x4 g_PrevViewProjMatrix;
+    float4x4 g_InvViewProjMatrix;
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -69,9 +79,11 @@ Texture2D g_AlbedoTexture : register(t0);
 Texture2D g_NormalTexture : register(t1);
 Texture2D g_MetallicTexture : register(t2);
 Texture2D g_RoughnessTexture : register(t3);
-Texture2DArray g_ShadowMap : register(t4);
-Texture2D g_EnvDiffuse : register(t5);
-Texture2D g_EnvSpecular : register(t6);
+// Shadow map + IBL textures are bound in a separate descriptor table (space1)
+// to avoid overlapping with per-pass textures in space0.
+Texture2DArray g_ShadowMap : register(t0, space1);
+TextureCube g_EnvDiffuse : register(t1, space1);
+TextureCube g_EnvSpecular : register(t2, space1);
 SamplerState g_Sampler : register(s0);
 
 // Vertex shader input
@@ -284,8 +296,24 @@ float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
 float2 DirectionToLatLong(float3 dir)
 {
     dir = normalize(dir);
-    float phi = atan2(dir.z, dir.x);    // [-PI, PI], +Z forward
-    float theta = acos(saturate(dir.y)); // [0, PI]
+
+    // Guard against NaNs and degenerate directions
+    if (!all(isfinite(dir))) {
+        dir = float3(0.0f, 0.0f, 1.0f);
+    }
+
+    // Handle poles explicitly to avoid atan2(0,0) instability and to pick a
+    // consistent longitude when looking straight up/down.
+    float absY = abs(dir.y);
+    if (absY > 0.9999f) {
+        float2 uvPole;
+        uvPole.x = 0.5f;                // arbitrary but consistent longitude
+        uvPole.y = (dir.y > 0.0f) ? 0.0f : 1.0f; // north pole at v=0, south at v=1
+        return uvPole;
+    }
+
+    float phi = atan2(dir.z, dir.x);       // [-PI, PI], +Z forward
+    float theta = acos(saturate(dir.y));   // [0, PI]
     float2 uv;
     uv.x = (phi / (2.0f * PI)) + 0.5f;
     uv.y = theta / PI;
@@ -465,7 +493,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
     metallic = saturate(metallic);
-    roughness = max(saturate(roughness), 0.04f);
+    // Raise roughness floor to soften extremely sharp highlights and reduce
+    // specular aliasing when the camera moves quickly.
+    roughness = max(saturate(roughness), 0.2f);
     ao = saturate(ao);
 
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
@@ -532,6 +562,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 numerator = D * G * F;
         float  denom = max(4.0f * NdotV * NdotL, 1e-4f);
         float3 specular = numerator / denom;
+        // Clamp per-light specular to avoid extreme spikes that can manifest
+        // as full-object color pops when multiple colored lights are present.
+        specular = min(specular, 4.0f.xxx);
 
         float3 kd = (1.0f - F) * (1.0f - metallic);
         float3 diffuse = kd * albedo / PI;
@@ -560,9 +593,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 V = normalize(g_CameraPosition.xyz - worldPos);
         float NdotV = saturate(dot(N, V));
 
-        // Diffuse IBL from low-frequency irradiance map
-        float2 diffuseUV = DirectionToLatLong(N);
-        float3 irradiance = g_EnvDiffuse.Sample(g_Sampler, diffuseUV).rgb;
+        // Diffuse IBL from low-frequency cubemap irradiance
+        float3 irradiance = g_EnvDiffuse.Sample(g_Sampler, N).rgb;
 
         float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
         diffuseIBL = irradiance * kd * albedo;
@@ -573,8 +605,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float maxMip = specMips > 0 ? float(specMips - 1) : 0.0f;
 
         float3 R = reflect(-V, N);
-        float2 specUV = DirectionToLatLong(R);
-        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, roughness * maxMip).rgb;
+        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, R, roughness * maxMip).rgb;
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
         specularIBL = prefiltered * Fibl;
@@ -588,11 +619,17 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         uint debugMode = (uint)g_DebugMode.x;
         if (debugMode == 8)
         {
-            return diffuseIBL * diffuseIntensity * ao;
+            // Diffuse IBL-only debug: clamp to avoid extreme flashes.
+            float3 dbg = diffuseIBL * diffuseIntensity * ao;
+            dbg = min(dbg, 32.0f.xxx);
+            return dbg;
         }
         else if (debugMode == 9)
         {
-            return specularIBL * specularIntensity * ao;
+            // Specular IBL-only debug: clamp to avoid extreme flashes.
+            float3 dbg = specularIBL * specularIntensity * ao;
+            dbg = min(dbg, 32.0f.xxx);
+            return dbg;
         }
         else if (debugMode == 11)
         {
@@ -612,11 +649,33 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         ambient = g_AmbientColor.rgb * albedo * ao;
     }
 
-    return totalLighting + ambient;
+    // Clamp combined direct + ambient radiance to a sane range before HDR,
+    // to reduce extreme spikes that can cause visible "flashes" when the
+    // camera moves rapidly across very bright highlights.
+    float3 color = totalLighting + ambient;
+    const float kMaxRadiance = 64.0f;
+    color = min(color, kMaxRadiance.xxx);
+    return color;
+}
+
+// Combined pixel output: main HDR color + packed normal/roughness for SSR/post
+struct PSOutput
+{
+    float4 color : SV_Target0;
+    float4 normalRoughness : SV_Target1;
+};
+
+PSOutput MakePSOutput(float4 color, float3 normal, float roughness)
+{
+    PSOutput o;
+    float3 nEnc = normalize(normal) * 0.5f + 0.5f;
+    o.color = color;
+    o.normalRoughness = float4(nEnc, roughness);
+    return o;
 }
 
 // Pixel Shader
-float4 PSMain(PSInput input) : SV_TARGET
+PSOutput PSMain(PSInput input)
 {
     // Sample albedo texture
     float4 albedoSample = g_MapFlags.x ? g_AlbedoTexture.Sample(g_Sampler, input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -687,21 +746,21 @@ float4 PSMain(PSInput input) : SV_TARGET
     if (debugMode == 1)
     {
         float3 nVis = normalize(normal) * 0.5f + 0.5f;
-        return float4(nVis, 1.0f);
+        return MakePSOutput(float4(nVis, 1.0f), normal, roughness);
     }
     else if (debugMode == 2)
     {
         float3 rVis = roughness.xxx;
-        return float4(rVis, 1.0f);
+        return MakePSOutput(float4(rVis, 1.0f), normal, roughness);
     }
     else if (debugMode == 3)
     {
         float3 mVis = metallic.xxx;
-        return float4(mVis, 1.0f);
+        return MakePSOutput(float4(mVis, 1.0f), normal, roughness);
     }
     else if (debugMode == 4)
     {
-        return float4(albedo, albedoSample.a * g_Albedo.a);
+        return MakePSOutput(float4(albedo, albedoSample.a * g_Albedo.a), normal, roughness);
     }
     else if (debugMode == 5)
     {
@@ -717,7 +776,7 @@ float4 PSMain(PSInput input) : SV_TARGET
             float3(0, 1, 0),
             float3(0, 0, 1)
         };
-        return float4(colors[cascadeIndex], 1.0f);
+        return MakePSOutput(float4(colors[cascadeIndex], 1.0f), normal, roughness);
     }
     else if (debugMode == 7)
     {
@@ -746,27 +805,27 @@ float4 PSMain(PSInput input) : SV_TARGET
         float h = FractalHeightBase(p, amp, frequency, oct, lacunarity, gain, warpStrength, noiseType);
         float v = 0.5f + h / (2.0f * amp); // map [-amp,amp] -> [0,1]
         v = saturate(v);
-        return float4(v, v, v, 1.0f);
+        return MakePSOutput(float4(v, v, v, 1.0f), normal, roughness);
     }
     else if (debugMode == 10)
     {
         // DirectionToLatLong debug: visualize env UVs as color
         float3 N = normalize(normal);
         float2 uv = DirectionToLatLong(N);
-        return float4(uv.x, uv.y, 0.0f, 1.0f);
+        return MakePSOutput(float4(uv.x, uv.y, 0.0f, 1.0f), normal, roughness);
     }
 
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao);
 
-    // Output linear HDR color; exposure/tonemapping is applied in a post-process pass
-    return float4(color, albedoSample.a * g_Albedo.a);
+    // Output linear HDR color; exposure/tonemapping is applied in a post-process pass.
+    return MakePSOutput(float4(color, albedoSample.a * g_Albedo.a), normal, roughness);
 }
 
 // === Skybox full-screen pass using the same FrameConstants / IBL maps ===
 struct SkyboxVSOutput
 {
     float4 position : SV_POSITION;
-    float3 direction : TEXCOORD0;
+    float2 uv : TEXCOORD0;
 };
 
 SkyboxVSOutput SkyboxVS(uint vertexId : SV_VertexID)
@@ -780,12 +839,8 @@ SkyboxVSOutput SkyboxVS(uint vertexId : SV_VertexID)
 
     output.position = float4(pos, 0.0f, 1.0f);
 
-    // Approximate view-space ray and rotate by inverse view rotation.
-    // Use +pos.y so that environment "up" maps to world +Y (no vertical flip).
-    float3 dirVS = normalize(float3(pos.x, pos.y, 1.0f));
-    float3x3 viewRot = (float3x3)g_ViewMatrix;
-    float3x3 invViewRot = transpose(viewRot);
-    output.direction = normalize(mul(invViewRot, dirVS));
+    // Map NDC to UV (0..1), matching the convention used in post-process.
+    output.uv = float2(0.5f * pos.x + 0.5f, -0.5f * pos.y + 0.5f);
 
     return output;
 }
@@ -798,10 +853,18 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
         return float4(g_AmbientColor.rgb, 1.0f);
     }
 
-    float3 dir = normalize(input.direction);
-    float2 uv = DirectionToLatLong(dir);
+    // Reconstruct a world-space direction from screen UV using the inverse
+    // view-projection matrix so the skybox matches the camera's FOV/aspect.
+    float2 uv = input.uv;
+    float x = uv.x * 2.0f - 1.0f;
+    float y = 1.0f - 2.0f * uv.y;
+    float4 clip = float4(x, y, 1.0f, 1.0f);
 
-    // Use the specular environment for visible background; scale by specular IBL intensity.
-    float3 color = g_EnvSpecular.Sample(g_Sampler, uv).rgb * g_EnvParams.y;
+    float4 world = mul(g_InvViewProjMatrix, clip);
+    float3 worldPos = world.xyz / max(world.w, 1.0e-4f);
+    float3 dir = normalize(worldPos - g_CameraPosition.xyz);
+
+    // Sample cubemap directly; hardware handles poles and seams.
+    float3 color = g_EnvSpecular.Sample(g_Sampler, dir).rgb * g_EnvParams.y;
     return float4(color, 1.0f);
 }

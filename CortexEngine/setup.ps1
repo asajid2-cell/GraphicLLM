@@ -93,6 +93,36 @@ if ($env:CUDA_PATH) {
     exit 1
 }
 
+# Optional: Detect TensorRT for Dreamer GPU diffusion. If found, we will
+# enable CORTEX_ENABLE_TENSORRT at CMake configure time.
+$TensorRTIncludeDir = $null
+$TensorRTLibDir = $null
+
+if ($env:TENSORRT_ROOT) {
+    $candidateRoot = $env:TENSORRT_ROOT
+    $inc = Join-Path $candidateRoot "include"
+    $lib = Join-Path $candidateRoot "lib"
+    if ((Test-Path $inc) -and (Test-Path $lib)) {
+        $TensorRTIncludeDir = $inc
+        $TensorRTLibDir = $lib
+        Write-Success "TensorRT detected via TENSORRT_ROOT at: $candidateRoot"
+    } else {
+        Write-Info "TENSORRT_ROOT is set but 'include' or 'lib' was not found under $candidateRoot; ignoring."
+    }
+} else {
+    # Common default install location; adjust if your TensorRT is elsewhere.
+    $defaultTrtRoot = "C:\TensorRT"
+    $inc = Join-Path $defaultTrtRoot "include"
+    $lib = Join-Path $defaultTrtRoot "lib"
+    if ((Test-Path $inc) -and (Test-Path $lib)) {
+        $TensorRTIncludeDir = $inc
+        $TensorRTLibDir = $lib
+        Write-Success "TensorRT detected at: $defaultTrtRoot"
+    } else {
+        Write-Info "TensorRT not detected automatically. Set TENSORRT_ROOT to enable Dreamer GPU diffusion (otherwise CPU stub will be used)."
+    }
+}
+
 # Ensure Ninja is available
 function Ensure-Ninja {
     $ninjaDir = "$env:ProgramFiles\Ninja"
@@ -252,6 +282,15 @@ $cmakeArgs = @(
     "-DCMAKE_BUILD_TYPE=$BuildConfig",
     "-DCMAKE_MAKE_PROGRAM=$ninjaExe"
 )
+
+if ($TensorRTIncludeDir -and $TensorRTLibDir) {
+    $cmakeArgs += "-DCORTEX_ENABLE_TENSORRT=ON"
+    $cmakeArgs += "-DTensorRT_INCLUDE_DIR=$TensorRTIncludeDir"
+    $cmakeArgs += "-DTensorRT_LIB_DIR=$TensorRTLibDir"
+} else {
+    # Be explicit so toggling between ON/OFF reconfigures correctly.
+    $cmakeArgs += "-DCORTEX_ENABLE_TENSORRT=OFF"
+}
 
 & cmake $cmakeArgs
 

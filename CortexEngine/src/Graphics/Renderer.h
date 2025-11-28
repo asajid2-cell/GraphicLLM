@@ -155,6 +155,15 @@ public:
     // Load texture from disk (sRGB aware)
     Result<std::shared_ptr<DX12Texture>> LoadTextureFromFile(const std::string& path, bool useSRGB);
 
+    // Create a GPU texture from in-memory RGBA8 data (used by the Dreamer
+    // diffusion pipeline to upload generated textures on the main thread).
+    Result<std::shared_ptr<DX12Texture>> CreateTextureFromRGBA(
+        const uint8_t* data,
+        uint32_t width,
+        uint32_t height,
+        bool useSRGB,
+        const std::string& debugName);
+
     // Debug/inspection controls
     void ToggleShadows();
     void CycleDebugViewMode();
@@ -197,11 +206,20 @@ public:
     void SetSSAOParams(float radius, float bias, float intensity);
     void SetPCSS(bool enabled) { m_pcssEnabled = enabled; }
     void SetFXAAEnabled(bool enabled) { m_fxaaEnabled = enabled; }
+    void SetTAAEnabled(bool enabled);
+    bool IsTAAEnabled() const { return m_taaEnabled; }
+    void ToggleTAA();
+    void SetSSREnabled(bool enabled);
+    void ToggleSSR();
+    void CycleScreenSpaceEffectsDebug();
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
     [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
+    // Dynamically register an environment map from an existing texture (used by Dreamer).
+    Result<void> AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name);
 
 private:
     static constexpr uint32_t kShadowCascadeCount = 3;
+    static constexpr uint32_t kBloomLevels = 3;
 
     void BeginFrame();
     void PrepareMainPass();
@@ -228,6 +246,8 @@ private:
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
     void RenderSkybox();
+    void RenderSSR();
+    void RenderMotionVectors();
     void RenderSSAO();
     void RenderBloom();
     void RenderPostProcess();
@@ -252,10 +272,13 @@ private:
     std::unique_ptr<DX12Pipeline> m_pipeline;
     std::unique_ptr<DX12Pipeline> m_shadowPipeline;
     std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
+    std::unique_ptr<DX12Pipeline> m_ssrPipeline;
     std::unique_ptr<DX12Pipeline> m_ssaoPipeline;
+    std::unique_ptr<DX12Pipeline> m_motionVectorsPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomDownsamplePipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurHPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurVPipeline;
+    std::unique_ptr<DX12Pipeline> m_bloomCompositePipeline;
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
 
     // Constant buffers
@@ -293,6 +316,11 @@ private:
     DescriptorHandle m_hdrRTV;
     DescriptorHandle m_hdrSRV;
     D3D12_RESOURCE_STATES m_hdrState = D3D12_RESOURCE_STATE_COMMON;
+    // G-buffer target storing world-space normal (xyz) and roughness (w)
+    ComPtr<ID3D12Resource> m_gbufferNormalRoughness;
+    DescriptorHandle m_gbufferNormalRoughnessRTV;
+    DescriptorHandle m_gbufferNormalRoughnessSRV;
+    D3D12_RESOURCE_STATES m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
 
     // SSAO target (single-channel occlusion)
     ComPtr<ID3D12Resource> m_ssaoTex;
@@ -300,15 +328,26 @@ private:
     DescriptorHandle m_ssaoSRV;
     D3D12_RESOURCE_STATES m_ssaoState = D3D12_RESOURCE_STATE_COMMON;
 
-    // Bloom textures (quarter resolution ping-pong)
-    ComPtr<ID3D12Resource> m_bloomTexA;
-    ComPtr<ID3D12Resource> m_bloomTexB;
-    DescriptorHandle m_bloomRTV[2];
-    DescriptorHandle m_bloomSRV[2];
-    D3D12_RESOURCE_STATES m_bloomState[2] = {
-        D3D12_RESOURCE_STATE_COMMON,
-        D3D12_RESOURCE_STATE_COMMON
-    };
+    // Screen-space reflection color buffer
+    ComPtr<ID3D12Resource> m_ssrColor;
+    DescriptorHandle m_ssrRTV;
+    DescriptorHandle m_ssrSRV;
+    D3D12_RESOURCE_STATES m_ssrState = D3D12_RESOURCE_STATE_COMMON;
+
+    // Camera motion vector buffer (UV-space velocity)
+    ComPtr<ID3D12Resource> m_velocityBuffer;
+    DescriptorHandle m_velocityRTV;
+    DescriptorHandle m_velocitySRV;
+    D3D12_RESOURCE_STATES m_velocityState = D3D12_RESOURCE_STATE_COMMON;
+
+    // Bloom textures as a small mip pyramid (multi-scale, ping-pong per level)
+    ComPtr<ID3D12Resource> m_bloomTexA[kBloomLevels];
+    ComPtr<ID3D12Resource> m_bloomTexB[kBloomLevels];
+    DescriptorHandle m_bloomRTV[kBloomLevels][2];
+    DescriptorHandle m_bloomSRV[kBloomLevels][2];
+    D3D12_RESOURCE_STATES m_bloomState[kBloomLevels][2] = {};
+    // SRV pointing to the final combined bloom texture used by post-process
+    DescriptorHandle m_bloomCombinedSRV;
 
     // Default resources
     std::shared_ptr<DX12Texture> m_placeholderAlbedo;
@@ -337,6 +376,22 @@ private:
     float m_ambientLightIntensity = 1.0f;
     float m_exposure = 1.0f;
     float m_bloomIntensity = 0.25f;
+    float m_bloomThreshold = 1.0f;
+    float m_bloomSoftKnee = 0.5f;
+    float m_bloomMaxContribution = 4.0f;
+
+    // Temporal anti-aliasing (camera-only) state
+    bool  m_taaEnabled = true;
+    float m_taaBlendFactor = 0.2f;
+    bool  m_hasHistory = false;
+    glm::vec2 m_taaJitterPrevPixels{0.0f, 0.0f};
+    glm::vec2 m_taaJitterCurrPixels{0.0f, 0.0f};
+    uint32_t m_taaSampleIndex = 0;
+    glm::mat4 m_prevViewProjMatrix{1.0f};
+    bool m_hasPrevViewProj = false;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_historyColor;
+    DescriptorHandle m_historySRV;
+    D3D12_RESOURCE_STATES m_historyState = D3D12_RESOURCE_STATE_COMMON;
 
     bool m_shadowsEnabled = true;
     float m_shadowMapSize = 2048.0f;
@@ -358,6 +413,7 @@ private:
     uint32_t m_debugViewMode = 0;
     bool m_pcssEnabled = false;
     bool m_fxaaEnabled = true;
+    bool m_ssrEnabled = true;
 
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;

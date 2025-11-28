@@ -171,6 +171,10 @@ void Window::Present() {
     UINT syncInterval = m_vsync ? 1 : 0;
     UINT presentFlags = 0;
 
+    if (!m_swapChain) {
+        return;
+    }
+
     m_swapChain->Present(syncInterval, presentFlags);
     m_currentBackBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
@@ -180,6 +184,9 @@ uint32_t Window::GetCurrentBackBufferIndex() const {
 }
 
 ID3D12Resource* Window::GetCurrentBackBuffer() const {
+    if (!m_swapChain) {
+        return nullptr;
+    }
     return m_backBuffers[m_currentBackBufferIndex].Get();
 }
 
@@ -190,6 +197,12 @@ D3D12_CPU_DESCRIPTOR_HANDLE Window::GetCurrentRTV() const {
 }
 
 void Window::OnResize(uint32_t width, uint32_t height) {
+    // Ignore redundant or degenerate resize events (e.g., minimization to 0x0)
+    if (width == 0 || height == 0) {
+        spdlog::warn("Ignoring resize to {}x{} (likely minimized)", width, height);
+        return;
+    }
+
     if (width == m_width && height == m_height) {
         return;
     }
@@ -210,7 +223,17 @@ void Window::OnResize(uint32_t width, uint32_t height) {
         m_device->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0
     );
     if (FAILED(hr)) {
-        spdlog::error("ResizeBuffers failed: 0x{:08X}", static_cast<unsigned int>(hr));
+        spdlog::error("ResizeBuffers failed: 0x{:08X} for {}x{}",
+                      static_cast<unsigned int>(hr),
+                      width,
+                      height);
+
+        // Attempt to restore RTVs for the existing back buffers so the renderer
+        // has valid targets instead of crashing on a null back buffer.
+        auto rtvResult = CreateRenderTargetViews(m_device);
+        if (rtvResult.IsErr()) {
+            spdlog::error("Failed to recreate RTVs after failed resize: {}", rtvResult.Error());
+        }
         return;
     }
 

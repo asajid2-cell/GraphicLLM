@@ -7,6 +7,7 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_ViewMatrix;
     float4x4 g_ProjectionMatrix;
     float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
     float4   g_CameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
     float4   g_TimeAndExposure;
@@ -30,6 +31,12 @@ cbuffer FrameConstants : register(b1)
     float4   g_ColorGrade;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
+    float4   g_BloomParams;
+    // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
+    float4   g_TAAParams;
+    float4x4 g_PrevViewProjMatrix;
+    float4x4 g_InvViewProjMatrix;
 };
 
 Texture2D g_Depth : register(t0);
@@ -58,60 +65,14 @@ VSOutput VSMain(uint vertexId : SV_VertexID)
     return output;
 }
 
-static const float PI = 3.14159265f;
-
-// Manual 4x4 matrix inverse for projection matrices.
-float4x4 InverseProjection(float4x4 m)
-{
-    // For typical projection matrices, we can use a specialized inverse.
-    // This is a simple cofactor-based inverse suitable for projection matrices.
-    float4x4 inv;
-
-    float det = determinant(m);
-    if (abs(det) < 1e-6f)
-    {
-        // Degenerate matrix; return identity.
-        inv = float4x4(
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        );
-        return inv;
-    }
-
-    // Compute inverse using adjugate / determinant approach.
-    // For a projection matrix this can be simplified, but we use a general approach.
-    float invDet = 1.0f / det;
-
-    inv[0][0] = invDet * (m[1][1] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) + m[1][2] * (m[2][3] * m[3][1] - m[2][1] * m[3][3]) + m[1][3] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]));
-    inv[0][1] = invDet * (m[0][1] * (m[2][3] * m[3][2] - m[2][2] * m[3][3]) + m[0][2] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) + m[0][3] * (m[2][2] * m[3][1] - m[2][1] * m[3][2]));
-    inv[0][2] = invDet * (m[0][1] * (m[1][2] * m[3][3] - m[1][3] * m[3][2]) + m[0][2] * (m[1][3] * m[3][1] - m[1][1] * m[3][3]) + m[0][3] * (m[1][1] * m[3][2] - m[1][2] * m[3][1]));
-    inv[0][3] = invDet * (m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3]) + m[0][2] * (m[1][1] * m[2][3] - m[1][3] * m[2][1]) + m[0][3] * (m[1][2] * m[2][1] - m[1][1] * m[2][2]));
-
-    inv[1][0] = invDet * (m[1][0] * (m[2][3] * m[3][2] - m[2][2] * m[3][3]) + m[1][2] * (m[2][0] * m[3][3] - m[2][3] * m[3][0]) + m[1][3] * (m[2][2] * m[3][0] - m[2][0] * m[3][2]));
-    inv[1][1] = invDet * (m[0][0] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) + m[0][2] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) + m[0][3] * (m[2][0] * m[3][2] - m[2][2] * m[3][0]));
-    inv[1][2] = invDet * (m[0][0] * (m[1][3] * m[3][2] - m[1][2] * m[3][3]) + m[0][2] * (m[1][0] * m[3][3] - m[1][3] * m[3][0]) + m[0][3] * (m[1][2] * m[3][0] - m[1][0] * m[3][2]));
-    inv[1][3] = invDet * (m[0][0] * (m[1][2] * m[2][3] - m[1][3] * m[2][2]) + m[0][2] * (m[1][3] * m[2][0] - m[1][0] * m[2][3]) + m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]));
-
-    inv[2][0] = invDet * (m[1][0] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) + m[1][1] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) + m[1][3] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
-    inv[2][1] = invDet * (m[0][0] * (m[2][3] * m[3][1] - m[2][1] * m[3][3]) + m[0][1] * (m[2][0] * m[3][3] - m[2][3] * m[3][0]) + m[0][3] * (m[2][1] * m[3][0] - m[2][0] * m[3][1]));
-    inv[2][2] = invDet * (m[0][0] * (m[1][1] * m[3][3] - m[1][3] * m[3][1]) + m[0][1] * (m[1][3] * m[3][0] - m[1][0] * m[3][3]) + m[0][3] * (m[1][0] * m[3][1] - m[1][1] * m[3][0]));
-    inv[2][3] = invDet * (m[0][0] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]) + m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]) + m[0][3] * (m[1][1] * m[2][0] - m[1][0] * m[2][1]));
-
-    inv[3][0] = invDet * (m[1][0] * (m[2][2] * m[3][1] - m[2][1] * m[3][2]) + m[1][1] * (m[2][0] * m[3][2] - m[2][2] * m[3][0]) + m[1][2] * (m[2][1] * m[3][0] - m[2][0] * m[3][1]));
-    inv[3][1] = invDet * (m[0][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) + m[0][1] * (m[2][2] * m[3][0] - m[2][0] * m[3][2]) + m[0][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
-    inv[3][2] = invDet * (m[0][0] * (m[1][2] * m[3][1] - m[1][1] * m[3][2]) + m[0][1] * (m[1][0] * m[3][2] - m[1][2] * m[3][0]) + m[0][2] * (m[1][1] * m[3][0] - m[1][0] * m[3][1]));
-    inv[3][3] = invDet * (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) + m[0][1] * (m[1][2] * m[2][0] - m[1][0] * m[2][2]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]));
-
-    return inv;
-}
-
 float3 ReconstructViewPos(float2 uv, float depth, float4x4 invProj)
 {
     // Invert the UV mapping used in VSMain to get clip space.
     float x = uv.x * 2.0f - 1.0f;
     float y = 1.0f - 2.0f * uv.y;
+    // Clamp depth to a safe range inside (0,1) to avoid numerical issues
+    depth = saturate(depth);
+    depth = min(depth, 1.0f - 1e-4f);
     float4 clip = float4(x, y, depth, 1.0f);
     float4 view = mul(invProj, clip);
     return view.xyz / max(view.w, 1e-4f);
@@ -133,11 +94,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
         return float4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
-    float2 texel = g_PostParams.xy;
+    // SSAO is rendered at half resolution; scale texel size accordingly
+    float2 texel = g_PostParams.xy * 2.0f;
 
-    // Precompute inverse projection matrix once per pixel.
-    float4x4 invProj = InverseProjection(g_ProjectionMatrix);
+    // Use inverse projection matrix provided by CPU via FrameConstants.
+    float4x4 invProj = g_InvProjectionMatrix;
     float3 posCenter = ReconstructViewPos(uv, depthCenter, invProj);
+    if (!all(isfinite(posCenter)))
+    {
+        // Invalid reconstruction; treat as unoccluded to avoid flashing
+        return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
 
     // Approximate normal from neighboring depth samples.
     float depthRight = g_Depth.SampleLevel(g_Sampler, uv + float2(texel.x, 0.0f), 0).r;
@@ -156,9 +123,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
         normal = float3(0.0f, 1.0f, 0.0f);
     }
 
-    float radius    = max(g_AOParams.y, 0.01f);
+    float baseRadius = max(g_AOParams.y, 0.01f);
     float bias      = max(g_AOParams.z, 0.0f);
     float intensity = max(g_AOParams.w, 0.0f);
+
+    // Scale sampling radius with view-space depth so AO stays
+    // visually consistent across near and far geometry.
+    float depthScale = max(posCenter.z, 1.0f);
+    float radius = baseRadius * depthScale;
 
     // Simple fixed sample kernel in view space.
     static const int   kSampleCount = 8;
@@ -175,14 +147,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     float occlusion = 0.0f;
 
+    // Build a stable orthonormal basis around the normal for the sample
+    // kernel to avoid numerical issues when the normal is near world axes.
+    float3 up = (abs(normal.y) < 0.99f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 tangent = normalize(cross(up, normal));
+    float3 bitangent = cross(normal, tangent);
+
     for (int i = 0; i < kSampleCount; ++i)
     {
-        // Orient sample around the normal.
+        // Orient sample around the normal using the local tangent frame.
         float3 dir = normalize(kKernel[i]);
-        // Push samples into the hemisphere oriented by the surface normal.
-        dir = normalize(dir.x * normalize(cross(normal, float3(0,1,0))) +
-                        dir.y * normalize(cross(normal, float3(1,0,0))) +
-                        dir.z * normal);
+        dir = normalize(dir.x * tangent + dir.y * bitangent + dir.z * normal);
 
         float3 samplePos = posCenter + dir * radius;
 
@@ -221,4 +196,3 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     return float4(ao, ao, ao, 1.0f);
 }
-

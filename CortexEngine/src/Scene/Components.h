@@ -49,8 +49,18 @@ struct TagComponent {
     explicit TagComponent(std::string t) : tag(std::move(t)) {}
 };
 
+// Mesh types used for high-level classification. StaticTriangle is the common
+// case; Skinned and Procedural are reserved for future animation and
+// on-the-fly generation passes.
+enum class MeshKind : uint32_t {
+    StaticTriangle = 0,
+    Skinned        = 1,
+    Procedural     = 2
+};
+
 // Mesh data
 struct MeshData {
+    MeshKind kind = MeshKind::StaticTriangle;
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texCoords;
@@ -127,6 +137,29 @@ struct CameraComponent {
 
     // Get view matrix (requires TransformComponent)
     [[nodiscard]] glm::mat4 GetViewMatrix(const TransformComponent& transform) const;
+};
+
+// Marker component for planar water surfaces. Any renderable entity tagged
+// with this component is treated as part of the water system (wave
+// displacement, water shading, and buoyancy queries).
+struct WaterSurfaceComponent {
+    // Higher priority surfaces can be preferred when sampling height in
+    // scenes with multiple overlapping water bodies in the future.
+    float priority = 0.0f;
+};
+
+// Simple buoyancy data for objects that should float on water. Vertical
+// integration and interaction are handled by a dedicated update step.
+struct BuoyancyComponent {
+    // Approximate radius used as a contact area scale for buoyant force.
+    float radius = 0.5f;
+    // Effective density of the object relative to water; values < 1 tend to
+    // float higher, > 1 sit lower.
+    float density = 1.0f;
+    // Linear damping applied to vertical motion to stabilize bobbing.
+    float damping = 0.8f;
+    // Internal vertical velocity used by the buoyancy integrator.
+    float verticalVelocity = 0.0f;
 };
 
 } // namespace Cortex::Scene

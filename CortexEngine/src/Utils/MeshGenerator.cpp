@@ -106,6 +106,35 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePlane(float width, float h
     return mesh;
 }
 
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateQuad(float width, float height) {
+    auto mesh = std::make_shared<Scene::MeshData>();
+
+    float halfW = width * 0.5f;
+    float halfH = height * 0.5f;
+
+    // Positions in XY plane, facing +Z
+    mesh->positions.push_back(glm::vec3(-halfW, -halfH, 0.0f));
+    mesh->positions.push_back(glm::vec3( halfW, -halfH, 0.0f));
+    mesh->positions.push_back(glm::vec3( halfW,  halfH, 0.0f));
+    mesh->positions.push_back(glm::vec3(-halfW,  halfH, 0.0f));
+
+    // Normals (all pointing +Z)
+    for (int i = 0; i < 4; ++i) {
+        mesh->normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+    }
+
+    // Texture coordinates
+    mesh->texCoords.push_back(glm::vec2(0.0f, 1.0f));
+    mesh->texCoords.push_back(glm::vec2(1.0f, 1.0f));
+    mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
+    mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
+
+    // Indices
+    mesh->indices = { 0, 1, 2, 0, 2, 3 };
+
+    return mesh;
+}
+
 std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint32_t segments) {
     auto mesh = std::make_shared<Scene::MeshData>();
 
@@ -514,6 +543,60 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
         }
     }
 
+    return mesh;
+}
+
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateDisk(float radius, uint32_t segments) {
+    auto mesh = std::make_shared<Scene::MeshData>();
+
+    // Center vertex
+    mesh->positions.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
+    mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+    mesh->texCoords.push_back(glm::vec2(0.5f, 0.5f));
+
+    // Rim vertices
+    for (uint32_t i = 0; i <= segments; ++i) {
+        float angle = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * glm::pi<float>();
+        float x = std::cos(angle) * radius;
+        float z = std::sin(angle) * radius;
+
+        mesh->positions.push_back(glm::vec3(x, 0.0f, z));
+        mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+        mesh->texCoords.push_back(glm::vec2(
+            0.5f + x / (2.0f * radius),
+            0.5f - z / (2.0f * radius)));
+    }
+
+    // Indices for triangle fan
+    for (uint32_t i = 1; i <= segments; ++i) {
+        mesh->indices.push_back(0);
+        mesh->indices.push_back(i);
+        mesh->indices.push_back((i % segments) + 1);
+    }
+
+    return mesh;
+}
+
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCapsule(float radius, float height, uint32_t segments) {
+    // For now, approximate a capsule as a cylinder with caps. This keeps the
+    // API available for higher-level systems while reusing the well-tested
+    // cylinder generator.
+    return CreateCylinder(radius, height + 2.0f * radius, segments);
+}
+
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateLine(float length, float thickness) {
+    // Represent a line segment as a thin box aligned along the X axis so it
+    // can be rendered with the standard triangle pipeline and scaled/rotated
+    // via TransformComponent.
+    float halfL = length * 0.5f;
+    float halfT = thickness * 0.5f;
+
+    auto mesh = CreateCube();
+    for (auto& p : mesh->positions) {
+        p.x *= halfL * 2.0f;
+        p.y *= halfT * 2.0f;
+        p.z *= halfT * 2.0f;
+    }
     return mesh;
 }
 

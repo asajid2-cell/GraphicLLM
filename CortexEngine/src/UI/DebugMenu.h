@@ -37,7 +37,9 @@ struct DebugMenuState {
     bool taaEnabled = true;
     bool ssrEnabled = true;
     bool ssaoEnabled = true;
-    bool iblEnabled = true;
+    // Default to no IBL so the engine boots into the neutral background;
+    // environments can be enabled explicitly via the debug menu.
+    bool iblEnabled = false;
     bool fogEnabled = false;
 
     // Optional DXR ray tracing toggle persisted with other settings.

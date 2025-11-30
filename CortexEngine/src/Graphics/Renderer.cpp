@@ -33,11 +33,39 @@ static float Halton(uint32_t index, uint32_t base) {
     }
     return result;
 }
+
+// Classify a renderable as transparent based on its opacity and preset name.
+// Glass presets default to partial alpha and should be rendered in a
+// separate blended pass after opaque geometry.
+static bool IsTransparentRenderable(const Cortex::Scene::RenderableComponent& renderable) {
+    // Primary signal: explicit alpha on the material color.
+    const float opacity = renderable.albedoColor.a;
+    if (opacity < 0.99f) {
+        return true;
+    }
+
+    // Secondary signal: logical material preset name (e.g., "glass").
+    if (!renderable.presetName.empty()) {
+        std::string presetLower = renderable.presetName;
+        std::transform(presetLower.begin(),
+                       presetLower.end(),
+                       presetLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (presetLower.find("glass") != std::string::npos) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     if (!device || !window) {
         return Result<void>::Err("Invalid device or window pointer");
     }
 
+    m_deviceRemoved = false;
     m_device = device;
     m_window = window;
 
@@ -188,6 +216,30 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_hdrColor.Reset();
     }
 
+    // RT sun shadow mask is optional; if creation fails we simply keep using
+    // cascaded shadows even when RT is enabled.
+    auto rtMaskResult = CreateRTShadowMask();
+    if (rtMaskResult.IsErr()) {
+        spdlog::warn("Failed to create RT shadow mask: {}", rtMaskResult.Error());
+    }
+
+    // RT reflections buffer is also optional and only meaningful when the
+    // DXR path is active. For now we allocate it eagerly when ray tracing is
+    // supported so the post-process path can consume it in a future pass.
+    if (m_rayTracingSupported && m_rayTracingContext) {
+        auto rtReflResult = CreateRTReflectionResources();
+        if (rtReflResult.IsErr()) {
+            spdlog::warn("Failed to create RT reflection buffer: {}", rtReflResult.Error());
+        }
+
+        // RT diffuse GI buffer is likewise optional; if creation fails we
+        // simply fall back to SSAO + ambient only.
+        auto rtGiResult = CreateRTGIResources();
+        if (rtGiResult.IsErr()) {
+            spdlog::warn("Failed to create RT GI buffer: {}", rtGiResult.Error());
+        }
+    }
+
     // Create constant buffers
     auto cbResult = m_frameConstantBuffer.Initialize(device->GetDevice());
     if (cbResult.IsErr()) {
@@ -276,6 +328,11 @@ void Renderer::Shutdown() {
 }
 
 void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
+    if (m_deviceRemoved) {
+        spdlog::error("Renderer::Render skipped because DX12 device was removed earlier (likely out of GPU memory). Restart is required.");
+        return;
+    }
+
     if (!m_window || !m_window->GetCurrentBackBuffer()) {
         spdlog::error("Renderer::Render called without a valid back buffer; skipping frame");
         return;
@@ -291,10 +348,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     BeginFrame();
     UpdateFrameConstants(deltaTime, registry);
 
-    // Optional ray tracing path (DXR). In this pass we build BLAS/TLAS on
-    // the DXR device when supported; DispatchRayTracing is still a no-op
-    // placeholder for upcoming RT effects.
+    // Optional ray tracing path (DXR). When enabled we build BLAS/TLAS and
+    // dispatch ray-traced passes using the current frame's depth buffer. To
+    // ensure depth and TLAS are consistent, render a depth-only prepass
+    // before invoking the DXR pipelines.
     if (m_rayTracingSupported && m_rayTracingEnabled && m_rayTracingContext) {
+        RenderDepthPrepass(registry);
         RenderRayTracing(registry);
     }
 
@@ -328,18 +387,25 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // Classic path now acts purely as fallback to avoid double-drawing/z-fighting
     if (!drewWithHyper) {
+        // Opaque geometry first
         RenderScene(registry);
-    }
-
-    // Screen-space reflections using HDR + depth + G-buffer (optional).
-    if (m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
-        // Dedicated helper keeps SSR logic contained.
-        RenderSSR();
+        // Then blended transparent/glass objects, sorted back-to-front.
+        RenderTransparent(registry);
     }
 
     // Camera motion vectors for TAA/motion blur (from depth + matrices).
     if (m_motionVectorsPipeline && m_velocityBuffer && m_depthBuffer) {
         RenderMotionVectors();
+    }
+
+    // HDR TAA resolve pass (stabilizes main lighting before reflections,
+    // bloom, fog, and tonemapping).
+    RenderTAA();
+
+    // Screen-space reflections using HDR + depth + G-buffer (optional).
+    if (m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
+        // Dedicated helper keeps SSR logic contained.
+        RenderSSR();
     }
 
     // Screen-space ambient occlusion from depth buffer (if enabled)
@@ -358,6 +424,27 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     EndFrame();
 }
 
+void Renderer::ResetTemporalHistoryForSceneChange() {
+    // Reset TAA history so the first frame after a scene switch uses the
+    // current HDR as the new history without blending in the previous scene.
+    m_hasHistory = false;
+    m_taaSampleIndex = 0;
+    m_taaJitterPrevPixels = glm::vec2(0.0f);
+    m_taaJitterCurrPixels = glm::vec2(0.0f);
+    m_hasPrevViewProj = false;
+
+    // Reset RT temporal data so RT shadows / GI / reflections do not leave
+    // ghosted silhouettes from the previous scene.
+    m_rtHasHistory   = false;
+    m_rtGIHasHistory = false;
+    m_hasPrevCamera  = false;
+
+    // Clear any pending debug-line state to avoid drawing lines that belonged
+    // to the previous layout.
+    m_debugLines.clear();
+    m_debugLinesDisabled = false;
+}
+
 void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext || !registry) {
         return;
@@ -365,29 +452,149 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
 
     ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
     HRESULT hr = m_commandList.As(&rtCmdList);
-    if (SUCCEEDED(hr) && rtCmdList) {
-        // For now we build BLAS/TLAS for the scene; DispatchRayTracing
-        // remains a no-op hook for upcoming RT effects.
-        m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
-        m_rayTracingContext->DispatchRayTracing(rtCmdList.Get());
+    if (FAILED(hr) || !rtCmdList) {
+        return;
+    }
+
+    // Ensure the depth buffer is in a readable state for the DXR passes.
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        rtCmdList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Ensure the RT shadow mask is ready for UAV writes before the DXR pass.
+    if (m_rtShadowMask && m_rtShadowMaskState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_rtShadowMask.Get();
+        barrier.Transition.StateBefore = m_rtShadowMaskState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        rtCmdList->ResourceBarrier(1, &barrier);
+        m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    // Build TLAS over the current ECS scene.
+    m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
+
+    // Dispatch the DXR sun-shadow pass when depth and mask descriptors are ready.
+    if (m_depthSRV.IsValid() && m_rtShadowMaskUAV.IsValid()) {
+        DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
+        m_rayTracingContext->DispatchRayTracing(
+            rtCmdList.Get(),
+            m_depthSRV,
+            m_rtShadowMaskUAV,
+            m_frameConstantBuffer.gpuAddress,
+            envTable);
+    }
+
+    // Optional RT reflections: reuse the same TLAS and depth buffer to write
+    // a reflection color buffer that can be inspected or composed in
+    // post-process. This pass is entirely optional; if the reflection pipeline
+    // was not created successfully, DispatchReflections is a no-op.
+    if (m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
+        if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+            D3D12_RESOURCE_BARRIER reflBarrier{};
+            reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            reflBarrier.Transition.pResource = m_rtReflectionColor.Get();
+            reflBarrier.Transition.StateBefore = m_rtReflectionState;
+            reflBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            reflBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            rtCmdList->ResourceBarrier(1, &reflBarrier);
+            m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        }
+
+        if (m_depthSRV.IsValid()) {
+            DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
+            m_rayTracingContext->DispatchReflections(
+                rtCmdList.Get(),
+                m_depthSRV,
+                m_rtReflectionUAV,
+                m_frameConstantBuffer.gpuAddress,
+                envTable);
+        }
+    }
+
+    // Optional RT diffuse GI: writes a low-frequency indirect lighting buffer
+    // that can be sampled by the main PBR shader. As with reflections, this
+    // pass is optional; DispatchGI is a no-op if the GI pipeline is not
+    // available.
+    if (m_rtGIColor && m_rtGIUAV.IsValid()) {
+        if (m_rtGIState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+            D3D12_RESOURCE_BARRIER giBarrier{};
+            giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            giBarrier.Transition.pResource = m_rtGIColor.Get();
+            giBarrier.Transition.StateBefore = m_rtGIState;
+            giBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            giBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            rtCmdList->ResourceBarrier(1, &giBarrier);
+            m_rtGIState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        }
+
+        if (m_depthSRV.IsValid()) {
+            DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
+            m_rayTracingContext->DispatchGI(
+                rtCmdList.Get(),
+                m_depthSRV,
+                m_rtGIUAV,
+                m_frameConstantBuffer.gpuAddress,
+                envTable);
+        }
     }
 }
 
 void Renderer::BeginFrame() {
-    // Handle window resize: recreate depth buffer when size changes
-    if (m_depthBuffer && (m_window->GetWidth() != m_depthBuffer->GetDesc().Width || m_window->GetHeight() != m_depthBuffer->GetDesc().Height)) {
-        m_depthBuffer.Reset();
-        auto depthResult = CreateDepthBuffer();
-        if (depthResult.IsErr()) {
-            spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
+    // Handle window resize: recreate depth buffer when the *effective*
+    // render resolution changes. When supersampling is active, the depth
+    // buffer is allocated at windowSize * renderScale, so we compare
+    // against that expected size rather than the raw window dimensions.
+    const float renderScale = std::max(m_renderScale, 1.0f);
+    const UINT expectedDepthWidth  = std::max<UINT>(1, static_cast<UINT>(m_window->GetWidth()  * renderScale));
+    const UINT expectedDepthHeight = std::max<UINT>(1, static_cast<UINT>(m_window->GetHeight() * renderScale));
+
+    if (m_depthBuffer) {
+        D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
+        if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
+            m_depthBuffer.Reset();
+            auto depthResult = CreateDepthBuffer();
+            if (depthResult.IsErr()) {
+                spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
+            }
         }
     }
-    // Handle HDR target resize
-    if (m_hdrColor && (m_window->GetWidth() != m_hdrColor->GetDesc().Width || m_window->GetHeight() != m_hdrColor->GetDesc().Height)) {
-        m_hdrColor.Reset();
-        auto hdrResult = CreateHDRTarget();
-        if (hdrResult.IsErr()) {
-            spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
+
+    // Handle HDR target resize using the same effective render resolution.
+    if (m_hdrColor) {
+        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+        if (hdrDesc.Width != expectedDepthWidth || hdrDesc.Height != expectedDepthHeight) {
+            m_hdrColor.Reset();
+            auto hdrResult = CreateHDRTarget();
+            if (hdrResult.IsErr()) {
+                spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
+            }
+
+            auto rtMaskResult = CreateRTShadowMask();
+            if (rtMaskResult.IsErr()) {
+                spdlog::warn("Failed to recreate RT shadow mask on resize: {}", rtMaskResult.Error());
+            }
+
+            if (m_rayTracingSupported && m_rayTracingContext) {
+                auto rtReflResult = CreateRTReflectionResources();
+                if (rtReflResult.IsErr()) {
+                    spdlog::warn("Failed to recreate RT reflection buffer on resize: {}", rtReflResult.Error());
+                }
+
+                auto rtGiResult = CreateRTGIResources();
+                if (rtGiResult.IsErr()) {
+                    spdlog::warn("Failed to recreate RT GI buffer on resize: {}", rtGiResult.Error());
+                }
+            }
         }
     }
     // Handle SSAO target resize (SSAO is rendered at half resolution).
@@ -467,6 +674,33 @@ void Renderer::PrepareMainPass() {
         m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
+    // If the ray-traced shadow mask exists and was written by the DXR pass,
+    // transition it to a shader-resource state so the PBR shader can sample it.
+    if (m_rtShadowMask && m_rtShadowMaskState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER rtMaskBarrier{};
+        rtMaskBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        rtMaskBarrier.Transition.pResource = m_rtShadowMask.Get();
+        rtMaskBarrier.Transition.StateBefore = m_rtShadowMaskState;
+        rtMaskBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        rtMaskBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &rtMaskBarrier);
+        m_rtShadowMaskState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Likewise, if the RT diffuse GI buffer was written by the DXR pass,
+    // transition it to a shader-resource state before sampling in the PBR
+    // shader.
+    if (m_rtGIColor && m_rtGIState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER giBarrier{};
+        giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        giBarrier.Transition.pResource = m_rtGIColor.Get();
+        giBarrier.Transition.StateBefore = m_rtGIState;
+        giBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        giBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &giBarrier);
+        m_rtGIState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
     if (m_hdrColor) {
         // Ensure HDR is in render target state
         if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
@@ -522,18 +756,32 @@ void Renderer::PrepareMainPass() {
     }
     m_commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    // Set viewport and scissor
+    // Set viewport and scissor to match the internal render resolution when
+    // using HDR (which may be supersampled relative to the window).
     D3D12_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(m_window->GetWidth());
-    viewport.Height = static_cast<float>(m_window->GetHeight());
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-
     D3D12_RECT scissorRect = {};
-    scissorRect.left = 0;
-    scissorRect.top = 0;
-    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
-    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    if (m_hdrColor) {
+        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+        viewport.Width  = static_cast<float>(hdrDesc.Width);
+        viewport.Height = static_cast<float>(hdrDesc.Height);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+
+        scissorRect.left = 0;
+        scissorRect.top = 0;
+        scissorRect.right  = static_cast<LONG>(hdrDesc.Width);
+        scissorRect.bottom = static_cast<LONG>(hdrDesc.Height);
+    } else {
+        viewport.Width  = static_cast<float>(m_window->GetWidth());
+        viewport.Height = static_cast<float>(m_window->GetHeight());
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+
+        scissorRect.left = 0;
+        scissorRect.top = 0;
+        scissorRect.right  = static_cast<LONG>(m_window->GetWidth());
+        scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    }
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissorRect);
@@ -551,6 +799,162 @@ void Renderer::PrepareMainPass() {
 }
 
 void Renderer::EndFrame() {
+    // Before presenting, update the RT shadow history buffer so the next
+    // frame's temporal smoothing has valid data.
+    if (m_rtShadowMask && m_rtShadowMaskHistory) {
+        D3D12_RESOURCE_BARRIER barriers[2] = {};
+        UINT barrierCount = 0;
+
+        if (m_rtShadowMaskState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Transition.pResource = m_rtShadowMask.Get();
+            barriers[barrierCount].Transition.StateBefore = m_rtShadowMaskState;
+            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCount;
+            m_rtShadowMaskState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        }
+
+        if (m_rtShadowMaskHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Transition.pResource = m_rtShadowMaskHistory.Get();
+            barriers[barrierCount].Transition.StateBefore = m_rtShadowMaskHistoryState;
+            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCount;
+            m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_COPY_DEST;
+        }
+
+        if (barrierCount > 0) {
+            m_commandList->ResourceBarrier(barrierCount, barriers);
+        }
+
+        m_commandList->CopyResource(m_rtShadowMaskHistory.Get(), m_rtShadowMask.Get());
+
+        // Return both resources to shader-resource state for the next frame.
+        barriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[0].Transition.pResource = m_rtShadowMask.Get();
+        barriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        barriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        barriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[1].Transition.pResource = m_rtShadowMaskHistory.Get();
+        barriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        m_commandList->ResourceBarrier(2, barriers);
+
+        m_rtShadowMaskState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtHasHistory = true;
+      }
+
+      // Update RT GI history buffer in lock-step with the RT GI color buffer
+      // so temporal accumulation in the shader has a stable previous frame.
+      if (m_rtGIColor && m_rtGIHistory) {
+          D3D12_RESOURCE_BARRIER giBarriers[2] = {};
+          UINT giBarrierCount = 0;
+
+          if (m_rtGIState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+              giBarriers[giBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+              giBarriers[giBarrierCount].Transition.pResource = m_rtGIColor.Get();
+              giBarriers[giBarrierCount].Transition.StateBefore = m_rtGIState;
+              giBarriers[giBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+              giBarriers[giBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+              ++giBarrierCount;
+              m_rtGIState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          }
+
+          if (m_rtGIHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
+              giBarriers[giBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+              giBarriers[giBarrierCount].Transition.pResource = m_rtGIHistory.Get();
+              giBarriers[giBarrierCount].Transition.StateBefore = m_rtGIHistoryState;
+              giBarriers[giBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+              giBarriers[giBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+              ++giBarrierCount;
+              m_rtGIHistoryState = D3D12_RESOURCE_STATE_COPY_DEST;
+          }
+
+          if (giBarrierCount > 0) {
+              m_commandList->ResourceBarrier(giBarrierCount, giBarriers);
+          }
+
+          m_commandList->CopyResource(m_rtGIHistory.Get(), m_rtGIColor.Get());
+
+          giBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          giBarriers[0].Transition.pResource = m_rtGIColor.Get();
+          giBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          giBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          giBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+          giBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          giBarriers[1].Transition.pResource = m_rtGIHistory.Get();
+          giBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+          giBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          giBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+          m_commandList->ResourceBarrier(2, giBarriers);
+
+          m_rtGIState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtGIHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtGIHasHistory = true;
+      }
+
+      // Update RT reflection history after the DXR reflections pass has
+      // populated the current RT reflection color buffer. This mirrors the
+      // shadow / GI history updates above so the post-process shader can
+      // blend against the previous frame when g_DebugMode.w indicates that
+      // RT history is valid.
+      if (m_rtReflectionColor && m_rtReflectionHistory) {
+          D3D12_RESOURCE_BARRIER reflBarriers[2] = {};
+          UINT reflBarrierCount = 0;
+
+          if (m_rtReflectionState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+              reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+              reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionColor.Get();
+              reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionState;
+              reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+              reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+              ++reflBarrierCount;
+              m_rtReflectionState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          }
+
+          if (m_rtReflectionHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
+              reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+              reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionHistory.Get();
+              reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionHistoryState;
+              reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+              reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+              ++reflBarrierCount;
+              m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_COPY_DEST;
+          }
+
+          if (reflBarrierCount > 0) {
+              m_commandList->ResourceBarrier(reflBarrierCount, reflBarriers);
+          }
+
+          m_commandList->CopyResource(m_rtReflectionHistory.Get(), m_rtReflectionColor.Get());
+
+          reflBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          reflBarriers[0].Transition.pResource = m_rtReflectionColor.Get();
+          reflBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          reflBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          reflBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+          reflBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+          reflBarriers[1].Transition.pResource = m_rtReflectionHistory.Get();
+          reflBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+          reflBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          reflBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+          m_commandList->ResourceBarrier(2, reflBarriers);
+
+          m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+      }
+
     // Transition back buffer to present state
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -627,9 +1031,19 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
     }
 
-    // Temporal AA jitter (in pixels) and corresponding UV delta for history sampling.
-    float invWidth = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetWidth()));
-    float invHeight = 1.0f / std::max(1.0f, static_cast<float>(m_window->GetHeight()));
+    // Temporal AA jitter (in pixels) and corresponding UV delta for history
+    // sampling. When an internal supersampling scale is active, base these
+    // values on the HDR render target size rather than the window size so
+    // jitter and post-process texel steps line up with the actual buffers.
+    float internalWidth  = static_cast<float>(m_window->GetWidth());
+    float internalHeight = static_cast<float>(m_window->GetHeight());
+    if (m_hdrColor) {
+        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+        internalWidth  = static_cast<float>(hdrDesc.Width);
+        internalHeight = static_cast<float>(hdrDesc.Height);
+    }
+    float invWidth  = 1.0f / std::max(1.0f, internalWidth);
+    float invHeight = 1.0f / std::max(1.0f, internalHeight);
 
     glm::vec2 jitterPixels(0.0f);
     if (m_taaEnabled) {
@@ -637,15 +1051,29 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         float jx = Halton(m_taaSampleIndex + 1, 2) - 0.5f;
         float jy = Halton(m_taaSampleIndex + 1, 3) - 0.5f;
         m_taaSampleIndex++;
-        // Scale jitter down so per-frame shifts are smaller and objects
-        // appear more stable while still providing subpixel coverage.
-        const float jitterScale = 0.5f; // 50% of original amplitude
+        // Scale jitter so per-frame shifts are small and objects remain
+        // stable while still providing enough subpixel coverage for TAA.
+        float jitterScale = 0.15f;
+        if (!m_cameraIsMoving) {
+            // When the camera is effectively stationary, disable jitter so
+            // the image converges to a sharp, stable result without
+            // "double-exposed" edges.
+            jitterScale = 0.0f;
+        }
         jitterPixels = glm::vec2(jx, jy) * jitterScale;
         m_taaJitterCurrPixels = jitterPixels;
     } else {
         m_taaJitterPrevPixels = glm::vec2(0.0f);
         m_taaJitterCurrPixels = glm::vec2(0.0f);
     }
+
+    // Compute a non-jittered view-projection matrix for RT reconstruction and
+    // motion vector generation before applying TAA offsets. This keeps RT
+    // rays and motion vectors stable while the raster path still benefits
+    // from jitter.
+    glm::mat4 vpNoJitter = frameData.projectionMatrix * frameData.viewMatrix;
+    frameData.viewProjectionNoJitter = vpNoJitter;
+    frameData.invViewProjectionNoJitter = glm::inverse(vpNoJitter);
 
     // Apply jitter to projection (NDC space).
     if (m_taaEnabled) {
@@ -934,13 +1362,35 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     }
 
     frameData.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
-    frameData.debugMode = glm::vec4(static_cast<float>(m_debugViewMode), 0.0f, 0.0f, 0.0f);
+
+    float overlayFlag = m_debugOverlayVisible ? 1.0f : 0.0f;
+    float selectedNorm = 0.0f;
+    if (m_debugOverlayVisible) {
+        // Normalize selected row (0..14) into 0..1 for the shader.
+        selectedNorm = glm::clamp(static_cast<float>(m_debugOverlaySelectedRow) / 14.0f, 0.0f, 1.0f);
+    }
+    // debugMode.w is used as a coarse "RT history valid" flag across the
+    // shading and post-process passes. Treat history as valid once any of
+    // the RT pipelines (shadows, GI, reflections) has produced at least one
+    // frame of data so temporal filtering can stabilize without requiring
+    // every RT feature to be active at the same time.
+    float rtHistoryValid = (m_rtHasHistory || m_rtGIHasHistory) ? 1.0f : 0.0f;
+    frameData.debugMode = glm::vec4(
+        static_cast<float>(m_debugViewMode),
+        overlayFlag,
+        selectedNorm,
+        rtHistoryValid);
 
     // Post-process parameters: reciprocal resolution, FXAA flag, and an extra
     // channel used as a simple runtime toggle for ray-traced sun shadows in
-    // the shading path (when DXR is available).
+    // the shading path (when DXR is available and the RT pipeline is valid).
     float fxaaFlag = (m_taaEnabled ? 0.0f : (m_fxaaEnabled ? 1.0f : 0.0f));
-    float rtShadowToggle = (m_rayTracingSupported && m_rayTracingEnabled) ? 1.0f : 0.0f;
+    bool rtPipelineReady =
+        m_rayTracingSupported &&
+        m_rayTracingEnabled &&
+        m_rayTracingContext &&
+        m_rayTracingContext->HasPipeline();
+    float rtShadowToggle = rtPipelineReady ? 1.0f : 0.0f;
     frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtShadowToggle);
 
     // Image-based lighting parameters
@@ -968,37 +1418,96 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_ssaoBias,
         m_ssaoIntensity);
 
-    // Bloom shaping parameters
+    // Bloom shaping parameters. The w component is repurposed as a simple
+    // "SSR enabled" flag so the post-process debug overlay can visualize the
+    // current SSR toggle without having to infer it from the SSR buffer
+    // contents.
     frameData.bloomParams = glm::vec4(
         m_bloomThreshold,
         m_bloomSoftKnee,
         m_bloomMaxContribution,
-        0.0f);
+        m_ssrEnabled ? 1.0f : 0.0f);
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.
     // Only enable TAA in the shader once we have a valid history buffer;
     // this avoids sampling uninitialized history and causing color flashes
-    // on the first frame after startup or resize.
+    // on the first frame after startup or resize. When the camera is nearly
+    // stationary we reduce jitter and blend strength to keep edges crisp and
+    // minimize residual ghosting.
     glm::vec2 jitterDeltaPixels = m_taaJitterPrevPixels - m_taaJitterCurrPixels;
     glm::vec2 jitterDeltaUV = glm::vec2(jitterDeltaPixels.x * invWidth, jitterDeltaPixels.y * invHeight);
     const bool taaActiveThisFrame = m_taaEnabled && m_hasHistory;
+    float blendForThisFrame = m_taaBlendFactor;
+    if (!m_cameraIsMoving) {
+        blendForThisFrame *= 0.5f;
+    }
     frameData.taaParams = glm::vec4(
         jitterDeltaUV.x,
         jitterDeltaUV.y,
-        m_taaBlendFactor,
+        blendForThisFrame,
         taaActiveThisFrame ? 1.0f : 0.0f);
 
-    // Previous and inverse view-projection matrices for TAA reprojection
+    // Water parameters shared with shaders (see ShaderTypes.h / Basic.hlsl).
+    frameData.waterParams0 = glm::vec4(
+        m_waterWaveAmplitude,
+        m_waterWaveLength,
+        m_waterWaveSpeed,
+        m_waterLevelY);
+    frameData.waterParams1 = glm::vec4(
+        m_waterPrimaryDir.x,
+        m_waterPrimaryDir.y,
+        m_waterSecondaryAmplitude,
+        0.0f);
+
+    // Previous and inverse view-projection matrices for TAA reprojection and
+    // motion vectors. We store the *non-jittered* view-projection from the
+    // previous frame so that motion vectors do not encode TAA jitter; jitter
+    // is handled separately via g_TAAParams.xy in the post-process.
     if (m_hasPrevViewProj) {
         frameData.prevViewProjectionMatrix = m_prevViewProjMatrix;
     } else {
-        frameData.prevViewProjectionMatrix = frameData.viewProjectionMatrix;
+        frameData.prevViewProjectionMatrix = vpNoJitter;
     }
+
     frameData.invViewProjectionMatrix = glm::inverse(frameData.viewProjectionMatrix);
 
-    // Update history for next frame
-    m_prevViewProjMatrix = frameData.viewProjectionMatrix;
+    // Update history for next frame (non-jittered)
+    m_prevViewProjMatrix = vpNoJitter;
     m_hasPrevViewProj = true;
+
+    // Reset RT temporal history when the camera moves significantly to
+    // avoid smearing old GI/shadow data across new viewpoints. We also track
+    // a softer motion flag used for TAA jitter/blend tuning.
+    if (m_hasPrevCamera) {
+        float posDelta = glm::length(cameraPos - m_prevCameraPos);
+        float fwdDot = glm::clamp(
+            glm::dot(glm::normalize(cameraForward), glm::normalize(m_prevCameraForward)),
+            -1.0f,
+            1.0f);
+        float angleDelta = std::acos(fwdDot);
+
+        const float posThreshold   = 2.5f;
+        const float angleThreshold = glm::radians(30.0f);
+
+        // Soft thresholds for "camera is moving" used to gate jitter and TAA
+        // blend strength; much lower than the history reset thresholds.
+        const float softPosThreshold   = 0.05f;
+        const float softAngleThreshold = glm::radians(2.0f);
+        m_cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
+
+        if (posDelta > posThreshold || angleDelta > angleThreshold) {
+            m_rtHasHistory   = false;
+            m_rtGIHasHistory = false;
+            // Let TAA resolve handle large changes via per-pixel color and
+            // depth checks rather than nuking history globally; this avoids
+            // sudden full-scene flicker when orbiting the camera.
+        }
+    } else {
+        m_cameraIsMoving = true;
+    }
+    m_prevCameraPos     = cameraPos;
+    m_prevCameraForward = cameraForward;
+    m_hasPrevCamera     = true;
 
     m_frameDataCPU = frameData;
     m_frameConstantBuffer.UpdateData(m_frameDataCPU);
@@ -1170,6 +1679,395 @@ void Renderer::RenderSSR() {
     m_commandList->DrawInstanced(3, 1, 0, 0);
 }
 
+void Renderer::RenderTAA() {
+    // Dedicated HDR TAA resolve pass. Operates on the main HDR color target
+    // and writes into an intermediate HDR buffer before copying the result
+    // back into the primary HDR target and updating the TAA history buffer.
+    if (!m_taaEnabled || !m_taaPipeline || !m_hdrColor || !m_taaIntermediate || !m_window) {
+        // Ensure HDR is in a readable state for subsequent passes even when TAA
+        // is disabled so SSR/post-process can still sample it.
+        if (m_hdrColor && m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_hdrColor.Get();
+            barrier.Transition.StateBefore = m_hdrState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+        // History is no longer meaningful once TAA has been disabled.
+        m_hasHistory = false;
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device || !m_commandList) {
+        return;
+    }
+
+    // If we do not yet have valid history (first frame after resize or after
+    // a large camera jump), skip reprojection and simply seed the history
+    // buffer with the current HDR frame.
+    if (!m_historyColor || !m_historySRV.IsValid() || !m_hasHistory) {
+        // Transition HDR to COPY_SOURCE and history to COPY_DEST.
+        if (m_hdrState != D3D12_RESOURCE_STATE_COPY_SOURCE || m_historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            D3D12_RESOURCE_BARRIER initBarriers[2] = {};
+            UINT initCount = 0;
+
+            if (m_hdrState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+                initBarriers[initCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                initBarriers[initCount].Transition.pResource = m_hdrColor.Get();
+                initBarriers[initCount].Transition.StateBefore = m_hdrState;
+                initBarriers[initCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                initBarriers[initCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                ++initCount;
+                m_hdrState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            }
+
+            if (m_historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
+                initBarriers[initCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                initBarriers[initCount].Transition.pResource = m_historyColor.Get();
+                initBarriers[initCount].Transition.StateBefore = m_historyState;
+                initBarriers[initCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+                initBarriers[initCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                ++initCount;
+                m_historyState = D3D12_RESOURCE_STATE_COPY_DEST;
+            }
+
+            if (initCount > 0) {
+                m_commandList->ResourceBarrier(initCount, initBarriers);
+            }
+        }
+
+        m_commandList->CopyResource(m_historyColor.Get(), m_hdrColor.Get());
+
+        // Transition HDR to PIXEL_SHADER_RESOURCE for subsequent passes and
+        // history back to PIXEL_SHADER_RESOURCE for future TAA frames.
+        D3D12_RESOURCE_BARRIER postCopy[2] = {};
+
+        postCopy[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postCopy[0].Transition.pResource = m_hdrColor.Get();
+        postCopy[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        postCopy[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        postCopy[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        postCopy[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postCopy[1].Transition.pResource = m_historyColor.Get();
+        postCopy[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        postCopy[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        postCopy[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+        m_commandList->ResourceBarrier(2, postCopy);
+        m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_hasHistory = true;
+        return;
+    }
+
+    // Transition resources to appropriate states for the TAA draw.
+    D3D12_RESOURCE_BARRIER barriers[5] = {};
+    UINT barrierCount = 0;
+
+    if (m_taaIntermediateState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_taaIntermediate.Get();
+        barriers[barrierCount].Transition.StateBefore = m_taaIntermediateState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_hdrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_hdrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+        barriers[barrierCount].Transition.StateBefore = m_gbufferNormalRoughnessState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_velocityBuffer && m_velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_velocityBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_velocityState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_historyState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_historyColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_historyState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (barrierCount > 0) {
+        m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    // Bind TAA render target (no depth).
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_taaIntermediateRTV.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+
+    D3D12_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(hdrDesc.Width);
+    viewport.Height = static_cast<float>(hdrDesc.Height);
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect = {};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(hdrDesc.Width);
+    scissorRect.bottom = static_cast<LONG>(hdrDesc.Height);
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_taaPipeline->GetPipelineState());
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // Frame constants
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Allocate transient descriptors mirroring the layout used in the
+    // post-process pass so bindings remain consistent:
+    // t0 = HDR scene color, t1 = bloom (unused here), t2 = SSAO (unused),
+    // t3 = TAA history, t4 = depth, t5 = normal/roughness, t6 = SSR (unused),
+    // t7 = velocity.
+    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (hdrHandleResult.IsErr()) {
+        spdlog::warn("RenderTAA: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+        return;
+    }
+    DescriptorHandle hdrHandle = hdrHandleResult.Value();
+
+    device->CopyDescriptorsSimple(
+        1,
+        hdrHandle.cpu,
+        m_hdrSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // t1: bloom (unused)
+    auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (bloomAllocResult.IsOk() && m_bloomCombinedSRV.IsValid()) {
+        DescriptorHandle bloomHandle = bloomAllocResult.Value();
+        device->CopyDescriptorsSimple(
+            1,
+            bloomHandle.cpu,
+            m_bloomCombinedSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    } else {
+        // Allocate a dummy descriptor to keep layout consistent even if bloom is missing.
+        (void)bloomAllocResult;
+    }
+
+    // t2: SSAO (unused in TAA but keep slot)
+    auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (ssaoAllocResult.IsOk() && m_ssaoSRV.IsValid()) {
+        DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
+        device->CopyDescriptorsSimple(
+            1,
+            ssaoHandle.cpu,
+            m_ssaoSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    } else {
+        (void)ssaoAllocResult;
+    }
+
+    // t3: TAA history
+    auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (historyAllocResult.IsErr()) {
+        spdlog::warn("RenderTAA: failed to allocate transient history SRV: {}", historyAllocResult.Error());
+        return;
+    }
+    DescriptorHandle historyHandle = historyAllocResult.Value();
+    device->CopyDescriptorsSimple(
+        1,
+        historyHandle.cpu,
+        m_historySRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // t4: depth
+    auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthAllocResult.IsErr()) {
+        spdlog::warn("RenderTAA: failed to allocate transient depth SRV: {}", depthAllocResult.Error());
+        return;
+    }
+    DescriptorHandle depthHandle = depthAllocResult.Value();
+    device->CopyDescriptorsSimple(
+        1,
+        depthHandle.cpu,
+        m_depthSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // t5: normal/roughness
+    auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (gbufAllocResult.IsErr()) {
+        spdlog::warn("RenderTAA: failed to allocate transient normal/roughness SRV: {}", gbufAllocResult.Error());
+        return;
+    }
+    DescriptorHandle gbufHandle = gbufAllocResult.Value();
+    device->CopyDescriptorsSimple(
+        1,
+        gbufHandle.cpu,
+        m_gbufferNormalRoughnessSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // t6: SSR (unused)
+    (void)m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+
+    // t7: velocity
+    if (m_velocitySRV.IsValid() && m_velocityBuffer) {
+        auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (velAllocResult.IsOk()) {
+            DescriptorHandle velHandle = velAllocResult.Value();
+            device->CopyDescriptorsSimple(
+                1,
+                velHandle.cpu,
+                m_velocitySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            spdlog::warn("RenderTAA: failed to allocate transient velocity SRV; TAA reprojection will be disabled this frame");
+        }
+    }
+
+    // Bind SRV table and optional shadow/env descriptors (unused but harmless).
+    m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
+
+    // Copy TAA-resolved HDR back into the primary HDR target so downstream
+    // passes (SSR, bloom, post-process) see a stabilized image.
+    D3D12_RESOURCE_BARRIER copyBarriers[3] = {};
+    UINT copyCount = 0;
+
+    if (m_taaIntermediateState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+        copyBarriers[copyCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        copyBarriers[copyCount].Transition.pResource = m_taaIntermediate.Get();
+        copyBarriers[copyCount].Transition.StateBefore = m_taaIntermediateState;
+        copyBarriers[copyCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        copyBarriers[copyCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++copyCount;
+        m_taaIntermediateState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    }
+
+    if (m_hdrState != D3D12_RESOURCE_STATE_COPY_DEST) {
+        copyBarriers[copyCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        copyBarriers[copyCount].Transition.pResource = m_hdrColor.Get();
+        copyBarriers[copyCount].Transition.StateBefore = m_hdrState;
+        copyBarriers[copyCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        copyBarriers[copyCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++copyCount;
+        m_hdrState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+
+    if (copyCount > 0) {
+        m_commandList->ResourceBarrier(copyCount, copyBarriers);
+    }
+
+    m_commandList->CopyResource(m_hdrColor.Get(), m_taaIntermediate.Get());
+
+    // Prepare HDR for sampling by downstream passes and at the same time copy
+    // the resolved HDR into the history buffer for the next frame.
+    D3D12_RESOURCE_BARRIER postTaa[3] = {};
+    UINT postCount = 0;
+
+    postTaa[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postTaa[postCount].Transition.pResource = m_taaIntermediate.Get();
+    postTaa[postCount].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    postTaa[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    postTaa[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ++postCount;
+    m_taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    postTaa[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postTaa[postCount].Transition.pResource = m_hdrColor.Get();
+    postTaa[postCount].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    postTaa[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    postTaa[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ++postCount;
+
+    if (m_historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
+        postTaa[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postTaa[postCount].Transition.pResource = m_historyColor.Get();
+        postTaa[postCount].Transition.StateBefore = m_historyState;
+        postTaa[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        postTaa[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++postCount;
+    }
+
+    m_commandList->ResourceBarrier(postCount, postTaa);
+
+    m_commandList->CopyResource(m_historyColor.Get(), m_hdrColor.Get());
+
+    // Final states: HDR as PIXEL_SHADER_RESOURCE for SSR/post-process, history
+    // as PIXEL_SHADER_RESOURCE for next frame.
+    D3D12_RESOURCE_BARRIER finalBarriers[2] = {};
+
+    finalBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    finalBarriers[0].Transition.pResource = m_hdrColor.Get();
+    finalBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    finalBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    finalBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    finalBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    finalBarriers[1].Transition.pResource = m_historyColor.Get();
+    finalBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    finalBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    finalBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    m_commandList->ResourceBarrier(2, finalBarriers);
+
+    m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_hasHistory = true;
+}
+
 void Renderer::RenderMotionVectors() {
     if (!m_motionVectorsPipeline || !m_velocityBuffer || !m_depthBuffer) {
         return;
@@ -1286,6 +2184,12 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         if (!renderable.visible || !renderable.mesh) {
             continue;
         }
+        // Transparent / glass materials are rendered in a dedicated blended
+        // pass after all opaque geometry so depth testing and composition
+        // behave correctly. Skip them here.
+        if (IsTransparentRenderable(renderable)) {
+            continue;
+        }
 
         EnsureMaterialTextures(renderable);
 
@@ -1324,6 +2228,35 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             m_fractalWarpStrength,
             m_fractalNoiseType);
 
+        // Encode a simple material "type" into fractalParams1.w so the
+        // shader can specialize behavior for glass / mirror / plastic /
+        // brick without changing the MaterialConstants layout.
+        //
+        // 0 = default (opaque)
+        // 1 = glass-like dielectric (strong specular, very little diffuse)
+        // 2 = mirror-like metal (polished conductor)
+        // 3 = plastic
+        // 4 = brick / masonry
+        float materialType = 0.0f;
+        if (!renderable.presetName.empty()) {
+            std::string presetLower = renderable.presetName;
+            std::transform(presetLower.begin(),
+                           presetLower.end(),
+                           presetLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (presetLower.find("glass") != std::string::npos) {
+                materialType = 1.0f;
+            } else if (presetLower.find("mirror") != std::string::npos) {
+                materialType = 2.0f;
+            } else if (presetLower.find("plastic") != std::string::npos) {
+                materialType = 3.0f;
+            } else if (presetLower.find("brick") != std::string::npos) {
+                materialType = 4.0f;
+            }
+        }
+        materialData.fractalParams1.w = materialType;
+
         // Update object constants
         ObjectConstants objectData = {};
         objectData.modelMatrix = transform.GetMatrix();
@@ -1335,6 +2268,15 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         // Bind constants
         m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
         m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+        // Select pipeline: dedicated water pipeline when available and entity
+        // is tagged as a water surface; otherwise use the default PBR pipeline.
+        const bool isWater = registry->HasComponent<Scene::WaterSurfaceComponent>(entity);
+        if (isWater && m_waterPipeline) {
+            m_commandList->SetPipelineState(m_waterPipeline->GetPipelineState());
+        } else {
+            m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+        }
 
         RefreshMaterialDescriptors(renderable);
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
@@ -1369,7 +2311,278 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     }
 }
 
+void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
+    if (!registry || !m_transparentPipeline) {
+        return;
+    }
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    if (view.begin() == view.end()) {
+        return;
+    }
+
+    struct TransparentDraw {
+        entt::entity entity;
+        float depth;
+    };
+
+    std::vector<TransparentDraw> drawList;
+    drawList.reserve(static_cast<size_t>(view.size_hint()));
+
+    const glm::vec3 cameraPos = glm::vec3(m_frameDataCPU.cameraPosition);
+
+    // Collect transparent entities and compute a simple distance-based depth
+    // for back-to-front sorting.
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform  = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (!IsTransparentRenderable(renderable)) {
+            continue;
+        }
+
+        glm::vec3 worldPos = glm::vec3(transform.GetMatrix()[3]);
+        float depth = glm::length2(worldPos - cameraPos);
+        drawList.push_back(TransparentDraw{entity, depth});
+    }
+
+    if (drawList.empty()) {
+        return;
+    }
+
+    std::sort(drawList.begin(), drawList.end(),
+              [](const TransparentDraw& a, const TransparentDraw& b) {
+                  // Draw far-to-near for correct alpha blending.
+                  return a.depth > b.depth;
+              });
+
+    // Root signature, pipeline, descriptor heap, and primitive topology for
+    // main geometry were already set in PrepareMainPass. We rebind the
+    // transparent pipeline and frame constants to be explicit.
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_transparentPipeline->GetPipelineState());
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    for (const auto& draw : drawList) {
+        auto entity = draw.entity;
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform  = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+
+        EnsureMaterialTextures(renderable);
+
+        MaterialConstants materialData = {};
+        materialData.albedo    = renderable.albedoColor;
+        materialData.metallic  = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+        materialData.ao        = glm::clamp(renderable.ao, 0.0f, 1.0f);
+
+        const auto hasAlbedoMap    = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+        const auto hasNormalMap    = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+        const auto hasMetallicMap  = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+        const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+
+        materialData.mapFlags = glm::uvec4(
+            hasAlbedoMap ? 1u : 0u,
+            hasNormalMap ? 1u : 0u,
+            hasMetallicMap ? 1u : 0u,
+            hasRoughnessMap ? 1u : 0u);
+
+        materialData.fractalParams0 = glm::vec4(
+            m_fractalAmplitude,
+            m_fractalFrequency,
+            m_fractalOctaves,
+            (m_fractalAmplitude > 0.0f ? 1.0f : 0.0f));
+        materialData.fractalParams1 = glm::vec4(
+            m_fractalCoordMode,
+            m_fractalScaleX,
+            m_fractalScaleZ,
+            0.0f);
+        materialData.fractalParams2 = glm::vec4(
+            m_fractalLacunarity,
+            m_fractalGain,
+            m_fractalWarpStrength,
+            m_fractalNoiseType);
+
+        float materialType = 0.0f;
+        if (!renderable.presetName.empty()) {
+            std::string presetLower = renderable.presetName;
+            std::transform(presetLower.begin(),
+                           presetLower.end(),
+                           presetLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (presetLower.find("glass") != std::string::npos) {
+                materialType = 1.0f;
+            } else if (presetLower.find("mirror") != std::string::npos) {
+                materialType = 2.0f;
+            } else if (presetLower.find("plastic") != std::string::npos) {
+                materialType = 3.0f;
+            } else if (presetLower.find("brick") != std::string::npos) {
+                materialType = 4.0f;
+            }
+        }
+        materialData.fractalParams1.w = materialType;
+
+        ObjectConstants objectData = {};
+        objectData.modelMatrix  = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB =
+            m_objectConstantBuffer.AllocateAndWrite(objectData);
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB =
+            m_materialConstantBuffer.AllocateAndWrite(materialData);
+
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+        RefreshMaterialDescriptors(renderable);
+        if (!renderable.textures.gpuState ||
+            !renderable.textures.gpuState->descriptors[0].IsValid()) {
+            continue;
+        }
+
+        m_commandList->SetGraphicsRootDescriptorTable(
+            3, renderable.textures.gpuState->descriptors[0].gpu);
+
+        if (renderable.mesh->gpuBuffers &&
+            renderable.mesh->gpuBuffers->vertexBuffer &&
+            renderable.mesh->gpuBuffers->indexBuffer) {
+            D3D12_VERTEX_BUFFER_VIEW vbv{};
+            vbv.BufferLocation =
+                renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+            vbv.SizeInBytes = static_cast<UINT>(
+                renderable.mesh->positions.size() * sizeof(Vertex));
+            vbv.StrideInBytes = sizeof(Vertex);
+
+            D3D12_INDEX_BUFFER_VIEW ibv{};
+            ibv.BufferLocation =
+                renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+            ibv.SizeInBytes = static_cast<UINT>(
+                renderable.mesh->indices.size() * sizeof(uint32_t));
+            ibv.Format = DXGI_FORMAT_R32_UINT;
+
+            m_commandList->IASetVertexBuffers(0, 1, &vbv);
+            m_commandList->IASetIndexBuffer(&ibv);
+
+            m_commandList->DrawIndexedInstanced(
+                static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+        }
+    }
+}
+
+void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
+    if (!registry || !m_depthBuffer || !m_depthOnlyPipeline) {
+        return;
+    }
+
+    // Ensure depth buffer is writable for the prepass.
+    if (m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+
+    // Bind depth stencil only; no color targets for this pass.
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    m_commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
+
+    // Clear depth to far plane.
+    m_commandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+    // Set viewport and scissor to match the depth buffer / window.
+    D3D12_VIEWPORT viewport{};
+    viewport.Width    = static_cast<float>(m_window->GetWidth());
+    viewport.Height   = static_cast<float>(m_window->GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+
+    D3D12_RECT scissorRect{};
+    scissorRect.left   = 0;
+    scissorRect.top    = 0;
+    scissorRect.right  = static_cast<LONG>(m_window->GetWidth());
+    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    // Bind root signature and depth-only pipeline.
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_depthOnlyPipeline->GetPipelineState());
+
+    // Frame constants (b1)
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform  = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+
+        if (!renderable.mesh->gpuBuffers ||
+            !renderable.mesh->gpuBuffers->vertexBuffer ||
+            !renderable.mesh->gpuBuffers->indexBuffer) {
+            continue;
+        }
+
+        // Object constants (b0); material/texture data are not needed for a
+        // pure depth pass so we skip b2 and descriptor tables.
+        ObjectConstants objectData = {};
+        objectData.modelMatrix  = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB =
+            m_objectConstantBuffer.AllocateAndWrite(objectData);
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+        D3D12_VERTEX_BUFFER_VIEW vbv{};
+        vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+        vbv.SizeInBytes    = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+        vbv.StrideInBytes  = sizeof(Vertex);
+
+        D3D12_INDEX_BUFFER_VIEW ibv{};
+        ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+        ibv.SizeInBytes    = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+        ibv.Format         = DXGI_FORMAT_R32_UINT;
+
+        m_commandList->IASetVertexBuffers(0, 1, &vbv);
+        m_commandList->IASetIndexBuffer(&ibv);
+
+        m_commandList->DrawIndexedInstanced(
+            static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+    }
+}
+
 Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
+    if (m_deviceRemoved) {
+        return Result<void>::Err("DX12 device has been removed; cannot upload mesh");
+    }
+
     if (!mesh) {
         return Result<void>::Err("Invalid mesh pointer");
     }
@@ -1502,6 +2715,7 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
                 spdlog::error(
                     "DX12 device removed before/while creating vertex buffer: reason=0x{:08X}",
                     static_cast<unsigned int>(removed));
+                m_deviceRemoved = true;
             }
         }
 
@@ -1767,6 +2981,9 @@ void Renderer::SetTAAEnabled(bool enabled) {
     m_taaSampleIndex = 0;
     m_taaJitterPrevPixels = glm::vec2(0.0f);
     m_taaJitterCurrPixels = glm::vec2(0.0f);
+    // Force history to be re-seeded on the next frame so we do not mix
+    // incompatible LDR/HDR or pre/post-teleport data.
+    m_hasHistory = false;
     spdlog::info("TAA {}", m_taaEnabled ? "ENABLED" : "DISABLED");
 }
 
@@ -1841,13 +3058,21 @@ void Renderer::SetFogParams(float density, float height, float falloff) {
 }
 
 void Renderer::CycleDebugViewMode() {
-    // 0 = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
-    // 5 = cascades, 6 = debug screen (post-process / HUD focus), 7 = fractal height,
-    // 8 = IBL diffuse only, 9 = IBL specular only, 10 = env direction/UV,
+    // 0  = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
+    // 5  = cascades, 6  = debug screen (post-process / HUD focus),
+    // 7  = fractal height,
+    // 8  = IBL diffuse only, 9  = IBL specular only, 10 = env direction/UV,
     // 11 = Fresnel (Fibl), 12 = specular mip debug,
     // 13 = SSAO only, 14 = SSAO overlay, 15 = SSR only, 16 = SSR overlay,
-    // 17 = forward light debug (heatmap / count), 18 = scene graph / debug lines
-    m_debugViewMode = (m_debugViewMode + 1) % 19;
+    // 17 = forward light debug (heatmap / count),
+    // 18 = RT shadow mask debug, 19 = RT shadow history debug,
+    // 20 = RT reflection buffer debug (post-process),
+    // 21 = RT GI buffer debug,
+    // 22 = shaded with RT GI disabled,
+    // 23 = shaded with RT reflections disabled (SSR only),
+    // 24 = RT reflection ray direction debug,
+    // 25 = TAA history weight debug.
+    m_debugViewMode = (m_debugViewMode + 1) % 26;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -1868,7 +3093,14 @@ void Renderer::CycleDebugViewMode() {
         case 15: label = "SSR_Only"; break;
         case 16: label = "SSR_Overlay"; break;
         case 17: label = "Light_Debug"; break;
-        case 18: label = "SceneGraph"; break;
+        case 18: label = "RT_ShadowMask"; break;
+        case 19: label = "RT_ShadowHistory"; break;
+        case 20: label = "RT_ReflectionBuffer"; break;
+        case 21: label = "RT_GI_Buffer"; break;
+        case 22: label = "Shaded_NoRTGI"; break;
+        case 23: label = "Shaded_NoRTRefl"; break;
+        case 24: label = "SDF_Debug"; break;
+        case 25: label = "TAA_HistoryWeight"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -1919,7 +3151,7 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 
 void Renderer::SetDebugViewMode(int mode) {
     // Clamp to the full range of supported debug modes.
-    int clamped = std::max(0, std::min(mode, 18));
+    int clamped = std::max(0, std::min(mode, 25));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -1963,6 +3195,45 @@ void Renderer::SetBloomIntensity(float intensity) {
     spdlog::info("Renderer bloom intensity set to {}", m_bloomIntensity);
 }
 
+void Renderer::SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
+                              float dirX, float dirZ, float secondaryAmplitude) {
+    m_waterLevelY = levelY;
+    m_waterWaveAmplitude = amplitude;
+    m_waterWaveLength = (waveLength <= 0.0f) ? 1.0f : waveLength;
+    m_waterWaveSpeed = speed;
+    glm::vec2 dir(dirX, dirZ);
+    if (glm::length2(dir) < 1e-4f) {
+        dir = glm::vec2(1.0f, 0.0f);
+    }
+    m_waterPrimaryDir = glm::normalize(dir);
+    m_waterSecondaryAmplitude = glm::max(0.0f, secondaryAmplitude);
+}
+
+float Renderer::SampleWaterHeightAt(const glm::vec2& worldXZ) const {
+    const float amplitude = m_waterWaveAmplitude;
+    const float waveLen   = (m_waterWaveLength <= 0.0f) ? 1.0f : m_waterWaveLength;
+    const float speed     = m_waterWaveSpeed;
+    const float waterY    = m_waterLevelY;
+
+    glm::vec2 dir = m_waterPrimaryDir;
+    if (glm::length2(dir) < 1e-4f) {
+        dir = glm::vec2(1.0f, 0.0f);
+    } else {
+        dir = glm::normalize(dir);
+    }
+    const glm::vec2 dir2(-dir.y, dir.x);
+
+    const float k = 2.0f * glm::pi<float>() / waveLen;
+    const float t = m_totalTime;
+
+    const float phase0 = glm::dot(dir, worldXZ) * k + speed * t;
+    const float h0 = amplitude * std::sin(phase0);
+
+    const float phase1 = glm::dot(dir2, worldXZ) * k * 1.3f + speed * 0.8f * t;
+    const float h1 = m_waterSecondaryAmplitude * std::sin(phase1);
+
+    return waterY + h0 + h1;
+}
 void Renderer::SetRayTracingEnabled(bool enabled) {
     bool newValue = enabled && m_rayTracingSupported;
     if (m_rayTracingEnabled == newValue) {
@@ -2294,6 +3565,19 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
     spdlog::info("Environment preset set to '{}'", m_environmentMaps[m_currentEnvironment].name);
 }
 
+std::string Renderer::GetCurrentEnvironmentName() const {
+    if (m_environmentMaps.empty()) {
+        return m_iblEnabled ? "None" : "None";
+    }
+
+    size_t index = m_currentEnvironment;
+    if (index >= m_environmentMaps.size()) {
+        index = 0;
+    }
+
+    return m_environmentMaps[index].name;
+}
+
 void Renderer::SetIBLIntensity(float diffuseIntensity, float specularIntensity) {
     float diff = std::max(diffuseIntensity, 0.0f);
     float spec = std::max(specularIntensity, 0.0f);
@@ -2478,8 +3762,9 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
 Result<void> Renderer::CreateDepthBuffer() {
     D3D12_RESOURCE_DESC depthDesc = {};
     depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthDesc.Width = m_window->GetWidth();
-    depthDesc.Height = m_window->GetHeight();
+    const float scale = std::max(m_renderScale, 1.0f);
+    depthDesc.Width = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
+    depthDesc.Height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
     depthDesc.DepthOrArraySize = 1;
     depthDesc.MipLevels = 1;
     depthDesc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -2664,13 +3949,463 @@ Result<void> Renderer::CreateShadowMapResources() {
     return Result<void>::Ok();
 }
 
+Result<void> Renderer::CreateRTShadowMask() {
+    if (!m_device || !m_descriptorManager || !m_window) {
+        return Result<void>::Err("Renderer not initialized for RT shadow mask creation");
+    }
+
+    const UINT width = m_window->GetWidth();
+    const UINT height = m_window->GetHeight();
+
+    if (width == 0 || height == 0) {
+        return Result<void>::Err("Window size is zero; cannot create RT shadow mask");
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    // RT shadow mask: single-channel 0..1, UAV for DXR writes.
+    m_rtShadowMask.Reset();
+    m_rtShadowMaskSRV = {};
+    m_rtShadowMaskUAV = {};
+    m_rtShadowMaskState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = width;
+    desc.Height = height;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr,
+        IID_PPV_ARGS(&m_rtShadowMask));
+    if (FAILED(hr)) {
+        m_rtShadowMask.Reset();
+        return Result<void>::Err("Failed to create RT shadow mask texture");
+    }
+
+    m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    // SRV for sampling in the PBR shader.
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        m_rtShadowMask.Reset();
+        return Result<void>::Err("Failed to allocate SRV for RT shadow mask: " + srvResult.Error());
+    }
+    m_rtShadowMaskSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtShadowMask.Get(),
+        &srvDesc,
+        m_rtShadowMaskSRV.cpu);
+
+    // UAV for DXR writes.
+    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (uavResult.IsErr()) {
+        m_rtShadowMask.Reset();
+        m_rtShadowMaskSRV = {};
+        return Result<void>::Err("Failed to allocate UAV for RT shadow mask: " + uavResult.Error());
+    }
+    m_rtShadowMaskUAV = uavResult.Value();
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = desc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_rtShadowMask.Get(),
+        nullptr,
+        &uavDesc,
+        m_rtShadowMaskUAV.cpu);
+
+    // History texture for simple temporal smoothing of RT shadows.
+    m_rtShadowMaskHistory.Reset();
+    m_rtShadowMaskHistorySRV = {};
+    m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC historyDesc = desc;
+    historyDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &historyDesc,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        nullptr,
+        IID_PPV_ARGS(&m_rtShadowMaskHistory));
+    if (FAILED(hr)) {
+        m_rtShadowMaskHistory.Reset();
+        return Result<void>::Err("Failed to create RT shadow mask history texture");
+    }
+
+    m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (historySrvResult.IsErr()) {
+        m_rtShadowMaskHistory.Reset();
+        m_rtShadowMaskHistorySRV = {};
+        return Result<void>::Err("Failed to allocate SRV for RT shadow mask history: " + historySrvResult.Error());
+    }
+    m_rtShadowMaskHistorySRV = historySrvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc{};
+    historySrvDesc.Format = historyDesc.Format;
+    historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    historySrvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtShadowMaskHistory.Get(),
+        &historySrvDesc,
+        m_rtShadowMaskHistorySRV.cpu);
+
+    // If the combined shadow + environment descriptor table has already been
+    // allocated, copy the SRVs into slots 3 and 4 (t3, t4, space1) so they
+    // are visible to the PBR shader when RT mode is active.
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        ID3D12Device* device = m_device->GetDevice();
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[3].cpu,
+            m_rtShadowMaskSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        if (m_rtShadowMaskHistorySRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                m_shadowAndEnvDescriptors[4].cpu,
+                m_rtShadowMaskHistorySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
+    }
+
+    // Any time we (re)create the RT shadow targets, history is invalid until
+    // we have copied a freshly written mask into it at the end of a frame.
+    m_rtHasHistory = false;
+
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateRTGIResources() {
+    if (!m_device || !m_descriptorManager || !m_window) {
+        return Result<void>::Err("Renderer not initialized for RT GI creation");
+    }
+
+    const UINT width = m_window->GetWidth();
+    const UINT height = m_window->GetHeight();
+
+    if (width == 0 || height == 0) {
+        return Result<void>::Err("Window size is zero; cannot create RT GI buffer");
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    m_rtGIColor.Reset();
+    m_rtGISRV = {};
+    m_rtGIUAV = {};
+    m_rtGIState = D3D12_RESOURCE_STATE_COMMON;
+
+    m_rtGIHistory.Reset();
+    m_rtGIHistorySRV = {};
+    m_rtGIHistoryState = D3D12_RESOURCE_STATE_COMMON;
+    m_rtGIHasHistory = false;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = width;
+    desc.Height = height;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+      HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+          &heapProps,
+          D3D12_HEAP_FLAG_NONE,
+          &desc,
+          D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+          nullptr,
+          IID_PPV_ARGS(&m_rtGIColor));
+    if (FAILED(hr)) {
+        m_rtGIColor.Reset();
+        return Result<void>::Err("Failed to create RT GI buffer");
+    }
+
+    m_rtGIState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+      // SRV for sampling in the PBR shader.
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        m_rtGIColor.Reset();
+        return Result<void>::Err("Failed to allocate SRV for RT GI buffer: " + srvResult.Error());
+    }
+    m_rtGISRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtGIColor.Get(),
+        &srvDesc,
+        m_rtGISRV.cpu);
+
+      // UAV for DXR writes.
+    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (uavResult.IsErr()) {
+        m_rtGIColor.Reset();
+        m_rtGISRV = {};
+        return Result<void>::Err("Failed to allocate UAV for RT GI buffer: " + uavResult.Error());
+    }
+    m_rtGIUAV = uavResult.Value();
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = desc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_rtGIColor.Get(),
+        nullptr,
+        &uavDesc,
+        m_rtGIUAV.cpu);
+
+      // Allocate history buffer (SRV only; written via CopyResource).
+      ComPtr<ID3D12Resource> history;
+      hr = m_device->GetDevice()->CreateCommittedResource(
+          &heapProps,
+          D3D12_HEAP_FLAG_NONE,
+          &desc,
+          D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+          nullptr,
+          IID_PPV_ARGS(&history));
+      if (FAILED(hr)) {
+          m_rtGIColor.Reset();
+          m_rtGISRV = {};
+          m_rtGIUAV = {};
+          return Result<void>::Err("Failed to create RT GI history buffer");
+      }
+      m_rtGIHistory = history;
+      m_rtGIHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+      auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+      if (historySrvResult.IsErr()) {
+          m_rtGIColor.Reset();
+          m_rtGISRV = {};
+          m_rtGIUAV = {};
+          m_rtGIHistory.Reset();
+          return Result<void>::Err("Failed to allocate SRV for RT GI history buffer: " + historySrvResult.Error());
+      }
+      m_rtGIHistorySRV = historySrvResult.Value();
+
+      D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc{};
+      historySrvDesc.Format = desc.Format;
+      historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+      historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+      historySrvDesc.Texture2D.MipLevels = 1;
+
+      m_device->GetDevice()->CreateShaderResourceView(
+          m_rtGIHistory.Get(),
+          &historySrvDesc,
+          m_rtGIHistorySRV.cpu);
+
+      // If the combined shadow + environment descriptor table has already been
+      // allocated, copy the SRVs into slots 5 (RT GI) and 6 (RT GI history)
+      // so they are visible to the PBR shader when RT mode is active.
+      if (m_shadowAndEnvDescriptors[0].IsValid() && m_rtGISRV.IsValid()) {
+          ID3D12Device* device = m_device->GetDevice();
+          device->CopyDescriptorsSimple(
+              1,
+              m_shadowAndEnvDescriptors[5].cpu,
+              m_rtGISRV.cpu,
+              D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+          if (m_rtGIHistorySRV.IsValid()) {
+              device->CopyDescriptorsSimple(
+                  1,
+                  m_shadowAndEnvDescriptors[6].cpu,
+                  m_rtGIHistorySRV.cpu,
+                  D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+          }
+      }
+
+      return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateRTReflectionResources() {
+    if (!m_device || !m_descriptorManager || !m_window) {
+        return Result<void>::Err("Renderer not initialized for RT reflection creation");
+    }
+
+    const UINT width = m_window->GetWidth();
+    const UINT height = m_window->GetHeight();
+
+    if (width == 0 || height == 0) {
+        return Result<void>::Err("Window size is zero; cannot create RT reflection buffer");
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    m_rtReflectionColor.Reset();
+    m_rtReflectionSRV = {};
+    m_rtReflectionUAV = {};
+    m_rtReflectionState = D3D12_RESOURCE_STATE_COMMON;
+    m_rtReflectionHistory.Reset();
+    m_rtReflectionHistorySRV = {};
+    m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = width;
+    desc.Height = height;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr,
+        IID_PPV_ARGS(&m_rtReflectionColor));
+    if (FAILED(hr)) {
+        m_rtReflectionColor.Reset();
+        return Result<void>::Err("Failed to create RT reflection color buffer");
+    }
+
+    m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    // SRV for sampling in post-process.
+    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (srvResult.IsErr()) {
+        m_rtReflectionColor.Reset();
+        return Result<void>::Err("Failed to allocate SRV for RT reflection buffer: " + srvResult.Error());
+    }
+    m_rtReflectionSRV = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtReflectionColor.Get(),
+        &srvDesc,
+        m_rtReflectionSRV.cpu);
+
+    // UAV for DXR writes.
+    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (uavResult.IsErr()) {
+        m_rtReflectionColor.Reset();
+        m_rtReflectionSRV = {};
+        return Result<void>::Err("Failed to allocate UAV for RT reflection buffer: " + uavResult.Error());
+    }
+    m_rtReflectionUAV = uavResult.Value();
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = desc.Format;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_rtReflectionColor.Get(),
+        nullptr,
+        &uavDesc,
+        m_rtReflectionUAV.cpu);
+
+    // Create a matching history buffer for temporal accumulation. This is
+    // sampled as an SRV only and written via CopyResource at the end of each
+    // frame after the DXR pass has produced the current RT reflection color.
+    ComPtr<ID3D12Resource> reflHistory;
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        nullptr,
+        IID_PPV_ARGS(&reflHistory));
+    if (FAILED(hr)) {
+        m_rtReflectionColor.Reset();
+        m_rtReflectionSRV = {};
+        m_rtReflectionUAV = {};
+        return Result<void>::Err("Failed to create RT reflection history buffer");
+    }
+    m_rtReflectionHistory = reflHistory;
+    m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    auto reflHistorySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    if (reflHistorySrvResult.IsErr()) {
+        m_rtReflectionColor.Reset();
+        m_rtReflectionSRV = {};
+        m_rtReflectionUAV = {};
+        m_rtReflectionHistory.Reset();
+        return Result<void>::Err("Failed to allocate SRV for RT reflection history buffer: " + reflHistorySrvResult.Error());
+    }
+    m_rtReflectionHistorySRV = reflHistorySrvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC reflHistorySrvDesc{};
+    reflHistorySrvDesc.Format = desc.Format;
+    reflHistorySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    reflHistorySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    reflHistorySrvDesc.Texture2D.MipLevels = 1;
+
+    m_device->GetDevice()->CreateShaderResourceView(
+        m_rtReflectionHistory.Get(),
+        &reflHistorySrvDesc,
+        m_rtReflectionHistorySRV.cpu);
+
+    return Result<void>::Ok();
+}
+
 Result<void> Renderer::CreateHDRTarget() {
     if (!m_device || !m_descriptorManager) {
         return Result<void>::Err("Renderer not initialized for HDR target creation");
     }
 
-    const UINT width = m_window->GetWidth();
-    const UINT height = m_window->GetHeight();
+    // Apply a simple supersampling factor so the main scene renders into a
+    // higher-resolution HDR target when m_renderScale > 1.0. The back buffer
+    // resolution remains tied to the window size; downsampling happens in
+    // the fullscreen post-process pass.
+    const float scale = std::max(m_renderScale, 1.0f);
+    const UINT width  = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
+    const UINT height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
 
     if (width == 0 || height == 0) {
         return Result<void>::Err("Window size is zero; cannot create HDR target");
@@ -2751,7 +4486,7 @@ Result<void> Renderer::CreateHDRTarget() {
         m_hdrSRV.cpu
     );
 
-    spdlog::info("HDR target created: {}x{}", width, height);
+    spdlog::info("HDR target created: {}x{} (scale {:.2f})", width, height, scale);
 
     // Normal/roughness G-buffer target (full resolution, matched to HDR)
     m_gbufferNormalRoughness.Reset();
@@ -2822,7 +4557,9 @@ Result<void> Renderer::CreateHDRTarget() {
         }
     }
 
-    // (Re)create history color buffer for temporal AA (LDR, back-buffer format)
+    // (Re)create history color buffer for temporal AA in HDR space. This
+    // matches the main HDR target format so TAA operates on linear lighting
+    // before tonemapping and late post-effects.
     m_historyColor.Reset();
     m_historySRV = {};
     m_historyState = D3D12_RESOURCE_STATE_COMMON;
@@ -2834,7 +4571,7 @@ Result<void> Renderer::CreateHDRTarget() {
     historyDesc.Height = height;
     historyDesc.DepthOrArraySize = 1;
     historyDesc.MipLevels = 1;
-    historyDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    historyDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
     historyDesc.SampleDesc.Count = 1;
     historyDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
@@ -2842,7 +4579,7 @@ Result<void> Renderer::CreateHDRTarget() {
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &historyDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
         nullptr,
         IID_PPV_ARGS(&m_historyColor)
     );
@@ -2850,7 +4587,7 @@ Result<void> Renderer::CreateHDRTarget() {
     if (FAILED(hr)) {
         spdlog::warn("Failed to create TAA history buffer");
     } else {
-        m_historyState = D3D12_RESOURCE_STATE_COPY_DEST;
+        m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
         if (!m_historySRV.IsValid()) {
             auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
@@ -2860,7 +4597,7 @@ Result<void> Renderer::CreateHDRTarget() {
                 m_historySRV = historySrvResult.Value();
 
                 D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc = {};
-                historySrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                historySrvDesc.Format = historyDesc.Format;
                 historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                 historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 historySrvDesc.Texture2D.MipLevels = 1;
@@ -2871,6 +4608,51 @@ Result<void> Renderer::CreateHDRTarget() {
                     m_historySRV.cpu
                 );
             }
+        }
+    }
+
+    // (Re)create intermediate TAA resolve target (matches HDR resolution/format).
+    m_taaIntermediate.Reset();
+    m_taaIntermediateRTV = {};
+    m_taaIntermediateState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_RESOURCE_DESC taaDesc = desc;
+    D3D12_CLEAR_VALUE taaClear = {};
+    taaClear.Format = taaDesc.Format;
+    taaClear.Color[0] = 0.0f;
+    taaClear.Color[1] = 0.0f;
+    taaClear.Color[2] = 0.0f;
+    taaClear.Color[3] = 1.0f;
+
+    hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &taaDesc,
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        &taaClear,
+        IID_PPV_ARGS(&m_taaIntermediate)
+    );
+
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create TAA intermediate HDR target");
+    } else {
+        m_taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        auto taaRtvResult = m_descriptorManager->AllocateRTV();
+        if (taaRtvResult.IsErr()) {
+            spdlog::warn("Failed to allocate RTV for TAA intermediate: {}", taaRtvResult.Error());
+        } else {
+            m_taaIntermediateRTV = taaRtvResult.Value();
+
+            D3D12_RENDER_TARGET_VIEW_DESC taaRtvDesc = {};
+            taaRtvDesc.Format = taaDesc.Format;
+            taaRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+            m_device->GetDevice()->CreateRenderTargetView(
+                m_taaIntermediate.Get(),
+                &taaRtvDesc,
+                m_taaIntermediateRTV.cpu
+            );
         }
     }
 
@@ -3042,7 +4824,7 @@ Result<void> Renderer::CreateCommandList() {
     return Result<void>::Ok();
 }
 
-Result<void> Renderer::CompileShaders() {
+  Result<void> Renderer::CompileShaders() {
     // Compile shaders
     auto vsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/Basic.hlsl",
@@ -3106,6 +4888,16 @@ Result<void> Renderer::CompileShaders() {
         return Result<void>::Err("Failed to compile post-process pixel shader: " + postPsResult.Error());
     }
 
+    // HDR TAA resolve pixel shader (operates on HDR lighting before tonemapping).
+    auto taaPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/PostProcess.hlsl",
+        "TAAResolvePS",
+        "ps_5_1"
+    );
+    if (taaPsResult.IsErr()) {
+        spdlog::warn("Failed to compile TAA HDR pixel shader: {}", taaPsResult.Error());
+    }
+
     auto ssaoVsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/SSAO.hlsl",
         "VSMain",
@@ -3162,6 +4954,27 @@ Result<void> Renderer::CompileShaders() {
         spdlog::warn("Failed to compile motion vector pixel shader: {}", motionPsResult.Error());
     }
 
+    // Water surface shaders (optional). If compilation fails, we simply skip
+    // creating a dedicated water pipeline and render water with the default
+    // PBR path instead.
+    auto waterVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Water.hlsl",
+        "WaterVS",
+        "vs_5_1"
+    );
+    if (waterVsResult.IsErr()) {
+        spdlog::warn("Failed to compile water vertex shader: {}", waterVsResult.Error());
+    }
+
+    auto waterPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Water.hlsl",
+        "WaterPS",
+        "ps_5_1"
+    );
+    if (waterPsResult.IsErr()) {
+        spdlog::warn("Failed to compile water pixel shader: {}", waterPsResult.Error());
+    }
+
     // Store compiled shaders (we'll use them in CreatePipeline)
     // For now, we'll just recreate the root signature and pipeline
 
@@ -3171,8 +4984,8 @@ Result<void> Renderer::CompileShaders() {
         return Result<void>::Err("Failed to create root signature: " + rsResult.Error());
     }
 
-    // Create pipeline
-    m_pipeline = std::make_unique<DX12Pipeline>();
+      // Create pipeline
+      m_pipeline = std::make_unique<DX12Pipeline>();
 
     PipelineDesc pipelineDesc = {};
     pipelineDesc.vertexShader = vsResult.Value();
@@ -3197,6 +5010,77 @@ Result<void> Renderer::CompileShaders() {
 
     if (pipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create pipeline: " + pipelineResult.Error());
+    }
+
+    // Transparent variant of the main PBR pipeline for glass/alpha
+    // materials. Uses the same shaders and input layout but enables
+    // alpha blending and disables depth writes so transparent surfaces
+    // can be rendered over the opaque scene in a separate pass.
+    m_transparentPipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc transparentDesc = pipelineDesc;
+    transparentDesc.blendEnabled = true;
+    transparentDesc.depthWriteEnabled = false;
+
+    auto transparentResult = m_transparentPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        transparentDesc);
+    if (transparentResult.IsErr()) {
+        spdlog::warn("Failed to create transparent pipeline: {}", transparentResult.Error());
+        m_transparentPipeline.reset();
+    }
+
+    // Depth-only pipeline for prepass: reuse the main vertex shader and
+    // input layout, but omit a pixel shader and disable color render
+    // targets so we only populate the depth buffer.
+    m_depthOnlyPipeline = std::make_unique<DX12Pipeline>();
+    PipelineDesc depthDesc = {};
+    depthDesc.vertexShader = vsResult.Value();
+    depthDesc.pixelShader  = {}; // empty = no PS
+    depthDesc.inputLayout  = pipelineDesc.inputLayout;
+    depthDesc.rtvFormat    = DXGI_FORMAT_UNKNOWN;
+    depthDesc.dsvFormat    = DXGI_FORMAT_D32_FLOAT;
+    depthDesc.numRenderTargets = 0;
+    depthDesc.depthTestEnabled  = true;
+    depthDesc.depthWriteEnabled = true;
+    depthDesc.cullMode = D3D12_CULL_MODE_BACK;
+    depthDesc.blendEnabled = false;
+
+    auto depthPipelineResult = m_depthOnlyPipeline->Initialize(
+        m_device->GetDevice(),
+        m_rootSignature->GetRootSignature(),
+        depthDesc
+    );
+    if (depthPipelineResult.IsErr()) {
+        spdlog::warn("Failed to create depth-only pipeline: {}", depthPipelineResult.Error());
+        m_depthOnlyPipeline.reset();
+    }
+
+    // Optional dedicated water pipeline: uses the same input layout and root
+    // signature as the main PBR pipeline but a tailored shader pair.
+    if (waterVsResult.IsOk() && waterPsResult.IsOk()) {
+        m_waterPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc waterDesc = {};
+        waterDesc.vertexShader = waterVsResult.Value();
+        waterDesc.pixelShader  = waterPsResult.Value();
+        waterDesc.inputLayout = pipelineDesc.inputLayout;
+        waterDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        waterDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        waterDesc.numRenderTargets = 2;
+        waterDesc.depthTestEnabled = true;
+        waterDesc.depthWriteEnabled = true;
+        waterDesc.cullMode = D3D12_CULL_MODE_BACK;
+        waterDesc.blendEnabled = false;
+
+        auto waterPipelineResult = m_waterPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            waterDesc);
+        if (waterPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create water pipeline: {}", waterPipelineResult.Error());
+            m_waterPipeline.reset();
+        }
     }
 
     // Skybox pipeline (fullscreen triangle; no depth)
@@ -3277,6 +5161,33 @@ Result<void> Renderer::CompileShaders() {
 
     if (postPipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
+    }
+
+    // HDR TAA resolve pipeline (fullscreen, writes into HDR intermediate)
+    if (taaPsResult.IsOk()) {
+        m_taaPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc taaDesc = {};
+        taaDesc.vertexShader = postVsResult.Value();
+        taaDesc.pixelShader  = taaPsResult.Value();
+        taaDesc.inputLayout = {}; // fullscreen triangle via SV_VertexID
+        taaDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        taaDesc.dsvFormat = DXGI_FORMAT_UNKNOWN;
+        taaDesc.numRenderTargets = 1;
+        taaDesc.depthTestEnabled = false;
+        taaDesc.depthWriteEnabled = false;
+        taaDesc.cullMode = D3D12_CULL_MODE_NONE;
+        taaDesc.blendEnabled = false;
+
+        auto taaPipelineResult = m_taaPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            taaDesc
+        );
+        if (taaPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create TAA pipeline: {}", taaPipelineResult.Error());
+            m_taaPipeline.reset();
+        }
     }
 
     // SSAO pipeline (fullscreen pass, single-channel target)
@@ -3661,9 +5572,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     // Ensure current environment index is valid
     m_currentEnvironment = 0;
 
-    // Allocate persistent descriptors for shadow + IBL (t4-t6) if not already created.
+    // Allocate persistent descriptors for shadow + IBL + RT mask/history + RT GI
+    // (space1, t0-t6) if not already created.
     if (!m_shadowAndEnvDescriptors[0].IsValid()) {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 7; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 return Result<void>::Err("Failed to allocate SRV table for shadow/environment: " + handleResult.Error());
@@ -3698,7 +5610,7 @@ Result<void> Renderer::AddEnvironmentFromTexture(const std::shared_ptr<DX12Textu
 
     // Ensure descriptor table exists, then refresh bindings.
     if (!m_shadowAndEnvDescriptors[0].IsValid() && m_descriptorManager) {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 7; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 return Result<void>::Err("Failed to allocate SRV table for Dreamer environment: " + handleResult.Error());
@@ -3768,6 +5680,35 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
             specularSrc.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
+    }
+
+    // Optional RT shadow mask and history (t3, t4). When unavailable the
+    // PBR shader simply reads cascaded shadows.
+    if (m_rtShadowMaskSRV.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[3].cpu,
+            m_rtShadowMaskSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
+    if (m_rtShadowMaskHistorySRV.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[4].cpu,
+            m_rtShadowMaskHistorySRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
+
+    // Optional RT diffuse GI buffer (t5). When unavailable the PBR shader
+    // falls back to SSAO + ambient only.
+    if (m_rtGISRV.IsValid()) {
+        device->CopyDescriptorsSimple(
+            1,
+            m_shadowAndEnvDescriptors[5].cpu,
+            m_rtGISRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 }
 
@@ -4228,6 +6169,40 @@ void Renderer::RenderPostProcess() {
         }
     }
 
+    // RT reflection buffer SRV (t8) used by hybrid SSR/RT reflections. We only
+    // bind this when the reflection buffer exists; sampling in the shader is
+    // additionally gated on the RT enable flag (postParams.w).
+    if (m_rtReflectionSRV.IsValid() && m_rtReflectionColor) {
+        auto rtReflAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (rtReflAllocResult.IsOk()) {
+            DescriptorHandle rtReflHandle = rtReflAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                rtReflHandle.cpu,
+                m_rtReflectionSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection SRV; RT reflections will be disabled this frame");
+        }
+    }
+
+    // Optional RT reflection history SRV (t9) used for temporal accumulation
+    // / denoising in the post-process pass. When history does not exist we
+    // simply fall back to the current RT reflection buffer only.
+    if (m_rtReflectionHistorySRV.IsValid() && m_rtReflectionHistory) {
+        auto rtReflHistAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (rtReflHistAllocResult.IsOk()) {
+            DescriptorHandle rtReflHistHandle = rtReflHistAllocResult.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                rtReflHistHandle.cpu,
+                m_rtReflectionHistorySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection history SRV; RT reflection temporal filtering will be disabled this frame");
+        }
+    }
+
     // Bind SRV table starting at t0
     m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
 
@@ -4239,50 +6214,55 @@ void Renderer::RenderPostProcess() {
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawInstanced(3, 1, 0, 0);
 
-    // After post-process, copy the LDR back buffer into the history buffer for next frame's TAA.
-    if (m_taaEnabled && m_historyColor && m_historySRV.IsValid()) {
-        D3D12_RESOURCE_BARRIER barriers[2] = {};
-        UINT barrierCountHistory = 0;
+    // Keep the RT reflection history buffer in sync with the current RT
+    // reflection color so post-process can perform simple temporal
+    // accumulation/denoising. This copy is independent of the TAA history.
+    if (m_rtReflectionColor && m_rtReflectionHistory) {
+        D3D12_RESOURCE_BARRIER reflBarriers[2] = {};
+        UINT reflBarrierCount = 0;
 
-        if (m_historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
-            barriers[barrierCountHistory].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCountHistory].Transition.pResource = m_historyColor.Get();
-            barriers[barrierCountHistory].Transition.StateBefore = m_historyState;
-            barriers[barrierCountHistory].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-            barriers[barrierCountHistory].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCountHistory;
+        if (m_rtReflectionState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+            reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionColor.Get();
+            reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionState;
+            reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++reflBarrierCount;
+            m_rtReflectionState = D3D12_RESOURCE_STATE_COPY_SOURCE;
         }
 
-        // Back buffer RT -> COPY_SOURCE for the copy
-        barriers[barrierCountHistory].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCountHistory].Transition.pResource = m_window->GetCurrentBackBuffer();
-        barriers[barrierCountHistory].Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barriers[barrierCountHistory].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        barriers[barrierCountHistory].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCountHistory;
+        if (m_rtReflectionHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionHistory.Get();
+            reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionHistoryState;
+            reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++reflBarrierCount;
+            m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_COPY_DEST;
+        }
 
-        m_commandList->ResourceBarrier(barrierCountHistory, barriers);
+        if (reflBarrierCount > 0) {
+            m_commandList->ResourceBarrier(reflBarrierCount, reflBarriers);
+        }
 
-        m_commandList->CopyResource(m_historyColor.Get(), m_window->GetCurrentBackBuffer());
+        m_commandList->CopyResource(m_rtReflectionHistory.Get(), m_rtReflectionColor.Get());
 
-        // Transition back buffer back to RENDER_TARGET and history to PIXEL_SHADER_RESOURCE
-        D3D12_RESOURCE_BARRIER postCopyBarriers[2] = {};
+        reflBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        reflBarriers[0].Transition.pResource = m_rtReflectionColor.Get();
+        reflBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        reflBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        reflBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 
-        postCopyBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        postCopyBarriers[0].Transition.pResource = m_window->GetCurrentBackBuffer();
-        postCopyBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        postCopyBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        postCopyBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        reflBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        reflBarriers[1].Transition.pResource = m_rtReflectionHistory.Get();
+        reflBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        reflBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        reflBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 
-        postCopyBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        postCopyBarriers[1].Transition.pResource = m_historyColor.Get();
-        postCopyBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        postCopyBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        postCopyBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(2, reflBarriers);
 
-        m_commandList->ResourceBarrier(2, postCopyBarriers);
-        m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        m_hasHistory = true;
+        m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 }
 

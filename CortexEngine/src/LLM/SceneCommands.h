@@ -37,7 +37,20 @@ struct SceneCommand {
 
 // Add a new entity to the scene
 struct AddEntityCommand : public SceneCommand {
-    enum class EntityType { Cube, Sphere, Plane, Cylinder, Pyramid, Cone, Torus, Model };
+    enum class EntityType {
+        Cube,
+        Sphere,
+        Plane,
+        Cylinder,
+        Pyramid,
+        Cone,
+        Torus,
+        Disk,
+        Capsule,
+        Quad,
+        Line,
+        Model
+    };
 
     EntityType entityType = EntityType::Cube;
     glm::vec3 position = glm::vec3(0.0f);
@@ -257,6 +270,11 @@ struct ModifyRendererCommand : public SceneCommand {
     bool setLightingRig = false;
     bool setFogEnabled = false;
     bool setFogParams = false;
+    bool setWaterLevel = false;
+    bool setWaterWaveAmplitude = false;
+    bool setWaterWaveLength = false;
+    bool setWaterWaveSpeed = false;
+    bool setWaterSecondaryAmplitude = false;
     bool setSunDirection = false;
     bool setSunColor = false;
     bool setSunIntensity = false;
@@ -287,6 +305,11 @@ struct ModifyRendererCommand : public SceneCommand {
     glm::vec3 sunDirection{ -0.3f, -1.0f, 0.1f };
     glm::vec3 sunColor{ 1.0f, 0.96f, 0.9f };
     float sunIntensity = 5.0f;
+    float waterLevel = 0.0f;
+    float waterWaveAmplitude = 0.2f;
+    float waterWaveLength = 8.0f;
+    float waterWaveSpeed = 1.0f;
+    float waterSecondaryAmplitude = 0.1f;
 
     ModifyRendererCommand() { type = CommandType::ModifyRenderer; }
     std::string ToString() const override;

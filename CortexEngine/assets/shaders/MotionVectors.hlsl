@@ -32,8 +32,12 @@ cbuffer FrameConstants : register(b1)
     float4   g_AOParams;
     float4   g_BloomParams;
     float4   g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
     float4x4 g_PrevViewProjMatrix;
     float4x4 g_InvViewProjMatrix;
+    float4   g_WaterParams0;
+    float4   g_WaterParams1;
 };
 
 Texture2D g_Depth : register(t0);
@@ -64,7 +68,10 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     float x = uv.x * 2.0f - 1.0f;
     float y = 1.0f - 2.0f * uv.y;
     float4 clip = float4(x, y, depth, 1.0f);
-    float4 world = mul(g_InvViewProjMatrix, clip);
+    // Use the non-jittered inverse view-projection for motion vectors so
+    // that TAA jitter does not appear as artificial motion. Jitter is
+    // applied separately via g_TAAParams.xy in the post-process.
+    float4 world = mul(g_InvViewProjectionNoJitter, clip);
     return world.xyz / max(world.w, 1e-4f);
 }
 
@@ -80,7 +87,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     float3 worldPos = ReconstructWorldPosition(uv, depth);
 
-    float4 currClip = mul(g_ViewProjectionMatrix, float4(worldPos, 1.0f));
+    // Motion vectors are computed in non-jittered clip space so they capture
+    // camera/object motion only; jitter is handled separately during TAA
+    // reprojection.
+    float4 currClip = mul(g_ViewProjectionNoJitter, float4(worldPos, 1.0f));
     float4 prevClip = mul(g_PrevViewProjMatrix, float4(worldPos, 1.0f));
 
     if (currClip.w == 0.0f || prevClip.w == 0.0f)

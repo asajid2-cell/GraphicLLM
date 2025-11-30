@@ -18,6 +18,7 @@
 #include "ShaderTypes.h"
 #include "Utils/Result.h"
 #include "../Scene/Components.h"
+#include "MeshBuffers.h"
 
 namespace Cortex {
     class Window;
@@ -28,11 +29,6 @@ namespace Cortex {
 }
 
 namespace Cortex::Graphics {
-
-struct MeshBuffers {
-    ComPtr<ID3D12Resource> vertexBuffer;
-    ComPtr<ID3D12Resource> indexBuffer;
-};
 
 // Constant buffer wrapper
 template<typename T>
@@ -184,6 +180,7 @@ public:
     [[nodiscard]] float GetCascadeResolutionScale(uint32_t cascadeIndex) const {
         return (cascadeIndex < kShadowCascadeCount) ? m_cascadeResolutionScale[cascadeIndex] : 1.0f;
     }
+    [[nodiscard]] std::string GetCurrentEnvironmentName() const;
 
     // Mutators for renderer-level commands
     void SetExposure(float exposure);
@@ -233,10 +230,27 @@ public:
     [[nodiscard]] bool GetIBLEnabled() const { return m_iblEnabled; }
     [[nodiscard]] bool GetSSREnabled() const { return m_ssrEnabled; }
 
+    // Water / liquid controls
+    void SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
+                        float dirX = 1.0f, float dirZ = 0.0f, float secondaryAmplitude = 0.0f);
+    // Sample the procedural water height at a given world-space XZ position.
+    // This mirrors the wave function used in Water.hlsl so buoyancy and
+    // other CPU-side systems can stay in sync with the GPU water surface.
+    float SampleWaterHeightAt(const glm::vec2& worldXZ) const;
+    [[nodiscard]] float GetWaterLevel() const { return m_waterLevelY; }
+    [[nodiscard]] float GetWaterWaveAmplitude() const { return m_waterWaveAmplitude; }
+    [[nodiscard]] float GetWaterWaveLength() const { return m_waterWaveLength; }
+    [[nodiscard]] float GetWaterWaveSpeed() const { return m_waterWaveSpeed; }
+    [[nodiscard]] float GetWaterSecondaryAmplitude() const { return m_waterSecondaryAmplitude; }
+
     // Ray tracing capability and toggle (DXR)
     [[nodiscard]] bool IsRayTracingSupported() const { return m_rayTracingSupported; }
     [[nodiscard]] bool IsRayTracingEnabled() const { return m_rayTracingEnabled; }
+    [[nodiscard]] bool IsDeviceRemoved() const { return m_deviceRemoved; }
     void SetRayTracingEnabled(bool enabled);
+    // Clear temporal history (TAA, RT shadows/GI) when the scene is rebuilt
+    // so the new layout does not inherit afterimages from the old one.
+    void ResetTemporalHistoryForSceneChange();
     // Dynamically register an environment map from an existing texture (used by Dreamer).
     Result<void> AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name);
 
@@ -253,10 +267,10 @@ private:
     static constexpr uint32_t kBloomLevels = 3;
 
     void BeginFrame();
+    void RenderDepthPrepass(Scene::ECS_Registry* registry);
     void PrepareMainPass();
     void EndFrame();
 
-    void RenderScene(Scene::ECS_Registry* registry);
     void UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* registry);
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     Result<void> EnsureHyperGeometryScene(Scene::ECS_Registry* registry);
@@ -271,6 +285,9 @@ private:
     Result<void> CreateHDRTarget();
     Result<void> CreateBloomResources();
     Result<void> CreateSSAOResources();
+    Result<void> CreateRTShadowMask();
+    Result<void> CreateRTReflectionResources();
+    Result<void> CreateRTGIResources();
     Result<void> InitializeEnvironmentMaps();
     void UpdateEnvironmentDescriptorTable();
     void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
@@ -278,7 +295,10 @@ private:
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
     void RenderSkybox();
+    void RenderScene(Scene::ECS_Registry* registry);
+    void RenderTransparent(Scene::ECS_Registry* registry);
     void RenderSSR();
+    void RenderTAA();
     void RenderMotionVectors();
     void RenderSSAO();
     void RenderBloom();
@@ -290,6 +310,17 @@ private:
 public:
     void AddDebugLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color);
     void ClearDebugLines();
+
+    // GPU-driven debug overlay (settings panel) state fed into FrameConstants.
+    void SetDebugOverlayState(bool visible, int selectedSection) {
+        m_debugOverlayVisible = visible;
+        m_debugOverlaySelectedRow = selectedSection;
+    }
+
+    // Flag used by the GPU post-process path to draw a simple settings
+    // overlay instead of relying on GDI, which is unreliable with modern
+    // flip-model swap chains.
+    void SetDebugOverlayVisible(bool visible) { m_debugOverlayVisible = visible; }
 
     // Graphics resources
     DX12Device* m_device = nullptr;
@@ -310,8 +341,16 @@ public:
     // Pipeline state
     std::unique_ptr<DX12RootSignature> m_rootSignature;
     std::unique_ptr<DX12Pipeline> m_pipeline;
+    // Blended variant of the main PBR pipeline used for glass/transparent
+    // materials. Shares the same shaders and input layout but enables
+    // alpha blending and disables depth writes so transparent surfaces can
+    // be rendered back-to-front over the opaque scene.
+    std::unique_ptr<DX12Pipeline> m_transparentPipeline;
+    std::unique_ptr<DX12Pipeline> m_depthOnlyPipeline;
     std::unique_ptr<DX12Pipeline> m_shadowPipeline;
+    // Fullscreen / post pipelines
     std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
+    std::unique_ptr<DX12Pipeline> m_taaPipeline;
     std::unique_ptr<DX12Pipeline> m_ssrPipeline;
     std::unique_ptr<DX12Pipeline> m_ssaoPipeline;
     std::unique_ptr<DX12Pipeline> m_motionVectorsPipeline;
@@ -321,6 +360,10 @@ public:
     std::unique_ptr<DX12Pipeline> m_bloomCompositePipeline;
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
     std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
+    std::unique_ptr<DX12Pipeline> m_waterPipeline;
+
+    bool m_debugOverlayVisible = false;
+    int  m_debugOverlaySelectedRow = 0;
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
@@ -346,8 +389,15 @@ public:
     ComPtr<ID3D12Resource> m_shadowMap;
     std::array<DescriptorHandle, kShadowArraySize> m_shadowMapDSVs;
     DescriptorHandle m_shadowMapSRV;
-    // Shadow + environment descriptor table (t4-t6)
-    std::array<DescriptorHandle, 3> m_shadowAndEnvDescriptors{};
+    // Shadow + environment descriptor table (space1):
+    //   t0 = shadow map array
+    //   t1 = diffuse IBL
+    //   t2 = specular IBL
+    //   t3 = RT shadow mask (optional, DXR)
+    //   t4 = RT shadow mask history (optional, DXR)
+    //   t5 = RT diffuse GI buffer (optional, DXR)
+    //   t6 = RT diffuse GI history buffer (optional, DXR)
+    std::array<DescriptorHandle, 7> m_shadowAndEnvDescriptors{};
     D3D12_VIEWPORT m_shadowViewport{};
     D3D12_RECT m_shadowScissor{};
     D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_COMMON;
@@ -357,6 +407,20 @@ public:
     DescriptorHandle m_hdrRTV;
     DescriptorHandle m_hdrSRV;
     D3D12_RESOURCE_STATES m_hdrState = D3D12_RESOURCE_STATE_COMMON;
+
+    // RT sun shadow mask and simple history buffer used for temporal
+    // smoothing. These are only created when DXR is supported; shaders
+    // treat them as optional and fall back to cascaded shadows when
+    // unavailable.
+    ComPtr<ID3D12Resource> m_rtShadowMask;
+    DescriptorHandle m_rtShadowMaskSRV;
+    DescriptorHandle m_rtShadowMaskUAV;
+    D3D12_RESOURCE_STATES m_rtShadowMaskState = D3D12_RESOURCE_STATE_COMMON;
+
+    ComPtr<ID3D12Resource> m_rtShadowMaskHistory;
+    DescriptorHandle m_rtShadowMaskHistorySRV;
+    D3D12_RESOURCE_STATES m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_COMMON;
+    bool m_rtHasHistory = false;
     // G-buffer target storing world-space normal (xyz) and roughness (w)
     ComPtr<ID3D12Resource> m_gbufferNormalRoughness;
     DescriptorHandle m_gbufferNormalRoughnessRTV;
@@ -380,6 +444,31 @@ public:
     DescriptorHandle m_velocityRTV;
     DescriptorHandle m_velocitySRV;
     D3D12_RESOURCE_STATES m_velocityState = D3D12_RESOURCE_STATE_COMMON;
+
+    // RT reflection color target written by DXR (hybrid SSR/RT path) and an
+    // optional history buffer for simple temporal accumulation/denoising.
+    ComPtr<ID3D12Resource> m_rtReflectionColor;
+    DescriptorHandle m_rtReflectionSRV;
+    DescriptorHandle m_rtReflectionUAV;
+    D3D12_RESOURCE_STATES m_rtReflectionState = D3D12_RESOURCE_STATE_COMMON;
+
+    ComPtr<ID3D12Resource> m_rtReflectionHistory;
+    DescriptorHandle m_rtReflectionHistorySRV;
+    D3D12_RESOURCE_STATES m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_COMMON;
+
+    // RT diffuse global illumination buffer written by DXR. This is a
+    // low-frequency indirect lighting term that can be sampled by the main
+    // PBR shader or viewed in debug modes. A small history buffer is kept
+    // alongside it for simple temporal accumulation.
+    ComPtr<ID3D12Resource> m_rtGIColor;
+    DescriptorHandle m_rtGISRV;
+    DescriptorHandle m_rtGIUAV;
+    D3D12_RESOURCE_STATES m_rtGIState = D3D12_RESOURCE_STATE_COMMON;
+
+    ComPtr<ID3D12Resource> m_rtGIHistory;
+    DescriptorHandle m_rtGIHistorySRV;
+    D3D12_RESOURCE_STATES m_rtGIHistoryState = D3D12_RESOURCE_STATE_COMMON;
+    bool m_rtGIHasHistory = false;
 
     // Bloom textures as a small mip pyramid (multi-scale, ping-pong per level)
     ComPtr<ID3D12Resource> m_bloomTexA[kBloomLevels];
@@ -424,9 +513,12 @@ public:
     std::vector<PendingEnvironment> m_pendingEnvironments;
 
     size_t m_currentEnvironment = 0;
-    float m_iblDiffuseIntensity = 1.0f;
-    float m_iblSpecularIntensity = 1.0f;
-    bool m_iblEnabled = true;
+    float m_iblDiffuseIntensity = 1.1f;
+    float m_iblSpecularIntensity = 1.3f;
+    // Start in a neutral "no IBL" mode so the engine boots into the default
+    // background; environments remain loaded and can be enabled via the
+    // debug menu or environment cycling controls.
+    bool m_iblEnabled = false;
 
     // Lighting state
     glm::vec3 m_directionalLightDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)); // direction from surface to light
@@ -435,6 +527,10 @@ public:
     glm::vec3 m_ambientLightColor = glm::vec3(0.04f);
     float m_ambientLightIntensity = 1.0f;
     float m_exposure = 1.0f;
+    // Internal rendering resolution scale for simple supersampling. A value
+    // greater than 1.0 renders the main scene into higher-resolution HDR
+    // and depth targets and downsamples in the post-process pass.
+    float m_renderScale = 1.5f;
     float m_bloomIntensity = 0.25f;
     float m_bloomThreshold = 1.0f;
     float m_bloomSoftKnee = 0.5f;
@@ -442,18 +538,25 @@ public:
 
     // Temporal anti-aliasing (camera-only) state
     bool  m_taaEnabled = true;
-    float m_taaBlendFactor = 0.2f;
+    float m_taaBlendFactor = 0.06f;
+    // Approximate camera motion flag for jitter/taa tuning.
+    bool  m_cameraIsMoving = false;
     bool  m_hasHistory = false;
     glm::vec2 m_taaJitterPrevPixels{0.0f, 0.0f};
     glm::vec2 m_taaJitterCurrPixels{0.0f, 0.0f};
     uint32_t m_taaSampleIndex = 0;
     glm::mat4 m_prevViewProjMatrix{1.0f};
     bool m_hasPrevViewProj = false;
+    // HDR history buffer for TAA (matches HDR color format) and an intermediate
+    // resolve target used when reprojecting into the current frame.
     Microsoft::WRL::ComPtr<ID3D12Resource> m_historyColor;
     DescriptorHandle m_historySRV;
     D3D12_RESOURCE_STATES m_historyState = D3D12_RESOURCE_STATE_COMMON;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_taaIntermediate;
+    DescriptorHandle m_taaIntermediateRTV;
+    D3D12_RESOURCE_STATES m_taaIntermediateState = D3D12_RESOURCE_STATE_COMMON;
 
-    bool m_shadowsEnabled = true;
+      bool m_shadowsEnabled = true;
     float m_shadowMapSize = 2048.0f;
     float m_shadowBias = 0.0005f;
     float m_shadowPCFRadius = 1.5f;
@@ -471,14 +574,25 @@ public:
     glm::mat4 m_lightViewProjectionMatrices[kShadowCascadeCount]{};
     float m_cascadeSplits[kShadowCascadeCount]{};
     float m_cascadeSplitLambda = 0.5f;
-    float m_cascadeResolutionScale[kShadowCascadeCount] = { 1.0f, 1.0f, 1.0f };
+      float m_cascadeResolutionScale[kShadowCascadeCount] = { 1.0f, 1.0f, 1.0f };
 
-    uint32_t m_debugViewMode = 0;
-    bool m_pcssEnabled = false;
-    bool m_fxaaEnabled = true;
-    bool m_ssrEnabled = true;
-    bool m_rayTracingSupported = false;
-    bool m_rayTracingEnabled = false;
+      uint32_t m_debugViewMode = 0;
+      bool m_pcssEnabled = false;
+      bool m_fxaaEnabled = true;
+      bool m_ssrEnabled = true;
+      bool m_rayTracingSupported = false;
+      bool m_rayTracingEnabled = false;
+      // Sticky flag set when the DX12 device reports "device removed" during
+      // resource creation (typically due to GPU memory pressure). Once this
+      // is true the renderer will skip further heavy work for the remainder
+      // of the run so scene rebuilds do not spam errors.
+      bool m_deviceRemoved = false;
+
+      // Camera history used to decide when to reset RT temporal history
+      // (shadows / GI) after large movements to avoid ghosting.
+      glm::vec3 m_prevCameraPos{0.0f};
+      glm::vec3 m_prevCameraForward{0.0f, 0.0f, 1.0f};
+      bool      m_hasPrevCamera = false;
 
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;
@@ -498,15 +612,24 @@ public:
 
     // Screen-space ambient occlusion parameters
     bool  m_ssaoEnabled = true;
-    float m_ssaoRadius = 0.5f;
-    float m_ssaoBias = 0.025f;
-    float m_ssaoIntensity = 1.0f;
+    float m_ssaoRadius = 0.25f;
+    float m_ssaoBias = 0.03f;
+    float m_ssaoIntensity = 0.35f;
 
     // Exponential height fog parameters
     bool  m_fogEnabled = false;
     float m_fogDensity = 0.02f;
     float m_fogHeight = 0.0f;
     float m_fogFalloff = 0.5f;
+
+    // Water / liquid parameters shared with shaders via waterParams0/1.
+    // Defaults describe a calm, low-amplitude water plane at Y=0.
+    float m_waterLevelY = 0.0f;
+    float m_waterWaveAmplitude = 0.2f;
+    float m_waterWaveLength = 8.0f;
+    float m_waterWaveSpeed = 1.0f;
+    glm::vec2 m_waterPrimaryDir = glm::vec2(1.0f, 0.0f);
+    float m_waterSecondaryAmplitude = 0.1f;
 
     // Frame state
     float m_totalTime = 0.0f;

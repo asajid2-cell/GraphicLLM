@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <string>
 #include <deque>
 #include <atomic>
@@ -72,18 +71,36 @@ public:
     void SetFocusTarget(const std::string& name);
     [[nodiscard]] std::string GetFocusTarget() const { return m_focusTargetName; }
 
+    // Scene preset controls (used by debug UI / hotkeys)
+    void ToggleScenePreset();
+
 private:
+    // High-level scene presets for easy switching between curated layouts.
+    enum class ScenePreset {
+        CornellBox = 0,
+        DragonOverWater = 1,
+    };
+
     void ProcessInput();
     void Update(float deltaTime);
     void Render(float deltaTime);
 
-    void InitializeScene();  // Create the spinning cube
+    void InitializeScene();
     std::vector<std::shared_ptr<LLM::SceneCommand>> BuildHeuristicCommands(const std::string& text);
+
+    void RebuildScene(ScenePreset preset);
+    void BuildCornellScene();
+    void BuildDragonStudioScene();
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
+    void ApplyHeroVisualBaseline();
+    void UpdateAutoDemo(float deltaTime);
     void SyncDebugMenuFromRenderer();
     void DebugDrawSceneGraph();
+    void SetCameraToSceneDefault(Scene::TransformComponent& transform);
+
+    void CaptureScreenshot();
 
     // Picking / camera helpers
     bool ComputeCameraRayFromMouse(float mouseX, float mouseY,
@@ -92,8 +109,9 @@ private:
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
 
-    // Translation gizmo helpers
+    // Translation / rotation gizmo helpers
     enum class GizmoAxis { None, X, Y, Z };
+    enum class GizmoMode { Translate, Rotate };
     void UpdateGizmoHover();
     bool HitTestGizmoAxis(const glm::vec3& rayOrigin,
                           const glm::vec3& rayDir,
@@ -124,7 +142,7 @@ private:
     std::string m_textInputBuffer;
 
     bool m_running = false;
-    std::chrono::high_resolution_clock::time_point m_lastFrameTime;
+    double m_lastFrameTimeSeconds = 0.0;
 
     uint32_t m_heuristicCounter = 0;
 
@@ -161,12 +179,18 @@ private:
     float m_cameraRollDamping = 3.0f;     // how quickly roll recenters when no input
     entt::entity m_activeCameraEntity = entt::null;
 
+    // Simple auto-demo orbit around the hero scene so the engine can present
+    // itself without manual camera input.
+    bool  m_autoDemoEnabled = false;
+    float m_autoDemoTime = 0.0f;
+
     // Current selection for editor-style interactions (picking & framing).
     entt::entity m_selectedEntity = entt::null;
 
     // Translation gizmo interaction state
     GizmoAxis m_gizmoHoveredAxis = GizmoAxis::None;
     GizmoAxis m_gizmoActiveAxis  = GizmoAxis::None;
+    GizmoMode m_gizmoMode        = GizmoMode::Translate;
     bool m_gizmoDragging = false;
     glm::vec2 m_lastMousePos{0.0f, 0.0f};
     glm::vec3 m_gizmoAxisDir{0.0f};
@@ -175,13 +199,18 @@ private:
     glm::vec3 m_gizmoDragPlanePoint{0.0f};
     glm::vec3 m_gizmoDragStartEntityPos{0.0f};
     float m_gizmoDragStartAxisParam = 0.0f;
+    glm::quat m_gizmoDragStartEntityRot{1.0f, 0.0f, 0.0f, 0.0f};
 
     // Engine settings (debug menu) navigation state
-    int m_settingsSection = 0;
-    int m_settingsItem = 0;
+    int  m_settingsSection = 0;
+    int  m_settingsItem = 0;
+    bool m_settingsOverlayVisible = false; // GPU overlay (M key)
 
     // Name of the current logical focus object/group (e.g., Pig_1 or SpinningCube).
     std::string m_focusTargetName;
+
+    // Current scene preset used when (re)building the ECS layout.
+    ScenePreset m_currentScenePreset = ScenePreset::DragonOverWater;
 };
 
 } // namespace Cortex

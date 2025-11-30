@@ -33,8 +33,12 @@ cbuffer FrameConstants : register(b1)
     float4   g_AOParams;
     float4   g_BloomParams;
     float4   g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
     float4x4 g_PrevViewProjMatrix;
     float4x4 g_InvViewProjMatrix;
+    float4   g_WaterParams0;
+    float4   g_WaterParams1;
 };
 
 Texture2D g_SceneColor        : register(t0);
@@ -110,25 +114,29 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
     float3 R = normalize(reflect(-V, N));
 
-    // Simple view-space ray-march along the reflection direction.
+    // Simple view-space ray-march along the reflection direction. Bias the
+    // marcher towards more, shorter steps so near-field reflections are more
+    // robust while still capping maximum distance to avoid long streaks.
     float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
     float3 viewDir = mul((float3x3)g_ViewMatrix, R);
 
-    float maxDistance = 50.0f;
-    int   maxSteps    = 32;
+    float maxDistance = 30.0f;
+    int   maxSteps    = 64;
     float stepSize    = maxDistance / maxSteps;
 
-    float thickness = 0.02f;
+    float thickness = 0.03f;
 
     float3 hitColor = 0.0f;
     bool   hit      = false;
 
     float3 posVS = viewPos;
+    float  traveled = 0.0f;
 
     [loop]
     for (int i = 0; i < maxSteps; ++i)
     {
         posVS += viewDir * stepSize;
+        traveled += stepSize;
 
         float4 clip = mul(g_ProjectionMatrix, float4(posVS, 1.0f));
         if (clip.w <= 1e-4f || !all(isfinite(clip)))
@@ -165,7 +173,11 @@ float4 SSRPS(VSOutput input) : SV_TARGET
         return float4(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
-    // Clamp extremely bright hits to reduce sudden color spikes
+    // Clamp extremely bright hits to reduce sudden color spikes and gently
+    // fade very long rays so far-field hits do not dominate the reflection.
+    float distanceFactor = saturate(1.0f - traveled / maxDistance);
+    hitColor *= distanceFactor;
+
     float maxChannel = max(max(hitColor.r, hitColor.g), hitColor.b);
     const float kMaxHitIntensity = 64.0f;
     if (maxChannel > kMaxHitIntensity)

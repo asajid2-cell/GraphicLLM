@@ -385,7 +385,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         switch (cmd->entityType) {
             case AddEntityCommand::EntityType::Cube:
             case AddEntityCommand::EntityType::Plane:
+            case AddEntityCommand::EntityType::Quad:
             case AddEntityCommand::EntityType::Pyramid:
+            case AddEntityCommand::EntityType::Line:
                 segPrimary = 0;
                 segSecondary = 0;
                 break;
@@ -414,6 +416,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
                 case AddEntityCommand::EntityType::Plane:
                     mesh = Utils::MeshGenerator::CreatePlane(2.0f, 2.0f);
                     break;
+                case AddEntityCommand::EntityType::Quad:
+                    mesh = Utils::MeshGenerator::CreateQuad(2.0f, 2.0f);
+                    break;
                 case AddEntityCommand::EntityType::Cylinder:
                     mesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, segPrimary);
                     break;
@@ -425,6 +430,15 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
                     break;
                 case AddEntityCommand::EntityType::Torus:
                     mesh = Utils::MeshGenerator::CreateTorus(0.5f, 0.2f, segPrimary, segSecondary);
+                    break;
+                case AddEntityCommand::EntityType::Disk:
+                    mesh = Utils::MeshGenerator::CreateDisk(0.5f, segPrimary);
+                    break;
+                case AddEntityCommand::EntityType::Capsule:
+                    mesh = Utils::MeshGenerator::CreateCapsule(0.25f, 1.0f, segPrimary);
+                    break;
+                case AddEntityCommand::EntityType::Line:
+                    mesh = Utils::MeshGenerator::CreateLine(1.0f, 0.02f);
                     break;
                 case AddEntityCommand::EntityType::Model:
                     // Handled above.
@@ -862,15 +876,26 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
         };
 
         static const std::unordered_map<std::string, MaterialPreset> kPresets = {
-            {"chrome",        {{0.8f, 0.8f, 0.85f, 1.0f}, 1.0f, 0.05f}},
-            {"gold",          {{1.0f, 0.85f, 0.3f, 1.0f}, 1.0f, 0.2f}},
-            {"brushed_metal", {{0.7f, 0.7f, 0.7f, 1.0f}, 1.0f, 0.35f}},
-            {"steel",         {{0.75f, 0.75f, 0.8f, 1.0f}, 1.0f, 0.25f}},
-            {"plastic",       {{0.8f, 0.8f, 0.8f, 1.0f}, 0.0f, 0.4f}},
-            {"rubber",        {{0.1f, 0.1f, 0.1f, 1.0f}, 0.0f, 0.9f}},
-            {"wood",          {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
-            {"stone",         {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
-            {"glass",         {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+            {"chrome",           {{0.8f, 0.8f, 0.85f, 1.0f}, 1.0f, 0.05f}},
+            {"gold",             {{1.0f, 0.85f, 0.3f, 1.0f}, 1.0f, 0.2f}},
+            {"brushed_metal",    {{0.7f, 0.7f, 0.7f, 1.0f}, 1.0f, 0.35f}},
+            {"steel",            {{0.75f, 0.75f, 0.8f, 1.0f}, 1.0f, 0.25f}},
+            {"plastic",          {{0.8f, 0.8f, 0.8f, 1.0f}, 0.0f, 0.4f}},
+            {"rubber",           {{0.1f, 0.1f, 0.1f, 1.0f}, 0.0f, 0.9f}},
+            {"wood",             {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
+            {"stone",            {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
+            {"glass",            {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+            // Hero-scene tuned presets so LLM commands can snap to the same
+            // materials used in the curated layout.
+            {"concrete",         {{0.9f, 0.9f, 0.9f, 1.0f}, 0.0f, 0.8f}},
+            {"water",            {{0.02f, 0.08f, 0.12f, 0.7f}, 0.0f, 0.05f}},
+            {"wood_floor",       {{0.35f, 0.25f, 0.18f, 1.0f}, 0.0f, 0.6f}},
+            {"painted_plastic",  {{0.5f, 0.1f, 0.8f, 1.0f}, 0.0f, 0.4f}},
+            {"polished_metal",   {{0.75f, 0.75f, 0.8f, 1.0f}, 1.0f, 0.2f}},
+            {"backdrop",         {{0.15f, 0.15f, 0.18f, 1.0f}, 0.0f, 0.85f}},
+            {"ceramic",          {{0.9f, 0.9f, 0.92f, 1.0f}, 0.0f, 0.2f}},
+            {"skin",             {{1.0f, 0.77f, 0.64f, 1.0f}, 0.0f, 0.6f}},
+            {"skin_ish",         {{1.0f, 0.8f, 0.7f, 1.0f}, 0.0f, 0.55f}},
         };
 
         auto it = kPresets.find(name);
@@ -1141,6 +1166,29 @@ void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::R
     if (cmd->setSunIntensity) {
         renderer->SetSunIntensity(cmd->sunIntensity);
         summary << "sun_intensity=" << cmd->sunIntensity << " ";
+        touched = true;
+    }
+    if (cmd->setWaterLevel || cmd->setWaterWaveAmplitude || cmd->setWaterWaveLength ||
+        cmd->setWaterWaveSpeed || cmd->setWaterSecondaryAmplitude) {
+        float level     = renderer->GetWaterLevel();
+        float amp       = renderer->GetWaterWaveAmplitude();
+        float waveLen   = renderer->GetWaterWaveLength();
+        float speed     = renderer->GetWaterWaveSpeed();
+        float secondary = renderer->GetWaterSecondaryAmplitude();
+
+        if (cmd->setWaterLevel)              level     = cmd->waterLevel;
+        if (cmd->setWaterWaveAmplitude)      amp       = cmd->waterWaveAmplitude;
+        if (cmd->setWaterWaveLength)         waveLen   = cmd->waterWaveLength;
+        if (cmd->setWaterWaveSpeed)          speed     = cmd->waterWaveSpeed;
+        if (cmd->setWaterSecondaryAmplitude) secondary = cmd->waterSecondaryAmplitude;
+
+        renderer->SetWaterParams(level, amp, waveLen, speed,
+                                 1.0f, 0.0f, secondary);
+        summary << "water(level=" << level
+                << ",amp=" << amp
+                << ",len=" << waveLen
+                << ",speed=" << speed
+                << ",secondary=" << secondary << ") ";
         touched = true;
     }
     if (cmd->setLightingRig && registry) {

@@ -100,7 +100,7 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     // Define root parameters
     // We need: 4 CBVs (b0, b1, b2, b3) +
     //          descriptor table for material textures (t0-t3) +
-    //          descriptor table for shadow/IBL textures (t4-t6)
+    //          descriptor table for shadow/IBL/RT textures (space1)
     D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
     // Parameter 0: Object constants (b0)
@@ -121,10 +121,10 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.RegisterSpace = 0;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 3: Descriptor table for textures (t0 - t7 in space0)
+    // Parameter 3: Descriptor table for textures (t0 - t9 in space0)
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 8;
+    descriptorRange.NumDescriptors = 10;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -138,9 +138,13 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     //   space1, t0 = shadow map array
     //   space1, t1 = IBL diffuse irradiance
     //   space1, t2 = IBL specular prefiltered environment
+    //   space1, t3 = RT sun shadow mask (optional)
+    //   space1, t4 = RT sun shadow mask history (optional)
+    //   space1, t5 = RT diffuse GI buffer (optional)
+    //   space1, t6 = RT diffuse GI history buffer (optional)
     D3D12_DESCRIPTOR_RANGE shadowRange = {};
     shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    shadowRange.NumDescriptors = 3;
+    shadowRange.NumDescriptors = 7;
     shadowRange.BaseShaderRegister = 0;
     shadowRange.RegisterSpace = 1;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;

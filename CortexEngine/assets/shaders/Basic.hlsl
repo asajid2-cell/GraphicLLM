@@ -15,7 +15,7 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_ViewProjectionMatrix;
     float4x4 g_InvProjectionMatrix;
     float4 g_CameraPosition;
-    // x = time, y = deltaTime, z = exposure, w = unused
+    // x = time, y = deltaTime, z = exposure, w = bloom intensity
     float4 g_TimeAndExposure;
     // rgb: ambient color * intensity, w unused
     float4 g_AmbientColor;
@@ -58,10 +58,21 @@ cbuffer FrameConstants : register(b1)
     float4 g_FogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4 g_AOParams;
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
+    // w = SSR enabled (>0.5) for the post-process debug overlay
+    float4 g_BloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     float4 g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
     float4x4 g_PrevViewProjMatrix;
     float4x4 g_InvViewProjMatrix;
+    // x = base wave amplitude, y = base wave length,
+    // z = wave speed,          w = global water level (Y)
+    float4 g_WaterParams0;
+    // x = primary wave dir X,  y = primary wave dir Z,
+    // z = secondary amplitude, w = reserved
+    float4 g_WaterParams1;
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -86,11 +97,16 @@ Texture2D g_AlbedoTexture : register(t0);
 Texture2D g_NormalTexture : register(t1);
 Texture2D g_MetallicTexture : register(t2);
 Texture2D g_RoughnessTexture : register(t3);
-// Shadow map + IBL textures are bound in a separate descriptor table (space1)
-// to avoid overlapping with per-pass textures in space0.
+// Shadow map + IBL + optional RT shadow mask textures are bound in a separate
+// descriptor table (space1) to avoid overlapping with per-pass textures in
+// space0.
 Texture2DArray g_ShadowMap : register(t0, space1);
 Texture2D g_EnvDiffuse : register(t1, space1);
 Texture2D g_EnvSpecular : register(t2, space1);
+Texture2D<float> g_RtShadowMask : register(t3, space1);
+Texture2D<float> g_RtShadowMaskHistory : register(t4, space1);
+  Texture2D g_RtGI : register(t5, space1);
+  Texture2D g_RtGIHistory : register(t6, space1);
 SamplerState g_Sampler : register(s0);
 
 // Vertex shader input
@@ -356,6 +372,12 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       cascadeIndex = min(cascadeIndex, 2u);
   
       float4 lightClip = mul(g_LightViewProjection[cascadeIndex], float4(worldPos, 1.0f));
+      if (lightClip.w <= 1e-4f || !all(isfinite(lightClip)))
+      {
+          // Treat degenerate projections as unshadowed to avoid streaks when
+          // world positions fall outside the valid light frustum.
+          return 1.0f;
+      }
       float3 lightNDC = lightClip.xyz / lightClip.w;
   
       // Outside light frustum for this cascade
@@ -376,8 +398,9 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       float pcfRadius = g_ShadowParams.y;
 
       // Increase bias slightly for farther cascades where depth precision is lower.
-      // This reduces shimmering on large objects that live mostly in mid/far cascades.
-      float cascadeScale = 1.0f + (float)cascadeIndex * 1.5f;
+      // Use a conservative scale so mid/far cascades stay stable without
+      // excessively washing out contact shadows.
+      float cascadeScale = 1.0f + (float)cascadeIndex * 0.5f;
       bias *= cascadeScale;
   
       // Simple slope-scaled bias to reduce acne
@@ -544,14 +567,70 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, slice);
   }
 
-float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao)
+float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord)
 {
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
-    metallic = saturate(metallic);
+    // Material classification encoded in fractalParams1.w by the renderer:
+    // 0 = default, 1 = glass, 2 = mirror, 3 = plastic, 4 = brick/masonry.
+    float materialType = g_FractalParams1.w;
+    bool isGlass  = (materialType > 0.5f && materialType < 1.5f);
+    bool isMirror = (materialType > 1.5f && materialType < 2.5f);
+    bool isPlastic = (materialType > 2.5f && materialType < 3.5f);
+    bool isBrick   = (materialType > 3.5f && materialType < 4.5f);
+
+    // Clamp metallic to leave a small diffuse contribution even for "full"
+    // metals so that scenes remain readable under very dark environments.
+    metallic = min(saturate(metallic), 0.95f);
+
+    // Glass, plastic, and brick are always treated as dielectrics in the
+    // BRDF (metallic = 0) so they rely on Fresnel and the specular lobe
+    // rather than a colored metal F0. Their reflectivity is controlled via
+    // roughness and the Fresnel term.
+    if (isGlass || isPlastic || isBrick) {
+        metallic = 0.0f;
+    }
+    roughness = saturate(roughness);
+
+    // Simple specular anti-aliasing: when the normal field varies rapidly
+    // across neighbouring pixels (for example, along the dragon scales),
+    // increase effective roughness slightly so the specular lobe is wide
+    // enough for TAA to stabilize without visible "sparkling".
+    float3 n = normalize(normal);
+    float3 dnDx = ddx(n);
+    float3 dnDy = ddy(n);
+    float normalVariance = dot(dnDx, dnDx) + dot(dnDy, dnDy);
+    normalVariance = saturate(normalVariance);
+    // Bias the variance term so flat regions remain unaffected while
+    // highly curved areas get a modest roughness boost. The factor is kept
+    // conservative so materials do not lose their intended gloss.
+    float specAAStrength = 0.8f;
+    float roughnessFromVariance = normalVariance * specAAStrength;
+
     // Raise roughness floor to soften extremely sharp highlights and reduce
-    // specular aliasing when the camera moves quickly.
-    roughness = max(saturate(roughness), 0.2f);
+    // specular aliasing when the camera moves quickly, then fold in the
+    // variance-based adjustment. Highly polished metals and glass are given
+    // a lower floor so mirror-like surfaces remain sharp, plastics sit in
+    // the mid-range, and brick/masonry stays fairly rough.
+    float minBaseRoughness;
+    if (isGlass || metallic > 0.8f)
+    {
+        minBaseRoughness = 0.02f;
+    }
+    else if (isPlastic)
+    {
+        minBaseRoughness = 0.25f;
+    }
+    else if (isBrick)
+    {
+        minBaseRoughness = 0.45f;
+    }
+    else
+    {
+        minBaseRoughness = 0.2f;
+    }
+    float baseRoughness = max(roughness, minBaseRoughness);
+    roughness = saturate(baseRoughness + roughnessFromVariance);
     ao = saturate(ao);
 
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
@@ -622,12 +701,39 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         // as full-object color pops when multiple colored lights are present.
         specular = min(specular, 4.0f.xxx);
 
+        // Gently emphasize the specular lobe for plastic so that highlights
+        // feel a bit more like a coated surface without introducing a full
+        // second clear-coat BRDF layer.
+        if (isPlastic)
+        {
+            specular *= 1.25f;
+        }
+
         float3 kd = (1.0f - F) * (1.0f - metallic);
+        // Glass is dominated by specular; keep only a very small diffuse
+        // term so that tinted glass can still contribute slightly to GI
+        // without washing out reflections.
+        if (isGlass) {
+            kd *= 0.1f;
+        }
         float3 diffuse = kd * albedo / PI;
 
         float3 lightColor = radiance;
 
         float3 contribution = (diffuse + specular) * lightColor * NdotL * attenuation;
+
+        // Softly compress per-light luminance to keep extremely bright spots
+        // from dominating the frame and fighting temporal filtering. Using a
+        // smooth rolloff avoids hard thresholds that can cause subtle popping
+        // when NdotL or attenuation crosses the clamp. The knee is set high
+        // enough that typical highlights remain largely linear.
+        float  lum = dot(contribution, float3(0.299f, 0.587f, 0.114f));
+        const float kLightLuminanceKnee = 64.0f;
+        if (lum > 1e-3f)
+        {
+            float compress = kLightLuminanceKnee / (lum + kLightLuminanceKnee);
+            contribution *= compress;
+        }
 
         // Apply shadows from the cascaded directional sun and a single
         // shadow-mapped local spotlight (if present).
@@ -635,16 +741,75 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         {
             // Sun shadows: only the primary directional light (index 0) uses
             // cascaded shadow maps. When the RT path is enabled (toggled via V
-            // and gated on DXR support), we currently treat the sun as
-            // unshadowed in the raster path; upcoming DXR passes will write a
-            // ray-traced shadow mask instead.
+            // and gated on DXR support), we allow a ray-traced shadow mask to
+            // override the cascaded result in screen space.
             if (i == 0)
             {
+                // Sun shadows from cascaded shadow maps.
                 float shadow = ComputeShadow(worldPos, normal);
+
+                // When RT sun shadows are enabled (postParams.w > 0.5), replace
+                // the cascaded result with a spatially-filtered, temporally-
+                // smoothed RT mask sampled in screen space. History blending
+                // is only applied once the CPU has populated the history buffer
+                // at least once.
                 if (g_PostParams.w > 0.5f)
                 {
-                    shadow = 1.0f;
+                    // Small cross-shaped spatial filter (center + 4 neighbors)
+                    // to soften per-frame RT noise while preserving contact
+                    // detail better than a full 3x3 blur.
+                    static const int2 offsets[5] = {
+                        int2( 0,  0),
+                        int2( 1,  0),
+                        int2(-1,  0),
+                        int2( 0,  1),
+                        int2( 0, -1)
+                    };
+
+                    float sum = 0.0f;
+                    float count = 0.0f;
+
+                    // Derive approximate render size from 1 / resolution stored
+                    // in postParams.xy so we can clamp sampling at image edges.
+                    float width  = 1.0f / max(g_PostParams.x, 1e-6f);
+                    float height = 1.0f / max(g_PostParams.y, 1e-6f);
+
+                    [unroll]
+                    for (int oi = 0; oi < 5; ++oi)
+                    {
+                        int2 p = pixelCoord + offsets[oi];
+                        if (p.x < 0 || p.y < 0 ||
+                            p.x >= (int)width || p.y >= (int)height)
+                        {
+                            continue;
+                        }
+                        sum += g_RtShadowMask.Load(int3(p, 0));
+                        count += 1.0f;
+                    }
+
+                    float rtShadow = (count > 0.0f)
+                        ? (sum / count)
+                        : g_RtShadowMask.Load(int3(pixelCoord, 0));
+
+                    // debugMode.w is used as a simple "RT history valid" flag,
+                    // written by the renderer once the first mask->history copy
+                    // has been performed.
+                    bool hasHistory = (g_DebugMode.w > 0.5f);
+                    if (hasHistory)
+                    {
+                        float history = g_RtShadowMaskHistory.Load(int3(pixelCoord, 0));
+                        float diff = abs(rtShadow - history);
+                        // When the current mask and history agree (small diff),
+                        // lean more on history for stability. When they diverge
+                        // strongly (e.g., moving casters or camera), trust the
+                        // new mask to avoid long-lived ghost shadows.
+                        float historyWeight = lerp(0.6f, 0.1f, saturate(diff * 4.0f));
+                        rtShadow = lerp(rtShadow, history, historyWeight);
+                    }
+
+                    shadow = rtShadow;
                 }
+
                 contribution *= shadow;
             }
         }
@@ -662,6 +827,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     }
 
     // Image-based lighting (IBL) using environment maps when available.
+    // Expose the debug view mode for the entire lighting function so that
+    // both IBL-specialized views and RT GI gating can branch on it.
+    uint debugView = (uint)g_DebugMode.x;
     float3 ambient = 0.0f;
     float3 diffuseIBL = 0.0f;
     float3 specularIBL = 0.0f;
@@ -697,7 +865,6 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         ambient = (diffuseIBL * diffuseIntensity + specularIBL * specularIntensity) * ao;
 
         // IBL-only debug modes
-        uint debugView = (uint)g_DebugMode.x;
         if (debugView == 8)
         {
             // Diffuse IBL-only debug: clamp to avoid extreme flashes.
@@ -730,11 +897,91 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         ambient = g_AmbientColor.rgb * albedo * ao;
     }
 
+    // Optional RT diffuse GI: when the DXR path is active (toggled via V and
+    // gated on device support), sample the RT GI buffer as a low-frequency
+    // ambient/IBL occlusion term rather than an additive light source. The
+    // GI pass encodes visibility in alpha (0 = fully occluded, 1 = fully
+    // visible), with rgb containing a debug-only color.
+    float giVisibility = 1.0f;
+    // To reduce single-sample noise, apply a small 5-tap cross filter in
+    // screen space over the RT GI alpha channel. We always allow the current
+    // GI buffer to influence shading when RTX is enabled; g_DebugMode.w is
+    // used only to gate history blending once the CPU has populated the
+    // GI history buffer at least once.
+    if (g_PostParams.w > 0.5f && debugView != 22u)
+    {
+        static const int2 offsets[5] = {
+            int2( 0,  0),
+            int2( 1,  0),
+            int2(-1,  0),
+            int2( 0,  1),
+            int2( 0, -1)
+        };
+
+        float sum = 0.0f;
+        float count = 0.0f;
+
+        // Derive approximate render size from 1 / resolution stored in
+        // postParams.xy so we can clamp sampling at image edges. This mirrors
+        // the guards used for the RT shadow mask filter and avoids sampling
+        // outside the valid GI buffer region.
+        float width  = 1.0f / max(g_PostParams.x, 1e-6f);
+        float height = 1.0f / max(g_PostParams.y, 1e-6f);
+
+        [unroll]
+        for (int i = 0; i < 5; ++i)
+        {
+            int2 p = pixelCoord + offsets[i];
+            if (p.x < 0 || p.y < 0 ||
+                p.x >= (int)width || p.y >= (int)height)
+            {
+                continue;
+            }
+            float a = g_RtGI.Load(int3(p, 0)).a;
+            sum += a;
+            count += 1.0f;
+        }
+
+        float giCurr = (count > 0.0f) ? saturate(sum / count) : 1.0f;
+
+        // Temporal accumulation: blend with a simple history buffer when
+        // available to reduce frame-to-frame noise from single-sample RT GI.
+        if (g_DebugMode.w > 0.5f)
+        {
+            float giHistory = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
+            float diff = abs(giCurr - giHistory);
+            // When GI is stable, lean more on history; when it changes a lot,
+            // trust the new sample to avoid visible ghosts/afterimages.
+            float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
+            giVisibility = lerp(giCurr, giHistory, historyWeight);
+        }
+        else
+        {
+            giVisibility = giCurr;
+        }
+
+        // Soften RT GI influence to reduce visible flicker: treat the raw
+        // visibility as a suggestion and blend it back towards 1.0 so that
+        // ambient is only gently modulated by the RT term. Also clamp to a
+        // minimum so GI never fully crushes ambient, which helps avoid
+        // "breathing" artifacts when rays flip between occluded / clear.
+        const float kGiStrength = 0.10f;
+        giVisibility = lerp(1.0f, giVisibility, kGiStrength);
+        giVisibility = max(giVisibility, 0.8f);
+    }
+
+    // Apply GI as an occlusion term on top of the existing ambient/IBL
+    // contribution so that indirect lighting is reduced in crevices and
+    // contact zones instead of simply increasing total energy.
+    ambient *= giVisibility;
+
     // Clamp combined direct + ambient radiance to a sane range before HDR,
     // to reduce extreme spikes that can cause visible "flashes" when the
     // camera moves rapidly across very bright highlights.
     float3 color = totalLighting + ambient;
-    const float kMaxRadiance = 64.0f;
+    // Global safety net for extreme spikes; most shaping is handled by the
+    // per-light soft clamp above, so this is rarely hit.
+    const float kMaxRadiance = 96.0f;
     color = min(color, kMaxRadiance.xxx);
     return color;
 }
@@ -773,7 +1020,10 @@ DebugPSInput DebugLineVS(DebugVSInput input)
 {
     DebugPSInput output;
     float4 worldPos = float4(input.position, 1.0f);
-    output.position = mul(g_ViewProjectionMatrix, worldPos);
+    // Use the non-jittered view-projection for debug lines/gizmos so they
+    // remain rock-solid on screen and do not inherit TAA jitter. The main
+    // scene still uses the jittered matrix in the standard VS path.
+    output.position = mul(g_ViewProjectionNoJitter, worldPos);
     output.color = input.color;
     return output;
 }
@@ -1007,8 +1257,58 @@ PSOutput PSMain(PSInput input)
 
         return MakePSOutput(float4(dbgColor, 1.0f), normal, roughness);
     }
+    else if (debugView == 18)
+    {
+        // Visualize the raw RT shadow mask as grayscale. When RT is disabled
+        // or no RT pipeline is available, show a neutral gray instead of
+        // sampling potentially uninitialized resources.
+        if (g_PostParams.w <= 0.5f)
+        {
+            return MakePSOutput(float4(0.5f, 0.5f, 0.5f, 1.0f), normal, roughness);
+        }
+        int2 pixelCoord = int2(input.position.xy);
+        float v = g_RtShadowMask.Load(int3(pixelCoord, 0));
+        return MakePSOutput(float4(v, v, v, 1.0f), normal, roughness);
+    }
+    else if (debugView == 19)
+    {
+        // Visualize the RT shadow history buffer as grayscale. Guard on both
+        // RT being enabled and history being marked valid by the renderer
+        // (debugMode.w > 0.5).
+        if (g_PostParams.w <= 0.5f || g_DebugMode.w <= 0.5f)
+        {
+            return MakePSOutput(float4(0.5f, 0.5f, 0.5f, 1.0f), normal, roughness);
+        }
+        int2 pixelCoord = int2(input.position.xy);
+        float v = g_RtShadowMaskHistory.Load(int3(pixelCoord, 0));
+        return MakePSOutput(float4(v, v, v, 1.0f), normal, roughness);
+    }
+    else if (debugView == 21)
+      {
+          // RT diffuse GI-only debug view. Shows the temporally-filtered GI
+          // visibility term (alpha) as grayscale so it matches what the main
+          // shading path actually uses instead of the raw, noisier buffer.
+          if (g_PostParams.w <= 0.5f)
+          {
+              return MakePSOutput(float4(0.0f, 0.0f, 0.0f, 1.0f), normal, roughness);
+          }
+          int2 pixelCoord = int2(input.position.xy);
+          float aCurr = g_RtGI.Load(int3(pixelCoord, 0)).a;
+          float a = aCurr;
+          // Only blend against history once the CPU has populated the GI
+          // history buffer and flagged it as valid via g_DebugMode.w.
+          if (g_DebugMode.w > 0.5f)
+          {
+              float aHist = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
+              float diff = abs(aCurr - aHist);
+              float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
+              a = lerp(aCurr, aHist, historyWeight);
+          }
+          return MakePSOutput(float4(a.xxx, 1.0f), normal, roughness);
+      }
 
-    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao);
+    int2 pixelCoord = int2(input.position.xy);
+    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord);
 
     // Output linear HDR color; exposure/tonemapping is applied in a post-process pass.
     return MakePSOutput(float4(color, albedoSample.a * g_Albedo.a), normal, roughness);

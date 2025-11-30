@@ -82,9 +82,20 @@ struct FrameConstants {
     //                      11 = Fresnel (Fibl), 12 = specular mip,
     //                      13 = SSAO only, 14 = SSAO overlay,
     //                      15 = SSR only, 16 = SSR overlay,
-    //                      17 = forward light debug), others reserved
+    //                      17 = forward light debug,
+    //                      18 = RT shadow mask debug,
+    //                      19 = RT shadow history debug,
+    //                      20 = RT reflection buffer debug (post-process),
+    //                      21 = RT GI buffer debug,
+    //                      22 = shaded with RT GI disabled,
+    //                      23 = shaded with RT reflections disabled (SSR only),
+    //                      24 = RT reflection ray direction debug,
+    //                      25 = TAA history weight debug),
+    //     w = RT history valid (>0.5), y/z reserved
     glm::vec4 debugMode;
-    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
+    // x = 1 / screenWidth, y = 1 / screenHeight,
+    // z = FXAA enabled (>0.5),
+    // w = RT sun shadows enabled (>0.5)
     glm::vec4 postParams;
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
@@ -96,13 +107,24 @@ struct FrameConstants {
     glm::vec4 fogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
-    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
+    // w = SSR enabled (>0.5) for the post-process debug overlay
     glm::vec4 bloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     glm::vec4 taaParams;
+    // Non-jittered view-projection for RT world-position reconstruction.
+    glm::mat4 viewProjectionNoJitter;
+    glm::mat4 invViewProjectionNoJitter;
     // Previous frame jittered view-projection and inverse of current
     glm::mat4 prevViewProjectionMatrix;
     glm::mat4 invViewProjectionMatrix;
+    // Water/wave parameters:
+    // waterParams0: x = base wave amplitude, y = base wave length,
+    //               z = wave speed,          w = global water level (Y)
+    // waterParams1: x = primary wave dir X,  y = primary wave dir Z,
+    //               z = secondary amplitude, w = reserved
+    glm::vec4 waterParams0;
+    glm::vec4 waterParams1;
 };
 
 // Material properties

@@ -8,6 +8,7 @@
 #include "LLM/RegressionTests.h"
 #include "UI/TextPrompt.h"
 #include "UI/DebugMenu.h"
+#include "UI/QuickSettingsWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
@@ -22,6 +23,10 @@
 #include <fstream>
 #include <chrono>
 #include <limits>
+#include <vector>
+#include <deque>
+#include <atomic>
+#include <thread>
 #include <nlohmann/json.hpp>
 
 namespace Cortex {
@@ -63,6 +68,12 @@ void Engine::SyncDebugMenuFromRenderer() {
 namespace {
     using nlohmann::json;
 
+    // Shared layout constant for the hero "Dragon Over Water Studio" scene.
+    constexpr float kHeroPoolZ = -3.0f;
+    // Shared dimensions for the Cornell box scene (centered at origin).
+    constexpr float kCornellHalfExtent = 2.0f; // half-size in X/Z
+    constexpr float kCornellHeight     = 2.0f; // Y height
+
     std::filesystem::path GetDebugMenuStatePath() {
         namespace fs = std::filesystem;
         // Store next to the executable / working directory
@@ -78,25 +89,34 @@ namespace {
                 if (in) {
                     json j;
                     in >> j;
-                    if (j.contains("exposure")) state.exposure = j.value("exposure", state.exposure);
-                    if (j.contains("shadowBias")) state.shadowBias = j.value("shadowBias", state.shadowBias);
-                    if (j.contains("shadowPCFRadius")) state.shadowPCFRadius = j.value("shadowPCFRadius", state.shadowPCFRadius);
-                    if (j.contains("cascadeLambda")) state.cascadeLambda = j.value("cascadeLambda", state.cascadeLambda);
-                    if (j.contains("cascade0ResolutionScale")) state.cascade0ResolutionScale = j.value("cascade0ResolutionScale", state.cascade0ResolutionScale);
-                    if (j.contains("bloomIntensity")) state.bloomIntensity = j.value("bloomIntensity", state.bloomIntensity);
-                    if (j.contains("cameraBaseSpeed")) state.cameraBaseSpeed = j.value("cameraBaseSpeed", state.cameraBaseSpeed);
-                    if (j.contains("fractalAmplitude")) state.fractalAmplitude = j.value("fractalAmplitude", state.fractalAmplitude);
-                    if (j.contains("fractalFrequency")) state.fractalFrequency = j.value("fractalFrequency", state.fractalFrequency);
-                    if (j.contains("fractalOctaves")) state.fractalOctaves = j.value("fractalOctaves", state.fractalOctaves);
-                    if (j.contains("fractalCoordMode")) state.fractalCoordMode = j.value("fractalCoordMode", state.fractalCoordMode);
-                    if (j.contains("fractalScaleX")) state.fractalScaleX = j.value("fractalScaleX", state.fractalScaleX);
-                    if (j.contains("fractalScaleZ")) state.fractalScaleZ = j.value("fractalScaleZ", state.fractalScaleZ);
-                    if (j.contains("fractalLacunarity")) state.fractalLacunarity = j.value("fractalLacunarity", state.fractalLacunarity);
-                    if (j.contains("fractalGain")) state.fractalGain = j.value("fractalGain", state.fractalGain);
-                    if (j.contains("fractalWarpStrength")) state.fractalWarpStrength = j.value("fractalWarpStrength", state.fractalWarpStrength);
-                    if (j.contains("fractalNoiseType")) state.fractalNoiseType = j.value("fractalNoiseType", state.fractalNoiseType);
-                    if (j.contains("lightingRig")) state.lightingRig = j.value("lightingRig", state.lightingRig);
-                    if (j.contains("rayTracingEnabled")) state.rayTracingEnabled = j.value("rayTracingEnabled", state.rayTracingEnabled);
+                    auto getOr = [&](const char* key, auto current) {
+                        using T = std::decay_t<decltype(current)>;
+                        std::string k(key);
+                        if (j.contains(k)) {
+                            return j.value(k, current);
+                        }
+                        return current;
+                    };
+
+                    state.exposure              = getOr("exposure",              state.exposure);
+                    state.shadowBias            = getOr("shadowBias",           state.shadowBias);
+                    state.shadowPCFRadius       = getOr("shadowPCFRadius",      state.shadowPCFRadius);
+                    state.cascadeLambda         = getOr("cascadeLambda",        state.cascadeLambda);
+                    state.cascade0ResolutionScale = getOr("cascade0ResolutionScale", state.cascade0ResolutionScale);
+                    state.bloomIntensity        = getOr("bloomIntensity",       state.bloomIntensity);
+                    state.cameraBaseSpeed       = getOr("cameraBaseSpeed",      state.cameraBaseSpeed);
+                    state.fractalAmplitude      = getOr("fractalAmplitude",     state.fractalAmplitude);
+                    state.fractalFrequency      = getOr("fractalFrequency",     state.fractalFrequency);
+                    state.fractalOctaves        = getOr("fractalOctaves",       state.fractalOctaves);
+                    state.fractalCoordMode      = getOr("fractalCoordMode",     state.fractalCoordMode);
+                    state.fractalScaleX         = getOr("fractalScaleX",        state.fractalScaleX);
+                    state.fractalScaleZ         = getOr("fractalScaleZ",        state.fractalScaleZ);
+                    state.fractalLacunarity     = getOr("fractalLacunarity",    state.fractalLacunarity);
+                    state.fractalGain           = getOr("fractalGain",          state.fractalGain);
+                    state.fractalWarpStrength   = getOr("fractalWarpStrength",  state.fractalWarpStrength);
+                    state.fractalNoiseType      = getOr("fractalNoiseType",     state.fractalNoiseType);
+                    state.lightingRig           = getOr("lightingRig",          state.lightingRig);
+                    state.rayTracingEnabled     = getOr("rayTracingEnabled",    state.rayTracingEnabled);
                 }
             }
         } catch (...) {
@@ -291,6 +311,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     ServiceLocator::SetDevice(m_device.get());
     ServiceLocator::SetRenderer(m_renderer.get());
     ServiceLocator::SetRegistry(m_registry.get());
+    ServiceLocator::SetEngine(this);
 
     // Initialize scene
     InitializeScene();
@@ -480,10 +501,15 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         m_cameraMaxSpeed = std::max(15.0f, m_cameraBaseSpeed * 8.0f);
 
         UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
+        UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
     }
 
     m_running = true;
-    m_lastFrameTime = std::chrono::high_resolution_clock::now();
+    {
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> secs = now.time_since_epoch();
+        m_lastFrameTimeSeconds = secs.count();
+    }
 
     const auto tEnd = clock::now();
     spdlog::info("Cortex Engine initialized successfully in {} ms (without LLM load).",
@@ -523,8 +549,12 @@ void Engine::ShowCameraHelpOverlay() {
         "  F9 / F10            - Adjust cascade split lambda\n"
         "  F11 / F12           - Adjust near cascade resolution scale\n"
         "  F2                  - Reset debug settings and show debug menu\n"
+        "  B                   - Apply hero visual baseline (studio lighting, TAA, SSR/SSAO)\n"
         "  V                   - Toggle ray tracing (if supported)\n"
         "  C                   - Cycle environment preset\n"
+        "  1 / 2 / 3           - Jump to hero camera bookmarks\n"
+        "  F6                  - Toggle auto-demo orbit around hero scene\n"
+        "  Print Screen        - Capture a screenshot to BMP\n"
         "\n"
         "Press OK to continue.";
 
@@ -549,6 +579,7 @@ void Engine::Shutdown() {
     // Persist last used debug menu state
     SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
     UI::DebugMenu::Shutdown();
+    UI::QuickSettingsWindow::Shutdown();
 
     // Phase 2: Shutdown LLM
     if (m_llmService) {
@@ -566,6 +597,7 @@ void Engine::Shutdown() {
     ServiceLocator::SetRegistry(nullptr);
     ServiceLocator::SetRenderer(nullptr);
     ServiceLocator::SetDevice(nullptr);
+    ServiceLocator::SetEngine(nullptr);
 
     m_registry.reset();
     m_renderer.reset();
@@ -592,6 +624,63 @@ void Engine::SetFocusTarget(const std::string& name) {
         }
         m_commandQueue->SetCurrentFocus(name, focusId);
     }
+}
+
+void Engine::ToggleScenePreset() {
+    ScenePreset next =
+        (m_currentScenePreset == ScenePreset::CornellBox)
+            ? ScenePreset::DragonOverWater
+            : ScenePreset::CornellBox;
+    RebuildScene(next);
+}
+
+void Engine::ApplyHeroVisualBaseline() {
+    if (!m_renderer) {
+        return;
+    }
+
+    // Image-based lighting and environment tuned for the hero studio scene.
+    m_renderer->SetEnvironmentPreset("studio");
+    m_renderer->SetIBLEnabled(true);
+    // Slightly reduce diffuse IBL so direct lighting and reflections carry
+    // more of the contrast, while keeping specular IBL strong for metals.
+    m_renderer->SetIBLIntensity(0.85f, 1.25f);
+
+    // Camera-friendly exposure / bloom for HDR studio environments.
+    m_renderer->SetExposure(1.2f);
+    m_renderer->SetBloomIntensity(0.3f);
+
+    // Shadow and AA defaults that balance quality and stability.
+    m_renderer->SetShadowsEnabled(true);
+    m_renderer->SetShadowBias(0.0005f);
+    m_renderer->SetShadowPCFRadius(1.5f);
+    m_renderer->SetCascadeSplitLambda(0.5f);
+
+    m_renderer->SetTAAEnabled(true);
+    m_renderer->SetFXAAEnabled(false);
+
+    // Screen-space ambient occlusion and reflections enabled as baseline.
+    m_renderer->SetSSAOEnabled(true);
+    m_renderer->SetSSREnabled(true);
+
+    // Water tuning for the hero pool: gentle waves with a clear, reflective surface.
+    // levelY matches the water surface entity's Y, amplitude and secondary amplitude keep
+    // the motion visible without breaking reflections on the dragon and sphere.
+    m_renderer->SetWaterParams(
+        -0.02f,   // levelY
+        0.03f,    // amplitude
+        6.0f,     // wavelength
+        0.6f,     // speed
+        1.0f, 0.2f,
+        0.015f);  // secondaryAmplitude
+
+    // Neutral fog off by default for a clean studio look.
+    m_renderer->SetFogEnabled(false);
+
+    // Reflect the new renderer state into the debug menu so sliders stay in sync.
+    SyncDebugMenuFromRenderer();
+
+    spdlog::info("Hero visual baseline applied (studio environment, TAA, SSR+SSAO)");
 }
 
 void Engine::RenderHUD() {
@@ -626,6 +715,14 @@ void Engine::RenderHUD() {
     float bloomIntensity = renderer->GetBloomIntensity();
     bool pcss = renderer->IsPCSS();
     bool fxaa = renderer->IsFXAAEnabled();
+    bool taa = renderer->IsTAAEnabled();
+    bool ssr = renderer->GetSSREnabled();
+    bool ssao = renderer->GetSSAOEnabled();
+    bool ibl = renderer->GetIBLEnabled();
+    bool fog = renderer->IsFogEnabled();
+    bool rtSupported = renderer->IsRayTracingSupported();
+    bool rtEnabled = renderer->IsRayTracingEnabled();
+    std::string envNameUtf8 = renderer->GetCurrentEnvironmentName();
 
     // Approximate FPS from last frame time
     float fps = (m_frameTime > 0.0f) ? (1.0f / m_frameTime) : 0.0f;
@@ -662,6 +759,66 @@ void Engine::RenderHUD() {
     } else {
         drawLine(L"Camera: <none>");
     }
+
+    // High-level render mode and quality summary.
+    auto debugViewLabel = [](int mode) -> const wchar_t* {
+        switch (mode) {
+            case 0:  return L"Shaded";
+            case 1:  return L"Normals";
+            case 2:  return L"Roughness";
+            case 3:  return L"Metallic";
+            case 4:  return L"Albedo";
+            case 5:  return L"Cascades";
+            case 6:  return L"DebugScreen";
+            case 13: return L"SSAO_Only";
+            case 14: return L"SSAO_Overlay";
+            case 15: return L"SSR_Only";
+            case 16: return L"SSR_Overlay";
+            case 18: return L"RT_ShadowMask";
+            case 19: return L"RT_ShadowHistory";
+            case 20: return L"RT_Reflections";
+            case 21: return L"RT_GI";
+            case 22: return L"Shaded_NoRTGI";
+            case 23: return L"Shaded_NoRTRefl";
+            case 24: return L"RT_ReflectionRays";
+            default: return L"Other";
+        }
+    };
+
+    std::wstring envName;
+    if (!envNameUtf8.empty()) {
+        envName.assign(envNameUtf8.begin(), envNameUtf8.end());
+    } else {
+        envName = L"<none>";
+    }
+
+    swprintf_s(buffer, L"View: %s (%d)  RTX: %s%s",
+               debugViewLabel(debugMode),
+               debugMode,
+               rtEnabled ? L"ON" : L"OFF",
+               !rtSupported ? L" [Not Supported]" : L"");
+    drawLine(buffer);
+
+    swprintf_s(buffer, L"Env: %s  IBL: %s  Fog: %s",
+               envName.c_str(),
+               ibl ? L"ON" : L"OFF",
+               fog ? L"ON" : L"OFF");
+    drawLine(buffer);
+
+    const wchar_t* aaLabel = taa ? L"TAA" : (fxaa ? L"FXAA" : L"None");
+    swprintf_s(buffer, L"AA: %s  SSR: %s  SSAO: %s",
+               aaLabel,
+               ssr ? L"ON" : L"OFF",
+               ssao ? L"ON" : L"OFF");
+    drawLine(buffer);
+
+    // Scene preset summary and quick hint for switching.
+    const wchar_t* sceneLabel =
+        (m_currentScenePreset == ScenePreset::CornellBox)
+            ? L"Cornell Box"
+            : L"Dragon Over Water Studio";
+    swprintf_s(buffer, L"Scene: %s  (press N to switch)", sceneLabel);
+    drawLine(buffer);
 
     // Only show detailed renderer/light/command information in debug screen mode
     if (debugMode == 6) {
@@ -753,83 +910,213 @@ void Engine::RenderHUD() {
                m_droneFlightEnabled ? "Drone" : "Orbit");
     drawLine(buffer);
 
+    // When an object is selected, expose its material numerically.
+    if (m_selectedEntity != entt::null &&
+        m_registry->HasComponent<Scene::RenderableComponent>(m_selectedEntity)) {
+        const auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(m_selectedEntity);
+        std::wstring preset;
+        if (!renderable.presetName.empty()) {
+            preset.assign(renderable.presetName.begin(), renderable.presetName.end());
+        } else {
+            preset = L"<none>";
+        }
+        swprintf_s(buffer, L"Material: preset=%s  base=(%.2f, %.2f, %.2f)  metal=%.2f  rough=%.2f  ao=%.2f",
+                   preset.c_str(),
+                   renderable.albedoColor.r,
+                   renderable.albedoColor.g,
+                   renderable.albedoColor.b,
+                   renderable.metallic,
+                   renderable.roughness,
+                   renderable.ao);
+        drawLine(buffer);
+    }
+
     drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan");
 
-    // Engine settings overlay (toggled with M). Draw a simple side panel with
-    // categories and current values inspired by DCC render settings UIs.
+    // When the GPU settings overlay is visible (M / F2), render a textual
+    // legend so it is obvious what each row controls and what the current
+    // values are. The colored bars themselves are drawn in the post-process
+    // shader; this HUD pass just annotates them.
     if (UI::DebugMenu::IsVisible()) {
         UI::DebugMenuState state = UI::DebugMenu::GetState();
 
-        // Panel rectangle on the right side
+        drawLine(L"[Settings overlay active – M / F2]");
+        drawLine(L"Use UP/DOWN to select row, LEFT/RIGHT to tweak, SPACE/ENTER to toggle.");
+
         int panelX = static_cast<int>(m_window->GetWidth()) - 320;
-        int panelY = 40;
-        int panelW = 300;
-        int panelH = 260;
+        int y = 48;
 
-        HBRUSH brush = CreateSolidBrush(RGB(10, 10, 10));
-        RECT panelRect{ panelX, panelY, panelX + panelW, panelY + panelH };
-        FillRect(dc, &panelRect, brush);
-        DeleteObject(brush);
-        FrameRect(dc, &panelRect, (HBRUSH)GetStockObject(WHITE_BRUSH));
-
-        int y = panelY + 8;
         auto drawPanelLine = [&](const wchar_t* text, COLORREF color) {
             SetTextColor(dc, color);
             TextOutW(dc, panelX + 12, y, text, static_cast<int>(wcslen(text)));
             y += 18;
         };
 
-        drawPanelLine(L"Engine Settings (M to close)", RGB(0, 200, 255));
-        y += 4;
-
         struct Row {
             const wchar_t* label;
-            float value;
-            int sectionIndex;
+            float          value;
+            bool           isBool;
+            int            sectionIndex;
         };
 
         Row rows[] = {
-            { L"[Render] Exposure (EV)",           state.exposure,                       0 },
-            { L"[Render] Bloom Intensity",         state.bloomIntensity,                 1 },
-            { L"[Shadows] Shadows Enabled",        state.shadowsEnabled ? 1.0f : 0.0f,   2 },
-            { L"[Shadows] PCSS (Soft Shadows)",    state.pcssEnabled ? 1.0f : 0.0f,      3 },
-            { L"[Shadows] Bias",                   state.shadowBias,                     4 },
-            { L"[Shadows] PCF Radius",             state.shadowPCFRadius,                5 },
-            { L"[Shadows] Cascade Lambda",         state.cascadeLambda,                  6 },
-            { L"[AA] FXAA",                        state.fxaaEnabled ? 1.0f : 0.0f,      7 },
-            { L"[AA] TAA",                         state.taaEnabled ? 1.0f : 0.0f,       8 },
-            { L"[Reflections] SSR",                state.ssrEnabled ? 1.0f : 0.0f,       9 },
-            { L"[AO] SSAO",                        state.ssaoEnabled ? 1.0f : 0.0f,      10 },
-            { L"[Environment] IBL",                state.iblEnabled ? 1.0f : 0.0f,       11 },
-            { L"[Environment] Fog",                state.fogEnabled ? 1.0f : 0.0f,       12 },
-            { L"[Camera] Base Speed",              state.cameraBaseSpeed,                13 },
-            { L"[Advanced] Ray Tracing",           state.rayTracingEnabled ? 1.0f : 0.0f,14 }
+            { L"[Render] Exposure (EV)",           state.exposure,                       false, 0 },
+            { L"[Render] Bloom Intensity",         state.bloomIntensity,                 false, 1 },
+            { L"[Shadows] Shadows Enabled",        state.shadowsEnabled ? 1.0f : 0.0f,   true,  2 },
+            { L"[Shadows] PCSS (Soft Shadows)",    state.pcssEnabled ? 1.0f : 0.0f,      true,  3 },
+            { L"[Shadows] Bias",                   state.shadowBias,                     false, 4 },
+            { L"[Shadows] PCF Radius",             state.shadowPCFRadius,                false, 5 },
+            { L"[Shadows] Cascade Lambda",         state.cascadeLambda,                  false, 6 },
+            { L"[AA] FXAA",                        state.fxaaEnabled ? 1.0f : 0.0f,      true,  7 },
+            { L"[AA] TAA",                         state.taaEnabled ? 1.0f : 0.0f,       true,  8 },
+            { L"[Reflections] SSR",                state.ssrEnabled ? 1.0f : 0.0f,       true,  9 },
+            { L"[AO] SSAO",                        state.ssaoEnabled ? 1.0f : 0.0f,      true,  10 },
+            { L"[Environment] IBL",                state.iblEnabled ? 1.0f : 0.0f,       true,  11 },
+            { L"[Environment] Fog",                state.fogEnabled ? 1.0f : 0.0f,       true,  12 },
+            { L"[Camera] Base Speed",              state.cameraBaseSpeed,                false, 13 },
+            { L"[Advanced] Ray Tracing",           state.rayTracingEnabled ? 1.0f : 0.0f,true,  14 }
         };
 
         const int rowCount = static_cast<int>(std::size(rows));
         for (int i = 0; i < rowCount; ++i) {
             const Row& r = rows[i];
-            wchar_t line[256];
-            if (r.sectionIndex == 2 || r.sectionIndex == 3 || r.sectionIndex == 7 ||
-                r.sectionIndex == 8 || r.sectionIndex == 9 || r.sectionIndex == 10 ||
-                r.sectionIndex == 11 || r.sectionIndex == 12 || r.sectionIndex == 14) {
-                swprintf_s(line, L"%s : %s", r.label, (state.rayTracingEnabled ? L"ON" : L"OFF"));
+            wchar_t lineText[256];
+
+            if (r.isBool) {
+                const bool on = (r.value > 0.5f);
+                swprintf_s(lineText, L"%2d) %s : %s", r.sectionIndex, r.label, on ? L"ON" : L"OFF");
             } else {
-                swprintf_s(line, L"%s : %.3f", r.label, r.value);
+                swprintf_s(lineText, L"%2d) %s : %.3f", r.sectionIndex, r.label, r.value);
             }
+
             COLORREF color = (m_settingsSection == r.sectionIndex)
                 ? RGB(255, 255, 0)
                 : RGB(200, 200, 200);
-            drawPanelLine(line, color);
-        }
 
-        y += 4;
-        drawPanelLine(L"Use UP/DOWN to select row", RGB(180, 180, 180));
-        drawPanelLine(L"LEFT/RIGHT to tweak value", RGB(180, 180, 180));
-        drawPanelLine(L"SPACE/ENTER to toggle flags", RGB(180, 180, 180));
+            drawPanelLine(lineText, color);
+        }
     }
 
     ReleaseDC(hwnd, dc);
+}
+
+void Engine::CaptureScreenshot() {
+    if (!m_window) {
+        spdlog::warn("CaptureScreenshot: window not available");
+        return;
+    }
+
+    HWND hwnd = m_window->GetHWND();
+    if (!hwnd) {
+        spdlog::warn("CaptureScreenshot: HWND is null");
+        return;
+    }
+
+    RECT rect{};
+    if (!GetClientRect(hwnd, &rect)) {
+        spdlog::warn("CaptureScreenshot: GetClientRect failed");
+        return;
+    }
+
+    int width  = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+    if (width <= 0 || height <= 0) {
+        spdlog::warn("CaptureScreenshot: invalid client size");
+        return;
+    }
+
+    HDC hdcWindow = GetDC(hwnd);
+    if (!hdcWindow) {
+        spdlog::warn("CaptureScreenshot: GetDC failed");
+        return;
+    }
+
+    HDC hdcMem = CreateCompatibleDC(hdcWindow);
+    if (!hdcMem) {
+        ReleaseDC(hwnd, hdcWindow);
+        spdlog::warn("CaptureScreenshot: CreateCompatibleDC failed");
+        return;
+    }
+
+    HBITMAP hbm = CreateCompatibleBitmap(hdcWindow, width, height);
+    if (!hbm) {
+        DeleteDC(hdcMem);
+        ReleaseDC(hwnd, hdcWindow);
+        spdlog::warn("CaptureScreenshot: CreateCompatibleBitmap failed");
+        return;
+    }
+
+    HGDIOBJ oldBmp = SelectObject(hdcMem, hbm);
+    BitBlt(hdcMem, 0, 0, width, height, hdcWindow, 0, 0, SRCCOPY);
+
+    BITMAP bmp{};
+    GetObject(hbm, sizeof(BITMAP), &bmp);
+
+    BITMAPINFOHEADER bi{};
+    bi.biSize = sizeof(BITMAPINFOHEADER);
+    bi.biWidth = bmp.bmWidth;
+    bi.biHeight = -bmp.bmHeight; // top-down
+    bi.biPlanes = 1;
+    bi.biBitCount = 32;
+    bi.biCompression = BI_RGB;
+
+    std::vector<uint8_t> pixels(static_cast<size_t>(bmp.bmWidth) * static_cast<size_t>(bmp.bmHeight) * 4u);
+    if (!GetDIBits(hdcWindow, hbm, 0, static_cast<UINT>(bmp.bmHeight), pixels.data(),
+                   reinterpret_cast<BITMAPINFO*>(&bi), DIB_RGB_COLORS)) {
+        SelectObject(hdcMem, oldBmp);
+        DeleteObject(hbm);
+        DeleteDC(hdcMem);
+        ReleaseDC(hwnd, hdcWindow);
+        spdlog::warn("CaptureScreenshot: GetDIBits failed");
+        return;
+    }
+
+    SYSTEMTIME st{};
+    GetLocalTime(&st);
+
+    wchar_t filenameW[MAX_PATH];
+    swprintf_s(filenameW, L"screenshot_%04d%02d%02d_%02d%02d%02d_%03d.bmp",
+               st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    HANDLE hFile = CreateFileW(filenameW, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        SelectObject(hdcMem, oldBmp);
+        DeleteObject(hbm);
+        DeleteDC(hdcMem);
+        ReleaseDC(hwnd, hdcWindow);
+        spdlog::warn("CaptureScreenshot: failed to create output file");
+        return;
+    }
+
+    BITMAPFILEHEADER bmf{};
+    bmf.bfType = 0x4D42; // 'BM'
+    DWORD dibSize = static_cast<DWORD>(pixels.size());
+    bmf.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    bmf.bfSize = bmf.bfOffBits + dibSize;
+
+    DWORD written = 0;
+    WriteFile(hFile, &bmf, sizeof(bmf), &written, nullptr);
+    WriteFile(hFile, &bi, sizeof(bi), &written, nullptr);
+    WriteFile(hFile, pixels.data(), dibSize, &written, nullptr);
+
+    CloseHandle(hFile);
+
+    SelectObject(hdcMem, oldBmp);
+    DeleteObject(hbm);
+    DeleteDC(hdcMem);
+    ReleaseDC(hwnd, hdcWindow);
+
+    // Convert filename to UTF-8 for logging.
+    int len = WideCharToMultiByte(CP_UTF8, 0, filenameW, -1, nullptr, 0, nullptr, nullptr);
+    std::string filenameUtf8;
+    if (len > 0) {
+        filenameUtf8.resize(static_cast<size_t>(len - 1));
+        WideCharToMultiByte(CP_UTF8, 0, filenameW, -1, filenameUtf8.data(), len - 1, nullptr, nullptr);
+    } else {
+        filenameUtf8 = "screenshot.bmp";
+    }
+
+    spdlog::info("Screenshot captured to {}", filenameUtf8);
 }
 
 void Engine::Run() {
@@ -838,10 +1125,10 @@ void Engine::Run() {
     while (m_running) {
         // Calculate delta time
         auto currentTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> deltaTime = currentTime - m_lastFrameTime;
-        m_lastFrameTime = currentTime;
-
-        float dt = deltaTime.count();
+        std::chrono::duration<double> secs = currentTime.time_since_epoch();
+        double nowSeconds = secs.count();
+        float dt = static_cast<float>(nowSeconds - m_lastFrameTimeSeconds);
+        m_lastFrameTimeSeconds = nowSeconds;
         m_frameTime = dt;
 
         // FPS counter
@@ -908,34 +1195,197 @@ void Engine::ProcessInput() {
                 break;
 
             case SDL_EVENT_KEY_DOWN: {
-                bool settingsVisible = UI::DebugMenu::IsVisible();
+                const SDL_Keycode key = event.key.key;
+                bool overlayVisible = m_settingsOverlayVisible;
+                bool settingsWindowVisible = UI::DebugMenu::IsVisible();
 
-                // When the settings menu is visible, repurpose keys for menu
-                // navigation and parameter adjustments instead of camera
-                // controls. ESC closes the menu rather than quitting.
-                if (settingsVisible) {
+                // -----------------------------------------------------------------
+                // Global keys that should always work, regardless of settings state
+                // -----------------------------------------------------------------
+                if (key == SDLK_ESCAPE) {
+                    // Close overlay first, then the settings window, then the
+                    // quick settings window; only exit the app if no UI is open.
+                    if (overlayVisible) {
+                        m_settingsOverlayVisible = false;
+                        spdlog::info("Settings overlay DISABLED (ESC)");
+                    } else if (settingsWindowVisible) {
+                        UI::DebugMenu::SetVisible(false);
+                        spdlog::info("Settings window HIDDEN (ESC)");
+                    } else if (UI::QuickSettingsWindow::IsVisible()) {
+                        UI::QuickSettingsWindow::SetVisible(false);
+                        spdlog::info("Quick settings window HIDDEN (ESC)");
+                    } else {
+                        m_running = false;
+                    }
+                    break;
+                }
+                if (key == SDLK_H) {
+                    m_showHUD = !m_showHUD;
+                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
+                    break;
+                }
+                if (key == SDLK_B) {
+                    ApplyHeroVisualBaseline();
+                    break;
+                }
+                if (key == SDLK_PRINTSCREEN) {
+                    CaptureScreenshot();
+                    break;
+                }
+                if (key == SDLK_F6) {
+                    // Toggle scripted auto-demo camera flythrough around the hero scene.
+                    m_autoDemoEnabled = !m_autoDemoEnabled;
+                    m_autoDemoTime = 0.0f;
+                    if (m_autoDemoEnabled) {
+                        spdlog::info("Auto-demo ENABLED (F6) - camera will orbit the hero scene");
+                    } else {
+                        spdlog::info("Auto-demo DISABLED (F6)");
+                    }
+                    break;
+                }
+                if (key == SDLK_N) {
+                    // Scene preset toggle: Cornell box <-> Dragon studio.
+                    ToggleScenePreset();
+                    break;
+                }
+                if (key == SDLK_1 || key == SDLK_2 || key == SDLK_3) {
+                    // Camera bookmarks for the current scene preset.
+                    if (m_registry && m_activeCameraEntity != entt::null &&
+                        m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity)) {
+                        m_autoDemoEnabled = false;
+                        auto& t = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+                        glm::vec3 center;
+                        if (m_currentScenePreset == ScenePreset::CornellBox) {
+                            center = glm::vec3(0.0f, 1.0f, 0.0f);
+                            if (key == SDLK_1) {
+                                // Default front view.
+                                t.position = glm::vec3(0.0f, 1.2f, -4.0f);
+                            } else if (key == SDLK_2) {
+                                // High overhead shot.
+                                t.position = glm::vec3(0.0f, 3.0f, -2.0f);
+                            } else { // SDLK_3
+                                // Angled view from the right.
+                                t.position = glm::vec3(3.0f, 1.5f, -3.0f);
+                            }
+                        } else {
+                            center = glm::vec3(0.0f, 1.0f, kHeroPoolZ);
+                            if (key == SDLK_1) {
+                                // Default hero shot.
+                                t.position = glm::vec3(0.0f, 3.0f, -8.0f);
+                            } else if (key == SDLK_2) {
+                                // High overhead shot looking down at the pool.
+                                t.position = glm::vec3(0.0f, 8.0f, kHeroPoolZ - 1.0f);
+                            } else { // SDLK_3
+                                // Angled view from the dragon side.
+                                t.position = glm::vec3(6.0f, 4.0f, kHeroPoolZ + 4.0f);
+                            }
+                        }
+
+                        glm::vec3 forward = glm::normalize(center - t.position);
+                        glm::vec3 up(0.0f, 1.0f, 0.0f);
+                        if (std::abs(glm::dot(forward, up)) > 0.99f) {
+                            up = glm::vec3(0.0f, 0.0f, 1.0f);
+                        }
+                        t.rotation = glm::quatLookAt(forward, up);
+
+                        forward = glm::normalize(forward);
+                        m_cameraYaw = std::atan2(forward.x, forward.z);
+                        m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+
+                        int index = (key == SDLK_1) ? 1 : (key == SDLK_2 ? 2 : 3);
+                        spdlog::info("Camera bookmark {} applied", index);
+                    }
+                    break;
+                }
+                if (key == SDLK_O) {
+                    // Toggle dedicated quick settings window (separate from
+                    // the GPU overlay / native debug window).
+                    UI::QuickSettingsWindow::Toggle();
+                    spdlog::info("Quick settings window toggled (O)");
+                    break;
+                }
+                if (key == SDLK_M) {
+                    // GPU overlay (in-shader menu) toggle – does not affect
+                    // the native F2 settings window.
+                    m_settingsOverlayVisible = !m_settingsOverlayVisible;
+                    if (m_settingsOverlayVisible) {
+                        m_settingsSection = 0;
+                    }
+                    spdlog::info("Settings overlay {}", m_settingsOverlayVisible ? "ENABLED" : "DISABLED");
+                    break;
+                }
+                if (key == SDLK_F2) {
+                    // Reset all debug settings (renderer + state) to defaults,
+                    // then show the native slider/checkbox settings window.
+                    UI::DebugMenu::ResetToDefaults();
+                    UI::DebugMenu::SetVisible(true);
+                    spdlog::info("Settings window RESET and ENABLED (F2)");
+                    break;
+                }
+                if (key == SDLK_T && m_llmEnabled) {
+                    // Architect text prompt (native dialog)
+                    auto text = UI::TextPrompt::Show(m_window ? m_window->GetHWND() : nullptr);
+                    if (!text.empty()) {
+                        spdlog::info("Submitting to Architect: \"{}\"", text);
+                        SubmitNaturalLanguageCommand(text);
+                    } else {
+                        spdlog::info("Text input cancelled");
+                    }
+                    break;
+                }
+                if (key == SDLK_Y) {
+                    // Phase 3: Trigger Dreamer texture generation for the current focus target.
+                    if (m_dreamerService && m_dreamerEnabled) {
+                        std::string prompt = UI::TextPrompt::Show(
+                            m_window ? m_window->GetHWND() : nullptr,
+                            "Dreamer Texture Prompt",
+                            "Describe the texture to generate:");
+                        if (!prompt.empty()) {
+                            std::string target = GetFocusTarget();
+                            if (target.empty()) {
+                                target = "SpinningCube";
+                            }
+                            AI::Vision::TextureRequest req;
+                            req.targetName = target;
+                            req.prompt = prompt;
+                            req.usage = AI::Vision::TextureUsage::Albedo;
+                            req.width = 512;
+                            req.height = 512;
+                            m_dreamerService->SubmitRequest(req);
+                            spdlog::info("[Dreamer] Queued texture request for '{}' with prompt: \"{}\"",
+                                         target, prompt);
+                        } else {
+                            spdlog::info("[Dreamer] Texture prompt cancelled");
+                        }
+                    } else {
+                        spdlog::info("[Dreamer] Service not enabled; Y key ignored");
+                    }
+                    break;
+                }
+
+                // -----------------------------------------------------------------
+                // When the GPU settings overlay is visible, use keys for menu navigation
+                // and value adjustments. Other keys still work thanks to the
+                // global handlers above.
+                // -----------------------------------------------------------------
+                if (overlayVisible) {
                     UI::DebugMenuState state = UI::DebugMenu::GetState();
                     const float stepSmall = 0.05f;
 
-                    if (event.key.key == SDLK_ESCAPE) {
-                        UI::DebugMenu::SetVisible(false);
-                        break;
-                    }
-                    // Section navigation: up/down move the highlight through
-                    // the list of settings sections.
-                    if (event.key.key == SDLK_UP) {
+                    // Section navigation
+                    if (key == SDLK_UP) {
                         m_settingsSection = std::max(0, m_settingsSection - 1);
                         break;
                     }
-                    if (event.key.key == SDLK_DOWN) {
+                    if (key == SDLK_DOWN) {
                         constexpr int kMaxSection = 14;
                         m_settingsSection = std::min(kMaxSection, m_settingsSection + 1);
                         break;
                     }
 
-                    // Adjust the currently highlighted setting with left/right.
-                    if (event.key.key == SDLK_LEFT || event.key.key == SDLK_RIGHT) {
-                        const float dir = (event.key.key == SDLK_RIGHT) ? 1.0f : -1.0f;
+                    // Adjust numeric / toggle rows with LEFT/RIGHT
+                    if (key == SDLK_LEFT || key == SDLK_RIGHT) {
+                        const float dir = (key == SDLK_RIGHT) ? 1.0f : -1.0f;
 
                         switch (m_settingsSection) {
                             case 0: // Exposure
@@ -995,14 +1445,21 @@ void Engine::ProcessInput() {
                         break;
                     }
 
-                    // Space/Enter toggle boolean sections such as ray tracing.
-                    if (event.key.key == SDLK_SPACE || event.key.key == SDLK_RETURN) {
+                    // Space/Enter toggle boolean rows
+                    if (key == SDLK_SPACE || key == SDLK_RETURN) {
                         if (m_settingsSection >= 2 && m_settingsSection <= 12) {
-                            // Boolean rows: flip the value
-                            // Let LEFT/RIGHT handler handle the actual toggle by
-                            // simulating a small positive delta.
-                            const SDL_Keycode fake = SDLK_RIGHT;
-                            (void)fake; // no-op; we already share logic above.
+                            switch (m_settingsSection) {
+                                case 2:  state.shadowsEnabled = !state.shadowsEnabled; break;
+                                case 3:  state.pcssEnabled = !state.pcssEnabled; break;
+                                case 7:  state.fxaaEnabled = !state.fxaaEnabled; break;
+                                case 8:  state.taaEnabled = !state.taaEnabled; break;
+                                case 9:  state.ssrEnabled = !state.ssrEnabled; break;
+                                case 10: state.ssaoEnabled = !state.ssaoEnabled; break;
+                                case 11: state.iblEnabled = !state.iblEnabled; break;
+                                case 12: state.fogEnabled = !state.fogEnabled; break;
+                                default: break;
+                            }
+                            UI::DebugMenu::SyncFromState(state);
                         } else if (m_settingsSection == 14) {
                             auto* renderer = m_renderer.get();
                             if (renderer && renderer->IsRayTracingSupported()) {
@@ -1012,21 +1469,16 @@ void Engine::ProcessInput() {
                         }
                         break;
                     }
-
-                    // Unhandled key while menu is visible: do not fall through
-                    // to the rest of the engine hotkeys.
-                    break;
+                    // For other keys while menu is visible, fall through to the
+                    // normal hotkeys so F4, camera controls, etc. still work.
                 }
 
-                if (event.key.key == SDLK_ESCAPE) {
-                    m_running = false;
-                }
-                else if (event.key.key == SDLK_F) {
+                if (key == SDLK_F) {
                     // Frame the currently selected entity (if any) and mark it
                     // as the logical focus target for LLM/Dreamer edits.
                     FrameSelectedEntity();
                 }
-                else if (event.key.key == SDLK_G) {
+                else if (key == SDLK_G) {
                     // Toggle drone/free-flight camera mode. When enabled, the camera
                     // can be steered continuously without holding the right mouse
                     // button and the mouse is locked in relative mode.
@@ -1049,126 +1501,73 @@ void Engine::ProcessInput() {
                         spdlog::info("Drone flight disabled");
                     }
                 }
-                else if (event.key.key == SDLK_T && m_llmEnabled) {
-                    // Block to show native prompt; returns empty on cancel
-                    auto text = UI::TextPrompt::Show(m_window->GetHWND());
-                    if (!text.empty()) {
-                        spdlog::info("Submitting to Architect: \"{}\"", text);
-                        SubmitNaturalLanguageCommand(text);
-                    } else {
-                        spdlog::info("Text input cancelled");
-                    }
-                }
-                else if (event.key.key == SDLK_Y) {
-                    // Phase 3: Trigger Dreamer texture generation for the current focus target.
-                    if (m_dreamerService && m_dreamerEnabled) {
-                        std::string prompt = UI::TextPrompt::Show(
-                            m_window->GetHWND(),
-                            "Dreamer Texture Prompt",
-                            "Describe the texture to generate:");
-                        if (!prompt.empty()) {
-                            std::string target = GetFocusTarget();
-                            if (target.empty()) {
-                                target = "SpinningCube";
-                            }
-                            AI::Vision::TextureRequest req;
-                            req.targetName = target;
-                            req.prompt = prompt;
-                            req.usage = AI::Vision::TextureUsage::Albedo;
-                            req.width = 512;
-                            req.height = 512;
-                            m_dreamerService->SubmitRequest(req);
-                            spdlog::info("[Dreamer] Queued texture request for '{}' with prompt: \"{}\"",
-                                         target, prompt);
-                        } else {
-                            spdlog::info("[Dreamer] Texture prompt cancelled");
-                        }
-                    } else {
-                        spdlog::info("[Dreamer] Service not enabled; Y key ignored");
-                    }
-                }
-                else if (event.key.key == SDLK_F1) {
+                else if (key == SDLK_F1) {
                     // Reset camera to default position/orientation
                     InitializeCameraController();
                     spdlog::info("Camera reset to default");
                 }
-                else if (event.key.key == SDLK_H) {
-                    m_showHUD = !m_showHUD;
-                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
-                }
-                else if (event.key.key == SDLK_P) {
+                else if (key == SDLK_P) {
                     if (m_renderer) {
                         bool enabled = !m_renderer->IsPCSS();
                         m_renderer->SetPCSS(enabled);
                         spdlog::info("PCSS contact-hardening {}", enabled ? "ENABLED" : "DISABLED");
                     }
                 }
-                else if (event.key.key == SDLK_X) {
+                else if (key == SDLK_X) {
                     if (m_renderer) {
                         bool enabled = !m_renderer->IsFXAAEnabled();
                         m_renderer->SetFXAAEnabled(enabled);
                         spdlog::info("FXAA {}", enabled ? "ENABLED" : "DISABLED");
                     }
                 }
-                else if (event.key.key == SDLK_Z) {
+                else if (key == SDLK_Z) {
                     if (m_renderer) {
                         m_renderer->ToggleTAA();
                     }
                 }
-                else if (event.key.key == SDLK_M) {
-                    UI::DebugMenu::Toggle();
-                    if (UI::DebugMenu::IsVisible()) {
-                        m_settingsSection = 0;
-                    }
-                }
-                else if (event.key.key == SDLK_F2) {
-                    // Reset all debug settings (sliders + view modes) to defaults, then show the menu
-                    UI::DebugMenu::ResetToDefaults();
-                    UI::DebugMenu::SetVisible(true);
-                }
-                else if (event.key.key == SDLK_F5) {
+                else if (key == SDLK_F5) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(0.5f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F7) {
+                else if (key == SDLK_F7) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(-0.0002f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F8) {
+                else if (key == SDLK_F8) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowBias(0.0002f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F9) {
+                else if (key == SDLK_F9) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(-0.05f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F10) {
+                else if (key == SDLK_F10) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeSplitLambda(0.05f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F11) {
+                else if (key == SDLK_F11) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, -0.1f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_F12) {
+                else if (key == SDLK_F12) {
                     if (m_renderer) {
                         m_renderer->AdjustCascadeResolutionScale(0, 0.1f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
-                else if (event.key.key == SDLK_V) {
+                else if (key == SDLK_V) {
                     if (m_renderer) {
                         if (!m_renderer->IsRayTracingSupported()) {
                             spdlog::info("Ray tracing not supported on this GPU; V toggle ignored");
@@ -1192,7 +1591,19 @@ void Engine::ProcessInput() {
                     }
                 }
                 else if (event.key.key == SDLK_R) {
-                    if (m_renderer) {
+                    // Toggle gizmo mode between translate and rotate so the
+                    // same axis handles can be used for both operations.
+                    if (m_selectedEntity != entt::null) {
+                        m_gizmoMode = (m_gizmoMode == GizmoMode::Translate)
+                            ? GizmoMode::Rotate
+                            : GizmoMode::Translate;
+                        spdlog::info("Gizmo mode: {}", m_gizmoMode == GizmoMode::Translate
+                                                       ? "TRANSLATE"
+                                                       : "ROTATE");
+                    }
+                    else if (m_renderer) {
+                        // When nothing is selected, keep the old R behavior
+                        // for cycling SSR/SSAO debug modes.
                         m_renderer->CycleScreenSpaceEffectsDebug();
                     }
                 }
@@ -1293,9 +1704,10 @@ void Engine::ProcessInput() {
                                 m_gizmoDragPlaneNormal = planeNormal;
                                 m_gizmoDragPlanePoint = m_gizmoDragCenter;
 
-                                // Cache initial entity position and axis parameter.
+                                // Cache initial entity transform and axis parameter.
                                 auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
                                 m_gizmoDragStartEntityPos = selT.position;
+                                m_gizmoDragStartEntityRot = selT.rotation;
                                 glm::vec3 hitPoint;
                                 if (RayPlaneIntersection(rayOrigin, rayDir,
                                                          m_gizmoDragPlanePoint,
@@ -1363,10 +1775,22 @@ void Engine::ProcessInput() {
                                     glm::vec3 axisN = glm::normalize(m_gizmoAxisDir);
                                     float s = glm::dot(hitPoint - m_gizmoDragCenter, axisN);
                                     float delta = s - m_gizmoDragStartAxisParam;
-                                    glm::vec3 offset = axisN * delta;
 
                                     auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
-                                    selT.position = m_gizmoDragStartEntityPos + offset;
+
+                                    if (m_gizmoMode == GizmoMode::Translate) {
+                                        glm::vec3 offset = axisN * delta;
+                                        selT.position = m_gizmoDragStartEntityPos + offset;
+                                    } else {
+                                        // Rotate around the gizmo axis passing through the
+                                        // object's center. Map drag distance along the axis
+                                        // to an angle in radians.
+                                        float angle = delta;
+                                        float maxAngle = glm::radians(720.0f);
+                                        angle = glm::clamp(angle, -maxAngle, maxAngle);
+                                        glm::quat deltaRot = glm::angleAxis(angle, axisN);
+                                        selT.rotation = glm::normalize(deltaRot * m_gizmoDragStartEntityRot);
+                                    }
                                 }
                             }
                         }
@@ -1591,8 +2015,9 @@ void Engine::Update(float deltaTime) {
         }
     }
 
-    // Update active camera (fly controls)
+    // Update active camera (fly controls) and optional auto-demo orbit
     UpdateCameraController(deltaTime);
+    UpdateAutoDemo(deltaTime);
 
     // Update all rotation components (spinning cube)
     auto viewRot = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
@@ -1609,6 +2034,31 @@ void Engine::Update(float deltaTime) {
     // operate on consistent world-space data.
     m_registry->UpdateTransforms();
 
+    // Simple buoyancy integration for entities tagged with BuoyancyComponent.
+    if (m_renderer && m_registry) {
+        auto buoyView = m_registry->View<Scene::BuoyancyComponent, Scene::TransformComponent>();
+        for (auto entity : buoyView) {
+            auto& buoyancy  = buoyView.get<Scene::BuoyancyComponent>(entity);
+            auto& transform = buoyView.get<Scene::TransformComponent>(entity);
+
+            glm::vec2 xz(transform.position.x, transform.position.z);
+            float waterHeight = m_renderer->SampleWaterHeightAt(xz);
+
+            // Positive displacement means the water surface is above the object.
+            float displacement = waterHeight - transform.position.y;
+
+            // Spring-damper vertical motion: force = k * displacement - c * velocity.
+            float k = 1.5f / glm::max(0.1f, buoyancy.radius);
+            float c = buoyancy.damping;
+
+            float accel = k * displacement - c * buoyancy.verticalVelocity;
+            buoyancy.verticalVelocity += accel * deltaTime;
+
+            // Integrate vertical position.
+            transform.position.y += buoyancy.verticalVelocity * deltaTime;
+        }
+    }
+
     // Per-frame gizmo hover detection (editor-style)
     UpdateGizmoHover();
 }
@@ -1618,10 +2068,20 @@ void Engine::Render(float deltaTime) {
     // main render; the renderer will consume these in its debug overlay pass.
     DebugDrawSceneGraph();
 
+    // Let the renderer know whether the GPU settings overlay should be
+    // visible, along with the currently highlighted row index. This drives
+    // the in-shader panel in the post-process path (M key).
+    if (m_renderer) {
+        m_renderer->SetDebugOverlayState(m_settingsOverlayVisible, m_settingsSection);
+    }
+
     m_renderer->Render(m_registry.get(), deltaTime);
 
-    // Render HUD overlay using GDI on top of the swap chain
-    if (m_showHUD) {
+    // Render HUD overlay using GDI on top of the swap chain (for FPS/camera
+    // text). Even when the user has hidden the normal HUD, keep RenderHUD()
+    // active while either the settings overlay or the native settings window
+    // is visible so the menu legend and row labels remain accessible.
+    if (m_showHUD || m_settingsOverlayVisible || UI::DebugMenu::IsVisible()) {
         RenderHUD();
     }
 }
@@ -1720,6 +2180,7 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
     const bool wantsDarker  = contains("darker") || contains("too bright") || contains("dim it") || contains("less bright");
     const bool wantsShadowsOff = contains("no shadows") || contains("turn off shadows") || contains("disable shadows");
     const bool wantsShadowsOn  = contains("cast shadows") || contains("turn on shadows") || contains("enable shadows");
+    const bool mentionsWater   = contains("water");
 
     if (m_renderer && !wantsAdd && (wantsBrighter || wantsDarker || wantsShadowsOff || wantsShadowsOn)) {
         auto cmd = std::make_shared<LLM::ModifyRendererCommand>();
@@ -1738,6 +2199,39 @@ std::vector<std::shared_ptr<LLM::SceneCommand>> Engine::BuildHeuristicCommands(c
         }
         out.push_back(cmd);
         return out;
+    }
+
+    // Simple water controls: raise/lower level or make waves calmer/rougher.
+    if (m_renderer && !wantsAdd && mentionsWater) {
+        auto cmd = std::make_shared<LLM::ModifyRendererCommand>();
+        float level = m_renderer->GetWaterLevel();
+        float amp   = m_renderer->GetWaterWaveAmplitude();
+        bool any = false;
+
+        if (contains("raise") || contains("higher") || contains("deeper")) {
+            cmd->setWaterLevel = true;
+            cmd->waterLevel = level + 0.05f;
+            any = true;
+        } else if (contains("lower") || contains("shallower") || contains("less deep")) {
+            cmd->setWaterLevel = true;
+            cmd->waterLevel = level - 0.05f;
+            any = true;
+        }
+
+        if (contains("calmer") || contains("still") || contains("smooth") || contains("less wavy")) {
+            cmd->setWaterWaveAmplitude = true;
+            cmd->waterWaveAmplitude = std::max(amp * 0.5f, 0.02f);
+            any = true;
+        } else if (contains("rougher") || contains("choppy") || contains("stronger waves") || contains("bigger waves")) {
+            cmd->setWaterWaveAmplitude = true;
+            cmd->waterWaveAmplitude = std::min(amp * 1.5f, 0.6f);
+            any = true;
+        }
+
+        if (any) {
+            out.push_back(cmd);
+            return out;
+        }
     }
 
     // If the user is not clearly asking to add, prefer to modify the existing showcase cube
@@ -2352,25 +2846,24 @@ void Engine::InitializeCameraController() {
 
     auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
 
-    // Reset to default position/orientation matching InitializeScene
-    transform.position = glm::vec3(0.0f, 3.0f, -8.0f);
-    glm::vec3 target(0.0f, 1.0f, 0.0f);
-    glm::vec3 up(0.0f, 1.0f, 0.0f);
-    glm::vec3 forward = glm::normalize(target - transform.position);
-    transform.rotation = glm::quatLookAt(forward, up);
-
-    // Derive yaw/pitch from forward vector (LH, +Z forward)
-    forward = glm::normalize(forward);
-    m_cameraYaw = std::atan2(forward.x, forward.z);
-    m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
-    float pitchLimit = glm::radians(89.0f);
-    m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+    // Reset to the default position/orientation for the current scene preset
+    // and derive yaw/pitch from the resulting forward vector.
+    SetCameraToSceneDefault(transform);
 
     m_cameraControllerInitialized = true;
 }
 
 void Engine::UpdateCameraController(float deltaTime) {
     if (!m_cameraControllerInitialized || !m_registry) {
+        return;
+    }
+
+    // When the auto-demo is active, camera motion is driven by UpdateAutoDemo
+    // so manual input is ignored for the duration of the scripted flythrough.
+    if (m_autoDemoEnabled) {
+        m_pendingMouseDeltaX = 0.0f;
+        m_pendingMouseDeltaY = 0.0f;
+        m_cameraVelocity = glm::vec3(0.0f);
         return;
     }
 
@@ -2537,114 +3030,424 @@ void Engine::UpdateCameraController(float deltaTime) {
     transform.rotation = glm::quatLookAt(glm::normalize(forward), up);
 }
 
-void Engine::InitializeScene() {
-    spdlog::info("Initializing scene...");
-
-    // --- Metallic sphere (procedural) ---
-    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.4f, 32);
-    auto sphereUpload = m_renderer->UploadMesh(sphereMesh);
-    if (sphereUpload.IsErr()) {
-        spdlog::error("Failed to upload sphere mesh: {}", sphereUpload.Error());
+void Engine::UpdateAutoDemo(float deltaTime) {
+    if (!m_autoDemoEnabled || !m_registry) {
         return;
     }
 
-    entt::entity sphereEntity = m_registry->CreateEntity();
-    auto& sphereTransform = m_registry->AddComponent<Scene::TransformComponent>(sphereEntity);
-    sphereTransform.position = glm::vec3(-1.5f, 1.0f, -3.0f);
+    if (m_activeCameraEntity == entt::null ||
+        !m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) ||
+        !m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        return;
+    }
 
-    m_registry->AddComponent<Scene::TagComponent>(sphereEntity, "MetalSphere");
+    m_autoDemoTime += deltaTime;
 
-    auto& sphereRenderable = m_registry->AddComponent<Scene::RenderableComponent>(sphereEntity);
-    sphereRenderable.mesh = sphereMesh;
-    sphereRenderable.textures.albedo    = m_renderer->GetPlaceholderTexture();
-    sphereRenderable.textures.normal    = m_renderer->GetPlaceholderNormal();
-    sphereRenderable.textures.metallic  = m_renderer->GetPlaceholderMetallic();
-    sphereRenderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
-    sphereRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
-    sphereRenderable.metallic    = 1.0f;
-    sphereRenderable.roughness   = 0.18f;
-    sphereRenderable.ao          = 1.0f;
-    sphereRenderable.presetName  = "chrome";
+    auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
 
-    auto& sphereRotation = m_registry->AddComponent<Scene::RotationComponent>(sphereEntity);
-    sphereRotation.axis  = glm::vec3(0.0f, 1.0f, 0.0f);
-    sphereRotation.speed = 0.5f;
+    // Simple orbital camera path around the hero pool.
+    const float orbitRadius = 8.0f;
+    const float orbitHeight = 3.0f;
+    const glm::vec3 center(0.0f, 1.0f, kHeroPoolZ);
 
-    // --- Metallic dragon (glTF from glTF-Sample-Models) ---
-    std::shared_ptr<Scene::MeshData> dragonMesh;
-    {
-        auto dragonMeshResult = Utils::LoadSampleModelMesh("DragonAttenuation");
-        if (dragonMeshResult.IsErr()) {
-            spdlog::warn("Failed to load DragonAttenuation sample model: {}", dragonMeshResult.Error());
-        } else {
-            dragonMesh = dragonMeshResult.Value();
-            auto dragonUpload = m_renderer->UploadMesh(dragonMesh);
-            if (dragonUpload.IsErr()) {
-                spdlog::warn("Failed to upload dragon mesh: {}", dragonUpload.Error());
-                dragonMesh.reset();
+    float angle = m_autoDemoTime * 0.35f; // radians per second
+    float yOffset = 0.5f * std::sin(m_autoDemoTime * 0.5f);
+
+    transform.position = glm::vec3(
+        orbitRadius * std::sin(angle),
+        orbitHeight + yOffset,
+        center.z - orbitRadius * std::cos(angle));
+
+    glm::vec3 forward = glm::normalize(center - transform.position);
+    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(forward, up)) > 0.99f) {
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+    transform.rotation = glm::quatLookAt(forward, up);
+
+    // Keep yaw/pitch consistent with the scripted forward vector so that when
+    // auto-demo is disabled, manual controls resume from a sensible state.
+    forward = glm::normalize(forward);
+    m_cameraYaw = std::atan2(forward.x, forward.z);
+    m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+
+    // Periodically showcase different RTX and screen-space configurations.
+    if (m_renderer) {
+        float cycle = std::fmod(m_autoDemoTime, 24.0f);
+
+        // Baseline: hybrid forward + SSR/SSAO, RTX off.
+        if (cycle < 8.0f) {
+            if (m_renderer->IsRayTracingSupported()) {
+                m_renderer->SetRayTracingEnabled(false);
             }
+            m_renderer->SetSSREnabled(true);
+            m_renderer->SetSSAOEnabled(true);
         }
+        // RTX reflections / GI enabled on top of the same scene.
+        else if (cycle < 16.0f) {
+            if (m_renderer->IsRayTracingSupported()) {
+                m_renderer->SetRayTracingEnabled(true);
+            }
+            m_renderer->SetSSREnabled(true);
+            m_renderer->SetSSAOEnabled(true);
+        }
+        // Contrast phase: keep RT on but disable SSR so reflections clearly change.
+        else {
+            if (m_renderer->IsRayTracingSupported()) {
+                m_renderer->SetRayTracingEnabled(true);
+            }
+            m_renderer->SetSSREnabled(false);
+            m_renderer->SetSSAOEnabled(true);
+        }
+
+        // Ensure a pleasant studio-like environment while the demo runs.
+        m_renderer->SetEnvironmentPreset("studio");
+        SyncDebugMenuFromRenderer();
     }
+}
 
-    if (dragonMesh) {
-        entt::entity dragonEntity = m_registry->CreateEntity();
-        auto& dragonTransform = m_registry->AddComponent<Scene::TransformComponent>(dragonEntity);
-        dragonTransform.position = glm::vec3(1.5f, 1.0f, -3.0f);
-        dragonTransform.scale    = glm::vec3(0.6f); // small dragon
+void Engine::BuildDragonStudioScene() {
+    spdlog::info("Building hero scene: Dragon Over Water Studio");
 
-        m_registry->AddComponent<Scene::TagComponent>(dragonEntity, "MetalDragon");
+    // Hero staging scene: "Dragon Over Water Studio"
+    //
+    // This scene is designed to exercise:
+    //  - Planar water rendering (waves, reflections)
+    //  - Direct lighting + cascaded sun shadows
+    //  - Hybrid SSR / RT reflections and RT GI
+    //  - LLM-driven edits on top of a curated layout.
+    //
+    // Layout (left-handed, +Z forward):
+    //  - Large studio floor centered at z = -3
+    //  - Square pool and water surface inset into the floor
+    //  - Metal dragon hovering above the water
+    //  - Chrome sphere opposite the dragon
+    //  - Colored cube on the near rim
+    //  - Backdrop wall behind the pool
+    //  - Three-point studio lighting rig (key / fill / rim).
 
-        auto& dragonRenderable = m_registry->AddComponent<Scene::RenderableComponent>(dragonEntity);
-        dragonRenderable.mesh = dragonMesh;
-        dragonRenderable.textures.albedo    = m_renderer->GetPlaceholderTexture();
-        dragonRenderable.textures.normal    = m_renderer->GetPlaceholderNormal();
-        dragonRenderable.textures.metallic  = m_renderer->GetPlaceholderMetallic();
-        dragonRenderable.textures.roughness = m_renderer->GetPlaceholderRoughness();
-        dragonRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
-        dragonRenderable.metallic    = 1.0f;
-        dragonRenderable.roughness   = 0.22f;
-        dragonRenderable.ao          = 1.0f;
-        dragonRenderable.presetName  = "chrome";
-
-        auto& dragonRotation = m_registry->AddComponent<Scene::RotationComponent>(dragonEntity);
-        dragonRotation.axis  = glm::vec3(0.0f, 1.0f, 0.0f);
-        dragonRotation.speed = 0.3f;
-    }
-
-    // Default focus is the metallic sphere so commands like "make it gold"
-    // have a clear target.
-    SetFocusTarget("MetalSphere");
+    const float poolZ = -3.0f;
 
     // Create a camera
     entt::entity cameraEntity = m_registry->CreateEntity();
     m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
 
     auto& cameraTransform = m_registry->AddComponent<Scene::TransformComponent>(cameraEntity);
-    // Place camera higher and slightly farther back on -Z to look forward
-    // (+Z is forward in our LH system), so the scene starts above the ground
-    // plane instead of hugging the "singularity" at the bottom.
+    // Place camera above and behind the pool, looking toward its center.
     cameraTransform.position = glm::vec3(0.0f, 3.0f, -8.0f);
+    glm::vec3 focus(0.0f, 1.0f, poolZ);
     cameraTransform.rotation = glm::quatLookAt(
-        glm::normalize(glm::vec3(0.0f) - cameraTransform.position),  // Look at origin
+        glm::normalize(focus - cameraTransform.position),
         glm::vec3(0.0f, 1.0f, 0.0f));
 
     auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
     camera.fov = 55.0f;  // Slightly wider FOV for full scene framing
     camera.isActive = true;
 
-    // Add a simple point light above the origin for forward lighting tests
-    entt::entity lightEntity = m_registry->CreateEntity();
-    auto& lightTransform = m_registry->AddComponent<Scene::TransformComponent>(lightEntity);
-    lightTransform.position = glm::vec3(0.0f, 6.0f, -4.0f);
-    auto& lightComp = m_registry->AddComponent<Scene::LightComponent>(lightEntity);
-    lightComp.type = Scene::LightType::Point;
-    lightComp.color = glm::vec3(1.0f, 0.95f, 0.8f);
-    lightComp.intensity = 10.0f;
-    lightComp.range = 15.0f;
-    lightComp.castsShadows = false;
+    // Configure sun / ambient for a clean studio look.
+    if (m_renderer) {
+        m_renderer->SetSunDirection(glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)));
+        m_renderer->SetSunColor(glm::vec3(1.0f));
+        m_renderer->SetSunIntensity(5.0f);
+    }
 
-    spdlog::info("Scene initialized:");
-    spdlog::info("{}", m_registry->DescribeScene());
+    // Initialize the Khronos sample model library so we can spawn the hero
+    // dragon mesh by logical name ("DragonAttenuation"). Failures here should
+    // not abort scene creation; we fall back to primitives if needed.
+    auto sampleLibResult = Utils::InitializeSampleModelLibrary();
+    if (sampleLibResult.IsErr()) {
+        spdlog::warn("SampleModelLibrary initialization failed: {}", sampleLibResult.Error());
+    }
+
+    // Convenience alias for the renderer pointer.
+    Graphics::Renderer* renderer = m_renderer.get();
+
+    // Studio floor: large plane under the pool.
+    auto floorMesh = Utils::MeshGenerator::CreatePlane(20.0f, 20.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(floorMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload floor mesh: {}", uploadResult.Error());
+            floorMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading floor mesh; aborting Dragon studio geometry build for this run.");
+            return;
+        }
+    }
+
+    if (floorMesh && floorMesh->gpuBuffers) {
+        entt::entity floorEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(floorEntity, "StudioFloor");
+        auto& floorXform = m_registry->AddComponent<Scene::TransformComponent>(floorEntity);
+        floorXform.position = glm::vec3(0.0f, 0.0f, poolZ);
+        floorXform.scale = glm::vec3(1.0f);
+
+        auto& floorRenderable = m_registry->AddComponent<Scene::RenderableComponent>(floorEntity);
+        floorRenderable.mesh = floorMesh;
+        floorRenderable.albedoColor = glm::vec4(0.35f, 0.25f, 0.18f, 1.0f);
+        floorRenderable.metallic = 0.0f;
+        floorRenderable.roughness = 0.6f;
+        floorRenderable.ao = 1.0f;
+        floorRenderable.presetName = "wood_floor";
+    } else {
+        spdlog::warn("Studio floor mesh is unavailable; 'StudioFloor' entity will be skipped.");
+    }
+
+    // Pool rim + water share the same underlying plane geometry.
+    auto poolMesh = Utils::MeshGenerator::CreatePlane(10.0f, 10.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(poolMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload pool mesh: {}", uploadResult.Error());
+            poolMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading pool mesh; aborting Dragon studio geometry build for this run.");
+            return;
+        }
+    }
+
+    if (poolMesh && poolMesh->gpuBuffers) {
+        // Pool rim: bright concrete ring around the water.
+        entt::entity rimEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(rimEntity, "PoolRim");
+        auto& rimXform = m_registry->AddComponent<Scene::TransformComponent>(rimEntity);
+        rimXform.position = glm::vec3(0.0f, 0.0f, poolZ);
+        rimXform.scale = glm::vec3(1.0f);
+
+        auto& rimRenderable = m_registry->AddComponent<Scene::RenderableComponent>(rimEntity);
+        rimRenderable.mesh = poolMesh;
+        rimRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+        rimRenderable.metallic = 0.0f;
+        rimRenderable.roughness = 0.8f;
+        rimRenderable.ao = 1.0f;
+        rimRenderable.presetName = "concrete";
+
+        // Water surface slightly below the rim so the edge reads clearly.
+        entt::entity waterEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(waterEntity, "WaterSurface");
+        auto& waterXform = m_registry->AddComponent<Scene::TransformComponent>(waterEntity);
+        waterXform.position = glm::vec3(0.0f, -0.02f, poolZ);
+        waterXform.scale = glm::vec3(1.0f);
+
+        auto& waterRenderable = m_registry->AddComponent<Scene::RenderableComponent>(waterEntity);
+        waterRenderable.mesh = poolMesh;
+        waterRenderable.albedoColor = glm::vec4(0.02f, 0.08f, 0.12f, 0.7f);
+        waterRenderable.metallic = 0.0f;
+        waterRenderable.roughness = 0.08f;
+        waterRenderable.ao = 1.0f;
+        waterRenderable.presetName = "water";
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(waterEntity, Scene::WaterSurfaceComponent{0.0f});
+    } else {
+        spdlog::warn("Pool mesh is unavailable; 'PoolRim' and 'WaterSurface' entities will be skipped.");
+    }
+
+    // Backdrop wall behind the pool to catch shadows and reflections.
+    auto wallMesh = Utils::MeshGenerator::CreatePlane(20.0f, 10.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(wallMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload wall mesh: {}", uploadResult.Error());
+            wallMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading backdrop wall mesh; aborting remaining Dragon studio geometry.");
+            return;
+        }
+    }
+
+    if (wallMesh && wallMesh->gpuBuffers) {
+        entt::entity wallEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(wallEntity, "BackdropWall");
+        auto& wallXform = m_registry->AddComponent<Scene::TransformComponent>(wallEntity);
+        wallXform.position = glm::vec3(0.0f, 5.0f, poolZ + 8.0f);
+        // Rotate plane upright so its normal points roughly toward the camera.
+        wallXform.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+        wallXform.scale = glm::vec3(1.0f);
+
+        auto& wallRenderable = m_registry->AddComponent<Scene::RenderableComponent>(wallEntity);
+        wallRenderable.mesh = wallMesh;
+        wallRenderable.albedoColor = glm::vec4(0.15f, 0.15f, 0.18f, 1.0f);
+        wallRenderable.metallic = 0.0f;
+        wallRenderable.roughness = 0.85f;
+        wallRenderable.ao = 1.0f;
+        wallRenderable.presetName = "backdrop";
+    } else {
+        spdlog::warn("Backdrop wall mesh is unavailable; 'BackdropWall' entity will be skipped.");
+    }
+
+    // Hero dragon mesh over the water.
+    std::shared_ptr<Scene::MeshData> dragonMesh;
+    auto dragonResult = Utils::LoadSampleModelMesh("DragonAttenuation");
+    if (dragonResult.IsOk()) {
+        dragonMesh = dragonResult.Value();
+        if (renderer) {
+            auto uploadResult = renderer->UploadMesh(dragonMesh);
+            if (uploadResult.IsErr()) {
+                spdlog::warn("Failed to upload dragon mesh: {}", uploadResult.Error());
+                dragonMesh.reset();
+            }
+        }
+    } else {
+        spdlog::warn("Failed to load DragonAttenuation sample mesh: {}", dragonResult.Error());
+    }
+
+    if (dragonMesh && dragonMesh->gpuBuffers) {
+        entt::entity dragonEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(dragonEntity, "MetalDragon");
+        auto& dragonXform = m_registry->AddComponent<Scene::TransformComponent>(dragonEntity);
+        dragonXform.position = glm::vec3(1.5f, 1.0f, poolZ);
+        dragonXform.scale = glm::vec3(1.0f);
+
+        auto& dragonRenderable = m_registry->AddComponent<Scene::RenderableComponent>(dragonEntity);
+        dragonRenderable.mesh = dragonMesh;
+        dragonRenderable.albedoColor = glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
+        dragonRenderable.metallic = 1.0f;
+        dragonRenderable.roughness = 0.22f;
+        dragonRenderable.ao = 1.0f;
+        dragonRenderable.presetName = "polished_metal";
+    }
+
+    // Chrome test sphere opposite the dragon.
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.75f, 32);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(sphereMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload sphere mesh: {}", uploadResult.Error());
+            sphereMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading sphere mesh; remaining Dragon studio geometry will be skipped.");
+            return;
+        }
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        entt::entity sphereEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(sphereEntity, "MetalSphere");
+        auto& sphereXform = m_registry->AddComponent<Scene::TransformComponent>(sphereEntity);
+        sphereXform.position = glm::vec3(-1.5f, 1.0f, poolZ);
+        sphereXform.scale = glm::vec3(1.0f);
+
+        auto& sphereRenderable = m_registry->AddComponent<Scene::RenderableComponent>(sphereEntity);
+        sphereRenderable.mesh = sphereMesh;
+        sphereRenderable.albedoColor = glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
+        sphereRenderable.metallic = 1.0f;
+        sphereRenderable.roughness = 0.05f;
+        sphereRenderable.ao = 1.0f;
+        sphereRenderable.presetName = "chrome";
+    } else {
+        spdlog::warn("Sphere mesh is unavailable; 'MetalSphere' entity will be skipped.");
+    }
+
+    // Colored cube on the near rim for GI/reflection contrast.
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(cubeMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload cube mesh: {}", uploadResult.Error());
+            cubeMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading cube mesh; remaining Dragon studio geometry will be skipped.");
+            return;
+        }
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        entt::entity cubeEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(cubeEntity, "ColorCube");
+        auto& cubeXform = m_registry->AddComponent<Scene::TransformComponent>(cubeEntity);
+        cubeXform.position = glm::vec3(0.0f, 0.5f, poolZ - 1.5f);
+        cubeXform.scale = glm::vec3(1.5f, 1.0f, 1.5f);
+
+        auto& cubeRenderable = m_registry->AddComponent<Scene::RenderableComponent>(cubeEntity);
+        cubeRenderable.mesh = cubeMesh;
+        cubeRenderable.albedoColor = glm::vec4(0.5f, 0.1f, 0.8f, 1.0f);
+        cubeRenderable.metallic = 0.0f;
+        cubeRenderable.roughness = 0.4f;
+        cubeRenderable.ao = 1.0f;
+        cubeRenderable.presetName = "painted_plastic";
+    } else {
+        spdlog::warn("Cube mesh is unavailable; 'ColorCube' entity will be skipped.");
+    }
+
+    // Studio lighting rig: warm key, cool rim, and soft fill.
+    auto makeSpotRotation = [](const glm::vec3& dir) {
+        glm::vec3 fwd = glm::normalize(dir);
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        if (std::abs(glm::dot(fwd, up)) > 0.99f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        return glm::quatLookAt(fwd, up);
+    };
+
+    // Key light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "KeyLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(3.0f, 4.0f, poolZ - 1.0f);
+        glm::vec3 dir(-0.6f, -0.8f, 0.7f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(1.0f, 0.95f, 0.85f);
+        // Slightly reduced intensity and a softer outer cone to keep the
+        // floor hotspot under the dragon bright but less extreme, which
+        // makes temporal filtering and motion more stable.
+        l.intensity = 10.0f;
+        l.range = 25.0f;
+        l.innerConeDegrees = 22.0f;
+        l.outerConeDegrees = 40.0f;
+        l.castsShadows = true;
+    }
+
+    // Fill light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "FillLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(-3.0f, 2.0f, poolZ - 0.0f);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Point;
+        l.color = glm::vec3(0.8f, 0.85f, 1.0f);
+        l.intensity = 4.0f;
+        l.range = 20.0f;
+        l.castsShadows = false;
+    }
+
+    // Rim light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RimLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 3.0f, poolZ + 7.0f);
+        glm::vec3 dir(0.0f, -0.5f, -1.0f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(0.9f, 0.9f, 1.0f);
+        l.intensity = 6.0f;
+        l.range = 25.0f;
+        l.innerConeDegrees = 25.0f;
+        l.outerConeDegrees = 42.0f;
+        l.castsShadows = false;
+    }
+
+}
+
+void Engine::InitializeScene() {
+    // Default to the Cornell box with mirrors as the initial scene so RTX
+    // shadows/reflections/GI can be evaluated in a controlled test layout.
+    // Callers can rebuild with the dragon studio preset later via the scene
+    // toggle or LLM commands.
+    m_currentScenePreset = ScenePreset::CornellBox;
+    RebuildScene(m_currentScenePreset);
 }
 
 void Engine::SubmitNaturalLanguageCommand(const std::string& command) {

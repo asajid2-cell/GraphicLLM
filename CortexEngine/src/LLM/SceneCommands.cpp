@@ -247,8 +247,17 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                                lowered == "leaf" || lowered == "wing") {
                         cmd->entityType = AddEntityCommand::EntityType::Plane;
                         recognizedPrimitive = true;
+                    } else if (lowered == "quad" || lowered == "billboard") {
+                        cmd->entityType = AddEntityCommand::EntityType::Quad;
+                        recognizedPrimitive = true;
                     } else if (lowered == "cylinder" || lowered == "capsule" || lowered == "pillar") {
                         cmd->entityType = AddEntityCommand::EntityType::Cylinder;
+                        recognizedPrimitive = true;
+                    } else if (lowered == "disk" || lowered == "circle") {
+                        cmd->entityType = AddEntityCommand::EntityType::Disk;
+                        recognizedPrimitive = true;
+                    } else if (lowered == "line" || lowered == "segment") {
+                        cmd->entityType = AddEntityCommand::EntityType::Line;
                         recognizedPrimitive = true;
                     } else if (lowered == "pyramid" || lowered == "wedge") {
                         cmd->entityType = AddEntityCommand::EntityType::Pyramid;
@@ -729,6 +738,29 @@ std::vector<std::shared_ptr<SceneCommand>> CommandParser::ParseJSON(const std::s
                     cmd->setSunIntensity = true;
                     float v = ReadNumber(cmdJson["sun_intensity"], "sun_intensity", cmd->sunIntensity);
                     cmd->sunIntensity = std::max(v, 0.0f);
+                }
+                if (cmdJson.contains("water_level")) {
+                    cmd->setWaterLevel = true;
+                    cmd->waterLevel = ReadNumber(cmdJson["water_level"], "water_level", cmd->waterLevel);
+                }
+                if (cmdJson.contains("water_wave_amplitude")) {
+                    cmd->setWaterWaveAmplitude = true;
+                    float v = ReadNumber(cmdJson["water_wave_amplitude"], "water_wave_amplitude", cmd->waterWaveAmplitude);
+                    cmd->waterWaveAmplitude = std::max(v, 0.0f);
+                }
+                if (cmdJson.contains("water_wave_length")) {
+                    cmd->setWaterWaveLength = true;
+                    float v = ReadNumber(cmdJson["water_wave_length"], "water_wave_length", cmd->waterWaveLength);
+                    cmd->waterWaveLength = std::max(v, 0.1f);
+                }
+                if (cmdJson.contains("water_wave_speed")) {
+                    cmd->setWaterWaveSpeed = true;
+                    cmd->waterWaveSpeed = ReadNumber(cmdJson["water_wave_speed"], "water_wave_speed", cmd->waterWaveSpeed);
+                }
+                if (cmdJson.contains("water_secondary_amplitude")) {
+                    cmd->setWaterSecondaryAmplitude = true;
+                    float v = ReadNumber(cmdJson["water_secondary_amplitude"], "water_secondary_amplitude", cmd->waterSecondaryAmplitude);
+                    cmd->waterSecondaryAmplitude = std::max(v, 0.0f);
                 }
                 if (cmdJson.contains("ssao_enabled") && cmdJson["ssao_enabled"].is_boolean()) {
                     cmd->setSSAOEnabled = true;

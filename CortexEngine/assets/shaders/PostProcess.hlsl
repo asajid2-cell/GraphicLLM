@@ -29,14 +29,12 @@ cbuffer FrameConstants : register(b1)
     float4   g_CascadeSplits;
     // x = depth bias, y = PCF radius in texels, z = shadows enabled (>0.5), w = PCSS enabled (>0.5)
     float4   g_ShadowParams;
-    // x = debug view mode (0 = shaded, 1 = normals, 2 = roughness, 3 = metallic,
-    //                      4 = albedo, 5 = cascade index, 6 = debug screen,
-    //                      7 = fractal height, 8 = IBL diffuse only,
-    //                      9 = IBL specular only, 10 = env direction/UV,
-    //                      11 = Fresnel (Fibl), 12 = specular mip,
-    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
+    // x = debug view mode (matches ShaderTypes.h / Basic.hlsl; see comments there),
+    //     w = RT history valid (>0.5), y/z reserved
     float4   g_DebugMode;
-    // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5), w reserved
+    // x = 1 / screenWidth, y = 1 / screenHeight,
+    // z = FXAA enabled (>0.5),
+    // w = RT sun shadows enabled (>0.5)
     float4   g_PostParams;
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 2 = night)
@@ -47,12 +45,17 @@ cbuffer FrameConstants : register(b1)
     float4   g_FogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
-    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved
+    // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
+    // w = SSR enabled (>0.5) for the post-process debug overlay
     float4   g_BloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     float4   g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
     float4x4 g_PrevViewProjMatrix;
     float4x4 g_InvViewProjMatrix;
+    float4   g_WaterParams0;
+    float4   g_WaterParams1;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -63,10 +66,371 @@ Texture2D g_Depth : register(t4);
 Texture2D g_NormalRoughness : register(t5);
 Texture2D g_SSRColor : register(t6);
 Texture2D g_Velocity : register(t7);
+// Optional RT reflection color buffer written by the DXR reflections pipeline.
+// Used for hybrid SSR/RT reflections when ray tracing is enabled and the
+// reflection pipeline is available, plus a simple history buffer for temporal
+// accumulation/denoising.
+Texture2D g_RTReflection : register(t8);
+Texture2D g_RTReflectionHistory : register(t9);
 // Shadow map array is accessed via a separate descriptor table (space1) so
 // that t0-t5 in space0 can be used for post-process textures without aliasing.
 Texture2DArray g_ShadowMap : register(t0, space1);
 SamplerState g_Sampler : register(s0);
+
+// -----------------------------------------------------------------------------
+// Minimal 3x5 pixel font for GPU-drawn labels in the settings overlay.
+// Each glyph row encodes three bits (left..right) in the low bits of a uint.
+// -----------------------------------------------------------------------------
+static const uint GLYPH_A[5] = { 2, 5, 7, 5, 5 };
+static const uint GLYPH_B[5] = { 6, 5, 6, 5, 6 };
+static const uint GLYPH_C[5] = { 3, 4, 4, 4, 3 };
+static const uint GLYPH_D[5] = { 6, 5, 5, 5, 6 };
+static const uint GLYPH_E[5] = { 7, 4, 7, 4, 7 };
+static const uint GLYPH_F[5] = { 7, 4, 7, 4, 4 };
+static const uint GLYPH_G[5] = { 3, 4, 5, 5, 3 };
+static const uint GLYPH_H[5] = { 5, 5, 7, 5, 5 };
+static const uint GLYPH_I[5] = { 7, 2, 2, 2, 7 };
+static const uint GLYPH_L[5] = { 4, 4, 4, 4, 7 };
+static const uint GLYPH_M[5] = { 5, 7, 5, 5, 5 };
+static const uint GLYPH_O[5] = { 7, 5, 5, 5, 7 };
+static const uint GLYPH_P[5] = { 7, 5, 7, 4, 4 };
+static const uint GLYPH_R[5] = { 7, 5, 7, 5, 5 };
+static const uint GLYPH_S[5] = { 3, 4, 3, 1, 6 };
+static const uint GLYPH_T[5] = { 7, 2, 2, 2, 2 };
+static const uint GLYPH_X[5] = { 5, 5, 2, 5, 5 };
+
+// Digits 0-9 (used for row indices).
+static const uint GLYPH_0[5] = { 7, 5, 5, 5, 7 };
+static const uint GLYPH_1[5] = { 2, 6, 2, 2, 7 };
+static const uint GLYPH_2[5] = { 7, 1, 7, 4, 7 };
+static const uint GLYPH_3[5] = { 7, 1, 7, 1, 7 };
+static const uint GLYPH_4[5] = { 5, 5, 7, 1, 1 };
+static const uint GLYPH_5[5] = { 7, 4, 7, 1, 7 };
+static const uint GLYPH_6[5] = { 7, 4, 7, 5, 7 };
+static const uint GLYPH_7[5] = { 7, 1, 2, 2, 2 };
+static const uint GLYPH_8[5] = { 7, 5, 7, 5, 7 };
+static const uint GLYPH_9[5] = { 7, 5, 7, 1, 7 };
+
+// Simple enumeration for the glyph ids we use.
+static const int GL_A = 0;
+static const int GL_B = 1;
+static const int GL_C = 2;
+static const int GL_D = 3;
+static const int GL_E_ = 4;
+static const int GL_F_ = 5;
+static const int GL_G_ = 6;
+static const int GL_H_ = 7;
+static const int GL_I_ = 8;
+static const int GL_L_ = 9;
+static const int GL_M_ = 10;
+static const int GL_O_ = 11;
+static const int GL_P_ = 12;
+static const int GL_R_ = 13;
+static const int GL_S_ = 14;
+static const int GL_T_ = 15;
+static const int GL_X_ = 16;
+static const int GL_0_ = 17;
+static const int GL_1_ = 18;
+static const int GL_2_ = 19;
+static const int GL_3_ = 20;
+static const int GL_4_ = 21;
+static const int GL_5_ = 22;
+static const int GL_6_ = 23;
+static const int GL_7_ = 24;
+static const int GL_8_ = 25;
+static const int GL_9_ = 26;
+
+int DigitToGlyph(int d)
+{
+    d = clamp(d, 0, 9);
+    switch (d)
+    {
+        case 0: return GL_0_;
+        case 1: return GL_1_;
+        case 2: return GL_2_;
+        case 3: return GL_3_;
+        case 4: return GL_4_;
+        case 5: return GL_5_;
+        case 6: return GL_6_;
+        case 7: return GL_7_;
+        case 8: return GL_8_;
+        case 9: return GL_9_;
+        default: return GL_0_;
+    }
+}
+
+uint GetGlyphRowBits(int glyphId, int row)
+{
+    row = clamp(row, 0, 4);
+    switch (glyphId)
+    {
+        case GL_A:  return GLYPH_A[row];
+        case GL_B:  return GLYPH_B[row];
+        case GL_C:  return GLYPH_C[row];
+        case GL_D:  return GLYPH_D[row];
+        case GL_E_: return GLYPH_E[row];
+        case GL_F_: return GLYPH_F[row];
+        case GL_G_: return GLYPH_G[row];
+        case GL_H_: return GLYPH_H[row];
+        case GL_I_: return GLYPH_I[row];
+        case GL_L_: return GLYPH_L[row];
+        case GL_M_: return GLYPH_M[row];
+        case GL_O_: return GLYPH_O[row];
+        case GL_P_: return GLYPH_P[row];
+        case GL_R_: return GLYPH_R[row];
+        case GL_S_: return GLYPH_S[row];
+        case GL_T_: return GLYPH_T[row];
+        case GL_X_: return GLYPH_X[row];
+        case GL_0_: return GLYPH_0[row];
+        case GL_1_: return GLYPH_1[row];
+        case GL_2_: return GLYPH_2[row];
+        case GL_3_: return GLYPH_3[row];
+        case GL_4_: return GLYPH_4[row];
+        case GL_5_: return GLYPH_5[row];
+        case GL_6_: return GLYPH_6[row];
+        case GL_7_: return GLYPH_7[row];
+        case GL_8_: return GLYPH_8[row];
+        case GL_9_: return GLYPH_9[row];
+        default:    return 0;
+    }
+}
+
+// Sample a single glyph in a [origin, origin+size] box in screen UV space.
+float SampleGlyph(int glyphId, float2 uv, float2 origin, float2 size)
+{
+    float2 local = (uv - origin) / size;
+    if (local.x < 0.0f || local.x >= 1.0f || local.y < 0.0f || local.y >= 1.0f)
+    {
+        return 0.0f;
+    }
+
+    const float gw = 3.0f;
+    const float gh = 5.0f;
+
+    float2 cell = float2(local.x * gw, (1.0f - local.y) * gh);
+    int ix = (int)cell.x;
+    int iy = (int)cell.y;
+
+    if (ix < 0 || ix > 2 || iy < 0 || iy > 4)
+    {
+        return 0.0f;
+    }
+
+    uint rowBits = GetGlyphRowBits(glyphId, iy);
+    uint mask = 1u << (2 - ix); // bit 2 = leftmost
+    return (rowBits & mask) != 0 ? 1.0f : 0.0f;
+}
+
+// Render a compact row label into the overlay panel. To keep things easily
+// readable with a very small 3x5 bitmap font, we draw a single strong
+// letter per row (E,B,S,F,...) rather than trying to form full words. The
+// HUD legend still shows the full text for each row.
+float RenderRowLabel(int rowIndex, float2 uv, float2 origin, float2 size)
+{
+    int glyphId = -1;
+    switch (rowIndex)
+    {
+        case 0: // Exposure
+            glyphId = GL_E_;
+            break;
+        case 1: // Bloom
+            glyphId = GL_B;
+            break;
+        case 2: // Shadows
+            glyphId = GL_S_;
+            break;
+        case 3: // PCSS
+            glyphId = GL_P_;
+            break;
+        case 4: // Bias
+            glyphId = GL_B;
+            break;
+        case 5: // PCF radius
+            glyphId = GL_P_;
+            break;
+        case 6: // Lambda
+            glyphId = GL_L_;
+            break;
+        case 7: // FXAA
+            glyphId = GL_F_;
+            break;
+        case 8: // TAA
+            glyphId = GL_T_;
+            break;
+        case 9: // SSR
+            glyphId = GL_S_;
+            break;
+        case 10: // SSAO
+            glyphId = GL_A;
+            break;
+        case 11: // IBL
+            glyphId = GL_I_;
+            break;
+        case 12: // Fog
+            glyphId = GL_F_;
+            break;
+        case 13: // Speed
+            glyphId = GL_S_;
+            break;
+        case 14: // RTX / RT
+            glyphId = GL_R_;
+            break;
+        default:
+            glyphId = DigitToGlyph(rowIndex % 10);
+            break;
+    }
+
+    if (glyphId < 0)
+    {
+        return 0.0f;
+    }
+
+    // Center the single glyph inside the label rect.
+    float2 glyphSize = size * float2(0.6f, 0.8f);
+    float2 glyphOrigin = origin + 0.5f * (size - glyphSize);
+    return SampleGlyph(glyphId, uv, glyphOrigin, glyphSize);
+}
+
+// -----------------------------------------------------------------------------
+// SDF / CSG debug raymarcher
+// -----------------------------------------------------------------------------
+
+float sdSphere(float3 p, float r)
+{
+    return length(p) - r;
+}
+
+float sdBox(float3 p, float3 b)
+{
+    float3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float sdTorus(float3 p, float2 t)
+{
+    float2 q = float2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+}
+
+float opUnion(float d1, float d2)
+{
+    return min(d1, d2);
+}
+
+float opIntersection(float d1, float d2)
+{
+    return max(d1, d2);
+}
+
+float opSubtraction(float d1, float d2)
+{
+    return max(d1, -d2);
+}
+
+float mapSDF(float3 p)
+{
+    // Three simple primitives combined with CSG for debugging:
+    //  - Sphere at origin
+    //  - Box shifted to the right
+    //  - Torus above the sphere, subtracted out
+    float dSphere = sdSphere(p, 0.8f);
+    float dBox    = sdBox(p - float3(1.2f, 0.0f, 0.0f), float3(0.6f, 0.6f, 0.6f));
+    float dTorus  = sdTorus(p - float3(0.0f, 1.0f, 0.0f), float2(0.8f, 0.25f));
+
+    float dUnion = opUnion(dSphere, dBox);
+    float dCSG   = opSubtraction(dUnion, dTorus);
+    return dCSG;
+}
+
+float3 normalSDF(float3 p)
+{
+    const float eps = 0.001f;
+    float3 e = float3(1.0f, -1.0f, 0.0f) * eps;
+    float nx = mapSDF(p + e.xyy) - mapSDF(p - e.xyy);
+    float ny = mapSDF(p + e.yyx) - mapSDF(p - e.yyx);
+    float nz = mapSDF(p + e.yxy) - mapSDF(p - e.yxy);
+    return normalize(float3(nx, ny, nz));
+}
+
+float3 RenderSDFScene(float2 uv)
+{
+    // Reconstruct a simple camera ray from the inverse view-projection
+    // matrix and the current pixel UV. We interpret the depth range as
+    // [0,1] and pick two clip-space points along the ray.
+    float2 ndc = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
+
+    float4 clipNear = float4(ndc, 0.0f, 1.0f);
+    float4 clipFar  = float4(ndc, 1.0f, 1.0f);
+
+    float4 worldNearH = mul(g_InvViewProjMatrix, clipNear);
+    float4 worldFarH  = mul(g_InvViewProjMatrix, clipFar);
+
+    float3 worldNear = worldNearH.xyz / worldNearH.w;
+    float3 worldFar  = worldFarH.xyz / worldFarH.w;
+
+    float3 ro = worldNear;
+    float3 rd = normalize(worldFar - worldNear);
+
+    // Raymarch
+    const int   MAX_STEPS = 96;
+    const float MAX_DIST  = 30.0f;
+    const float SURF_EPS  = 0.0015f;
+
+    float t = 0.0f;
+    float dist = 0.0f;
+    bool hit = false;
+
+    [loop]
+    for (int i = 0; i < MAX_STEPS; ++i)
+    {
+        float3 p = ro + rd * t;
+        dist = mapSDF(p);
+        if (dist < SURF_EPS)
+        {
+            hit = true;
+            break;
+        }
+        t += dist;
+        if (t > MAX_DIST)
+        {
+            break;
+        }
+    }
+
+    if (!hit)
+    {
+        // Simple background: fade to dark based on view direction.
+        float sky = saturate(0.5f + 0.5f * rd.y);
+        return lerp(float3(0.02f, 0.02f, 0.04f), float3(0.2f, 0.25f, 0.35f), sky);
+    }
+
+    float3 pHit = ro + rd * t;
+    float3 nHit = normalSDF(pHit);
+
+    // Simple lighting: one white key light + ambient.
+    float3 lightDir = normalize(-g_Lights[0].direction_cosInner.xyz);
+    float3 lightColor = (g_LightCount.x > 0) ? g_Lights[0].color_range.rgb : float3(4.0f, 4.0f, 4.0f);
+
+    float NdotL = saturate(dot(nHit, lightDir));
+    float NdotV = saturate(dot(nHit, -rd));
+
+    float3 albedo = float3(0.7f, 0.75f, 0.9f);
+
+    // Basic Lambert + specular
+    float3 diffuse = albedo * NdotL;
+
+    float3 halfDir = normalize(lightDir - rd);
+    float NdotH = saturate(dot(nHit, halfDir));
+    float spec = pow(NdotH, 64.0f) * NdotL;
+
+    float3 color = diffuse * lightColor * 0.5f + spec * lightColor;
+
+    // Cheap rim light for readability
+    float rim = pow(1.0f - NdotV, 2.0f);
+    color += rim * float3(0.3f, 0.4f, 0.6f);
+
+    return color;
+}
 
 struct VSOutput
 {
@@ -171,33 +535,395 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     return world.xyz / max(world.w, 1e-4f);
 }
 
+// ----------------------------------------------------------------------------
+// HDR TAA resolve pass
+// ----------------------------------------------------------------------------
+float4 TAAResolvePS(VSOutput input) : SV_TARGET
+{
+    float2 uv = input.uv;
+    float3 curr = g_SceneColor.Sample(g_Sampler, uv).rgb;
+
+    uint  debugView      = (uint)g_DebugMode.x;
+    bool  isRtDebugView  = (debugView >= 18u && debugView <= 24u);
+    bool  historyValid   = (g_TAAParams.w > 0.5f);
+    float taaBlendBase   = (historyValid && !isRtDebugView) ? g_TAAParams.z : 0.0f;
+
+    // No valid history yet or TAA disabled: pass through.
+    if (taaBlendBase <= 0.0f)
+    {
+        if (debugView == 25u)
+        {
+            return float4(0.0f, 0.0f, 0.0f, 1.0f);
+        }
+        return float4(curr, 1.0f);
+    }
+
+    float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
+    float  speed = length(vel);
+
+    // Disable TAA for very fast motion to avoid long streaks.
+    if (speed >= 0.5f)
+    {
+        if (debugView == 25u)
+        {
+            return float4(0.0f, 0.0f, 0.0f, 1.0f);
+        }
+        return float4(curr, 1.0f);
+    }
+
+    // Center depth/normal for surface-aware neighbourhood selection.
+    float  centerDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+    float4 centerNR    = g_NormalRoughness.SampleLevel(g_Sampler, uv, 0);
+    float3 centerNormal = normalize(centerNR.xyz * 2.0f - 1.0f);
+    float  surfaceRoughness = centerNR.w;
+
+    // Keep the depth window very tight so silhouettes do not mix surfaces,
+    // with a small relaxation in the far distance to account for depth-buffer
+    // precision. A separate edge factor derived from depth variance further
+    // suppresses history exactly at discontinuities.
+    float depthThreshold = max(0.0008f, centerDepth * 0.0025f);
+    const float normalThreshold = 0.9f; // ~25 degrees
+
+    float3 cMin = curr;
+    float3 cMax = curr;
+    bool   anyNeighborAccepted = false;
+    float2 texel = g_PostParams.xy;
+    float  maxDepthDelta = 0.0f;
+
+    // For a simple reactive mask we also track local luminance statistics
+    // for accepted neighbours so we can identify very bright specular
+    // highlights that diverge strongly from their surroundings.
+    float  neighbourLumSum   = 0.0f;
+    float  neighbourLumCount = 0.0f;
+    const float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+
+    // Neighborhood clamp: build a min/max envelope around the current pixel,
+    // but only from samples that are likely to belong to the same surface
+    // (similar depth and normal). This prevents history from borrowing colors
+    // across silhouettes or between the dragon and the floor.
+    [unroll]
+    for (int ny = -1; ny <= 1; ++ny)
+    {
+        [unroll]
+        for (int nx = -1; nx <= 1; ++nx)
+        {
+            float2 offset   = float2(nx, ny) * texel;
+            float2 sampleUV = saturate(uv + offset);
+
+            float  sampleDepth = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
+            float4 sampleNR    = g_NormalRoughness.SampleLevel(g_Sampler, sampleUV, 0);
+            float3 sampleNormal = normalize(sampleNR.xyz * 2.0f - 1.0f);
+
+            float depthDelta = abs(sampleDepth - centerDepth);
+            maxDepthDelta = max(maxDepthDelta, depthDelta);
+            bool depthOk  = (depthDelta < depthThreshold);
+            bool normalOk = (dot(sampleNormal, centerNormal) > normalThreshold);
+
+            if (depthOk && normalOk)
+            {
+                float3 cN = g_SceneColor.Sample(g_Sampler, sampleUV).rgb;
+                cMin = min(cMin, cN);
+                cMax = max(cMax, cN);
+                anyNeighborAccepted = true;
+
+                float lumN = dot(cN, lumaWeights);
+                neighbourLumSum   += lumN;
+                neighbourLumCount += 1.0f;
+            }
+        }
+    }
+
+    // If no neighbour passed the surface test, treat this pixel as a
+    // disocclusion: the envelope collapses to the current color and history
+    // cannot pull us away from it.
+    if (!anyNeighborAccepted)
+    {
+        cMin = curr;
+        cMax = curr;
+    }
+
+    float2 historyUV = saturate(uv + vel);
+    float3 history   = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
+    float3 historyClamped = clamp(history, cMin, cMax);
+    float3 currClamped    = clamp(curr,    cMin, cMax);
+
+    // Conservative history blending using three regimes per pixel:
+    //   - Static: low speed, small color delta -> strong history.
+    //   - Transitional: moderate motion or delta -> modest history.
+    //   - Dynamic / disoccluded: large motion or delta -> history disabled.
+    float3 diff = abs(currClamped - historyClamped);
+    float  maxDiff = max(max(diff.r, diff.g), diff.b);
+
+    // Roughness gating: shiny surfaces get less history in all regimes so
+    // fast-moving specular highlights do not leave long trails.
+    float roughFactor = saturate(surfaceRoughness * 0.6f + 0.2f);
+
+    float finalBlend = 0.0f;
+
+    // Static: essentially locked pixels.
+    if (speed < 0.03f && maxDiff < 0.03f)
+    {
+        finalBlend = taaBlendBase;
+    }
+    // Transitional: small motion or moderate color changes.
+    else if (speed < 0.25f && maxDiff < 0.20f)
+    {
+        finalBlend = taaBlendBase * 0.45f;
+    }
+    // High-frequency but still somewhat stable (e.g., glossy highlights):
+    else if (speed < 0.35f && maxDiff < 0.35f)
+    {
+        finalBlend = taaBlendBase * 0.35f;
+    }
+    // Otherwise treat as dynamic / disoccluded and rely on the current
+    // frame only; history stays in the clamp range but does not influence
+    // the final color this frame.
+
+    // At hard geometric edges (large depth variance in the 3x3 stencil) we
+    // aggressively suppress history so silhouettes remain crisp instead of
+    // blending foreground and background together.
+    float edgeDepthMin = 0.0015f;
+    float edgeDepthMax = 0.01f;
+    float edgeFactor = saturate((maxDepthDelta - edgeDepthMin) / (edgeDepthMax - edgeDepthMin));
+
+    // Hard disocclusion cutoff: for very large depth steps treat the pixel
+    // as newly exposed and rely entirely on the current frame.
+    if (maxDepthDelta > edgeDepthMax)
+    {
+        edgeFactor = 1.0f;
+    }
+
+    // Reactive mask: when a pixel is both much brighter than its local
+    // neighbourhood and significantly different from history, and also
+    // relatively glossy, we treat it as a highly dynamic specular feature
+    // and clamp history very aggressively. This is particularly important
+    // for the bright highlights on the dragon and floor.
+    float currLum = dot(currClamped, lumaWeights);
+    float avgNeighbourLum = (neighbourLumCount > 0.0f)
+        ? (neighbourLumSum / neighbourLumCount)
+        : currLum;
+
+    float lumDeltaLocal  = max(currLum - avgNeighbourLum, 0.0f);
+    float reactiveLocal  = saturate(lumDeltaLocal * 4.0f);
+
+    float histLum        = dot(historyClamped, lumaWeights);
+    float lumDeltaHist   = abs(currLum - histLum);
+    float reactiveHist   = saturate(lumDeltaHist * 2.0f);
+
+    float specFactor     = saturate(1.0f - surfaceRoughness);
+    float reactiveMask   = saturate(max(reactiveLocal, reactiveHist) * specFactor);
+
+    finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
+
+    // Clamp maximum history contribution per frame so that large objects do
+    // not accumulate very long tails of stale information. This trades more
+    // local blur for much shorter-lived ghosting, which is generally a
+    // better compromise for the dragon and floor highlights.
+    finalBlend = min(finalBlend, 0.25f);
+
+    finalBlend = saturate(finalBlend);
+
+    float3 result = lerp(currClamped, historyClamped, finalBlend);
+
+    if (debugView == 25u)
+    {
+        // TAA debug: visualize how much history is blended into the final
+        // color. Bright pixels have strong temporal accumulation; dark
+        // pixels lean towards the current frame.
+        return float4(finalBlend.xxx, 1.0f);
+    }
+
+    return float4(result, 1.0f);
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
-    float3 hdrColor = g_SceneColor.Sample(g_Sampler, uv).rgb;
 
-    // Screen-space reflection composite: SSR buffer stores reflection color in
-    // rgb and a roughness-based weight in alpha. Apply it in HDR space so
-    // reflections participate in bloom and tonemapping.
-    float4 ssrSample = g_SSRColor.Sample(g_Sampler, uv);
-    float ssrWeight = saturate(ssrSample.a);
-    if (ssrWeight > 0.0f)
+    // SDF / CSG debug view renders a raymarched implicit scene instead of the
+    // normal post-process chain so that SDF primitives can be inspected in
+    // isolation using the current camera and light state.
+    uint debugViewNow = (uint)g_DebugMode.x;
+    if (debugViewNow == 24u)
     {
-        // Clamp extremely bright SSR highlights to avoid harsh color pops when
-        // the ray marches across very hot pixels in the environment or scene.
-        float3 ssrColor = ssrSample.rgb;
-        float  ssrMax   = max(max(ssrColor.r, ssrColor.g), ssrColor.b);
-        const float kMaxSSRIntensity = 32.0f;
-        if (ssrMax > kMaxSSRIntensity)
+        float3 sdfColor = RenderSDFScene(uv);
+        return float4(sdfColor, 1.0f);
+    }
+
+    // Base scene color + alpha as written by the main PBR pass. For opaque
+    // materials alpha is 1; glass / water / other transparent materials use
+    // alpha < 1 and are treated as thin transmissive surfaces in this pass.
+    float4 sceneSample = g_SceneColor.Sample(g_Sampler, uv);
+    float3 hdrColor = sceneSample.rgb;
+    float  opacity = sceneSample.a;
+
+    // G-buffer normal and roughness for the current pixel, shared between
+    // refraction and reflection logic. The normal is encoded as 0..1 and
+    // unpacked back to -1..1 here.
+    float4 nrSample = g_NormalRoughness.Sample(g_Sampler, uv);
+    float3 gbufNormal = normalize(nrSample.xyz * 2.0f - 1.0f);
+    float  roughness = nrSample.w;
+
+    // Screen-space refraction for thin transparent materials (glass, water).
+    // We approximate refraction as a small UV offset in the scene color
+    // buffer driven by the surface normal and opacity. This is not physically
+    // exact but gives a convincing "bent background" look for glass bricks
+    // and water without requiring a separate depth/scene-color prepass.
+    if (opacity < 0.99f)
+    {
+        float3 N = gbufNormal;
+        float2 dir = N.xy;
+        float  lenDir = max(length(dir), 1e-3f);
+        dir /= lenDir;
+
+        // Stronger distortion for thinner / more transparent surfaces and
+        // for glossier materials; very rough transparent objects behave more
+        // like frosted glass so the refraction offset is smaller.
+        float gloss = saturate(1.0f - roughness);
+        float transparency = saturate(1.0f - opacity);
+
+        // Base strength in "pixels" at the current resolution. Values are
+        // deliberately modest so the effect reads without becoming noisy.
+        const float kBaseRefractPixels = 6.0f;
+        float refractPixels = kBaseRefractPixels * gloss * transparency;
+
+        float2 texel = g_PostParams.xy; // 1 / width, 1 / height
+        float2 offset = dir * refractPixels * texel;
+        float2 refractUV = saturate(uv + offset);
+
+        float3 refracted = g_SceneColor.Sample(g_Sampler, refractUV).rgb;
+
+        // Blend refraction with the original shaded color so local lighting
+        // (specular highlights on glass, etc.) is preserved while the
+        // background appears distorted through the surface.
+        float refractionWeight = lerp(0.35f, 0.75f, transparency);
+        hdrColor = lerp(hdrColor, refracted, refractionWeight);
+    }
+
+    // Screen-space + RT reflection composite. The SSR buffer stores reflection
+    // color in rgb and a confidence/coverage term in alpha; the optional RT
+    // reflection buffer provides a fallback for regions where SSR is unreliable
+    // (off-screen or failed rays). Both are applied in HDR space so they
+    // participate in bloom and tonemapping.
+    float4 ssrSample   = g_SSRColor.Sample(g_Sampler, uv);
+    float  ssrWeightRaw = saturate(ssrSample.a);
+
+    // Clamp extremely bright SSR highlights to avoid harsh color pops when
+    // the ray marches across very hot pixels in the environment or scene.
+    float3 ssrColor = ssrSample.rgb;
+    float  ssrMax   = max(max(ssrColor.r, ssrColor.g), ssrColor.b);
+    const float kMaxSSRIntensity = 32.0f;
+    if (ssrMax > kMaxSSRIntensity)
+    {
+        ssrColor *= (kMaxSSRIntensity / ssrMax);
+    }
+
+    // Base reflection strength from roughness (shared by SSR and RT). This
+    // roughly tracks the specular lobe so glossy surfaces get stronger
+    // reflections while rough surfaces stay diffuse/IBL dominated.
+    float gloss = saturate(1.0f - roughness);
+    gloss *= gloss;
+
+    // Scale SSR coverage into a soft weight; keep some headroom so the
+    // underlying BRDF/IBL specular term can still contribute. Only allow
+    // SSR to contribute on genuinely glossy surfaces with reasonably high
+    // ray confidence to avoid large, low-frequency reflection overlays on
+    // mid-roughness walls and floors.
+    const float kMaxSSRWeight = 0.6f;
+    float  wSSR = 0.0f;
+    if (roughness < 0.35f && ssrWeightRaw > 0.4f)
+    {
+        float ssrConf = ssrWeightRaw * ssrWeightRaw;
+        wSSR = ssrConf * kMaxSSRWeight * gloss;
+    }
+
+    // Optional RT reflection buffer: when RT is enabled (postParams.w > 0.5)
+    // we blend between SSR (near-field, high-confidence) and RT (fallback for
+    // low-SSR-confidence regions). Debug view 23 forces RT reflections off so
+    // that SSR-only behaviour can be inspected without recompiling.
+    float3 rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
+    bool   rtEnabled = (g_PostParams.w > 0.5f && (uint)g_DebugMode.x != 23u);
+
+    if (rtEnabled)
+    {
+        // Clamp extreme RT reflection intensity so very hot env texels do not
+        // overpower the underlying BRDF/IBL term.
+        const float kMaxRTIntensity = 32.0f;
+        float rtMax = max(max(rtRefl.r, rtRefl.g), rtRefl.b);
+        if (rtMax > kMaxRTIntensity)
         {
-            ssrColor *= (kMaxSSRIntensity / ssrMax);
+            rtRefl *= (kMaxRTIntensity / rtMax);
         }
 
-        // Moderately limit SSR contribution so we blend towards reflections
-        // without fully replacing the underlying specular/IBL term.
-        const float kMaxSSRWeight = 0.4f;
-        float  w = ssrWeight * kMaxSSRWeight;
-        hdrColor = lerp(hdrColor, ssrColor, w);
+        // Small 5-tap cross filter in screen space over the RT reflection
+        // buffer to reduce aliasing/fizzing from single-sample DXR. This is
+        // followed by a simple temporal accumulation against a history
+        // buffer when RT history has been populated on the CPU side.
+        float2 texel = g_PostParams.xy;
+        float3 accum = rtRefl;
+        float  total = 1.0f;
+
+        float2 offsets[4] = {
+            float2( texel.x,  0.0f),
+            float2(-texel.x,  0.0f),
+            float2( 0.0f,     texel.y),
+            float2( 0.0f,    -texel.y)
+        };
+
+        [unroll]
+        for (int i = 0; i < 4; ++i)
+        {
+            float2 sampleUV = saturate(uv + offsets[i]);
+            float3 sampleRT = g_RTReflection.Sample(g_Sampler, sampleUV).rgb;
+            accum += sampleRT;
+            total += 1.0f;
+        }
+
+        rtRefl = accum / max(total, 1e-4f);
+
+        // Temporal accumulation using a simple history buffer updated once
+        // per frame from the CPU. Only blend against history once the
+        // renderer has flagged RT history as valid (g_DebugMode.w > 0.5).
+        if (g_DebugMode.w > 0.5f)
+        {
+            float3 rtHist = g_RTReflectionHistory.Sample(g_Sampler, uv).rgb;
+            float3 diff = abs(rtRefl - rtHist);
+            float maxDiffHist = max(max(diff.r, diff.g), diff.b);
+            float historyWeight = lerp(0.7f, 0.05f, saturate(maxDiffHist * 4.0f));
+            rtRefl = lerp(rtRefl, rtHist, historyWeight);
+        }
+    }
+
+    // Prefer SSR whenever it is confident; let RT take over only when SSR
+    // confidence is low so the total reflection energy stays stable and the
+    // two lobes do not "fight" each other.
+    float  rawRTWeight = 1.0f - ssrWeightRaw;
+    rawRTWeight *= rawRTWeight;
+    float  wRT = rtEnabled ? rawRTWeight * gloss : 0.0f;
+
+    float  weightSum = wSSR + wRT;
+    if (weightSum > 1e-4f)
+    {
+        float invSum = 1.0f / weightSum;
+        float3 reflHybrid = (ssrColor * wSSR + rtRefl * wRT) * invSum;
+
+        // Detect water pixels approximately by comparing reconstructed
+        // world-space height to the global water level. This lets us boost
+        // reflection strength on water surfaces without introducing a full
+        // material ID system.
+        float depth = g_Depth.Sample(g_Sampler, uv).r;
+        float3 worldPos = ReconstructWorldPosition(uv, depth);
+        float waterLevelY = g_WaterParams0.w;
+        bool isWaterPixel = abs(worldPos.y - waterLevelY) < 0.3f;
+
+        const float maxReflBlendNonWater = 0.3f;
+        const float maxReflBlendWater    = 0.75f;
+        float maxReflBlend = isWaterPixel ? maxReflBlendWater : maxReflBlendNonWater;
+
+        // Final lerp factor: surface gloss and total reflection weight gate
+        // how strongly we move towards the hybrid reflection color.
+        float reflBlend = maxReflBlend * saturate(weightSum);
+        hdrColor = lerp(hdrColor, reflHybrid, reflBlend);
     }
 
     // Bloom: sample blurred bloom texture if available
@@ -289,6 +1015,31 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
             float3 fogColor = g_AmbientColor.rgb;
             hdrBlurred = lerp(hdrBlurred, fogColor, fog);
+        }
+    }
+
+    // Underwater grading: when the camera is below the global water level,
+    // bias colors toward a cool, desaturated palette. This is intentionally
+    // lightweight and layered on top of the existing fog/tonemapping.
+    {
+        float waterLevelY = g_WaterParams0.w;
+        bool isUnderwater = (g_CameraPosition.y < waterLevelY - 0.2f);
+        if (isUnderwater)
+        {
+            // Approximate how deep we are below the surface and use that to
+            // drive intensity; clamp to avoid over-darkening.
+            float depthBelow = saturate((waterLevelY - g_CameraPosition.y) * 0.1f);
+
+            // Shift towards blue-green, reduce contrast slightly.
+            float3 underwaterTint = float3(0.0f, 0.4f, 0.6f);
+            float3 tinted = lerp(hdrBlurred, underwaterTint, 0.25f * depthBelow);
+
+            // Mild desaturation for a hazy underwater look.
+            float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+            float  luma = dot(tinted, lumaWeights);
+            float3 desat = lerp(tinted, luma.xxx, 0.2f * depthBelow);
+
+            hdrBlurred = desat;
         }
     }
 
@@ -388,6 +1139,145 @@ float4 PSMain(VSOutput input) : SV_TARGET
     color = ApplyACESFilm(color);
     color = pow(color, 1.0f / 2.2f);
 
+    // GPU-driven settings overlay. When g_DebugMode.y > 0.5 the engine is
+    // indicating that the settings panel (M/F2) is active. We dim the scene
+    // and render a simple panel on the right that shows rows/bars whose
+    // lengths reflect the current debug settings. g_DebugMode.z encodes the
+    // currently selected row (0..1 normalized).
+    if (g_DebugMode.y > 0.5f)
+    {
+        // Dim the background colors, but keep the scene reasonably visible
+        // so changes to lighting remain apparent while the menu is open.
+        color *= 0.5f;
+
+        const float panelX = 0.72f;
+        const float headerY = 0.15f;
+        const float bodyBottom = 0.95f;
+
+        if (uv.x > panelX)
+        {
+            float3 panelColor = float3(0.05f, 0.05f, 0.05f);
+
+            // Header band.
+            if (uv.y < headerY)
+            {
+                panelColor = float3(0.0f, 0.35f, 0.55f);
+            }
+
+            // Subtle horizontal stripes.
+            float stripe = frac(uv.y * 20.0f);
+            if (stripe < 0.02f)
+            {
+                panelColor += 0.05f;
+            }
+
+            // Body rows representing settings.
+            if (uv.y >= headerY && uv.y <= bodyBottom)
+            {
+                const int rowCount = 15;
+                float rowHeight = (bodyBottom - headerY) / rowCount;
+                int row = clamp(int((uv.y - headerY) / rowHeight), 0, rowCount - 1);
+                int selectedRow = (int)round(saturate(g_DebugMode.z) * (rowCount - 1));
+
+                // Row label on the left side. This uses a tiny bitmap font
+                // rendered entirely in the shader, but we allocate a bit more
+                // space so the glyphs form legible 3–4 letter abbreviations
+                // instead of a dense QR-like block.
+                float labelWidthNorm = 0.30f; // fraction of panel width
+                float2 rowOrigin = float2(panelX, headerY + row * rowHeight);
+                float2 labelOrigin = rowOrigin + float2(0.04f * (1.0f - panelX), rowHeight * 0.15f);
+                float2 labelSize = float2((1.0f - panelX) * labelWidthNorm, rowHeight * 0.7f);
+                float labelAlpha = RenderRowLabel(row, uv, labelOrigin, labelSize);
+
+                if (labelAlpha > 0.01f)
+                {
+                    float3 textColor = (row == selectedRow)
+                        ? float3(1.0f, 1.0f, 0.2f)
+                        : float3(0.9f, 0.9f, 0.9f);
+                    panelColor = lerp(panelColor, textColor, labelAlpha);
+                }
+
+                // Map settings to a normalized 0..1 bar length. The row
+                // indices are aligned with Engine::m_settingsSection.
+                float value = 0.0f;
+                switch (row)
+                {
+                    case 0: // Exposure
+                        value = saturate((g_TimeAndExposure.z - 0.5f) / 4.5f);
+                        break;
+                    case 1: // Bloom intensity
+                        value = saturate(g_TimeAndExposure.w / max(g_BloomParams.z, 1.0f));
+                        break;
+                    case 2: // Shadows enabled
+                        value = (g_ShadowParams.z > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 3: // PCSS
+                        value = (g_ShadowParams.w > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 4: // Shadow bias
+                        value = saturate(g_ShadowParams.x / 0.01f);
+                        break;
+                    case 5: // Shadow PCF radius
+                        value = saturate(g_ShadowParams.y / 5.0f);
+                        break;
+                    case 6: // Cascade lambda (approximate from first split depth)
+                        // Lambda lives on the CPU, but higher lambda generally
+                        // pushes the first split farther from the camera, so
+                        // we normalize the first split against the far plane.
+                        value = saturate(g_CascadeSplits.x / max(g_CascadeSplits.w, 1e-4f));
+                        break;
+                    case 7: // FXAA
+                        value = (g_PostParams.z > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 8: // TAA
+                        value = (g_TAAParams.w > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 9: // SSR enabled flag (fed by bloomParams.w)
+                        value = (g_BloomParams.w > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 10: // SSAO
+                        value = (g_AOParams.x > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 11: // IBL
+                        value = (g_EnvParams.z > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 12: // Fog
+                        value = (g_FogParams.w > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    case 13: // Camera base speed (visualized as 0..1 in a loose range)
+                        // The camera speed itself is only known on the CPU.
+                        // We approximate this row as mid-level so navigation
+                        // still lines up; the actual numeric value is
+                        // displayed in the HUD legend.
+                        value = 0.5f;
+                        break;
+                    case 14: // RT sun shadows (pipeline-ready)
+                        value = (g_PostParams.w > 0.5f) ? 1.0f : 0.0f;
+                        break;
+                    default:
+                        value = 0.5f;
+                        break;
+                }
+
+                // Horizontal bar: start just to the right of the label area.
+                float barStartX = panelX + (1.0f - panelX) * (labelWidthNorm + 0.04f);
+                float xNorm = saturate((uv.x - barStartX) / (1.0f - barStartX));
+                if (xNorm <= value)
+                {
+                    panelColor += 0.20f;
+                }
+
+                // Highlight selected row.
+                if (row == selectedRow)
+                {
+                    panelColor += 0.10f;
+                }
+            }
+
+            color = lerp(color, panelColor, 0.9f);
+        }
+    }
+
     // Simple warm/cool grading driven by g_ColorGrade.xy.
     // Positive warm shifts towards orange, positive cool shifts towards blue.
     float warm = saturate(0.5f + g_ColorGrade.x * 0.5f); // map [-1,1] -> [0,1]
@@ -400,10 +1290,16 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float ao = 1.0f;
     if (g_AOParams.x > 0.5f)
     {
-        // Simple 3x3 blur over the SSAO buffer to reduce noise and banding.
+        // Bilateral 3x3 blur over the SSAO buffer using full-resolution depth
+        // as a guide. This keeps occlusion pinned to the correct surfaces and
+        // reduces the large "halo discs" that appear when AO bleeds across
+        // object boundaries or onto the environment.
         float2 texel = g_PostParams.xy;
-        float sum = 0.0f;
-        float weight = 1.0f / 9.0f;
+        float  depthCenter = g_Depth.Sample(g_Sampler, uv).r;
+
+        float aoAccum = 0.0f;
+        float wAccum  = 0.0f;
+
         [unroll]
         for (int y = -1; y <= 1; ++y)
         {
@@ -411,74 +1307,35 @@ float4 PSMain(VSOutput input) : SV_TARGET
             for (int x = -1; x <= 1; ++x)
             {
                 float2 offset = float2(x, y) * texel;
-                sum += g_SSAO.Sample(g_Sampler, uv + offset).r * weight;
+                float2 sampleUV = uv + offset;
+
+                float sampleAO    = g_SSAO.Sample(g_Sampler, sampleUV).r;
+                float sampleDepth = g_Depth.Sample(g_Sampler, sampleUV).r;
+
+                float depthDelta = abs(sampleDepth - depthCenter);
+                // Prefer AO from surfaces at a similar depth; fade out
+                // contributions from significantly different depths so
+                // background walls do not inherit foreground occlusion.
+                float wDepth = saturate(1.0f - depthDelta * 40.0f);
+
+                float w = wDepth;
+                aoAccum += sampleAO * w;
+                wAccum  += w;
             }
         }
-        ao = saturate(sum);
-        float aoIntensity = saturate(g_AOParams.w);
+
+        ao = (wAccum > 0.0f) ? saturate(aoAccum / wAccum) : 1.0f;
+
+        // Keep AO influence relatively subtle so it grounds objects without
+        // creating strong dark discs under them.
+        float aoIntensity = saturate(g_AOParams.w * 0.6f);
         color *= lerp(1.0f, ao, aoIntensity);
     }
 
-    // Temporal AA with depth-based reprojection. We reproject the current
-    // pixel into the previous frame using g_PrevViewProjMatrix and the
-    // inverse of the current view-projection, then apply the jitter delta
-    // stored in g_TAAParams.xy. When depth is invalid, we fall back to a
-    // simple jitter-based history lookup. History weighting is reduced in
-    // regions with high motion to limit ghosting.
-    float taaBlend = (g_TAAParams.w > 0.5f) ? g_TAAParams.z : 0.0f;
-    if (taaBlend > 0.0f)
-    {
-        // Start with jitter-based UV as a robust fallback.
-        float2 historyUV = uv + g_TAAParams.xy;
-
-        // Sample depth; skip reprojection for background/cleared pixels.
-        float depth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
-        if (depth > 0.0f && depth < 1.0f - 1e-4f)
-        {
-            float3 worldPos = ReconstructWorldPosition(uv, depth);
-            float4 prevClip = mul(g_PrevViewProjMatrix, float4(worldPos, 1.0f));
-
-            if (abs(prevClip.w) > 1e-4f)
-            {
-                float invW = 1.0f / prevClip.w;
-                float2 prevNdc = prevClip.xy * invW;
-
-                // Map back to UV space, keeping the same NDC->UV convention
-                // as VSMain (Y inverted).
-                float2 prevUV;
-                prevUV.x = prevNdc.x * 0.5f + 0.5f;
-                prevUV.y = 0.5f - prevNdc.y * 0.5f;
-
-                // Only accept reprojection when it lands on-screen.
-                if (prevUV.x >= 0.0f && prevUV.x <= 1.0f &&
-                    prevUV.y >= 0.0f && prevUV.y <= 1.0f)
-                {
-                    historyUV = prevUV + g_TAAParams.xy;
-                }
-            }
-        }
-
-        historyUV = saturate(historyUV);
-        float3 history = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
-
-        // Motion-aware blending: scale history contribution down when velocity is high.
-        float2 velTaa = g_Velocity.Sample(g_Sampler, uv).xy;
-        float speedTaa = length(velTaa);
-        float motionFactor = saturate(speedTaa * 40.0f); // same scale as blur
-        float finalBlend = saturate(taaBlend * (1.0f - motionFactor));
-
-        // Reduce history weight when the color difference is very large; this
-        // helps avoid strong hue "smears" when the view or lighting changes
-        // abruptly between frames.
-        float3 diff = abs(color - history);
-        float maxDiff = max(max(diff.r, diff.g), diff.b);
-        float diffFactor = saturate(1.0f - maxDiff * 2.0f);
-        finalBlend *= diffFactor;
-
-        color = lerp(color, history, finalBlend);
-    }
-
-    // Optional FXAA-like smoothing (very lightweight approximation)
+    // Optional FXAA-like smoothing (lightweight approximation). When TAA is
+    // active we allow slightly more blur here so that any residual temporal
+    // noise is traded for a stable, softer edge rather than visible
+    // ghosting on large, high-contrast objects.
     if (g_PostParams.z > 0.5f)
     {
         float2 texel = g_PostParams.xy;
@@ -499,14 +1356,21 @@ float4 PSMain(VSOutput input) : SV_TARGET
                              max(abs(lumM - lumU), abs(lumM - lumD)));
 
         // Only smooth when local contrast is noticeable
-        if (contrast > 0.05f)
+        float threshold = 0.03f;
+        if (g_TAAParams.w > 0.5f)
+        {
+            threshold = 0.02f;
+        }
+
+        if (contrast > threshold)
         {
             float3 avg = (cM + cR + cL + cU + cD) * (1.0f / 5.0f);
-            color = lerp(cM, avg, 0.6f);
+            float blurAmount = (g_TAAParams.w > 0.5f) ? 0.8f : 0.6f;
+            color = lerp(cM, avg, blurAmount);
         }
     }
 
-    // SSAO / SSR debug views in post-process so tuning radius/bias/intensity is easier.
+    // SSAO / SSR / RT reflection debug views in post-process so tuning radius/bias/intensity is easier.
     if (g_DebugMode.x == 13.0f)
     {
         // AO only
@@ -530,6 +1394,22 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float3 ssr = g_SSRColor.Sample(g_Sampler, uv).rgb;
         float3 overlay = color * 0.5f + ssr * 0.5f;
         return float4(saturate(overlay), 1.0f);
+    }
+    else if (g_DebugMode.x == 20.0f)
+    {
+        // RT reflection-only debug view (pre-tonemap). Shows the raw DXR
+        // reflection buffer color so the pipeline can be validated in
+        // isolation from SSR and the main PBR shading.
+        float3 rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
+        return float4(rtRefl, 1.0f);
+    }
+    else if (g_DebugMode.x == 24.0f)
+    {
+        // RT reflection ray-direction debug view. The DXR reflection pass
+        // encodes the per-pixel reflection ray direction as RGB in the
+        // reflection buffer when this mode is active (see RaytracedReflections.hlsl).
+        float3 rayVis = g_RTReflection.Sample(g_Sampler, uv).rgb;
+        return float4(rayVis, 1.0f);
     }
 
     // Shadow map cascade visualization in the top-right corner, only when

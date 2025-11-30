@@ -2,13 +2,16 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <exception>
-#include <filesystem>
 #include <windows.h>
 #include <vector>
 #include <dbghelp.h>
 #include <cstdlib>
+#include <string>
+#include <filesystem>
 
 using namespace Cortex;
+
+namespace {
 
 // Global SEH handler to log crashes instead of silent termination
 LONG WINAPI CortexCrashHandler(EXCEPTION_POINTERS* info) {
@@ -50,6 +53,54 @@ LONG WINAPI CortexCrashHandler(EXCEPTION_POINTERS* info) {
     }
     return EXCEPTION_EXECUTE_HANDLER;
 }
+
+// Lightweight helpers to avoid <filesystem> and keep the main translation
+// unit small enough for constrained build environments.
+std::string GetExecutableDirectory() {
+    char exePathA[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameA(nullptr, exePathA, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) {
+        char cwd[MAX_PATH] = {};
+        DWORD cwdLen = GetCurrentDirectoryA(MAX_PATH, cwd);
+        if (cwdLen > 0 && cwdLen < MAX_PATH) {
+            return std::string(cwd, cwdLen);
+        }
+        return ".";
+    }
+    std::string path(exePathA, len);
+    size_t slash = path.find_last_of("\\/");
+    if (slash != std::string::npos) {
+        path.resize(slash);
+    }
+    return path;
+}
+
+bool FileExists(const std::string& path) {
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    return attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+bool DirectoryHasEngine(const std::string& dir) {
+    if (dir.empty()) {
+        return false;
+    }
+    std::string pattern = dir;
+    char last = pattern.back();
+    if (last != '\\' && last != '/') {
+        pattern += '\\';
+    }
+    pattern += "*.engine";
+
+    WIN32_FIND_DATAA data{};
+    HANDLE hFind = FindFirstFileA(pattern.c_str(), &data);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    FindClose(hFind);
+    return true;
+}
+
+} // namespace
 
 int main(int argc, char* argv[]) {
     // Set up logging
@@ -172,25 +223,13 @@ int main(int argc, char* argv[]) {
         // Phase 3: Autoconfigure Dreamer diffusion engines if present either
         // next to the executable or at the project root.
         if (config.enableDreamer) {
-            auto hasEnginesInDir = [](const fs::path& dir) -> bool {
-                if (!fs::exists(dir) || !fs::is_directory(dir)) {
-                    return false;
-                }
-                for (const auto& entry : fs::directory_iterator(dir)) {
-                    if (entry.is_regular_file() && entry.path().extension() == ".engine") {
-                        return true;
-                    }
-                }
-                return false;
-            };
+            std::string dreamerDirExe  = (modelsDirExe  / "dreamer").string();
+            std::string dreamerDirRoot = (modelsDirRoot / "dreamer").string();
+            std::string chosenDreamerDir;
 
-            fs::path dreamerDirExe   = modelsDirExe   / "dreamer";
-            fs::path dreamerDirRoot  = modelsDirRoot  / "dreamer";
-            fs::path chosenDreamerDir;
-
-            if (hasEnginesInDir(dreamerDirExe)) {
+            if (DirectoryHasEngine(dreamerDirExe)) {
                 chosenDreamerDir = dreamerDirExe;
-            } else if (hasEnginesInDir(dreamerDirRoot)) {
+            } else if (DirectoryHasEngine(dreamerDirRoot)) {
                 chosenDreamerDir = dreamerDirRoot;
             }
 
@@ -201,7 +240,7 @@ int main(int argc, char* argv[]) {
                 config.dreamerConfig.maxWidth = 768;
                 config.dreamerConfig.maxHeight = 768;
                 config.dreamerConfig.useGPU = true;
-                config.dreamerConfig.enginePath = chosenDreamerDir.string();
+                config.dreamerConfig.enginePath = chosenDreamerDir;
                 spdlog::info("Dreamer diffusion engines detected at '{}'; GPU diffusion enabled (CORTEX_ENABLE_TENSORRT build required for runtime).",
                              config.dreamerConfig.enginePath);
             } else {

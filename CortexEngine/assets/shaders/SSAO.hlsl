@@ -38,8 +38,12 @@ cbuffer FrameConstants : register(b1)
     float4   g_BloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     float4   g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
     float4x4 g_PrevViewProjMatrix;
     float4x4 g_InvViewProjMatrix;
+    float4   g_WaterParams0;
+    float4   g_WaterParams1;
 };
 
 Texture2D g_Depth : register(t0);
@@ -130,10 +134,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float bias      = max(g_AOParams.z, 0.0f);
     float intensity = max(g_AOParams.w, 0.0f);
 
-    // Scale sampling radius with view-space depth so AO stays
-    // visually consistent across near and far geometry.
-    float depthScale = max(posCenter.z, 1.0f);
-    float radius = baseRadius * depthScale;
+    // Scale sampling radius with view-space depth in a conservative way so
+    // near-camera geometry uses a smaller radius (tighter contact shadows)
+    // and distant geometry gradually approaches the full radius. This helps
+    // avoid large AO "discs" that extend far beyond the objects casting them.
+    float viewDepth = abs(posCenter.z);
+    float depthScale = saturate(viewDepth / 8.0f);       // ~0 at the camera, ~1 past ~8 units
+    float radius = baseRadius * lerp(0.5f, 1.0f, depthScale);
 
     // Simple fixed sample kernel in view space.
     static const int   kSampleCount = 8;

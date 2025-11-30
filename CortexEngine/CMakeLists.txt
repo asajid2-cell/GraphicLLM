@@ -59,6 +59,7 @@ option(CORTEX_ENABLE_TENSORRT "Enable Dreamer GPU diffusion via TensorRT" OFF)
 # Source Files
 set(CORTEX_SOURCES
     src/Core/Engine.cpp
+    src/Core/Engine_Scenes.cpp
     src/Core/Window.cpp
     src/Core/ServiceLocator.cpp
 
@@ -95,6 +96,7 @@ set(CORTEX_SOURCES
     # UI helpers
     src/UI/TextPrompt.cpp
     src/UI/DebugMenu.cpp
+    src/UI/QuickSettingsWindow.cpp
 )
 
 set(CORTEX_HEADERS
@@ -138,6 +140,7 @@ set(CORTEX_HEADERS
     # UI helpers
     src/UI/TextPrompt.h
     src/UI/DebugMenu.h
+    src/UI/QuickSettingsWindow.h
 )
 
 # Executable

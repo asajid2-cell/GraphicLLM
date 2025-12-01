@@ -66,6 +66,9 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     }
 
     m_deviceRemoved = false;
+    m_deviceRemovedLogged = false;
+    m_missingBufferWarningLogged = false;
+    m_zeroDrawWarningLogged = false;
     m_device = device;
     m_window = window;
 
@@ -290,14 +293,120 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     return Result<void>::Ok();
 }
 
+float Renderer::GetEstimatedVRAMMB() const {
+    if (!m_window) {
+        return 0.0f;
+    }
+
+    const float scale = std::clamp(m_renderScale, 0.5f, 1.5f);
+    const UINT width  = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
+    const UINT height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
+
+    auto bytesForRT = [&](UINT w, UINT h, DXGI_FORMAT fmt) -> uint64_t {
+        uint32_t bpp = 0;
+        switch (fmt) {
+        case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        case DXGI_FORMAT_R16G16B16A16_UNORM:
+            bpp = 8 * 4;  // 16 bits * 4
+            break;
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+        case DXGI_FORMAT_B8G8R8A8_UNORM:
+            bpp = 4 * 8;
+            break;
+        case DXGI_FORMAT_D32_FLOAT:
+            bpp = 4 * 8;
+            break;
+        default:
+            bpp = 4 * 8;
+            break;
+        }
+        const uint64_t bytesPerPixel = bpp / 8u;
+        return static_cast<uint64_t>(w) * static_cast<uint64_t>(h) * bytesPerPixel;
+    };
+
+    uint64_t totalBytes = 0;
+
+    // Main HDR color + history/taa intermediate (if allocated).
+    totalBytes += bytesForRT(width, height, DXGI_FORMAT_R16G16B16A16_FLOAT); // m_hdrColor
+    totalBytes += bytesForRT(width, height, DXGI_FORMAT_R16G16B16A16_FLOAT); // history / TAA
+
+    // Depth buffer
+    totalBytes += bytesForRT(width, height, DXGI_FORMAT_D32_FLOAT);
+
+    // SSAO at half resolution
+    totalBytes += bytesForRT(std::max(1u, width / 2u),
+                             std::max(1u, height / 2u),
+                             DXGI_FORMAT_R8G8B8A8_UNORM);
+
+    // SSR color buffer (full resolution RGBA16F)
+    totalBytes += bytesForRT(width, height, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    // RT reflections + history (half-res RGBA16F)
+    const UINT halfW = std::max(1u, m_window->GetWidth()  / 2u);
+    const UINT halfH = std::max(1u, m_window->GetHeight() / 2u);
+    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl
+    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl history
+
+    // RT GI color + history (half-res RGBA16F)
+    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    // Shadow map (four cascades packed into one atlas)
+    const UINT shadowRes = static_cast<UINT>(m_shadowMapSize);
+    totalBytes += bytesForRT(shadowRes, shadowRes, DXGI_FORMAT_D32_FLOAT);
+
+    // Very coarse allowance for vertex/index buffers and other resources.
+    // This keeps the estimate conservative without walking all GPU objects.
+    totalBytes += 256ull * 1024ull * 1024ull; // ~256 MB mesh/texture slack
+
+    // Add acceleration-structure memory usage when DXR is active. This folds
+    // BLAS/TLAS buffers into the on-screen VRAM estimate so heavy RT scenes
+    // surface their additional footprint to the user.
+    if (m_rayTracingContext && m_rayTracingSupported) {
+        totalBytes += m_rayTracingContext->GetAccelerationStructureBytes();
+    }
+
+    const double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
+    return static_cast<float>(mb);
+}
+
+void Renderer::ApplySafeQualityPreset() {
+    // Lower internal resolution and disable the heaviest features so the
+    // engine can render more complex scenes on 8 GB GPUs without hitting
+    // device-removed errors. Users can re-enable individual features once
+    // they confirm there is headroom.
+    // Aggressive low-quality preset intended for troubleshooting heavy scenes
+    // on 8 GB-class GPUs. This trades resolution, RT, and shadow quality for
+    // stability so complex layouts can be inspected without immediately
+    // exhausting VRAM.
+    SetRenderScale(0.6f);
+
+    // Turn off optional RT passes by default; RT shadows follow the master
+    // toggle, and reflections/GI are separate feature bits.
+    SetRayTracingEnabled(false);
+    m_rtReflectionsEnabled = false;
+    m_rtGIEnabled = false;
+
+    // Disable costly screen-space effects; FXAA stays on as a cheap fallback.
+    SetTAAEnabled(false);
+    SetFXAAEnabled(true);
+    SetSSREnabled(false);
+    SetSSAOEnabled(false);
+    SetFogEnabled(false);
+
+    // Cap shadow-map resolution aggressively to keep cascaded shadows from
+    // dominating memory and bandwidth in conservative mode.
+    m_shadowMapSize = std::min(m_shadowMapSize, 1024.0f);
+    for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
+        m_cascadeResolutionScale[i] = std::min(m_cascadeResolutionScale[i], 0.75f);
+    }
+
+    spdlog::info("Renderer: applied safe low-quality preset (scale=0.60, RT off, SSR/SSAO/Fog off, shadows capped)");
+}
+
 void Renderer::Shutdown() {
     if (m_commandQueue) {
         m_commandQueue->Flush();
-    }
-
-    if (m_rayTracingContext) {
-        m_rayTracingContext->Shutdown();
-        m_rayTracingContext.reset();
     }
 
     if (m_rayTracingContext) {
@@ -329,7 +438,10 @@ void Renderer::Shutdown() {
 
 void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     if (m_deviceRemoved) {
-        spdlog::error("Renderer::Render skipped because DX12 device was removed earlier (likely out of GPU memory). Restart is required.");
+        if (!m_deviceRemovedLogged) {
+            spdlog::error("Renderer::Render skipped because DX12 device was removed earlier (likely out of GPU memory). Restart is required.");
+            m_deviceRemovedLogged = true;
+        }
         return;
     }
 
@@ -346,6 +458,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     ProcessPendingEnvironmentMaps(std::numeric_limits<uint32_t>::max());
 
     BeginFrame();
+    if (m_deviceRemoved) {
+        // A fatal error occurred while preparing frame resources (for example,
+        // depth/HDR creation failed due to device removal). Skip the rest of
+        // this frame; the next call will early-out at the top.
+        return;
+    }
     UpdateFrameConstants(deltaTime, registry);
 
     // Optional ray tracing path (DXR). When enabled we build BLAS/TLAS and
@@ -560,17 +678,22 @@ void Renderer::BeginFrame() {
     // render resolution changes. When supersampling is active, the depth
     // buffer is allocated at windowSize * renderScale, so we compare
     // against that expected size rather than the raw window dimensions.
-    const float renderScale = std::max(m_renderScale, 1.0f);
+    const float renderScale = std::clamp(m_renderScale, 0.5f, 1.5f);
     const UINT expectedDepthWidth  = std::max<UINT>(1, static_cast<UINT>(m_window->GetWidth()  * renderScale));
     const UINT expectedDepthHeight = std::max<UINT>(1, static_cast<UINT>(m_window->GetHeight() * renderScale));
 
     if (m_depthBuffer) {
         D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
         if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
+            spdlog::info("BeginFrame: recreating depth buffer for renderScale {:.2f} ({}x{})",
+                         renderScale, expectedDepthWidth, expectedDepthHeight);
             m_depthBuffer.Reset();
             auto depthResult = CreateDepthBuffer();
             if (depthResult.IsErr()) {
                 spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
+                // Treat this as a fatal condition for the current run.
+                m_deviceRemoved = true;
+                return;
             }
         }
     }
@@ -579,10 +702,14 @@ void Renderer::BeginFrame() {
     if (m_hdrColor) {
         D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
         if (hdrDesc.Width != expectedDepthWidth || hdrDesc.Height != expectedDepthHeight) {
+            spdlog::info("BeginFrame: recreating HDR target for renderScale {:.2f} ({}x{})",
+                         renderScale, expectedDepthWidth, expectedDepthHeight);
             m_hdrColor.Reset();
             auto hdrResult = CreateHDRTarget();
             if (hdrResult.IsErr()) {
                 spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
+                m_deviceRemoved = true;
+                return;
             }
 
             auto rtMaskResult = CreateRTShadowMask();
@@ -666,6 +793,11 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
+    // Cap the number of particles we draw in a single frame to keep the
+    // per-frame instance buffer small and avoid pathological memory usage if
+    // an emitter accidentally spawns an excessive number of particles.
+    static constexpr uint32_t kMaxParticleInstances = 4096;
+
     auto view = registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
     if (view.begin() == view.end()) {
         return;
@@ -685,11 +817,19 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
                 continue;
             }
 
+            if (instances.size() >= kMaxParticleInstances) {
+                break;
+            }
+
             ParticleInstance inst{};
             inst.position = emitter.localSpace ? (emitterWorldPos + p.position) : p.position;
             inst.size     = p.size;
             inst.color    = p.color;
             instances.push_back(inst);
+        }
+
+        if (instances.size() >= kMaxParticleInstances) {
+            break;
         }
     }
 
@@ -1223,6 +1363,15 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         );
         cameraForward = glm::normalize(target - cameraPos);
         frameData.cameraPosition = glm::vec4(cameraPos, 1.0f);
+    }
+
+    // Cache camera parameters for culling and RT use.
+    m_cameraPositionWS = cameraPos;
+    m_cameraForwardWS  = cameraForward;
+    m_cameraNearPlane  = camNear;
+    m_cameraFarPlane   = camFar;
+    if (m_rayTracingContext) {
+        m_rayTracingContext->SetCameraParams(cameraPos, cameraForward, camNear, camFar);
     }
 
     // Temporal AA jitter (in pixels) and corresponding UV delta for history
@@ -2406,6 +2555,28 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             continue;
         }
 
+        // Simple frustum/near-far culling using a bounding sphere derived
+        // from the mesh's object-space bounds and the entity transform. This
+        // avoids submitting obviously off-screen objects in large scenes
+        // such as the RT showcase gallery without changing visibility for
+        // anything inside the camera frustum.
+        const auto& meshData = *renderable.mesh;
+        if (meshData.hasBounds) {
+            const glm::vec3 centerWS = glm::vec3(transform.worldMatrix * glm::vec4(meshData.boundsCenter, 1.0f));
+            const float maxScale = glm::compMax(glm::abs(transform.scale));
+            const float radiusWS = meshData.boundsRadius * maxScale;
+
+            const glm::vec3 toCenter = centerWS - m_cameraPositionWS;
+            const float distAlongFwd = glm::dot(toCenter, glm::normalize(m_cameraForwardWS));
+
+            // Cull objects entirely behind the near plane or far beyond the
+            // far plane, with a small radius cushion.
+            if (distAlongFwd + radiusWS < m_cameraNearPlane ||
+                distAlongFwd - radiusWS > m_cameraFarPlane) {
+                continue;
+            }
+        }
+
         EnsureMaterialTextures(renderable);
 
         // Update material constants
@@ -2574,12 +2745,19 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
             drawnCount++;
         } else {
-            spdlog::warn("  Entity {} has no vertex/index buffers", entityCount);
+            // Log this warning only once to avoid spamming the console every
+            // frame if the scene contains placeholder entities without mesh
+            // data (for example, when scene setup fails part-way through).
+            if (!m_missingBufferWarningLogged) {
+                spdlog::warn("  Entity {} has no vertex/index buffers", entityCount);
+                m_missingBufferWarningLogged = true;
+            }
         }
     }
-
-    if (drawnCount == 0 && entityCount > 0) {
+ 
+    if (drawnCount == 0 && entityCount > 0 && !m_zeroDrawWarningLogged) {
         spdlog::warn("RenderScene: Found {} entities but drew 0!", entityCount);
+        m_zeroDrawWarningLogged = true;
     }
 }
 
@@ -4104,7 +4282,7 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
 Result<void> Renderer::CreateDepthBuffer() {
     D3D12_RESOURCE_DESC depthDesc = {};
     depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    const float scale = std::max(m_renderScale, 1.0f);
+    const float scale = std::clamp(m_renderScale, 0.5f, 1.5f);
     depthDesc.Width = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
     depthDesc.Height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
     depthDesc.DepthOrArraySize = 1;
@@ -4134,7 +4312,26 @@ Result<void> Renderer::CreateDepthBuffer() {
     );
 
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create depth buffer");
+        m_depthBuffer.Reset();
+        m_depthStencilView = {};
+        m_depthSRV = {};
+
+        // If the device was removed (likely due to GPU memory pressure),
+        // mark the renderer as degraded so Render() can skip further work.
+        HRESULT removed = m_device->GetDevice()->GetDeviceRemovedReason();
+        if (removed == DXGI_ERROR_DEVICE_REMOVED ||
+            removed == DXGI_ERROR_DEVICE_RESET ||
+            removed == DXGI_ERROR_DRIVER_INTERNAL_ERROR) {
+            m_deviceRemoved = true;
+        }
+
+        char buf[64];
+        sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
+        char dim[64];
+        sprintf_s(dim, "%ux%u", depthDesc.Width, depthDesc.Height);
+        return Result<void>::Err(std::string("Failed to create depth buffer (")
+                                 + dim + ", scale=" + std::to_string(scale)
+                                 + ", hr=" + buf + ")");
     }
 
     m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
@@ -4452,12 +4649,19 @@ Result<void> Renderer::CreateRTGIResources() {
         return Result<void>::Err("Renderer not initialized for RT GI creation");
     }
 
-    const UINT width = m_window->GetWidth();
-    const UINT height = m_window->GetHeight();
+    const UINT fullWidth  = m_window->GetWidth();
+    const UINT fullHeight = m_window->GetHeight();
 
-    if (width == 0 || height == 0) {
+    if (fullWidth == 0 || fullHeight == 0) {
         return Result<void>::Err("Window size is zero; cannot create RT GI buffer");
     }
+
+    // Allocate RT GI at half-resolution relative to the main render target.
+    // This substantially reduces VRAM usage and ray dispatch cost while the
+    // subsequent spatial + temporal filters in the shader hide most of the
+    // resolution loss.
+    const UINT width  = std::max(1u, fullWidth  / 2u);
+    const UINT height = std::max(1u, fullHeight / 2u);
 
     D3D12_HEAP_PROPERTIES heapProps{};
     heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -4540,7 +4744,8 @@ Result<void> Renderer::CreateRTGIResources() {
         &uavDesc,
         m_rtGIUAV.cpu);
 
-      // Allocate history buffer (SRV only; written via CopyResource).
+      // Allocate history buffer (SRV only; written via CopyResource). Match
+      // the half-resolution size used for the main GI buffer.
       ComPtr<ID3D12Resource> history;
       hr = m_device->GetDevice()->CreateCommittedResource(
           &heapProps,
@@ -4606,12 +4811,18 @@ Result<void> Renderer::CreateRTReflectionResources() {
         return Result<void>::Err("Renderer not initialized for RT reflection creation");
     }
 
-    const UINT width = m_window->GetWidth();
-    const UINT height = m_window->GetHeight();
+    const UINT fullWidth  = m_window->GetWidth();
+    const UINT fullHeight = m_window->GetHeight();
 
-    if (width == 0 || height == 0) {
+    if (fullWidth == 0 || fullHeight == 0) {
         return Result<void>::Err("Window size is zero; cannot create RT reflection buffer");
     }
+
+    // Allocate RT reflections at half-resolution relative to the main render
+    // target. The hybrid SSR/RT composition and temporal filtering smooth
+    // out the reduced resolution while significantly lowering VRAM usage.
+    const UINT width  = std::max(1u, fullWidth  / 2u);
+    const UINT height = std::max(1u, fullHeight / 2u);
 
     D3D12_HEAP_PROPERTIES heapProps{};
     heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -4745,7 +4956,7 @@ Result<void> Renderer::CreateHDRTarget() {
     // higher-resolution HDR target when m_renderScale > 1.0. The back buffer
     // resolution remains tied to the window size; downsampling happens in
     // the fullscreen post-process pass.
-    const float scale = std::max(m_renderScale, 1.0f);
+    const float scale = std::clamp(m_renderScale, 0.5f, 1.5f);
     const UINT width  = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
     const UINT height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
 
@@ -4787,7 +4998,24 @@ Result<void> Renderer::CreateHDRTarget() {
     );
 
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create HDR color target");
+        m_hdrColor.Reset();
+        m_hdrRTV = {};
+        m_hdrSRV = {};
+
+        HRESULT removed = m_device->GetDevice()->GetDeviceRemovedReason();
+        if (removed == DXGI_ERROR_DEVICE_REMOVED ||
+            removed == DXGI_ERROR_DEVICE_RESET ||
+            removed == DXGI_ERROR_DRIVER_INTERNAL_ERROR) {
+            m_deviceRemoved = true;
+        }
+
+        char buf[64];
+        sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
+        char dim[64];
+        sprintf_s(dim, "%ux%u", width, height);
+        return Result<void>::Err(std::string("Failed to create HDR color target (")
+                                 + dim + ", scale=" + std::to_string(scale)
+                                 + ", hr=" + buf + ")");
     }
 
     m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;

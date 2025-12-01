@@ -19,6 +19,19 @@ namespace {
     constexpr UINT AlignTo(UINT value, UINT alignment) {
         return (value + alignment - 1u) & ~(alignment - 1u);
     }
+
+    // Coarse safety limits for RT acceleration structure memory usage to avoid
+    // exhausting VRAM on 8 GB GPUs in heavy scenes. These are deliberately
+    // conservative: once the BLAS budget is reached, additional meshes fall
+    // back to raster-only lighting for RT passes.
+    constexpr uint64_t kMaxBLASBytesTotal = 2ull * 1024ull * 1024ull * 1024ull;      // ~2 GB
+    constexpr uint64_t kMaxBLASBuildBytesPerFrame = 256ull * 1024ull * 1024ull;      // ~256 MB/frame
+
+    // Mesh-level guardrails for RT participation. Extremely large meshes are
+    // rendered normally but skipped for BLAS building to avoid huge single
+    // allocations and long RT build times.
+    constexpr uint64_t kMaxRTTrianglesPerMesh = 1'000'000ull;                        // ~1M tris
+    constexpr uint64_t kMaxRTMeshBytes = 64ull * 1024ull * 1024ull;                  // ~64 MB per VB/IB
 }
 
 Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHeapManager* descriptors) {
@@ -800,6 +813,8 @@ void DX12RaytracingContext::Shutdown() {
     m_tlas.Reset();
     m_instanceBuffer.Reset();
     m_blasCache.clear();
+    m_totalBLASBytes = 0;
+    m_totalTLASBytes = 0;
 
     m_device5.Reset();
     m_descriptors = nullptr;
@@ -815,6 +830,20 @@ void DX12RaytracingContext::OnResize(uint32_t width, uint32_t height) {
     m_rtxHeight = height;
 }
 
+void DX12RaytracingContext::SetCameraParams(const glm::vec3& positionWS,
+                                            const glm::vec3& forwardWS,
+                                            float nearPlane,
+                                            float farPlane) {
+    m_cameraPosWS     = positionWS;
+    float fwdLenSq    = glm::dot(forwardWS, forwardWS);
+    m_cameraForwardWS = (fwdLenSq > 0.0f)
+        ? glm::normalize(forwardWS)
+        : glm::vec3(0.0f, 0.0f, 1.0f);
+    m_cameraNearPlane = nearPlane;
+    m_cameraFarPlane  = farPlane;
+    m_hasCamera       = true;
+}
+
 void DX12RaytracingContext::RebuildBLASForMesh(const std::shared_ptr<Scene::MeshData>& mesh) {
     if (!m_device5 || !mesh) {
         return;
@@ -827,6 +856,30 @@ void DX12RaytracingContext::RebuildBLASForMesh(const std::shared_ptr<Scene::Mesh
         !mesh->gpuBuffers->indexBuffer ||
         mesh->positions.empty() ||
         mesh->indices.empty()) {
+        return;
+    }
+
+    const size_t indexCount = mesh->indices.size();
+    const size_t vertexCount = mesh->positions.size();
+    const uint64_t triCount = static_cast<uint64_t>(indexCount / 3u);
+
+    if (triCount == 0 || vertexCount == 0) {
+        return;
+    }
+
+    // Guard against extremely large meshes that would require very large BLAS
+    // buffers. These meshes will still render in the raster path but will not
+    // participate in RT shadows/reflections/GI.
+    const uint64_t approxVertexBytes = static_cast<uint64_t>(vertexCount) * sizeof(Vertex);
+    const uint64_t approxIndexBytes  = static_cast<uint64_t>(indexCount) * sizeof(uint32_t);
+    if (triCount > kMaxRTTrianglesPerMesh ||
+        approxVertexBytes > kMaxRTMeshBytes ||
+        approxIndexBytes > kMaxRTMeshBytes) {
+        spdlog::warn(
+            "DX12RaytracingContext: skipping BLAS for large mesh (verts={}, indices={}, tris≈{})",
+            static_cast<uint64_t>(vertexCount),
+            static_cast<uint64_t>(indexCount),
+            triCount);
         return;
     }
 
@@ -860,11 +913,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
 
     m_instanceDescs.clear();
 
+    // Track the amount of BLAS memory we build in this call so that very
+    // heavy scenes can converge over several frames instead of spiking GPU
+    // work and VRAM usage on the first RT frame.
+    uint64_t bytesBuiltThisFrame = 0;
+
     auto view = registry->View<Scene::TransformComponent, Scene::RenderableComponent>();
     uint32_t instanceIndex = 0;
 
     for (auto entity : view) {
-        auto& transform = view.get<Scene::TransformComponent>(entity);
+        auto& transform  = view.get<Scene::TransformComponent>(entity);
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
@@ -878,6 +936,26 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
         }
 
         BLASEntry& blasEntry = it->second;
+
+        // Optional near/far culling using a simple bounding sphere based on
+        // the mesh's object-space bounds and the world transform. This keeps
+        // the TLAS smaller for large scenes without changing any visible
+        // geometry.
+        if (renderable.mesh->hasBounds && m_hasCamera) {
+            const glm::vec3 centerWS =
+                glm::vec3(transform.worldMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+            const glm::vec3 absScale = glm::abs(transform.scale);
+            const float maxScale = std::max(absScale.x, std::max(absScale.y, absScale.z));
+            const float radiusWS = renderable.mesh->boundsRadius * maxScale;
+
+            const glm::vec3 toCenter = centerWS - m_cameraPosWS;
+            const float distAlongFwd = glm::dot(toCenter, m_cameraForwardWS);
+
+            if (distAlongFwd + radiusWS < m_cameraNearPlane ||
+                distAlongFwd - radiusWS > m_cameraFarPlane) {
+                continue;
+            }
+        }
 
         if (!blasEntry.blas && blasEntry.hasGeometry) {
             D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs{};
@@ -895,6 +973,29 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
 
             blasEntry.blasSize = prebuild.ResultDataMaxSizeInBytes;
             blasEntry.scratchSize = prebuild.ScratchDataSizeInBytes;
+
+            const uint64_t candidateBytes =
+                static_cast<uint64_t>(prebuild.ResultDataMaxSizeInBytes) +
+                static_cast<uint64_t>(prebuild.ScratchDataSizeInBytes);
+            if (candidateBytes == 0) {
+                continue;
+            }
+
+            // Global memory budget for all BLAS buffers: once reached, meshes
+            // beyond this limit are rendered raster-only for RT passes.
+            if (m_totalBLASBytes + candidateBytes > kMaxBLASBytesTotal) {
+                spdlog::warn(
+                    "DX12RaytracingContext: BLAS memory budget reached; "
+                    "skipping additional BLAS builds for remaining meshes");
+                continue;
+            }
+
+            // Per-frame build budget: allow the scene to converge over
+            // multiple frames instead of issuing all BLAS builds at once.
+            if (bytesBuiltThisFrame + candidateBytes > kMaxBLASBuildBytesPerFrame) {
+                // Defer building this mesh to a subsequent frame.
+                continue;
+            }
 
             D3D12_HEAP_PROPERTIES heapProps{};
             heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -958,6 +1059,9 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
             cmdList->ResourceBarrier(1, &barrier);
 
             blasEntry.built = true;
+
+            m_totalBLASBytes += candidateBytes;
+            bytesBuiltThisFrame += candidateBytes;
         }
 
         if (!blasEntry.blas) {
@@ -1052,7 +1156,9 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs{};
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    // TLAS favors build speed to keep the first RT frame responsive in heavy
+    // scenes; BLAS still prefers fast trace for per-mesh performance.
+    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     inputs.NumDescs = numInstances;
     inputs.InstanceDescs = m_instanceBuffer->GetGPUVirtualAddress();
@@ -1134,6 +1240,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier.UAV.pResource = m_tlas.Get();
     cmdList->ResourceBarrier(1, &barrier);
+
+    // Update TLAS memory accounting based on the currently allocated TLAS +
+    // scratch buffers so the renderer can fold this into VRAM estimates.
+    if (m_tlas && m_tlasScratch) {
+        const auto tlasDescCur = m_tlas->GetDesc();
+        const auto scratchDescCur = m_tlasScratch->GetDesc();
+        m_totalTLASBytes =
+            static_cast<uint64_t>(tlasDescCur.Width) +
+            static_cast<uint64_t>(scratchDescCur.Width);
+    }
 }
 
 void DX12RaytracingContext::DispatchRayTracing(

@@ -255,6 +255,34 @@ public:
     void SetAreaLightSizeScale(float scale);
     [[nodiscard]] float GetAreaLightSizeScale() const { return m_areaLightSizeScale; }
 
+    [[nodiscard]] float GetRenderScale() const { return m_renderScale; }
+    void SetRenderScale(float scale) {
+        // Ignore render-scale changes after a fatal device-removed event; the
+        // renderer is no longer in a state where reallocating major resources
+        // is meaningful.
+        if (m_deviceRemoved) {
+            return;
+        }
+        m_renderScale = std::clamp(scale, 0.5f, 1.5f);
+    }
+
+    // Optional RT feature toggles exposed to UI.
+    void SetRTReflectionsEnabled(bool enabled) { m_rtReflectionsEnabled = enabled; }
+    void SetRTGIEnabled(bool enabled) { m_rtGIEnabled = enabled; }
+    [[nodiscard]] bool GetRTReflectionsEnabled() const { return m_rtReflectionsEnabled; }
+    [[nodiscard]] bool GetRTGIEnabled() const { return m_rtGIEnabled; }
+
+    // Approximate VRAM usage for the current frame, in megabytes. This is
+    // intentionally coarse and only sums major render targets (HDR, depth,
+    // SSAO, SSR, RT buffers, shadow maps) plus a rough estimate for mesh
+    // buffers so the UI can provide a sense of GPU pressure.
+    [[nodiscard]] float GetEstimatedVRAMMB() const;
+
+    // Conservative quality preset intended for lower-end or
+    // memory-constrained GPUs. Scales resolution down and disables
+    // expensive RT and screen-space effects.
+    void ApplySafeQualityPreset();
+
     // Ray tracing capability and toggle (DXR)
     [[nodiscard]] bool IsRayTracingSupported() const { return m_rayTracingSupported; }
     [[nodiscard]] bool IsRayTracingEnabled() const { return m_rayTracingEnabled; }
@@ -549,8 +577,9 @@ public:
     float m_exposure = 1.0f;
     // Internal rendering resolution scale for simple supersampling. Default
     // to 1.0 so that HDR and depth targets match the window resolution; this
-    // keeps VRAM usage predictable on 8 GB GPUs. Higher values can be
-    // re-enabled later via a dedicated quality control.
+    // keeps VRAM usage predictable on 8 GB GPUs. For heavier scenes this can
+    // be reduced (e.g. 0.75) to trade some sharpness for significantly lower
+    // VRAM usage and shading cost.
     float m_renderScale = 1.0f;
     float m_bloomIntensity = 0.25f;
     float m_bloomThreshold = 1.0f;
@@ -562,6 +591,11 @@ public:
     float m_taaBlendFactor = 0.06f;
     // Approximate camera motion flag for jitter/taa tuning.
     bool  m_cameraIsMoving = false;
+    // Cached camera parameters for the current frame, used by culling and RT.
+    glm::vec3 m_cameraPositionWS{0.0f};
+    glm::vec3 m_cameraForwardWS{0.0f, 0.0f, 1.0f};
+    float m_cameraNearPlane = 0.1f;
+    float m_cameraFarPlane  = 1000.0f;
     bool  m_hasHistory = false;
     glm::vec2 m_taaJitterPrevPixels{0.0f, 0.0f};
     glm::vec2 m_taaJitterCurrPixels{0.0f, 0.0f};
@@ -613,6 +647,13 @@ public:
       // is true the renderer will skip further heavy work for the remainder
       // of the run so scene rebuilds do not spam errors.
       bool m_deviceRemoved = false;
+      bool m_deviceRemovedLogged = false;
+
+      // Logging throttles so we do not spam the console with the same
+      // warnings every frame once the renderer has entered an error state or
+      // when scene content is incomplete.
+      bool m_missingBufferWarningLogged = false;
+      bool m_zeroDrawWarningLogged      = false;
 
       // Camera history used to decide when to reset RT temporal history
       // (shadows / GI) after large movements to avoid ghosting.

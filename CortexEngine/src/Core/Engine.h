@@ -23,6 +23,14 @@ struct EngineConfig {
     bool enableVSync = true;
     uint32_t targetFPS = 60;
 
+    // Startup quality mode controls how aggressively the renderer trades
+    // image quality for stability on low-VRAM GPUs.
+    enum class QualityMode {
+        Default = 0,     // Higher quality for curated/hero scenes
+        Conservative = 1 // Safe low preset for heavy/RT scenes
+    };
+    QualityMode qualityMode = QualityMode::Default;
+
     // Phase 2: LLM config
     bool enableLLM = true;
     LLM::LLMConfig llmConfig;
@@ -38,6 +46,11 @@ struct EngineConfig {
 
     // Ray tracing config (DXR)
     bool enableRayTracing = false;
+
+    // Optional initial scene preset. When empty, the engine chooses its
+    // default (currently the RT showcase gallery). Accepted values are
+    // "dragon", "rt_showcase", and "cornell".
+    std::string initialScenePreset;
 };
 
 // Main engine class - orchestrates the game loop
@@ -68,6 +81,8 @@ public:
     [[nodiscard]] Window* GetWindow() { return m_window.get(); }
     [[nodiscard]] Graphics::Renderer* GetRenderer() { return m_renderer.get(); }
     [[nodiscard]] Scene::ECS_Registry* GetRegistry() { return m_registry.get(); }
+    // Last measured frame time (seconds) for FPS overlays / tools.
+    [[nodiscard]] float GetLastFrameTimeSeconds() const { return m_frameTime; }
 
     // Logical focus target (most recently spawned or modified group/entity).
     void SetFocusTarget(const std::string& name);

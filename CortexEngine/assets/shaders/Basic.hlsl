@@ -1023,7 +1023,10 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     // gated on device support), sample the RT GI buffer as a low-frequency
     // ambient/IBL occlusion term rather than an additive light source. The
     // GI pass encodes visibility in alpha (0 = fully occluded, 1 = fully
-    // visible), with rgb containing a debug-only color.
+    // visible), with rgb containing a debug-only color. The RT GI buffers
+    // are allocated at half-resolution relative to the main render target,
+    // so we convert from full-resolution pixel coordinates to GI texel
+    // coordinates when sampling.
     float giVisibility = 1.0f;
     // To reduce single-sample noise, apply a small 5-tap cross filter in
     // screen space over the RT GI alpha channel. We always allow the current
@@ -1044,18 +1047,24 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float count = 0.0f;
 
         // Derive approximate render size from 1 / resolution stored in
-        // postParams.xy so we can clamp sampling at image edges. This mirrors
-        // the guards used for the RT shadow mask filter and avoids sampling
-        // outside the valid GI buffer region.
-        float width  = 1.0f / max(g_PostParams.x, 1e-6f);
-        float height = 1.0f / max(g_PostParams.y, 1e-6f);
+        // postParams.xy so we can clamp sampling at image edges. The GI
+        // buffers are half-resolution, so use half of the main render size
+        // for bounds.
+        float fullWidth  = 1.0f / max(g_PostParams.x, 1e-6f);
+        float fullHeight = 1.0f / max(g_PostParams.y, 1e-6f);
+        float giWidth    = fullWidth * 0.5f;
+        float giHeight   = fullHeight * 0.5f;
+
+        // Convert the full-resolution pixel coordinate to the GI buffer's
+        // texel space and build a small cross-shaped kernel around it.
+        int2 giBase = pixelCoord / 2;
 
         [unroll]
         for (int i = 0; i < 5; ++i)
         {
-            int2 p = pixelCoord + offsets[i];
+            int2 p = giBase + offsets[i];
             if (p.x < 0 || p.y < 0 ||
-                p.x >= (int)width || p.y >= (int)height)
+                p.x >= (int)giWidth || p.y >= (int)giHeight)
             {
                 continue;
             }
@@ -1070,7 +1079,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         // available to reduce frame-to-frame noise from single-sample RT GI.
         if (g_DebugMode.w > 0.5f)
         {
-            float giHistory = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
+            float giHistory = g_RtGIHistory.Load(int3(giBase, 0)).a;
             float diff = abs(giCurr - giHistory);
             // When GI is stable, lean more on history; when it changes a lot,
             // trust the new sample to avoid visible ghosts/afterimages.
@@ -1416,13 +1425,16 @@ PSOutput PSMain(PSInput input)
             return MakePSOutput(float4(0.0f, 0.0f, 0.0f, 1.0f), normal, roughness);
         }
         int2 pixelCoord = int2(input.position.xy);
-        float aCurr = g_RtGI.Load(int3(pixelCoord, 0)).a;
+        // RT GI buffers are half-resolution; convert from full-res pixel
+        // coordinates to GI texel coordinates before sampling.
+        int2 giCoord = pixelCoord / 2;
+        float aCurr = g_RtGI.Load(int3(giCoord, 0)).a;
         float a = aCurr;
         // Only blend against history once the CPU has populated the GI
         // history buffer and flagged it as valid via g_DebugMode.w.
         if (g_DebugMode.w > 0.5f)
         {
-            float aHist = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
+            float aHist = g_RtGIHistory.Load(int3(giCoord, 0)).a;
             float diff = abs(aCurr - aHist);
             float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
             a = lerp(aCurr, aHist, historyWeight);

@@ -508,6 +508,10 @@ void Engine::BuildRTShowcaseScene() {
     // SSR/SSAO/bloom, and moderate fog/god-rays for the atrium.
     if (renderer) {
         renderer->SetEnvironmentPreset("studio");
+        // Heavy RT scenes can be rendered at a slightly reduced internal
+        // resolution to keep VRAM usage and shading cost in check on 8 GB
+        // GPUs while preserving the full window size for the swap chain.
+        renderer->SetRenderScale(0.85f);
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.9f, 1.2f);
 

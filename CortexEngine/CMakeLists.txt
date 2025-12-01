@@ -97,6 +97,7 @@ set(CORTEX_SOURCES
     src/UI/TextPrompt.cpp
     src/UI/DebugMenu.cpp
     src/UI/QuickSettingsWindow.cpp
+    src/UI/SceneEditorWindow.cpp
 )
 
 set(CORTEX_HEADERS
@@ -141,6 +142,7 @@ set(CORTEX_HEADERS
     src/UI/TextPrompt.h
     src/UI/DebugMenu.h
     src/UI/QuickSettingsWindow.h
+    src/UI/SceneEditorWindow.h
 )
 
 # Executable

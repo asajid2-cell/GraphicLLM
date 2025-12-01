@@ -60,6 +60,8 @@ public:
 
     // Phase 2: Submit natural language command to The Architect
     void SubmitNaturalLanguageCommand(const std::string& command);
+    // Queue a low-level scene command (used by native editor tools).
+    void EnqueueSceneCommand(std::shared_ptr<LLM::SceneCommand> command);
 
     // Accessors
     [[nodiscard]] bool IsRunning() const { return m_running; }
@@ -79,6 +81,7 @@ private:
     enum class ScenePreset {
         CornellBox = 0,
         DragonOverWater = 1,
+        RTShowcase      = 2,
     };
 
     void ProcessInput();
@@ -91,6 +94,7 @@ private:
     void RebuildScene(ScenePreset preset);
     void BuildCornellScene();
     void BuildDragonStudioScene();
+    void BuildRTShowcaseScene();
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
@@ -109,9 +113,9 @@ private:
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
 
-    // Translation / rotation gizmo helpers
+    // Translation / rotation / scale gizmo helpers
     enum class GizmoAxis { None, X, Y, Z };
-    enum class GizmoMode { Translate, Rotate };
+    enum class GizmoMode { Translate, Rotate, Scale };
     void UpdateGizmoHover();
     bool HitTestGizmoAxis(const glm::vec3& rayOrigin,
                           const glm::vec3& rayDir,
@@ -200,6 +204,7 @@ private:
     glm::vec3 m_gizmoDragStartEntityPos{0.0f};
     float m_gizmoDragStartAxisParam = 0.0f;
     glm::quat m_gizmoDragStartEntityRot{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 m_gizmoDragStartEntityScale{1.0f, 1.0f, 1.0f};
 
     // Engine settings (debug menu) navigation state
     int  m_settingsSection = 0;
@@ -210,7 +215,7 @@ private:
     std::string m_focusTargetName;
 
     // Current scene preset used when (re)building the ECS layout.
-    ScenePreset m_currentScenePreset = ScenePreset::DragonOverWater;
+    ScenePreset m_currentScenePreset = ScenePreset::RTShowcase;
 };
 
 } // namespace Cortex

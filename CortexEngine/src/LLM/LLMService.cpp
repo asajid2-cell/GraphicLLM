@@ -91,6 +91,11 @@ std::string BuildHeuristicJson(const std::string& prompt) {
         {"wood",          {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
         {"stone",         {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
         {"glass",         {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+        {"cloth",         {{0.8f, 0.0f, 0.0f, 1.0f}, 0.0f, 0.75f}},
+        {"velvet",        {{0.6f, 0.1f, 0.2f, 1.0f}, 0.0f, 0.8f}},
+        {"emissive",      {{1.0f, 1.0f, 1.0f, 0.8f}, 0.0f, 0.3f}},
+        {"neon_blue",     {{0.4f, 0.8f, 1.0f, 0.9f}, 0.0f, 0.25f}},
+        {"neon_pink",     {{1.0f, 0.3f, 0.7f, 0.9f}, 0.0f, 0.25f}},
     };
 
     // Named preset phrases like "chrome", "gold", etc. These either apply
@@ -406,7 +411,16 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
     // Load model with new API
     const auto tModelStart = clock::now();
     llama_model_params model_params = llama_model_default_params();
-    model_params.n_gpu_layers = std::max(0, m_config.gpuLayers);
+    // Clamp GPU offload to a conservative maximum so we do not exhaust VRAM
+    // on 8 GB-class GPUs while still keeping a meaningful portion of the
+    // transformer on the GPU. This avoids triggering TDR / device-removed
+    // errors that would also reset the DX12 device used by the renderer.
+    int requestedGpuLayers = std::max(0, m_config.gpuLayers);
+    const int kMaxGpuLayers = 48;
+    int clampedGpuLayers = std::min(requestedGpuLayers, kMaxGpuLayers);
+    model_params.n_gpu_layers = clampedGpuLayers;
+    spdlog::info("LLM: using {} GPU layers for model offload (requested {})",
+                 clampedGpuLayers, requestedGpuLayers);
     m_model = llama_model_load_from_file(config.modelPath.c_str(), model_params);
 
     if (!m_model) {
@@ -419,9 +433,9 @@ Result<void> LLMService::Initialize(const LLMConfig& config) {
     ctx_params.n_ctx = config.contextSize;
     ctx_params.n_threads = config.threads;
     ctx_params.n_threads_batch = config.threads;
-    // Ensure the batch size is at least as large as the context so that
-    // a full prompt can be decoded in a single llama_decode() call
-    // without tripping the internal n_tokens_all <= n_batch assert.
+    // Use a batch size equal to the context so llama.cpp never hits the
+    // internal n_tokens_all <= n_batch assertion when building prompts.
+    // This matches the original engine configuration.
     ctx_params.n_batch = ctx_params.n_ctx;
 
     m_context = llama_init_from_model(static_cast<llama_model*>(m_model), ctx_params);

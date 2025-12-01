@@ -224,6 +224,9 @@ public:
     void SetFogEnabled(bool enabled);
     void SetFogParams(float density, float height, float falloff);
     [[nodiscard]] bool IsFogEnabled() const { return m_fogEnabled; }
+    [[nodiscard]] float GetFogDensity() const { return m_fogDensity; }
+    [[nodiscard]] float GetFogHeight() const { return m_fogHeight; }
+    [[nodiscard]] float GetFogFalloff() const { return m_fogFalloff; }
     [[nodiscard]] bool IsPCSS() const { return m_pcssEnabled; }
     [[nodiscard]] bool IsFXAAEnabled() const { return m_fxaaEnabled; }
     [[nodiscard]] bool GetSSAOEnabled() const { return m_ssaoEnabled; }
@@ -232,7 +235,8 @@ public:
 
     // Water / liquid controls
     void SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
-                        float dirX = 1.0f, float dirZ = 0.0f, float secondaryAmplitude = 0.0f);
+                        float dirX = 1.0f, float dirZ = 0.0f, float secondaryAmplitude = 0.0f,
+                        float steepness = 0.6f);
     // Sample the procedural water height at a given world-space XZ position.
     // This mirrors the wave function used in Water.hlsl so buoyancy and
     // other CPU-side systems can stay in sync with the GPU water surface.
@@ -242,6 +246,14 @@ public:
     [[nodiscard]] float GetWaterWaveLength() const { return m_waterWaveLength; }
     [[nodiscard]] float GetWaterWaveSpeed() const { return m_waterWaveSpeed; }
     [[nodiscard]] float GetWaterSecondaryAmplitude() const { return m_waterSecondaryAmplitude; }
+    [[nodiscard]] float GetWaterSteepness() const { return m_waterSteepness; }
+    [[nodiscard]] glm::vec2 GetWaterPrimaryDir() const { return m_waterPrimaryDir; }
+
+    void SetGodRayIntensity(float intensity);
+    [[nodiscard]] float GetGodRayIntensity() const { return m_godRayIntensity; }
+
+    void SetAreaLightSizeScale(float scale);
+    [[nodiscard]] float GetAreaLightSizeScale() const { return m_areaLightSizeScale; }
 
     // Ray tracing capability and toggle (DXR)
     [[nodiscard]] bool IsRayTracingSupported() const { return m_rayTracingSupported; }
@@ -305,6 +317,7 @@ private:
     void RenderPostProcess();
     void RenderDebugLines();
     void RenderRayTracing(Scene::ECS_Registry* registry);
+    void RenderParticles(Scene::ECS_Registry* registry);
 
     // Debug drawing API
 public:
@@ -361,6 +374,13 @@ public:
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
     std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
     std::unique_ptr<DX12Pipeline> m_waterPipeline;
+    std::unique_ptr<DX12Pipeline> m_particlePipeline;
+
+    // If we ever fail to map the particle instance buffer (for example due
+    // to device removal or severe memory pressure), flip this flag so that
+    // subsequent frames simply skip particle rendering instead of spamming
+    // warnings or risking further failures.
+    bool m_particleBufferMapFailed = false;
 
     bool m_debugOverlayVisible = false;
     int  m_debugOverlaySelectedRow = 0;
@@ -527,17 +547,18 @@ public:
     glm::vec3 m_ambientLightColor = glm::vec3(0.04f);
     float m_ambientLightIntensity = 1.0f;
     float m_exposure = 1.0f;
-    // Internal rendering resolution scale for simple supersampling. A value
-    // greater than 1.0 renders the main scene into higher-resolution HDR
-    // and depth targets and downsamples in the post-process pass.
-    float m_renderScale = 1.5f;
+    // Internal rendering resolution scale for simple supersampling. Default
+    // to 1.0 so that HDR and depth targets match the window resolution; this
+    // keeps VRAM usage predictable on 8 GB GPUs. Higher values can be
+    // re-enabled later via a dedicated quality control.
+    float m_renderScale = 1.0f;
     float m_bloomIntensity = 0.25f;
     float m_bloomThreshold = 1.0f;
     float m_bloomSoftKnee = 0.5f;
     float m_bloomMaxContribution = 4.0f;
 
     // Temporal anti-aliasing (camera-only) state
-    bool  m_taaEnabled = true;
+    bool  m_taaEnabled = false;
     float m_taaBlendFactor = 0.06f;
     // Approximate camera motion flag for jitter/taa tuning.
     bool  m_cameraIsMoving = false;
@@ -582,6 +603,11 @@ public:
       bool m_ssrEnabled = true;
       bool m_rayTracingSupported = false;
       bool m_rayTracingEnabled = false;
+      // Optional RT feature toggles; RT shadows follow the main toggle,
+      // while reflections and GI can be enabled separately once stability
+      // and memory headroom have been verified.
+      bool m_rtReflectionsEnabled = false;
+      bool m_rtGIEnabled = false;
       // Sticky flag set when the DX12 device reports "device removed" during
       // resource creation (typically due to GPU memory pressure). Once this
       // is true the renderer will skip further heavy work for the remainder
@@ -606,9 +632,11 @@ public:
     float m_fractalWarpStrength = 0.0f;
     float m_fractalNoiseType = 0.0f;
 
-    // Simple warm/cool grading applied in post-process
+    // Simple warm/cool grading applied in post-process, plus an extra
+    // channel (m_godRayIntensity) used to scale volumetric sun shafts.
     float m_colorGradeWarm = 0.0f;
     float m_colorGradeCool = 0.0f;
+    float m_godRayIntensity = 1.0f;
 
     // Screen-space ambient occlusion parameters
     bool  m_ssaoEnabled = true;
@@ -630,6 +658,20 @@ public:
     float m_waterWaveSpeed = 1.0f;
     glm::vec2 m_waterPrimaryDir = glm::vec2(1.0f, 0.0f);
     float m_waterSecondaryAmplitude = 0.1f;
+    float m_waterSteepness = 0.6f;
+
+    // Global scale factor applied to rectangular area light sizes when
+    // packing GPU light parameters; exposed via the quick settings UI.
+    float m_areaLightSizeScale = 1.0f;
+
+    // Particle system GPU data
+    struct ParticleInstance {
+        glm::vec3 position;
+        float     size;
+        glm::vec4 color;
+    };
+    ComPtr<ID3D12Resource> m_particleInstanceBuffer;
+    UINT                   m_particleInstanceCapacity = 0;
 
     // Frame state
     float m_totalTime = 0.0f;

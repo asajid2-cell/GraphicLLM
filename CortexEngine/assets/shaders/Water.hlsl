@@ -48,7 +48,7 @@ cbuffer FrameConstants : register(b1)
     // z = wave speed,          w = global water level (Y)
     float4   g_WaterParams0;
     // x = primary wave dir X,  y = primary wave dir Z,
-    // z = secondary amplitude, w = reserved
+    // z = secondary amplitude, w = steepness (0..1)
     float4   g_WaterParams1;
 };
 
@@ -62,6 +62,7 @@ cbuffer MaterialConstants : register(b2)
     float4 g_FractalParams0;
     float4 g_FractalParams1;
     float4 g_FractalParams2;
+    float4 g_CoatParams;
 };
 
 struct VSInput
@@ -93,7 +94,7 @@ PSInput WaterVS(VSInput input)
     // Base world position before displacement.
     float4 worldPos = mul(g_ModelMatrix, float4(input.position, 1.0f));
 
-    // Simple directional sine wave using the shared water parameters.
+    // Directional Gerstner-style waves using the shared water parameters.
     float amplitude = g_WaterParams0.x;
     float waveLen   = max(g_WaterParams0.y, 0.1f);
     float speed     = g_WaterParams0.z;
@@ -101,19 +102,38 @@ PSInput WaterVS(VSInput input)
 
     float2 dir      = normalize(float2(g_WaterParams1.x, g_WaterParams1.y));
     float secondaryAmp = g_WaterParams1.z;
+    // Overall steepness for horizontal displacement (0 = purely vertical
+    // sine waves, ~0.6 = moderately choppy). This is kept modest so that
+    // buoyancy queries using the CPU mirror remain visually consistent.
+    float steepness = saturate(g_WaterParams1.w);
 
     float k = 2.0f * PI / waveLen;
     float t = g_TimeAndExposure.x;
 
-    float2 xz = worldPos.xz;
-    float phase0 = dot(dir, xz) * k + speed * t;
-    float h0 = amplitude * sin(phase0);
+    // Base (undisplaced) horizontal position in world space.
+    float2 xzBase = worldPos.xz;
+    float phase0 = dot(dir, xzBase) * k + speed * t;
 
     float2 dir2 = float2(-dir.y, dir.x);
-    float phase1 = dot(dir2, xz) * k * 1.3f + speed * 0.8f * t;
-    float h1 = secondaryAmp * sin(phase1);
+    float phase1 = dot(dir2, xzBase) * k * 1.3f + speed * 0.8f * t;
 
+    // Vertical displacement matches the CPU SampleWaterHeightAt() helper so
+    // that buoyancy queries line up with the visible surface.
+    float h0 = amplitude * sin(phase0);
+    float h1 = secondaryAmp * sin(phase1);
     float height = h0 + h1;
+
+    // Gerstner-style horizontal chop for richer silhouettes. We keep the
+    // steepness relatively low and base the displacement on xzBase so the
+    // surface still behaves like a height field for gameplay.
+    float Qa0 = steepness * amplitude;
+    float Qa1 = steepness * secondaryAmp;
+
+    float2 disp0 = Qa0 * float2(dir.x * cos(phase0), dir.y * cos(phase0));
+    float2 disp1 = Qa1 * float2(dir2.x * cos(phase1), dir2.y * cos(phase1));
+    float2 xzDisplaced = xzBase + disp0 + disp1;
+
+    worldPos.xz = xzDisplaced;
     worldPos.y = waterY + height;
     output.worldPos = worldPos.xyz;
 
@@ -170,6 +190,16 @@ float4 WaterPS(PSInput input) : SV_TARGET
 {
     float3 N = normalize(input.normal);
     float3 V = normalize(g_CameraPosition.xyz - input.worldPos);
+
+    uint debugView = (uint)g_DebugMode.x;
+    if (debugView == 29u)
+    {
+        // Water debug: visualize wave height, slope magnitude, and foam ramp.
+        float heightVis = saturate(input.waveHeight * 0.5f + 0.5f);
+        float slope = input.slopeMag;
+        float foamRamp = saturate((slope - 0.08f) * 4.0f);
+        return float4(heightVis, slope, foamRamp, 1.0f);
+    }
 
     // Keep water relatively smooth by default; the hybrid SSR/RT reflection
     // pass adds the high-frequency mirror component.

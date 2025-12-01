@@ -111,7 +111,8 @@ struct RotationComponent {
 enum class LightType : uint32_t {
     Directional = 0,
     Point       = 1,
-    Spot        = 2
+    Spot        = 2,
+    AreaRect    = 3
 };
 
 // Light Component - Forward lighting sources
@@ -123,6 +124,10 @@ struct LightComponent {
     float innerConeDegrees = 20.0f; // For spot (ignored for others)
     float outerConeDegrees = 30.0f; // For spot
     bool castsShadows = false;    // Reserved for future shadowed lights
+    // Rectangular area lights (softboxes) use the light's transform
+    // orientation plus this size in local X/Y as their emitting surface.
+    glm::vec2 areaSize = glm::vec2(1.0f, 1.0f);
+    bool twoSided = false;
 };
 
 // Camera Component
@@ -160,6 +165,41 @@ struct BuoyancyComponent {
     float damping = 0.8f;
     // Internal vertical velocity used by the buoyancy integrator.
     float verticalVelocity = 0.0f;
+};
+
+// Simple CPU-side particle representation for emitters. Particles are
+// simulated in local or world space and rendered via a GPU-instanced
+// quad in the renderer.
+struct Particle {
+    glm::vec3 position{0.0f};
+    glm::vec3 velocity{0.0f};
+    float     age = 0.0f;
+    float     lifetime = 1.0f;
+    float     size = 0.1f;
+    glm::vec4 color{1.0f};
+};
+
+enum class ParticleEmitterType : uint32_t {
+    Smoke = 0,
+    Fire  = 1
+};
+
+struct ParticleEmitterComponent {
+    ParticleEmitterType type = ParticleEmitterType::Smoke;
+    float rate = 20.0f;           // particles per second
+    float lifetime = 3.0f;        // seconds
+    glm::vec3 initialVelocity{0.0f, 1.0f, 0.0f};
+    glm::vec3 velocityRandom{0.3f, 0.3f, 0.3f};
+    float sizeStart = 0.1f;
+    float sizeEnd   = 0.5f;
+    glm::vec4 colorStart{1.0f};
+    glm::vec4 colorEnd{1.0f, 1.0f, 1.0f, 0.0f};
+    float gravity = -0.5f;
+    bool  localSpace = false;
+
+    // Internal state
+    float emissionAccumulator = 0.0f;
+    std::vector<Particle> particles;
 };
 
 } // namespace Cortex::Scene

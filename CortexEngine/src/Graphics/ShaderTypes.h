@@ -36,7 +36,7 @@ struct ObjectConstants {
 
 // Light data for forward lighting
 struct Light {
-    // xyz: position (for point/spot), w: type (0 = directional, 1 = point, 2 = spot)
+    // xyz: position (for point/spot/area), w: type (0 = directional, 1 = point, 2 = spot, 3 = rect area)
     glm::vec4 position_type;
     // xyz: direction (for dir/spot, normalized), w: inner cone cos (spot)
     glm::vec4 direction_cosInner;
@@ -89,8 +89,12 @@ struct FrameConstants {
     //                      21 = RT GI buffer debug,
     //                      22 = shaded with RT GI disabled,
     //                      23 = shaded with RT reflections disabled (SSR only),
-    //                      24 = RT reflection ray direction debug,
-    //                      25 = TAA history weight debug),
+    //                      24 = SDF debug / RT reflection ray direction (mode-dependent),
+    //                      25 = TAA history weight debug,
+    //                      26 = material layers debug (clear-coat / sheen / SSS),
+    //                      27 = anisotropy debug,
+    //                      28 = fog factor debug (post-process),
+    //                      29 = water debug (height/slope/foam)),
     //     w = RT history valid (>0.5), y/z reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight,
@@ -100,7 +104,8 @@ struct FrameConstants {
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
     glm::vec4 envParams;
-    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    // x = warm tint (-1..1), y = cool tint (-1..1),
+    // z = god-ray intensity scale, w reserved
     glm::vec4 colorGrade;
     // Exponential height fog parameters:
     // x = density, y = base height, z = height falloff, w = enabled (>0.5)
@@ -122,7 +127,7 @@ struct FrameConstants {
     // waterParams0: x = base wave amplitude, y = base wave length,
     //               z = wave speed,          w = global water level (Y)
     // waterParams1: x = primary wave dir X,  y = primary wave dir Z,
-    //               z = secondary amplitude, w = reserved
+    //               z = secondary amplitude, w = steepness (0..1)
     glm::vec4 waterParams0;
     glm::vec4 waterParams1;
 };
@@ -137,6 +142,9 @@ struct MaterialConstants {
     alignas(16) glm::vec4 fractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     alignas(16) glm::vec4 fractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     alignas(16) glm::vec4 fractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
+    // x = clear-coat intensity (0..1), y = clear-coat roughness (0..1),
+    // z,w reserved for future layering parameters.
+    alignas(16) glm::vec4 coatParams;
 };
 
 } // namespace Cortex::Graphics

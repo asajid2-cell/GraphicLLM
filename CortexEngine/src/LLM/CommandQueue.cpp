@@ -885,6 +885,8 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
             {"wood",             {{0.6f, 0.4f, 0.25f, 1.0f}, 0.0f, 0.6f}},
             {"stone",            {{0.5f, 0.5f, 0.55f, 1.0f}, 0.0f, 0.8f}},
             {"glass",            {{0.8f, 0.9f, 1.0f, 0.3f}, 1.0f, 0.02f}},
+            {"cloth",            {{0.8f, 0.0f, 0.0f, 1.0f}, 0.0f, 0.75f}},
+            {"velvet",           {{0.6f, 0.1f, 0.2f, 1.0f}, 0.0f, 0.8f}},
             // Hero-scene tuned presets so LLM commands can snap to the same
             // materials used in the curated layout.
             {"concrete",         {{0.9f, 0.9f, 0.9f, 1.0f}, 0.0f, 0.8f}},
@@ -896,6 +898,11 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
             {"ceramic",          {{0.9f, 0.9f, 0.92f, 1.0f}, 0.0f, 0.2f}},
             {"skin",             {{1.0f, 0.77f, 0.64f, 1.0f}, 0.0f, 0.6f}},
             {"skin_ish",         {{1.0f, 0.8f, 0.7f, 1.0f}, 0.0f, 0.55f}},
+            // Emissive variants (alpha encodes emission strength for the
+            // shader; metallic/roughness kept neutral).
+            {"emissive",         {{1.0f, 1.0f, 1.0f, 0.8f}, 0.0f, 0.3f}},
+            {"neon_blue",        {{0.4f, 0.8f, 1.0f, 0.9f}, 0.0f, 0.25f}},
+            {"neon_pink",        {{1.0f, 0.3f, 0.7f, 0.9f}, 0.0f, 0.25f}},
         };
 
         auto it = kPresets.find(name);

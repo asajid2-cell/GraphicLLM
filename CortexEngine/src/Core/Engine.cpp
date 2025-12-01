@@ -9,6 +9,7 @@
 #include "UI/TextPrompt.h"
 #include "UI/DebugMenu.h"
 #include "UI/QuickSettingsWindow.h"
+#include "UI/SceneEditorWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
@@ -502,6 +503,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
         UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
         UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
+        UI::SceneEditorWindow::Initialize(m_window->GetHWND());
     }
 
     m_running = true;
@@ -543,7 +545,8 @@ void Engine::ShowCameraHelpOverlay() {
         "  F3                  - Toggle shadows\n"
         "  F4                  - Cycle debug view (shaded/normal/rough/metal/albedo/cascades/IBL/SSAO/SSR/SceneGraph)\n"
         "  Z                   - Toggle temporal AA (TAA) on/off\n"
-        "  R                   - Cycle SSR/SSAO (both on -> SSR only -> SSAO only -> both off)\n"
+        "  R                   - Cycle gizmo mode (translate / rotate / resize)\n"
+        "  U                   - Open scene editor window\n"
         "  F5                  - Increase shadow PCF radius\n"
         "  F7 / F8             - Decrease / increase shadow bias\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
@@ -580,6 +583,7 @@ void Engine::Shutdown() {
     SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
     UI::DebugMenu::Shutdown();
     UI::QuickSettingsWindow::Shutdown();
+    UI::SceneEditorWindow::Shutdown();
 
     // Phase 2: Shutdown LLM
     if (m_llmService) {
@@ -627,10 +631,19 @@ void Engine::SetFocusTarget(const std::string& name) {
 }
 
 void Engine::ToggleScenePreset() {
-    ScenePreset next =
-        (m_currentScenePreset == ScenePreset::CornellBox)
-            ? ScenePreset::DragonOverWater
-            : ScenePreset::CornellBox;
+    ScenePreset next;
+    switch (m_currentScenePreset) {
+    case ScenePreset::RTShowcase:
+        next = ScenePreset::CornellBox;
+        break;
+    case ScenePreset::CornellBox:
+        next = ScenePreset::DragonOverWater;
+        break;
+    case ScenePreset::DragonOverWater:
+    default:
+        next = ScenePreset::RTShowcase;
+        break;
+    }
     RebuildScene(next);
 }
 
@@ -650,14 +663,16 @@ void Engine::ApplyHeroVisualBaseline() {
     m_renderer->SetExposure(1.2f);
     m_renderer->SetBloomIntensity(0.3f);
 
-    // Shadow and AA defaults that balance quality and stability.
+    // Shadow and AA defaults that balance quality and stability. Use FXAA
+    // as the default AA so presentation is stable even while TAA is being
+    // iterated on.
     m_renderer->SetShadowsEnabled(true);
     m_renderer->SetShadowBias(0.0005f);
     m_renderer->SetShadowPCFRadius(1.5f);
     m_renderer->SetCascadeSplitLambda(0.5f);
 
-    m_renderer->SetTAAEnabled(true);
-    m_renderer->SetFXAAEnabled(false);
+    m_renderer->SetTAAEnabled(false);
+    m_renderer->SetFXAAEnabled(true);
 
     // Screen-space ambient occlusion and reflections enabled as baseline.
     m_renderer->SetSSAOEnabled(true);
@@ -856,6 +871,7 @@ void Engine::RenderHUD() {
                 const wchar_t* typeLabel = L"Point";
                 if (light.type == Scene::LightType::Directional) typeLabel = L"Dir";
                 else if (light.type == Scene::LightType::Spot)   typeLabel = L"Spot";
+                else if (light.type == Scene::LightType::AreaRect) typeLabel = L"Area";
 
                 glm::vec3 pos(0.0f);
                 if (m_registry->HasComponent<Scene::TransformComponent>(entity)) {
@@ -1304,6 +1320,12 @@ void Engine::ProcessInput() {
                     spdlog::info("Quick settings window toggled (O)");
                     break;
                 }
+                if (key == SDLK_U) {
+                    // Separate scene editor window for spawning primitives and models.
+                    UI::SceneEditorWindow::Toggle();
+                    spdlog::info("Scene editor window toggled (U)");
+                    break;
+                }
                 if (key == SDLK_M) {
                     // GPU overlay (in-shader menu) toggle – does not affect
                     // the native F2 settings window.
@@ -1591,21 +1613,20 @@ void Engine::ProcessInput() {
                     }
                 }
                 else if (event.key.key == SDLK_R) {
-                    // Toggle gizmo mode between translate and rotate so the
-                    // same axis handles can be used for both operations.
-                    if (m_selectedEntity != entt::null) {
-                        m_gizmoMode = (m_gizmoMode == GizmoMode::Translate)
-                            ? GizmoMode::Rotate
-                            : GizmoMode::Translate;
-                        spdlog::info("Gizmo mode: {}", m_gizmoMode == GizmoMode::Translate
-                                                       ? "TRANSLATE"
-                                                       : "ROTATE");
+                    // Cycle gizmo mode between translate, rotate, and resize
+                    // so the same axis handles can be used for all three.
+                    if (m_gizmoMode == GizmoMode::Translate) {
+                        m_gizmoMode = GizmoMode::Rotate;
+                    } else if (m_gizmoMode == GizmoMode::Rotate) {
+                        m_gizmoMode = GizmoMode::Scale;
+                    } else {
+                        m_gizmoMode = GizmoMode::Translate;
                     }
-                    else if (m_renderer) {
-                        // When nothing is selected, keep the old R behavior
-                        // for cycling SSR/SSAO debug modes.
-                        m_renderer->CycleScreenSpaceEffectsDebug();
-                    }
+
+                    const char* label = (m_gizmoMode == GizmoMode::Translate)
+                        ? "TRANSLATE"
+                        : (m_gizmoMode == GizmoMode::Rotate ? "ROTATE" : "RESIZE");
+                    spdlog::info("Gizmo mode: {}", label);
                 }
                 else if (event.key.key == SDLK_C) {
                     if (m_renderer) {
@@ -1706,8 +1727,9 @@ void Engine::ProcessInput() {
 
                                 // Cache initial entity transform and axis parameter.
                                 auto& selT = reg.get<Scene::TransformComponent>(m_selectedEntity);
-                                m_gizmoDragStartEntityPos = selT.position;
-                                m_gizmoDragStartEntityRot = selT.rotation;
+                                m_gizmoDragStartEntityPos   = selT.position;
+                                m_gizmoDragStartEntityRot   = selT.rotation;
+                                m_gizmoDragStartEntityScale = selT.scale;
                                 glm::vec3 hitPoint;
                                 if (RayPlaneIntersection(rayOrigin, rayDir,
                                                          m_gizmoDragPlanePoint,
@@ -1781,7 +1803,7 @@ void Engine::ProcessInput() {
                                     if (m_gizmoMode == GizmoMode::Translate) {
                                         glm::vec3 offset = axisN * delta;
                                         selT.position = m_gizmoDragStartEntityPos + offset;
-                                    } else {
+                                    } else if (m_gizmoMode == GizmoMode::Rotate) {
                                         // Rotate around the gizmo axis passing through the
                                         // object's center. Map drag distance along the axis
                                         // to an angle in radians.
@@ -1790,6 +1812,15 @@ void Engine::ProcessInput() {
                                         angle = glm::clamp(angle, -maxAngle, maxAngle);
                                         glm::quat deltaRot = glm::angleAxis(angle, axisN);
                                         selT.rotation = glm::normalize(deltaRot * m_gizmoDragStartEntityRot);
+                                    } else if (m_gizmoMode == GizmoMode::Scale) {
+                                        // Resize the object by scaling uniformly based on
+                                        // drag distance along the selected axis. Mapping
+                                        // delta into a modest scale factor keeps interaction
+                                        // predictable and prevents negative scales.
+                                        float scaleDelta  = delta * 0.5f;
+                                        float scaleFactor = 1.0f + scaleDelta;
+                                        scaleFactor = std::clamp(scaleFactor, 0.1f, 10.0f);
+                                        selT.scale = m_gizmoDragStartEntityScale * scaleFactor;
                                     }
                                 }
                             }
@@ -2056,6 +2087,82 @@ void Engine::Update(float deltaTime) {
 
             // Integrate vertical position.
             transform.position.y += buoyancy.verticalVelocity * deltaTime;
+        }
+    }
+
+    // CPU particle system integration: emit and update particles for simple
+    // smoke / fire effects. Simulation runs in lockstep with the main update
+    // so that render and physics stay in sync without introducing additional
+    // threading complexity.
+    if (m_registry) {
+        auto view = m_registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
+        for (auto entity : view) {
+            auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
+            auto& transform = view.get<Scene::TransformComponent>(entity);
+
+            // Emit new particles according to the configured rate.
+            emitter.emissionAccumulator += deltaTime * glm::max(emitter.rate, 0.0f);
+            const int maxToEmit = static_cast<int>(emitter.emissionAccumulator);
+            emitter.emissionAccumulator -= static_cast<float>(maxToEmit);
+
+            const std::size_t maxParticles = 2048;
+            for (int i = 0; i < maxToEmit; ++i) {
+                if (emitter.particles.size() >= maxParticles) {
+                    break;
+                }
+
+                Scene::Particle p;
+                p.age = 0.0f;
+                p.lifetime = glm::max(emitter.lifetime, 0.1f);
+
+                // Simple deterministic jitter based on current particle count
+                // so behaviour stays stable across runs without a RNG.
+                const float seed = static_cast<float>(emitter.particles.size() + 1);
+                auto rand01 = [seed](float k) {
+                    float v = std::sin(seed * (12.9898f + k) + 78.233f) * 43758.5453f;
+                    return v - std::floor(v);
+                };
+
+                glm::vec3 velJitter(
+                    (rand01(1.0f) * 2.0f - 1.0f) * emitter.velocityRandom.x,
+                    (rand01(2.0f) * 2.0f - 1.0f) * emitter.velocityRandom.y,
+                    (rand01(3.0f) * 2.0f - 1.0f) * emitter.velocityRandom.z);
+
+                p.velocity = emitter.initialVelocity + velJitter;
+                p.size = emitter.sizeStart;
+                p.color = emitter.colorStart;
+
+                if (emitter.localSpace) {
+                    p.position = glm::vec3(0.0f);
+                } else {
+                    p.position = glm::vec3(transform.worldMatrix[3]);
+                }
+
+                emitter.particles.push_back(p);
+            }
+
+            // Integrate existing particles.
+            const float gravity = emitter.gravity;
+            for (auto& p : emitter.particles) {
+                p.age += deltaTime;
+                if (p.age > p.lifetime) {
+                    continue;
+                }
+                p.velocity.y += gravity * deltaTime;
+                p.position += p.velocity * deltaTime;
+
+                float t = glm::clamp(p.age / p.lifetime, 0.0f, 1.0f);
+                p.size = glm::mix(emitter.sizeStart, emitter.sizeEnd, t);
+                p.color = glm::mix(emitter.colorStart, emitter.colorEnd, t);
+            }
+
+            // Remove dead particles in-place.
+            emitter.particles.erase(
+                std::remove_if(
+                    emitter.particles.begin(),
+                    emitter.particles.end(),
+                    [](const Scene::Particle& p) { return p.age >= p.lifetime; }),
+                emitter.particles.end());
         }
     }
 
@@ -2799,20 +2906,32 @@ void Engine::DebugDrawSceneGraph() {
             return glm::vec4(base, 1.0f);
         };
 
+        float axisThickness = len * 0.02f;
+
+        glm::vec4 xColor = colorForAxis(GizmoAxis::X, {1,0,0});
+        glm::vec4 yColor = colorForAxis(GizmoAxis::Y, {0,1,0});
+        glm::vec4 zColor = colorForAxis(GizmoAxis::Z, {0,0,1});
+
         glm::vec3 xTip = c + axisX * len;
-        m_renderer->AddDebugLine(c, xTip, colorForAxis(GizmoAxis::X, {1,0,0}));
-        m_renderer->AddDebugLine(xTip - axisY*0.05f, xTip + axisY*0.05f,
-                                 colorForAxis(GizmoAxis::X, {1,0,0}));
+        glm::vec3 xOffset = (axisY + axisZ) * (0.5f * axisThickness);
+        m_renderer->AddDebugLine(c, xTip, xColor);
+        m_renderer->AddDebugLine(c + xOffset, xTip + xOffset, xColor);
+        m_renderer->AddDebugLine(c - xOffset, xTip - xOffset, xColor);
+        m_renderer->AddDebugLine(xTip - axisY*0.05f, xTip + axisY*0.05f, xColor);
 
         glm::vec3 yTip = c + axisY * len;
-        m_renderer->AddDebugLine(c, yTip, colorForAxis(GizmoAxis::Y, {0,1,0}));
-        m_renderer->AddDebugLine(yTip - axisZ*0.05f, yTip + axisZ*0.05f,
-                                 colorForAxis(GizmoAxis::Y, {0,1,0}));
+        glm::vec3 yOffset = (axisZ + axisX) * (0.5f * axisThickness);
+        m_renderer->AddDebugLine(c, yTip, yColor);
+        m_renderer->AddDebugLine(c + yOffset, yTip + yOffset, yColor);
+        m_renderer->AddDebugLine(c - yOffset, yTip - yOffset, yColor);
+        m_renderer->AddDebugLine(yTip - axisZ*0.05f, yTip + axisZ*0.05f, yColor);
 
         glm::vec3 zTip = c + axisZ * len;
-        m_renderer->AddDebugLine(c, zTip, colorForAxis(GizmoAxis::Z, {0,0,1}));
-        m_renderer->AddDebugLine(zTip - axisX*0.05f, zTip + axisX*0.05f,
-                                 colorForAxis(GizmoAxis::Z, {0,0,1}));
+        glm::vec3 zOffset = (axisX + axisY) * (0.5f * axisThickness);
+        m_renderer->AddDebugLine(c, zTip, zColor);
+        m_renderer->AddDebugLine(c + zOffset, zTip + zOffset, zColor);
+        m_renderer->AddDebugLine(c - zOffset, zTip - zOffset, zColor);
+        m_renderer->AddDebugLine(zTip - axisX*0.05f, zTip + axisX*0.05f, zColor);
     }
 }
 
@@ -3395,14 +3514,16 @@ void Engine::BuildDragonStudioScene() {
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         l.color = glm::vec3(1.0f, 0.95f, 0.85f);
-        // Slightly reduced intensity and a softer outer cone to keep the
-        // floor hotspot under the dragon bright but less extreme, which
-        // makes temporal filtering and motion more stable.
+        // Slightly reduced intensity and a softer outer cone keep the floor
+        // hotspot under the dragon bright but less extreme. We rely on the
+        // sun/cascaded shadows for structure and disable key-light shadows
+        // entirely so small PCF/PCSS variations do not cause flicker in the
+        // patch under the dragon.
         l.intensity = 10.0f;
         l.range = 25.0f;
         l.innerConeDegrees = 22.0f;
         l.outerConeDegrees = 40.0f;
-        l.castsShadows = true;
+        l.castsShadows = false;
     }
 
     // Fill light
@@ -3439,14 +3560,35 @@ void Engine::BuildDragonStudioScene() {
         l.castsShadows = false;
     }
 
+    // Large softbox-style area light above the pool to produce broad,
+    // studio-like highlights on metals and water. This is implemented as a
+    // rectangular area light with no dedicated shadow map; it relies on the
+    // existing sun shadows and volumetric fog for structure.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "SoftboxArea");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 6.0f, poolZ - 1.0f);
+        glm::vec3 dir(0.0f, -1.0f, 0.1f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::AreaRect;
+        l.color = glm::vec3(1.0f, 0.98f, 0.94f);
+        l.intensity = 3.0f;
+        l.range = 30.0f;
+        l.areaSize = glm::vec2(6.0f, 4.0f);
+        l.twoSided = false;
+        l.castsShadows = false;
+    }
+
 }
 
 void Engine::InitializeScene() {
-    // Default to the Cornell box with mirrors as the initial scene so RTX
-    // shadows/reflections/GI can be evaluated in a controlled test layout.
-    // Callers can rebuild with the dragon studio preset later via the scene
-    // toggle or LLM commands.
-    m_currentScenePreset = ScenePreset::CornellBox;
+    // Default to the original "Dragon Over Water Studio" hero scene so the
+    // engine boots into the established Phase 2 layout. The RT showcase and
+    // Cornell box remain available via the scene toggle or LLM commands.
+    m_currentScenePreset = ScenePreset::DragonOverWater;
     RebuildScene(m_currentScenePreset);
 }
 
@@ -3641,6 +3783,13 @@ void Engine::SubmitNaturalLanguageCommand(const std::string& command) {
             }
         }
     });
+}
+
+void Engine::EnqueueSceneCommand(std::shared_ptr<LLM::SceneCommand> command) {
+    if (!m_commandQueue || !command) {
+        return;
+    }
+    m_commandQueue->Push(std::move(command));
 }
 
 } // namespace Cortex

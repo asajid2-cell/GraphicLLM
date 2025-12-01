@@ -52,7 +52,8 @@ cbuffer FrameConstants : register(b1)
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
     float4 g_EnvParams;
-    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    // x = warm tint (-1..1), y = cool tint (-1..1),
+    // z = god-ray intensity scale, w reserved
     float4 g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4 g_FogParams;
@@ -71,7 +72,7 @@ cbuffer FrameConstants : register(b1)
     // z = wave speed,          w = global water level (Y)
     float4 g_WaterParams0;
     // x = primary wave dir X,  y = primary wave dir Z,
-    // z = secondary amplitude, w = reserved
+    // z = secondary amplitude, w = steepness (0..1)
     float4 g_WaterParams1;
 };
 
@@ -90,6 +91,8 @@ cbuffer MaterialConstants : register(b2)
     float4 g_FractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     float4 g_FractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
+    // x = clear-coat weight, y = clear-coat roughness, z/w reserved.
+    float4 g_CoatParams;
 };
 
 // Texture and sampler
@@ -176,6 +179,7 @@ static const float SHADOW_MAP_SIZE = 2048.0f;
 static const uint LIGHT_TYPE_DIRECTIONAL = 0;
 static const uint LIGHT_TYPE_POINT       = 1;
 static const uint LIGHT_TYPE_SPOT        = 2;
+static const uint LIGHT_TYPE_AREA_RECT   = 3;
 
 // --- Fractal noise helpers (2D hash + value noise + fbm) ---
 
@@ -567,27 +571,55 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, slice);
   }
 
-float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord)
+float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord, float4 tangentWS)
 {
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
     // Material classification encoded in fractalParams1.w by the renderer:
-    // 0 = default, 1 = glass, 2 = mirror, 3 = plastic, 4 = brick/masonry.
-    float materialType = g_FractalParams1.w;
-    bool isGlass  = (materialType > 0.5f && materialType < 1.5f);
-    bool isMirror = (materialType > 1.5f && materialType < 2.5f);
-    bool isPlastic = (materialType > 2.5f && materialType < 3.5f);
-    bool isBrick   = (materialType > 3.5f && materialType < 4.5f);
+    // 0 = default,
+    // 1 = glass,
+    // 2 = mirror,
+    // 3 = plastic,
+    // 4 = brick/masonry,
+    // 5 = emissive / neon surface.
+    float materialType    = g_FractalParams1.w;
+    bool isGlass          = (materialType > 0.5f && materialType < 1.5f);
+    bool isMirror         = (materialType > 1.5f && materialType < 2.5f);
+    bool isPlastic        = (materialType > 2.5f && materialType < 3.5f);
+    bool isBrick          = (materialType > 3.5f && materialType < 4.5f);
+    bool isEmissive       = (materialType > 4.5f && materialType < 5.5f);
+    bool anisoMetalFlag   = (materialType > 5.5f && materialType < 6.5f);
+    bool anisoWoodFlag    = (materialType > 6.5f && materialType < 7.5f);
+    float clearCoatWeight   = saturate(g_CoatParams.x);
+    float clearCoatRoughness = saturate(g_CoatParams.y);
+    float sheenWeight       = saturate(g_CoatParams.z);
+    float sssWrap           = saturate(g_CoatParams.w);
+
+    float anisotropy = 0.0f;
+    if (anisoMetalFlag)
+    {
+        anisotropy = 0.7f;
+    }
+    else if (anisoWoodFlag)
+    {
+        anisotropy = 0.5f;
+    }
+
+    // Reconstruct tangent and bitangent in world space for anisotropic
+    // highlights; tangentWS.w encodes the bitangent sign.
+    float3 T = normalize(tangentWS.xyz);
+    float  bitangentSign = (tangentWS.w >= 0.0f) ? 1.0f : -1.0f;
+    float3 B = normalize(cross(normal, T)) * bitangentSign;
 
     // Clamp metallic to leave a small diffuse contribution even for "full"
     // metals so that scenes remain readable under very dark environments.
     metallic = min(saturate(metallic), 0.95f);
 
-    // Glass, plastic, and brick are always treated as dielectrics in the
+    // Glass, plastic, brick, and emissive surfaces are always treated as dielectrics in the
     // BRDF (metallic = 0) so they rely on Fresnel and the specular lobe
     // rather than a colored metal F0. Their reflectivity is controlled via
     // roughness and the Fresnel term.
-    if (isGlass || isPlastic || isBrick) {
+    if (isGlass || isPlastic || isBrick || isEmissive) {
         metallic = 0.0f;
     }
     roughness = saturate(roughness);
@@ -648,7 +680,11 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float attenuation = 1.0f;
         float3 radiance = light.color_range.rgb;
 
-        if (type == LIGHT_TYPE_POINT || type == LIGHT_TYPE_SPOT)
+        const bool isPointLike = (type == LIGHT_TYPE_POINT ||
+                                  type == LIGHT_TYPE_SPOT  ||
+                                  type == LIGHT_TYPE_AREA_RECT);
+
+        if (isPointLike)
         {
             float3 toLight = light.position_type.xyz - worldPos;
             float dist = length(toLight);
@@ -671,6 +707,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 float spotFactor = saturate((cosTheta - cosOuter) / max(cosInner - cosOuter, 1e-4f));
                 attenuation *= spotFactor * spotFactor;
             }
+            else if (type == LIGHT_TYPE_AREA_RECT)
+            {
+                // Rectangular area lights approximate a softbox: clamp the
+                // minimum attenuation so they do not fall off as aggressively
+                // as point lights and stay visually present across a larger
+                // portion of the scene.
+                attenuation = max(attenuation, 0.35f);
+            }
         }
         else
         {
@@ -691,12 +735,62 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         }
 
         float3 F = FresnelSchlick(VdotH, F0);
-        float D = DistributionGGX(NdotH, roughness);
-        float G = GeometrySmith(NdotV, NdotL, roughness);
+        float  D;
+        float  roughForLight = roughness;
+        // Area lights produce broader highlights; approximate this by using
+        // a slightly higher effective roughness for their specular lobe so
+        // they read as large soft sources in the studio / Cornell scenes.
+        if (type == LIGHT_TYPE_AREA_RECT)
+        {
+            roughForLight = saturate(roughness * 1.5f + 0.05f);
+        }
+        if (anisotropy > 0.01f)
+        {
+            // Anisotropic GGX distribution using different roughness along
+            // tangent and bitangent directions. Geometry term remains the
+            // isotropic Smith approximation.
+            float alpha  = roughForLight * roughForLight;
+            float alphaX = alpha * (1.0f + anisotropy);
+            float alphaY = alpha / max(1.0f + anisotropy, 1e-3f);
+
+            float3 H = halfDir;
+            float3 Ht = float3(dot(H, T), dot(H, B), dot(H, normal));
+
+            float denomH = Ht.x * Ht.x / (alphaX * alphaX) +
+                           Ht.y * Ht.y / (alphaY * alphaY) +
+                           Ht.z * Ht.z / (alpha  * alpha);
+            denomH = max(denomH, 1e-4f);
+            float denom2 = denomH * denomH;
+            D = 1.0f / (PI * alphaX * alphaY * denom2);
+        }
+        else
+        {
+            D = DistributionGGX(NdotH, roughForLight);
+        }
+        float G = GeometrySmith(NdotV, NdotL, roughForLight);
 
         float3 numerator = D * G * F;
         float  denom = max(4.0f * NdotV * NdotL, 1e-4f);
         float3 specular = numerator / denom;
+
+        // Optional clear-coat layer: a thin glossy dielectric top layer over
+        // the base BRDF used for painted plastics and polished metals. This
+        // reuses the GGX lobes with a lower roughness and fixed F0 so that
+        // highlights stay tight and energetic without exploding HDR.
+        float coatWeight = clearCoatWeight;
+        float coatRough  = clearCoatRoughness;
+        if (coatWeight > 0.01f)
+        {
+            float3 F_coat = FresnelSchlick(VdotH, float3(0.04f, 0.04f, 0.04f));
+            float  D_coat = DistributionGGX(NdotH, coatRough);
+            float  G_coat = GeometrySmith(NdotV, NdotL, coatRough);
+            float3 specCoat = (D_coat * G_coat * F_coat) / denom;
+
+            // Blend base and coat lobes; keep the coat slightly energy-
+            // limited so we do not double-count all incoming light.
+            float coatBlend = coatWeight * 0.8f;
+            specular = lerp(specular, specCoat, coatBlend);
+        }
         // Clamp per-light specular to avoid extreme spikes that can manifest
         // as full-object color pops when multiple colored lights are present.
         specular = min(specular, 4.0f.xxx);
@@ -709,6 +803,21 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             specular *= 1.25f;
         }
 
+        // Optional cloth/sheen term: adds a soft grazing-angle highlight
+        // suitable for fabric/velvet presets. Uses coatParams.z as a simple
+        // weight so presets can enable or tune the effect without changing
+        // the material layout.
+        float3 sheenColor = albedo;
+        if (sheenWeight > 0.01f)
+        {
+            float oneMinusNL = 1.0f - NdotL;
+            float oneMinusNV = 1.0f - NdotV;
+            float sheen = pow(saturate(oneMinusNL), 4.0f) * pow(saturate(oneMinusNV), 4.0f);
+            float3 sheenTerm = sheenWeight * sheen * sheenColor * radiance * attenuation;
+            // Sheen is purely additive on top of the base BRDF.
+            specular += sheenTerm / max(NdotL, 1e-4f);
+        }
+
         float3 kd = (1.0f - F) * (1.0f - metallic);
         // Glass is dominated by specular; keep only a very small diffuse
         // term so that tinted glass can still contribute slightly to GI
@@ -717,6 +826,19 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
             kd *= 0.1f;
         }
         float3 diffuse = kd * albedo / PI;
+
+        // Very simple SSS / wrap-diffuse for skin-like materials. Instead of
+        // changing the geometry term we scale the Lambert diffuse so that the
+        // effective NdotL behaves like a wrapped cosine, keeping specular
+        // unchanged. coatParams.w carries the wrap factor (0 = classic
+        // Lambert, ~0.3 = noticeably wrapped).
+        if (sssWrap > 0.01f)
+        {
+            float lambert = max(NdotL, 1e-4f);
+            float wrapped = saturate((NdotL + sssWrap) / (1.0f + sssWrap));
+            float scale = wrapped / lambert;
+            diffuse *= scale;
+        }
 
         float3 lightColor = radiance;
 
@@ -1039,6 +1161,7 @@ PSOutput PSMain(PSInput input)
     // Sample albedo texture
     float4 albedoSample = g_MapFlags.x ? g_AlbedoTexture.Sample(g_Sampler, input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
     float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb);
+    float  baseOpacity = saturate(albedoSample.a * g_Albedo.a);
 
     float metallic = g_MapFlags.z ? g_MetallicTexture.Sample(g_Sampler, input.texCoord).r : g_Metallic;
     float roughness = g_MapFlags.w ? g_RoughnessTexture.Sample(g_Sampler, input.texCoord).r : g_Roughness;
@@ -1119,7 +1242,7 @@ PSOutput PSMain(PSInput input)
     }
     else if (debugView == 4)
     {
-        return MakePSOutput(float4(albedo, albedoSample.a * g_Albedo.a), normal, roughness);
+        return MakePSOutput(float4(albedo, baseOpacity), normal, roughness);
     }
     else if (debugView == 5)
     {
@@ -1195,7 +1318,7 @@ PSOutput PSMain(PSInput input)
             float3 lightDir;
             float attenuation = 1.0f;
 
-            if (type == LIGHT_TYPE_POINT || type == LIGHT_TYPE_SPOT)
+            if (type == LIGHT_TYPE_POINT || type == LIGHT_TYPE_SPOT || type == LIGHT_TYPE_AREA_RECT)
             {
                 float3 toLight = light.position_type.xyz - input.worldPos;
                 float dist = length(toLight);
@@ -1284,34 +1407,125 @@ PSOutput PSMain(PSInput input)
         return MakePSOutput(float4(v, v, v, 1.0f), normal, roughness);
     }
     else if (debugView == 21)
-      {
-          // RT diffuse GI-only debug view. Shows the temporally-filtered GI
-          // visibility term (alpha) as grayscale so it matches what the main
-          // shading path actually uses instead of the raw, noisier buffer.
-          if (g_PostParams.w <= 0.5f)
-          {
-              return MakePSOutput(float4(0.0f, 0.0f, 0.0f, 1.0f), normal, roughness);
-          }
-          int2 pixelCoord = int2(input.position.xy);
-          float aCurr = g_RtGI.Load(int3(pixelCoord, 0)).a;
-          float a = aCurr;
-          // Only blend against history once the CPU has populated the GI
-          // history buffer and flagged it as valid via g_DebugMode.w.
-          if (g_DebugMode.w > 0.5f)
-          {
-              float aHist = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
-              float diff = abs(aCurr - aHist);
-              float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
-              a = lerp(aCurr, aHist, historyWeight);
-          }
-          return MakePSOutput(float4(a.xxx, 1.0f), normal, roughness);
-      }
+    {
+        // RT diffuse GI-only debug view. Shows the temporally-filtered GI
+        // visibility term (alpha) as grayscale so it matches what the main
+        // shading path actually uses instead of the raw, noisier buffer.
+        if (g_PostParams.w <= 0.5f)
+        {
+            return MakePSOutput(float4(0.0f, 0.0f, 0.0f, 1.0f), normal, roughness);
+        }
+        int2 pixelCoord = int2(input.position.xy);
+        float aCurr = g_RtGI.Load(int3(pixelCoord, 0)).a;
+        float a = aCurr;
+        // Only blend against history once the CPU has populated the GI
+        // history buffer and flagged it as valid via g_DebugMode.w.
+        if (g_DebugMode.w > 0.5f)
+        {
+            float aHist = g_RtGIHistory.Load(int3(pixelCoord, 0)).a;
+            float diff = abs(aCurr - aHist);
+            float historyWeight = lerp(0.7f, 0.1f, saturate(diff * 4.0f));
+            a = lerp(aCurr, aHist, historyWeight);
+        }
+        return MakePSOutput(float4(a.xxx, 1.0f), normal, roughness);
+    }
+    else if (debugView == 26)
+    {
+        // Material layers debug: visualize clear-coat, sheen, and SSS wrap
+        // packed into RGB so you can quickly see where each effect is active.
+        float clearCoatWeight   = saturate(g_CoatParams.x);
+        float sheenWeight       = saturate(g_CoatParams.z);
+        float sssWrap           = saturate(g_CoatParams.w);
+        float3 layerVis = float3(clearCoatWeight, sheenWeight, sssWrap);
+        return MakePSOutput(float4(layerVis, 1.0f), normal, roughness);
+    }
+    else if (debugView == 27)
+    {
+        // Anisotropy debug: encode tangent direction in RG and anisotropy
+        // strength in B so brushed metals / wood grain can be inspected.
+        float materialType    = g_FractalParams1.w;
+        bool  anisoMetalFlag  = (materialType > 5.5f && materialType < 6.5f);
+        bool  anisoWoodFlag   = (materialType > 6.5f && materialType < 7.5f);
+        float anisotropy      = anisoMetalFlag ? 0.7f : (anisoWoodFlag ? 0.5f : 0.0f);
+
+        // Reconstruct tangent in world space from the interpolated normal and
+        // tangent attributes; this mirrors the work done in CalculateLighting
+        // closely enough for debug visualization.
+        float3 N = normalize(normal);
+        float3 tangentWS = normalize(mul(g_NormalMatrix, float4(input.tangent.xyz, 0.0f)).xyz);
+        float3 T = tangentWS;
+        float3 tVis = normalize(T) * 0.5f + 0.5f;
+        float3 debugColor = float3(tVis.x, tVis.y, anisotropy);
+        return MakePSOutput(float4(debugColor, 1.0f), normal, roughness);
+    }
 
     int2 pixelCoord = int2(input.position.xy);
-    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord);
+    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord, input.tangent);
+
+    // Emissive / neon materials: add a simple self-illumination term derived
+    // from the albedo color so that glowing panels and signs contribute
+    // visible light and feed into bloom/tonemapping. The preset encodes
+    // emission strength in the alpha channel of the albedo color.
+    float materialType   = g_FractalParams1.w;
+    bool isGlass         = (materialType > 0.5f && materialType < 1.5f);
+    bool isMirror        = (materialType > 1.5f && materialType < 2.5f);
+    bool isPlastic       = (materialType > 2.5f && materialType < 3.5f);
+    bool isBrick         = (materialType > 3.5f && materialType < 4.5f);
+    bool isEmissive      = (materialType > 4.5f && materialType < 5.5f);
+    bool anisoMetalFlag2 = (materialType > 5.5f && materialType < 6.5f);
+    bool anisoWoodFlag2  = (materialType > 6.5f && materialType < 7.5f);
+    if (isEmissive)
+    {
+        // Treat albedo alpha as a normalized emission control and map it
+        // into a practical intensity range so emissive presets can request
+        // brighter or dimmer surfaces without exploding HDR.
+        float emissiveControl = baseOpacity;
+        float emissiveIntensity = lerp(2.0f, 12.0f, emissiveControl);
+        float3 emissiveColor = albedo;
+        color += emissiveColor * emissiveIntensity;
+    }
+
+    // Per-material TAA weight: opaque materials encode a simple temporal
+    // accumulation preference into the alpha channel so the TAA resolve can
+    // down-weight history on problematic surfaces (mirrors, glass, strong
+    // emissive panels) without adding a dedicated G-buffer. Transparent
+    // materials keep their physical opacity (< 0.99) so refraction and
+    // blending in the post-process pass continue to behave as before.
+    float taaWeight = 1.0f;
+    if (isGlass || isMirror)
+    {
+        // Mirrors / pure glass rely on SSR/RT and per-frame shading; even a
+        // small amount of history can leave visible multi-exposures.
+        taaWeight = 0.0f;
+    }
+    else if (isEmissive)
+    {
+        taaWeight = 0.25f;
+    }
+    else if (isPlastic)
+    {
+        taaWeight = 0.7f;
+    }
+    else if (anisoMetalFlag2 || anisoWoodFlag2)
+    {
+        taaWeight = 0.5f;
+    }
+    else if (isBrick)
+    {
+        taaWeight = 1.0f;
+    }
+
+    float finalOpacity = baseOpacity;
+    if (baseOpacity >= 0.99f)
+    {
+        // Opaque materials: remap TAA weight into a tight 0.99-1.0 window so
+        // the post-process can recover it while still treating the surface
+        // as fully opaque (opacity < 0.99 is the transparent cutoff).
+        finalOpacity = 0.99f + 0.01f * saturate(taaWeight);
+    }
 
     // Output linear HDR color; exposure/tonemapping is applied in a post-process pass.
-    return MakePSOutput(float4(color, albedoSample.a * g_Albedo.a), normal, roughness);
+    return MakePSOutput(float4(color, finalOpacity), normal, roughness);
 }
 
 // === Skybox full-screen pass using the same FrameConstants / IBL maps ===

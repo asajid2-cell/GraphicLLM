@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "Utils/Result.h"
 #include "Scene/Components.h"
 
@@ -34,5 +35,10 @@ Result<void> InitializeSampleModelLibrary();
 //     "DragonAttenuation") and loads its glTF mesh via LoadGLTFMesh.
 //   - Name matching is case-insensitive.
 Result<std::shared_ptr<Scene::MeshData>> LoadSampleModelMesh(const std::string& assetName);
+
+// Return the list of registered sample model names (lower-case keys).
+// The library is initialized on first call; on failure an empty list is
+// returned.
+std::vector<std::string> GetSampleModelNames();
 
 } // namespace Cortex::Utils

@@ -39,7 +39,8 @@ cbuffer FrameConstants : register(b1)
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 2 = night)
     float4   g_EnvParams;
-    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    // x = warm tint (-1..1), y = cool tint (-1..1),
+    // z = god-ray intensity scale, w reserved
     float4   g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4   g_FogParams;
@@ -541,7 +542,25 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
 float4 TAAResolvePS(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
-    float3 curr = g_SceneColor.Sample(g_Sampler, uv).rgb;
+    float4 sceneSample = g_SceneColor.Sample(g_Sampler, uv);
+    float3 curr = sceneSample.rgb;
+    float  opacity = sceneSample.a;
+
+    // Per-material TAA weight encoded into the alpha channel for opaque
+    // surfaces. Opaque materials store a weight in the [0.99, 1.0] range
+    // so the post-process can recover it without affecting the opaque vs
+    // transparent classification used elsewhere. Transparent pixels
+    // (opacity < 0.99) are treated as having no TAA history to avoid
+    // smearing glass / UI / volume-like elements.
+    float materialTAAWeight = 1.0f;
+    if (opacity >= 0.99f)
+    {
+        materialTAAWeight = saturate((opacity - 0.99f) * 100.0f);
+    }
+    else
+    {
+        materialTAAWeight = 0.0f;
+    }
 
     uint  debugView      = (uint)g_DebugMode.x;
     bool  isRtDebugView  = (debugView >= 18u && debugView <= 24u);
@@ -642,7 +661,11 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         cMax = curr;
     }
 
-    float2 historyUV = saturate(uv + vel);
+    // Motion vectors are stored in non-jittered UV space; g_TAAParams.xy
+    // encodes the jitter delta between the previous and current frames in
+    // UV units. To sample the correct history location, apply both the
+    // camera motion (vel) and the jitter difference.
+    float2 historyUV = saturate(uv + vel + g_TAAParams.xy);
     float3 history   = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
     float3 historyClamped = clamp(history, cMin, cMax);
     float3 currClamped    = clamp(curr,    cMin, cMax);
@@ -654,26 +677,43 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float3 diff = abs(currClamped - historyClamped);
     float  maxDiff = max(max(diff.r, diff.g), diff.b);
 
+    // Large color deltas generally indicate either disocclusion or highly
+    // view-dependent shading (e.g., reflections). In those cases, relying
+    // on history tends to produce visible ghosts, so treat them as
+    // effectively "no history" for this frame.
+    if (maxDiff > 0.6f)
+    {
+        if (debugView == 25u)
+        {
+            return float4(0.0f, 0.0f, 0.0f, 1.0f);
+        }
+        return float4(curr, 1.0f);
+    }
+
     // Roughness gating: shiny surfaces get less history in all regimes so
     // fast-moving specular highlights do not leave long trails.
     float roughFactor = saturate(surfaceRoughness * 0.6f + 0.2f);
 
     float finalBlend = 0.0f;
 
-    // Static: essentially locked pixels.
-    if (speed < 0.03f && maxDiff < 0.03f)
+    // Static: essentially locked pixels. Use a modest history weight so
+    // they benefit from temporal smoothing without leaving long-lived
+    // ghosts when lighting changes.
+    if (speed < 0.02f && maxDiff < 0.02f)
     {
-        finalBlend = taaBlendBase;
+        finalBlend = taaBlendBase * 0.6f;
     }
-    // Transitional: small motion or moderate color changes.
-    else if (speed < 0.25f && maxDiff < 0.20f)
+    // Transitional: small motion or moderate color changes. Keep history
+    // contribution very low so new frames dominate.
+    else if (speed < 0.20f && maxDiff < 0.18f)
     {
-        finalBlend = taaBlendBase * 0.45f;
+        finalBlend = taaBlendBase * 0.25f;
     }
-    // High-frequency but still somewhat stable (e.g., glossy highlights):
-    else if (speed < 0.35f && maxDiff < 0.35f)
+    // High-frequency but still somewhat stable (e.g., glossy highlights).
+    // Only allow a tiny amount of history so specular streaks do not smear.
+    else if (speed < 0.30f && maxDiff < 0.30f)
     {
-        finalBlend = taaBlendBase * 0.35f;
+        finalBlend = taaBlendBase * 0.15f;
     }
     // Otherwise treat as dynamic / disoccluded and rely on the current
     // frame only; history stays in the clamp range but does not influence
@@ -682,8 +722,11 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     // At hard geometric edges (large depth variance in the 3x3 stencil) we
     // aggressively suppress history so silhouettes remain crisp instead of
     // blending foreground and background together.
-    float edgeDepthMin = 0.0015f;
-    float edgeDepthMax = 0.01f;
+    // Treat even small depth discontinuities as candidates for history
+    // suppression; the Cornell box has large, high-contrast edges where
+    // cross-surface blending is very noticeable.
+    float edgeDepthMin = 0.0007f;
+    float edgeDepthMax = 0.0040f;
     float edgeFactor = saturate((maxDepthDelta - edgeDepthMin) / (edgeDepthMax - edgeDepthMin));
 
     // Hard disocclusion cutoff: for very large depth steps treat the pixel
@@ -715,11 +758,43 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
 
     finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
 
+    // If this pixel sits on a clear geometric edge (noticeable depth step),
+    // clamp history even more aggressively so Cornell-box style wall/floor
+    // edges do not accumulate ghosts. Anything with a depth variance above
+    // edgeDepthMin is considered an edge for this purpose.
+    if (maxDepthDelta > edgeDepthMin)
+    {
+        finalBlend *= 0.15f;
+    }
+
+    // Mirror-like / very smooth surfaces (low roughness) are highly
+    // view-dependent; relying on history here tends to create visible
+    // ghosting and seam artifacts (e.g., the Cornell mirror panel). For
+    // those pixels, disable history entirely so the image tracks the
+    // current frame only; they are handled by SSR/RT instead.
+    if (surfaceRoughness < 0.07f)
+    {
+        finalBlend = 0.0f;
+    }
+
     // Clamp maximum history contribution per frame so that large objects do
-    // not accumulate very long tails of stale information. This trades more
-    // local blur for much shorter-lived ghosting, which is generally a
-    // better compromise for the dragon and floor highlights.
-    finalBlend = min(finalBlend, 0.25f);
+    // not accumulate very long tails of stale information. This trades a bit
+    // more spatial noise for significantly shorter-lived ghosting.
+    finalBlend = min(finalBlend, 0.18f);
+
+    // Treat very bright, isolated hotspots as fully reactive: if the current
+    // pixel is much brighter than its local neighbourhood, relying on
+    // history tends to leave visible "afterimages". In that case, fall back
+    // to the current frame only for this pixel.
+    if (lumDeltaLocal > 0.5f)
+    {
+        finalBlend = 0.0f;
+    }
+
+    // Apply per-material TAA weight recovered from the scene color alpha so
+    // mirrors, glass, and emissive panels can request reduced or disabled
+    // history accumulation without requiring an additional G-buffer.
+    finalBlend *= materialTAAWeight;
 
     finalBlend = saturate(finalBlend);
 
@@ -1013,6 +1088,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
             fog *= heightFactor;
             fog = saturate(fog);
 
+            // Fog factor debug: visualize the scalar fog term directly as
+            // grayscale instead of compositing it over the scene.
+            if ((uint)g_DebugMode.x == 28u)
+            {
+                return float4(fog.xxx, 1.0f);
+            }
+
             float3 fogColor = g_AmbientColor.rgb;
             hdrBlurred = lerp(hdrBlurred, fogColor, fog);
         }
@@ -1113,6 +1195,9 @@ float4 PSMain(VSOutput input) : SV_TARGET
                         float falloff = saturate(1.0f - distToSun * 1.5f);
                         float3 godColor = g_AmbientColor.rgb;
                         float3 godRays = godColor * godAccum * baseIntensity * falloff / (float)NUM_SAMPLES;
+                        // Global scalar driven from the renderer (colorGrade.z)
+                        // so volumetric intensity can be tuned live.
+                        godRays *= max(g_ColorGrade.z, 0.0f);
 
                         // Clamp to avoid excessive streak brightness.
                         godRays = min(godRays, 4.0f.xxx);
@@ -1138,6 +1223,25 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     color = ApplyACESFilm(color);
     color = pow(color, 1.0f / 2.2f);
+
+    // Optional post-tonemap sharpening to recover some crispness lost to
+    // TAA/FXAA. This is a simple unsharp-mask-style filter that is kept
+    // intentionally mild so it does not introduce ringing. It is only
+    // applied when TAA is enabled in the current frame.
+    if (g_TAAParams.w > 0.5f)
+    {
+        float2 texel = g_PostParams.xy;
+        float3 cM = color;
+        float3 cR = g_SceneColor.Sample(g_Sampler, uv + float2(texel.x, 0.0f)).rgb;
+        float3 cL = g_SceneColor.Sample(g_Sampler, uv - float2(texel.x, 0.0f)).rgb;
+        float3 cU = g_SceneColor.Sample(g_Sampler, uv - float2(0.0f, texel.y)).rgb;
+        float3 cD = g_SceneColor.Sample(g_Sampler, uv + float2(0.0f, texel.y)).rgb;
+
+        float3 blur = (cM + cR + cL + cU + cD) * (1.0f / 5.0f);
+        float3 highFreq = cM - blur;
+        const float sharpenStrength = 0.15f;
+        color = saturate(cM + highFreq * sharpenStrength);
+    }
 
     // GPU-driven settings overlay. When g_DebugMode.y > 0.5 the engine is
     // indicating that the settings panel (M/F2) is active. We dim the scene

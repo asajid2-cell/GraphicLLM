@@ -541,7 +541,7 @@ void DebugMenu::ResetToDefaults() {
         renderer->SetDebugViewMode(0);
         renderer->SetPCSS(false);
         renderer->SetFXAAEnabled(true);
-        renderer->SetTAAEnabled(true);
+        renderer->SetTAAEnabled(false);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);
         renderer->SetIBLEnabled(false);
@@ -552,7 +552,7 @@ void DebugMenu::ResetToDefaults() {
     g_state.current.shadowsEnabled = true;
     g_state.current.pcssEnabled = false;
     g_state.current.fxaaEnabled = true;
-    g_state.current.taaEnabled = true;
+    g_state.current.taaEnabled = false;
     g_state.current.ssrEnabled = true;
     g_state.current.ssaoEnabled = true;
     g_state.current.iblEnabled = false;

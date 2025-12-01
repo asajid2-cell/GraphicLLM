@@ -408,6 +408,11 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         RenderSSR();
     }
 
+        // GPU-instanced particle sprites (smoke / fire). Rendered after the
+        // TAA resolve so they layer over the stable HDR image but before SSAO,
+        // bloom, and post-process tonemapping.
+        RenderParticles(registry);
+
     // Screen-space ambient occlusion from depth buffer (if enabled)
     RenderSSAO();
 
@@ -496,9 +501,10 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
 
     // Optional RT reflections: reuse the same TLAS and depth buffer to write
     // a reflection color buffer that can be inspected or composed in
-    // post-process. This pass is entirely optional; if the reflection pipeline
-    // was not created successfully, DispatchReflections is a no-op.
-    if (m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
+    // post-process. This pass is entirely optional and disabled by default;
+    // if the reflection pipeline was not created successfully,
+    // DispatchReflections is a no-op.
+    if (m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
         if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
             D3D12_RESOURCE_BARRIER reflBarrier{};
             reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -523,9 +529,9 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
 
     // Optional RT diffuse GI: writes a low-frequency indirect lighting buffer
     // that can be sampled by the main PBR shader. As with reflections, this
-    // pass is optional; DispatchGI is a no-op if the GI pipeline is not
-    // available.
-    if (m_rtGIColor && m_rtGIUAV.IsValid()) {
+    // pass is optional and disabled by default; DispatchGI is a no-op if the
+    // GI pipeline is not available.
+    if (m_rtGIEnabled && m_rtGIColor && m_rtGIUAV.IsValid()) {
         if (m_rtGIState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
             D3D12_RESOURCE_BARRIER giBarrier{};
             giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -653,6 +659,194 @@ void Renderer::BeginFrame() {
     // Reset command allocator and list
     m_commandAllocators[m_frameIndex]->Reset();
     m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+}
+
+void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
+    if (!registry || !m_particlePipeline || !m_hdrColor || m_particleBufferMapFailed) {
+        return;
+    }
+
+    auto view = registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
+    if (view.begin() == view.end()) {
+        return;
+    }
+
+    std::vector<ParticleInstance> instances;
+    instances.reserve(1024);
+
+    for (auto entity : view) {
+        auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        glm::vec3 emitterWorldPos = glm::vec3(transform.worldMatrix[3]);
+
+        for (const auto& p : emitter.particles) {
+            if (p.age >= p.lifetime) {
+                continue;
+            }
+
+            ParticleInstance inst{};
+            inst.position = emitter.localSpace ? (emitterWorldPos + p.position) : p.position;
+            inst.size     = p.size;
+            inst.color    = p.color;
+            instances.push_back(inst);
+        }
+    }
+
+    if (instances.empty()) {
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return;
+    }
+
+    const UINT instanceCount = static_cast<UINT>(instances.size());
+    const UINT requiredCapacity = instanceCount;
+    const UINT minCapacity = 256;
+
+    if (!m_particleInstanceBuffer || m_particleInstanceCapacity < requiredCapacity) {
+        UINT newCapacity = std::max(requiredCapacity, minCapacity);
+
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = static_cast<UINT64>(newCapacity) * sizeof(ParticleInstance);
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ComPtr<ID3D12Resource> buffer;
+        HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&buffer));
+
+        if (FAILED(hr)) {
+            spdlog::warn("RenderParticles: failed to allocate instance buffer");
+            return;
+        }
+
+        m_particleInstanceBuffer = buffer;
+        m_particleInstanceCapacity = newCapacity;
+    }
+
+    // Upload instance data
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{0, 0};
+    const UINT bufferSize = instanceCount * sizeof(ParticleInstance);
+    HRESULT mapHr = m_particleInstanceBuffer->Map(0, &readRange, &mapped);
+    if (SUCCEEDED(mapHr)) {
+        memcpy(mapped, instances.data(), bufferSize);
+        m_particleInstanceBuffer->Unmap(0, nullptr);
+    } else {
+        spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
+                     static_cast<unsigned int>(mapHr));
+        if (m_device && m_device->GetDevice()) {
+            HRESULT reason = m_device->GetDevice()->GetDeviceRemovedReason();
+            if (reason != S_OK) {
+                spdlog::warn("RenderParticles: device removed reason=0x{:08X}",
+                             static_cast<unsigned int>(reason));
+                // Treat this as a fatal condition for the renderer; once the
+                // DX12 device has been removed, further rendering work is not
+                // reliable until the app is restarted.
+                m_deviceRemoved = true;
+            }
+        }
+        m_particleBufferMapFailed = true;
+        return;
+    }
+
+    // Transient quad vertex buffer in an upload heap; tiny and self-contained.
+    struct QuadVertex { float px, py, pz; float u, v; };
+    static const QuadVertex kQuadVertices[4] = {
+        { -0.5f, -0.5f, 0.0f, 0.0f, 1.0f },
+        { -0.5f,  0.5f, 0.0f, 0.0f, 0.0f },
+        {  0.5f, -0.5f, 0.0f, 1.0f, 1.0f },
+        {  0.5f,  0.5f, 0.0f, 1.0f, 0.0f },
+    };
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC vbDesc = {};
+    vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    vbDesc.Width = sizeof(kQuadVertices);
+    vbDesc.Height = 1;
+    vbDesc.DepthOrArraySize = 1;
+    vbDesc.MipLevels = 1;
+    vbDesc.Format = DXGI_FORMAT_UNKNOWN;
+    vbDesc.SampleDesc.Count = 1;
+    vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    vbDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> quadVB;
+    HRESULT hrVB = device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &vbDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&quadVB));
+    if (FAILED(hrVB)) {
+        spdlog::warn("RenderParticles: failed to allocate quad vertex buffer");
+        return;
+    }
+
+    void* quadMapped = nullptr;
+    if (SUCCEEDED(quadVB->Map(0, &readRange, &quadMapped))) {
+        memcpy(quadMapped, kQuadVertices, sizeof(kQuadVertices));
+        quadVB->Unmap(0, nullptr);
+    }
+
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_particlePipeline->GetPipelineState());
+
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    ObjectConstants obj{};
+    obj.modelMatrix  = glm::mat4(1.0f);
+    obj.normalMatrix = glm::mat4(1.0f);
+    auto objAddr = m_objectConstantBuffer.AllocateAndWrite(obj);
+    m_commandList->SetGraphicsRootConstantBufferView(0, objAddr);
+
+    D3D12_VERTEX_BUFFER_VIEW vbViews[2] = {};
+    vbViews[0].BufferLocation = quadVB->GetGPUVirtualAddress();
+    vbViews[0].StrideInBytes  = sizeof(QuadVertex);
+    vbViews[0].SizeInBytes    = sizeof(kQuadVertices);
+
+    vbViews[1].BufferLocation = m_particleInstanceBuffer->GetGPUVirtualAddress();
+    vbViews[1].StrideInBytes  = sizeof(ParticleInstance);
+    vbViews[1].SizeInBytes    = bufferSize;
+
+    m_commandList->IASetVertexBuffers(0, 2, vbViews);
+    m_commandList->IASetIndexBuffer(nullptr);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    m_commandList->DrawInstanced(4, instanceCount, 0, 0);
 }
 
 void Renderer::PrepareMainPass() {
@@ -1140,7 +1334,15 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         glm::vec3 radiance = color * intensity;
 
         Light& outLight = frameData.lights[lightCount];
-        outLight.position_type = glm::vec4(lightXform.position, type == Scene::LightType::Point ? 1.0f : 2.0f);
+        float gpuType = 1.0f;
+        if (type == Scene::LightType::Point) {
+            gpuType = 1.0f;
+        } else if (type == Scene::LightType::Spot) {
+            gpuType = 2.0f;
+        } else if (type == Scene::LightType::AreaRect) {
+            gpuType = 3.0f;
+        }
+        outLight.position_type = glm::vec4(lightXform.position, gpuType);
 
         glm::vec3 forwardLS = lightXform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         glm::vec3 dir = glm::normalize(forwardLS);
@@ -1173,7 +1375,15 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             ++m_localShadowCount;
         }
 
-        outLight.params = glm::vec4(cosOuter, shadowIndex, 0.0f, 0.0f);
+        // For rect area lights we encode the half-size in params.zw so that
+        // the shader can approximate their footprint. Other light types
+        // leave these components at zero.
+        glm::vec2 areaHalfSize(0.0f);
+        if (type == Scene::LightType::AreaRect) {
+            areaHalfSize = 0.5f * glm::max(lightComp.areaSize, glm::vec2(0.0f));
+        }
+
+        outLight.params = glm::vec4(cosOuter, shadowIndex, areaHalfSize.x, areaHalfSize.y);
 
         ++lightCount;
     }
@@ -1401,8 +1611,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         iblEnabled,
         static_cast<float>(m_currentEnvironment));
 
-    // Color grading parameters (warm/cool) for post-process
-    frameData.colorGrade = glm::vec4(m_colorGradeWarm, m_colorGradeCool, 0.0f, 0.0f);
+    // Color grading parameters (warm/cool) for post-process. We repurpose
+    // colorGrade.z as a simple scalar for volumetric sun shafts so the
+    // intensity of "god rays" can be tuned from the UI without adding a new
+    // constant buffer field.
+    frameData.colorGrade = glm::vec4(m_colorGradeWarm, m_colorGradeCool, m_godRayIntensity, 0.0f);
 
     // Exponential height fog parameters
     frameData.fogParams = glm::vec4(
@@ -1439,6 +1652,8 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     const bool taaActiveThisFrame = m_taaEnabled && m_hasHistory;
     float blendForThisFrame = m_taaBlendFactor;
     if (!m_cameraIsMoving) {
+        // When the camera is effectively stationary, reduce blend strength
+        // so history converges but does not dominate the image.
         blendForThisFrame *= 0.5f;
     }
     frameData.taaParams = glm::vec4(
@@ -1457,7 +1672,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_waterPrimaryDir.x,
         m_waterPrimaryDir.y,
         m_waterSecondaryAmplitude,
-        0.0f);
+        m_waterSteepness);
 
     // Previous and inverse view-projection matrices for TAA reprojection and
     // motion vectors. We store the *non-jittered* view-projection from the
@@ -2228,6 +2443,14 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             m_fractalWarpStrength,
             m_fractalNoiseType);
 
+        // Clear-coat / sheen / SSS parameters used by the shader to add thin
+        // glossy or cloth-like layers over the base BRDF.
+        // x = coat weight, y = coat roughness, z = sheen weight, w = SSS wrap.
+        float clearCoat = 0.0f;
+        float clearCoatRoughness = 0.2f;
+        float sheenWeight = 0.0f;
+        float sssWrap = 0.0f;
+
         // Encode a simple material "type" into fractalParams1.w so the
         // shader can specialize behavior for glass / mirror / plastic /
         // brick without changing the MaterialConstants layout.
@@ -2237,6 +2460,11 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         // 2 = mirror-like metal (polished conductor)
         // 3 = plastic
         // 4 = brick / masonry
+        // 5 = emissive / neon surface
+        // 6 = anisotropic metal (brushed)
+        // 7 = anisotropic wood
+        // 6 = anisotropic metal (brushed)
+        // 7 = anisotropic wood
         float materialType = 0.0f;
         if (!renderable.presetName.empty()) {
             std::string presetLower = renderable.presetName;
@@ -2253,9 +2481,53 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
                 materialType = 3.0f;
             } else if (presetLower.find("brick") != std::string::npos) {
                 materialType = 4.0f;
+            } else if (presetLower.find("brushed_metal") != std::string::npos) {
+                materialType = 6.0f;
+            } else if (presetLower.find("wood_floor") != std::string::npos) {
+                materialType = 7.0f;
+            } else if (presetLower.find("emissive") != std::string::npos ||
+                       presetLower.find("neon") != std::string::npos ||
+                       presetLower.find("light") != std::string::npos) {
+                materialType = 5.0f;
+            }
+
+            // Heuristic clear-coat: painted plastics and polished metals
+            // get a thin glossy top layer for stronger, tighter highlights.
+            if (presetLower.find("painted_plastic") != std::string::npos ||
+                presetLower.find("plastic") != std::string::npos)
+            {
+                clearCoat = 1.0f;
+                clearCoatRoughness = 0.15f;
+            }
+            else if (presetLower.find("polished_metal") != std::string::npos ||
+                     presetLower.find("chrome") != std::string::npos)
+            {
+                clearCoat = 0.6f;
+                clearCoatRoughness = 0.08f;
+            }
+
+            // Cloth / velvet-style presets get a soft sheen lobe instead of
+            // a strong clear-coat highlight.
+            if (presetLower.find("cloth") != std::string::npos ||
+                presetLower.find("velvet") != std::string::npos)
+            {
+                clearCoat = 0.0f;
+                sheenWeight = 1.0f;
+            }
+
+            // Skin-like presets get a gentle wrap-diffuse term for a very
+            // simple subsurface scattering approximation.
+            if (presetLower.find("skin_ish") != std::string::npos)
+            {
+                sssWrap = 0.25f;
+            }
+            else if (presetLower.find("skin") != std::string::npos)
+            {
+                sssWrap = 0.35f;
             }
         }
         materialData.fractalParams1.w = materialType;
+        materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
 
         // Update object constants
         ObjectConstants objectData = {};
@@ -2418,6 +2690,11 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
             m_fractalWarpStrength,
             m_fractalNoiseType);
 
+        float clearCoat = 0.0f;
+        float clearCoatRoughness = 0.2f;
+        float sheenWeight = 0.0f;
+        float sssWrap = 0.0f;
+
         float materialType = 0.0f;
         if (!renderable.presetName.empty()) {
             std::string presetLower = renderable.presetName;
@@ -2434,9 +2711,47 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
                 materialType = 3.0f;
             } else if (presetLower.find("brick") != std::string::npos) {
                 materialType = 4.0f;
+            } else if (presetLower.find("brushed_metal") != std::string::npos) {
+                materialType = 6.0f;
+            } else if (presetLower.find("wood_floor") != std::string::npos) {
+                materialType = 7.0f;
+            } else if (presetLower.find("emissive") != std::string::npos ||
+                       presetLower.find("neon") != std::string::npos ||
+                       presetLower.find("light") != std::string::npos) {
+                materialType = 5.0f;
+            }
+
+            if (presetLower.find("painted_plastic") != std::string::npos ||
+                presetLower.find("plastic") != std::string::npos)
+            {
+                clearCoat = 1.0f;
+                clearCoatRoughness = 0.15f;
+            }
+            else if (presetLower.find("polished_metal") != std::string::npos ||
+                     presetLower.find("chrome") != std::string::npos)
+            {
+                clearCoat = 0.6f;
+                clearCoatRoughness = 0.08f;
+            }
+
+            if (presetLower.find("cloth") != std::string::npos ||
+                presetLower.find("velvet") != std::string::npos)
+            {
+                clearCoat = 0.0f;
+                sheenWeight = 1.0f;
+            }
+
+            if (presetLower.find("skin_ish") != std::string::npos)
+            {
+                sssWrap = 0.25f;
+            }
+            else if (presetLower.find("skin") != std::string::npos)
+            {
+                sssWrap = 0.35f;
             }
         }
         materialData.fractalParams1.w = materialType;
+        materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
 
         ObjectConstants objectData = {};
         objectData.modelMatrix  = transform.GetMatrix();
@@ -3057,6 +3372,24 @@ void Renderer::SetFogParams(float density, float height, float falloff) {
     spdlog::info("Fog params: density={}, height={}, falloff={}", m_fogDensity, m_fogHeight, m_fogFalloff);
 }
 
+void Renderer::SetGodRayIntensity(float intensity) {
+    float clamped = glm::clamp(intensity, 0.0f, 5.0f);
+    if (std::abs(clamped - m_godRayIntensity) < 1e-3f) {
+        return;
+    }
+    m_godRayIntensity = clamped;
+    spdlog::info("God-ray intensity set to {}", m_godRayIntensity);
+}
+
+void Renderer::SetAreaLightSizeScale(float scale) {
+    float clamped = glm::clamp(scale, 0.25f, 4.0f);
+    if (std::abs(clamped - m_areaLightSizeScale) < 1e-3f) {
+        return;
+    }
+    m_areaLightSizeScale = clamped;
+    spdlog::info("Area light size scale set to {}", m_areaLightSizeScale);
+}
+
 void Renderer::CycleDebugViewMode() {
     // 0  = shaded, 1 = normals, 2 = roughness, 3 = metallic, 4 = albedo,
     // 5  = cascades, 6  = debug screen (post-process / HUD focus),
@@ -3070,9 +3403,13 @@ void Renderer::CycleDebugViewMode() {
     // 21 = RT GI buffer debug,
     // 22 = shaded with RT GI disabled,
     // 23 = shaded with RT reflections disabled (SSR only),
-    // 24 = RT reflection ray direction debug,
-    // 25 = TAA history weight debug.
-    m_debugViewMode = (m_debugViewMode + 1) % 26;
+    // 24 = SDF debug / RT reflection ray direction,
+    // 25 = TAA history weight debug,
+    // 26 = material layer debug (coat / sheen / SSS),
+    // 27 = anisotropy debug,
+    // 28 = fog factor debug,
+    // 29 = water debug.
+    m_debugViewMode = (m_debugViewMode + 1) % 30;
     const char* label = nullptr;
     switch (m_debugViewMode) {
         case 0: label = "Shaded"; break;
@@ -3101,6 +3438,10 @@ void Renderer::CycleDebugViewMode() {
         case 23: label = "Shaded_NoRTRefl"; break;
         case 24: label = "SDF_Debug"; break;
         case 25: label = "TAA_HistoryWeight"; break;
+        case 26: label = "MaterialLayers"; break;
+        case 27: label = "Anisotropy_Debug"; break;
+        case 28: label = "Fog_Factor"; break;
+        case 29: label = "Water_Debug"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);
@@ -3196,7 +3537,7 @@ void Renderer::SetBloomIntensity(float intensity) {
 }
 
 void Renderer::SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
-                              float dirX, float dirZ, float secondaryAmplitude) {
+                              float dirX, float dirZ, float secondaryAmplitude, float steepness) {
     m_waterLevelY = levelY;
     m_waterWaveAmplitude = amplitude;
     m_waterWaveLength = (waveLength <= 0.0f) ? 1.0f : waveLength;
@@ -3207,6 +3548,7 @@ void Renderer::SetWaterParams(float levelY, float amplitude, float waveLength, f
     }
     m_waterPrimaryDir = glm::normalize(dir);
     m_waterSecondaryAmplitude = glm::max(0.0f, secondaryAmplitude);
+    m_waterSteepness = glm::clamp(steepness, 0.0f, 1.0f);
 }
 
 float Renderer::SampleWaterHeightAt(const glm::vec2& worldXZ) const {
@@ -5083,6 +5425,96 @@ Result<void> Renderer::CreateCommandList() {
         }
     }
 
+    // Particle pipeline: instanced camera-facing quads rendered into the HDR
+    // buffer. Uses a minimal vertex format (position/UV + per-instance data)
+    // and simple alpha blending.
+    auto particleVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Particles.hlsl",
+        "VSMain",
+        "vs_5_1");
+    if (particleVsResult.IsErr()) {
+        spdlog::warn("Failed to compile particle vertex shader: {}", particleVsResult.Error());
+    }
+    auto particlePsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Particles.hlsl",
+        "PSMain",
+        "ps_5_1");
+    if (particlePsResult.IsErr()) {
+        spdlog::warn("Failed to compile particle pixel shader: {}", particlePsResult.Error());
+    }
+
+    if (particleVsResult.IsOk() && particlePsResult.IsOk()) {
+        m_particlePipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc particleDesc = {};
+        particleDesc.vertexShader = particleVsResult.Value();
+        particleDesc.pixelShader  = particlePsResult.Value();
+        // Quad vertex buffer in slot 0
+        D3D12_INPUT_ELEMENT_DESC posElem{};
+        posElem.SemanticName = "POSITION";
+        posElem.SemanticIndex = 0;
+        posElem.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+        posElem.InputSlot = 0;
+        posElem.AlignedByteOffset = 0;
+        posElem.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+        posElem.InstanceDataStepRate = 0;
+
+        D3D12_INPUT_ELEMENT_DESC uvElem{};
+        uvElem.SemanticName = "TEXCOORD";
+        uvElem.SemanticIndex = 0;
+        uvElem.Format = DXGI_FORMAT_R32G32_FLOAT;
+        uvElem.InputSlot = 0;
+        uvElem.AlignedByteOffset = 12;
+        uvElem.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+        uvElem.InstanceDataStepRate = 0;
+
+        // Instance data in slot 1: position (TEXCOORD1), size (TEXCOORD2), color (COLOR0)
+        D3D12_INPUT_ELEMENT_DESC instPos{};
+        instPos.SemanticName = "TEXCOORD";
+        instPos.SemanticIndex = 1;
+        instPos.Format = DXGI_FORMAT_R32G32B32_FLOAT;
+        instPos.InputSlot = 1;
+        instPos.AlignedByteOffset = 0;
+        instPos.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        instPos.InstanceDataStepRate = 1;
+
+        D3D12_INPUT_ELEMENT_DESC instSize{};
+        instSize.SemanticName = "TEXCOORD";
+        instSize.SemanticIndex = 2;
+        instSize.Format = DXGI_FORMAT_R32_FLOAT;
+        instSize.InputSlot = 1;
+        instSize.AlignedByteOffset = 12;
+        instSize.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        instSize.InstanceDataStepRate = 1;
+
+        D3D12_INPUT_ELEMENT_DESC instColor{};
+        instColor.SemanticName = "COLOR";
+        instColor.SemanticIndex = 0;
+        instColor.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        instColor.InputSlot = 1;
+        instColor.AlignedByteOffset = 16;
+        instColor.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        instColor.InstanceDataStepRate = 1;
+
+        particleDesc.inputLayout = { posElem, uvElem, instPos, instSize, instColor };
+        particleDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        particleDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        particleDesc.numRenderTargets = 1;
+        particleDesc.depthTestEnabled = true;
+        particleDesc.depthWriteEnabled = false;
+        particleDesc.cullMode = D3D12_CULL_MODE_NONE;
+        particleDesc.blendEnabled = true;
+
+        auto particlePipelineResult = m_particlePipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            particleDesc);
+        if (particlePipelineResult.IsErr()) {
+            spdlog::warn("Failed to create particle pipeline: {}", particlePipelineResult.Error());
+            m_particlePipeline.reset();
+        }
+    }
+
     // Skybox pipeline (fullscreen triangle; no depth)
     if (skyboxVsResult.IsOk() && skyboxPsResult.IsOk()) {
         m_skyboxPipeline = std::make_unique<DX12Pipeline>();
@@ -5479,7 +5911,11 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     std::sort(envFiles.begin(), envFiles.end());
 
     int successCount = 0;
-    for (size_t index = 0; index < envFiles.size(); ++index) {
+    // To keep VRAM usage reasonable on 8 GB GPUs, load a limited number of
+    // HDR/EXR environments eagerly. Additional environments can be added at
+    // runtime via the Dreamer path without bloating startup memory.
+    const size_t kMaxStartupEnvs = 8;
+    for (size_t index = 0; index < envFiles.size() && successCount < static_cast<int>(kMaxStartupEnvs); ++index) {
         const auto& envPath = envFiles[index];
         std::string pathStr = envPath.string();
         std::string name = envPath.stem().string();

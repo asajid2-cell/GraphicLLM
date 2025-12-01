@@ -495,4 +495,21 @@ Result<std::shared_ptr<Scene::MeshData>> LoadSampleModelMesh(const std::string& 
     return LoadGLTFMesh(it->second.string());
 }
 
+std::vector<std::string> GetSampleModelNames() {
+    std::vector<std::string> names;
+
+    auto initResult = InitializeSampleModelLibrary();
+    if (initResult.IsErr()) {
+        return names;
+    }
+
+    names.reserve(g_sampleModelPaths.size());
+    for (const auto& kv : g_sampleModelPaths) {
+        names.push_back(kv.first);
+    }
+
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
 } // namespace Cortex::Utils

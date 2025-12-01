@@ -34,7 +34,7 @@ struct DebugMenuState {
     bool shadowsEnabled = true;
     bool pcssEnabled = false;
     bool fxaaEnabled = true;
-    bool taaEnabled = true;
+    bool taaEnabled = false;
     bool ssrEnabled = true;
     bool ssaoEnabled = true;
     // Default to no IBL so the engine boots into the neutral background;

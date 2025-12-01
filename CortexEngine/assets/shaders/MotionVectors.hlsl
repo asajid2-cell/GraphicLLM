@@ -68,10 +68,13 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     float x = uv.x * 2.0f - 1.0f;
     float y = 1.0f - 2.0f * uv.y;
     float4 clip = float4(x, y, depth, 1.0f);
-    // Use the non-jittered inverse view-projection for motion vectors so
-    // that TAA jitter does not appear as artificial motion. Jitter is
-    // applied separately via g_TAAParams.xy in the post-process.
-    float4 world = mul(g_InvViewProjectionNoJitter, clip);
+    // Depth was written with the jittered view-projection matrix in the
+    // main shading pass, so reconstruct world-space using the matching
+    // jittered inverse view-projection. We later project into the
+    // non-jittered current/previous view-projection matrices so the
+    // resulting velocity encodes camera motion only (jitter is handled
+    // separately in the TAA resolve).
+    float4 world = mul(g_InvViewProjMatrix, clip);
     return world.xyz / max(world.w, 1e-4f);
 }
 

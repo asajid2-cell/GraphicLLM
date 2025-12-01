@@ -218,7 +218,9 @@ int main(int argc, char* argv[]) {
         config.llmConfig.threads = 4;
         config.llmConfig.temperature = 0.1f; // deterministic JSON commands
         config.llmConfig.maxTokens = 128;    // short, avoids runaway loops
-        config.llmConfig.gpuLayers = 999;    // offload all layers to GPU when available
+        // Request aggressive but bounded GPU offload; the LLM service will
+        // clamp this to a safe maximum for the current machine.
+        config.llmConfig.gpuLayers = 64;
 
         // Phase 3: Autoconfigure Dreamer diffusion engines if present either
         // next to the executable or at the project root.

@@ -24,6 +24,10 @@ enum ControlIdQuick : int {
     IDC_QS_IBL         = 2105,
     IDC_QS_FOG         = 2106,
     IDC_QS_RT          = 2107,
+    IDC_QS_WATER_STEEPNESS = 2108,
+    IDC_QS_FOG_DENSITY     = 2109,
+    IDC_QS_GODRAYS         = 2110,
+    IDC_QS_AREA_SIZE       = 2111,
 
     IDC_QS_DEBUGVIEW   = 2201,
     IDC_QS_ENV_NEXT    = 2202,
@@ -42,6 +46,10 @@ struct QuickSettingsState {
     HWND sliderExposure = nullptr;
     HWND sliderBloom = nullptr;
     HWND sliderCameraSpeed = nullptr;
+    HWND sliderWaterSteepness = nullptr;
+    HWND sliderFogDensity = nullptr;
+    HWND sliderGodRays = nullptr;
+    HWND sliderAreaSize = nullptr;
 
     HWND chkShadows = nullptr;
     HWND chkTAA = nullptr;
@@ -100,6 +108,14 @@ void RefreshControlsFromState() {
     SetSliderFromFloat(g_qs.sliderBloom,       s.bloomIntensity,  0.0f, 5.0f);
     SetSliderFromFloat(g_qs.sliderCameraSpeed, s.cameraBaseSpeed, 0.5f, 25.0f);
 
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (renderer) {
+        SetSliderFromFloat(g_qs.sliderWaterSteepness, renderer->GetWaterSteepness(), 0.0f, 1.0f);
+        SetSliderFromFloat(g_qs.sliderFogDensity,     renderer->GetFogDensity(),      0.0f, 0.1f);
+        SetSliderFromFloat(g_qs.sliderGodRays,        renderer->GetGodRayIntensity(), 0.0f, 3.0f);
+        SetSliderFromFloat(g_qs.sliderAreaSize,       renderer->GetAreaLightSizeScale(), 0.25f, 2.0f);
+    }
+
     SetCheckbox(g_qs.chkShadows, s.shadowsEnabled);
     SetCheckbox(g_qs.chkTAA,     s.taaEnabled);
     SetCheckbox(g_qs.chkSSR,     s.ssrEnabled);
@@ -109,7 +125,6 @@ void RefreshControlsFromState() {
     SetCheckbox(g_qs.chkRT,      s.rayTracingEnabled);
 
     // Button labels that depend on current engine state.
-    auto* renderer = Cortex::ServiceLocator::GetRenderer();
     if (renderer && g_qs.btnDebugView) {
         int mode = renderer->GetDebugViewMode();
         const wchar_t* label = L"Debug View";
@@ -232,6 +247,22 @@ void RegisterQuickSettingsClass() {
             g_qs.sliderCameraSpeed = makeSlider(IDC_QS_CAM_SPEED, y);
             y += sliderHeight + rowGap * 2;
 
+            makeLabel(L"Water Steepness", y);
+            g_qs.sliderWaterSteepness = makeSlider(IDC_QS_WATER_STEEPNESS, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Fog Density", y);
+            g_qs.sliderFogDensity = makeSlider(IDC_QS_FOG_DENSITY, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"God-Ray Intensity", y);
+            g_qs.sliderGodRays = makeSlider(IDC_QS_GODRAYS, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Area Light Size", y);
+            g_qs.sliderAreaSize = makeSlider(IDC_QS_AREA_SIZE, y);
+            y += sliderHeight + rowGap * 2;
+
             // Checkboxes
             g_qs.chkShadows = makeCheckbox(IDC_QS_SHADOWS, L"Shadows", y);
             y += checkHeight + rowGap;
@@ -272,6 +303,41 @@ void RegisterQuickSettingsClass() {
                 s.bloomIntensity = SliderToFloat(slider, 0.0f, 5.0f);
             } else if (slider == g_qs.sliderCameraSpeed) {
                 s.cameraBaseSpeed = SliderToFloat(slider, 0.5f, 25.0f);
+            } else if (slider == g_qs.sliderWaterSteepness ||
+                       slider == g_qs.sliderFogDensity     ||
+                       slider == g_qs.sliderGodRays        ||
+                       slider == g_qs.sliderAreaSize) {
+                if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
+                    if (slider == g_qs.sliderWaterSteepness) {
+                        float steep = SliderToFloat(slider, 0.0f, 1.0f);
+                        renderer->SetWaterParams(
+                            renderer->GetWaterLevel(),
+                            renderer->GetWaterWaveAmplitude(),
+                            renderer->GetWaterWaveLength(),
+                            renderer->GetWaterWaveSpeed(),
+                            renderer->GetWaterPrimaryDir().x,
+                            renderer->GetWaterPrimaryDir().y,
+                            renderer->GetWaterSecondaryAmplitude(),
+                            steep);
+                    } else if (slider == g_qs.sliderFogDensity) {
+                        float density = SliderToFloat(slider, 0.0f, 0.1f);
+                        renderer->SetFogParams(
+                            density,
+                            renderer->GetFogHeight(),
+                            renderer->GetFogFalloff());
+                    } else if (slider == g_qs.sliderGodRays) {
+                        float g = SliderToFloat(slider, 0.0f, 3.0f);
+                        renderer->SetGodRayIntensity(g);
+                    } else if (slider == g_qs.sliderAreaSize) {
+                        float sArea = SliderToFloat(slider, 0.25f, 2.0f);
+                        renderer->SetAreaLightSizeScale(sArea);
+                    }
+                }
+
+                // Renderer-only sliders do not change DebugMenuState; keep it
+                // in sync only for the core exposure/bloom/speed values above.
+                DebugMenu::SyncFromState(s);
+                return 0;
             }
 
             DebugMenu::SyncFromState(s);

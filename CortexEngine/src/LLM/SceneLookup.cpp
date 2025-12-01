@@ -628,6 +628,7 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
             case Scene::LightType::Directional: typeStr = "directional"; break;
             case Scene::LightType::Spot:        typeStr = "spot"; break;
             case Scene::LightType::Point:       typeStr = "point"; break;
+            case Scene::LightType::AreaRect:    typeStr = "area_rect"; break;
         }
 
         std::ostringstream line;
@@ -670,6 +671,7 @@ std::string SceneLookup::BuildSummary(Scene::ECS_Registry* registry, size_t maxC
                 case Scene::LightType::Directional: typeStr2 = "directional"; break;
                 case Scene::LightType::Spot:        typeStr2 = "spot"; break;
                 case Scene::LightType::Point:       typeStr2 = "point"; break;
+                case Scene::LightType::AreaRect:    typeStr2 = "area_rect"; break;
             }
 
             std::ostringstream line2;

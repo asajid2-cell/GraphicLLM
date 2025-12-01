@@ -130,6 +130,28 @@ int main(int argc, char* argv[]) {
         config.device.enableDebugLayer = false;
         config.device.enableGPUValidation = false;  // Too slow for development
 
+        // Optional: parse simple command-line flags
+        //   --scene <dragon|rt_showcase|cornell>
+        //   --mode  <default|conservative>
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--scene" && i + 1 < argc) {
+                config.initialScenePreset = argv[++i];
+            } else if (arg.rfind("--scene=", 0) == 0) {
+                config.initialScenePreset = arg.substr(std::string("--scene=").size());
+            } else if (arg == "--mode" && i + 1 < argc) {
+                std::string mode = argv[++i];
+                if (mode == "conservative") {
+                    config.qualityMode = EngineConfig::QualityMode::Conservative;
+                }
+            } else if (arg.rfind("--mode=", 0) == 0) {
+                std::string mode = arg.substr(std::string("--mode=").size());
+                if (mode == "conservative") {
+                    config.qualityMode = EngineConfig::QualityMode::Conservative;
+                }
+            }
+        }
+
         // Phase 2: Configure The Architect (LLM)
         config.enableLLM = true;
 
@@ -218,9 +240,15 @@ int main(int argc, char* argv[]) {
         config.llmConfig.threads = 4;
         config.llmConfig.temperature = 0.1f; // deterministic JSON commands
         config.llmConfig.maxTokens = 128;    // short, avoids runaway loops
-        // Request aggressive but bounded GPU offload; the LLM service will
-        // clamp this to a safe maximum for the current machine.
-        config.llmConfig.gpuLayers = 64;
+        // Request GPU offload for a substantial part of the model while
+        // keeping headroom for DX12 resources on 8 GB-class GPUs. The LLM
+        // service will clamp this to a safe maximum for the current machine.
+        //
+        // 32 layers keeps inference clearly on-GPU but typically uses
+        // noticeably less VRAM than the previous 64-layer request, which
+        // reduces the risk of DXGI device-removed errors when large RT
+        // scenes and HDR/RT buffers are active.
+        config.llmConfig.gpuLayers = 32;
 
         // Phase 3: Autoconfigure Dreamer diffusion engines if present either
         // next to the executable or at the project root.

@@ -74,6 +74,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCube() {
         mesh->indices.push_back(baseIndex + 3);
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -103,6 +104,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePlane(float width, float h
     // Indices
     mesh->indices = { 0, 1, 2, 0, 2, 3 };
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -132,6 +134,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateQuad(float width, float he
     // Indices
     mesh->indices = { 0, 1, 2, 0, 2, 3 };
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -172,6 +175,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint3
         }
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -260,6 +264,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCylinder(float radius, flo
         mesh->indices.push_back(bottomCapStart + i * 2);
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -374,6 +379,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePyramid(float baseSize, fl
     mesh->indices.push_back(baseIdx + 1);
     mesh->indices.push_back(baseIdx + 2);
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -487,6 +493,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCone(float radius, float h
         mesh->indices.push_back(baseCapStart + i);
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -543,6 +550,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
         }
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 
@@ -574,6 +582,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateDisk(float radius, uint32_
         mesh->indices.push_back((i % segments) + 1);
     }
 
+    mesh->UpdateBounds();
     return mesh;
 }
 

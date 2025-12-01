@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <spdlog/spdlog.h>
+#include <glm/glm.hpp>
 
 #include "Utils/Result.h"
 #include "Graphics/RHI/DescriptorHeap.h"
@@ -97,6 +98,20 @@ public:
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
         const DescriptorHandle& shadowEnvTable);
 
+    // Cache camera parameters for TLAS culling and distance-based RT tuning.
+    void SetCameraParams(const glm::vec3& positionWS,
+                         const glm::vec3& forwardWS,
+                         float nearPlane,
+                         float farPlane);
+
+    // Approximate GPU memory footprint of all ray tracing acceleration
+    // structures (BLAS + TLAS + scratch). This value is updated when BLAS/TLAS
+    // buffers are allocated or resized so the renderer can incorporate it into
+    // VRAM budgeting and HUD estimates without walking all resources.
+    [[nodiscard]] uint64_t GetAccelerationStructureBytes() const {
+        return m_totalBLASBytes + m_totalTLASBytes;
+    }
+
     [[nodiscard]] bool HasPipeline() const {
         // A usable pipeline requires a built state object, shader table, and
         // the persistent descriptor slots used for TLAS/depth/mask binding.
@@ -134,16 +149,29 @@ private:
 
     // Cached BLAS per unique mesh.
     std::unordered_map<const Scene::MeshData*, BLASEntry> m_blasCache;
+    // Approximate total GPU memory consumed by all BLAS buffers (result +
+    // scratch). Updated as BLAS resources are allocated.
+    uint64_t m_totalBLASBytes = 0;
 
     // TLAS and instance data.
     ComPtr<ID3D12Resource> m_instanceBuffer;
     UINT64 m_instanceBufferSize = 0;
     std::vector<D3D12_RAYTRACING_INSTANCE_DESC> m_instanceDescs;
 
+    // Cached camera information used for simple near/far culling when building
+    // the TLAS so we do not trace rays against obviously off-screen geometry.
+    glm::vec3 m_cameraPosWS{0.0f};
+    glm::vec3 m_cameraForwardWS{0.0f, 0.0f, 1.0f};
+    float     m_cameraNearPlane = 0.1f;
+    float     m_cameraFarPlane  = 1000.0f;
+    bool      m_hasCamera = false;
+
     ComPtr<ID3D12Resource> m_tlas;
     ComPtr<ID3D12Resource> m_tlasScratch;
     UINT64 m_tlasSize = 0;
     UINT64 m_tlasScratchSize = 0;
+    // Approximate total GPU memory consumed by TLAS + scratch buffer.
+    uint64_t m_totalTLASBytes = 0;
 
     // RT pipeline for sun shadows.
     ComPtr<ID3D12RootSignature> m_rtGlobalRootSignature;

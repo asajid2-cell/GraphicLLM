@@ -65,12 +65,37 @@ struct MeshData {
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texCoords;
     std::vector<uint32_t> indices;
+    // Simple bounding volume used for culling and RT acceleration structure
+    // budgeting. Bounds are computed in object space and updated by mesh
+    // generators / loaders once vertex positions are populated.
+    glm::vec3 boundsCenter{0.0f};
+    float     boundsRadius = 0.0f;
+    bool      hasBounds = false;
 
     // GPU buffer handles (renderer-owned)
     std::shared_ptr<Cortex::Graphics::MeshBuffers> gpuBuffers;
 
     void ResetGPUResources() {
         gpuBuffers.reset();
+    }
+
+    void UpdateBounds() {
+        if (positions.empty()) {
+            boundsCenter = glm::vec3(0.0f);
+            boundsRadius = 0.0f;
+            hasBounds = false;
+            return;
+        }
+
+        glm::vec3 minP = positions[0];
+        glm::vec3 maxP = positions[0];
+        for (const auto& p : positions) {
+            minP = glm::min(minP, p);
+            maxP = glm::max(maxP, p);
+        }
+        boundsCenter = 0.5f * (minP + maxP);
+        boundsRadius = glm::length(maxP - boundsCenter);
+        hasBounds = true;
     }
 };
 

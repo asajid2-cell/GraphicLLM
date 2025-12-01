@@ -9,6 +9,7 @@
 #include "UI/TextPrompt.h"
 #include "UI/DebugMenu.h"
 #include "UI/QuickSettingsWindow.h"
+#include "UI/QualitySettingsWindow.h"
 #include "UI/SceneEditorWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
@@ -314,7 +315,41 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     ServiceLocator::SetRegistry(m_registry.get());
     ServiceLocator::SetEngine(this);
 
-    // Initialize scene
+    // Initialize scene quality. When requested via CLI/config, start from a
+    // conservative preset tuned for heavy/RT scenes on 8 GB GPUs. Otherwise
+    // favor a higher-quality baseline suitable for smaller curated scenes.
+    if (m_renderer) {
+        if (config.qualityMode == EngineConfig::QualityMode::Conservative) {
+            m_renderer->ApplySafeQualityPreset();
+        } else {
+            // Hero/default mode: full internal resolution and higher-quality
+            // AA/effects. RT remains controlled by config.enableRayTracing
+            // and the runtime Quality window.
+            m_renderer->SetRenderScale(1.0f);
+            m_renderer->SetTAAEnabled(true);
+            m_renderer->SetFXAAEnabled(false);
+            m_renderer->SetSSAOEnabled(true);
+            m_renderer->SetSSREnabled(true);
+            m_renderer->SetFogEnabled(true);
+        }
+    }
+
+    // Choose initial scene preset based on configuration string, if provided.
+    if (!config.initialScenePreset.empty()) {
+        std::string sceneLower = config.initialScenePreset;
+        std::transform(sceneLower.begin(), sceneLower.end(), sceneLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        if (sceneLower == "dragon" || sceneLower == "dragonoverwater") {
+            m_currentScenePreset = ScenePreset::DragonOverWater;
+        } else if (sceneLower == "cornell" || sceneLower == "cornellbox") {
+            m_currentScenePreset = ScenePreset::CornellBox;
+        } else if (sceneLower == "rt" || sceneLower == "rtshowcase" || sceneLower == "rt_showcase") {
+            m_currentScenePreset = ScenePreset::RTShowcase;
+        }
+        // Unknown strings fall through and keep the engine default.
+    }
+
     InitializeScene();
     InitializeCameraController();
     ShowCameraHelpOverlay();
@@ -503,6 +538,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
         UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
         UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
+        UI::QualitySettingsWindow::Initialize(m_window->GetHWND());
         UI::SceneEditorWindow::Initialize(m_window->GetHWND());
     }
 
@@ -583,6 +619,7 @@ void Engine::Shutdown() {
     SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
     UI::DebugMenu::Shutdown();
     UI::QuickSettingsWindow::Shutdown();
+    UI::QualitySettingsWindow::Shutdown();
     UI::SceneEditorWindow::Shutdown();
 
     // Phase 2: Shutdown LLM
@@ -741,6 +778,10 @@ void Engine::RenderHUD() {
 
     // Approximate FPS from last frame time
     float fps = (m_frameTime > 0.0f) ? (1.0f / m_frameTime) : 0.0f;
+    // Estimated VRAM usage for the current renderer configuration. This is a
+    // coarse upper bound based on active render targets and a small allowance
+    // for meshes/textures, suitable for on-screen diagnostics.
+    float vramMB = renderer->GetEstimatedVRAMMB();
 
     HWND hwnd = m_window->GetHWND();
     if (!hwnd) {
@@ -763,8 +804,11 @@ void Engine::RenderHUD() {
 
     wchar_t buffer[256];
 
-    // Always show top-level FPS/camera
+    // Always show top-level FPS / frame time and an approximate VRAM estimate
     swprintf_s(buffer, L"FPS: %.1f  Frame: %.2f ms", fps, m_frameTime * 1000.0f);
+    drawLine(buffer);
+
+    swprintf_s(buffer, L"VRAM (est): %.0f MB", vramMB);
     drawLine(buffer);
 
     if (haveCamera) {
@@ -1235,15 +1279,22 @@ void Engine::ProcessInput() {
                     }
                     break;
                 }
-                if (key == SDLK_H) {
-                    m_showHUD = !m_showHUD;
-                    spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
-                    break;
-                }
-                if (key == SDLK_B) {
-                    ApplyHeroVisualBaseline();
-                    break;
-                }
+                  if (key == SDLK_H) {
+                      m_showHUD = !m_showHUD;
+                      spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
+                      break;
+                  }
+                  if (key == SDLK_F8) {
+                      // Native quality/performance tuning window with
+                      // render-scale and RTX feature controls.
+                      UI::QualitySettingsWindow::Toggle();
+                      spdlog::info("Quality settings window toggled (F8)");
+                      break;
+                  }
+                  if (key == SDLK_B) {
+                      ApplyHeroVisualBaseline();
+                      break;
+                  }
                 if (key == SDLK_PRINTSCREEN) {
                     CaptureScreenshot();
                     break;
@@ -3585,10 +3636,20 @@ void Engine::BuildDragonStudioScene() {
 }
 
 void Engine::InitializeScene() {
-    // Default to the original "Dragon Over Water Studio" hero scene so the
-    // engine boots into the established Phase 2 layout. The RT showcase and
-    // Cornell box remain available via the scene toggle or LLM commands.
-    m_currentScenePreset = ScenePreset::DragonOverWater;
+    // If no scene has been selected yet (for example, from the config or
+    // command line), default to the RT showcase gallery so the engine boots
+    // directly into the most feature-rich scene. Other scenes remain
+    // available via the scene toggle or LLM commands.
+    switch (m_currentScenePreset) {
+    case ScenePreset::CornellBox:
+    case ScenePreset::DragonOverWater:
+    case ScenePreset::RTShowcase:
+        break;
+    default:
+        m_currentScenePreset = ScenePreset::RTShowcase;
+        break;
+    }
+
     RebuildScene(m_currentScenePreset);
 }
 

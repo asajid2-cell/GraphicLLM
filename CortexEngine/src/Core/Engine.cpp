@@ -541,6 +541,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
         UI::QualitySettingsWindow::Initialize(m_window->GetHWND());
         UI::SceneEditorWindow::Initialize(m_window->GetHWND());
+        UI::PerformanceWindow::Initialize(m_window->GetHWND());
     }
 
     m_running = true;
@@ -3186,15 +3187,16 @@ void Engine::UpdateCameraController(float deltaTime) {
         };
 
         glm::vec3 moveDir(0.0f);
-        if (keyDown(SDL_SCANCODE_W)) moveDir += forward;
-        if (keyDown(SDL_SCANCODE_S)) moveDir -= forward;
-        if (keyDown(SDL_SCANCODE_D)) moveDir += right;
-        if (keyDown(SDL_SCANCODE_A)) moveDir -= right;
+        // Standard FPS controls: WASD for horizontal/forward movement
+        if (keyDown(SDL_SCANCODE_S)) moveDir += forward;  // W = forward
+        if (keyDown(SDL_SCANCODE_W)) moveDir -= forward;  // S = backward
+        if (keyDown(SDL_SCANCODE_D)) moveDir += right;    // D = right
+        if (keyDown(SDL_SCANCODE_A)) moveDir -= right;    // A = left
 
-        // Vertical thrust in both modes: Space to move up, Ctrl (or C) to move down.
-        if (keyDown(SDL_SCANCODE_SPACE)) moveDir += up;
-        if (keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL) || keyDown(SDL_SCANCODE_C)) {
-            moveDir -= up;
+        // Space for up, Ctrl for down (vertical movement)
+        if (keyDown(SDL_SCANCODE_SPACE)) moveDir += up;   // Space = up
+        if (keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL)) {
+            moveDir -= up;  // Ctrl = down
         }
 
         if (m_droneFlightEnabled) {

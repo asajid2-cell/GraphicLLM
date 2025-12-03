@@ -78,12 +78,14 @@ public:
     //  - Providing a persistent UAV descriptor for the RT reflection color target.
     //  - Passing the GPU virtual address of the FrameConstants constant buffer.
     //  - Providing the SRV table for shadow/IBL/RT textures (space1, t0-t6).
+    //  - Providing the G-buffer normal/roughness SRV for proper surface normals.
     void DispatchReflections(
         ID3D12GraphicsCommandList4* cmdList,
         const DescriptorHandle& depthSrv,
         const DescriptorHandle& reflectionUav,
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-        const DescriptorHandle& shadowEnvTable);
+        const DescriptorHandle& shadowEnvTable,
+        const DescriptorHandle& normalRoughnessSrv);
 
     // Dispatch a simple RT diffuse GI pass. The caller is responsible for:
     //  - Ensuring the TLAS has been built for this frame.
@@ -211,6 +213,7 @@ private:
     DescriptorHandle m_rtTlasSrv;
     DescriptorHandle m_rtDepthSrv;
     DescriptorHandle m_rtMaskUav;
+    DescriptorHandle m_rtGBufferNormalSrv;  // G-buffer normal/roughness for proper RT reflections
 };
 
 } // namespace Cortex::Graphics

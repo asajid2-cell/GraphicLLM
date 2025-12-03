@@ -8,6 +8,7 @@
 
 RaytracingAccelerationStructure g_TopLevel      : register(t0, space2);
 Texture2D<float>               g_Depth          : register(t1, space2);
+Texture2D<float4>              g_NormalRoughness: register(t2, space2);
 RWTexture2D<float4>            g_ReflectionOut  : register(u0, space2);
 // Shared IBL environment (equirectangular) used by the main PBR path.
 Texture2D                      g_EnvSpecular    : register(t2, space1);
@@ -171,30 +172,45 @@ void Miss_Reflection(inout ReflectionPayload payload)
 [shader("closesthit")]
 void ClosestHit_Reflection(inout ReflectionPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-    // Calculate barycentric coordinates for vertex attribute interpolation
-    float3 barycentrics = float3(
-        1.0f - attribs.barycentrics.x - attribs.barycentrics.y,
-        attribs.barycentrics.x,
-        attribs.barycentrics.y
-    );
+    // Sample the G-buffer normal at the hit point to compute proper reflection
+    // directions for multi-bounce reflections. We reconstruct screen-space UVs
+    // from the world-space hit point by projecting it back through the camera.
 
-    // For multi-bounce reflections we need the geometric normal. Since we don't
-    // have vertex buffer access in this minimal DXR setup, we compute the
-    // geometric normal from the ray hit. This works well for planar mirrors.
-    // A full implementation would fetch and interpolate vertex normals here.
     float3 worldRayDir = WorldRayDirection();
+    float3 worldRayOrigin = WorldRayOrigin();
+    float3 hitPoint = worldRayOrigin + worldRayDir * RayTCurrent();
 
-    // Use geometric normal: surface faces the direction opposite to where the ray came from
-    // This approximation works for mirror-like surfaces where we assume the surface is locally planar
-    payload.hitNormal = normalize(-worldRayDir);
+    // Project hit point to clip space to get screen-space UVs for G-buffer lookup
+    float4 clipPos = mul(g_ViewProjectionMatrix, float4(hitPoint, 1.0f));
+    clipPos /= max(clipPos.w, 1e-4f);
 
-    // For better accuracy with complex geometry, flip the normal if it's facing away from the ray
-    // (though for mirrors this shouldn't happen)
-    if (dot(payload.hitNormal, worldRayDir) > 0.0f)
+    float2 screenUV;
+    screenUV.x = clipPos.x * 0.5f + 0.5f;
+    screenUV.y = 0.5f - clipPos.y * 0.5f;  // Flip Y for D3D coordinates
+
+    // Sample G-buffer normal if the hit point is on-screen, otherwise fall back
+    // to the ray-direction approximation for off-screen geometry.
+    float3 surfaceNormal;
+    if (screenUV.x >= 0.0f && screenUV.x <= 1.0f && screenUV.y >= 0.0f && screenUV.y <= 1.0f)
     {
-        payload.hitNormal = -payload.hitNormal;
+        // Sample G-buffer normal (stored in RGB as [0,1] encoding [-1,1])
+        float4 normalSample = g_NormalRoughness.SampleLevel(g_Sampler, screenUV, 0);
+        surfaceNormal = normalize(normalSample.rgb * 2.0f - 1.0f);
+
+        // Validate the normal; if invalid (NaN/zero), fall back to approximation
+        if (!all(isfinite(surfaceNormal)) || length(surfaceNormal) < 0.1f)
+        {
+            surfaceNormal = normalize(-worldRayDir);
+        }
+    }
+    else
+    {
+        // Hit point is off-screen (behind camera or outside frustum), use
+        // ray-direction approximation as fallback
+        surfaceNormal = normalize(-worldRayDir);
     }
 
+    payload.hitNormal = surfaceNormal;
     payload.hitDistance = RayTCurrent();
     payload.color = SampleEnvironment(worldRayDir);
     payload.hit = true;
@@ -221,10 +237,12 @@ void RayGen_Reflection()
     float3 N = ApproximateNormal(launchIndex, launchDims);
     float3 initialR = normalize(reflect(-V, N));
 
-    // Iterative multi-bounce ray tracing for infinite mirror effect
-    static const int MAX_BOUNCES = 16;  // Adjustable: 8 for performance, 32 for extreme quality
-    static const float REFLECTIVITY = 0.95f;  // Dimming factor per bounce (mirrors aren't 100% reflective)
-    static const float THROUGHPUT_CUTOFF = 0.05f;  // Stop if contribution is too dim to see
+    // Single-bounce ray tracing. Multi-bounce is disabled because we don't have
+    // access to vertex normals in the hit shader, which are required to compute
+    // proper reflection directions for secondary bounces.
+    static const int MAX_BOUNCES = 1;
+    static const float REFLECTIVITY = 0.95f;
+    static const float THROUGHPUT_CUTOFF = 0.05f;
 
     float3 accumulatedColor = float3(0.0f, 0.0f, 0.0f);
     float3 throughput = float3(1.0f, 1.0f, 1.0f);  // How much light survives each bounce

@@ -53,22 +53,25 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
     m_rtxWidth = 0;
     m_rtxHeight = 0;
 
-    // Allocate persistent descriptors for TLAS, depth, and RT mask if we have
-    // a descriptor manager. The renderer will copy the actual SRVs/UAV into
-    // these slots before dispatch.
+    // Allocate persistent descriptors for TLAS, depth, RT mask, and G-buffer
+    // normal if we have a descriptor manager. The renderer will copy the actual
+    // SRVs/UAV into these slots before dispatch.
     if (m_descriptors) {
         auto tlasHandle = m_descriptors->AllocateCBV_SRV_UAV();
         auto depthHandle = m_descriptors->AllocateCBV_SRV_UAV();
         auto maskHandle = m_descriptors->AllocateCBV_SRV_UAV();
-        if (tlasHandle.IsErr() || depthHandle.IsErr() || maskHandle.IsErr()) {
+        auto gbufferNormalHandle = m_descriptors->AllocateCBV_SRV_UAV();
+        if (tlasHandle.IsErr() || depthHandle.IsErr() || maskHandle.IsErr() || gbufferNormalHandle.IsErr()) {
             spdlog::warn("DX12RaytracingContext: failed to allocate RT descriptor slots; DXR shadows will be disabled");
             m_rtTlasSrv = {};
             m_rtDepthSrv = {};
             m_rtMaskUav = {};
+            m_rtGBufferNormalSrv = {};
         } else {
             m_rtTlasSrv = tlasHandle.Value();
             m_rtDepthSrv = depthHandle.Value();
             m_rtMaskUav = maskHandle.Value();
+            m_rtGBufferNormalSrv = gbufferNormalHandle.Value();
         }
     }
 
@@ -103,7 +106,7 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
 
     // Build global root signature for the RT pipelines (shadows + reflections + GI).
     {
-        D3D12_ROOT_PARAMETER rootParams[5] = {};
+        D3D12_ROOT_PARAMETER rootParams[6] = {};
 
         // b0, space0: FrameConstants
         rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -162,6 +165,19 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
         rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
         rootParams[4].DescriptorTable.pDescriptorRanges = &shadowEnvRange;
         rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        // t2, space2: G-buffer normal/roughness SRV for proper reflection bounces
+        D3D12_DESCRIPTOR_RANGE gbufferNormalRange{};
+        gbufferNormalRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        gbufferNormalRange.NumDescriptors = 1;
+        gbufferNormalRange.BaseShaderRegister = 2;
+        gbufferNormalRange.RegisterSpace = 2;
+        gbufferNormalRange.OffsetInDescriptorsFromTableStart = 0;
+
+        rootParams[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParams[5].DescriptorTable.NumDescriptorRanges = 1;
+        rootParams[5].DescriptorTable.pDescriptorRanges = &gbufferNormalRange;
+        rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // Static sampler (s0) for environment/IBL sampling.
         D3D12_STATIC_SAMPLER_DESC samplerDesc{};
@@ -1391,7 +1407,8 @@ void DX12RaytracingContext::DispatchReflections(
     const DescriptorHandle& depthSrv,
     const DescriptorHandle& reflectionUav,
     D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-    const DescriptorHandle& shadowEnvTable) {
+    const DescriptorHandle& shadowEnvTable,
+    const DescriptorHandle& normalRoughnessSrv) {
     if (!m_device5 || !cmdList || !m_tlas || !m_rtReflStateObject ||
         !m_rtReflStateProps || !m_rtReflShaderTable ||
         !m_rtGlobalRootSignature || !m_descriptors) {
@@ -1399,7 +1416,9 @@ void DX12RaytracingContext::DispatchReflections(
     }
 
     if (!depthSrv.IsValid() || !reflectionUav.IsValid() ||
-        !m_rtTlasSrv.IsValid() || !m_rtDepthSrv.IsValid() || !m_rtMaskUav.IsValid()) {
+        !m_rtTlasSrv.IsValid() || !m_rtDepthSrv.IsValid() ||
+        !m_rtMaskUav.IsValid() || !m_rtGBufferNormalSrv.IsValid() ||
+        !normalRoughnessSrv.IsValid()) {
         return;
     }
 
@@ -1433,6 +1452,12 @@ void DX12RaytracingContext::DispatchReflections(
         reflectionUav.cpu,
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    device->CopyDescriptorsSimple(
+        1,
+        m_rtGBufferNormalSrv.cpu,
+        normalRoughnessSrv.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
     ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() };
     cmdList->SetDescriptorHeaps(1, heaps);
 
@@ -1446,6 +1471,7 @@ void DX12RaytracingContext::DispatchReflections(
     if (shadowEnvTable.IsValid()) {
         cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu);
     }
+    cmdList->SetComputeRootDescriptorTable(5, m_rtGBufferNormalSrv.gpu);
 
     const D3D12_GPU_VIRTUAL_ADDRESS shaderTableVA = m_rtReflShaderTable->GetGPUVirtualAddress();
 

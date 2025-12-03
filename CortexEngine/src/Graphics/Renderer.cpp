@@ -662,13 +662,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // m_ssrEnabled, etc.) still control whether they actually run.
     constexpr bool kEnableShadowPass    = true;
     constexpr bool kEnableMotionVectors = true;
-    constexpr bool kEnableTAA           = false;
-    constexpr bool kEnableSSR           = false;
-    constexpr bool kEnableParticles     = false;
-    constexpr bool kEnableSSAO          = false;
-    constexpr bool kEnableBloom         = false;
-    // Re-enable the fullscreen post-process resolve so the HDR scene color
-    // is actually written to the swap-chain back buffer.
+    constexpr bool kEnableTAA           = true;
+    constexpr bool kEnableSSR           = true;
+    constexpr bool kEnableParticles     = true;
+    constexpr bool kEnableSSAO          = true;
+    constexpr bool kEnableBloom         = true;
+    // Fullscreen post-process resolve writes HDR scene color to the swap-chain back buffer.
     constexpr bool kEnablePostProcess   = true;
     constexpr bool kEnableDebugLines    = false;
 

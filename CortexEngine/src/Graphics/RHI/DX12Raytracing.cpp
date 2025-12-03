@@ -480,9 +480,11 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
         subobjects[1].Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
         subobjects[1].pDesc = &hitGroup;
 
-        // Subobject 2: Shader config (payload + attributes)
+        // Subobject 2: Shader config (payload + attributes). The reflection
+        // payload currently packs float3 color, float3 hitNormal, float
+        // hitDistance, and a bool flag, which easily fits within 32 bytes.
         D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
-        shaderConfig.MaxPayloadSizeInBytes = 16; // float3 color + hit flag
+        shaderConfig.MaxPayloadSizeInBytes = 32;
         shaderConfig.MaxAttributeSizeInBytes = 8; // barycentrics
 
         subobjects[2].Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;

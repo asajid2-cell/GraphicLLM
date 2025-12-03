@@ -1033,7 +1033,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
             m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
 
-        if (m_depthSRV.IsValid() && m_normalRoughnessSRV.IsValid()) {
+        if (m_depthSRV.IsValid() && m_gbufferNormalRoughnessSRV.IsValid()) {
             DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
             m_rayTracingContext->DispatchReflections(
                 rtCmdList.Get(),
@@ -1041,7 +1041,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 m_rtReflectionUAV,
                 m_frameConstantBuffer.gpuAddress,
                 envTable,
-                m_normalRoughnessSRV);
+                m_gbufferNormalRoughnessSRV);
             m_rtReflectionWrittenThisFrame = true;
         }
     }

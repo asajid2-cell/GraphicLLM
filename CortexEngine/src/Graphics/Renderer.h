@@ -4,6 +4,8 @@
 #include <array>
 #include <unordered_map>
 #include <string>
+#include <algorithm>
+#include <deque>
 #include <spdlog/spdlog.h>
 #include "Core/Window.h"
 #include "RHI/DX12Device.h"
@@ -19,6 +21,7 @@
 #include "Utils/Result.h"
 #include "../Scene/Components.h"
 #include "MeshBuffers.h"
+#include "Graphics/AssetRegistry.h"
 
 namespace Cortex {
     class Window;
@@ -142,6 +145,9 @@ public:
 
     // Upload mesh to GPU
     Result<void> UploadMesh(std::shared_ptr<Scene::MeshData> mesh);
+    // Enqueue a mesh upload to be processed by the GPU job queue.
+    Result<void> EnqueueMeshUpload(const std::shared_ptr<Scene::MeshData>& mesh,
+                                   const char* label);
 
     // Get default placeholder texture
     std::shared_ptr<DX12Texture> GetPlaceholderTexture() const { return m_placeholderAlbedo; }
@@ -149,8 +155,13 @@ public:
     std::shared_ptr<DX12Texture> GetPlaceholderMetallic() const { return m_placeholderMetallic; }
     std::shared_ptr<DX12Texture> GetPlaceholderRoughness() const { return m_placeholderRoughness; }
 
-    // Load texture from disk (sRGB aware)
-    Result<std::shared_ptr<DX12Texture>> LoadTextureFromFile(const std::string& path, bool useSRGB);
+    // Load texture from disk (sRGB aware). The optional kind parameter
+    // allows the asset registry to separate environment maps from generic
+    // material textures when reporting memory usage.
+    Result<std::shared_ptr<DX12Texture>> LoadTextureFromFile(
+        const std::string& path,
+        bool useSRGB,
+        AssetRegistry::TextureKind kind = AssetRegistry::TextureKind::Generic);
 
     // Create a GPU texture from in-memory RGBA8 data (used by the Dreamer
     // diffusion pipeline to upload generated textures on the main thread).
@@ -207,6 +218,18 @@ public:
     void ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry);
     // Image-based lighting / environment controls
     void SetEnvironmentPreset(const std::string& name);
+    // Manually load a limited number of deferred environment maps from disk
+    // into GPU memory. Used by performance tools to incrementally test IBL
+    // pressure instead of loading all HDRs at startup.
+    void LoadAdditionalEnvironmentMaps(uint32_t maxToLoad);
+    // Optional residency limit for IBL environments. When enabled, only a
+    // small fixed number of environments are kept resident; loading or
+    // creating new environments will evict the oldest unused ones in FIFO
+    // order to keep VRAM usage predictable on 8 GB-class GPUs.
+    void SetIBLLimitEnabled(bool enabled);
+    [[nodiscard]] bool IsIBLLimitEnabled() const { return m_iblLimitEnabled; }
+    [[nodiscard]] float GetIBLDiffuseIntensity() const { return m_iblDiffuseIntensity; }
+    [[nodiscard]] float GetIBLSpecularIntensity() const { return m_iblSpecularIntensity; }
     void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
     void SetIBLEnabled(bool enabled);
     void CycleEnvironmentPreset();
@@ -218,6 +241,11 @@ public:
     void SetTAAEnabled(bool enabled);
     bool IsTAAEnabled() const { return m_taaEnabled; }
     void ToggleTAA();
+
+    // Per-scene particle toggle so heavy layouts on 8 GB GPUs can turn off
+    // billboard particles without affecting global renderer state.
+    void SetParticlesEnabled(bool enabled) { m_particlesEnabledForScene = enabled; }
+    [[nodiscard]] bool GetParticlesEnabled() const { return m_particlesEnabledForScene; }
     void SetSSREnabled(bool enabled);
     void ToggleSSR();
     void CycleScreenSpaceEffectsDebug();
@@ -263,7 +291,35 @@ public:
         if (m_deviceRemoved) {
             return;
         }
-        m_renderScale = std::clamp(scale, 0.5f, 1.5f);
+
+        float clamped = std::clamp(scale, 0.5f, 1.5f);
+
+        // On high-resolution displays, clamp the internal render scale based
+        // on the active resolution and heavy features (RT/SSR/SSAO/RT GI) so
+        // that 1440p and 4K runs do not inadvertently exceed the VRAM budget.
+        if (m_window) {
+            const unsigned int width  = std::max(1u, m_window->GetWidth());
+            const unsigned int height = std::max(1u, m_window->GetHeight());
+            const bool heavyEffects =
+                m_rayTracingEnabled || m_ssrEnabled || m_ssaoEnabled ||
+                m_rtReflectionsEnabled || m_rtGIEnabled;
+
+            // Approximate 4K and 1440p thresholds by height; fall back to
+            // width for ultrawide setups.
+            if (height >= 2160 || width >= 3840) {
+                // 4K: favor 0.5–0.6 when heavy effects are enabled, allow up
+                // to ~0.75 when RT/SSR/SSAO/RT GI are all off.
+                const float maxScale = heavyEffects ? 0.6f : 0.75f;
+                clamped = std::clamp(clamped, 0.5f, maxScale);
+            } else if (height >= 1440 || width >= 2560) {
+                // 1440p: favor ~0.7–0.8 when heavy effects are enabled; allow
+                // full 1.0 when they are disabled.
+                const float maxScale = heavyEffects ? 0.8f : 1.0f;
+                clamped = std::clamp(clamped, 0.5f, maxScale);
+            }
+        }
+
+        m_renderScale = clamped;
     }
 
     // Optional RT feature toggles exposed to UI.
@@ -277,6 +333,19 @@ public:
     // SSAO, SSR, RT buffers, shadow maps) plus a rough estimate for mesh
     // buffers so the UI can provide a sense of GPU pressure.
     [[nodiscard]] float GetEstimatedVRAMMB() const;
+    [[nodiscard]] const AssetRegistry& GetAssetRegistry() const { return m_assetRegistry; }
+    [[nodiscard]] AssetRegistry::MemoryBreakdown GetAssetMemoryBreakdown() const {
+        return m_assetRegistry.GetMemoryBreakdown();
+    }
+    // Mesh key lookups for asset / BLAS management.
+    [[nodiscard]] const std::unordered_map<const Scene::MeshData*, std::string>& GetMeshAssetKeys() const {
+        return m_meshAssetKeys;
+    }
+
+    // Lightweight CPU-side timings for major passes, in milliseconds.
+    [[nodiscard]] float GetLastMainPassTimeMS() const { return m_lastMainPassMs; }
+    [[nodiscard]] float GetLastRTTimeMS()   const { return m_lastRTPassMs; }
+    [[nodiscard]] float GetLastPostTimeMS() const { return m_lastPostMs; }
 
     // Conservative quality preset intended for lower-end or
     // memory-constrained GPUs. Scales resolution down and disables
@@ -288,8 +357,27 @@ public:
     [[nodiscard]] bool IsRayTracingEnabled() const { return m_rayTracingEnabled; }
     [[nodiscard]] bool IsDeviceRemoved() const { return m_deviceRemoved; }
     void SetRayTracingEnabled(bool enabled);
-    // Clear temporal history (TAA, RT shadows/GI) when the scene is rebuilt
-    // so the new layout does not inherit afterimages from the old one.
+
+    // Experimental voxel backend toggle. When enabled, the main Render path
+    // skips the traditional raster + RT pipeline and instead runs a
+    // fullscreen voxel raymarch pass that visualizes the scene using a
+    // grid-based voxel prototype. This is wired from EngineConfig so that
+    // the launcher/CLI can select it at startup.
+    // Only enable the voxel backend when both requested and the experimental
+    // voxel pipeline was created successfully. This prevents configuration or
+    // shader compile errors from leaving the renderer in a state where the
+    // classic DX12 path is skipped but the voxel path has nothing to draw.
+    void SetVoxelBackendEnabled(bool enabled) {
+        m_voxelBackendEnabled = enabled && (m_voxelPipeline != nullptr);
+    }
+    [[nodiscard]] bool IsVoxelBackendEnabled() const { return m_voxelBackendEnabled; }
+    // Mark the dense voxel grid as out of date so the next voxel render pass
+    // rebuilds it from the current ECS scene. Called on scene rebuilds or
+    // when large structural changes occur.
+    void MarkVoxelGridDirty() { m_voxelGridDirty = true; }
+    // Clear temporal history (TAA, RT shadows/GI/reflections) when the scene
+    // is rebuilt so the new layout does not inherit afterimages from the old
+    // one.
     void ResetTemporalHistoryForSceneChange();
     // Dynamically register an environment map from an existing texture (used by Dreamer).
     Result<void> AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name);
@@ -298,6 +386,30 @@ public:
     void SetSunDirection(const glm::vec3& dir);
     void SetSunColor(const glm::vec3& color);
     void SetSunIntensity(float intensity);
+    [[nodiscard]] float GetSunIntensity() const { return m_directionalLightIntensity; }
+
+    // GPU job queue introspection for incremental loading / diagnostics.
+    [[nodiscard]] bool HasPendingGpuJobs() const { return !m_gpuJobQueue.empty(); }
+    [[nodiscard]] uint32_t GetPendingMeshJobs() const { return m_pendingMeshJobs; }
+    [[nodiscard]] uint32_t GetPendingBLASJobs() const { return m_pendingBLASJobs; }
+    // Conservative signal that RT is still "warming up" its BLAS set.
+    [[nodiscard]] bool IsRTWarmingUp() const;
+
+    // Block until all outstanding GPU work on the main and upload queues has
+    // completed. Used sparingly before large reallocations (e.g., when
+    // resizing depth/HDR targets after a render-scale change) to avoid
+    // transient allocation spikes on memory-constrained GPUs.
+    void WaitForGPU();
+
+    // Lighting rig safety toggle: when true, ApplyLightingRig selects a
+    // lower-intensity / fewer-shadows variant on <=8 GB adapters.
+    void SetUseSafeLightingRigOnLowVRAM(bool enabled) { m_useSafeLightingRigOnLowVRAM = enabled; }
+    [[nodiscard]] bool GetUseSafeLightingRigOnLowVRAM() const { return m_useSafeLightingRigOnLowVRAM; }
+
+    // Asset lifetime helpers used by the engine after scene rebuilds.
+    void RebuildAssetRefsFromScene(Scene::ECS_Registry* registry);
+    void PruneUnusedMeshes(Scene::ECS_Registry* registry);
+    void PruneUnusedTextures();
 
 private:
     static constexpr uint32_t kShadowCascadeCount = 3;
@@ -322,6 +434,7 @@ private:
     Result<void> CreatePipeline();
     Result<void> CreatePlaceholderTexture();
     Result<void> CreateShadowMapResources();
+    void RecreateShadowMapResourcesForCurrentSize();
     Result<void> CreateHDRTarget();
     Result<void> CreateBloomResources();
     Result<void> CreateSSAOResources();
@@ -331,6 +444,7 @@ private:
     Result<void> InitializeEnvironmentMaps();
     void UpdateEnvironmentDescriptorTable();
     void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
+    void EnforceIBLResidencyLimit();
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
@@ -344,6 +458,10 @@ private:
     void RenderBloom();
     void RenderPostProcess();
     void RenderDebugLines();
+    void ProcessGpuJobsPerFrame();
+    void RenderVoxel(Scene::ECS_Registry* registry);
+    Result<void> BuildVoxelGridFromScene(Scene::ECS_Registry* registry);
+    Result<void> UploadVoxelGridToGPU();
     void RenderRayTracing(Scene::ECS_Registry* registry);
     void RenderParticles(Scene::ECS_Registry* registry);
 
@@ -403,12 +521,15 @@ public:
     std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
     std::unique_ptr<DX12Pipeline> m_waterPipeline;
     std::unique_ptr<DX12Pipeline> m_particlePipeline;
+    // Experimental fullscreen voxel renderer pipeline (SV_VertexID triangle).
+    std::unique_ptr<DX12Pipeline> m_voxelPipeline;
 
     // If we ever fail to map the particle instance buffer (for example due
     // to device removal or severe memory pressure), flip this flag so that
     // subsequent frames simply skip particle rendering instead of spamming
     // warnings or risking further failures.
     bool m_particleBufferMapFailed = false;
+    bool m_particlesEnabledForScene = true;
 
     bool m_debugOverlayVisible = false;
     int  m_debugOverlaySelectedRow = 0;
@@ -426,6 +547,58 @@ public:
     uint32_t m_uploadAllocatorIndex = 0;
     std::array<uint64_t, kUploadPoolSize> m_uploadFences{0, 0, 0, 0};
     uint64_t m_pendingUploadFence = 0;
+
+    // Manual GPU breadcrumbs: a tiny readback buffer written via
+    // WriteBufferImmediate so that device-removed errors can report which
+    // high-level GPU marker was last executed before the fault.
+    enum class GpuMarker : uint32_t {
+        None              = 0,
+        BeginFrame        = 1,
+        ShadowPass        = 2,
+        Skybox            = 3,
+        OpaqueGeometry    = 4,
+        TransparentGeom   = 5,
+        MotionVectors     = 6,
+        TAAResolve        = 7,
+        SSR               = 8,
+        Particles         = 9,
+        SSAO              = 10,
+        Bloom             = 11,
+        PostProcess       = 12,
+        DebugLines        = 13,
+        EndFrame          = 14,
+    };
+
+    Result<void> CreateBreadcrumbBuffer();
+    void WriteBreadcrumb(GpuMarker marker);
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_breadcrumbBuffer;
+    uint32_t* m_breadcrumbMap = nullptr;
+
+    // Asset/memory registry for approximate per-asset GPU usage accounting.
+    mutable AssetRegistry m_assetRegistry;
+    // Map from MeshData pointer to the registry key used for geometry/BLAS.
+    std::unordered_map<const Scene::MeshData*, std::string> m_meshAssetKeys;
+
+    // Lightweight GPU job queue used to spread heavy work (mesh uploads and
+    // BLAS builds) across multiple frames to reduce first-frame spikes.
+    enum class GpuJobType : uint32_t {
+        MeshUpload = 0,
+        BuildBLAS  = 1
+    };
+
+    struct GpuJob {
+        GpuJobType type = GpuJobType::MeshUpload;
+        std::shared_ptr<Scene::MeshData> mesh;          // for MeshUpload
+        const Scene::MeshData* blasMeshKey = nullptr;   // for BuildBLAS
+        std::string label;
+    };
+
+    std::deque<GpuJob> m_gpuJobQueue;
+    uint32_t m_maxMeshJobsPerFrame = 2;
+    uint32_t m_maxBLASJobsPerFrame = 2;
+    uint32_t m_pendingMeshJobs = 0;
+    uint32_t m_pendingBLASJobs = 0;
 
     // Depth buffer
     ComPtr<ID3D12Resource> m_depthBuffer;
@@ -533,6 +706,9 @@ public:
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
 
+    // Texture cache to prevent duplicate loads (CRITICAL for GPU memory management)
+    std::unordered_map<std::string, std::shared_ptr<DX12Texture>> m_textureCache;
+
     // Debug line rendering (world-space overlay)
     struct DebugLineVertex {
         glm::vec3 position;
@@ -547,7 +723,8 @@ public:
 
     // Environment maps for image-based lighting
     struct EnvironmentMaps {
-        std::string name;                                  // display name
+        std::string name;   // display name
+        std::string path;   // source file on disk (if any)
         std::shared_ptr<DX12Texture> diffuseIrradiance;    // low-frequency env for diffuse
         std::shared_ptr<DX12Texture> specularPrefiltered;  // mip-chain env for specular
     };
@@ -561,6 +738,12 @@ public:
     std::vector<PendingEnvironment> m_pendingEnvironments;
 
     size_t m_currentEnvironment = 0;
+    // Optional IBL residency limit used by the performance tools. When
+    // enabled, the renderer keeps at most kMaxIBLResident environments
+    // resident at a time and evicts older ones in FIFO order when new
+    // environments are loaded.
+    bool  m_iblLimitEnabled = false;
+    static constexpr uint32_t kMaxIBLResident = 4;
     float m_iblDiffuseIntensity = 1.1f;
     float m_iblSpecularIntensity = 1.3f;
     // Start in a neutral "no IBL" mode so the engine boots into the default
@@ -574,6 +757,7 @@ public:
     float m_directionalLightIntensity = 5.0f;
     glm::vec3 m_ambientLightColor = glm::vec3(0.04f);
     float m_ambientLightIntensity = 1.0f;
+    bool  m_useSafeLightingRigOnLowVRAM = false;
     float m_exposure = 1.0f;
     // Internal rendering resolution scale for simple supersampling. Default
     // to 1.0 so that HDR and depth targets match the window resolution; this
@@ -617,6 +801,7 @@ public:
     float m_shadowPCFRadius = 1.5f;
     bool  m_hasLocalShadow = false;
     uint32_t m_localShadowCount = 0;
+    bool     m_localShadowBudgetWarningEmitted = false;
     glm::mat4 m_localLightViewProjMatrices[kMaxShadowedLocalLights]{};
 
     // Camera-followed shadow frustum parameters
@@ -649,17 +834,52 @@ public:
       bool m_deviceRemoved = false;
       bool m_deviceRemovedLogged = false;
 
+      // Lightweight runtime diagnostics for device-removed hangs. We track
+      // the last successfully completed high-level pass within Render() and
+      // a monotonically increasing frame counter so that device removal
+      // logs can report where and when the failure was first observed.
+      const char* m_lastCompletedPass = "None";
+      uint64_t    m_renderFrameCounter = 0;
+
+      // When true, the renderer skips the classic raster/IBL/RT path and
+      // instead runs the experimental voxel raymarch backend. This is
+      // currently a prototype path intended for research and can be
+      // selected via the launcher or CLI.
+      bool m_voxelBackendEnabled = false;
+
+      // Dense voxel grid backing the experimental voxel renderer. For now we
+      // build a uniform grid in CPU memory and upload it to a structured
+      // buffer SRV that the voxel pixel shader reads from during DDA
+      // traversal. This acts as a bridge toward a future sparse voxel octree.
+      // The default dimension of 384 yields ~56.6M voxels (~216 MB at
+      // 4 bytes each), which keeps the raymarch reasonably fast on the 8 GB
+      // target GPU while still providing high detail when combined with
+      // interior triangle sampling.
+      std::vector<uint32_t> m_voxelGridCPU;
+      uint32_t m_voxelGridDim = 384;
+      bool     m_voxelGridDirty = true;
+      Microsoft::WRL::ComPtr<ID3D12Resource> m_voxelGridBuffer;
+      DescriptorHandle m_voxelGridSRV{};
+      // Simple mapping from material preset / tag names to compact 8-bit
+      // material identifiers used by the voxel grid. Keeps the palette small
+      // and stable across frames while allowing different meshes or presets
+      // to show distinct colors in voxel mode.
+      std::unordered_map<std::string, uint8_t> m_voxelMaterialIds;
+      uint8_t m_nextVoxelMaterialId = 1;
+
       // Logging throttles so we do not spam the console with the same
       // warnings every frame once the renderer has entered an error state or
       // when scene content is incomplete.
       bool m_missingBufferWarningLogged = false;
       bool m_zeroDrawWarningLogged      = false;
 
-      // Camera history used to decide when to reset RT temporal history
-      // (shadows / GI) after large movements to avoid ghosting.
-      glm::vec3 m_prevCameraPos{0.0f};
-      glm::vec3 m_prevCameraForward{0.0f, 0.0f, 1.0f};
-      bool      m_hasPrevCamera = false;
+    // Camera history used to decide when to reset RT temporal history
+    // (shadows / GI / reflections) after large movements to avoid ghosting.
+    glm::vec3 m_prevCameraPos{0.0f};
+    glm::vec3 m_prevCameraForward{0.0f, 0.0f, 1.0f};
+    bool      m_hasPrevCamera = false;
+    bool      m_rtReflHasHistory = false;
+    bool      m_rtReflectionWrittenThisFrame = false;
 
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;
@@ -681,9 +901,13 @@ public:
 
     // Screen-space ambient occlusion parameters
     bool  m_ssaoEnabled = true;
-    float m_ssaoRadius = 0.25f;
-    float m_ssaoBias = 0.03f;
-    float m_ssaoIntensity = 0.35f;
+      float m_ssaoRadius = 0.25f;
+      float m_ssaoBias = 0.03f;
+      float m_ssaoIntensity = 0.35f;
+
+      // Internal helpers for diagnostics and error reporting.
+      void MarkPassComplete(const char* passName);
+      void ReportDeviceRemoved(const char* context, HRESULT hr, const char* file, int line);
 
     // Exponential height fog parameters
     bool  m_fogEnabled = false;
@@ -721,6 +945,16 @@ public:
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     bool m_hyperSceneBuilt = false;
 #endif
+
+    // CPU timing (approximate) for major passes, updated once per frame.
+    float m_lastDepthPrepassMs = 0.0f;
+    float m_lastShadowPassMs   = 0.0f;
+    float m_lastMainPassMs     = 0.0f;
+    float m_lastRTPassMs       = 0.0f;
+    float m_lastSSRMs          = 0.0f;
+    float m_lastSSAOMs         = 0.0f;
+    float m_lastBloomMs        = 0.0f;
+    float m_lastPostMs         = 0.0f;
 };
 
 } // namespace Cortex::Graphics

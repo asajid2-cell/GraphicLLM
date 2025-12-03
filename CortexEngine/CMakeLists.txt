@@ -69,6 +69,7 @@ set(CORTEX_SOURCES
     src/Graphics/RHI/DescriptorHeap.cpp
     src/Graphics/RHI/DX12Pipeline.cpp
     src/Graphics/RHI/DX12Raytracing.cpp
+    src/Graphics/AssetRegistry.cpp
     src/Graphics/TextureLoader.cpp
     src/Graphics/Renderer.cpp
     src/Graphics/Renderer_Bloom.cpp
@@ -80,6 +81,9 @@ set(CORTEX_SOURCES
     src/Utils/FileUtils.cpp
     src/Utils/MeshGenerator.cpp
     src/Utils/GLTFLoader.cpp
+
+    # Diagnostics
+    src/Core/PerfDiagnostics.cpp
 
     # Phase 3: The Dreamer (Vision)
     src/AI/Vision/DreamerService.cpp
@@ -99,12 +103,16 @@ set(CORTEX_SOURCES
     src/UI/QuickSettingsWindow.cpp
     src/UI/QualitySettingsWindow.cpp
     src/UI/SceneEditorWindow.cpp
+    src/UI/PerformanceWindow.cpp
+    src/UI/LightingWindow.cpp
+    src/UI/HierarchyWindow.cpp
 )
 
 set(CORTEX_HEADERS
     src/Core/Engine.h
     src/Core/Window.h
     src/Core/ServiceLocator.h
+    src/Core/PerfDiagnostics.h
 
     src/Graphics/RHI/DX12Device.h
     src/Graphics/RHI/DX12Texture.h
@@ -115,6 +123,7 @@ set(CORTEX_HEADERS
     src/Graphics/RHI/d3dx12.h
     src/Graphics/MaterialState.h
     src/Graphics/TextureLoader.h
+    src/Graphics/AssetRegistry.h
     src/Graphics/Renderer.h
     src/Graphics/ShaderTypes.h
 
@@ -145,6 +154,9 @@ set(CORTEX_HEADERS
     src/UI/QuickSettingsWindow.h
     src/UI/QualitySettingsWindow.h
     src/UI/SceneEditorWindow.h
+    src/UI/PerformanceWindow.h
+    src/UI/LightingWindow.h
+    src/UI/HierarchyWindow.h
 )
 
 # Executable

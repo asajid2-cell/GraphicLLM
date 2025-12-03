@@ -67,6 +67,9 @@ struct DebugMenuInternalState {
     HWND chkRT = nullptr;
     HWND btnReset = nullptr;
     HWND btnSceneToggle = nullptr;
+
+    int contentHeight = 0;
+    int scrollPos = 0;
 };
 
 DebugMenuInternalState g_state;
@@ -179,7 +182,6 @@ void RegisterDebugMenuClass() {
             RECT rc{};
             GetClientRect(hwnd, &rc);
             int width = rc.right - rc.left;
-            int height = rc.bottom - rc.top;
 
             const int margin = 8;
             const int labelHeight = 18;
@@ -287,9 +289,83 @@ void RegisterDebugMenuClass() {
                 x, y, width - margin * 2, 26,
                 hwnd, reinterpret_cast<HMENU>(IDC_SCENE_TOGGLE), nullptr, nullptr);
             SendMessageW(state->btnSceneToggle, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            y += 26 + rowGap;
+
+            state->contentHeight = y + margin;
+            state->scrollPos = 0;
+
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (state->contentHeight > 0 ? state->contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = 0;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
 
             // Populate initial positions
             RefreshControlsFromState();
+            return 0;
+        }
+        case WM_SIZE: {
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (state->contentHeight > 0 ? state->contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = state->scrollPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+            return 0;
+        }
+        case WM_VSCROLL: {
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_ALL;
+            GetScrollInfo(hwnd, SB_VERT, &si);
+            int yPos = si.nPos;
+
+            switch (LOWORD(wParam)) {
+            case SB_LINEUP:   yPos -= 20; break;
+            case SB_LINEDOWN: yPos += 20; break;
+            case SB_PAGEUP:   yPos -= static_cast<int>(si.nPage); break;
+            case SB_PAGEDOWN: yPos += static_cast<int>(si.nPage); break;
+            case SB_THUMBTRACK:
+            case SB_THUMBPOSITION:
+                yPos = si.nTrackPos;
+                break;
+            default:
+                break;
+            }
+
+            if (yPos < si.nMin) yPos = si.nMin;
+            if (yPos > static_cast<int>(si.nMax - si.nPage + 1)) {
+                yPos = static_cast<int>(si.nMax - si.nPage + 1);
+            }
+            if (yPos < si.nMin) yPos = si.nMin;
+
+            si.fMask = SIF_POS;
+            si.nPos = yPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+
+            int dy = state->scrollPos - yPos;
+            if (dy != 0) {
+                ScrollWindowEx(hwnd,
+                               0,
+                               dy,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               SW_INVALIDATE | SW_SCROLLCHILDREN);
+                state->scrollPos = yPos;
+            }
             return 0;
         }
         case WM_HSCROLL: {
@@ -424,7 +500,7 @@ void EnsureWindowCreated() {
         WS_EX_TOOLWINDOW,
         kDebugMenuClassName,
         L"Cortex Renderer Settings",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VSCROLL,
         rc.left, rc.top,
         rc.right - rc.left, rc.bottom - rc.top,
         g_state.parent,

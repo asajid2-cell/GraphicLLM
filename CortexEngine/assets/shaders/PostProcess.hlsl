@@ -912,7 +912,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
         wSSR = ssrConf * kMaxSSRWeight * gloss;
     }
 
-    // Optional RT reflection buffer: when RT is enabled (postParams.w > 0.5)
+    // Optional RT reflection buffer: when RT reflections are enabled
+    // (postParams.w > 0.5) and the debug view does not force SSR-only mode,
     // we blend between SSR (near-field, high-confidence) and RT (fallback for
     // low-SSR-confidence regions). Debug view 23 forces RT reflections off so
     // that SSR-only behaviour can be inspected without recompiling.
@@ -931,10 +932,11 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
 
         // Small 5-tap cross filter in screen space over the RT reflection
-        // buffer to reduce aliasing/fizzing from single-sample DXR. This is
-        // followed by a simple temporal accumulation against a history
-        // buffer when RT history has been populated on the CPU side.
-        float2 texel = g_PostParams.xy;
+        // buffer to reduce aliasing/fizzing from single-sample DXR. The RT
+        // reflection buffer is allocated at half resolution relative to the
+        // main HDR target, so convert the 1 / resolution stored in
+        // g_PostParams.xy into RT texel size by doubling it.
+        float2 texel = g_PostParams.xy * 2.0f;
         float3 accum = rtRefl;
         float  total = 1.0f;
 
@@ -962,9 +964,19 @@ float4 PSMain(VSOutput input) : SV_TARGET
         if (g_DebugMode.w > 0.5f)
         {
             float3 rtHist = g_RTReflectionHistory.Sample(g_Sampler, uv).rgb;
-            float3 diff = abs(rtRefl - rtHist);
-            float maxDiffHist = max(max(diff.r, diff.g), diff.b);
-            float historyWeight = lerp(0.7f, 0.05f, saturate(maxDiffHist * 4.0f));
+            float3 diff   = abs(rtRefl - rtHist);
+            float  maxDiff = max(max(diff.r, diff.g), diff.b);
+
+            // Base history weight is modest and tapers off on very glossy
+            // surfaces so sharp reflections do not leave long afterimages.
+            const float baseMaxHistory = 0.4f;
+            float       maxHistWeight  = lerp(baseMaxHistory, 0.1f, gloss);
+
+            // When the current and previous frames diverge strongly,
+            // aggressively downweight history to avoid ghosting.
+            float histFactor    = saturate(1.0f - maxDiff * 6.0f);
+            float historyWeight = maxHistWeight * histFactor;
+
             rtRefl = lerp(rtRefl, rtHist, historyWeight);
         }
     }
@@ -1142,29 +1154,30 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float3 sunWorld = camPos + sunDirWS * 1000.0f;
 
             float4 sunClip = mul(g_ViewProjectionMatrix, float4(sunWorld, 1.0f));
-            if (sunClip.w > 0.0f)
+            // Avoid unstable projections very close to the camera plane.
+            if (sunClip.w > 0.1f)
             {
                 float2 sunNdc = sunClip.xy / sunClip.w;
                 float2 sunUV;
                 sunUV.x = sunNdc.x * 0.5f + 0.5f;
                 sunUV.y = 0.5f - sunNdc.y * 0.5f;
 
-                // Only bother if the projected sun is at least roughly on-screen.
-                if (sunUV.x > -0.2f && sunUV.x < 1.2f &&
-                    sunUV.y > -0.2f && sunUV.y < 1.2f)
+                // Only bother if the projected sun is reasonably near the viewport.
+                if (sunUV.x > -0.5f && sunUV.x < 1.5f &&
+                    sunUV.y > -0.5f && sunUV.y < 1.5f)
                 {
                     const int NUM_SAMPLES = 16;
                     float2 toSun = sunUV - uv;
-                    float distToSun = length(toSun);
+                    float  distToSun = length(toSun);
 
-                    // Skip pixels very far from the sun projection to keep cost down.
-                    if (distToSun > 0.02f)
+                    // Skip pixels extremely close to or very far from the sun projection.
+                    if (distToSun > 0.02f && distToSun < 1.5f)
                     {
                         float2 step = toSun / (float)NUM_SAMPLES;
                         float2 sampleUV = uv;
 
                         float3 godAccum = 0.0f;
-                        float illumination = 1.0f;
+                        float  illumination = 1.0f;
 
                         float density = max(g_FogParams.x, 0.0f);
                         // Base intensity tied to fog density so thicker fog yields
@@ -1172,7 +1185,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
                         float baseIntensity = saturate(density * 20.0f);
                         float decay = 0.92f;
 
-                        [unroll]
+                        [loop]
                         for (int i = 0; i < NUM_SAMPLES; ++i)
                         {
                             sampleUV += step;
@@ -1182,14 +1195,21 @@ float4 PSMain(VSOutput input) : SV_TARGET
                                 break;
                             }
 
-                            float d = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
+                            // God rays are low-frequency; use a lower mip level to
+                            // reduce bandwidth and cache pressure.
+                            float d = g_Depth.SampleLevel(g_Sampler, sampleUV, 2).r;
                             // Treat fully-clear depth as sky; anything else occludes.
                             float unoccluded = (d >= 1.0f - 1e-3f) ? 1.0f : 0.0f;
                             illumination *= lerp(0.0f, 1.0f, unoccluded * decay);
 
-                            float3 sampleHdr = g_SceneColor.SampleLevel(g_Sampler, sampleUV, 0).rgb;
-                            float lum = dot(sampleHdr, float3(0.299f, 0.587f, 0.114f));
-                            godAccum += lum.xxx * illumination;
+                            // Only bother sampling scene color while there is still
+                            // noticeable illumination along the ray.
+                            if (illumination > 0.01f)
+                            {
+                                float3 sampleHdr = g_SceneColor.SampleLevel(g_Sampler, sampleUV, 2).rgb;
+                                float lum = dot(sampleHdr, float3(0.299f, 0.587f, 0.114f));
+                                godAccum += lum.xxx * illumination;
+                            }
                         }
 
                         float falloff = saturate(1.0f - distToSun * 1.5f);

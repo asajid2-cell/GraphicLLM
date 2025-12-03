@@ -49,7 +49,9 @@ Result<void> Renderer::CreateBloomResources() {
         desc.Height = height;
         desc.DepthOrArraySize = 1;
         desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        // Bloom only needs HDR RGB; R11G11B10_FLOAT cuts memory and bandwidth
+        // in half compared to RGBA16F while preserving sufficient range.
+        desc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
         desc.SampleDesc.Count = 1;
         desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 

@@ -63,6 +63,9 @@ struct QuickSettingsState {
     HWND btnEnvNext = nullptr;
     HWND btnAutoDemo = nullptr;
     HWND btnSceneToggle = nullptr;
+
+    int contentHeight = 0;
+    int scrollPos = 0;
 };
 
 QuickSettingsState g_qs;
@@ -287,8 +290,83 @@ void RegisterQuickSettingsClass() {
             g_qs.btnAutoDemo = makeButton(IDC_QS_AUTODEMO, L"Auto Demo: Toggle", y);
             y += 24 + rowGap;
             g_qs.btnSceneToggle = makeButton(IDC_QS_SCENE_TOGGLE, L"Toggle Scene (Cornell / Dragon)", y);
+            y += 24 + rowGap;
+
+            // Record content height for scrolling and initialize scroll bar.
+            g_qs.contentHeight = y + margin;
+            g_qs.scrollPos = 0;
+
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (g_qs.contentHeight > 0 ? g_qs.contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = 0;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
 
             RefreshControlsFromState();
+            return 0;
+        }
+        case WM_SIZE: {
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (g_qs.contentHeight > 0 ? g_qs.contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = g_qs.scrollPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+            return 0;
+        }
+        case WM_VSCROLL: {
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_ALL;
+            GetScrollInfo(hwnd, SB_VERT, &si);
+            int yPos = si.nPos;
+
+            switch (LOWORD(wParam)) {
+            case SB_LINEUP:   yPos -= 20; break;
+            case SB_LINEDOWN: yPos += 20; break;
+            case SB_PAGEUP:   yPos -= static_cast<int>(si.nPage); break;
+            case SB_PAGEDOWN: yPos += static_cast<int>(si.nPage); break;
+            case SB_THUMBTRACK:
+            case SB_THUMBPOSITION:
+                yPos = si.nTrackPos;
+                break;
+            default:
+                break;
+            }
+
+            if (yPos < si.nMin) yPos = si.nMin;
+            if (yPos > static_cast<int>(si.nMax - si.nPage + 1)) {
+                yPos = static_cast<int>(si.nMax - si.nPage + 1);
+            }
+            if (yPos < si.nMin) yPos = si.nMin;
+
+            si.fMask = SIF_POS;
+            si.nPos = yPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+
+            int dy = g_qs.scrollPos - yPos;
+            if (dy != 0) {
+                ScrollWindowEx(hwnd,
+                               0,
+                               dy,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               SW_INVALIDATE | SW_SCROLLCHILDREN);
+                g_qs.scrollPos = yPos;
+            }
             return 0;
         }
         case WM_HSCROLL: {
@@ -457,7 +535,7 @@ void EnsureWindowCreated() {
         WS_EX_TOOLWINDOW,
         kQuickSettingsClassName,
         L"Cortex Quick Settings",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VSCROLL,
         x, y,
         width, height,
         g_qs.parent,

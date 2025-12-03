@@ -4,6 +4,7 @@
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 #include <memory>
+#include <cstdint>
 #include "Utils/Result.h"
 
 using Microsoft::WRL::ComPtr;
@@ -39,6 +40,10 @@ public:
     [[nodiscard]] ID3D12Device* GetDevice() const { return m_device.Get(); }
     [[nodiscard]] IDXGIFactory6* GetFactory() const { return m_factory.Get(); }
     [[nodiscard]] IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
+    // Approximate dedicated video memory reported by the selected adapter
+    // (in bytes). Used for coarse-grained budgeting decisions such as
+    // environment map limits on 8 GB-class GPUs.
+    [[nodiscard]] std::uint64_t GetDedicatedVideoMemoryBytes() const { return m_dedicatedVideoMemoryBytes; }
 
     // Check for tearing support (for variable refresh rate displays)
     [[nodiscard]] bool SupportsTearing() const { return m_supportsTearing; }
@@ -48,10 +53,13 @@ private:
     Result<void> SelectAdapter();
     Result<void> CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel);
     void CheckTearingSupport();
+    void EnableDRED();
 
     ComPtr<IDXGIFactory6> m_factory;
     ComPtr<IDXGIAdapter1> m_adapter;
     ComPtr<ID3D12Device> m_device;
+
+    std::uint64_t m_dedicatedVideoMemoryBytes = 0;
 
     bool m_supportsTearing = false;
 };

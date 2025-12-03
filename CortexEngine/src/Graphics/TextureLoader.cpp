@@ -2,6 +2,8 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <cstring>
 #ifndef CORTEX_STB_IMAGE_IMPLEMENTED
 #define CORTEX_STB_IMAGE_IMPLEMENTED
 #define STB_IMAGE_IMPLEMENTATION
@@ -183,6 +185,214 @@ Result<std::vector<MipLevel>> TextureLoader::LoadImageRGBAWithMips(const std::st
 
     spdlog::info("Loaded texture '{}': {}x{} ({} mips)", path, levels.front().width, levels.front().height, levels.size());
     return Result<std::vector<MipLevel>>::Ok(std::move(levels));
+}
+
+namespace {
+
+// DDS structures based on the DirectX 9/10 DDS spec. Only the fields required
+// for basic BCn 2D textures are modeled here.
+
+constexpr uint32_t DDS_MAGIC = 0x20534444; // "DDS "
+
+struct DDS_PIXELFORMAT {
+    uint32_t size;
+    uint32_t flags;
+    uint32_t fourCC;
+    uint32_t rgbBitCount;
+    uint32_t rBitMask;
+    uint32_t gBitMask;
+    uint32_t bBitMask;
+    uint32_t aBitMask;
+};
+
+struct DDS_HEADER {
+    uint32_t size;
+    uint32_t flags;
+    uint32_t height;
+    uint32_t width;
+    uint32_t pitchOrLinearSize;
+    uint32_t depth;
+    uint32_t mipMapCount;
+    uint32_t reserved1[11];
+    DDS_PIXELFORMAT ddspf;
+    uint32_t caps;
+    uint32_t caps2;
+    uint32_t caps3;
+    uint32_t caps4;
+    uint32_t reserved2;
+};
+
+struct DDS_HEADER_DXT10 {
+    uint32_t dxgiFormat;        // DXGI_FORMAT
+    uint32_t resourceDimension; // D3D10_RESOURCE_DIMENSION
+    uint32_t miscFlag;
+    uint32_t arraySize;
+    uint32_t miscFlags2;
+};
+
+enum DDSFlags : uint32_t {
+    DDS_FOURCC = 0x00000004u,
+};
+
+// FOURCC helpers
+constexpr uint32_t MakeFourCC(char c0, char c1, char c2, char c3) {
+    return static_cast<uint32_t>(static_cast<uint8_t>(c0)) |
+           (static_cast<uint32_t>(static_cast<uint8_t>(c1)) << 8) |
+           (static_cast<uint32_t>(static_cast<uint8_t>(c2)) << 16) |
+           (static_cast<uint32_t>(static_cast<uint8_t>(c3)) << 24);
+}
+
+} // namespace
+
+Result<CompressedImage> TextureLoader::LoadDDSCompressed(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return Result<CompressedImage>::Err("Failed to open DDS file: " + path);
+    }
+
+    uint32_t magic = 0;
+    file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+    if (!file || magic != DDS_MAGIC) {
+        return Result<CompressedImage>::Err("Invalid or non-DDS file: " + path);
+    }
+
+    DDS_HEADER header{};
+    file.read(reinterpret_cast<char*>(&header), sizeof(header));
+    if (!file || header.size != sizeof(DDS_HEADER) || header.ddspf.size != sizeof(DDS_PIXELFORMAT)) {
+        return Result<CompressedImage>::Err("Invalid DDS header in: " + path);
+    }
+
+    // Determine if we have a DX10 header.
+    bool hasDX10 = false;
+    DDS_HEADER_DXT10 headerDX10{};
+    if (header.ddspf.flags & DDS_FOURCC) {
+        if (header.ddspf.fourCC == MakeFourCC('D', 'X', '1', '0')) {
+            hasDX10 = true;
+            file.read(reinterpret_cast<char*>(&headerDX10), sizeof(headerDX10));
+            if (!file) {
+                return Result<CompressedImage>::Err("Failed to read DDS DX10 header: " + path);
+            }
+        }
+    }
+
+    CompressedFormat format = CompressedFormat::Unknown;
+
+    if (hasDX10) {
+        // Map a small subset of DXGI formats used in the offline pipeline.
+        switch (headerDX10.dxgiFormat) {
+        case 71: /* DXGI_FORMAT_BC1_UNORM */
+            format = CompressedFormat::BC1_UNORM;
+            break;
+        case 72: /* DXGI_FORMAT_BC1_UNORM_SRGB */
+            format = CompressedFormat::BC1_UNORM_SRGB;
+            break;
+        case 77: /* DXGI_FORMAT_BC3_UNORM */
+            format = CompressedFormat::BC3_UNORM;
+            break;
+        case 78: /* DXGI_FORMAT_BC3_UNORM_SRGB */
+            format = CompressedFormat::BC3_UNORM_SRGB;
+            break;
+        case 83: /* DXGI_FORMAT_BC5_UNORM */
+            format = CompressedFormat::BC5_UNORM;
+            break;
+        case 95: /* DXGI_FORMAT_BC6H_UF16 */
+            format = CompressedFormat::BC6H_UF16;
+            break;
+        case 98: /* DXGI_FORMAT_BC7_UNORM */
+            format = CompressedFormat::BC7_UNORM;
+            break;
+        case 99: /* DXGI_FORMAT_BC7_UNORM_SRGB */
+            format = CompressedFormat::BC7_UNORM_SRGB;
+            break;
+        default:
+            return Result<CompressedImage>::Err("Unsupported BC format in DDS (DX10) for: " + path);
+        }
+    } else {
+        // Legacy fourCC mapping for common BCn formats.
+        if (!(header.ddspf.flags & DDS_FOURCC)) {
+            return Result<CompressedImage>::Err("DDS lacks FOURCC/DX10 header: " + path);
+        }
+        switch (header.ddspf.fourCC) {
+        case MakeFourCC('D', 'X', 'T', '1'):
+            format = CompressedFormat::BC1_UNORM;
+            break;
+        case MakeFourCC('D', 'X', 'T', '3'):
+            format = CompressedFormat::BC3_UNORM;
+            break;
+        case MakeFourCC('D', 'X', 'T', '5'):
+            format = CompressedFormat::BC3_UNORM;
+            break;
+        case MakeFourCC('A', 'T', 'I', '2'): // BC5_UNORM
+        case MakeFourCC('B', 'C', '5', 'U'):
+            format = CompressedFormat::BC5_UNORM;
+            break;
+        default:
+            return Result<CompressedImage>::Err("Unsupported DDS FOURCC for compressed texture: " + path);
+        }
+    }
+
+    if (format == CompressedFormat::Unknown) {
+        return Result<CompressedImage>::Err("Unrecognized compressed DDS format: " + path);
+    }
+
+    const uint32_t width = header.width;
+    const uint32_t height = header.height;
+    uint32_t mipCount = header.mipMapCount ? header.mipMapCount : 1u;
+
+    // Read the remainder of the file into memory
+    file.seekg(0, std::ios::end);
+    std::streamoff fileEnd = file.tellg();
+    std::streamoff dataStart = hasDX10
+        ? static_cast<std::streamoff>(sizeof(uint32_t) + sizeof(DDS_HEADER) + sizeof(DDS_HEADER_DXT10))
+        : static_cast<std::streamoff>(sizeof(uint32_t) + sizeof(DDS_HEADER));
+    if (fileEnd <= dataStart) {
+        return Result<CompressedImage>::Err("DDS file has no image data: " + path);
+    }
+    const size_t dataSize = static_cast<size_t>(fileEnd - dataStart);
+    std::vector<uint8_t> buffer(dataSize);
+    file.seekg(dataStart, std::ios::beg);
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(dataSize));
+    if (!file) {
+        return Result<CompressedImage>::Err("Failed to read DDS image data: " + path);
+    }
+
+    // Derive per-mip sizes using BC block layout. This keeps the loader
+    // independent of header.pitchOrLinearSize quirks.
+    const uint32_t blockBytes =
+        (format == CompressedFormat::BC1_UNORM ||
+         format == CompressedFormat::BC1_UNORM_SRGB)
+        ? 8u : 16u;
+
+    CompressedImage img;
+    img.width = width;
+    img.height = height;
+    img.mipLevels = mipCount;
+    img.format = format;
+    img.mipData.reserve(mipCount);
+
+    size_t offset = 0;
+    uint32_t mipWidth = width;
+    uint32_t mipHeight = height;
+    for (uint32_t mip = 0; mip < mipCount; ++mip) {
+        uint32_t blocksWide = std::max(1u, (mipWidth + 3u) / 4u);
+        uint32_t blocksHigh = std::max(1u, (mipHeight + 3u) / 4u);
+        size_t mipSize = static_cast<size_t>(blocksWide) * blocksHigh * blockBytes;
+
+        if (offset + mipSize > buffer.size()) {
+            return Result<CompressedImage>::Err("DDS image data truncated for mip " + std::to_string(mip) + ": " + path);
+        }
+
+        std::vector<uint8_t> mipBytes(mipSize);
+        std::memcpy(mipBytes.data(), buffer.data() + offset, mipSize);
+        img.mipData.push_back(std::move(mipBytes));
+
+        offset += mipSize;
+        mipWidth = std::max(1u, mipWidth / 2u);
+        mipHeight = std::max(1u, mipHeight / 2u);
+    }
+
+    spdlog::info("Loaded compressed DDS '{}' ({}x{}, {} mips)", path, img.width, img.height, img.mipLevels);
+    return Result<CompressedImage>::Ok(std::move(img));
 }
 
 } // namespace Cortex::Graphics

@@ -1033,14 +1033,15 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
             m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
 
-        if (m_depthSRV.IsValid()) {
+        if (m_depthSRV.IsValid() && m_normalRoughnessSRV.IsValid()) {
             DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
             m_rayTracingContext->DispatchReflections(
                 rtCmdList.Get(),
                 m_depthSRV,
                 m_rtReflectionUAV,
                 m_frameConstantBuffer.gpuAddress,
-                envTable);
+                envTable,
+                m_normalRoughnessSRV);
             m_rtReflectionWrittenThisFrame = true;
         }
     }
@@ -2308,17 +2309,12 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_rayTracingEnabled &&
         m_rayTracingContext &&
         m_rayTracingContext->HasPipeline();
-    // postParams.w continues to represent "RT reflections enabled" so
-    // post-process can gate sampling of the RT reflection buffer. This is
-    // stricter than simply checking whether the RT pipeline exists; it also
-    // respects the per-feature reflection toggle and any warm-up gating.
-    const bool rtReflectionsActive =
-        rtPipelineReady &&
-        m_rtReflectionsEnabled &&
-        m_rtReflectionColor &&
-        m_rtReflectionSRV.IsValid();
-    float rtReflToggle = rtReflectionsActive ? 1.0f : 0.0f;
-    frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtReflToggle);
+    // postParams.w represents "RT sun shadows enabled" per ShaderTypes.h line 102.
+    // This flag gates the RT shadow mask sampling in Basic.hlsl (line 878).
+    // RT shadows are always active when the RT pipeline is ready, unlike
+    // reflections/GI which have separate feature toggles.
+    float rtShadowsToggle = rtPipelineReady ? 1.0f : 0.0f;
+    frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtShadowsToggle);
 
     // Image-based lighting parameters
     float iblEnabled = m_iblEnabled ? 1.0f : 0.0f;
@@ -2418,17 +2414,19 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             1.0f);
         float angleDelta = std::acos(fwdDot);
 
-        // Tightened thresholds from 2.5 units / 30 degrees to 0.5 units / 5
-        // degrees to aggressively invalidate RT temporal history when the
-        // camera moves even slightly. This prevents shadow ghosting and
-        // reflection afterimages visible in corners during navigation.
-        const float posThreshold   = 0.5f;
-        const float angleThreshold = glm::radians(5.0f);
+        // Hard thresholds for RT history invalidation. These should only fire
+        // during significant camera jumps (teleports, cut scenes) to avoid
+        // constantly resetting temporal accumulation during normal navigation.
+        // The per-pixel rejection in RT shaders handles edge cases like
+        // shadow boundaries and moving objects more gracefully.
+        const float posThreshold   = 5.0f;
+        const float angleThreshold = glm::radians(45.0f);
 
         // Soft thresholds for "camera is moving" used to gate jitter and TAA
-        // blend strength; much lower than the history reset thresholds.
-        const float softPosThreshold   = 0.05f;
-        const float softAngleThreshold = glm::radians(2.0f);
+        // blend strength. These fire during normal navigation to keep edges
+        // sharp and reduce temporal lag.
+        const float softPosThreshold   = 0.1f;
+        const float softAngleThreshold = glm::radians(3.0f);
         m_cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
 
         if (posDelta > posThreshold || angleDelta > angleThreshold) {

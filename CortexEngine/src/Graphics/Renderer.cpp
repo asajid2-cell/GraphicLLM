@@ -2418,8 +2418,12 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             1.0f);
         float angleDelta = std::acos(fwdDot);
 
-        const float posThreshold   = 2.5f;
-        const float angleThreshold = glm::radians(30.0f);
+        // Tightened thresholds from 2.5 units / 30 degrees to 0.5 units / 5
+        // degrees to aggressively invalidate RT temporal history when the
+        // camera moves even slightly. This prevents shadow ghosting and
+        // reflection afterimages visible in corners during navigation.
+        const float posThreshold   = 0.5f;
+        const float angleThreshold = glm::radians(5.0f);
 
         // Soft thresholds for "camera is moving" used to gate jitter and TAA
         // blend strength; much lower than the history reset thresholds.
@@ -6981,12 +6985,55 @@ Result<void> Renderer::CreatePipeline() {
 }
 
 Result<void> Renderer::CreatePlaceholderTexture() {
-    // Placeholder textures have repeatedly triggered device-removed faults on
-    // this 8 GB GPU during initialization, even though they are not critical
-    // for rendering (materials fall back to solid colors when textures are
-    // missing). To keep the renderer stable, skip creating GPU-backed
-    // placeholders for now; they can be reintroduced later via a safer path.
-    spdlog::warn("CreatePlaceholderTexture: skipping GPU placeholder creation due to previous device-removed faults");
+    // Now that we've fixed the upload buffer use-after-free bugs and added
+    // texture caching, we can safely create placeholder textures again.
+    const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    const float flatNormal[4] = { 0.5f, 0.5f, 1.0f, 1.0f };
+    const float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+    auto createAndBind = [&](const float color[4], std::shared_ptr<DX12Texture>& out) -> Result<void> {
+        auto texResult = DX12Texture::CreatePlaceholder(
+            m_device->GetDevice(),
+            m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
+            m_commandQueue->GetCommandQueue(),
+            2,
+            2,
+            color
+        );
+
+        if (texResult.IsErr()) {
+            return Result<void>::Err("Failed to create placeholder texture: " + texResult.Error());
+        }
+
+        out = std::make_shared<DX12Texture>(std::move(texResult.Value()));
+
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate SRV for placeholder: " + srvResult.Error());
+        }
+
+        auto createSRVResult = out->CreateSRV(m_device->GetDevice(), srvResult.Value());
+        if (createSRVResult.IsErr()) {
+            return createSRVResult;
+        }
+        return Result<void>::Ok();
+    };
+
+    auto albedoResult = createAndBind(white, m_placeholderAlbedo);
+    if (albedoResult.IsErr()) return albedoResult;
+
+    auto normalResult = createAndBind(flatNormal, m_placeholderNormal);
+    if (normalResult.IsErr()) return normalResult;
+
+    auto metallicResult = createAndBind(black, m_placeholderMetallic);
+    if (metallicResult.IsErr()) return metallicResult;
+
+    auto roughnessResult = createAndBind(white, m_placeholderRoughness);
+    if (roughnessResult.IsErr()) return roughnessResult;
+
+    m_commandQueue->Flush();
+
+    spdlog::info("Placeholder textures created");
     return Result<void>::Ok();
 }
 
@@ -7007,16 +7054,6 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     if (!m_descriptorManager || !m_device) {
         return Result<void>::Err("Renderer not initialized for environment maps");
     }
-
-    // For now, skip loading HDR/EXR environments entirely while we stabilize
-    // device-removed behaviour on 8 GB-class GPUs. The renderer will fall
-    // back to a neutral placeholder IBL or direct lighting only. This keeps
-    // startup GPU work minimal and removes large texture uploads as a source
-    // of initialization failures.
-    spdlog::warn("InitializeEnvironmentMaps: skipping HDR/EXR environment loading (debug stability mode)");
-    m_environmentMaps.clear();
-    m_pendingEnvironments.clear();
-    return Result<void>::Ok();
 
     // Clear any existing environments
     m_environmentMaps.clear();

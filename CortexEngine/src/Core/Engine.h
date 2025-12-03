@@ -54,8 +54,8 @@ struct EngineConfig {
     float cameraSprintMultiplier = 3.0f;
     float mouseSensitivity = 0.003f;
 
-    // Ray tracing config (DXR)
-    bool enableRayTracing = false;
+    // Ray tracing config (DXR) - enabled by default now that memory issues are fixed
+    bool enableRayTracing = true;
 
     // Optional initial scene preset. When empty, the engine chooses its
     // default (currently the RT showcase gallery). Accepted values are

@@ -11,6 +11,7 @@
 #include "UI/QuickSettingsWindow.h"
 #include "UI/QualitySettingsWindow.h"
 #include "UI/SceneEditorWindow.h"
+#include "UI/PerformanceWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
@@ -762,9 +763,10 @@ void Engine::ApplyVRAMQualityGovernor() {
     m_qualityAutoReduced = false;
 
     const float estimatedMB = m_renderer->GetEstimatedVRAMMB();
-    // Soft limit tuned for 8 GB adapters; callers may tighten this by
-    // adjusting the renderer's internal estimate in the future.
-    constexpr float kSoftLimitMB = 6500.0f;
+    // Soft limit tuned for 8 GB adapters. Now that we've fixed the upload buffer
+    // use-after-free bugs and added texture caching, we can safely use a much
+    // higher threshold. The duplicate texture loading was causing massive VRAM waste.
+    constexpr float kSoftLimitMB = 7500.0f; // Raised from 6500 MB
     if (estimatedMB <= kSoftLimitMB) {
         return;
     }
@@ -1647,11 +1649,8 @@ void Engine::ProcessInput() {
                     spdlog::info("Camera reset to default");
                 }
                 else if (key == SDLK_P) {
-                    if (m_renderer) {
-                        bool enabled = !m_renderer->IsPCSS();
-                        m_renderer->SetPCSS(enabled);
-                        spdlog::info("PCSS contact-hardening {}", enabled ? "ENABLED" : "DISABLED");
-                    }
+                    // Toggle performance diagnostics window
+                    UI::PerformanceWindow::Toggle();
                 }
                 else if (key == SDLK_X) {
                     if (m_renderer) {

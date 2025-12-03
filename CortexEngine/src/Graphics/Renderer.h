@@ -746,10 +746,8 @@ public:
     static constexpr uint32_t kMaxIBLResident = 4;
     float m_iblDiffuseIntensity = 1.1f;
     float m_iblSpecularIntensity = 1.3f;
-    // Start in a neutral "no IBL" mode so the engine boots into the default
-    // background; environments remain loaded and can be enabled via the
-    // debug menu or environment cycling controls.
-    bool m_iblEnabled = false;
+    // Enable IBL by default now that environment loading is stable again
+    bool m_iblEnabled = true;
 
     // Lighting state
     glm::vec3 m_directionalLightDirection = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)); // direction from surface to light
@@ -771,7 +769,7 @@ public:
     float m_bloomMaxContribution = 4.0f;
 
     // Temporal anti-aliasing (camera-only) state
-    bool  m_taaEnabled = false;
+    bool  m_taaEnabled = true;  // Re-enabled now that memory issues are fixed
     float m_taaBlendFactor = 0.06f;
     // Approximate camera motion flag for jitter/taa tuning.
     bool  m_cameraIsMoving = false;
@@ -910,7 +908,7 @@ public:
       void ReportDeviceRemoved(const char* context, HRESULT hr, const char* file, int line);
 
     // Exponential height fog parameters
-    bool  m_fogEnabled = false;
+    bool  m_fogEnabled = true;  // Re-enabled now that memory issues are fixed
     float m_fogDensity = 0.02f;
     float m_fogHeight = 0.0f;
     float m_fogFalloff = 0.5f;

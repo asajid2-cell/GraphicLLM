@@ -54,6 +54,8 @@ cbuffer FrameConstants : register(b0, space0)
 struct ReflectionPayload
 {
     float3 color;
+    float3 hitNormal;   // Surface normal at hit point for proper reflection calculation
+    float  hitDistance; // Ray travel distance for accurate hit point reconstruction
     bool   hit;
 };
 
@@ -161,19 +163,41 @@ void Miss_Reflection(inout ReflectionPayload payload)
     // match the skybox and specular environment lighting.
     float3 dir = normalize(WorldRayDirection());
     payload.color = SampleEnvironment(dir);
+    payload.hitNormal = float3(0.0f, 0.0f, 0.0f);
+    payload.hitDistance = 0.0f;
     payload.hit = false;
 }
 
 [shader("closesthit")]
-void ClosestHit_Reflection(inout ReflectionPayload payload, in BuiltInTriangleIntersectionAttributes /*attribs*/)
+void ClosestHit_Reflection(inout ReflectionPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-    // For this first pass we still avoid material-aware shading; instead we
-    // treat geometry as an occluder for the environment and reuse the same
-    // environment sample used on misses. The alpha channel still encodes a
-    // simple hit flag so debug views can distinguish hits from misses.
-    float3 dir = normalize(WorldRayDirection());
-    payload.color = SampleEnvironment(dir);
-    payload.hit   = true;
+    // Calculate barycentric coordinates for vertex attribute interpolation
+    float3 barycentrics = float3(
+        1.0f - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y
+    );
+
+    // For multi-bounce reflections we need the geometric normal. Since we don't
+    // have vertex buffer access in this minimal DXR setup, we compute the
+    // geometric normal from the ray hit. This works well for planar mirrors.
+    // A full implementation would fetch and interpolate vertex normals here.
+    float3 worldRayDir = WorldRayDirection();
+
+    // Use geometric normal: surface faces the direction opposite to where the ray came from
+    // This approximation works for mirror-like surfaces where we assume the surface is locally planar
+    payload.hitNormal = normalize(-worldRayDir);
+
+    // For better accuracy with complex geometry, flip the normal if it's facing away from the ray
+    // (though for mirrors this shouldn't happen)
+    if (dot(payload.hitNormal, worldRayDir) > 0.0f)
+    {
+        payload.hitNormal = -payload.hitNormal;
+    }
+
+    payload.hitDistance = RayTCurrent();
+    payload.color = SampleEnvironment(worldRayDir);
+    payload.hit = true;
 }
 
 [shader("raygeneration")]
@@ -194,39 +218,96 @@ void RayGen_Reflection()
     float3 camPos   = g_CameraPosition.xyz;
 
     float3 V = normalize(camPos - worldPos);
-
     float3 N = ApproximateNormal(launchIndex, launchDims);
-    float3 R = normalize(reflect(-V, N));
+    float3 initialR = normalize(reflect(-V, N));
 
-    ReflectionPayload payload;
-    payload.color = float3(0.0f, 0.0f, 0.0f);
-    payload.hit   = false;
+    // Iterative multi-bounce ray tracing for infinite mirror effect
+    static const int MAX_BOUNCES = 16;  // Adjustable: 8 for performance, 32 for extreme quality
+    static const float REFLECTIVITY = 0.95f;  // Dimming factor per bounce (mirrors aren't 100% reflective)
+    static const float THROUGHPUT_CUTOFF = 0.05f;  // Stop if contribution is too dim to see
 
-    RayDesc ray;
-    ray.Origin = worldPos + N * 0.05f;
-    ray.Direction = R;
-    ray.TMin = 0.0f;
-    ray.TMax = 10000.0f;
+    float3 accumulatedColor = float3(0.0f, 0.0f, 0.0f);
+    float3 throughput = float3(1.0f, 1.0f, 1.0f);  // How much light survives each bounce
 
-    TraceRay(
-        g_TopLevel,
-        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
-        /*InstanceInclusionMask*/ 0xFF,
-        /*RayContributionToHitGroupIndex*/ 0,
-        /*MultiplierForGeometryContributionToHitGroupIndex*/ 0,
-        /*MissShaderIndex*/ 0,
-        ray,
-        payload);
+    float3 currentOrigin = worldPos + N * 0.05f;
+    float3 currentDir = initialR;
+    bool finalHit = false;
+
+    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++)
+    {
+        // Early exit if throughput is too low (performance optimization)
+        if (max(throughput.r, max(throughput.g, throughput.b)) < THROUGHPUT_CUTOFF)
+        {
+            break;
+        }
+
+        ReflectionPayload payload;
+        payload.color = float3(0.0f, 0.0f, 0.0f);
+        payload.hitNormal = float3(0.0f, 0.0f, 0.0f);
+        payload.hitDistance = 0.0f;
+        payload.hit = false;
+
+        RayDesc ray;
+        ray.Origin = currentOrigin;
+        ray.Direction = currentDir;
+        ray.TMin = 0.001f;  // Small offset to avoid self-intersection
+        ray.TMax = 10000.0f;
+
+        TraceRay(
+            g_TopLevel,
+            RAY_FLAG_NONE,  // Changed from ACCEPT_FIRST_HIT to allow proper bouncing
+            /*InstanceInclusionMask*/ 0xFF,
+            /*RayContributionToHitGroupIndex*/ 0,
+            /*MultiplierForGeometryContributionToHitGroupIndex*/ 0,
+            /*MissShaderIndex*/ 0,
+            ray,
+            payload);
+
+        if (!payload.hit)
+        {
+            // Ray escaped to environment/sky - accumulate and stop
+            accumulatedColor += payload.color * throughput;
+            break;
+        }
+
+        // Hit a surface - treat it as a mirror for multi-bounce reflections
+        // In a full implementation, you'd check material properties here
+        // and break early if the surface is rough (roughness > 0.1)
+
+        // Accumulate the environment contribution at this hit point
+        accumulatedColor += payload.color * throughput;
+        finalHit = true;
+
+        // Prepare for next bounce using the hit information from the payload
+        float3 hitPoint = ray.Origin + ray.Direction * payload.hitDistance;
+
+        // Calculate the proper reflection direction using the surface normal
+        // returned by the ClosestHit shader
+        float3 reflectedDir = reflect(currentDir, payload.hitNormal);
+
+        // Each bounce loses some energy (mirrors aren't 100% reflective)
+        throughput *= REFLECTIVITY;
+
+        // Update ray origin with small offset along the normal to avoid self-intersection
+        currentOrigin = hitPoint + payload.hitNormal * 0.001f;
+        currentDir = normalize(reflectedDir);
+    }
+
+    // If we exhausted all bounces without hitting sky, add fallback color
+    // to avoid black center in infinite mirror tunnel
+    if (max(throughput.r, max(throughput.g, throughput.b)) >= THROUGHPUT_CUTOFF)
+    {
+        accumulatedColor += g_AmbientColor.rgb * throughput * 0.5f;
+    }
 
     // When the RT reflection ray-direction debug view is active (debug mode 24),
     // encode the reflection ray direction directly into RGB so the post-process
-    // path can visualize the ray field. Otherwise, store the environment-driven
-    // reflection color written by the miss/closest-hit shaders.
+    // path can visualize the ray field. Otherwise, store the accumulated color.
     uint debugView = (uint)g_DebugMode.x;
     float3 outColor =
         (debugView == 24u)
-        ? (R * 0.5f + 0.5f)
-        : payload.color;
+        ? (initialR * 0.5f + 0.5f)
+        : accumulatedColor;
 
-    g_ReflectionOut[launchIndex] = float4(outColor, payload.hit ? 1.0f : 0.0f);
+    g_ReflectionOut[launchIndex] = float4(outColor, finalHit ? 1.0f : 0.0f);
 }

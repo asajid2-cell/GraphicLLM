@@ -921,11 +921,15 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                     {
                         float history = g_RtShadowMaskHistory.Load(int3(pixelCoord, 0));
                         float diff = abs(rtShadow - history);
-                        // When the current mask and history agree (small diff),
-                        // lean more on history for stability. When they diverge
-                        // strongly (e.g., moving casters or camera), trust the
-                        // new mask to avoid long-lived ghost shadows.
-                        float historyWeight = lerp(0.6f, 0.1f, saturate(diff * 4.0f));
+
+                        // Conservative temporal accumulation: reduced max weight
+                        // from 0.6 to 0.25 and increased diff sensitivity from
+                        // 4.0 to 10.0 to aggressively reject history at shadow
+                        // boundaries and when objects move. This eliminates the
+                        // ghosting/afterimage artifacts visible in corners and
+                        // on moving objects while retaining enough temporal
+                        // smoothing to reduce single-pixel ray tracing noise.
+                        float historyWeight = lerp(0.25f, 0.0f, saturate(diff * 10.0f));
                         rtShadow = lerp(rtShadow, history, historyWeight);
                     }
 

@@ -38,6 +38,7 @@ enum ControlIdPerf : int {
     IDC_PERF_FOG            = 4048,
     IDC_PERF_PARTICLES      = 4049,
     IDC_PERF_IBL_LIMIT      = 4050,
+    IDC_PERF_PCSS           = 4051,
 
     IDC_PERF_LOAD_ENV_ONE   = 4060,
     IDC_PERF_LOAD_ENV_ALL   = 4061,
@@ -75,6 +76,7 @@ struct PerfWindowState {
     HWND chkFog      = nullptr;
     HWND chkParticles = nullptr;
     HWND chkIBLLimit = nullptr;
+    HWND chkPCSS     = nullptr;
 
     HWND btnEnvOne   = nullptr;
     HWND btnEnvAll   = nullptr;
@@ -152,6 +154,7 @@ void RefreshControlsFromState() {
     SetCheckbox(g_perf.chkFog,      renderer->IsFogEnabled());
     SetCheckbox(g_perf.chkParticles, renderer->GetParticlesEnabled());
     SetCheckbox(g_perf.chkIBLLimit, renderer->IsIBLLimitEnabled());
+    SetCheckbox(g_perf.chkPCSS,     renderer->IsPCSS());
 }
 
 void RefreshStats() {
@@ -407,6 +410,8 @@ void RegisterPerfWindowClass() {
             g_perf.chkParticles  = makeCheckbox(IDC_PERF_PARTICLES,   L"Particles (billboard emitters)", y);
             y += checkHeight + rowGap;
             g_perf.chkIBLLimit   = makeCheckbox(IDC_PERF_IBL_LIMIT,   L"IBL limit (max 4 envs resident; FIFO eviction)", y);
+            y += checkHeight + rowGap;
+            g_perf.chkPCSS       = makeCheckbox(IDC_PERF_PCSS,        L"PCSS (contact-hardening shadows)", y);
             y += checkHeight + rowGap * 2;
 
             // Buttons
@@ -632,6 +637,11 @@ void RegisterPerfWindowClass() {
                 case IDC_PERF_IBL_LIMIT: {
                     bool enabled = GetCheckbox(g_perf.chkIBLLimit);
                     renderer->SetIBLLimitEnabled(enabled);
+                    break;
+                }
+                case IDC_PERF_PCSS: {
+                    bool enabled = GetCheckbox(g_perf.chkPCSS);
+                    renderer->SetPCSS(enabled);
                     break;
                 }
                 default:

@@ -401,9 +401,12 @@ int main(int argc, char* argv[]) {
         config.window.width = 1280;
         config.window.height = 720;
         config.window.vsync = true;
-        // Disable DX debug layer to avoid runtime breaks/crashes on some systems
-        config.device.enableDebugLayer = false;
-        config.device.enableGPUValidation = false;  // Too slow for development
+        // Enable DX12 debug layer + GPU-based validation so device-removed
+        // errors surface precise diagnostics via the D3D12 debug runtime.
+        // If this proves too slow on a given system it can be toggled off
+        // here or via a launcher option later.
+        config.device.enableDebugLayer = true;
+        config.device.enableGPUValidation = true;
 
         // Decide whether to show the launcher UI. Power users can skip it
         // via CLI or by specifying a scene/mode explicitly.

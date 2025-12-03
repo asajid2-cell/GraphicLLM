@@ -67,9 +67,18 @@ void Renderer::ReportDeviceRemoved(const char* context,
         default:                         markerName = "None"; break;
     }
 
+    auto rs = [](D3D12_RESOURCE_STATES s) {
+        return static_cast<unsigned int>(s);
+    };
+
     spdlog::error(
         "DX12 device removed or GPU fault in '{}' (hr=0x{:08X}, reason=0x{:08X}, frameCounter={}, "
-        "swapIndex={}, lastPass='{}', lastGpuMarker='{}', at {}:{})",
+        "swapIndex={}, lastPass='{}', lastGpuMarker='{}', at {}:{}). "
+        "ResourceStates: depth=0x{:X}, shadowMap=0x{:X}, hdr=0x{:X}, "
+        "rtShadowMask=0x{:X}, rtShadowMaskHistory=0x{:X}, gbufferNR=0x{:X}, "
+        "ssao=0x{:X}, ssr=0x{:X}, velocity=0x{:X}, history=0x{:X}, "
+        "taaIntermediate=0x{:X}, rtRefl=0x{:X}, rtReflHist=0x{:X}, "
+        "rtGI=0x{:X}, rtGIHist=0x{:X}",
         ctx,
         static_cast<unsigned int>(hr),
         static_cast<unsigned int>(reason),
@@ -78,7 +87,22 @@ void Renderer::ReportDeviceRemoved(const char* context,
         m_lastCompletedPass ? m_lastCompletedPass : "None",
         markerName,
         file ? file : "unknown",
-        line);
+        line,
+        rs(m_depthState),
+        rs(m_shadowMapState),
+        rs(m_hdrState),
+        rs(m_rtShadowMaskState),
+        rs(m_rtShadowMaskHistoryState),
+        rs(m_gbufferNormalRoughnessState),
+        rs(m_ssaoState),
+        rs(m_ssrState),
+        rs(m_velocityState),
+        rs(m_historyState),
+        rs(m_taaIntermediateState),
+        rs(m_rtReflectionState),
+        rs(m_rtReflectionHistoryState),
+        rs(m_rtGIState),
+        rs(m_rtGIHistoryState));
 
     m_deviceRemoved = true;
 }
@@ -708,6 +732,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // per frame so scene rebuilds and RT warm-up do not spike the first frame.
     ProcessGpuJobsPerFrame();
     MarkPassComplete("Render_BeforeBeginFrame");
+    if (m_verboseLoggingEnabled) {
+        spdlog::info("[Render] After ProcessGpuJobsPerFrame: pendingMeshJobs={} pendingBLASJobs={}", m_pendingMeshJobs, m_pendingBLASJobs);
+    }
 
     // Common frame setup (depth/HDR resize, command list reset, constant
     // buffer updates) shared by both the classic raster/RT backend and the
@@ -724,10 +751,14 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     MarkPassComplete("BeginFrame_Done");
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
+    if (m_verboseLoggingEnabled) {
+        spdlog::info("[Render] After UpdateFrameConstants: cameraPos=({:.2f},{:.2f},{:.2f})",
+                     m_cameraPositionWS.x, m_cameraPositionWS.y, m_cameraPositionWS.z);
+    }
 
     // Optional ultra-minimal debug frame: clear the current back buffer and
-    // present, skipping all geometry, lighting, and post-process work. This
-    // is disabled in normal builds so the full renderer runs by default.
+    // present, skipping all geometry, lighting, and post-process work.
+    // This is disabled in normal builds so the full renderer runs.
     constexpr bool kForceMinimalFrame = false;
     if (kForceMinimalFrame) {
         ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
@@ -778,6 +809,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
         RenderRayTracing(registry);
         MarkPassComplete("RenderRayTracing_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderRayTracing completed");
+        }
     }
     const auto tAfterRT = clock::now();
     m_lastRTPassMs =
@@ -799,11 +833,19 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Main scene pass
     PrepareMainPass();
     MarkPassComplete("PrepareMainPass_Done");
+    if (m_verboseLoggingEnabled) {
+        spdlog::info("[Render] PrepareMainPass completed (hdrState=0x{:X}, gbufferNRState=0x{:X})",
+                     static_cast<unsigned int>(m_hdrState),
+                     static_cast<unsigned int>(m_gbufferNormalRoughnessState));
+    }
 
     // Draw environment background (skybox) into the HDR target before geometry.
     WriteBreadcrumb(GpuMarker::Skybox);
     RenderSkybox();
     MarkPassComplete("RenderSkybox_Done");
+    if (m_verboseLoggingEnabled) {
+        spdlog::info("[Render] RenderSkybox completed");
+    }
 
     bool drewWithHyper = false;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -832,6 +874,9 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::TransparentGeom);
         RenderTransparent(registry);
         MarkPassComplete("RenderTransparent_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderScene/RenderTransparent completed");
+        }
     }
 
     // Camera motion vectors for TAA/motion blur (from depth + matrices).
@@ -839,6 +884,10 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::MotionVectors);
         RenderMotionVectors();
         MarkPassComplete("RenderMotionVectors_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderMotionVectors completed (velocityState=0x{:X})",
+                         static_cast<unsigned int>(m_velocityState));
+        }
     }
 
     // HDR TAA resolve pass (stabilizes main lighting before reflections,
@@ -847,6 +896,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::TAAResolve);
         RenderTAA();
         MarkPassComplete("RenderTAA_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderTAA completed (taaIntermediateState=0x{:X}, hdrState=0x{:X}, historyState=0x{:X})",
+                         static_cast<unsigned int>(m_taaIntermediateState),
+                         static_cast<unsigned int>(m_hdrState),
+                         static_cast<unsigned int>(m_historyState));
+        }
     }
 
     const auto tMainEnd = clock::now();
@@ -862,6 +917,10 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::SSR);
         RenderSSR();
         MarkPassComplete("RenderSSR_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderSSR completed (ssrState=0x{:X})",
+                         static_cast<unsigned int>(m_ssrState));
+        }
         const auto tSsrEnd = clock::now();
         m_lastSSRMs =
             std::chrono::duration_cast<std::chrono::microseconds>(tSsrEnd - tSsrStart).count() / 1000.0f;
@@ -916,6 +975,13 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::PostProcess);
         RenderPostProcess();
         MarkPassComplete("RenderPostProcess_Done");
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[Render] RenderPostProcess completed (hdrState=0x{:X}, ssaoState=0x{:X}, ssrState=0x{:X}, velocityState=0x{:X})",
+                         static_cast<unsigned int>(m_hdrState),
+                         static_cast<unsigned int>(m_ssaoState),
+                         static_cast<unsigned int>(m_ssrState),
+                         static_cast<unsigned int>(m_velocityState));
+        }
         const auto tPostOnlyEnd = clock::now();
         m_lastPostMs =
             std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
@@ -1015,35 +1081,12 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 envTable);
     }
 
-    // Optional RT reflections: reuse the same TLAS and depth buffer to write
-    // a reflection color buffer that can be inspected or composed in
-    // post-process. This pass is entirely optional and disabled by default;
-    // if the reflection pipeline was not created successfully,
-    // DispatchReflections is a no-op.
-    if (!rtWarmingUp && m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
-        if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-            D3D12_RESOURCE_BARRIER reflBarrier{};
-            reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            reflBarrier.Transition.pResource = m_rtReflectionColor.Get();
-            reflBarrier.Transition.StateBefore = m_rtReflectionState;
-            reflBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            reflBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            rtCmdList->ResourceBarrier(1, &reflBarrier);
-            m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        }
-
-        if (m_depthSRV.IsValid() && m_gbufferNormalRoughnessSRV.IsValid()) {
-            DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
-            m_rayTracingContext->DispatchReflections(
-                rtCmdList.Get(),
-                m_depthSRV,
-                m_rtReflectionUAV,
-                m_frameConstantBuffer.gpuAddress,
-                envTable,
-                m_gbufferNormalRoughnessSRV);
-            m_rtReflectionWrittenThisFrame = true;
-        }
-    }
+    // Optional RT reflections: currently disabled to keep the renderer stable
+    // while the reflection pipeline is migrated to a vertex-buffer based
+    // implementation. RT shadows and (optionally) RT GI remain active.
+    // if (!rtWarmingUp && m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
+    //     ...
+    // }
 
     // Optional RT diffuse GI: writes a low-frequency indirect lighting buffer
     // that can be sampled by the main PBR shader. As with reflections, this
@@ -2632,11 +2675,23 @@ void Renderer::RenderTAA() {
         }
         // History is no longer meaningful once TAA has been disabled.
         m_hasHistory = false;
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[RenderTAA] Skipped (enabled={} pipeline={} hdrColor={} taaIntermediate={})",
+                         m_taaEnabled,
+                         m_taaPipeline != nullptr,
+                         m_hdrColor != nullptr,
+                         m_taaIntermediate != nullptr);
+        }
         return;
     }
 
     ID3D12Device* device = m_device->GetDevice();
     if (!device || !m_commandList) {
+        if (m_verboseLoggingEnabled) {
+            spdlog::warn("[RenderTAA] Aborted: device={} commandList={}",
+                         device != nullptr,
+                         m_commandList != nullptr);
+        }
         return;
     }
 
@@ -3319,7 +3374,15 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             // frame if the scene contains placeholder entities without mesh
             // data (for example, when scene setup fails part-way through).
             if (!m_missingBufferWarningLogged) {
-                spdlog::warn("  Entity {} has no vertex/index buffers", entityCount);
+                const size_t posCount = renderable.mesh ? renderable.mesh->positions.size() : 0;
+                const size_t idxCount = renderable.mesh ? renderable.mesh->indices.size() : 0;
+                void* meshPtr = renderable.mesh ? static_cast<void*>(renderable.mesh.get()) : nullptr;
+                spdlog::warn(
+                    "  Entity {} has no vertex/index buffers (meshPtr={}, positions={}, indices={})",
+                    entityCount,
+                    meshPtr,
+                    static_cast<unsigned long long>(posCount),
+                    static_cast<unsigned long long>(idxCount));
                 m_missingBufferWarningLogged = true;
             }
         }
@@ -7698,11 +7761,17 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
 void Renderer::RenderPostProcess() {
     if (!m_postProcessPipeline || !m_hdrColor) {
         // No HDR/post-process configured; main pass may have rendered directly to back buffer
+        if (m_verboseLoggingEnabled) {
+            spdlog::info("[RenderPostProcess] Skipped (pipeline={} hdrColor={})",
+                         m_postProcessPipeline != nullptr,
+                         m_hdrColor != nullptr);
+        }
         return;
     }
 
-    // Transition HDR/SSAO to shader resource and back buffer to render target
-    D3D12_RESOURCE_BARRIER barriers[3] = {};
+    // Transition HDR/SSAO (and any other textures sampled in post) to shader
+    // resource state and the back buffer to render target.
+    D3D12_RESOURCE_BARRIER barriers[5] = {};
     UINT barrierCount = 0;
 
     if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -7723,6 +7792,31 @@ void Renderer::RenderPostProcess() {
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
         m_ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // SSR color buffer is sampled in the post-process shader (t6). Ensure its
+    // resource state reflects that before binding the SRV; leaving it in
+    // RENDER_TARGET while sampling can trigger device-removed on some drivers.
+    if (m_ssrColor && m_ssrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_ssrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_ssrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Motion vectors are also sampled (t7) for motion-aware blur/TAA in the
+    // post-process shader; keep their state in sync with the SRV usage.
+    if (m_velocityBuffer && m_velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_velocityBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_velocityState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
     barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -7912,22 +8006,26 @@ void Renderer::RenderPostProcess() {
         }
     }
 
-    // RT reflection buffer SRV (t8) used by hybrid SSR/RT reflections. We only
-    // bind this when the reflection buffer exists; sampling in the shader is
-    // additionally gated on the RT enable flag (postParams.w).
-    if (m_rtReflectionSRV.IsValid() && m_rtReflectionColor) {
-        auto rtReflAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (rtReflAllocResult.IsOk()) {
-            DescriptorHandle rtReflHandle = rtReflAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                rtReflHandle.cpu,
-                m_rtReflectionSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection SRV; RT reflections will be disabled this frame");
-        }
-    }
+    // RT reflection buffer SRV (t8) used by hybrid SSR/RT reflections.
+    // This path is currently disabled to avoid resource-state hazards while
+    // the RT reflection pipeline is being migrated to a vertex-buffer-based
+    // implementation. The DXR pass that writes m_rtReflectionColor is also
+    // disabled, so binding this SRV would provide no additional visual
+    // benefit but can still trigger driver bugs on some GPUs.
+    //
+    // if (m_rtReflectionSRV.IsValid() && m_rtReflectionColor) {
+    //     auto rtReflAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    //     if (rtReflAllocResult.IsOk()) {
+    //         DescriptorHandle rtReflHandle = rtReflAllocResult.Value();
+    //         m_device->GetDevice()->CopyDescriptorsSimple(
+    //             1,
+    //             rtReflHandle.cpu,
+    //             m_rtReflectionSRV.cpu,
+    //             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    //     } else {
+    //         spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection SRV; RT reflections will be disabled this frame");
+    //     }
+    // }
 
     // Optional RT reflection history SRV (t9) used for temporal accumulation
     // / denoising in the post-process pass. When history does not exist we
@@ -8124,7 +8222,7 @@ void Renderer::RenderVoxel(Scene::ECS_Registry* registry) {
     barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     m_commandList->ResourceBarrier(1, &barrier);
-
+//test//
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 

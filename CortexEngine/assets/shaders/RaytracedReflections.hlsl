@@ -172,47 +172,21 @@ void Miss_Reflection(inout ReflectionPayload payload)
 [shader("closesthit")]
 void ClosestHit_Reflection(inout ReflectionPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
-    // Sample the G-buffer normal at the hit point to compute proper reflection
-    // directions for multi-bounce reflections. We reconstruct screen-space UVs
-    // from the world-space hit point by projecting it back through the camera.
-
+    // Temporary stabilizer: use a simple geometric normal for reflections so
+    // the DXR path does not depend on shared G-buffer resources. This avoids
+    // cross-pipeline hazards while we move toward a full vertex-buffer based
+    // solution for infinite mirrors.
     float3 worldRayDir = WorldRayDirection();
-    float3 worldRayOrigin = WorldRayOrigin();
-    float3 hitPoint = worldRayOrigin + worldRayDir * RayTCurrent();
 
-    // Project hit point to clip space to get screen-space UVs for G-buffer lookup
-    float4 clipPos = mul(g_ViewProjectionMatrix, float4(hitPoint, 1.0f));
-    clipPos /= max(clipPos.w, 1e-4f);
-
-    float2 screenUV;
-    screenUV.x = clipPos.x * 0.5f + 0.5f;
-    screenUV.y = 0.5f - clipPos.y * 0.5f;  // Flip Y for D3D coordinates
-
-    // Sample G-buffer normal if the hit point is on-screen, otherwise fall back
-    // to the ray-direction approximation for off-screen geometry.
-    float3 surfaceNormal;
-    if (screenUV.x >= 0.0f && screenUV.x <= 1.0f && screenUV.y >= 0.0f && screenUV.y <= 1.0f)
+    float3 normal = normalize(payload.hitNormal);
+    if (!all(isfinite(normal)) || length(normal) < 0.1f)
     {
-        // Sample G-buffer normal (stored in RGB as [0,1] encoding [-1,1])
-        float4 normalSample = g_NormalRoughness.SampleLevel(g_Sampler, screenUV, 0);
-        surfaceNormal = normalize(normalSample.rgb * 2.0f - 1.0f);
-
-        // Validate the normal; if invalid (NaN/zero), fall back to approximation
-        if (!all(isfinite(surfaceNormal)) || length(surfaceNormal) < 0.1f)
-        {
-            surfaceNormal = normalize(-worldRayDir);
-        }
-    }
-    else
-    {
-        // Hit point is off-screen (behind camera or outside frustum), use
-        // ray-direction approximation as fallback
-        surfaceNormal = normalize(-worldRayDir);
+        normal = normalize(-worldRayDir);
     }
 
-    payload.hitNormal = surfaceNormal;
+    payload.hitNormal   = normal;
     payload.hitDistance = RayTCurrent();
-    payload.color = SampleEnvironment(worldRayDir);
+    payload.color       = SampleEnvironment(reflect(worldRayDir, normal));
     payload.hit = true;
 }
 

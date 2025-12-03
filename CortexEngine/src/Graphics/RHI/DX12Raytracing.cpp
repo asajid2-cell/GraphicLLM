@@ -21,10 +21,10 @@ namespace {
     }
 
     // Coarse safety limits for RT acceleration structure memory usage to avoid
-    // exhausting VRAM on 8 GB GPUs in heavy scenes. These are deliberately
-    // conservative: once the BLAS budget is reached, additional meshes fall
-    // back to raster-only lighting for RT passes.
-    constexpr uint64_t kMaxBLASBytesTotal = 2ull * 1024ull * 1024ull * 1024ull;      // ~2 GB
+    // exhausting VRAM on 8 GB GPUs in heavy scenes. Once the BLAS budget is
+    // reached, additional meshes fall back to raster-only lighting for RT
+    // passes instead of risking a device-removed error.
+    constexpr uint64_t kMaxBLASBytesTotal = 1ull * 1024ull * 1024ull * 1024ull;      // ~1 GB
     constexpr uint64_t kMaxBLASBuildBytesPerFrame = 256ull * 1024ull * 1024ull;      // ~256 MB/frame
 
     // Mesh-level guardrails for RT participation. Extremely large meshes are
@@ -903,6 +903,62 @@ void DX12RaytracingContext::RebuildBLASForMesh(const std::shared_ptr<Scene::Mesh
     entry.geometryDesc = geom;
     entry.hasGeometry = (tri.VertexCount > 0 && tri.IndexCount > 0);
     entry.built = false;
+    entry.buildRequested = false;
+}
+
+void DX12RaytracingContext::BuildSingleBLAS(const Scene::MeshData* meshKey) {
+    if (!m_device5 || !meshKey) {
+        return;
+    }
+
+    auto it = m_blasCache.find(meshKey);
+    if (it == m_blasCache.end()) {
+        return;
+    }
+    BLASEntry& blasEntry = it->second;
+    if (!blasEntry.hasGeometry || blasEntry.blas) {
+        return;
+    }
+
+    // Mark this BLAS as requested; BuildTLAS will perform the heavy build
+    // work using the current frame's command list and per-frame budgets.
+    blasEntry.buildRequested = true;
+}
+
+uint32_t DX12RaytracingContext::GetPendingBLASCount() const {
+    uint32_t count = 0;
+    for (const auto& kv : m_blasCache) {
+        const BLASEntry& e = kv.second;
+        if (e.hasGeometry && !e.blas && e.buildRequested) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void DX12RaytracingContext::ReleaseBLASForMesh(const Scene::MeshData* meshKey) {
+    if (!meshKey) {
+        return;
+    }
+
+    auto it = m_blasCache.find(meshKey);
+    if (it == m_blasCache.end()) {
+        return;
+    }
+
+    BLASEntry& entry = it->second;
+    if (entry.blas) {
+        const uint64_t bytes = entry.blasSize + entry.scratchSize;
+        if (bytes > 0 && m_totalBLASBytes >= bytes) {
+            m_totalBLASBytes -= bytes;
+        }
+        entry.blas.Reset();
+        entry.built = false;
+        entry.buildRequested = false;
+        entry.blasSize = 0;
+        entry.scratchSize = 0;
+        spdlog::info("DX12RaytracingContext: released BLAS for mesh {}", static_cast<const void*>(meshKey));
+    }
 }
 
 void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
@@ -957,7 +1013,7 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
             }
         }
 
-        if (!blasEntry.blas && blasEntry.hasGeometry) {
+        if (!blasEntry.blas && blasEntry.hasGeometry && blasEntry.buildRequested) {
             D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs{};
             inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
             inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
@@ -981,8 +1037,6 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
                 continue;
             }
 
-            // Global memory budget for all BLAS buffers: once reached, meshes
-            // beyond this limit are rendered raster-only for RT passes.
             if (m_totalBLASBytes + candidateBytes > kMaxBLASBytesTotal) {
                 spdlog::warn(
                     "DX12RaytracingContext: BLAS memory budget reached; "
@@ -990,10 +1044,7 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
                 continue;
             }
 
-            // Per-frame build budget: allow the scene to converge over
-            // multiple frames instead of issuing all BLAS builds at once.
             if (bytesBuiltThisFrame + candidateBytes > kMaxBLASBuildBytesPerFrame) {
-                // Defer building this mesh to a subsequent frame.
                 continue;
             }
 
@@ -1059,6 +1110,7 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
             cmdList->ResourceBarrier(1, &barrier);
 
             blasEntry.built = true;
+            blasEntry.buildRequested = false;
 
             m_totalBLASBytes += candidateBytes;
             bytesBuiltThisFrame += candidateBytes;

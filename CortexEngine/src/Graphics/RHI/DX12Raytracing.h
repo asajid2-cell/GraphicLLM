@@ -127,10 +127,20 @@ public:
         return m_rtGIStateObject && m_rtGIStateProps && m_rtGIShaderTable;
     }
 
+    // Incremental BLAS helpers used by the renderer's GPU job queue so BLAS
+    // builds can be spread across multiple frames.
+    void BuildSingleBLAS(const Scene::MeshData* meshKey);
+    [[nodiscard]] uint32_t GetPendingBLASCount() const;
+    // Explicitly release BLAS memory for a mesh that is no longer referenced
+    // by any renderables, so RT acceleration structures do not accumulate
+    // across scene rebuilds.
+    void ReleaseBLASForMesh(const Scene::MeshData* meshKey);
+
 private:
     struct BLASEntry {
         bool hasGeometry = false;
         bool built = false;
+        bool buildRequested = false;
 
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 

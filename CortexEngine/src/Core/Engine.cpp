@@ -1,4 +1,4 @@
-#include "Engine.h"
+﻿#include "Engine.h"
 #include "ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
@@ -648,6 +648,24 @@ void Engine::Shutdown() {
     spdlog::info("Cortex Engine shut down");
 }
 
+void Engine::SetSelectedEntity(entt::entity entity) {
+    m_selectedEntity = entity;
+
+    if (!m_registry || entity == entt::null) {
+        return;
+    }
+
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(entity)) {
+        return;
+    }
+
+    if (reg.all_of<Scene::TagComponent>(entity)) {
+        const auto& tag = reg.get<Scene::TagComponent>(entity);
+        SetFocusTarget(tag.tag);
+    }
+}
+
 void Engine::SetFocusTarget(const std::string& name) {
     m_focusTargetName = name;
 
@@ -733,6 +751,55 @@ void Engine::ApplyHeroVisualBaseline() {
     SyncDebugMenuFromRenderer();
 
     spdlog::info("Hero visual baseline applied (studio environment, TAA, SSR+SSAO)");
+}
+
+void Engine::ApplyVRAMQualityGovernor() {
+    if (!m_renderer) {
+        return;
+    }
+
+    // Reset flag; it will be raised again if any step takes effect.
+    m_qualityAutoReduced = false;
+
+    const float estimatedMB = m_renderer->GetEstimatedVRAMMB();
+    // Soft limit tuned for 8 GB adapters; callers may tighten this by
+    // adjusting the renderer's internal estimate in the future.
+    constexpr float kSoftLimitMB = 6500.0f;
+    if (estimatedMB <= kSoftLimitMB) {
+        return;
+    }
+
+    bool changed = false;
+
+    // Peel off expensive features one by one so we keep as much visual
+    // fidelity as possible while backing away from the limit.
+    if (m_renderer->GetSSREnabled()) {
+        m_renderer->SetSSREnabled(false);
+        m_perfSSROff = true;
+        changed = true;
+        spdlog::warn("VRAM governor: disabling SSR (est VRAM {:.0f} MB > {:.0f} MB)", estimatedMB, kSoftLimitMB);
+    } else if (m_renderer->GetSSAOEnabled()) {
+        m_renderer->SetSSAOEnabled(false);
+        changed = true;
+        spdlog::warn("VRAM governor: disabling SSAO (est VRAM {:.0f} MB > {:.0f} MB)", estimatedMB, kSoftLimitMB);
+    } else if (m_renderer->IsFogEnabled()) {
+        m_renderer->SetFogEnabled(false);
+        changed = true;
+        spdlog::warn("VRAM governor: disabling fog (est VRAM {:.0f} MB > {:.0f} MB)", estimatedMB, kSoftLimitMB);
+    } else {
+        // Fall back to the aggressive safe preset which clamps shadow-map
+        // size, render scale, and heavy RT/SSR/SSAO features.
+        m_renderer->ApplySafeQualityPreset();
+        changed = true;
+        spdlog::warn("VRAM governor: applied safe low-quality preset (est VRAM {:.0f} MB > {:.0f} MB)",
+                     estimatedMB, kSoftLimitMB);
+    }
+
+    if (changed) {
+        m_qualityAutoReduced = true;
+        // Keep debug UI in sync with any toggles we just changed.
+        SyncDebugMenuFromRenderer();
+    }
 }
 
 void Engine::RenderHUD() {
@@ -1000,7 +1067,7 @@ void Engine::RenderHUD() {
     if (UI::DebugMenu::IsVisible()) {
         UI::DebugMenuState state = UI::DebugMenu::GetState();
 
-        drawLine(L"[Settings overlay active – M / F2]");
+        drawLine(L"[Settings overlay active GÇô M / F2]");
         drawLine(L"Use UP/DOWN to select row, LEFT/RIGHT to tweak, SPACE/ENTER to toggle.");
 
         int panelX = static_cast<int>(m_window->GetWidth()) - 320;
@@ -1378,7 +1445,7 @@ void Engine::ProcessInput() {
                     break;
                 }
                 if (key == SDLK_M) {
-                    // GPU overlay (in-shader menu) toggle – does not affect
+                    // GPU overlay (in-shader menu) toggle GÇô does not affect
                     // the native F2 settings window.
                     m_settingsOverlayVisible = !m_settingsOverlayVisible;
                     if (m_settingsOverlayVisible) {
@@ -3053,8 +3120,11 @@ void Engine::UpdateCameraController(float deltaTime) {
         m_pendingMouseDeltaX = 0.0f;
         m_pendingMouseDeltaY = 0.0f;
 
-        m_cameraYaw   += dx * m_mouseSensitivity;
-        m_cameraPitch -= dy * m_mouseSensitivity;
+        m_cameraYaw += dx * m_mouseSensitivity;
+        // Invert Y so that moving the mouse up pitches the camera down and
+        // moving it down pitches up, matching the requested flight-style
+        // controls.
+        m_cameraPitch += dy * m_mouseSensitivity;
 
         float pitchLimit = glm::radians(89.0f);
         m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
@@ -3122,10 +3192,13 @@ void Engine::UpdateCameraController(float deltaTime) {
         if (keyDown(SDL_SCANCODE_D)) moveDir += right;
         if (keyDown(SDL_SCANCODE_A)) moveDir -= right;
 
+        // Vertical thrust in both modes: Space to move up, Ctrl (or C) to move down.
+        if (keyDown(SDL_SCANCODE_SPACE)) moveDir += up;
+        if (keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL) || keyDown(SDL_SCANCODE_C)) {
+            moveDir -= up;
+        }
+
         if (m_droneFlightEnabled) {
-            // In drone mode, vertical thrust is space/ctrl; Q/E are roll.
-            if (keyDown(SDL_SCANCODE_SPACE)) moveDir += up;
-            if (keyDown(SDL_SCANCODE_LCTRL) || keyDown(SDL_SCANCODE_RCTRL)) moveDir -= up;
 
             // Auto-forward cruise: when no explicit movement keys are pressed,
             // keep the camera gliding forward for fast, fluid traversal.
@@ -3854,3 +3927,4 @@ void Engine::EnqueueSceneCommand(std::shared_ptr<LLM::SceneCommand> command) {
 }
 
 } // namespace Cortex
+

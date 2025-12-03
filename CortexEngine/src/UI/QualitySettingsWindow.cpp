@@ -51,6 +51,9 @@ struct QualityState {
     HWND txtFPS  = nullptr;
     HWND txtVRAM = nullptr;
     HWND btnSafePreset = nullptr;
+
+    int contentHeight = 0;
+    int scrollPos = 0;
 };
 
 QualityState g_q;
@@ -253,12 +256,86 @@ void RegisterQualitySettingsClass() {
 
             // Safe preset button
             g_q.btnSafePreset = makeButton(IDC_QL_SAFE_PRESET, L"Apply Safe Low Preset", y);
+            y += 24 + rowGap;
+
+            g_q.contentHeight = y + margin;
+            g_q.scrollPos = 0;
+
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (g_q.contentHeight > 0 ? g_q.contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = 0;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
 
             // Periodic refresh for stats.
             SetTimer(hwnd, 1, 500, nullptr);
 
             RefreshControlsFromState();
             RefreshStatsLabels();
+            return 0;
+        }
+        case WM_SIZE: {
+            RECT rc{};
+            GetClientRect(hwnd, &rc);
+            int clientHeight = rc.bottom - rc.top;
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_PAGE | SIF_RANGE | SIF_POS;
+            si.nMin = 0;
+            si.nMax = (g_q.contentHeight > 0 ? g_q.contentHeight : clientHeight) - 1;
+            if (si.nMax < 0) si.nMax = 0;
+            si.nPage = clientHeight;
+            si.nPos = g_q.scrollPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+            return 0;
+        }
+        case WM_VSCROLL: {
+            SCROLLINFO si{};
+            si.cbSize = sizeof(si);
+            si.fMask = SIF_ALL;
+            GetScrollInfo(hwnd, SB_VERT, &si);
+            int yPos = si.nPos;
+
+            switch (LOWORD(wParam)) {
+            case SB_LINEUP:   yPos -= 20; break;
+            case SB_LINEDOWN: yPos += 20; break;
+            case SB_PAGEUP:   yPos -= static_cast<int>(si.nPage); break;
+            case SB_PAGEDOWN: yPos += static_cast<int>(si.nPage); break;
+            case SB_THUMBTRACK:
+            case SB_THUMBPOSITION:
+                yPos = si.nTrackPos;
+                break;
+            default:
+                break;
+            }
+
+            if (yPos < si.nMin) yPos = si.nMin;
+            if (yPos > static_cast<int>(si.nMax - si.nPage + 1)) {
+                yPos = static_cast<int>(si.nMax - si.nPage + 1);
+            }
+            if (yPos < si.nMin) yPos = si.nMin;
+
+            si.fMask = SIF_POS;
+            si.nPos = yPos;
+            SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
+
+            int dy = g_q.scrollPos - yPos;
+            if (dy != 0) {
+                ScrollWindowEx(hwnd,
+                               0,
+                               dy,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               nullptr,
+                               SW_INVALIDATE | SW_SCROLLCHILDREN);
+                g_q.scrollPos = yPos;
+            }
             return 0;
         }
         case WM_TIMER:
@@ -407,7 +484,7 @@ void EnsureWindowCreated() {
         WS_EX_TOOLWINDOW,
         kQualitySettingsClassName,
         L"Cortex Quality / Performance",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VSCROLL,
         x, y,
         width, height,
         g_q.parent,

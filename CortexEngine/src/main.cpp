@@ -100,6 +100,281 @@ bool DirectoryHasEngine(const std::string& dir) {
     return true;
 }
 
+struct LauncherState {
+    HWND hwnd = nullptr;
+    HFONT font = nullptr;
+    HWND comboScene = nullptr;
+    HWND comboQuality = nullptr;
+    HWND chkRT = nullptr;
+    HWND chkLLM = nullptr;
+    HWND chkDreamer = nullptr;
+    HWND radioRaster = nullptr;
+    HWND radioVoxel = nullptr;
+    HWND btnLaunch = nullptr;
+    HWND btnCancel = nullptr;
+    EngineConfig* config = nullptr;
+    bool accepted = false;
+};
+
+enum LauncherControlId : int {
+    IDC_LAUNCH_SCENE    = 2001,
+    IDC_LAUNCH_QUALITY  = 2002,
+    IDC_LAUNCH_RT       = 2003,
+    IDC_LAUNCH_LLM      = 2004,
+    IDC_LAUNCH_DREAMER  = 2005,
+    IDC_LAUNCH_RASTER   = 2006,
+    IDC_LAUNCH_VOXEL    = 2007,
+    IDC_LAUNCH_OK       = 2010,
+    IDC_LAUNCH_CANCEL   = 2011,
+};
+
+LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    auto* state = reinterpret_cast<LauncherState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+
+    switch (msg) {
+    case WM_NCCREATE: {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lParam);
+        auto* s  = reinterpret_cast<LauncherState*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(s));
+        return TRUE;
+    }
+    case WM_CREATE: {
+        state = reinterpret_cast<LauncherState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        if (!state) return -1;
+
+        state->font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+
+        RECT rc{};
+        GetClientRect(hwnd, &rc);
+        int width  = rc.right - rc.left;
+        int margin = 12;
+        int labelH = 18;
+        int ctrlH  = 22;
+        int rowGap = 6;
+
+        int xLabel = margin;
+        int xCtrl  = margin + 140;
+        int ctrlW  = width - xCtrl - margin;
+        int y      = margin;
+
+        auto makeLabel = [&](const wchar_t* text, int yy) {
+            HWND h = CreateWindowExW(
+                0, L"STATIC", text,
+                WS_CHILD | WS_VISIBLE,
+                xLabel, yy, xCtrl - xLabel - 4, labelH,
+                hwnd, nullptr, nullptr, nullptr);
+            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            return h;
+        };
+
+        auto makeCombo = [&](int id, int yy) {
+            HWND h = CreateWindowExW(
+                0, L"COMBOBOX", L"",
+                WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
+                xCtrl, yy, ctrlW, 120,
+                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            return h;
+        };
+
+        auto makeCheckbox = [&](int id, const wchar_t* text, int yy) {
+            HWND h = CreateWindowExW(
+                0, L"BUTTON", text,
+                WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                xCtrl, yy, ctrlW, ctrlH,
+                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            return h;
+        };
+
+        auto makeRadio = [&](int id, const wchar_t* text, int yy) {
+            HWND h = CreateWindowExW(
+                0, L"BUTTON", text,
+                WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
+                xCtrl, yy, ctrlW, ctrlH,
+                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            return h;
+        };
+
+        auto makeButton = [&](int id, const wchar_t* text, int xx, int yy, int w) {
+            HWND h = CreateWindowExW(
+                0, L"BUTTON", text,
+                WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                xx, yy, w, ctrlH + 4,
+                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+            SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
+            return h;
+        };
+
+        // Scene selection
+        makeLabel(L"Scene", y);
+        state->comboScene = makeCombo(IDC_LAUNCH_SCENE, y);
+        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"RT Showcase Gallery"));
+        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Cornell Box"));
+        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dragon Over Water"));
+        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"God Rays Atrium"));
+        SendMessageW(state->comboScene, CB_SETCURSEL, 0, 0);
+        y += labelH + rowGap * 2;
+
+        // Quality mode
+        makeLabel(L"Quality mode", y);
+        state->comboQuality = makeCombo(IDC_LAUNCH_QUALITY, y);
+        SendMessageW(state->comboQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Default (high)"));
+        SendMessageW(state->comboQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Conservative (8 GB safe)"));
+        SendMessageW(state->comboQuality, CB_SETCURSEL,
+                     state->config && state->config->qualityMode == EngineConfig::QualityMode::Conservative ? 1 : 0,
+                     0);
+        y += labelH + rowGap * 2;
+
+        // Feature toggles
+        state->chkRT = makeCheckbox(IDC_LAUNCH_RT, L"Enable ray tracing (DXR)", y);
+        y += ctrlH + rowGap;
+        state->chkLLM = makeCheckbox(IDC_LAUNCH_LLM, L"Enable Architect LLM", y);
+        y += ctrlH + rowGap;
+        state->chkDreamer = makeCheckbox(IDC_LAUNCH_DREAMER, L"Enable Dreamer textures", y);
+        y += ctrlH + rowGap * 2;
+
+        // Backend selection
+        makeLabel(L"Render backend", y);
+        state->radioRaster = makeRadio(IDC_LAUNCH_RASTER, L"DX12 rasterization (current)", y);
+        y += ctrlH + rowGap;
+        state->radioVoxel = makeRadio(IDC_LAUNCH_VOXEL, L"Voxel renderer (experimental)", y);
+        y += ctrlH + rowGap * 2;
+
+        // Defaults from config
+        if (state->config) {
+            SendMessageW(state->chkRT, BM_SETCHECK, state->config->enableRayTracing ? BST_CHECKED : BST_UNCHECKED, 0);
+            SendMessageW(state->chkLLM, BM_SETCHECK, state->config->enableLLM ? BST_CHECKED : BST_UNCHECKED, 0);
+            SendMessageW(state->chkDreamer, BM_SETCHECK, state->config->enableDreamer ? BST_CHECKED : BST_UNCHECKED, 0);
+            bool voxel = state->config->renderBackend == EngineConfig::RenderBackend::VoxelExperimental;
+            SendMessageW(state->radioRaster, BM_SETCHECK, voxel ? BST_UNCHECKED : BST_CHECKED, 0);
+            SendMessageW(state->radioVoxel, BM_SETCHECK, voxel ? BST_CHECKED : BST_UNCHECKED, 0);
+        } else {
+            SendMessageW(state->chkRT, BM_SETCHECK, BST_UNCHECKED, 0);
+            SendMessageW(state->chkLLM, BM_SETCHECK, BST_CHECKED, 0);
+            SendMessageW(state->chkDreamer, BM_SETCHECK, BST_CHECKED, 0);
+            SendMessageW(state->radioRaster, BM_SETCHECK, BST_CHECKED, 0);
+        }
+
+        // Buttons: place directly below the render backend radios so the
+        // layout reads top-to-bottom (scene, quality, features, backend,
+        // then actions) instead of anchoring them to the bottom edge.
+        int btnW = 80;
+        int btnY = y;
+        state->btnLaunch = makeButton(IDC_LAUNCH_OK, L"Launch", width - margin - btnW * 2 - rowGap, btnY, btnW);
+        state->btnCancel = makeButton(IDC_LAUNCH_CANCEL, L"Exit", width - margin - btnW, btnY, btnW);
+
+        return 0;
+    }
+    case WM_COMMAND: {
+        int id = LOWORD(wParam);
+        int code = HIWORD(wParam);
+        if (code == BN_CLICKED) {
+            if (id == IDC_LAUNCH_OK && state && state->config) {
+                // Scene
+                int selScene = static_cast<int>(SendMessageW(state->comboScene, CB_GETCURSEL, 0, 0));
+                switch (selScene) {
+                default:
+                case 0: state->config->initialScenePreset = "rt_showcase"; break;
+                case 1: state->config->initialScenePreset = "cornell";     break;
+                case 2: state->config->initialScenePreset = "dragon";      break;
+                case 3: state->config->initialScenePreset = "god_rays";    break;
+                }
+                // Quality
+                int selQuality = static_cast<int>(SendMessageW(state->comboQuality, CB_GETCURSEL, 0, 0));
+                state->config->qualityMode =
+                    (selQuality == 1) ? EngineConfig::QualityMode::Conservative
+                                      : EngineConfig::QualityMode::Default;
+                // Toggles
+                auto isChecked = [](HWND h) {
+                    return SendMessageW(h, BM_GETCHECK, 0, 0) == BST_CHECKED;
+                };
+                state->config->enableRayTracing = isChecked(state->chkRT);
+                state->config->enableLLM        = isChecked(state->chkLLM);
+                state->config->enableDreamer    = isChecked(state->chkDreamer);
+
+                // Backend
+                bool voxel = (SendMessageW(state->radioVoxel, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                state->config->renderBackend =
+                    voxel ? EngineConfig::RenderBackend::VoxelExperimental
+                          : EngineConfig::RenderBackend::RasterDX12;
+
+                state->accepted = true;
+                PostQuitMessage(0);
+                return 0;
+            }
+            if (id == IDC_LAUNCH_CANCEL) {
+                if (state) state->accepted = false;
+                PostQuitMessage(0);
+                return 0;
+            }
+        }
+        break;
+    }
+    case WM_CLOSE:
+        if (state) state->accepted = false;
+        PostQuitMessage(0);
+        return 0;
+    case WM_DESTROY:
+        return 0;
+    }
+
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+bool ShowLauncher(EngineConfig& config) {
+    WNDCLASSW wc{};
+    wc.lpfnWndProc   = LauncherWndProc;
+    wc.hInstance     = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"CortexLauncherWindow";
+    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+
+    static bool registered = false;
+    if (!registered) {
+        RegisterClassW(&wc);
+        registered = true;
+    }
+
+    LauncherState state{};
+    state.config = &config;
+
+    int width  = 520;
+    int height = 340;
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    int x = (screenW - width) / 2;
+    int y = (screenH - height) / 2;
+
+    state.hwnd = CreateWindowExW(
+        0,
+        wc.lpszClassName,
+        L"Cortex Engine Launcher",
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, y, width, height,
+        nullptr,
+        nullptr,
+        wc.hInstance,
+        &state);
+
+    if (!state.hwnd) {
+        return true; // fall back to direct launch
+    }
+
+    ShowWindow(state.hwnd, SW_SHOW);
+    UpdateWindow(state.hwnd);
+
+    MSG msg;
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    DestroyWindow(state.hwnd);
+    return state.accepted;
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -129,6 +404,30 @@ int main(int argc, char* argv[]) {
         // Disable DX debug layer to avoid runtime breaks/crashes on some systems
         config.device.enableDebugLayer = false;
         config.device.enableGPUValidation = false;  // Too slow for development
+
+        // Decide whether to show the launcher UI. Power users can skip it
+        // via CLI or by specifying a scene/mode explicitly.
+        bool hasSceneFlag = false;
+        bool hasModeFlag  = false;
+        bool noLauncher   = false;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--scene" || arg.rfind("--scene=", 0) == 0) {
+                hasSceneFlag = true;
+            } else if (arg == "--mode" || arg.rfind("--mode=", 0) == 0) {
+                hasModeFlag = true;
+            } else if (arg == "--no-launcher") {
+                noLauncher = true;
+            }
+        }
+
+        const bool useLauncher = !noLauncher && !hasSceneFlag && !hasModeFlag;
+        if (useLauncher) {
+            if (!ShowLauncher(config)) {
+                spdlog::info("Launcher cancelled; exiting.");
+                return 0;
+            }
+        }
 
         // Optional: parse simple command-line flags
         //   --scene <dragon|rt_showcase|cornell>

@@ -68,6 +68,20 @@ public:
         const std::string& debugName = ""
     );
 
+    // Create texture from a pre-compressed BCn mip chain (BC1/BC3/BC5/BC7).
+    // The mip data is expected to be tightly packed BC blocks with no
+    // per-row padding; row strides are derived from GetCopyableFootprints.
+    Result<void> InitializeFromCompressedMipChain(
+        ID3D12Device* device,
+        ID3D12CommandQueue* copyQueue,
+        ID3D12CommandQueue* graphicsQueue,
+        const std::vector<std::vector<uint8_t>>& mipData,
+        uint32_t width,
+        uint32_t height,
+        DXGI_FORMAT format,
+        const std::string& debugName = ""
+    );
+
     // Create a "placeholder" texture (solid color)
     static Result<DX12Texture> CreatePlaceholder(
         ID3D12Device* device,

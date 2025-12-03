@@ -46,6 +46,7 @@ void Engine::RebuildScene(ScenePreset preset) {
         BuildDragonStudioScene();
         break;
     case ScenePreset::RTShowcase:
+    case ScenePreset::GodRays: // currently shares layout with RTShowcase
     default:
         BuildRTShowcaseScene();
         break;
@@ -63,11 +64,61 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::CornellBox:      presetName = "Cornell Box"; break;
     case ScenePreset::DragonOverWater: presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:      presetName = "RT Showcase Gallery"; break;
+    case ScenePreset::GodRays:         presetName = "God Rays Atrium"; break;
     default:                           presetName = "Unknown"; break;
     }
 
     spdlog::info("Scene rebuilt as {}", presetName);
     spdlog::info("{}", m_registry->DescribeScene());
+
+    // One-shot asset memory summary to highlight the heaviest categories and
+    // assets in the new scene. This complements the frame-level VRAM estimate
+    // and helps diagnose oversize textures or geometry.
+    if (m_renderer) {
+        auto breakdown = m_renderer->GetAssetMemoryBreakdown();
+        const double texMB  = static_cast<double>(breakdown.textureBytes) / (1024.0 * 1024.0);
+        const double envMB  = static_cast<double>(breakdown.environmentBytes) / (1024.0 * 1024.0);
+        const double geomMB = static_cast<double>(breakdown.geometryBytes) / (1024.0 * 1024.0);
+        const double rtMB   = static_cast<double>(breakdown.rtStructureBytes) / (1024.0 * 1024.0);
+        spdlog::info("Asset memory breakdown after rebuild: tex≈{:.0f} MB env≈{:.0f} MB geom≈{:.0f} MB RT≈{:.0f} MB",
+                     texMB, envMB, geomMB, rtMB);
+
+        auto heavyTex = m_renderer->GetAssetRegistry().GetHeaviestTextures(3);
+        if (!heavyTex.empty()) {
+            spdlog::info("Top textures by estimated GPU bytes:");
+            for (const auto& t : heavyTex) {
+                const double mb = static_cast<double>(t.bytes) / (1024.0 * 1024.0);
+                spdlog::info("  {} ≈ {:.1f} MB", t.key, mb);
+            }
+        }
+        auto heavyMesh = m_renderer->GetAssetRegistry().GetHeaviestMeshes(3);
+        if (!heavyMesh.empty()) {
+            spdlog::info("Top meshes by estimated GPU bytes:");
+            for (const auto& m : heavyMesh) {
+                const double mb = static_cast<double>(m.bytes) / (1024.0 * 1024.0);
+                spdlog::info("  {} ≈ {:.1f} MB", m.key, mb);
+            }
+        }
+    }
+
+    // Rebuild asset ref-counts from the new ECS graph and prune any meshes
+    // that are no longer referenced so BLAS/geometry memory does not
+    // accumulate across scene changes. Then prune unused textures from the
+    // registry so diagnostics do not track stale entries.
+    if (m_renderer) {
+        // Mark the voxel volume as dirty so the next voxel render pass
+        // rebuilds it from the new ECS layout instead of reusing geometry
+        // from the previous scene.
+        m_renderer->MarkVoxelGridDirty();
+        m_renderer->RebuildAssetRefsFromScene(m_registry.get());
+        m_renderer->PruneUnusedMeshes(m_registry.get());
+        m_renderer->PruneUnusedTextures();
+    }
+
+    // Apply VRAM-aware quality clamping after large scene rebuilds so that
+    // heavy layouts automatically fall back to safe presets when the
+    // estimated GPU memory footprint is close to the adapter limit.
+    ApplyVRAMQualityGovernor();
 }
 
 void Engine::BuildCornellScene() {
@@ -102,6 +153,20 @@ void Engine::BuildCornellScene() {
         renderer->SetSunIntensity(2.0f);
         renderer->SetEnvironmentPreset("studio");
         renderer->SetIBLEnabled(true);
+        // Subtle volumetric fog and god-rays for the Cornell top light so the
+        // interior feels more atmospheric without overwhelming the small box.
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.03f, 0.0f, 0.55f);
+        renderer->SetGodRayIntensity(0.9f);
+        // Keep water parameters gentle; the Cornell "puddle" is a shallow,
+        // mostly still surface used for specular highlights and SSR.
+        renderer->SetWaterParams(
+            0.0f,   // levelY
+            0.015f, // amplitude
+            4.0f,   // wavelength
+            0.5f,   // speed
+            1.0f, 0.0f,
+            0.01f); // secondaryAmplitude
     }
 
     // Shared plane meshes
@@ -146,6 +211,10 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.03f;
         r.ao = 1.0f;
         r.presetName = "cornell_floor";
+        // Reuse the RT showcase wood floor textures so the Cornell floor
+        // participates in the same BC7/BC5 material pipeline.
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_floor_normal_bc5.dds";
     }
 
     // Ceiling
@@ -163,6 +232,8 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_ceiling";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
     // Back wall
@@ -180,6 +251,8 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.03f;
         r.ao = 1.0f;
         r.presetName = "cornell_back";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
     // Left wall (green)
@@ -197,6 +270,8 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_green";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
     // Right wall (red)
@@ -214,6 +289,8 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_red";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
     // Front wall (mirror) closing the box toward -Z so that the interior is
@@ -248,19 +325,42 @@ void Engine::BuildCornellScene() {
         }
     }
     if (mirrorMesh && mirrorMesh->gpuBuffers) {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "Cornell_Mirror");
-        auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(0.0f, 1.0f, kCornellHalfExtent - 0.01f);
-        t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+        // Primary mirror on the back wall.
+        {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "Cornell_Mirror");
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(0.0f, 1.0f, kCornellHalfExtent - 0.01f);
+            t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
 
-        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
-        r.mesh = mirrorMesh;
-        r.albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        r.metallic = 1.0f;
-        r.roughness = 0.02f;
-        r.ao = 1.0f;
-        r.presetName = "mirror";
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = mirrorMesh;
+            r.albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            r.metallic = 1.0f;
+            r.roughness = 0.02f;
+            r.ao = 1.0f;
+            r.presetName = "mirror";
+        }
+
+        // Interior mirror panel facing the back-wall mirror to create a simple
+        // "infinity mirror" effect when reflections are enabled. This is placed
+        // slightly in front of the back wall so repeated bounces between the
+        // two mirrors create a tunnel-like illusion in RT/SSR.
+        {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "Cornell_InfinityPanel");
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(0.0f, 1.0f, 0.0f);
+            t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = mirrorMesh;
+            r.albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            r.metallic = 1.0f;
+            r.roughness = 0.02f;
+            r.ao = 1.0f;
+            r.presetName = "infinity_mirror";
+        }
     }
 
     // Test spheres inside the box (re-used for multiple entities).
@@ -338,6 +438,8 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.8f;
         r.ao = 1.0f;
         r.presetName = "brick";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_leftwall_normal_bc5.dds";
     }
 
     // Low plinth in the center made from a cylinder for additional curved
@@ -369,8 +471,28 @@ void Engine::BuildCornellScene() {
         r.presetName = "plastic";
     }
 
+    // Shallow water puddle in the center of the floor so the Cornell
+    // layout exercises the same liquid shading path as the hero pool and
+    // RT showcase courtyard. The global water function is tuned above.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "Cornell_WaterPuddle");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 0.0f, 0.4f);
+        t.scale = glm::vec3(0.35f, 1.0f, 0.35f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = floorMesh;
+        r.albedoColor = glm::vec4(0.02f, 0.08f, 0.12f, 0.7f);
+        r.metallic = 0.0f;
+        r.roughness = 0.06f;
+        r.ao = 1.0f;
+        r.presetName = "water";
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(e, Scene::WaterSurfaceComponent{0.0f});
+    }
+
     // No hero character mesh in this layout; the Cornell box focuses on
-    // spheres, columns, mirrors, and pure lighting/reflection behavior.
+    // spheres, columns, mirrors, liquids, and pure lighting/reflection behavior.
 
     // Secondary mirror panel on the right wall to create more complex
     // multi-bounce reflections.
@@ -504,36 +626,30 @@ void Engine::BuildRTShowcaseScene() {
 
     auto* renderer = m_renderer.get();
 
-    // Global renderer defaults for the RT showcase: IBL + RT on, TAA/FXAA,
-    // SSR/SSAO/bloom, and moderate fog/god-rays for the atrium.
+    // In conservative mode on 8 GB-class GPUs, disable particles for this
+    // scene to keep VRAM and per-frame work within a safer envelope.
+    if (renderer && m_device) {
+        const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
+        const std::uint64_t mb = bytes / (1024ull * 1024ull);
+        if (m_qualityMode == EngineConfig::QualityMode::Conservative &&
+            mb > 0 && mb <= 8192ull) {
+            renderer->SetParticlesEnabled(false);
+        }
+    }
+
+    // Global renderer defaults for the RT showcase. IBL and lighting are
+    // configured for the gallery in all modes, but heavy quality settings
+    // (higher internal resolution, SSR/SSAO/fog, strong bloom/god-rays) are
+    // only enabled when the engine was started in a high-quality mode.
     if (renderer) {
         renderer->SetEnvironmentPreset("studio");
-        // Heavy RT scenes can be rendered at a slightly reduced internal
-        // resolution to keep VRAM usage and shading cost in check on 8 GB
-        // GPUs while preserving the full window size for the swap chain.
-        renderer->SetRenderScale(0.85f);
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.9f, 1.2f);
-
-        renderer->SetExposure(1.2f);
-        renderer->SetBloomIntensity(0.35f);
 
         renderer->SetShadowsEnabled(true);
         renderer->SetShadowBias(0.0005f);
         renderer->SetShadowPCFRadius(1.5f);
         renderer->SetCascadeSplitLambda(0.5f);
-
-        renderer->SetFXAAEnabled(true);
-        renderer->SetTAAEnabled(true);
-        renderer->SetSSREnabled(true);
-        renderer->SetSSAOEnabled(true);
-
-        renderer->SetFogEnabled(true);
-        renderer->SetFogParams(0.03f, 0.0f, 0.45f);
-        renderer->SetGodRayIntensity(1.8f);
-        // Leave ray tracing disabled by default; the user can toggle it
-        // explicitly (V key / debug menu) once the scene is up so that any
-        // DXR issues do not prevent the engine from becoming interactive.
 
         // Single sun direction chosen to produce long gallery shadows, glancing
         // pool reflections, and beams through the atrium windows.
@@ -552,6 +668,35 @@ void Engine::BuildRTShowcaseScene() {
             /*dirZ*/ 0.25f,
             /*secondaryAmplitude*/ 0.08f,
             /*steepness*/ 0.6f);
+
+        if (m_qualityMode == EngineConfig::QualityMode::Default) {
+            // High-quality RT showcase: request a slightly reduced internal
+            // resolution (clamped to ≈0.8 at 1440p with heavy effects), plus
+            // full TAA/FXAA, SSR/SSAO, and atmospheric fog/god-rays.
+            renderer->SetRenderScale(0.85f);
+            renderer->SetExposure(1.2f);
+            renderer->SetBloomIntensity(0.35f);
+
+            renderer->SetFXAAEnabled(true);
+            renderer->SetTAAEnabled(true);
+            renderer->SetSSREnabled(true);
+            renderer->SetSSAOEnabled(true);
+
+            renderer->SetFogEnabled(true);
+            renderer->SetFogParams(0.03f, 0.0f, 0.45f);
+            renderer->SetGodRayIntensity(1.8f);
+        } else {
+            // Conservative mode: keep the safe preset baseline (internal
+            // resolution ~0.75, SSR/SSAO/fog off). Only adjust exposure and
+            // bloom slightly for readability.
+            renderer->SetExposure(1.1f);
+            renderer->SetBloomIntensity(0.25f);
+        }
+
+        // Leave ray tracing disabled by default; the user can toggle it
+        // explicitly (V key / debug menu) once the scene is up so that any
+        // DXR issues do not prevent the engine from becoming interactive.
+
     }
 
     // Shared meshes
@@ -635,6 +780,11 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.55f;
         r.ao = 1.0f;
         r.presetName = "wood_floor";
+        // Phase 2: RT showcase floor uses pre-compressed BC7/BC5 textures when
+        // available. The loader will fall back to placeholders if these DDS
+        // assets are missing.
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_floor_normal_bc5.dds";
     }
 
     if (floorPlane && floorPlane->gpuBuffers) {
@@ -669,6 +819,8 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.85f;
         r.ao = 1.0f;
         r.presetName = "brick";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_leftwall_normal_bc5.dds";
 
         // Mirror panels on the left wall
         if (quadPanel && quadPanel->gpuBuffers) {
@@ -719,6 +871,8 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.7f;
         r.ao = 1.0f;
         r.presetName = "backdrop";
+        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
+        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
     // Row of primitives down the gallery
@@ -753,6 +907,8 @@ void Engine::BuildRTShowcaseScene() {
             r.roughness = 0.25f;
             r.ao = 1.0f;
             r.presetName = "brushed_metal";
+            r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_albedo.dds";
+            r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_cylinder_brushed_normal_bc5.dds";
         }
         // Plastic cube
         {
@@ -769,6 +925,8 @@ void Engine::BuildRTShowcaseScene() {
             r.roughness = 0.35f;
             r.ao = 1.0f;
             r.presetName = "plastic";
+            r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_cube_plastic_albedo.dds";
+            r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_cube_plastic_normal_bc5.dds";
         }
         // Anisotropic torus
         {
@@ -793,9 +951,28 @@ void Engine::BuildRTShowcaseScene() {
     if (dragonResult.IsOk()) {
         dragonMesh = dragonResult.Value();
         if (renderer) {
-            auto upload = renderer->UploadMesh(dragonMesh);
-            if (upload.IsErr()) {
-                spdlog::warn("Failed to upload RTShowcase dragon mesh: {}", upload.Error());
+            bool allowDragonUpload = true;
+            // On 8 GB-class adapters in conservative mode, the RT showcase
+            // scene is already heavy. Keep the dragon raster path but avoid
+            // additional BLAS memory by skipping the mesh upload entirely
+            // when VRAM is especially tight. This can be relaxed later if
+            // budgets show headroom.
+            if (m_qualityMode == EngineConfig::QualityMode::Conservative && m_device) {
+                const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
+                const std::uint64_t mb = bytes / (1024ull * 1024ull);
+                if (mb > 0 && mb <= 8192ull) {
+                    allowDragonUpload = false;
+                    spdlog::info("RTShowcase: skipping dragon mesh upload on 8 GB conservative mode to keep RT/geometry budgets safe");
+                }
+            }
+
+            if (allowDragonUpload) {
+                auto enqueue = renderer->EnqueueMeshUpload(dragonMesh, "RTShowcaseDragon");
+                if (enqueue.IsErr()) {
+                    spdlog::warn("Failed to enqueue RTShowcase dragon mesh upload: {}", enqueue.Error());
+                    dragonMesh.reset();
+                }
+            } else {
                 dragonMesh.reset();
             }
         }
@@ -803,7 +980,7 @@ void Engine::BuildRTShowcaseScene() {
         spdlog::warn("RTShowcase: failed to load DragonAttenuation: {}", dragonResult.Error());
     }
 
-    if (dragonMesh && dragonMesh->gpuBuffers && cubeMesh && cubeMesh->gpuBuffers) {
+    if (dragonMesh && cubeMesh && cubeMesh->gpuBuffers) {
         // Dragon plinth
         entt::entity pe = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(pe, "RTGallery_DragonPlinth");
@@ -1205,6 +1382,358 @@ void Engine::BuildRTShowcaseScene() {
         l.range = 15.0f;
         l.innerConeDegrees = 20.0f;
         l.outerConeDegrees = 35.0f;
+        l.castsShadows = false;
+    }
+}
+
+void Engine::BuildGodRaysScene() {
+    spdlog::info("Building hero scene: God Rays Atrium");
+
+    auto* renderer = m_renderer.get();
+
+    // Camera placed at one end of the atrium, looking toward a bright,
+    // backlit wall so volumetric beams and water reflections read clearly.
+    {
+        entt::entity cameraEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
+
+        auto& t = m_registry->AddComponent<TransformComponent>(cameraEntity);
+        t.position = glm::vec3(0.0f, 3.0f, -16.0f);
+        glm::vec3 focus(0.0f, 1.5f, 0.0f);
+        t.rotation = glm::quatLookAt(glm::normalize(focus - t.position),
+                                     glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
+        cam.fov = 55.0f;
+        cam.isActive = true;
+    }
+
+    // Global lighting / environment tuned for strong god rays over a reflective
+    // pool. We enable fog and increase god-ray intensity so beams through the
+    // atrium windows and across the water surface are clearly visible.
+    if (renderer) {
+        renderer->SetEnvironmentPreset("studio");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.75f, 1.1f);
+
+        renderer->SetShadowsEnabled(true);
+        renderer->SetShadowBias(0.0005f);
+        renderer->SetShadowPCFRadius(1.5f);
+        renderer->SetCascadeSplitLambda(0.5f);
+
+        glm::vec3 sunDir = glm::normalize(glm::vec3(0.45f, 0.75f, 0.15f));
+        renderer->SetSunDirection(sunDir);
+        renderer->SetSunColor(glm::vec3(1.0f));
+        renderer->SetSunIntensity(4.0f);
+
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(
+            /*density*/ 0.045f,
+            /*baseHeight*/ 0.0f,
+            /*falloff*/ 0.65f);
+        renderer->SetGodRayIntensity(2.0f);
+
+        // Slow, gentle waves for a shallow indoor pool.
+        renderer->SetWaterParams(
+            /*levelY*/ 0.0f,
+            /*amplitude*/ 0.05f,
+            /*waveLength*/ 8.0f,
+            /*speed*/ 0.5f,
+            /*dirX*/ 1.0f,
+            /*dirZ*/ 0.2f,
+            /*secondaryAmplitude*/ 0.02f,
+            /*steepness*/ 0.5f);
+    }
+
+    Graphics::Renderer* rendererPtr = m_renderer.get();
+
+    // Atrium dimensions (left-handed, +Z forward).
+    const float hallLength = 32.0f;
+    const float hallWidth  = 12.0f;
+    const float wallHeight = 8.0f;
+
+    // Floor
+    auto floorMesh = Utils::MeshGenerator::CreatePlane(hallLength, hallWidth);
+    if (rendererPtr) {
+        auto upload = rendererPtr->UploadMesh(floorMesh);
+        if (upload.IsErr()) {
+            spdlog::warn("GodRays: failed to upload floor mesh: {}", upload.Error());
+            floorMesh.reset();
+        }
+        if (rendererPtr->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading GodRays floor; aborting scene build.");
+            return;
+        }
+    }
+    if (floorMesh && floorMesh->gpuBuffers) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_Floor");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 0.0f, 0.0f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = floorMesh;
+        r.albedoColor = glm::vec4(0.18f, 0.16f, 0.15f, 1.0f);
+        r.metallic = 0.0f;
+        r.roughness = 0.6f;
+        r.ao = 1.0f;
+        r.presetName = "godrays_floor";
+    }
+
+    // Walls: long planes enclosing the atrium, leaving the far end open so
+    // beams can rake across the interior.
+    auto wallMesh = Utils::MeshGenerator::CreatePlane(hallLength, wallHeight);
+    if (rendererPtr) {
+        auto upload = rendererPtr->UploadMesh(wallMesh);
+        if (upload.IsErr()) {
+            spdlog::warn("GodRays: failed to upload wall mesh: {}", upload.Error());
+            wallMesh.reset();
+        }
+        if (rendererPtr->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading GodRays walls; aborting scene build.");
+            return;
+        }
+    }
+
+    if (wallMesh && wallMesh->gpuBuffers) {
+        const float halfWidth = hallWidth * 0.5f;
+
+        // Left wall
+        {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_LeftWall");
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(-halfWidth, wallHeight * 0.5f, 0.0f);
+            t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), -glm::half_pi<float>(), 0.0f));
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = wallMesh;
+            r.albedoColor = glm::vec4(0.65f, 0.65f, 0.7f, 1.0f);
+            r.metallic = 0.0f;
+            r.roughness = 0.5f;
+            r.ao = 1.0f;
+            r.presetName = "godrays_wall";
+        }
+
+        // Right wall
+        {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_RightWall");
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(halfWidth, wallHeight * 0.5f, 0.0f);
+            t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), glm::half_pi<float>(), 0.0f));
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = wallMesh;
+            r.albedoColor = glm::vec4(0.65f, 0.65f, 0.7f, 1.0f);
+            r.metallic = 0.0f;
+            r.roughness = 0.5f;
+            r.ao = 1.0f;
+            r.presetName = "godrays_wall";
+        }
+
+        // Back wall that catches the main god rays.
+        auto backWallMesh = Utils::MeshGenerator::CreatePlane(hallWidth, wallHeight);
+        if (rendererPtr) {
+            auto upload = rendererPtr->UploadMesh(backWallMesh);
+            if (upload.IsErr()) {
+                spdlog::warn("GodRays: failed to upload back wall mesh: {}", upload.Error());
+                backWallMesh.reset();
+            }
+        }
+        if (backWallMesh && backWallMesh->gpuBuffers) {
+            entt::entity e = m_registry->CreateEntity();
+            m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_BackWall");
+            auto& t = m_registry->AddComponent<TransformComponent>(e);
+            t.position = glm::vec3(0.0f, wallHeight * 0.5f, hallLength * 0.5f);
+            t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+            r.mesh = backWallMesh;
+            r.albedoColor = glm::vec4(0.9f, 0.9f, 0.95f, 1.0f);
+            r.metallic = 0.0f;
+            r.roughness = 0.35f;
+            r.ao = 1.0f;
+            r.presetName = "godrays_backwall";
+        }
+    }
+
+    // Shallow central pool running along the atrium floor. This shares plane
+    // geometry between the rim and the water surface.
+    auto poolMesh = Utils::MeshGenerator::CreatePlane(hallLength * 0.7f, hallWidth * 0.45f);
+    if (rendererPtr) {
+        auto upload = rendererPtr->UploadMesh(poolMesh);
+        if (upload.IsErr()) {
+            spdlog::warn("GodRays: failed to upload pool mesh: {}", upload.Error());
+            poolMesh.reset();
+        }
+        if (rendererPtr->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading GodRays pool; aborting remaining geometry.");
+            return;
+        }
+    }
+
+    if (poolMesh && poolMesh->gpuBuffers) {
+        // Pool rim
+        entt::entity rim = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(rim, "GodRays_PoolRim");
+        auto& rimXf = m_registry->AddComponent<TransformComponent>(rim);
+        rimXf.position = glm::vec3(0.0f, 0.0f, 4.0f);
+
+        auto& rimR = m_registry->AddComponent<Scene::RenderableComponent>(rim);
+        rimR.mesh = poolMesh;
+        rimR.albedoColor = glm::vec4(0.85f, 0.85f, 0.87f, 1.0f);
+        rimR.metallic = 0.0f;
+        rimR.roughness = 0.8f;
+        rimR.ao = 1.0f;
+        rimR.presetName = "godrays_poolrim";
+
+        // Water surface slightly below the rim.
+        entt::entity water = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(water, "GodRays_Water");
+        auto& waterXf = m_registry->AddComponent<TransformComponent>(water);
+        waterXf.position = glm::vec3(0.0f, -0.02f, 4.0f);
+
+        auto& waterR = m_registry->AddComponent<Scene::RenderableComponent>(water);
+        waterR.mesh = poolMesh;
+        waterR.albedoColor = glm::vec4(0.03f, 0.09f, 0.13f, 0.8f);
+        waterR.metallic = 0.0f;
+        waterR.roughness = 0.06f;
+        waterR.ao = 1.0f;
+        waterR.presetName = "godrays_water";
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, Scene::WaterSurfaceComponent{0.0f});
+    }
+
+    // Simple columns along the pool to break up beams and provide structure.
+    auto columnMesh = Utils::MeshGenerator::CreateCylinder(0.25f, wallHeight, 24);
+    if (rendererPtr) {
+        auto upload = rendererPtr->UploadMesh(columnMesh);
+        if (upload.IsErr()) {
+            spdlog::warn("GodRays: failed to upload column mesh: {}", upload.Error());
+            columnMesh.reset();
+        }
+    }
+    if (columnMesh && columnMesh->gpuBuffers) {
+        const float zStart = -2.0f;
+        const float zEnd   = 10.0f;
+        const int   count  = 4;
+        for (int i = 0; i < count; ++i) {
+            float t = (count > 1) ? (float(i) / float(count - 1)) : 0.0f;
+            float z = glm::mix(zStart, zEnd, t);
+
+            for (int side = -1; side <= 1; side += 2) {
+                entt::entity e = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_Column");
+                auto& xf = m_registry->AddComponent<TransformComponent>(e);
+                xf.position = glm::vec3(side * 3.0f, wallHeight * 0.5f, z);
+
+                auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+                r.mesh = columnMesh;
+                r.albedoColor = glm::vec4(0.7f, 0.7f, 0.75f, 1.0f);
+                r.metallic = 0.0f;
+                r.roughness = 0.4f;
+                r.ao = 1.0f;
+                r.presetName = "godrays_column";
+            }
+        }
+    }
+
+    // A pair of hero primitives resting near the pool to show reflections and
+    // specular highlights inside the beams.
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto cubeMesh   = Utils::MeshGenerator::CreateCube();
+    if (rendererPtr) {
+        auto upSphere = rendererPtr->UploadMesh(sphereMesh);
+        if (upSphere.IsErr()) {
+            spdlog::warn("GodRays: failed to upload sphere mesh: {}", upSphere.Error());
+            sphereMesh.reset();
+        }
+        auto upCube = rendererPtr->UploadMesh(cubeMesh);
+        if (upCube.IsErr()) {
+            spdlog::warn("GodRays: failed to upload cube mesh: {}", upCube.Error());
+            cubeMesh.reset();
+        }
+        if (rendererPtr->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading GodRays hero meshes; skipping remaining geometry.");
+            return;
+        }
+    }
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_Sphere");
+        auto& xf = m_registry->AddComponent<TransformComponent>(e);
+        xf.position = glm::vec3(-1.6f, 0.6f, 4.5f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = sphereMesh;
+        r.albedoColor = glm::vec4(1.0f, 0.98f, 0.95f, 1.0f);
+        r.metallic = 1.0f;
+        r.roughness = 0.08f;
+        r.ao = 1.0f;
+        r.presetName = "godrays_chrome_sphere";
+    }
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_GlassCube");
+        auto& xf = m_registry->AddComponent<TransformComponent>(e);
+        xf.position = glm::vec3(1.8f, 0.7f, 3.5f);
+        xf.scale    = glm::vec3(1.2f, 1.2f, 1.2f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = cubeMesh;
+        r.albedoColor = glm::vec4(0.6f, 0.8f, 1.0f, 0.35f);
+        r.metallic = 0.0f;
+        r.roughness = 0.05f;
+        r.ao = 1.0f;
+        r.presetName = "godrays_glass_cube";
+    }
+
+    // Simple interior light rig: a warm key and a cool rim to complement the
+    // sun and provide additional structure in the beams.
+    auto makeSpotRotation = [](const glm::vec3& dir) {
+        glm::vec3 fwd = glm::normalize(dir);
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        if (std::abs(glm::dot(fwd, up)) > 0.99f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        return glm::quatLookAt(fwd, up);
+    };
+
+    // Warm key light from above-left, angled through the fog.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_KeyLight");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(-4.0f, 6.0f, 2.0f);
+        glm::vec3 dir(0.5f, -0.9f, 0.3f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(1.0f, 0.92f, 0.85f);
+        l.intensity = 9.0f;
+        l.range = 30.0f;
+        l.innerConeDegrees = 20.0f;
+        l.outerConeDegrees = 35.0f;
+        l.castsShadows = true;
+    }
+
+    // Cool rim light grazing across the back wall and columns.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "GodRays_RimLight");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(4.0f, 5.0f, 6.0f);
+        glm::vec3 dir(-0.4f, -0.7f, -0.6f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(0.8f, 0.9f, 1.1f);
+        l.intensity = 6.0f;
+        l.range = 28.0f;
+        l.innerConeDegrees = 22.0f;
+        l.outerConeDegrees = 40.0f;
         l.castsShadows = false;
     }
 }

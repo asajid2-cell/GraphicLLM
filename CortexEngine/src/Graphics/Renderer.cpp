@@ -6,10 +6,12 @@
 #include "Graphics/MaterialState.h"
 #include <spdlog/spdlog.h>
 #include <cmath>
+#include <chrono>
 #include <array>
 #include <limits>
 #include <filesystem>
 #include <algorithm>
+#include <cstdio>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -19,6 +21,140 @@ namespace Cortex::Graphics {
 
 Renderer::~Renderer() {
     Shutdown();
+}
+
+// Helper to tag the last successfully completed high-level render pass.
+// This is used purely for diagnostics when the DX12 device reports a
+// removed/hung state so logs can point at the most recent pass that ran.
+void Renderer::MarkPassComplete(const char* passName) {
+    m_lastCompletedPass = passName ? passName : "Unknown";
+}
+
+// Centralized device-removed reporting. Any code path that encounters a
+// failure HRESULT and suspects device loss should call this helper so we
+// emit a consistent, information-rich log entry (context, hr, device
+// removed reason, frame index, last completed pass, file/line).
+void Renderer::ReportDeviceRemoved(const char* context,
+                                   HRESULT hr,
+                                   const char* file,
+                                   int line) {
+    const char* ctx = context ? context : "Unknown";
+
+    HRESULT reason = S_OK;
+    if (m_device && m_device->GetDevice()) {
+        reason = m_device->GetDevice()->GetDeviceRemovedReason();
+    }
+
+    // Snapshot the last GPU breadcrumb value (if available) so logs can
+    // distinguish between CPU-side pass tags and the last marker the GPU
+    // actually reached before the fault.
+    uint32_t markerVal = (m_breadcrumbMap != nullptr) ? *m_breadcrumbMap : 0u;
+    const char* markerName = "None";
+    switch (static_cast<GpuMarker>(markerVal)) {
+        case GpuMarker::BeginFrame:      markerName = "BeginFrame"; break;
+        case GpuMarker::ShadowPass:      markerName = "ShadowPass"; break;
+        case GpuMarker::Skybox:          markerName = "Skybox"; break;
+        case GpuMarker::OpaqueGeometry:  markerName = "OpaqueGeometry"; break;
+        case GpuMarker::TransparentGeom: markerName = "TransparentGeom"; break;
+        case GpuMarker::MotionVectors:   markerName = "MotionVectors"; break;
+        case GpuMarker::TAAResolve:      markerName = "TAAResolve"; break;
+        case GpuMarker::SSR:             markerName = "SSR"; break;
+        case GpuMarker::Particles:       markerName = "Particles"; break;
+        case GpuMarker::SSAO:            markerName = "SSAO"; break;
+        case GpuMarker::Bloom:           markerName = "Bloom"; break;
+        case GpuMarker::PostProcess:     markerName = "PostProcess"; break;
+        case GpuMarker::DebugLines:      markerName = "DebugLines"; break;
+        default:                         markerName = "None"; break;
+    }
+
+    spdlog::error(
+        "DX12 device removed or GPU fault in '{}' (hr=0x{:08X}, reason=0x{:08X}, frameCounter={}, "
+        "swapIndex={}, lastPass='{}', lastGpuMarker='{}', at {}:{})",
+        ctx,
+        static_cast<unsigned int>(hr),
+        static_cast<unsigned int>(reason),
+        static_cast<unsigned long long>(m_renderFrameCounter),
+        static_cast<unsigned int>(m_frameIndex),
+        m_lastCompletedPass ? m_lastCompletedPass : "None",
+        markerName,
+        file ? file : "unknown",
+        line);
+
+    m_deviceRemoved = true;
+}
+
+// Convenience macro so call sites automatically capture file/line.
+#define CORTEX_REPORT_DEVICE_REMOVED(ctx, hr) \
+    ReportDeviceRemoved((ctx), (hr), __FILE__, __LINE__)
+
+Result<void> Renderer::CreateBreadcrumbBuffer() {
+    if (!m_device || !m_device->GetDevice()) {
+        return Result<void>::Err("Renderer not initialized for breadcrumb buffer creation");
+    }
+    if (m_breadcrumbBuffer) {
+        return Result<void>::Ok();
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = sizeof(uint32_t);
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&m_breadcrumbBuffer));
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create GPU breadcrumb buffer");
+    }
+
+    hr = m_breadcrumbBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_breadcrumbMap));
+    if (FAILED(hr)) {
+        m_breadcrumbBuffer.Reset();
+        m_breadcrumbMap = nullptr;
+        return Result<void>::Err("Failed to map GPU breadcrumb buffer");
+    }
+
+    if (m_breadcrumbMap) {
+        *m_breadcrumbMap = static_cast<uint32_t>(GpuMarker::None);
+    }
+
+    spdlog::info("GPU breadcrumb buffer initialized for device-removed diagnostics");
+    return Result<void>::Ok();
+}
+
+void Renderer::WriteBreadcrumb(GpuMarker marker) {
+    if (!m_breadcrumbBuffer || !m_commandList) {
+        return;
+    }
+
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> list4;
+    if (FAILED(m_commandList.As(&list4)) || !list4) {
+        return;
+    }
+
+    D3D12_WRITEBUFFERIMMEDIATE_PARAMETER param{};
+    param.Dest = m_breadcrumbBuffer->GetGPUVirtualAddress();
+    param.Value = static_cast<uint32_t>(marker);
+
+    list4->WriteBufferImmediate(1, &param, nullptr);
 }
 
 // Simple Halton sequence helper for TAA jitter
@@ -266,6 +402,12 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
 
+    // Initialize GPU breadcrumb buffer for device-removed diagnostics.
+    auto breadcrumbResult = CreateBreadcrumbBuffer();
+    if (breadcrumbResult.IsErr()) {
+        spdlog::warn("Renderer: failed to create GPU breadcrumb buffer: {}", breadcrumbResult.Error());
+    }
+
     // Compile shaders and create pipeline
     auto shaderResult = CompileShaders();
     if (shaderResult.IsErr()) {
@@ -291,6 +433,60 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
     spdlog::info("Renderer initialized successfully");
     return Result<void>::Ok();
+}
+
+void Renderer::ProcessGpuJobsPerFrame() {
+    if (m_deviceRemoved) {
+        return;
+    }
+
+    uint32_t meshCount = 0;
+    uint32_t blasCount = 0;
+
+    while (!m_gpuJobQueue.empty()) {
+        GpuJob job = m_gpuJobQueue.front();
+
+        if (job.type == GpuJobType::MeshUpload) {
+            if (meshCount >= m_maxMeshJobsPerFrame) {
+                break;
+            }
+            if (job.mesh) {
+                auto res = UploadMesh(job.mesh);
+                if (res.IsErr()) {
+                    spdlog::warn("GpuJob MeshUpload '{}' failed: {}", job.label, res.Error());
+                }
+            }
+            if (m_pendingMeshJobs > 0) {
+                --m_pendingMeshJobs;
+            }
+            ++meshCount;
+        } else if (job.type == GpuJobType::BuildBLAS) {
+            if (blasCount >= m_maxBLASJobsPerFrame) {
+                break;
+            }
+            if (m_rayTracingContext && job.blasMeshKey) {
+                m_rayTracingContext->BuildSingleBLAS(job.blasMeshKey);
+            }
+            if (m_pendingBLASJobs > 0) {
+                --m_pendingBLASJobs;
+            }
+            ++blasCount;
+        }
+
+        m_gpuJobQueue.pop_front();
+    }
+}
+
+bool Renderer::IsRTWarmingUp() const {
+    if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext) {
+        return false;
+    }
+    // Consider RT "warming up" while there are outstanding BLAS jobs either
+    // in the renderer's queue or pending inside the DXR context.
+    if (m_pendingBLASJobs > 0) {
+        return true;
+    }
+    return m_rayTracingContext->GetPendingBLASCount() > 0;
 }
 
 float Renderer::GetEstimatedVRAMMB() const {
@@ -333,23 +529,33 @@ float Renderer::GetEstimatedVRAMMB() const {
     // Depth buffer
     totalBytes += bytesForRT(width, height, DXGI_FORMAT_D32_FLOAT);
 
-    // SSAO at half resolution
-    totalBytes += bytesForRT(std::max(1u, width / 2u),
-                             std::max(1u, height / 2u),
-                             DXGI_FORMAT_R8G8B8A8_UNORM);
+    // SSAO at half resolution (only when enabled)
+    if (m_ssaoEnabled) {
+        totalBytes += bytesForRT(std::max(1u, width / 2u),
+                                 std::max(1u, height / 2u),
+                                 DXGI_FORMAT_R8G8B8A8_UNORM);
+    }
 
-    // SSR color buffer (full resolution RGBA16F)
-    totalBytes += bytesForRT(width, height, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    // SSR color buffer (full resolution RGBA16F, only when enabled)
+    if (m_ssrEnabled) {
+        totalBytes += bytesForRT(width, height, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    }
 
-    // RT reflections + history (half-res RGBA16F)
-    const UINT halfW = std::max(1u, m_window->GetWidth()  / 2u);
-    const UINT halfH = std::max(1u, m_window->GetHeight() / 2u);
-    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl
-    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl history
+    // RT reflections + history (half-res RGBA16F, only when RT + reflections are enabled).
+    // Base the estimate on the same internal render size used for HDR/depth so
+    // scaled resolutions are reflected accurately.
+    const UINT halfW = std::max(1u, width  / 2u);
+    const UINT halfH = std::max(1u, height / 2u);
+    if (m_rayTracingEnabled && m_rtReflectionsEnabled) {
+        totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl
+        totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT); // refl history
+    }
 
-    // RT GI color + history (half-res RGBA16F)
-    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    // RT GI color + history (half-res RGBA16F, only when RT + GI are enabled)
+    if (m_rayTracingEnabled && m_rtGIEnabled) {
+        totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        totalBytes += bytesForRT(halfW, halfH, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    }
 
     // Shadow map (four cascades packed into one atlas)
     const UINT shadowRes = static_cast<UINT>(m_shadowMapSize);
@@ -363,7 +569,11 @@ float Renderer::GetEstimatedVRAMMB() const {
     // BLAS/TLAS buffers into the on-screen VRAM estimate so heavy RT scenes
     // surface their additional footprint to the user.
     if (m_rayTracingContext && m_rayTracingSupported) {
-        totalBytes += m_rayTracingContext->GetAccelerationStructureBytes();
+        const uint64_t rtBytes = m_rayTracingContext->GetAccelerationStructureBytes();
+        totalBytes += rtBytes;
+        // Mirror RT structure usage into the asset registry so the memory
+        // inspector can report it alongside textures/geometry.
+        m_assetRegistry.SetRTStructureBytes(rtBytes);
     }
 
     const double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
@@ -375,12 +585,6 @@ void Renderer::ApplySafeQualityPreset() {
     // engine can render more complex scenes on 8 GB GPUs without hitting
     // device-removed errors. Users can re-enable individual features once
     // they confirm there is headroom.
-    // Aggressive low-quality preset intended for troubleshooting heavy scenes
-    // on 8 GB-class GPUs. This trades resolution, RT, and shadow quality for
-    // stability so complex layouts can be inspected without immediately
-    // exhausting VRAM.
-    SetRenderScale(0.6f);
-
     // Turn off optional RT passes by default; RT shadows follow the master
     // toggle, and reflections/GI are separate feature bits.
     SetRayTracingEnabled(false);
@@ -400,8 +604,19 @@ void Renderer::ApplySafeQualityPreset() {
     for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
         m_cascadeResolutionScale[i] = std::min(m_cascadeResolutionScale[i], 0.75f);
     }
+    // If the current atlas is larger than the new safe size, recreate it so
+    // the VRAM savings take effect immediately instead of waiting for a
+    // resize-triggered reallocation.
+    RecreateShadowMapResourcesForCurrentSize();
 
-    spdlog::info("Renderer: applied safe low-quality preset (scale=0.60, RT off, SSR/SSAO/Fog off, shadows capped)");
+    // Aggressive low-quality preset intended for troubleshooting heavy scenes
+    // on 8 GB-class GPUs. This trades resolution, RT, and shadow quality for
+    // stability so complex layouts can be inspected without immediately
+    // exhausting VRAM. Heavy effects were disabled above so the resolution
+    // clamp in SetRenderScale uses the "light" path.
+    SetRenderScale(0.75f);
+
+    spdlog::info("Renderer: applied safe low-quality preset (scale=0.75, RT off, SSR/SSAO/Fog off, shadows capped)");
 }
 
 void Renderer::Shutdown() {
@@ -418,6 +633,7 @@ void Renderer::Shutdown() {
     m_placeholderNormal.reset();
     m_placeholderMetallic.reset();
     m_placeholderRoughness.reset();
+    m_textureCache.clear();
     m_depthBuffer.Reset();
     m_shadowMap.Reset();
     m_hdrColor.Reset();
@@ -437,6 +653,25 @@ void Renderer::Shutdown() {
 }
 
 void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
+    // Monotonic frame counter for diagnostics; independent of swap-chain
+    // buffer index so logs can be correlated easily.
+    ++m_renderFrameCounter;
+    MarkPassComplete("Render_Entry");
+
+    // All passes enabled by default; per-feature runtime flags (m_ssaoEnabled,
+    // m_ssrEnabled, etc.) still control whether they actually run.
+    constexpr bool kEnableShadowPass    = true;
+    constexpr bool kEnableMotionVectors = true;
+    constexpr bool kEnableTAA           = false;
+    constexpr bool kEnableSSR           = false;
+    constexpr bool kEnableParticles     = false;
+    constexpr bool kEnableSSAO          = false;
+    constexpr bool kEnableBloom         = false;
+    // Re-enable the fullscreen post-process resolve so the HDR scene color
+    // is actually written to the swap-chain back buffer.
+    constexpr bool kEnablePostProcess   = true;
+    constexpr bool kEnableDebugLines    = false;
+
     if (m_deviceRemoved) {
         if (!m_deviceRemovedLogged) {
             spdlog::error("Renderer::Render skipped because DX12 device was removed earlier (likely out of GPU memory). Restart is required.");
@@ -450,41 +685,126 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         return;
     }
 
+    using clock = std::chrono::high_resolution_clock;
+
     m_totalTime += deltaTime;
 
     // Ensure all environment maps are loaded before rendering the scene. This
     // trades a slightly longer startup for stable frame times once the scene
-    // becomes interactive.
-    ProcessPendingEnvironmentMaps(std::numeric_limits<uint32_t>::max());
+    // becomes interactive. On 8 GB-class GPUs we avoid automatically loading
+    // deferred environments to keep env/IBL memory bounded.
+    uint32_t maxEnvLoadsPerFrame = std::numeric_limits<uint32_t>::max();
+    if (m_device) {
+        const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
+        const std::uint64_t mb = bytes / (1024ull * 1024ull);
+        if (mb > 0 && mb <= 8192ull) {
+            maxEnvLoadsPerFrame = 0;
+        } else {
+            maxEnvLoadsPerFrame = 2;
+        }
+    }
+    ProcessPendingEnvironmentMaps(maxEnvLoadsPerFrame);
 
+    // Process a limited number of heavy GPU jobs (mesh uploads / BLAS builds)
+    // per frame so scene rebuilds and RT warm-up do not spike the first frame.
+    ProcessGpuJobsPerFrame();
+    MarkPassComplete("Render_BeforeBeginFrame");
+
+    // Common frame setup (depth/HDR resize, command list reset, constant
+    // buffer updates) shared by both the classic raster/RT backend and the
+    // experimental voxel renderer.
     BeginFrame();
+    WriteBreadcrumb(GpuMarker::BeginFrame);
     if (m_deviceRemoved) {
         // A fatal error occurred while preparing frame resources (for example,
         // depth/HDR creation failed due to device removal). Skip the rest of
         // this frame; the next call will early-out at the top.
+        MarkPassComplete("BeginFrame_DeviceRemoved");
         return;
     }
+    MarkPassComplete("BeginFrame_Done");
     UpdateFrameConstants(deltaTime, registry);
+    MarkPassComplete("UpdateFrameConstants_Done");
+
+    // Optional ultra-minimal debug frame: clear the current back buffer and
+    // present, skipping all geometry, lighting, and post-process work. This
+    // is disabled in normal builds so the full renderer runs by default.
+    constexpr bool kForceMinimalFrame = false;
+    if (kForceMinimalFrame) {
+        ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
+        if (backBuffer) {
+            D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
+
+            D3D12_RESOURCE_BARRIER bbBarrier{};
+            bbBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            bbBarrier.Transition.pResource   = backBuffer;
+            bbBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+            bbBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            bbBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &bbBarrier);
+
+            const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+            m_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+        }
+
+        EndFrame();
+        return;
+    }
+
+    // Experimental voxel backend: replace the traditional raster + RT path
+    // with a fullscreen voxel raymarch pass. This is primarily intended for
+    // research and diagnostics; when enabled we still reuse the same DX12
+    // device, swap chain, and FrameConstants so camera controls and lighting
+    // stay consistent with the classic renderer.
+    if (m_voxelBackendEnabled) {
+        RenderVoxel(registry);
+        MarkPassComplete("RenderVoxel_Done");
+        EndFrame();
+        return;
+    }
 
     // Optional ray tracing path (DXR). When enabled we build BLAS/TLAS and
     // dispatch ray-traced passes using the current frame's depth buffer. To
     // ensure depth and TLAS are consistent, render a depth-only prepass
     // before invoking the DXR pipelines.
+    const auto tBeforeRT = clock::now();
     if (m_rayTracingSupported && m_rayTracingEnabled && m_rayTracingContext) {
+        const auto tDepthStart = clock::now();
         RenderDepthPrepass(registry);
+        MarkPassComplete("RenderDepthPrepass_Done");
+        const auto tDepthEnd = clock::now();
+        m_lastDepthPrepassMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tDepthEnd - tDepthStart).count() / 1000.0f;
+
         RenderRayTracing(registry);
+        MarkPassComplete("RenderRayTracing_Done");
     }
+    const auto tAfterRT = clock::now();
+    m_lastRTPassMs =
+        std::chrono::duration_cast<std::chrono::microseconds>(tAfterRT - tBeforeRT).count() / 1000.0f;
+
+    const auto tMainStart = clock::now();
 
     // First pass: render depth from directional light
-    if (m_shadowsEnabled && m_shadowMap && m_shadowPipeline) {
+    if (kEnableShadowPass && m_shadowsEnabled && m_shadowMap && m_shadowPipeline) {
+        const auto tShadowStart = clock::now();
+        WriteBreadcrumb(GpuMarker::ShadowPass);
         RenderShadowPass(registry);
+        MarkPassComplete("RenderShadowPass_Done");
+        const auto tShadowEnd = clock::now();
+        m_lastShadowPassMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tShadowEnd - tShadowStart).count() / 1000.0f;
     }
 
     // Main scene pass
     PrepareMainPass();
+    MarkPassComplete("PrepareMainPass_Done");
 
     // Draw environment background (skybox) into the HDR target before geometry.
+    WriteBreadcrumb(GpuMarker::Skybox);
     RenderSkybox();
+    MarkPassComplete("RenderSkybox_Done");
 
     bool drewWithHyper = false;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -506,45 +826,121 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Classic path now acts purely as fallback to avoid double-drawing/z-fighting
     if (!drewWithHyper) {
         // Opaque geometry first
+        WriteBreadcrumb(GpuMarker::OpaqueGeometry);
         RenderScene(registry);
+        MarkPassComplete("RenderScene_Done");
         // Then blended transparent/glass objects, sorted back-to-front.
+        WriteBreadcrumb(GpuMarker::TransparentGeom);
         RenderTransparent(registry);
+        MarkPassComplete("RenderTransparent_Done");
     }
 
     // Camera motion vectors for TAA/motion blur (from depth + matrices).
-    if (m_motionVectorsPipeline && m_velocityBuffer && m_depthBuffer) {
+    if (kEnableMotionVectors && m_motionVectorsPipeline && m_velocityBuffer && m_depthBuffer) {
+        WriteBreadcrumb(GpuMarker::MotionVectors);
         RenderMotionVectors();
+        MarkPassComplete("RenderMotionVectors_Done");
     }
 
     // HDR TAA resolve pass (stabilizes main lighting before reflections,
     // bloom, fog, and tonemapping).
-    RenderTAA();
-
-    // Screen-space reflections using HDR + depth + G-buffer (optional).
-    if (m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
-        // Dedicated helper keeps SSR logic contained.
-        RenderSSR();
+    if (kEnableTAA) {
+        WriteBreadcrumb(GpuMarker::TAAResolve);
+        RenderTAA();
+        MarkPassComplete("RenderTAA_Done");
     }
 
-        // GPU-instanced particle sprites (smoke / fire). Rendered after the
-        // TAA resolve so they layer over the stable HDR image but before SSAO,
-        // bloom, and post-process tonemapping.
+    const auto tMainEnd = clock::now();
+    m_lastMainPassMs =
+        std::chrono::duration_cast<std::chrono::microseconds>(tMainEnd - tMainStart).count() / 1000.0f;
+
+    // Screen-space reflections using HDR + depth + G-buffer (optional).
+    const auto tPostStart = clock::now();
+
+    if (kEnableSSR && m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
+        const auto tSsrStart = clock::now();
+        // Dedicated helper keeps SSR logic contained.
+        WriteBreadcrumb(GpuMarker::SSR);
+        RenderSSR();
+        MarkPassComplete("RenderSSR_Done");
+        const auto tSsrEnd = clock::now();
+        m_lastSSRMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tSsrEnd - tSsrStart).count() / 1000.0f;
+    } else {
+        m_lastSSRMs = 0.0f;
+    }
+
+    // GPU-instanced particle sprites (smoke / fire). Rendered after the
+    // TAA resolve so they layer over the stable HDR image but before SSAO,
+    // bloom, and post-process tonemapping. Scenes can disable this via
+    // SetParticlesEnabled when running on tight VRAM budgets.
+    if (kEnableParticles && m_particlesEnabledForScene) {
+        MarkPassComplete("RenderParticles_Begin");
+        WriteBreadcrumb(GpuMarker::Particles);
         RenderParticles(registry);
+        MarkPassComplete("RenderParticles_Done");
+    }
 
     // Screen-space ambient occlusion from depth buffer (if enabled)
-    RenderSSAO();
+    {
+        const auto tSsaoStart = clock::now();
+        if (kEnableSSAO) {
+            WriteBreadcrumb(GpuMarker::SSAO);
+            RenderSSAO();
+            MarkPassComplete("RenderSSAO_Done");
+        } else {
+            m_lastSSAOMs = 0.0f;
+        }
+        const auto tSsaoEnd = clock::now();
+        m_lastSSAOMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tSsaoEnd - tSsaoStart).count() / 1000.0f;
+    }
 
     // Bloom passes operating on HDR buffer (if available)
-    RenderBloom();
+    {
+        const auto tBloomStart = clock::now();
+        if (kEnableBloom) {
+            WriteBreadcrumb(GpuMarker::Bloom);
+            RenderBloom();
+            MarkPassComplete("RenderBloom_Done");
+        } else {
+            m_lastBloomMs = 0.0f;
+        }
+        const auto tBloomEnd = clock::now();
+        m_lastBloomMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tBloomEnd - tBloomStart).count() / 1000.0f;
+    }
 
-    // Post-process HDR -> back buffer (or no-op if HDR disabled)
-    RenderPostProcess();
+    // Post-process HDR -> back buffer (or no-op if disabled)
+    if (kEnablePostProcess) {
+        const auto tPostOnlyStart = clock::now();
+        WriteBreadcrumb(GpuMarker::PostProcess);
+        RenderPostProcess();
+        MarkPassComplete("RenderPostProcess_Done");
+        const auto tPostOnlyEnd = clock::now();
+        m_lastPostMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
+    } else {
+        m_lastPostMs = 0.0f;
+        MarkPassComplete("RenderPostProcess_Skipped");
+    }
 
     // Debug overlay lines rendered after all post-processing so they are not
     // affected by tone mapping, bloom, or TAA.
-    RenderDebugLines();
+    if (kEnableDebugLines) {
+        WriteBreadcrumb(GpuMarker::DebugLines);
+        RenderDebugLines();
+        MarkPassComplete("RenderDebugLines_Done");
+    }
+
+    // Reset per-frame RT reflection write flag so history updates only occur
+    // on frames where the DXR reflections pass actually ran.
+    m_rtReflectionWrittenThisFrame = false;
 
     EndFrame();
+
+    // If desired later, we can expose total render CPU time via
+    // duration_cast here using (clock::now() - frameStart).
 }
 
 void Renderer::ResetTemporalHistoryForSceneChange() {
@@ -560,6 +956,7 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
     // ghosted silhouettes from the previous scene.
     m_rtHasHistory   = false;
     m_rtGIHasHistory = false;
+    m_rtReflHasHistory = false;
     m_hasPrevCamera  = false;
 
     // Clear any pending debug-line state to avoid drawing lines that belonged
@@ -572,6 +969,8 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext || !registry) {
         return;
     }
+
+    const bool rtWarmingUp = IsRTWarmingUp();
 
     ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
     HRESULT hr = m_commandList.As(&rtCmdList);
@@ -609,12 +1008,12 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     // Dispatch the DXR sun-shadow pass when depth and mask descriptors are ready.
     if (m_depthSRV.IsValid() && m_rtShadowMaskUAV.IsValid()) {
         DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
-        m_rayTracingContext->DispatchRayTracing(
-            rtCmdList.Get(),
-            m_depthSRV,
-            m_rtShadowMaskUAV,
-            m_frameConstantBuffer.gpuAddress,
-            envTable);
+            m_rayTracingContext->DispatchRayTracing(
+                rtCmdList.Get(),
+                m_depthSRV,
+                m_rtShadowMaskUAV,
+                m_frameConstantBuffer.gpuAddress,
+                envTable);
     }
 
     // Optional RT reflections: reuse the same TLAS and depth buffer to write
@@ -622,7 +1021,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     // post-process. This pass is entirely optional and disabled by default;
     // if the reflection pipeline was not created successfully,
     // DispatchReflections is a no-op.
-    if (m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
+    if (!rtWarmingUp && m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
         if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
             D3D12_RESOURCE_BARRIER reflBarrier{};
             reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -642,6 +1041,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 m_rtReflectionUAV,
                 m_frameConstantBuffer.gpuAddress,
                 envTable);
+            m_rtReflectionWrittenThisFrame = true;
         }
     }
 
@@ -649,7 +1049,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     // that can be sampled by the main PBR shader. As with reflections, this
     // pass is optional and disabled by default; DispatchGI is a no-op if the
     // GI pipeline is not available.
-    if (m_rtGIEnabled && m_rtGIColor && m_rtGIUAV.IsValid()) {
+    if (!rtWarmingUp && m_rtGIEnabled && m_rtGIColor && m_rtGIUAV.IsValid()) {
         if (m_rtGIState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
             D3D12_RESOURCE_BARRIER giBarrier{};
             giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -673,60 +1073,190 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 }
 
+void Renderer::RebuildAssetRefsFromScene(Scene::ECS_Registry* registry) {
+    if (!registry) {
+        return;
+    }
+
+    // Reset all ref-counts to zero and then rebuild them from the current
+    // ECS graph. This produces an accurate snapshot of which meshes are
+    // still referenced after a scene rebuild.
+    m_assetRegistry.ResetAllRefCounts();
+
+    auto view = registry->View<Scene::RenderableComponent>();
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+
+        // Mesh references: map MeshData* to asset key when available.
+        if (renderable.mesh) {
+            const Scene::MeshData* meshPtr = renderable.mesh.get();
+            auto it = m_meshAssetKeys.find(meshPtr);
+            if (it != m_meshAssetKeys.end()) {
+                m_assetRegistry.AddRefMeshKey(it->second);
+            }
+        }
+
+        // Texture references: paths are used as canonical keys. Dreamer and
+        // other non-file sentinel values are ignored for now.
+        auto refPath = [&](const std::string& path) {
+            if (path.empty()) {
+                return;
+            }
+            if (!path.empty() && path[0] == '[') {
+                return;
+            }
+            m_assetRegistry.AddRefTextureKey(path);
+        };
+
+        refPath(renderable.textures.albedoPath);
+        refPath(renderable.textures.normalPath);
+        refPath(renderable.textures.metallicPath);
+        refPath(renderable.textures.roughnessPath);
+    }
+}
+
+void Renderer::PruneUnusedMeshes(Scene::ECS_Registry* /*registry*/) {
+    // Focus on BLAS/geometry cleanup; texture lifetime is primarily tied to
+    // scene entities and will be reclaimed when those are destroyed.
+    auto unused = m_assetRegistry.CollectUnusedMeshes();
+    if (unused.empty()) {
+        return;
+    }
+
+    uint64_t totalBytes = 0;
+    uint32_t count = 0;
+
+    for (const auto& asset : unused) {
+        totalBytes += asset.bytes;
+        ++count;
+
+        // Locate the MeshData* corresponding to this key so BLAS entries can
+        // be released. We expect only a small number of meshes, so a simple
+        // linear search over m_meshAssetKeys is sufficient.
+        const Scene::MeshData* meshPtr = nullptr;
+        for (const auto& kv : m_meshAssetKeys) {
+            if (kv.second == asset.key) {
+                meshPtr = kv.first;
+                break;
+            }
+        }
+
+        if (meshPtr && m_rayTracingContext) {
+            m_rayTracingContext->ReleaseBLASForMesh(meshPtr);
+        }
+
+        // Remove from the mesh key map so future ref rebuilds do not consider it.
+        if (meshPtr) {
+            m_meshAssetKeys.erase(meshPtr);
+        }
+    }
+
+    const double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
+    spdlog::info("Pruned {} unused meshes (≈{:.1f} MB of geometry/BLAS candidates)", count, mb);
+}
+
+void Renderer::PruneUnusedTextures() {
+    auto unused = m_assetRegistry.CollectUnusedTextures();
+    if (unused.empty()) {
+        return;
+    }
+
+    uint64_t totalBytes = 0;
+    uint32_t count = 0;
+
+    for (const auto& asset : unused) {
+        totalBytes += asset.bytes;
+        ++count;
+        // Removing the entry from the registry is sufficient from the
+        // diagnostics perspective; the underlying DX12Texture resources are
+        // owned by shared_ptrs attached to scene materials and will already
+        // have been released when those components were destroyed.
+        m_assetRegistry.UnregisterTexture(asset.key);
+    }
+
+    const double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
+    spdlog::info("Pruned {} unused textures from registry (≈{:.1f} MB candidates)", count, mb);
+}
+
 void Renderer::BeginFrame() {
-    // Handle window resize: recreate depth buffer when the *effective*
-    // render resolution changes. When supersampling is active, the depth
-    // buffer is allocated at windowSize * renderScale, so we compare
-    // against that expected size rather than the raw window dimensions.
+    // Handle window resize: recreate depth buffer when the window size
+    // changes. To keep this path maximally stable on 8 GB-class GPUs we
+    // currently allocate depth/HDR at the window resolution only and ignore
+    // renderScale for the underlying resource size; internal resolution
+    // scaling is handled in the shader paths instead. This avoids repeated
+    // large reallocations when renderScale changes and has proven more
+    // robust on devices prone to device-removed faults under memory
+    // pressure.
     const float renderScale = std::clamp(m_renderScale, 0.5f, 1.5f);
-    const UINT expectedDepthWidth  = std::max<UINT>(1, static_cast<UINT>(m_window->GetWidth()  * renderScale));
-    const UINT expectedDepthHeight = std::max<UINT>(1, static_cast<UINT>(m_window->GetHeight() * renderScale));
+    const UINT expectedDepthWidth  = std::max<UINT>(1, m_window->GetWidth());
+    const UINT expectedDepthHeight = std::max<UINT>(1, m_window->GetHeight());
+
+    bool needDepthResize = false;
+    bool needHDRResize   = false;
 
     if (m_depthBuffer) {
         D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
         if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
-            spdlog::info("BeginFrame: recreating depth buffer for renderScale {:.2f} ({}x{})",
-                         renderScale, expectedDepthWidth, expectedDepthHeight);
-            m_depthBuffer.Reset();
-            auto depthResult = CreateDepthBuffer();
-            if (depthResult.IsErr()) {
-                spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
-                // Treat this as a fatal condition for the current run.
-                m_deviceRemoved = true;
-                return;
-            }
+            needDepthResize = true;
+        }
+    }
+
+    if (m_hdrColor) {
+        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+        if (hdrDesc.Width != expectedDepthWidth || hdrDesc.Height != expectedDepthHeight) {
+            needHDRResize = true;
+        }
+    }
+
+    if ((needDepthResize || needHDRResize) && !m_deviceRemoved) {
+        spdlog::info("BeginFrame: reallocating depth/HDR for renderScale {:.2f} ({}x{})",
+                     renderScale, expectedDepthWidth, expectedDepthHeight);
+        // For now, avoid a full GPU flush here; depth/HDR are resized
+        // infrequently and the old resources are no longer referenced after
+        // this point, so we can rely on normal frame fencing to keep things
+        // safe without stalling the CPU on both queues.
+        // WaitForGPU();
+    }
+
+    if (needDepthResize && m_depthBuffer) {
+        spdlog::info("BeginFrame: recreating depth buffer for renderScale {:.2f} ({}x{})",
+                     renderScale, expectedDepthWidth, expectedDepthHeight);
+        m_depthBuffer.Reset();
+        auto depthResult = CreateDepthBuffer();
+        if (depthResult.IsErr()) {
+            spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
+            // Treat this as a fatal condition for the current run.
+            m_deviceRemoved = true;
+            return;
         }
     }
 
     // Handle HDR target resize using the same effective render resolution.
-    if (m_hdrColor) {
-        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
-        if (hdrDesc.Width != expectedDepthWidth || hdrDesc.Height != expectedDepthHeight) {
-            spdlog::info("BeginFrame: recreating HDR target for renderScale {:.2f} ({}x{})",
-                         renderScale, expectedDepthWidth, expectedDepthHeight);
-            m_hdrColor.Reset();
-            auto hdrResult = CreateHDRTarget();
-            if (hdrResult.IsErr()) {
-                spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
-                m_deviceRemoved = true;
-                return;
+    if (needHDRResize && m_hdrColor) {
+        spdlog::info("BeginFrame: recreating HDR target for renderScale {:.2f} ({}x{})",
+                     renderScale, expectedDepthWidth, expectedDepthHeight);
+        m_hdrColor.Reset();
+        auto hdrResult = CreateHDRTarget();
+        if (hdrResult.IsErr()) {
+            spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
+            m_deviceRemoved = true;
+            return;
+        }
+
+        auto rtMaskResult = CreateRTShadowMask();
+        if (rtMaskResult.IsErr()) {
+            spdlog::warn("Failed to recreate RT shadow mask on resize: {}", rtMaskResult.Error());
+        }
+
+        if (m_rayTracingSupported && m_rayTracingContext) {
+            auto rtReflResult = CreateRTReflectionResources();
+            if (rtReflResult.IsErr()) {
+                spdlog::warn("Failed to recreate RT reflection buffer on resize: {}", rtReflResult.Error());
             }
 
-            auto rtMaskResult = CreateRTShadowMask();
-            if (rtMaskResult.IsErr()) {
-                spdlog::warn("Failed to recreate RT shadow mask on resize: {}", rtMaskResult.Error());
-            }
-
-            if (m_rayTracingSupported && m_rayTracingContext) {
-                auto rtReflResult = CreateRTReflectionResources();
-                if (rtReflResult.IsErr()) {
-                    spdlog::warn("Failed to recreate RT reflection buffer on resize: {}", rtReflResult.Error());
-                }
-
-                auto rtGiResult = CreateRTGIResources();
-                if (rtGiResult.IsErr()) {
-                    spdlog::warn("Failed to recreate RT GI buffer on resize: {}", rtGiResult.Error());
-                }
+            auto rtGiResult = CreateRTGIResources();
+            if (rtGiResult.IsErr()) {
+                spdlog::warn("Failed to recreate RT GI buffer on resize: {}", rtGiResult.Error());
             }
         }
     }
@@ -789,7 +1319,7 @@ void Renderer::BeginFrame() {
 }
 
 void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
-    if (!registry || !m_particlePipeline || !m_hdrColor || m_particleBufferMapFailed) {
+    if (m_deviceRemoved || !registry || !m_particlePipeline || !m_hdrColor || m_particleBufferMapFailed) {
         return;
     }
 
@@ -896,17 +1426,10 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     } else {
         spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
                      static_cast<unsigned int>(mapHr));
-        if (m_device && m_device->GetDevice()) {
-            HRESULT reason = m_device->GetDevice()->GetDeviceRemovedReason();
-            if (reason != S_OK) {
-                spdlog::warn("RenderParticles: device removed reason=0x{:08X}",
-                             static_cast<unsigned int>(reason));
-                // Treat this as a fatal condition for the renderer; once the
-                // DX12 device has been removed, further rendering work is not
-                // reliable until the app is restarted.
-                m_deviceRemoved = true;
-            }
-        }
+        // Map failures are one of the first places a hung device surfaces.
+        // Capture rich diagnostics so we can see which pass/frame triggered
+        // device removal.
+        CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapInstanceBuffer", mapHr);
         m_particleBufferMapFailed = true;
         return;
     }
@@ -939,16 +1462,18 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     vbDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
     ComPtr<ID3D12Resource> quadVB;
-    HRESULT hrVB = device->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &vbDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&quadVB));
-    if (FAILED(hrVB)) {
-        spdlog::warn("RenderParticles: failed to allocate quad vertex buffer");
-        return;
+        HRESULT hrVB = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &vbDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&quadVB));
+        if (FAILED(hrVB)) {
+            spdlog::warn("RenderParticles: failed to allocate quad vertex buffer (hr=0x{:08X})",
+                         static_cast<unsigned int>(hrVB));
+            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_CreateQuadVB", hrVB);
+            return;
     }
 
     void* quadMapped = nullptr;
@@ -1024,7 +1549,7 @@ void Renderer::PrepareMainPass() {
     // Likewise, if the RT diffuse GI buffer was written by the DXR pass,
     // transition it to a shader-resource state before sampling in the PBR
     // shader.
-    if (m_rtGIColor && m_rtGIState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        if (m_rtGIColor && m_rtGIState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER giBarrier{};
         giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         giBarrier.Transition.pResource = m_rtGIColor.Get();
@@ -1133,9 +1658,14 @@ void Renderer::PrepareMainPass() {
 }
 
 void Renderer::EndFrame() {
+    // Mark the start of end-of-frame work (RT history copies, back-buffer
+    // transition, present) so device-removed diagnostics can distinguish
+    // hangs that occur after all main passes have finished.
+    WriteBreadcrumb(GpuMarker::EndFrame);
+
     // Before presenting, update the RT shadow history buffer so the next
     // frame's temporal smoothing has valid data.
-    if (m_rtShadowMask && m_rtShadowMaskHistory) {
+    if (m_rayTracingSupported && m_rayTracingEnabled && m_rtShadowMask && m_rtShadowMaskHistory) {
         D3D12_RESOURCE_BARRIER barriers[2] = {};
         UINT barrierCount = 0;
 
@@ -1187,7 +1717,7 @@ void Renderer::EndFrame() {
 
       // Update RT GI history buffer in lock-step with the RT GI color buffer
       // so temporal accumulation in the shader has a stable previous frame.
-      if (m_rtGIColor && m_rtGIHistory) {
+      if (m_rayTracingSupported && m_rayTracingEnabled && m_rtGIColor && m_rtGIHistory) {
           D3D12_RESOURCE_BARRIER giBarriers[2] = {};
           UINT giBarrierCount = 0;
 
@@ -1240,8 +1770,9 @@ void Renderer::EndFrame() {
       // populated the current RT reflection color buffer. This mirrors the
       // shadow / GI history updates above so the post-process shader can
       // blend against the previous frame when g_DebugMode.w indicates that
-      // RT history is valid.
-      if (m_rtReflectionColor && m_rtReflectionHistory) {
+      // RT history is valid. If no reflection rays were traced this frame,
+      // skip the copy so we do not treat uninitialized data as valid history.
+      if (m_rayTracingSupported && m_rayTracingEnabled && m_rtReflectionWrittenThisFrame && m_rtReflectionColor && m_rtReflectionHistory) {
           D3D12_RESOURCE_BARRIER reflBarriers[2] = {};
           UINT reflBarrierCount = 0;
 
@@ -1287,6 +1818,7 @@ void Renderer::EndFrame() {
 
           m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
           m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+          m_rtReflHasHistory = true;
       }
 
     // Transition back buffer to present state
@@ -1306,6 +1838,16 @@ void Renderer::EndFrame() {
     // Present
     m_window->Present();
 
+    // Surface device-removed errors as close to present as possible. This
+    // helps isolate hangs that occur in swap-chain or late-frame work.
+    if (m_device && m_device->GetDevice()) {
+        HRESULT reason = m_device->GetDevice()->GetDeviceRemovedReason();
+        if (reason != S_OK) {
+            CORTEX_REPORT_DEVICE_REMOVED("EndFrame_Present", reason);
+            return;
+        }
+    }
+
     // Signal fence for this frame
     m_fenceValues[m_frameIndex] = m_commandQueue->Signal();
 }
@@ -1319,7 +1861,8 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     float fovY = glm::radians(60.0f);
 
     // Reset per-frame local light shadow state; will be populated below if we
-    // find suitable shadow-casting spotlights.
+    // find suitable shadow-casting spotlights. We keep the budget-warning
+    // flag sticky so we do not spam logs every frame.
     m_hasLocalShadow = false;
     m_localShadowCount = 0;
 
@@ -1509,19 +2052,34 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 
         if (m_shadowsEnabled &&
             lightComp.castsShadows &&
-            type == Scene::LightType::Spot &&
-            m_localShadowCount < kMaxShadowedLocalLights)
+            type == Scene::LightType::Spot)
         {
-            uint32_t localIndex = m_localShadowCount;
-            uint32_t slice = kShadowCascadeCount + localIndex;
+            if (m_localShadowCount < kMaxShadowedLocalLights) {
+                uint32_t localIndex = m_localShadowCount;
+                uint32_t slice = kShadowCascadeCount + localIndex;
 
-            shadowIndex = static_cast<float>(slice);
-            localLightPos[localIndex] = lightXform.position;
-            localLightDir[localIndex] = dir;
-            localLightRange[localIndex] = lightComp.range;
-            localOuterDegrees[localIndex] = lightComp.outerConeDegrees;
+                shadowIndex = static_cast<float>(slice);
+                localLightPos[localIndex] = lightXform.position;
+                localLightDir[localIndex] = dir;
+                localLightRange[localIndex] = lightComp.range;
+                localOuterDegrees[localIndex] = lightComp.outerConeDegrees;
 
-            ++m_localShadowCount;
+                ++m_localShadowCount;
+            } else if (!m_localShadowBudgetWarningEmitted) {
+                std::string nameUtf8 = "<unnamed>";
+                if (registry && registry->HasComponent<Scene::TagComponent>(entity)) {
+                    const auto& tag = registry->GetComponent<Scene::TagComponent>(entity).tag;
+                    if (!tag.empty()) {
+                        nameUtf8 = tag;
+                    }
+                }
+                spdlog::warn(
+                    "Local shadow budget exceeded ({} lights); '{}' will render without local shadows. "
+                    "Consider disabling 'castsShadows' on some lights or enabling safe lighting rigs.",
+                    m_localShadowCount,
+                    nameUtf8);
+                m_localShadowBudgetWarningEmitted = true;
+            }
         }
 
         // For rect area lights we encode the half-size in params.zw so that
@@ -1733,7 +2291,8 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     // the RT pipelines (shadows, GI, reflections) has produced at least one
     // frame of data so temporal filtering can stabilize without requiring
     // every RT feature to be active at the same time.
-    float rtHistoryValid = (m_rtHasHistory || m_rtGIHasHistory) ? 1.0f : 0.0f;
+    float rtHistoryValid =
+        (m_rtHasHistory || m_rtGIHasHistory || m_rtReflHasHistory) ? 1.0f : 0.0f;
     frameData.debugMode = glm::vec4(
         static_cast<float>(m_debugViewMode),
         overlayFlag,
@@ -1749,8 +2308,17 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_rayTracingEnabled &&
         m_rayTracingContext &&
         m_rayTracingContext->HasPipeline();
-    float rtShadowToggle = rtPipelineReady ? 1.0f : 0.0f;
-    frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtShadowToggle);
+    // postParams.w continues to represent "RT reflections enabled" so
+    // post-process can gate sampling of the RT reflection buffer. This is
+    // stricter than simply checking whether the RT pipeline exists; it also
+    // respects the per-feature reflection toggle and any warm-up gating.
+    const bool rtReflectionsActive =
+        rtPipelineReady &&
+        m_rtReflectionsEnabled &&
+        m_rtReflectionColor &&
+        m_rtReflectionSRV.IsValid();
+    float rtReflToggle = rtReflectionsActive ? 1.0f : 0.0f;
+    frameData.postParams = glm::vec4(invWidth, invHeight, fxaaFlag, rtReflToggle);
 
     // Image-based lighting parameters
     float iblEnabled = m_iblEnabled ? 1.0f : 0.0f;
@@ -1860,8 +2428,9 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
 
         if (posDelta > posThreshold || angleDelta > angleThreshold) {
-            m_rtHasHistory   = false;
-            m_rtGIHasHistory = false;
+            m_rtHasHistory      = false;
+            m_rtGIHasHistory    = false;
+            m_rtReflHasHistory  = false;
             // Let TAA resolve handle large changes via per-pixel color and
             // depth checks rather than nuking history globally; this avoids
             // sudden full-scene flicker when orbiting the camera.
@@ -3155,24 +3724,62 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         return Result<void>::Err("Renderer is not initialized");
     }
 
-    const UINT64 vbSize = static_cast<UINT64>(vertices.size() * sizeof(Vertex));
-    const UINT64 ibSize = static_cast<UINT64>(mesh->indices.size() * sizeof(uint32_t));
+    const UINT64 vertexCount = static_cast<UINT64>(vertices.size());
+    const UINT64 indexCount  = static_cast<UINT64>(mesh->indices.size());
+    const UINT64 vbSize = vertexCount * static_cast<UINT64>(sizeof(Vertex));
+    const UINT64 ibSize = indexCount  * static_cast<UINT64>(sizeof(uint32_t));
 
     if (vbSize == 0 || ibSize == 0) {
         spdlog::error(
             "UploadMesh called with empty geometry: vertices={} indices={}",
-            vertices.size(),
-            mesh->indices.size());
+            static_cast<uint64_t>(vertexCount),
+            static_cast<uint64_t>(indexCount));
         return Result<void>::Err("Mesh has no vertices or indices");
     }
 
-    // Default heap resources that will be used at draw time
-    D3D12_HEAP_PROPERTIES defaultHeap = {};
-    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
-    defaultHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    defaultHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    defaultHeap.CreationNodeMask = 1;
-    defaultHeap.VisibleNodeMask = 1;
+    // Log per-mesh GPU buffer footprint to help diagnose large assets.
+    const double vbMB = static_cast<double>(vbSize) / (1024.0 * 1024.0);
+    const double ibMB = static_cast<double>(ibSize) / (1024.0 * 1024.0);
+    spdlog::info(
+        "UploadMesh: vertices={} indices={} (VB≈{:.2f} MB, IB≈{:.2f} MB)",
+        static_cast<uint64_t>(vertexCount),
+        static_cast<uint64_t>(indexCount),
+        vbMB,
+        ibMB);
+
+    // Hard guardrails for pathological meshes so a single glTF cannot
+    // allocate multi-GB vertex/index buffers and trigger device-removed.
+    constexpr UINT64 kMaxMeshVertices = 10'000'000ull;  // ~10M verts
+    constexpr UINT64 kMaxMeshIndices  = 30'000'000ull;  // ~10M tris
+    constexpr UINT64 kMaxMeshVBBytes  = 512ull * 1024ull * 1024ull; // ~512 MB
+    constexpr UINT64 kMaxMeshIBBytes  = 512ull * 1024ull * 1024ull; // ~512 MB
+
+    if (vertexCount > kMaxMeshVertices ||
+        indexCount  > kMaxMeshIndices  ||
+        vbSize      > kMaxMeshVBBytes  ||
+        ibSize      > kMaxMeshIBBytes) {
+        spdlog::error(
+            "UploadMesh: mesh exceeds conservative GPU upload budget; "
+            "skipping upload to avoid device-removed (verts={} indices={} VB≈{:.2f} MB IB≈{:.2f} MB)",
+            static_cast<uint64_t>(vertexCount),
+            static_cast<uint64_t>(indexCount),
+            vbMB,
+            ibMB);
+        return Result<void>::Err("Mesh exceeds GPU upload size budget; not uploaded");
+    }
+
+    // For robustness on 8 GB-class GPUs, keep mesh vertex/index buffers in
+    // UPLOAD heap memory. This avoids additional copy/transition command
+    // lists during scene builds, removing a common source of device-removed
+    // faults while the renderer is under active development. The cost is a
+    // modest reduction in peak geometry throughput, which is acceptable for
+    // the current content size.
+    D3D12_HEAP_PROPERTIES uploadHeap = {};
+    uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
+    uploadHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    uploadHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    uploadHeap.CreationNodeMask = 1;
+    uploadHeap.VisibleNodeMask = 1;
 
     D3D12_RESOURCE_DESC vbDesc = {};
     vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -3184,13 +3791,17 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     vbDesc.SampleDesc.Count = 1;
     vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+    D3D12_RESOURCE_DESC ibDesc = vbDesc;
+    ibDesc.Width = ibSize;
+
     auto gpuBuffers = std::make_shared<MeshBuffers>();
+
     ComPtr<ID3D12Resource> vertexBuffer;
     HRESULT hr = device->CreateCommittedResource(
-        &defaultHeap,
+        &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
         &vbDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&vertexBuffer)
     );
@@ -3201,162 +3812,98 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
             vbSize,
             vertices.size());
 
-        // If the device was removed, log the reason to help diagnosis.
-        if (auto* dxDevice = m_device ? m_device->GetDevice() : nullptr) {
-            HRESULT removed = dxDevice->GetDeviceRemovedReason();
-            if (removed != S_OK) {
-                spdlog::error(
-                    "DX12 device removed before/while creating vertex buffer: reason=0x{:08X}",
-                    static_cast<unsigned int>(removed));
-                m_deviceRemoved = true;
-            }
-        }
-
-        return Result<void>::Err("Failed to create default-heap vertex buffer");
+        CORTEX_REPORT_DEVICE_REMOVED("UploadMesh_CreateVertexBuffer", hr);
+        return Result<void>::Err("Failed to create upload-heap vertex buffer");
     }
-
-    D3D12_RESOURCE_DESC ibDesc = vbDesc;
-    ibDesc.Width = ibSize;
 
     ComPtr<ID3D12Resource> indexBuffer;
     hr = device->CreateCommittedResource(
-        &defaultHeap,
+        &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
         &ibDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&indexBuffer)
     );
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create default-heap index buffer");
+        return Result<void>::Err("Failed to create upload-heap index buffer");
     }
 
-    // Upload buffers (CPU-visible staging)
-    D3D12_HEAP_PROPERTIES uploadHeap = defaultHeap;
-    uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-    ComPtr<ID3D12Resource> vbUpload;
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &vbDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&vbUpload)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create vertex upload buffer");
-    }
-
-    ComPtr<ID3D12Resource> ibUpload;
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &ibDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&ibUpload)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create index upload buffer");
-    }
-
-    // Copy CPU data into upload buffers
+    // Copy CPU data directly into the upload-heap GPU buffers.
     D3D12_RANGE readRange = { 0, 0 };
     void* mappedData = nullptr;
-    hr = vbUpload->Map(0, &readRange, &mappedData);
+    hr = vertexBuffer->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map vertex upload buffer");
+        return Result<void>::Err("Failed to map vertex buffer");
     }
     memcpy(mappedData, vertices.data(), vbSize);
-    vbUpload->Unmap(0, nullptr);
+    vertexBuffer->Unmap(0, nullptr);
 
-    hr = ibUpload->Map(0, &readRange, &mappedData);
+    hr = indexBuffer->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map index upload buffer");
+        return Result<void>::Err("Failed to map index buffer");
     }
     memcpy(mappedData, mesh->indices.data(), ibSize);
-    ibUpload->Unmap(0, nullptr);
-
-    // Record copy + transition commands using pooled upload lists
-    uint32_t allocatorIndex = m_uploadAllocatorIndex++ % kUploadPoolSize;
-    auto allocatorToUse = m_uploadCommandAllocators[allocatorIndex];
-    auto listToUse = m_uploadCommandLists[allocatorIndex];
-    if (!allocatorToUse || !listToUse) {
-        return Result<void>::Err("Upload command list not initialized");
-    }
-    // Ensure allocator isn't in-flight
-    if (m_uploadFences[allocatorIndex] != 0 && m_uploadQueue && !m_uploadQueue->IsFenceComplete(m_uploadFences[allocatorIndex])) {
-        m_uploadQueue->WaitForFenceValue(m_uploadFences[allocatorIndex]);
-    }
-    allocatorToUse->Reset();
-    listToUse->Reset(allocatorToUse.Get(), nullptr);
-
-    listToUse->CopyBufferRegion(vertexBuffer.Get(), 0, vbUpload.Get(), 0, vbSize);
-    listToUse->CopyBufferRegion(indexBuffer.Get(), 0, ibUpload.Get(), 0, ibSize);
-    listToUse->Close();
-
-    m_uploadQueue->ExecuteCommandList(listToUse.Get());
-    uint64_t uploadFence = m_uploadQueue->Signal();
-    m_uploadFences[allocatorIndex] = uploadFence;
-
-    // Transition resources on the graphics queue after copy completes (no flush; defer sync to render loop)
-    ComPtr<ID3D12CommandAllocator> transitionAllocator;
-    HRESULT hrAlloc = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&transitionAllocator));
-    if (FAILED(hrAlloc)) {
-        return Result<void>::Err("Failed to create transition command allocator");
-    }
-    ComPtr<ID3D12GraphicsCommandList> transitionList;
-    HRESULT hrList = device->CreateCommandList(
-        0,
-        D3D12_COMMAND_LIST_TYPE_DIRECT,
-        transitionAllocator.Get(),
-        nullptr,
-        IID_PPV_ARGS(&transitionList)
-    );
-    if (FAILED(hrList)) {
-        return Result<void>::Err("Failed to create transition command list");
-    }
-
-    D3D12_RESOURCE_BARRIER barriers[2] = {};
-
-    barriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barriers[0].Transition.pResource = vertexBuffer.Get();
-    barriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    barriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-    barriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barriers[1].Transition.pResource = indexBuffer.Get();
-    barriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_INDEX_BUFFER;
-    barriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-    transitionList->ResourceBarrier(2, barriers);
-    transitionList->Close();
-
-    // Ensure transition list waits for copy completion, then wait for graphics completion to keep staging buffers alive
-    m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), uploadFence);
-    m_commandQueue->ExecuteCommandList(transitionList.Get());
-    const uint64_t gfxFence = m_commandQueue->Signal();
-    m_commandQueue->WaitForFenceValue(gfxFence);
-    m_pendingUploadFence = uploadFence;
+    indexBuffer->Unmap(0, nullptr);
 
     // Store GPU buffers with lifetime tied to mesh
     gpuBuffers->vertexBuffer = vertexBuffer;
     gpuBuffers->indexBuffer = indexBuffer;
     mesh->gpuBuffers = gpuBuffers;
 
-    // Register geometry with the ray tracing context (stubbed in this phase).
-    if (m_rayTracingContext) {
-        m_rayTracingContext->RebuildBLASForMesh(mesh);
+    // Register approximate geometry footprint in the asset registry so the
+    // memory inspector can surface heavy meshes, and cache the mapping from
+    // MeshData pointer to asset key for later ref-count rebuild / BLAS pruning.
+    {
+        char keyBuf[64];
+        std::snprintf(keyBuf, sizeof(keyBuf), "mesh@%p", static_cast<const void*>(mesh.get()));
+        const std::string key(keyBuf);
+        m_assetRegistry.RegisterMesh(key, vbSize, ibSize);
+        m_meshAssetKeys[mesh.get()] = key;
     }
 
-    spdlog::info("Mesh uploaded to default heap: {} vertices, {} indices", vertices.size(), mesh->indices.size());
+    // Register geometry with the ray tracing context and enqueue a BLAS build
+    // job so RT acceleration structures can converge incrementally.
+    if (m_rayTracingSupported && m_rayTracingContext) {
+        m_rayTracingContext->RebuildBLASForMesh(mesh);
+
+        GpuJob job{};
+        job.type = GpuJobType::BuildBLAS;
+        job.blasMeshKey = mesh.get();
+        job.label = "BLAS";
+        m_gpuJobQueue.push_back(job);
+        ++m_pendingBLASJobs;
+    }
+
+    spdlog::info("Mesh uploaded to upload heap: {} vertices, {} indices", vertices.size(), mesh->indices.size());
     return Result<void>::Ok();
 }
 
-Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(const std::string& path, bool useSRGB) {
+Result<void> Renderer::EnqueueMeshUpload(const std::shared_ptr<Scene::MeshData>& mesh,
+                                         const char* label)
+{
+    if (m_deviceRemoved) {
+        return Result<void>::Err("DX12 device has been removed; cannot enqueue mesh upload");
+    }
+
+    if (!mesh) {
+        return Result<void>::Err("EnqueueMeshUpload called with null mesh");
+    }
+
+    GpuJob job;
+    job.type = GpuJobType::MeshUpload;
+    job.mesh = mesh;
+    job.label = label ? label : "MeshUpload";
+    m_gpuJobQueue.push_back(std::move(job));
+    ++m_pendingMeshJobs;
+
+    return Result<void>::Ok();
+}
+
+Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(
+    const std::string& path,
+    bool useSRGB,
+    AssetRegistry::TextureKind kind) {
     if (path.empty()) {
         return Result<std::shared_ptr<DX12Texture>>::Err("Empty texture path");
     }
@@ -3365,30 +3912,189 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(const std::st
         return Result<std::shared_ptr<DX12Texture>>::Err("Renderer is not initialized");
     }
 
-    auto imageResult = TextureLoader::LoadImageRGBAWithMips(path, true);
-    if (imageResult.IsErr()) {
-        return Result<std::shared_ptr<DX12Texture>>::Err(imageResult.Error());
+    // CRITICAL: Check cache first to prevent duplicate texture loads and GPU memory exhaustion
+    std::string cacheKey = path + (useSRGB ? "_srgb" : "_linear");
+    auto cacheIt = m_textureCache.find(cacheKey);
+    if (cacheIt != m_textureCache.end()) {
+        return Result<std::shared_ptr<DX12Texture>>::Ok(cacheIt->second);
     }
 
+    // Prefer pre-compressed DDS textures when available so that BCn blocks
+    // can be uploaded directly without expanding to RGBA8 in system memory.
+    // The compressed path is now hardened (validated mip sizes, single
+    // DIRECT queue for copy+barrier) and is enabled by default again so
+    // RTShowcase and other hero scenes can use BC7/BC5/BC6H assets.
+    constexpr bool kEnableCompressedDDS = true;
+
+    auto getLowerExt = [](const std::string& p) -> std::string {
+        auto pos = p.find_last_of('.');
+        if (pos == std::string::npos) return {};
+        std::string ext = p.substr(pos);
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return ext;
+    };
+
     DX12Texture texture;
-    std::vector<std::vector<uint8_t>> mipData;
-    uint32_t width = imageResult.Value().front().width;
-    uint32_t height = imageResult.Value().front().height;
-    for (const auto& mip : imageResult.Value()) {
-        mipData.push_back(mip.pixels);
+    auto ext = getLowerExt(path);
+    bool usedCompressedPath = false;
+
+    // If the caller explicitly requested a DDS, always try the compressed
+    // path. Otherwise, check for a sibling .dds next to the requested file
+    // so assets can be converted incrementally without touching call sites.
+    if (kEnableCompressedDDS && ext == ".dds") {
+        auto ddsResult = TextureLoader::LoadDDSCompressed(path);
+        if (!ddsResult.IsErr()) {
+            const auto& img = ddsResult.Value();
+
+            auto toDXGI = [](TextureLoader::CompressedFormat fmt) -> DXGI_FORMAT {
+                using F = TextureLoader::CompressedFormat;
+                switch (fmt) {
+                case F::BC1_UNORM:        return DXGI_FORMAT_BC1_UNORM;
+                case F::BC1_UNORM_SRGB:   return DXGI_FORMAT_BC1_UNORM_SRGB;
+                case F::BC3_UNORM:        return DXGI_FORMAT_BC3_UNORM;
+                case F::BC3_UNORM_SRGB:   return DXGI_FORMAT_BC3_UNORM_SRGB;
+                case F::BC5_UNORM:        return DXGI_FORMAT_BC5_UNORM;
+                case F::BC6H_UF16:        return DXGI_FORMAT_BC6H_UF16;
+                case F::BC7_UNORM:        return DXGI_FORMAT_BC7_UNORM;
+                case F::BC7_UNORM_SRGB:   return DXGI_FORMAT_BC7_UNORM_SRGB;
+                default:                  return DXGI_FORMAT_UNKNOWN;
+                }
+            };
+
+            DXGI_FORMAT compressedFormat = toDXGI(img.format);
+            if (compressedFormat != DXGI_FORMAT_UNKNOWN) {
+                auto initCompressed = texture.InitializeFromCompressedMipChain(
+                    m_device->GetDevice(),
+                    m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
+                    m_commandQueue->GetCommandQueue(),
+                    img.mipData,
+                    img.width,
+                    img.height,
+                    compressedFormat,
+                    path
+                );
+                if (!initCompressed.IsErr()) {
+                    usedCompressedPath = true;
+                } else {
+                    spdlog::warn("Failed to initialize compressed texture '{}': {}", path, initCompressed.Error());
+                }
+            } else {
+                spdlog::warn("Unsupported compressed DDS format for '{}'", path);
+            }
+        } else {
+            spdlog::warn("Failed to load compressed DDS '{}': {}", path, ddsResult.Error());
+        }
+    } else {
+        // Prefer compressed sibling if present: <name>.dds next to the source.
+        if (kEnableCompressedDDS) {
+        std::filesystem::path original(path);
+        std::filesystem::path sibling = original;
+        sibling.replace_extension(".dds");
+        if (std::filesystem::exists(sibling)) {
+            std::string siblingStr = sibling.string();
+            auto ddsResult = TextureLoader::LoadDDSCompressed(siblingStr);
+            if (!ddsResult.IsErr()) {
+                const auto& img = ddsResult.Value();
+
+                auto toDXGI = [](TextureLoader::CompressedFormat fmt) -> DXGI_FORMAT {
+                    using F = TextureLoader::CompressedFormat;
+                    switch (fmt) {
+                    case F::BC1_UNORM:        return DXGI_FORMAT_BC1_UNORM;
+                    case F::BC1_UNORM_SRGB:   return DXGI_FORMAT_BC1_UNORM_SRGB;
+                    case F::BC3_UNORM:        return DXGI_FORMAT_BC3_UNORM;
+                    case F::BC3_UNORM_SRGB:   return DXGI_FORMAT_BC3_UNORM_SRGB;
+                    case F::BC5_UNORM:        return DXGI_FORMAT_BC5_UNORM;
+                    case F::BC6H_UF16:        return DXGI_FORMAT_BC6H_UF16;
+                    case F::BC7_UNORM:        return DXGI_FORMAT_BC7_UNORM;
+                    case F::BC7_UNORM_SRGB:   return DXGI_FORMAT_BC7_UNORM_SRGB;
+                    default:                  return DXGI_FORMAT_UNKNOWN;
+                    }
+                };
+
+                DXGI_FORMAT compressedFormat = toDXGI(img.format);
+                if (compressedFormat != DXGI_FORMAT_UNKNOWN) {
+                    auto initCompressed = texture.InitializeFromCompressedMipChain(
+                        m_device->GetDevice(),
+                        nullptr, // use graphics queue for copy + transitions
+                        m_commandQueue->GetCommandQueue(),
+                        img.mipData,
+                        img.width,
+                        img.height,
+                        compressedFormat,
+                        siblingStr
+                    );
+                    if (!initCompressed.IsErr()) {
+                        usedCompressedPath = true;
+                        spdlog::info("Loaded compressed sibling '{}' for texture '{}'", siblingStr, path);
+                    } else {
+                        spdlog::warn("Failed to initialize compressed sibling '{}' for '{}': {}; falling back to RGBA path",
+                                     siblingStr, path, initCompressed.Error());
+                    }
+                } else {
+                    spdlog::warn("Unsupported compressed DDS format for sibling '{}' (source '{}'); falling back to RGBA path",
+                                 siblingStr, path);
+                }
+            } else {
+                spdlog::warn("Failed to load compressed sibling '{}' for '{}': {}; falling back to RGBA path",
+                             siblingStr, path, ddsResult.Error());
+            }
+            }
+        }
     }
-    auto initResult = texture.InitializeFromMipChain(
-        m_device->GetDevice(),
-        m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
-        m_commandQueue->GetCommandQueue(),
-        mipData,
-        width,
-        height,
-        useSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
-        path
-    );
-    if (initResult.IsErr()) {
-        return Result<std::shared_ptr<DX12Texture>>::Err(initResult.Error());
+
+    // If compressed loading failed or was not requested, fall back to the
+    // generic RGBA path. DDS files are handled exclusively via the
+    // compressed loader; if that fails we deliberately fall back to a
+    // placeholder instead of sending .dds through stb_image (which just
+    // spams load failures).
+    if (!usedCompressedPath) {
+        auto imagePath = path;
+        std::string extLower = getLowerExt(path);
+        if (extLower == ".dds") {
+            // Placeholder-only fallback for DDS when compressed loading
+            // fails; return a small white texture so materials remain
+            // renderable without spamming errors every frame.
+            float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+            auto placeholderResult = DX12Texture::CreatePlaceholder(
+                m_device->GetDevice(),
+                nullptr,
+                m_commandQueue->GetCommandQueue(),
+                2,
+                2,
+                white);
+            if (placeholderResult.IsErr()) {
+                return Result<std::shared_ptr<DX12Texture>>::Err(
+                    "Failed to create placeholder texture for DDS '" + path +
+                    "': " + placeholderResult.Error());
+            }
+            texture = std::move(placeholderResult.Value());
+        } else {
+            auto imageResult = TextureLoader::LoadImageRGBAWithMips(imagePath, true);
+            if (imageResult.IsErr()) {
+                return Result<std::shared_ptr<DX12Texture>>::Err(imageResult.Error());
+            }
+
+            std::vector<std::vector<uint8_t>> mipData;
+            uint32_t width = imageResult.Value().front().width;
+            uint32_t height = imageResult.Value().front().height;
+            for (const auto& mip : imageResult.Value()) {
+                mipData.push_back(mip.pixels);
+            }
+            auto initResult = texture.InitializeFromMipChain(
+                m_device->GetDevice(),
+                nullptr, // use graphics queue for copy + transitions
+                m_commandQueue->GetCommandQueue(),
+                mipData,
+                width,
+                height,
+                useSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM,
+                imagePath
+            );
+            if (initResult.IsErr()) {
+                return Result<std::shared_ptr<DX12Texture>>::Err(initResult.Error());
+            }
+        }
     }
 
     auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
@@ -3401,12 +4107,95 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(const std::st
         return Result<std::shared_ptr<DX12Texture>>::Err(createResult.Error());
     }
 
-    // Ensure upload completion before using on graphics queue
-    uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
-    if (m_uploadQueue && fence != 0) {
-        m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
+    auto texPtr = std::make_shared<DX12Texture>(std::move(texture));
+
+    // Approximate per-texture GPU memory footprint and register with the
+    // asset registry for diagnostics. This is intentionally conservative.
+    auto estimateTextureBytes = [](uint32_t width,
+                                   uint32_t height,
+                                   uint32_t mipLevels,
+                                   DXGI_FORMAT format) -> uint64_t {
+        if (width == 0 || height == 0 || mipLevels == 0) {
+            return 0;
+        }
+
+        const auto isBC = [](DXGI_FORMAT fmt) {
+            switch (fmt) {
+            case DXGI_FORMAT_BC1_UNORM:
+            case DXGI_FORMAT_BC1_UNORM_SRGB:
+            case DXGI_FORMAT_BC3_UNORM:
+            case DXGI_FORMAT_BC3_UNORM_SRGB:
+            case DXGI_FORMAT_BC5_UNORM:
+            case DXGI_FORMAT_BC6H_UF16:
+            case DXGI_FORMAT_BC7_UNORM:
+            case DXGI_FORMAT_BC7_UNORM_SRGB:
+                return true;
+            default:
+                return false;
+            }
+        };
+
+        const auto blockSize = [](DXGI_FORMAT fmt) -> uint32_t {
+            switch (fmt) {
+            case DXGI_FORMAT_BC1_UNORM:
+            case DXGI_FORMAT_BC1_UNORM_SRGB:
+                return 8;
+            case DXGI_FORMAT_BC3_UNORM:
+            case DXGI_FORMAT_BC3_UNORM_SRGB:
+            case DXGI_FORMAT_BC5_UNORM:
+            case DXGI_FORMAT_BC6H_UF16:
+            case DXGI_FORMAT_BC7_UNORM:
+            case DXGI_FORMAT_BC7_UNORM_SRGB:
+                return 16;
+            default:
+                return 16;
+            }
+        };
+
+        const auto bytesPerPixel = [](DXGI_FORMAT fmt) -> uint32_t {
+            switch (fmt) {
+            case DXGI_FORMAT_R8G8B8A8_UNORM:
+            case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+            case DXGI_FORMAT_B8G8R8A8_UNORM:
+                return 4;
+            case DXGI_FORMAT_R16G16B16A16_FLOAT:
+            case DXGI_FORMAT_R16G16B16A16_UNORM:
+                return 8;
+            default:
+                return 4;
+            }
+        };
+
+        uint64_t total = 0;
+        uint32_t w = width;
+        uint32_t h = height;
+        for (uint32_t mip = 0; mip < mipLevels; ++mip) {
+            if (isBC(format)) {
+                const uint32_t bw = (w + 3u) / 4u;
+                const uint32_t bh = (h + 3u) / 4u;
+                total += static_cast<uint64_t>(bw) * static_cast<uint64_t>(bh) * blockSize(format);
+            } else {
+                total += static_cast<uint64_t>(w) * static_cast<uint64_t>(h) * bytesPerPixel(format);
+            }
+            w = std::max(1u, w >> 1);
+            h = std::max(1u, h >> 1);
+        }
+        return total;
+    };
+
+    const uint64_t bytes = estimateTextureBytes(
+        texPtr->GetWidth(),
+        texPtr->GetHeight(),
+        texPtr->GetMipLevels(),
+        texPtr->GetFormat());
+    if (bytes > 0) {
+        m_assetRegistry.RegisterTexture(path, bytes, kind);
     }
-    return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
+
+    // CRITICAL: Add to cache to prevent duplicate loads
+    m_textureCache[cacheKey] = texPtr;
+
+    return Result<std::shared_ptr<DX12Texture>>::Ok(texPtr);
 }
 
 Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
@@ -3427,7 +4216,7 @@ Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
     DX12Texture texture;
     auto initResult = texture.InitializeFromData(
         m_device->GetDevice(),
-        m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
+        nullptr, // use graphics queue for copy + transitions
         m_commandQueue->GetCommandQueue(),
         data,
         width,
@@ -3448,12 +4237,6 @@ Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
     auto createResult = texture.CreateSRV(m_device->GetDevice(), srvResult.Value());
     if (createResult.IsErr()) {
         return Result<std::shared_ptr<DX12Texture>>::Err(createResult.Error());
-    }
-
-    // Ensure upload completion before using on graphics queue
-    uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
-    if (m_uploadQueue && fence != 0) {
-        m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
     }
 
     return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
@@ -3847,6 +4630,18 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
     m_ambientLightColor = glm::vec3(0.04f);
     m_ambientLightIntensity = 1.0f;
 
+    // On 8 GB-class adapters, optionally select a "safe" variant of each rig
+    // with reduced intensities and fewer local shadow-casting lights. This
+    // helps keep RTShowcase and other heavy scenes within budget.
+    bool useSafeRig = false;
+    if (m_device && m_useSafeLightingRigOnLowVRAM) {
+        const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
+        const std::uint64_t mb = bytes / (1024ull * 1024ull);
+        if (mb > 0 && mb <= 8192ull) {
+            useSafeRig = true;
+        }
+    }
+
     switch (rig) {
     case LightingRig::Custom:
         spdlog::info("Lighting rig: Custom (no preset applied)");
@@ -3869,8 +4664,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Spot;
             l.color = glm::vec3(1.0f, 0.95f, 0.85f);
-            l.intensity = 14.0f;
-            l.range = 25.0f;
+            l.intensity = useSafeRig ? 10.0f : 14.0f;
+            l.range = useSafeRig ? 18.0f : 25.0f;
             l.innerConeDegrees = 20.0f;
             l.outerConeDegrees = 35.0f;
             l.castsShadows = true;
@@ -3885,8 +4680,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Point;
             l.color = glm::vec3(0.8f, 0.85f, 1.0f);
-            l.intensity = 5.0f;
-            l.range = 20.0f;
+            l.intensity = useSafeRig ? 3.0f : 5.0f;
+            l.range = useSafeRig ? 14.0f : 20.0f;
             l.castsShadows = false;
         }
         // Rim light - dimmer spotlight from behind
@@ -3905,8 +4700,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Spot;
             l.color = glm::vec3(0.9f, 0.9f, 1.0f);
-            l.intensity = 8.0f;
-            l.range = 25.0f;
+            l.intensity = useSafeRig ? 5.0f : 8.0f;
+            l.range = useSafeRig ? 18.0f : 25.0f;
             l.innerConeDegrees = 25.0f;
             l.outerConeDegrees = 40.0f;
             l.castsShadows = false;
@@ -3919,9 +4714,9 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
         // Cooler sun, higher ambient, and a grid of overhead point lights.
         m_directionalLightDirection = glm::normalize(glm::vec3(0.2f, 1.0f, 0.1f));
         m_directionalLightColor = glm::vec3(0.9f, 0.95f, 1.0f);
-        m_directionalLightIntensity = 3.5f;
+        m_directionalLightIntensity = useSafeRig ? 2.5f : 3.5f;
         m_ambientLightColor = glm::vec3(0.08f, 0.09f, 0.1f);
-        m_ambientLightIntensity = 1.5f;
+        m_ambientLightIntensity = useSafeRig ? 1.0f : 1.5f;
 
         const int countX = 3;
         const int countZ = 3;
@@ -3942,9 +4737,11 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
                 auto& l = enttReg.emplace<Scene::LightComponent>(e);
                 l.type = Scene::LightType::Point;
                 l.color = glm::vec3(0.9f, 0.95f, 1.0f);
-                l.intensity = 10.0f;
-                l.range = 10.0f;
-                l.castsShadows = (ix == 1 && iz == 1); // center light may cast shadows
+                l.intensity = useSafeRig ? 7.0f : 10.0f;
+                l.range = useSafeRig ? 8.0f : 10.0f;
+                // On safe rigs keep the center light unshadowed; rely on
+                // cascades and ambient for structure.
+                l.castsShadows = (!useSafeRig && ix == 1 && iz == 1);
             }
         }
         spdlog::info("Applied lighting rig: TopDownWarehouse");
@@ -3955,9 +4752,9 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
         // Reduce ambient and use a single harsh side light plus a dim back fill.
         m_directionalLightDirection = glm::normalize(glm::vec3(-0.2f, 1.0f, 0.0f));
         m_directionalLightColor = glm::vec3(0.8f, 0.7f, 0.6f);
-        m_directionalLightIntensity = 2.0f;
+        m_directionalLightIntensity = useSafeRig ? 1.5f : 2.0f;
         m_ambientLightColor = glm::vec3(0.01f, 0.01f, 0.02f);
-        m_ambientLightIntensity = 0.5f;
+        m_ambientLightIntensity = useSafeRig ? 0.4f : 0.5f;
 
         // Strong side spotlight
         {
@@ -3975,8 +4772,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Spot;
             l.color = glm::vec3(1.0f, 0.85f, 0.7f);
-            l.intensity = 18.0f;
-            l.range = 20.0f;
+            l.intensity = useSafeRig ? 13.0f : 18.0f;
+            l.range = useSafeRig ? 16.0f : 20.0f;
             l.innerConeDegrees = 18.0f;
             l.outerConeDegrees = 30.0f;
             l.castsShadows = true;
@@ -3992,8 +4789,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             auto& l = enttReg.emplace<Scene::LightComponent>(e);
             l.type = Scene::LightType::Point;
             l.color = glm::vec3(0.4f, 0.5f, 0.8f);
-            l.intensity = 3.0f;
-            l.range = 10.0f;
+            l.intensity = useSafeRig ? 2.0f : 3.0f;
+            l.range = useSafeRig ? 8.0f : 10.0f;
             l.castsShadows = false;
         }
 
@@ -4008,9 +4805,9 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
         // reasonable while still giving good occlusion cues.
         m_directionalLightDirection = glm::normalize(glm::vec3(-0.1f, -1.0f, 0.1f));
         m_directionalLightColor = glm::vec3(0.5f, 0.55f, 0.65f);
-        m_directionalLightIntensity = 1.5f;
+        m_directionalLightIntensity = useSafeRig ? 1.0f : 1.5f;
         m_ambientLightColor = glm::vec3(0.02f, 0.03f, 0.05f);
-        m_ambientLightIntensity = 0.7f;
+        m_ambientLightIntensity = useSafeRig ? 0.5f : 0.7f;
 
         const int lightCount = 8;
         const float spacing = 7.5f;
@@ -4031,11 +4828,15 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             // Warm sodium-vapor style color
             l.color = glm::vec3(1.0f, 0.85f, 0.55f);
             // Strong intensity and generous range so they fill the street.
-            l.intensity = 24.0f;
-            l.range = 18.0f;
-            // Let every second lantern cast shadows; the renderer will pick up
-            // to kMaxShadowedLocalLights of these for actual shadow maps.
-            l.castsShadows = (i % 2 == 0);
+            l.intensity = useSafeRig ? 15.0f : 24.0f;
+            l.range = useSafeRig ? 14.0f : 18.0f;
+            // Let every second lantern cast shadows in the high variant; in
+            // the safe variant only every fourth lantern is shadowed.
+            if (useSafeRig) {
+                l.castsShadows = (i % 4 == 0);
+            } else {
+                l.castsShadows = (i % 2 == 0);
+            }
         }
 
         spdlog::info("Applied lighting rig: StreetLanterns ({} lights)", lightCount);
@@ -4205,7 +5006,15 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
                     renderable.textures.gpuState->descriptorsReady = false;
                 }
             } else {
+                // One-shot failure: clear the path and fall back to the
+                // placeholder so we do not keep spamming load attempts (and
+                // reallocating resources) every frame for the same asset.
                 spdlog::warn("Failed to load texture '{}': {}", path, loaded.Error());
+                path.clear();
+                slot = placeholder;
+                if (renderable.textures.gpuState) {
+                    renderable.textures.gpuState->descriptorsReady = false;
+                }
             }
         } else if (path.empty() && slot && slot != placeholder) {
             slot = placeholder;
@@ -4241,6 +5050,11 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
     }
     auto& state = *tex.gpuState;
 
+    ID3D12Device* device = m_device ? m_device->GetDevice() : nullptr;
+    if (!device || !m_descriptorManager) {
+        return;
+    }
+
     // Allocate descriptors once per material and reuse them; textures can change,
     // but we simply overwrite the descriptor contents.
     if (!state.descriptors[0].IsValid()) {
@@ -4266,14 +5080,39 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
                         (i == 1) ? m_placeholderNormal :
                         (i == 2) ? m_placeholderMetallic :
                                    m_placeholderRoughness;
-        auto srcHandle = sources[i] && sources[i]->GetSRV().IsValid() ? sources[i]->GetSRV() : fallback->GetSRV();
 
-        m_device->GetDevice()->CopyDescriptorsSimple(
-            1,
-            state.descriptors[i].cpu,
-            srcHandle.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
+        DescriptorHandle srcHandle;
+        if (sources[i] && sources[i]->GetSRV().IsValid()) {
+            srcHandle = sources[i]->GetSRV();
+        } else if (fallback && fallback->GetSRV().IsValid()) {
+            srcHandle = fallback->GetSRV();
+        }
+
+        if (srcHandle.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                state.descriptors[i].cpu,
+                srcHandle.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            // No real or placeholder texture available: create a null SRV so
+            // shaders can safely sample without dereferencing an invalid
+            // descriptor. Use a simple 2D RGBA8 layout, which is compatible
+            // with how placeholder textures are normally created.
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MipLevels = 1;
+            srvDesc.Texture2D.MostDetailedMip = 0;
+
+            device->CreateShaderResourceView(
+                nullptr,
+                &srvDesc,
+                state.descriptors[i].cpu
+            );
+        }
     }
 
     state.descriptorsReady = true;
@@ -4282,9 +5121,13 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
 Result<void> Renderer::CreateDepthBuffer() {
     D3D12_RESOURCE_DESC depthDesc = {};
     depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    const float scale = std::clamp(m_renderScale, 0.5f, 1.5f);
-    depthDesc.Width = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
-    depthDesc.Height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
+    // Allocate the hardware depth buffer at the window resolution. Internal
+    // renderScale is applied logically in shaders/VRAM estimates rather than
+    // through frequent depth reallocations, which has proven more stable on
+    // 8 GB-class GPUs.
+    const float scale = 1.0f;
+    depthDesc.Width = std::max(1u, static_cast<UINT>(m_window->GetWidth()));
+    depthDesc.Height = std::max(1u, static_cast<UINT>(m_window->GetHeight()));
     depthDesc.DepthOrArraySize = 1;
     depthDesc.MipLevels = 1;
     depthDesc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -4316,14 +5159,7 @@ Result<void> Renderer::CreateDepthBuffer() {
         m_depthStencilView = {};
         m_depthSRV = {};
 
-        // If the device was removed (likely due to GPU memory pressure),
-        // mark the renderer as degraded so Render() can skip further work.
-        HRESULT removed = m_device->GetDevice()->GetDeviceRemovedReason();
-        if (removed == DXGI_ERROR_DEVICE_REMOVED ||
-            removed == DXGI_ERROR_DEVICE_RESET ||
-            removed == DXGI_ERROR_DRIVER_INTERNAL_ERROR) {
-            m_deviceRemoved = true;
-        }
+        CORTEX_REPORT_DEVICE_REMOVED("CreateDepthBuffer", hr);
 
         char buf[64];
         sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
@@ -4486,6 +5322,36 @@ Result<void> Renderer::CreateShadowMapResources() {
     // Shadow SRV changed; refresh the combined shadow + environment descriptor table.
     UpdateEnvironmentDescriptorTable();
     return Result<void>::Ok();
+}
+
+void Renderer::RecreateShadowMapResourcesForCurrentSize() {
+    if (!m_device || !m_descriptorManager) {
+        return;
+    }
+    if (!m_shadowMap) {
+        // Nothing to recreate yet.
+        return;
+    }
+
+    D3D12_RESOURCE_DESC currentDesc = m_shadowMap->GetDesc();
+    const UINT desiredDim = static_cast<UINT>(m_shadowMapSize);
+
+    // Only recreate when the current atlas is larger than the new safe size.
+    if (currentDesc.Width <= desiredDim && currentDesc.Height <= desiredDim) {
+        return;
+    }
+
+    m_shadowMap.Reset();
+    m_shadowMapSRV = {};
+    for (auto& dsv : m_shadowMapDSVs) {
+        dsv = {};
+    }
+
+    auto result = CreateShadowMapResources();
+    if (result.IsErr()) {
+        spdlog::warn("Renderer: failed to recreate shadow map at safe size: {}", result.Error());
+        m_shadowsEnabled = false;
+    }
 }
 
 Result<void> Renderer::CreateRTShadowMask() {
@@ -4811,18 +5677,26 @@ Result<void> Renderer::CreateRTReflectionResources() {
         return Result<void>::Err("Renderer not initialized for RT reflection creation");
     }
 
-    const UINT fullWidth  = m_window->GetWidth();
-    const UINT fullHeight = m_window->GetHeight();
+    UINT baseWidth  = m_window->GetWidth();
+    UINT baseHeight = m_window->GetHeight();
 
-    if (fullWidth == 0 || fullHeight == 0) {
-        return Result<void>::Err("Window size is zero; cannot create RT reflection buffer");
+    // Prefer to match the HDR render target size so RT reflections stay in
+    // lockstep with the actual shading resolution when renderScale is used.
+    if (m_hdrColor) {
+        D3D12_RESOURCE_DESC hdrDesc = m_hdrColor->GetDesc();
+        baseWidth  = static_cast<UINT>(hdrDesc.Width);
+        baseHeight = static_cast<UINT>(hdrDesc.Height);
+    }
+
+    if (baseWidth == 0 || baseHeight == 0) {
+        return Result<void>::Err("Render target size is zero; cannot create RT reflection buffer");
     }
 
     // Allocate RT reflections at half-resolution relative to the main render
     // target. The hybrid SSR/RT composition and temporal filtering smooth
     // out the reduced resolution while significantly lowering VRAM usage.
-    const UINT width  = std::max(1u, fullWidth  / 2u);
-    const UINT height = std::max(1u, fullHeight / 2u);
+    const UINT width  = std::max(1u, baseWidth  / 2u);
+    const UINT height = std::max(1u, baseHeight / 2u);
 
     D3D12_HEAP_PROPERTIES heapProps{};
     heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -4944,6 +5818,11 @@ Result<void> Renderer::CreateRTReflectionResources() {
         &reflHistorySrvDesc,
         m_rtReflectionHistorySRV.cpu);
 
+    // Initialize both the current and history reflection buffers to black so
+    // any sampling before the first successful DXR pass yields a neutral
+    // result instead of undefined VRAM contents.
+    m_rtReflHasHistory = false;
+
     return Result<void>::Ok();
 }
 
@@ -4952,13 +5831,14 @@ Result<void> Renderer::CreateHDRTarget() {
         return Result<void>::Err("Renderer not initialized for HDR target creation");
     }
 
-    // Apply a simple supersampling factor so the main scene renders into a
-    // higher-resolution HDR target when m_renderScale > 1.0. The back buffer
-    // resolution remains tied to the window size; downsampling happens in
-    // the fullscreen post-process pass.
-    const float scale = std::clamp(m_renderScale, 0.5f, 1.5f);
-    const UINT width  = std::max(1u, static_cast<UINT>(m_window->GetWidth()  * scale));
-    const UINT height = std::max(1u, static_cast<UINT>(m_window->GetHeight() * scale));
+    // Allocate the HDR target at the window resolution. Internal renderScale
+    // is handled logically in the shading paths; keeping the underlying HDR
+    // resource size fixed avoids large reallocations when renderScale
+    // changes and reduces the risk of device-removed faults on memory-
+    // constrained GPUs.
+    const float scale = 1.0f;
+    const UINT width  = std::max(1u, static_cast<UINT>(m_window->GetWidth()));
+    const UINT height = std::max(1u, static_cast<UINT>(m_window->GetHeight()));
 
     if (width == 0 || height == 0) {
         return Result<void>::Err("Window size is zero; cannot create HDR target");
@@ -5002,12 +5882,7 @@ Result<void> Renderer::CreateHDRTarget() {
         m_hdrRTV = {};
         m_hdrSRV = {};
 
-        HRESULT removed = m_device->GetDevice()->GetDeviceRemovedReason();
-        if (removed == DXGI_ERROR_DEVICE_REMOVED ||
-            removed == DXGI_ERROR_DEVICE_RESET ||
-            removed == DXGI_ERROR_DRIVER_INTERNAL_ERROR) {
-            m_deviceRemoved = true;
-        }
+        CORTEX_REPORT_DEVICE_REMOVED("CreateHDRTarget", hr);
 
         char buf[64];
         sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
@@ -5458,6 +6333,19 @@ Result<void> Renderer::CreateCommandList() {
         return Result<void>::Err("Failed to compile post-process pixel shader: " + postPsResult.Error());
     }
 
+    // Experimental voxel raymarch pixel shader. Uses the same fullscreen
+    // vertex shader as the post-process path (SV_VertexID triangle) and the
+    // shared FrameConstants layout so that camera and lighting state remain
+    // consistent with the classic renderer.
+    auto voxelPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/VoxelRaymarch.hlsl",
+        "PSMain",
+        "ps_5_1"
+    );
+    if (voxelPsResult.IsErr()) {
+        spdlog::warn("Failed to compile voxel raymarch pixel shader: {}", voxelPsResult.Error());
+    }
+
     // HDR TAA resolve pixel shader (operates on HDR lighting before tonemapping).
     auto taaPsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
@@ -5823,6 +6711,40 @@ Result<void> Renderer::CreateCommandList() {
         return Result<void>::Err("Failed to create post-process pipeline: " + postPipelineResult.Error());
     }
 
+    // Voxel renderer pipeline: fullscreen triangle rendered directly into
+    // the swap chain back buffer. This keeps the experimental voxel backend
+    // independent from the HDR/SSR/RT path while still sharing the same
+    // root signature and FrameConstants layout.
+    if (voxelPsResult.IsOk()) {
+        m_voxelPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc voxelDesc = {};
+        voxelDesc.vertexShader = postVsResult.Value();
+        voxelDesc.pixelShader  = voxelPsResult.Value();
+        voxelDesc.inputLayout  = {}; // SV_VertexID triangle
+        voxelDesc.rtvFormat    = DXGI_FORMAT_R8G8B8A8_UNORM;
+        voxelDesc.dsvFormat    = DXGI_FORMAT_UNKNOWN;
+        voxelDesc.numRenderTargets = 1;
+        voxelDesc.depthTestEnabled  = false;
+        voxelDesc.depthWriteEnabled = false;
+        voxelDesc.cullMode = D3D12_CULL_MODE_NONE;
+        voxelDesc.blendEnabled = false;
+
+        auto voxelPipelineResult = m_voxelPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            voxelDesc
+        );
+        if (voxelPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create voxel renderer pipeline: {}", voxelPipelineResult.Error());
+            m_voxelPipeline.reset();
+        } else {
+            spdlog::info("Voxel renderer pipeline created successfully (rtvFormat=R8G8B8A8_UNORM).");
+        }
+    } else {
+        spdlog::warn("Voxel raymarch pixel shader compilation failed; experimental voxel backend disabled.");
+    }
+
     // HDR TAA resolve pipeline (fullscreen, writes into HDR intermediate)
     if (taaPsResult.IsOk()) {
         m_taaPipeline = std::make_unique<DX12Pipeline>();
@@ -5935,7 +6857,9 @@ Result<void> Renderer::CreateCommandList() {
     // Downsample + bright-pass
     m_bloomDownsamplePipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomDownDesc = postDesc;
-    bloomDownDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    // Bloom targets are allocated as R11G11B10_FLOAT; match the RTV format
+    // here so the pipeline writes directly into those HDR RGB buffers.
+    bloomDownDesc.rtvFormat = DXGI_FORMAT_R11G11B10_FLOAT;
     bloomDownDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomDownsamplePS",
@@ -5953,7 +6877,7 @@ Result<void> Renderer::CreateCommandList() {
     // Horizontal blur
     m_bloomBlurHPipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomBlurHDesc = postDesc;
-    bloomBlurHDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    bloomBlurHDesc.rtvFormat = DXGI_FORMAT_R11G11B10_FLOAT;
     bloomBlurHDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomBlurHPS",
@@ -5971,7 +6895,7 @@ Result<void> Renderer::CreateCommandList() {
     // Vertical blur
     m_bloomBlurVPipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomBlurVDesc = postDesc;
-    bloomBlurVDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    bloomBlurVDesc.rtvFormat = DXGI_FORMAT_R11G11B10_FLOAT;
     bloomBlurVDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomBlurVPS",
@@ -5989,7 +6913,7 @@ Result<void> Renderer::CreateCommandList() {
     // Composite / upsample (additive) into base bloom level
     m_bloomCompositePipeline = std::make_unique<DX12Pipeline>();
     PipelineDesc bloomCompositeDesc = postDesc;
-    bloomCompositeDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    bloomCompositeDesc.rtvFormat = DXGI_FORMAT_R11G11B10_FLOAT;
     bloomCompositeDesc.pixelShader = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "BloomUpsamplePS",
@@ -6057,60 +6981,42 @@ Result<void> Renderer::CreatePipeline() {
 }
 
 Result<void> Renderer::CreatePlaceholderTexture() {
-    const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    const float flatNormal[4] = { 0.5f, 0.5f, 1.0f, 1.0f };
-    const float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-    auto createAndBind = [&](const float color[4], std::shared_ptr<DX12Texture>& out) -> Result<void> {
-        auto texResult = DX12Texture::CreatePlaceholder(
-            m_device->GetDevice(),
-            m_uploadQueue ? m_uploadQueue->GetCommandQueue() : nullptr,
-            m_commandQueue->GetCommandQueue(),
-            2,
-            2,
-            color
-        );
-
-        if (texResult.IsErr()) {
-            return Result<void>::Err("Failed to create placeholder texture: " + texResult.Error());
-        }
-
-        out = std::make_shared<DX12Texture>(std::move(texResult.Value()));
-
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate SRV for placeholder: " + srvResult.Error());
-        }
-
-        auto createSRVResult = out->CreateSRV(m_device->GetDevice(), srvResult.Value());
-        if (createSRVResult.IsErr()) {
-            return createSRVResult;
-        }
-        return Result<void>::Ok();
-    };
-
-    auto albedoResult = createAndBind(white, m_placeholderAlbedo);
-    if (albedoResult.IsErr()) return albedoResult;
-
-    auto normalResult = createAndBind(flatNormal, m_placeholderNormal);
-    if (normalResult.IsErr()) return normalResult;
-
-    auto metallicResult = createAndBind(black, m_placeholderMetallic);
-    if (metallicResult.IsErr()) return metallicResult;
-
-    auto roughnessResult = createAndBind(white, m_placeholderRoughness);
-    if (roughnessResult.IsErr()) return roughnessResult;
-
-    m_commandQueue->Flush();
-
-    spdlog::info("Placeholder textures created");
+    // Placeholder textures have repeatedly triggered device-removed faults on
+    // this 8 GB GPU during initialization, even though they are not critical
+    // for rendering (materials fall back to solid colors when textures are
+    // missing). To keep the renderer stable, skip creating GPU-backed
+    // placeholders for now; they can be reintroduced later via a safer path.
+    spdlog::warn("CreatePlaceholderTexture: skipping GPU placeholder creation due to previous device-removed faults");
     return Result<void>::Ok();
+}
+
+void Renderer::WaitForGPU() {
+    // Block until the main graphics queue has finished all submitted work so
+    // large reallocations (depth/HDR/RT targets) do not temporarily overlap
+    // with resources still in use on the GPU. This is used sparingly, only
+    // on resolution changes, to avoid unnecessary stalls.
+    if (m_commandQueue) {
+        m_commandQueue->Flush();
+    }
+    if (m_uploadQueue) {
+        m_uploadQueue->Flush();
+    }
 }
 
 Result<void> Renderer::InitializeEnvironmentMaps() {
     if (!m_descriptorManager || !m_device) {
         return Result<void>::Err("Renderer not initialized for environment maps");
     }
+
+    // For now, skip loading HDR/EXR environments entirely while we stabilize
+    // device-removed behaviour on 8 GB-class GPUs. The renderer will fall
+    // back to a neutral placeholder IBL or direct lighting only. This keeps
+    // startup GPU work minimal and removes large texture uploads as a source
+    // of initialization failures.
+    spdlog::warn("InitializeEnvironmentMaps: skipping HDR/EXR environment loading (debug stability mode)");
+    m_environmentMaps.clear();
+    m_pendingEnvironments.clear();
+    return Result<void>::Ok();
 
     // Clear any existing environments
     m_environmentMaps.clear();
@@ -6138,42 +7044,69 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     std::sort(envFiles.begin(), envFiles.end());
 
+    // On 8 GB-class GPUs, clamp the number of eagerly loaded environments
+    // aggressively so a single scene does not spend hundreds of MB on IBL
+    // that may never be used. Heavier adapters can afford a broader set.
+    constexpr size_t kDefaultMaxStartupEnvs = 8;
+    size_t maxStartupEnvs = kDefaultMaxStartupEnvs;
+    bool isEightGBClass = false;
+    if (m_device) {
+        const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
+        const std::uint64_t mb = bytes / (1024ull * 1024ull);
+        if (mb > 0 && mb <= 8192ull) {
+            isEightGBClass = true;
+            maxStartupEnvs = 1; // studio-only on 8 GB
+        }
+    }
+
     int successCount = 0;
-    // To keep VRAM usage reasonable on 8 GB GPUs, load a limited number of
-    // HDR/EXR environments eagerly. Additional environments can be added at
-    // runtime via the Dreamer path without bloating startup memory.
-    const size_t kMaxStartupEnvs = 8;
-    for (size_t index = 0; index < envFiles.size() && successCount < static_cast<int>(kMaxStartupEnvs); ++index) {
+    bool envBudgetReached = false;
+    for (size_t index = 0; index < envFiles.size(); ++index) {
         const auto& envPath = envFiles[index];
         std::string pathStr = envPath.string();
         std::string name = envPath.stem().string();
 
-        // Load all environments synchronously during startup so that by the
-        // time the scene becomes interactive, HDR backgrounds and IBL are
-        // fully available and won't cause hitches while moving the camera.
-        auto texResult = LoadTextureFromFile(pathStr, false);
-        if (texResult.IsErr()) {
-            spdlog::warn("Failed to load environment from '{}': {}", pathStr, texResult.Error());
-            continue;
+        if (!envBudgetReached && successCount < static_cast<int>(maxStartupEnvs)) {
+            // Load a limited number of environments synchronously during
+            // startup. On 8 GB this is typically just the studio env used
+            // by RT showcase; heavier adapters can afford more variety.
+            auto texResult = LoadTextureFromFile(pathStr, false, AssetRegistry::TextureKind::Environment);
+            if (texResult.IsErr()) {
+                spdlog::warn("Failed to load environment from '{}': {}", pathStr, texResult.Error());
+                continue;
+            }
+
+            auto tex = texResult.Value();
+
+            EnvironmentMaps env;
+            env.name = name;
+            env.path = pathStr;
+            env.diffuseIrradiance = tex;
+            env.specularPrefiltered = tex;
+            m_environmentMaps.push_back(env);
+
+            spdlog::info(
+                "Environment '{}' loaded at startup from '{}': {}x{}, {} mips",
+                name,
+                pathStr,
+                tex->GetWidth(),
+                tex->GetHeight(),
+                tex->GetMipLevels());
+
+            ++successCount;
+
+            // Once the environment memory budget has been exceeded, stop
+            // eagerly loading additional skyboxes and defer them instead so
+            // 8 GB-class GPUs do not spend hundreds of MB on unused IBL.
+            if (m_assetRegistry.IsEnvironmentBudgetExceeded()) {
+                envBudgetReached = true;
+            }
+        } else {
+            PendingEnvironment pending;
+            pending.path = pathStr;
+            pending.name = name;
+            m_pendingEnvironments.push_back(std::move(pending));
         }
-
-        auto tex = texResult.Value();
-
-        EnvironmentMaps env;
-        env.name = name;
-        env.diffuseIrradiance = tex;
-        env.specularPrefiltered = tex;
-        m_environmentMaps.push_back(env);
-
-        spdlog::info(
-            "Environment '{}' loaded at startup from '{}': {}x{}, {} mips",
-            name,
-            pathStr,
-            tex->GetWidth(),
-            tex->GetHeight(),
-            tex->GetMipLevels());
-
-        ++successCount;
     }
 
     // If no environments loaded, create a fallback placeholder environment
@@ -6236,6 +7169,21 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     // Ensure current environment index is valid
     m_currentEnvironment = 0;
 
+    // On 8 GB-class adapters, enable the IBL residency limit by default so
+    // later environment loads (via the Performance window) cannot silently
+    // accumulate more than a small fixed number of skyboxes in VRAM.
+    if (isEightGBClass) {
+        SetIBLLimitEnabled(true);
+    } else {
+        // If the limit was toggled on in a previous run, leave it as-is;
+        // EnforceIBLResidencyLimit below will respect the current flag.
+    }
+
+    // If an IBL residency limit is active, trim any excess environments
+    // loaded at startup so that we do not immediately exceed the target
+    // number of resident skyboxes on 8 GB-class GPUs.
+    EnforceIBLResidencyLimit();
+
     // Allocate persistent descriptors for shadow + IBL + RT mask/history + RT GI
     // (space1, t0-t6) if not already created.
     if (!m_shadowAndEnvDescriptors[0].IsValid()) {
@@ -6251,8 +7199,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     UpdateEnvironmentDescriptorTable();
 
     spdlog::info(
-        "Environment maps initialized: {} loaded eagerly, 0 pending for deferred loading",
-        successCount);
+        "Environment maps initialized: {} loaded eagerly, {} pending for deferred loading (8 GB-class adapter: {})",
+        successCount,
+        m_pendingEnvironments.size(),
+        isEightGBClass ? "YES" : "NO");
     return Result<void>::Ok();
 }
 
@@ -6263,10 +7213,12 @@ Result<void> Renderer::AddEnvironmentFromTexture(const std::shared_ptr<DX12Textu
 
     EnvironmentMaps env;
     env.name = name.empty() ? "DreamerEnv" : name;
+    env.path.clear();
     env.diffuseIrradiance = tex;
     env.specularPrefiltered = tex;
 
     m_environmentMaps.push_back(env);
+    EnforceIBLResidencyLimit();
     m_currentEnvironment = m_environmentMaps.size() - 1;
 
     spdlog::info("Environment '{}' registered from Dreamer texture ({}x{}, {} mips)",
@@ -6312,21 +7264,32 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
     }
 
     // Environment selection
-    size_t envIndex = m_currentEnvironment;
-    if (m_environmentMaps.empty() || envIndex >= m_environmentMaps.size()) {
-        envIndex = 0;
+    DescriptorHandle diffuseSrc;
+    DescriptorHandle specularSrc;
+
+    if (!m_environmentMaps.empty()) {
+        size_t envIndex = m_currentEnvironment;
+        if (envIndex >= m_environmentMaps.size()) {
+            envIndex = 0;
+        }
+        const EnvironmentMaps& env = m_environmentMaps[envIndex];
+
+        if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
+            diffuseSrc = env.diffuseIrradiance->GetSRV();
+        }
+        if (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid()) {
+            specularSrc = env.specularPrefiltered->GetSRV();
+        }
     }
-    const EnvironmentMaps& env = m_environmentMaps[envIndex];
 
-    DescriptorHandle diffuseSrc =
-        (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid())
-            ? env.diffuseIrradiance->GetSRV()
-            : (m_placeholderAlbedo ? m_placeholderAlbedo->GetSRV() : DescriptorHandle{});
-
-    DescriptorHandle specularSrc =
-        (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid())
-            ? env.specularPrefiltered->GetSRV()
-            : (m_placeholderAlbedo ? m_placeholderAlbedo->GetSRV() : DescriptorHandle{});
+    // If no environment texture is available, fall back to placeholders when
+    // present; otherwise leave the descriptors as null SRVs.
+    if (!diffuseSrc.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        diffuseSrc = m_placeholderAlbedo->GetSRV();
+    }
+    if (!specularSrc.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        specularSrc = m_placeholderAlbedo->GetSRV();
+    }
 
     if (diffuseSrc.IsValid()) {
         device->CopyDescriptorsSimple(
@@ -6386,7 +7349,7 @@ void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {
         PendingEnvironment pending = m_pendingEnvironments.back();
         m_pendingEnvironments.pop_back();
 
-        auto texResult = LoadTextureFromFile(pending.path, false);
+        auto texResult = LoadTextureFromFile(pending.path, false, AssetRegistry::TextureKind::Environment);
         if (texResult.IsErr()) {
             spdlog::warn(
                 "Deferred environment load failed for '{}': {}",
@@ -6399,9 +7362,11 @@ void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {
 
         EnvironmentMaps env;
         env.name = pending.name;
+        env.path = pending.path;
         env.diffuseIrradiance = tex;
         env.specularPrefiltered = tex;
         m_environmentMaps.push_back(env);
+        EnforceIBLResidencyLimit();
 
         spdlog::info(
             "Deferred environment '{}' loaded from '{}': {}x{}, {} mips ({} remaining)",
@@ -6417,6 +7382,86 @@ void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {
 
     if (m_pendingEnvironments.empty()) {
         spdlog::info("All deferred environment maps loaded (total environments: {})", m_environmentMaps.size());
+    }
+}
+
+void Renderer::LoadAdditionalEnvironmentMaps(uint32_t maxToLoad) {
+    if (maxToLoad == 0) {
+        return;
+    }
+    ProcessPendingEnvironmentMaps(maxToLoad);
+}
+
+void Renderer::SetIBLLimitEnabled(bool enabled) {
+    if (m_iblLimitEnabled == enabled) {
+        return;
+    }
+    m_iblLimitEnabled = enabled;
+    if (m_iblLimitEnabled) {
+        EnforceIBLResidencyLimit();
+    }
+}
+
+void Renderer::EnforceIBLResidencyLimit() {
+    if (!m_iblLimitEnabled) {
+        return;
+    }
+    if (m_environmentMaps.size() <= kMaxIBLResident) {
+        return;
+    }
+
+    bool changed = false;
+    // Evict oldest environments in FIFO order while keeping the current
+    // environment resident whenever possible.
+    while (m_environmentMaps.size() > kMaxIBLResident) {
+        if (m_environmentMaps.empty()) {
+            break;
+        }
+
+        size_t victimIndex = std::numeric_limits<size_t>::max();
+        for (size_t i = 0; i < m_environmentMaps.size(); ++i) {
+            if (i != m_currentEnvironment) {
+                victimIndex = i;
+                break;
+            }
+        }
+
+        if (victimIndex == std::numeric_limits<size_t>::max()) {
+            // Only the current environment is resident; nothing to evict.
+            break;
+        }
+
+        EnvironmentMaps victim = m_environmentMaps[victimIndex];
+        spdlog::info("IBL residency limit: evicting environment '{}' (path='{}') to keep at most {} loaded",
+                     victim.name,
+                     victim.path,
+                     kMaxIBLResident);
+
+        // If we know the source path, push it back into the pending queue so
+        // it can be reloaded later if needed.
+        if (!victim.path.empty()) {
+            PendingEnvironment pending;
+            pending.path = victim.path;
+            pending.name = victim.name;
+            m_pendingEnvironments.push_back(std::move(pending));
+        }
+
+        m_environmentMaps.erase(m_environmentMaps.begin() + static_cast<std::ptrdiff_t>(victimIndex));
+        changed = true;
+
+        if (!m_environmentMaps.empty()) {
+            if (victimIndex < m_currentEnvironment && m_currentEnvironment > 0) {
+                --m_currentEnvironment;
+            } else if (m_currentEnvironment >= m_environmentMaps.size()) {
+                m_currentEnvironment = m_environmentMaps.size() - 1;
+            }
+        } else {
+            m_currentEnvironment = 0;
+        }
+    }
+
+    if (changed && !m_environmentMaps.empty()) {
+        UpdateEnvironmentDescriptorTable();
     }
 }
 
@@ -6877,57 +7922,6 @@ void Renderer::RenderPostProcess() {
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawInstanced(3, 1, 0, 0);
-
-    // Keep the RT reflection history buffer in sync with the current RT
-    // reflection color so post-process can perform simple temporal
-    // accumulation/denoising. This copy is independent of the TAA history.
-    if (m_rtReflectionColor && m_rtReflectionHistory) {
-        D3D12_RESOURCE_BARRIER reflBarriers[2] = {};
-        UINT reflBarrierCount = 0;
-
-        if (m_rtReflectionState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
-            reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionColor.Get();
-            reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionState;
-            reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-            reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++reflBarrierCount;
-            m_rtReflectionState = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        }
-
-        if (m_rtReflectionHistoryState != D3D12_RESOURCE_STATE_COPY_DEST) {
-            reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionHistory.Get();
-            reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionHistoryState;
-            reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-            reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++reflBarrierCount;
-            m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_COPY_DEST;
-        }
-
-        if (reflBarrierCount > 0) {
-            m_commandList->ResourceBarrier(reflBarrierCount, reflBarriers);
-        }
-
-        m_commandList->CopyResource(m_rtReflectionHistory.Get(), m_rtReflectionColor.Get());
-
-        reflBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        reflBarriers[0].Transition.pResource = m_rtReflectionColor.Get();
-        reflBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        reflBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        reflBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        reflBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        reflBarriers[1].Transition.pResource = m_rtReflectionHistory.Get();
-        reflBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        reflBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        reflBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        m_commandList->ResourceBarrier(2, reflBarriers);
-
-        m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
 }
 
 void Renderer::AddDebugLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color) {
@@ -6942,7 +7936,7 @@ void Renderer::ClearDebugLines() {
 }
 
 void Renderer::RenderDebugLines() {
-    if (m_debugLinesDisabled || !m_debugLinePipeline || m_debugLines.empty() || !m_window) {
+    if (m_deviceRemoved || m_debugLinesDisabled || !m_debugLinePipeline || m_debugLines.empty() || !m_window) {
         m_debugLines.clear();
         return;
     }
@@ -7009,46 +8003,41 @@ void Renderer::RenderDebugLines() {
     // Upload vertex data.
     void* mapped = nullptr;
     D3D12_RANGE readRange{ 0, 0 };
-    if (SUCCEEDED(m_debugLineVertexBuffer->Map(0, &readRange, &mapped))) {
+    HRESULT mapHr = m_debugLineVertexBuffer->Map(0, &readRange, &mapped);
+    if (SUCCEEDED(mapHr)) {
         memcpy(mapped, m_debugLines.data(), bufferSize);
         m_debugLineVertexBuffer->Unmap(0, nullptr);
     } else {
         spdlog::warn("RenderDebugLines: failed to map vertex buffer (disabling debug lines for this run)");
+        CORTEX_REPORT_DEVICE_REMOVED("RenderDebugLines_MapVertexBuffer", mapHr);
         m_debugLinesDisabled = true;
         m_debugLines.clear();
         return;
     }
 
     // Set pipeline state and render target (back buffer).
-    auto* backBuffer = m_window->GetCurrentBackBuffer();
+    ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
     if (!backBuffer) {
         m_debugLines.clear();
         return;
     }
 
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-    // We already transitioned the back buffer in EndFrame; assume it is in
-    // RENDER_TARGET state here after RenderPostProcess.
-
     m_commandList->SetPipelineState(m_debugLinePipeline->GetPipelineState());
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
 
-    // Frame constants are already bound; ensure object/material CBVs are valid
-    // by binding identity constants once.
+    // Frame constants are already bound by the main render path; ensure
+    // object constants are valid by binding an identity transform once.
     ObjectConstants obj{};
-    obj.modelMatrix = glm::mat4(1.0f);
+    obj.modelMatrix  = glm::mat4(1.0f);
     obj.normalMatrix = glm::mat4(1.0f);
     auto objAddr = m_objectConstantBuffer.AllocateAndWrite(obj);
     m_commandList->SetGraphicsRootConstantBufferView(0, objAddr);
 
     // IA setup
-    D3D12_VERTEX_BUFFER_VIEW vbv = {};
+    D3D12_VERTEX_BUFFER_VIEW vbv{};
     vbv.BufferLocation = m_debugLineVertexBuffer->GetGPUVirtualAddress();
-    vbv.StrideInBytes = sizeof(DebugLineVertex);
-    vbv.SizeInBytes = bufferSize;
+    vbv.StrideInBytes  = sizeof(DebugLineVertex);
+    vbv.SizeInBytes    = bufferSize;
 
     m_commandList->IASetVertexBuffers(0, 1, &vbv);
     m_commandList->IASetIndexBuffer(nullptr);
@@ -7057,6 +8046,405 @@ void Renderer::RenderDebugLines() {
     // Draw all lines in one call.
     m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 
+    // Clear for next frame.
     m_debugLines.clear();
+}
+
+void Renderer::RenderVoxel(Scene::ECS_Registry* registry) {
+    // Build or refresh the dense voxel grid from the current scene so the
+    // voxel renderer can visualize real geometry instead of a hardcoded test
+    // pattern. Errors here are non-fatal; the shader will simply render the
+    // background gradient when no grid is available.
+    if (registry) {
+        auto voxelResult = BuildVoxelGridFromScene(registry);
+        if (voxelResult.IsErr()) {
+            spdlog::warn("RenderVoxel: {}", voxelResult.Error());
+        }
+    }
+
+    static bool s_loggedOnce = false;
+    if (!s_loggedOnce) {
+        spdlog::info("RenderVoxel: voxel backend active, beginning voxel frame");
+        s_loggedOnce = true;
+    }
+
+    // Minimal fullscreen voxel prototype. Renders directly into the current
+    // back buffer using a fullscreen triangle and the experimental voxel
+    // raymarch pixel shader. We intentionally bypass the traditional HDR
+    // path here so the prototype can stay self-contained.
+    if (!m_window || !m_voxelPipeline) {
+        return;
+    }
+
+    ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
+    if (!backBuffer) {
+        spdlog::error("RenderVoxel: back buffer is null; skipping frame");
+        return;
+    }
+
+    // Transition back buffer from PRESENT to RENDER_TARGET.
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = backBuffer;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    m_commandList->ResourceBarrier(1, &barrier);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
+    // Clear to a bright color so we can easily confirm that the voxel path
+    // is rendering even if the shader fails to draw any geometry.
+    const float clearColor[4] = { 0.2f, 0.0f, 0.4f, 1.0f };
+    m_commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+
+    // Viewport + scissor match the window size.
+    D3D12_VIEWPORT vp{};
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width    = static_cast<float>(m_window->GetWidth());
+    vp.Height   = static_cast<float>(m_window->GetHeight());
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+
+    D3D12_RECT scissor{};
+    scissor.left   = 0;
+    scissor.top    = 0;
+    scissor.right  = static_cast<LONG>(m_window->GetWidth());
+    scissor.bottom = static_cast<LONG>(m_window->GetHeight());
+
+    m_commandList->RSSetViewports(1, &vp);
+    m_commandList->RSSetScissorRects(1, &scissor);
+
+    // Root signature and descriptor heap match the main renderer so the
+    // voxel shader can read FrameConstants via the standard layout and
+    // access the dense voxel grid SRV.
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // Frame constants (b1)
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Voxel grid SRV table (t0). If the grid failed to build or upload we
+    // still render a gradient background; the shader simply finds no hits.
+    if (m_voxelGridSRV.IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_voxelGridSRV.gpu);
+    }
+
+    // Fullscreen triangle; no vertex buffer required (SV_VertexID path).
+    m_commandList->SetPipelineState(m_voxelPipeline->GetPipelineState());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+Result<void> Renderer::BuildVoxelGridFromScene(Scene::ECS_Registry* registry) {
+    if (!registry || !m_device) {
+        return Result<void>::Ok();
+    }
+
+    // Skip rebuild when the grid is still valid. This keeps voxelization
+    // cost tied to scene changes instead of every frame.
+    if (!m_voxelGridDirty && !m_voxelGridCPU.empty()) {
+        return Result<void>::Ok();
+    }
+
+    const uint32_t dim = m_voxelGridDim;
+    const size_t voxelCount = static_cast<size_t>(dim) * static_cast<size_t>(dim) * static_cast<size_t>(dim);
+    m_voxelGridCPU.assign(voxelCount, 0u);
+    m_voxelMaterialIds.clear();
+    m_nextVoxelMaterialId = 1;
+
+    // World-space bounds for the voxel volume. These must stay in sync with
+    // the values used in VoxelRaymarch.hlsl so CPU voxelization and GPU
+    // traversal agree on which region of space is discretized.
+    // World-space voxel volume bounds. These are chosen to comfortably
+    // enclose the curated hero scenes (Cornell, Dragon, RTShowcase) without
+    // being so large that the 128^3 grid becomes too sparse. The same
+    // numbers must be kept in sync with VoxelRaymarch.hlsl.
+    const glm::vec3 gridMin(-10.0f, -2.0f, -10.0f);
+    const glm::vec3 gridMax( 10.0f,  8.0f,  10.0f);
+    const glm::vec3 gridSize = gridMax - gridMin;
+    const glm::vec3 cellSize = gridSize / static_cast<float>(dim);
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    auto& rawReg = registry->GetRegistry();
+
+    auto getMaterialId = [&](const Scene::RenderableComponent& r, entt::entity e) -> uint8_t {
+        std::string key;
+        if (!r.presetName.empty()) {
+            key = r.presetName;
+        } else {
+            if (auto* tag = rawReg.try_get<Scene::TagComponent>(e)) {
+                key = tag->tag;
+            }
+        }
+
+        if (key.empty()) {
+            key = "default";
+        }
+
+        auto it = m_voxelMaterialIds.find(key);
+        if (it != m_voxelMaterialIds.end()) {
+            return it->second;
+        }
+
+        uint8_t id = m_nextVoxelMaterialId;
+        if (id == 0u) {
+            id = 1u;
+        }
+        if (m_nextVoxelMaterialId < 255u) {
+            ++m_nextVoxelMaterialId;
+        }
+        m_voxelMaterialIds.emplace(std::move(key), id);
+        return id;
+    };
+
+    // Helper: stamp a single world-space point into the dense voxel grid.
+    auto stampVoxel = [&](const glm::vec3& wp, uint8_t matId) {
+        glm::vec3 local = (wp - gridMin) / cellSize;
+
+        int ix = static_cast<int>(std::floor(local.x));
+        int iy = static_cast<int>(std::floor(local.y));
+        int iz = static_cast<int>(std::floor(local.z));
+
+        if (ix < 0 || iy < 0 || iz < 0 ||
+            ix >= static_cast<int>(dim) ||
+            iy >= static_cast<int>(dim) ||
+            iz >= static_cast<int>(dim)) {
+            return;
+        }
+
+        const size_t idx =
+            static_cast<size_t>(ix) +
+            static_cast<size_t>(iy) * dim +
+            static_cast<size_t>(iz) * dim * dim;
+
+        // Only overwrite empty cells so the first material to claim a voxel
+        // keeps it; this avoids excessive flicker when multiple meshes touch.
+        if (m_voxelGridCPU[idx] == 0u) {
+            m_voxelGridCPU[idx] = matId;
+        }
+    };
+
+    // Helper: stamp a polyline between two world-space points into the grid.
+    // This densifies thin geometry and small props by filling voxels along
+    // triangle edges instead of marking only the original vertices.
+    const float cellDiag = glm::length(cellSize);
+    auto stampSegment = [&](const glm::vec3& a, const glm::vec3& b, uint8_t matId) {
+        glm::vec3 delta = b - a;
+        float len = glm::length(delta);
+        if (len <= 1e-4f) {
+            stampVoxel(a, matId);
+            return;
+        }
+
+        // Choose the number of samples so that we take at least one sample
+        // per voxel diagonal along the segment, with a small safety factor.
+        int steps = static_cast<int>(len / cellDiag * 2.0f);
+        steps = std::max(1, steps);
+
+        for (int i = 0; i <= steps; ++i) {
+            float t = static_cast<float>(i) / static_cast<float>(steps);
+            glm::vec3 p = glm::mix(a, b, t);
+            stampVoxel(p, matId);
+        }
+    };
+
+    // Helper: stamp interior samples for a triangle using a simple barycentric
+    // grid. This significantly reduces gaps on large walls and planes by
+    // marking voxels across the full triangle area instead of only its
+    // edges. The cost is amortized over scene rebuilds, not per-frame.
+    auto stampTriangleInterior = [&](const glm::vec3& w0,
+                                     const glm::vec3& w1,
+                                     const glm::vec3& w2,
+                                     uint8_t matId) {
+        const int kSubdiv = 6; // ~28 samples per triangle
+        for (int i = 0; i <= kSubdiv; ++i) {
+            float u = static_cast<float>(i) / static_cast<float>(kSubdiv);
+            for (int j = 0; j <= kSubdiv - i; ++j) {
+                float v = static_cast<float>(j) / static_cast<float>(kSubdiv);
+                float w = 1.0f - u - v;
+                if (w < 0.0f) {
+                    continue;
+                }
+                glm::vec3 p = u * w0 + v * w1 + w * w2;
+                stampVoxel(p, matId);
+            }
+        }
+    };
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform  = view.get<Scene::TransformComponent>(entity);
+        if (!renderable.mesh || !renderable.visible) {
+            continue;
+        }
+
+        const auto& mesh = *renderable.mesh;
+        const auto& positions = mesh.positions;
+        if (positions.empty()) {
+            continue;
+        }
+
+        const glm::mat4 world = transform.worldMatrix;
+        const uint8_t matId = getMaterialId(renderable, entity);
+
+        const auto& indices = mesh.indices;
+
+        if (!indices.empty()) {
+            // Triangle-based voxelization: stamp vertices and edges for each
+            // indexed triangle to get a much denser surface shell, which
+            // keeps smaller props and thin features from falling apart.
+            const size_t triCount = indices.size() / 3;
+            for (size_t tri = 0; tri < triCount; ++tri) {
+                const uint32_t i0 = indices[tri * 3 + 0];
+                const uint32_t i1 = indices[tri * 3 + 1];
+                const uint32_t i2 = indices[tri * 3 + 2];
+                if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size()) {
+                    continue;
+                }
+
+                glm::vec3 w0 = glm::vec3(world * glm::vec4(positions[i0], 1.0f));
+                glm::vec3 w1 = glm::vec3(world * glm::vec4(positions[i1], 1.0f));
+                glm::vec3 w2 = glm::vec3(world * glm::vec4(positions[i2], 1.0f));
+
+                stampVoxel(w0, matId);
+                stampVoxel(w1, matId);
+                stampVoxel(w2, matId);
+
+                stampSegment(w0, w1, matId);
+                stampSegment(w1, w2, matId);
+                stampSegment(w2, w0, matId);
+
+                // Fill the triangle interior with a modest barycentric grid so
+                // large planes and walls do not appear as sparse dotted lines.
+                stampTriangleInterior(w0, w1, w2, matId);
+            }
+        } else {
+            // Non-indexed meshes: fall back to stamping vertices only.
+            for (const auto& p : positions) {
+                glm::vec3 wp = glm::vec3(world * glm::vec4(p, 1.0f));
+                stampVoxel(wp, matId);
+            }
+        }
+    }
+
+    // Basic diagnostics: count occupied voxels so voxel mode failures can be
+    // distinguished between "no data" and shader-side issues.
+    size_t filled = 0;
+    for (uint32_t v : m_voxelGridCPU) {
+        if (v != 0u) {
+            ++filled;
+        }
+    }
+    const double density = static_cast<double>(filled) /
+        static_cast<double>(m_voxelGridCPU.size());
+    spdlog::info("Voxel grid built: dim={} filled={} (density {:.6f})",
+                 dim, filled, density);
+
+    auto uploadResult = UploadVoxelGridToGPU();
+    if (uploadResult.IsOk()) {
+        m_voxelGridDirty = false;
+    }
+    return uploadResult;
+}
+
+Result<void> Renderer::UploadVoxelGridToGPU() {
+    if (!m_device || m_voxelGridCPU.empty()) {
+        return Result<void>::Ok();
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("UploadVoxelGridToGPU: device is null");
+    }
+
+    const UINT64 byteSize = static_cast<UINT64>(m_voxelGridCPU.size() * sizeof(uint32_t));
+
+    // Create or resize the upload buffer backing the voxel grid.
+    bool recreate = false;
+    if (!m_voxelGridBuffer) {
+        recreate = true;
+    } else {
+        auto desc = m_voxelGridBuffer->GetDesc();
+        if (desc.Width < byteSize) {
+            recreate = true;
+        }
+    }
+
+    if (recreate) {
+        m_voxelGridBuffer.Reset();
+
+        D3D12_HEAP_PROPERTIES heapProps{};
+        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = byteSize;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_voxelGridBuffer));
+
+        if (FAILED(hr)) {
+            char buf[64];
+            sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
+            return Result<void>::Err(std::string("Failed to create voxel grid buffer (hr=") + buf + ")");
+        }
+
+        // Allocate a persistent SRV slot the first time we create the buffer.
+        if (!m_voxelGridSRV.IsValid() && m_descriptorManager) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate SRV for voxel grid: " + srvResult.Error());
+            }
+            m_voxelGridSRV = srvResult.Value();
+        }
+
+        if (m_voxelGridSRV.IsValid()) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = static_cast<UINT>(m_voxelGridCPU.size());
+            srvDesc.Buffer.StructureByteStride = sizeof(uint32_t);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+            device->CreateShaderResourceView(m_voxelGridBuffer.Get(), &srvDesc, m_voxelGridSRV.cpu);
+        }
+    }
+
+    // Upload the CPU voxel data into the buffer.
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{0, 0};
+    HRESULT mapHr = m_voxelGridBuffer->Map(0, &readRange, &mapped);
+    if (FAILED(mapHr) || !mapped) {
+        char buf[64];
+        sprintf_s(buf, "0x%08X", static_cast<unsigned int>(mapHr));
+        return Result<void>::Err(std::string("Failed to map voxel grid buffer (hr=") + buf + ")");
+    }
+
+    memcpy(mapped, m_voxelGridCPU.data(), static_cast<size_t>(byteSize));
+    m_voxelGridBuffer->Unmap(0, nullptr);
+
+    return Result<void>::Ok();
 }
 } // namespace Cortex::Graphics

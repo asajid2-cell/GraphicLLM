@@ -7,7 +7,9 @@ namespace Cortex::Graphics {
 Result<void> DX12Device::Initialize(const DeviceConfig& config) {
     spdlog::info("Initializing DX12 Device...");
 
-    // Enable debug layer if requested; if it fails, fall back to release device
+    // Enable debug layer if requested; if it fails, fall back to release device.
+    // When the debug layer is active we also enable DRED so that device-removed
+    // hangs surface rich breadcrumbs and page-fault information.
     bool debugLayerEnabled = false;
     if (config.enableDebugLayer) {
 #if defined(_DEBUG)
@@ -28,6 +30,10 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
             spdlog::warn("Failed to enable D3D12 Debug Layer, continuing without it");
         }
 #endif
+    }
+
+    if (debugLayerEnabled) {
+        EnableDRED();
     }
 
     // Create DXGI Factory
@@ -59,6 +65,7 @@ void DX12Device::Shutdown() {
     m_device.Reset();
     m_adapter.Reset();
     m_factory.Reset();
+    m_dedicatedVideoMemoryBytes = 0;
 
     spdlog::info("DX12 Device shut down");
 }
@@ -96,6 +103,7 @@ Result<void> DX12Device::SelectAdapter() {
         // Check if adapter supports D3D12
         if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr))) {
             m_adapter = adapter;
+            m_dedicatedVideoMemoryBytes = static_cast<std::uint64_t>(desc.DedicatedVideoMemory);
 
             // Log adapter info
             char adapterName[128];
@@ -160,6 +168,19 @@ void DX12Device::CheckTearingSupport() {
             spdlog::info("Variable refresh rate (tearing) supported");
         }
     }
+}
+
+void DX12Device::EnableDRED() {
+#if defined(_DEBUG)
+    ComPtr<ID3D12DeviceRemovedExtendedDataSettings> dredSettings;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings)))) {
+        dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+        spdlog::info("DX12 DRED (auto-breadcrumbs + page fault reporting) enabled");
+    } else {
+        spdlog::warn("DX12 DRED settings interface not available; device-removed diagnostics limited");
+    }
+#endif
 }
 
 } // namespace Cortex::Graphics

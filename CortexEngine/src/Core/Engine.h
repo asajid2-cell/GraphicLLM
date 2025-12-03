@@ -8,6 +8,7 @@
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
 #include "Graphics/Renderer.h"
+#include "PerfDiagnostics.h"
 #include "Scene/ECS_Registry.h"
 #include "LLM/LLMService.h"
 #include "LLM/CommandQueue.h"
@@ -22,6 +23,15 @@ struct EngineConfig {
     Graphics::DeviceConfig device;
     bool enableVSync = true;
     uint32_t targetFPS = 60;
+
+    // Render backend selection. Currently only the DX12 raster path is
+    // implemented; additional backends (e.g., voxel renderer) can be wired
+    // in behind this enum without changing higher-level code.
+    enum class RenderBackend {
+        RasterDX12 = 0,
+        VoxelExperimental = 1
+    };
+    RenderBackend renderBackend = RenderBackend::RasterDX12;
 
     // Startup quality mode controls how aggressively the renderer trades
     // image quality for stability on low-VRAM GPUs.
@@ -81,8 +91,19 @@ public:
     [[nodiscard]] Window* GetWindow() { return m_window.get(); }
     [[nodiscard]] Graphics::Renderer* GetRenderer() { return m_renderer.get(); }
     [[nodiscard]] Scene::ECS_Registry* GetRegistry() { return m_registry.get(); }
+    // Editor-style selection control so UI tools (hierarchy window, etc.) can
+    // drive the currently selected entity.
+    void SetSelectedEntity(entt::entity entity);
     // Last measured frame time (seconds) for FPS overlays / tools.
     [[nodiscard]] float GetLastFrameTimeSeconds() const { return m_frameTime; }
+    // Diagnostics helpers for perf/memory governors.
+    [[nodiscard]] bool DidVRAMGovernorReduce() const { return m_qualityAutoReduced; }
+    [[nodiscard]] bool DidPerfGovernorAdjust() const {
+        return m_perfReflectionsDisabled || m_perfGIDisabled || m_perfScaleReduced || m_perfSSROff;
+    }
+    [[nodiscard]] bool WasPerfRTGIDisabled() const { return m_perfGIDisabled; }
+    [[nodiscard]] bool WasPerfRTReflectionsDisabled() const { return m_perfReflectionsDisabled; }
+    [[nodiscard]] bool WasPerfSSROff() const { return m_perfSSROff; }
 
     // Logical focus target (most recently spawned or modified group/entity).
     void SetFocusTarget(const std::string& name);
@@ -94,9 +115,10 @@ public:
 private:
     // High-level scene presets for easy switching between curated layouts.
     enum class ScenePreset {
-        CornellBox = 0,
+        CornellBox      = 0,
         DragonOverWater = 1,
         RTShowcase      = 2,
+        GodRays         = 3,
     };
 
     void ProcessInput();
@@ -110,6 +132,7 @@ private:
     void BuildCornellScene();
     void BuildDragonStudioScene();
     void BuildRTShowcaseScene();
+    void BuildGodRaysScene();
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
@@ -127,6 +150,14 @@ private:
                                    glm::vec3& outDirection);
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
+
+    // VRAM-aware quality governor to automatically reduce expensive features
+    // when the estimated GPU memory footprint exceeds a soft limit.
+    void ApplyVRAMQualityGovernor();
+    // Simple FPS-aware quality governor that progressively disables
+    // expensive features and lowers internal resolution when the smoothed
+    // frame time exceeds a budget.
+    void ApplyPerfQualityGovernor();
 
     // Translation / rotation / scale gizmo helpers
     enum class GizmoAxis { None, X, Y, Z };
@@ -168,11 +199,20 @@ private:
     float m_frameTime = 0.0f;
     uint32_t m_frameCount = 0;
     float m_fpsTimer = 0.0f;
+    float m_avgFrameTimeMs = 0.0f;
 
     // HUD / debug overlay
     void RenderHUD();
     bool m_showHUD = true;
     std::deque<std::string> m_recentCommandMessages;
+    bool m_qualityAutoReduced = false;
+    bool m_perfReflectionsDisabled = false;
+    bool m_perfGIDisabled = false;
+    bool m_perfScaleReduced = false;
+    bool m_perfSSROff = false;
+
+    // Central performance/memory diagnostics snapshotter.
+    PerfDiagnostics m_perf;
 
     // Camera control state
     void ShowCameraHelpOverlay();
@@ -206,6 +246,10 @@ private:
     // Current selection for editor-style interactions (picking & framing).
     entt::entity m_selectedEntity = entt::null;
 
+    // Toggle for drawing world-origin debug axes (XYZ tripod). When false,
+    // the origin axes are suppressed so the view can be captured cleanly.
+    bool m_showOriginAxes = true;
+
     // Translation gizmo interaction state
     GizmoAxis m_gizmoHoveredAxis = GizmoAxis::None;
     GizmoAxis m_gizmoActiveAxis  = GizmoAxis::None;
@@ -231,6 +275,11 @@ private:
 
     // Current scene preset used when (re)building the ECS layout.
     ScenePreset m_currentScenePreset = ScenePreset::RTShowcase;
+
+    // Startup quality mode used to decide whether curated scenes (RT showcase)
+    // should enable their full high-quality settings or stay on the safe
+    // low-VRAM preset.
+    EngineConfig::QualityMode m_qualityMode = EngineConfig::QualityMode::Default;
 };
 
 } // namespace Cortex

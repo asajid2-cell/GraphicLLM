@@ -333,6 +333,13 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_renderer->SetSSREnabled(true);
             m_renderer->SetFogEnabled(true);
         }
+
+        // Select render backend. The experimental voxel renderer bypasses the
+        // classic raster + RT path when explicitly requested via EngineConfig.
+        bool useVoxel =
+            (config.renderBackend == EngineConfig::RenderBackend::VoxelExperimental);
+        m_renderer->SetVoxelBackendEnabled(useVoxel);
+        spdlog::info("Render backend: {}", useVoxel ? "VoxelExperimental" : "RasterDX12");
     }
 
     // Choose initial scene preset based on configuration string, if provided.

@@ -12,7 +12,11 @@ void RunRegressionTests() {
     spdlog::info("[LLM Tests] Running command regression tests...");
 
     Scene::ECS_Registry registry;
-    Graphics::Renderer renderer; // Not fully initialized; safe for simple setters
+    // Do NOT pass a real renderer to regression tests. These tests run on a
+    // background thread during LLM init, and calling UploadMesh from a non-render
+    // thread causes race conditions with the main render loop, leading to
+    // device-removed errors. Passing nullptr safely skips GPU-dependent operations.
+    Graphics::Renderer* renderer = nullptr;
     CommandQueue queue;
 
     // Helper to run a JSON script and optionally log the resulting scene summary
@@ -27,7 +31,7 @@ void RunRegressionTests() {
         for (auto& c : commands) {
             queue.Push(c);
         }
-        queue.ExecuteAll(&registry, &renderer);
+        queue.ExecuteAll(&registry, renderer);
         auto statuses = queue.ConsumeStatus();
         for (const auto& s : statuses) {
             spdlog::info("  [{}] {}", s.success ? "ok" : "fail", s.message);

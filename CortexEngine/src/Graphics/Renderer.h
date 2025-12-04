@@ -870,6 +870,7 @@ public:
       // when scene content is incomplete.
       bool m_missingBufferWarningLogged = false;
       bool m_zeroDrawWarningLogged      = false;
+      bool m_verboseLoggingEnabled      = true;  // Enable detailed frame-by-frame logging for debugging
 
     // Camera history used to decide when to reset RT temporal history
     // (shadows / GI / reflections) after large movements to avoid ghosting.

@@ -1,0 +1,76 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build CortexEngine (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "CortexEngine/build",
+                "--config",
+                "Release",
+                "--target",
+                "CortexEngine"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Build CortexEngine (Debug)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "CortexEngine/build",
+                "--config",
+                "Debug",
+                "--target",
+                "CortexEngine"
+            ],
+            "group": "build",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Clean Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "CortexEngine/build",
+                "--target",
+                "clean"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Reconfigure CMake",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S",
+                "CortexEngine",
+                "-B",
+                "CortexEngine/build"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

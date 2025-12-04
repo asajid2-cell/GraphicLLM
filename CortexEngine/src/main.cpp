@@ -465,15 +465,19 @@ int main(int argc, char* argv[]) {
         //   CORTEX_DISABLE_DREAMER=1 : same as --no-dreamer
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
+            spdlog::info("Command line arg[{}]: '{}'", i, arg);
             if (arg == "--no-llm") {
                 config.enableLLM = false;
+                spdlog::info("  -> LLM disabled via --no-llm");
             } else if (arg.rfind("--llm-model=", 0) == 0) {
                 config.enableLLM = true;
                 config.llmConfig.modelPath = arg.substr(std::string("--llm-model=").size());
             } else if (arg == "--no-dreamer") {
                 config.enableDreamer = false;
+                spdlog::info("  -> Dreamer disabled via --no-dreamer");
             }
         }
+        spdlog::info("After parsing args: enableDreamer={}, enableLLM={}", config.enableDreamer, config.enableLLM);
 
         if (const char* envDisable = std::getenv("CORTEX_DISABLE_LLM")) {
             std::string value = envDisable;

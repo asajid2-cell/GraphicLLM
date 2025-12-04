@@ -12,7 +12,6 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
     // hangs surface rich breadcrumbs and page-fault information.
     bool debugLayerEnabled = false;
     if (config.enableDebugLayer) {
-#if defined(_DEBUG)
         ComPtr<ID3D12Debug> debugController;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
             debugController->EnableDebugLayer();
@@ -29,7 +28,6 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
         } else {
             spdlog::warn("Failed to enable D3D12 Debug Layer, continuing without it");
         }
-#endif
     }
 
     if (debugLayerEnabled) {
@@ -130,13 +128,14 @@ Result<void> DX12Device::CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel) {
         return Result<void>::Err("Failed to create D3D12 device");
     }
 
-    // Optional: configure info queue without breaking on messages
-#if defined(_DEBUG)
+    // Optional: configure info queue. During GPU debugging we explicitly
+    // break on corruption and error severities so the debugger stops at the
+    // first offending call and surfaces a callstack. Warnings remain
+    // non-breaking to avoid overly chatty behavior.
     ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_device.As(&infoQueue))) {
-        // Do not break on errors to avoid abrupt termination
-        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, FALSE);
-        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, FALSE);
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // Filter out noisy info messages
@@ -146,7 +145,6 @@ Result<void> DX12Device::CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel) {
         filter.DenyList.pSeverityList = severities;
         infoQueue->PushStorageFilter(&filter);
     }
-#endif
 
     return Result<void>::Ok();
 }
@@ -171,7 +169,6 @@ void DX12Device::CheckTearingSupport() {
 }
 
 void DX12Device::EnableDRED() {
-#if defined(_DEBUG)
     ComPtr<ID3D12DeviceRemovedExtendedDataSettings> dredSettings;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings)))) {
         dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
@@ -180,7 +177,6 @@ void DX12Device::EnableDRED() {
     } else {
         spdlog::warn("DX12 DRED settings interface not available; device-removed diagnostics limited");
     }
-#endif
 }
 
 } // namespace Cortex::Graphics

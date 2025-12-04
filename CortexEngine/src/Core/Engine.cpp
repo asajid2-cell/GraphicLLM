@@ -488,6 +488,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     // Phase 3: Initialize The Dreamer (async texture generator). This is a lightweight
     // CPU-only service that produces RGBA8 pixels; the Engine uploads them via the
     // Renderer on the main thread.
+    // TEMPORARILY DISABLED TO ISOLATE DEVICE REMOVAL BUG
+    /*
     if (config.enableDreamer) {
         m_dreamerService = std::make_unique<AI::Vision::DreamerService>();
         auto dreamerResult = m_dreamerService->Initialize(config.dreamerConfig);
@@ -498,6 +500,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             spdlog::info("The Dreamer is online! (async texture generation ready)");
         }
     }
+    */
+    spdlog::info("Dreamer initialization SKIPPED (commented out for debugging)");
 
     // Initialize debug menu with current / persisted renderer & camera parameters
     if (m_renderer && m_window) {

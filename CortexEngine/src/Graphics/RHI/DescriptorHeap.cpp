@@ -133,26 +133,61 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateDSV() {
 Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
     auto result = m_cbvSrvUavHeap.Allocate();
     if (result.IsErr()) {
+        spdlog::error("CBV_SRV_UAV persistent allocation FAILED: heap exhausted at {}/{} (persistent={})",
+                      m_cbvSrvUavHeap.GetUsedCount(), m_cbvSrvUavHeap.GetCapacity(), m_cbvSrvUavPersistentCount);
         return result;
     }
 
     auto handle = result.Value();
+    uint32_t oldPersistentCount = m_cbvSrvUavPersistentCount;
     if (handle.index + 1 > m_cbvSrvUavPersistentCount) {
         m_cbvSrvUavPersistentCount = handle.index + 1;
+
+        // Log persistent descriptor growth (useful for tracking texture loads)
+        if (m_cbvSrvUavPersistentCount % 50 == 0 || m_cbvSrvUavPersistentCount > m_cbvSrvUavHeap.GetCapacity() * 0.8f) {
+            spdlog::info("CBV_SRV_UAV persistent descriptors: {} / {} capacity ({:.1f}% persistent)",
+                         m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity(),
+                         100.0f * m_cbvSrvUavPersistentCount / m_cbvSrvUavHeap.GetCapacity());
+        }
     }
 
     return Result<DescriptorHandle>::Ok(handle);
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
-    return m_cbvSrvUavHeap.Allocate();
+    uint32_t used = m_cbvSrvUavHeap.GetUsedCount();
+    uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
+
+    // Warn when approaching capacity (>90% full)
+    if (used >= capacity * 0.9f) {
+        spdlog::warn("CBV_SRV_UAV heap nearly full: {}/{} descriptors used (persistent={}, transient={})",
+                     used, capacity, m_cbvSrvUavPersistentCount, used - m_cbvSrvUavPersistentCount);
+    }
+
+    auto result = m_cbvSrvUavHeap.Allocate();
+    if (result.IsErr()) {
+        spdlog::error("CBV_SRV_UAV heap EXHAUSTED: {}/{} descriptors (persistent={}, transient region full)",
+                      used, capacity, m_cbvSrvUavPersistentCount);
+    }
+
+    return result;
 }
 
 void DescriptorHeapManager::ResetFrameHeaps() {
     // Only reset the transient region of the shader-visible heap each frame.
     // Persistent descriptors (textures, shadow maps, HDR targets, etc.) live
     // in [0, m_cbvSrvUavPersistentCount) and are never overwritten.
+
+    uint32_t usedBefore = m_cbvSrvUavHeap.GetUsedCount();
+    uint32_t transientUsed = usedBefore - m_cbvSrvUavPersistentCount;
+
     m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentCount);
+
+    // Log if transient usage is high (indicates potential inefficiency)
+    if (transientUsed > 100) {
+        spdlog::debug("Frame heap reset: persistent={}, transient={} (capacity={})",
+                      m_cbvSrvUavPersistentCount, transientUsed, m_cbvSrvUavHeap.GetCapacity());
+    }
 }
 
 } // namespace Cortex::Graphics

@@ -17,11 +17,17 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
             debugController->EnableDebugLayer();
             spdlog::info("D3D12 Debug Layer enabled");
 
-            if (config.enableGPUValidation) {
-                ComPtr<ID3D12Debug1> debugController1;
-                if (SUCCEEDED(debugController.As(&debugController1))) {
-                    debugController1->SetEnableGPUBasedValidation(TRUE);
+            ComPtr<ID3D12Debug1> debugController1;
+            if (SUCCEEDED(debugController.As(&debugController1))) {
+                // Explicitly set GPU-based validation to the requested state so we can
+                // force it OFF even if the environment/registry would enable it.
+                debugController1->SetEnableGPUBasedValidation(
+                    config.enableGPUValidation ? TRUE : FALSE);
+                debugController1->SetEnableSynchronizedCommandQueueValidation(FALSE);
+                if (config.enableGPUValidation) {
                     spdlog::info("GPU-based validation enabled");
+                } else {
+                    spdlog::info("GPU-based validation explicitly disabled");
                 }
             }
             debugLayerEnabled = true;
@@ -134,8 +140,10 @@ Result<void> DX12Device::CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel) {
     // non-breaking to avoid overly chatty behavior.
     ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_device.As(&infoQueue))) {
+        // Only break on corruption; log other severities without breaking so we can keep
+        // running through descriptor validation errors for investigation.
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, FALSE);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, FALSE);
 
         // Filter out noisy info messages
@@ -166,6 +174,32 @@ void DX12Device::CheckTearingSupport() {
             spdlog::info("Variable refresh rate (tearing) supported");
         }
     }
+}
+
+Cortex::Result<DX12Device::VideoMemoryInfo> DX12Device::QueryVideoMemoryInfo() const {
+    VideoMemoryInfo out{};
+
+    if (!m_adapter) {
+        return Cortex::Result<VideoMemoryInfo>::Err("DX12Device::QueryVideoMemoryInfo: adapter is null");
+    }
+
+    ComPtr<IDXGIAdapter3> adapter3;
+    HRESULT hr = m_adapter.As(&adapter3);
+    if (FAILED(hr) || !adapter3) {
+        return Cortex::Result<VideoMemoryInfo>::Err("DX12Device::QueryVideoMemoryInfo: IDXGIAdapter3 not available");
+    }
+
+    DXGI_QUERY_VIDEO_MEMORY_INFO info{};
+    hr = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+    if (FAILED(hr)) {
+        return Cortex::Result<VideoMemoryInfo>::Err("DX12Device::QueryVideoMemoryInfo: QueryVideoMemoryInfo failed");
+    }
+
+    out.currentUsageBytes = static_cast<std::uint64_t>(info.CurrentUsage);
+    out.budgetBytes = static_cast<std::uint64_t>(info.Budget);
+    out.availableForReservationBytes = static_cast<std::uint64_t>(info.AvailableForReservation);
+
+    return Cortex::Result<VideoMemoryInfo>::Ok(out);
 }
 
 void DX12Device::EnableDRED() {

@@ -21,6 +21,12 @@ struct DeviceConfig {
 // Core DX12 Device wrapper - manages the low-level GPU interface
 class DX12Device {
 public:
+    struct VideoMemoryInfo {
+        std::uint64_t currentUsageBytes = 0;
+        std::uint64_t budgetBytes = 0;
+        std::uint64_t availableForReservationBytes = 0;
+    };
+
     DX12Device() = default;
     ~DX12Device() = default;
 
@@ -44,6 +50,11 @@ public:
     // (in bytes). Used for coarse-grained budgeting decisions such as
     // environment map limits on 8 GB-class GPUs.
     [[nodiscard]] std::uint64_t GetDedicatedVideoMemoryBytes() const { return m_dedicatedVideoMemoryBytes; }
+    // Query current DXGI video memory usage and budget for the local (GPU)
+    // segment. This is used by debug diagnostics to understand whether the
+    // renderer is approaching the adapter's budget when device-removed
+    // faults occur under memory pressure.
+    [[nodiscard]] Cortex::Result<VideoMemoryInfo> QueryVideoMemoryInfo() const;
 
     // Check for tearing support (for variable refresh rate displays)
     [[nodiscard]] bool SupportsTearing() const { return m_supportsTearing; }

@@ -84,7 +84,8 @@ public:
     // Allocate descriptors from appropriate heap
     Result<DescriptorHandle> AllocateRTV();  // Render Target View
     Result<DescriptorHandle> AllocateDSV();  // Depth Stencil View
-    Result<DescriptorHandle> AllocateCBV_SRV_UAV();  // Constant Buffer / Shader Resource / Unordered Access View
+    Result<DescriptorHandle> AllocateCBV_SRV_UAV();  // Constant Buffer / Shader Resource / Unordered Access View (shader-visible)
+    Result<DescriptorHandle> AllocateStagingCBV_SRV_UAV();  // CPU-only staging descriptors for persistent resources
 
     // Get heaps for binding
     [[nodiscard]] ID3D12DescriptorHeap* GetCBV_SRV_UAV_Heap() const {
@@ -105,10 +106,12 @@ private:
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
     static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 4096;  // Increased from 1024 to support dynamic texture loading + transient allocations per frame
+    static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 2048;  // CPU-only staging heap for persistent SRVs
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
     DescriptorHeap m_cbvSrvUavHeap;
+    DescriptorHeap m_stagingCbvSrvUavHeap;  // CPU-only heap for copying to shader-visible heap
 
     // Number of CBV/SRV/UAV descriptors reserved for persistent resources
     // (textures, shadow maps, HDR targets, etc.). Transient allocations start

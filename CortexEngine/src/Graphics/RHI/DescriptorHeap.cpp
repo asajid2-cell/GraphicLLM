@@ -118,7 +118,14 @@ Result<void> DescriptorHeapManager::Initialize(ID3D12Device* device) {
         return Result<void>::Err("Failed to create CBV/SRV/UAV heap: " + cbvResult.Error());
     }
 
-    spdlog::info("Descriptor Heap Manager initialized");
+    // Create staging CBV/SRV/UAV heap (CPU-only, non-shader-visible)
+    // Used for persistent SRVs that will be copied to the shader-visible heap
+    auto stagingResult = m_stagingCbvSrvUavHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, STAGING_CBV_SRV_UAV_HEAP_SIZE, false);
+    if (stagingResult.IsErr()) {
+        return Result<void>::Err("Failed to create staging CBV/SRV/UAV heap: " + stagingResult.Error());
+    }
+
+    spdlog::info("Descriptor Heap Manager initialized (with staging heap)");
     return Result<void>::Ok();
 }
 
@@ -152,6 +159,17 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
     }
 
     return Result<DescriptorHandle>::Ok(handle);
+}
+
+Result<DescriptorHandle> DescriptorHeapManager::AllocateStagingCBV_SRV_UAV() {
+    // Allocate from the CPU-only staging heap
+    // These descriptors can be safely used as SOURCE in CopyDescriptorsSimple
+    auto result = m_stagingCbvSrvUavHeap.Allocate();
+    if (result.IsErr()) {
+        spdlog::error("Staging CBV_SRV_UAV heap EXHAUSTED: {}/{} descriptors",
+                      m_stagingCbvSrvUavHeap.GetUsedCount(), m_stagingCbvSrvUavHeap.GetCapacity());
+    }
+    return result;
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {

@@ -83,11 +83,11 @@ Result<void> Renderer::CreateSSAOResources() {
         m_ssaoRTV.cpu
     );
 
-    // SRV
+    // SRV - use staging heap for persistent SSAO SRV (copied in post-process)
     if (!m_ssaoSRV.IsValid()) {
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate SRV for SSAO target: " + srvResult.Error());
+            return Result<void>::Err("Failed to allocate staging SRV for SSAO target: " + srvResult.Error());
         }
         m_ssaoSRV = srvResult.Value();
     }

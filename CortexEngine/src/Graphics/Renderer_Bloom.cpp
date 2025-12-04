@@ -99,11 +99,11 @@ Result<void> Renderer::CreateBloomResources() {
                 m_bloomRTV[level][ping].cpu
             );
 
-            // SRV for sampling this bloom target
+            // SRV for sampling this bloom target - use staging heap (copied in post-process)
             if (!m_bloomSRV[level][ping].IsValid()) {
-                auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+                auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
                 if (srvResult.IsErr()) {
-                    return Result<void>::Err("Failed to allocate SRV for bloom target: " + srvResult.Error());
+                    return Result<void>::Err("Failed to allocate staging SRV for bloom target: " + srvResult.Error());
                 }
                 m_bloomSRV[level][ping] = srvResult.Value();
             }

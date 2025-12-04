@@ -17,10 +17,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/norm.hpp>
+#include <stdio.h>
 
 namespace Cortex::Graphics {
 
 Renderer::~Renderer() {
+    // Ensure GPU is completely idle before any member destructors run
+    WaitForGPU();
     Shutdown();
 }
 
@@ -750,6 +753,10 @@ void Renderer::ApplySafeQualityPreset() {
 }
 
 void Renderer::Shutdown() {
+    // CRITICAL FIX: Wait for GPU to finish all work before destroying resources
+    // Otherwise we get OBJECT_DELETED_WHILE_STILL_IN_USE crash
+    WaitForGPU();
+
     if (m_commandQueue) {
         m_commandQueue->Flush();
     }
@@ -1412,6 +1419,7 @@ void Renderer::BeginFrame() {
 
     bool needDepthResize = false;
     bool needHDRResize   = false;
+    bool needSSAOResize  = false;
 
     // Reset per-frame back-buffer state tracking; individual passes that
     // render directly to the swap-chain will set this when they transition
@@ -1432,14 +1440,23 @@ void Renderer::BeginFrame() {
         }
     }
 
-    if ((needDepthResize || needHDRResize) && !m_deviceRemoved) {
-        spdlog::info("BeginFrame: reallocating depth/HDR for renderScale {:.2f} ({}x{})",
+    // Check SSAO resize (half resolution)
+    if (m_ssaoTex) {
+        D3D12_RESOURCE_DESC ssaoDesc = m_ssaoTex->GetDesc();
+        UINT expectedWidth  = std::max<UINT>(1, m_window->GetWidth()  / 2);
+        UINT expectedHeight = std::max<UINT>(1, m_window->GetHeight() / 2);
+        if (ssaoDesc.Width != expectedWidth || ssaoDesc.Height != expectedHeight) {
+            needSSAOResize = true;
+        }
+    }
+
+    // CRITICAL: Wait for GPU before destroying ANY render targets
+    if ((needDepthResize || needHDRResize || needSSAOResize) && !m_deviceRemoved) {
+        spdlog::info("BeginFrame: reallocating render targets for renderScale {:.2f} ({}x{})",
                      renderScale, expectedDepthWidth, expectedDepthHeight);
-        // For now, avoid a full GPU flush here; depth/HDR are resized
-        // infrequently and the old resources are no longer referenced after
-        // this point, so we can rely on normal frame fencing to keep things
-        // safe without stalling the CPU on both queues.
-        // WaitForGPU();
+        // Must wait for GPU to finish using old resources before destroying them
+        // Normal frame fencing is NOT sufficient - Debug Layer proves we need explicit sync here
+        WaitForGPU();
     }
 
     if (needDepthResize && m_depthBuffer) {
@@ -1489,17 +1506,13 @@ void Renderer::BeginFrame() {
         }
     }
     // Handle SSAO target resize (SSAO is rendered at half resolution).
-    if (m_ssaoTex) {
-        D3D12_RESOURCE_DESC ssaoDesc = m_ssaoTex->GetDesc();
-        UINT expectedWidth  = std::max<UINT>(1, m_window->GetWidth()  / 2);
-        UINT expectedHeight = std::max<UINT>(1, m_window->GetHeight() / 2);
-        if (ssaoDesc.Width != expectedWidth || ssaoDesc.Height != expectedHeight) {
-            m_ssaoTex.Reset();
-            auto ssaoResult = CreateSSAOResources();
-            if (ssaoResult.IsErr()) {
-                spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
-                m_ssaoEnabled = false;
-            }
+    if (needSSAOResize && m_ssaoTex) {
+        spdlog::info("BeginFrame: recreating SSAO target (half resolution)");
+        m_ssaoTex.Reset();
+        auto ssaoResult = CreateSSAOResources();
+        if (ssaoResult.IsErr()) {
+            spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
+            m_ssaoEnabled = false;
         }
     }
     // Propagate resize to ray tracing context so it can adjust any RT targets.
@@ -1614,6 +1627,11 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     const UINT minCapacity = 256;
 
     if (!m_particleInstanceBuffer || m_particleInstanceCapacity < requiredCapacity) {
+        // CRITICAL: If replacing an existing buffer, wait for GPU to finish using it
+        if (m_particleInstanceBuffer) {
+            WaitForGPU();
+        }
+
         UINT newCapacity = std::max(requiredCapacity, minCapacity);
 
         D3D12_HEAP_PROPERTIES heapProps = {};
@@ -1726,6 +1744,43 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             return;
         }
     }
+
+    // --- FIX: Bind render targets with depth buffer BEFORE setting pipeline ---
+    // The particle pipeline expects DXGI_FORMAT_D32_FLOAT depth, so we MUST bind the DSV
+
+    // 1. Transition depth buffer to write state if needed
+    // 2. NEW FIX: Transition HDR Color to RENDER_TARGET (may be in PIXEL_SHADER_RESOURCE from previous pass)
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    uint32_t barrierCount = 0;
+
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+
+    if (m_hdrColor && m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_hdrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_hdrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    if (barrierCount > 0) {
+        m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    // 3. Bind render targets (HDR color + depth)
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetPipelineState(m_particlePipeline->GetPipelineState());
@@ -4422,9 +4477,10 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(
         }
     }
 
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Use staging heap for persistent texture SRVs (will be copied to shader-visible heap)
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
-        return Result<std::shared_ptr<DX12Texture>>::Err("Failed to allocate SRV for texture " + path + ": " + srvResult.Error());
+        return Result<std::shared_ptr<DX12Texture>>::Err("Failed to allocate staging SRV for texture " + path + ": " + srvResult.Error());
     }
 
     auto createResult = texture.CreateSRV(m_device->GetDevice(), srvResult.Value());
@@ -4553,10 +4609,11 @@ Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
         return Result<std::shared_ptr<DX12Texture>>::Err(initResult.Error());
     }
 
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Use staging heap for persistent Dreamer texture SRVs
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
         return Result<std::shared_ptr<DX12Texture>>::Err(
-            "Failed to allocate SRV for Dreamer texture '" + debugName + "': " + srvResult.Error());
+            "Failed to allocate staging SRV for Dreamer texture '" + debugName + "': " + srvResult.Error());
     }
 
     auto createResult = texture.CreateSRV(m_device->GetDevice(), srvResult.Value());
@@ -5516,10 +5573,10 @@ Result<void> Renderer::CreateDepthBuffer() {
         m_depthStencilView.cpu
     );
 
-    // Create SRV for depth sampling (SSAO)
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Create SRV for depth sampling (SSAO) - use staging heap for persistent descriptors
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate SRV for depth buffer: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for depth buffer: " + srvResult.Error());
     }
     m_depthSRV = srvResult.Value();
 
@@ -5607,10 +5664,10 @@ Result<void> Renderer::CreateShadowMapResources() {
         );
     }
 
-    // Create SRV for sampling shadow map
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Create SRV for sampling shadow map - use staging heap for persistent resources
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate SRV for shadow map: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for shadow map: " + srvResult.Error());
     }
     m_shadowMapSRV = srvResult.Value();
 
@@ -5730,11 +5787,11 @@ Result<void> Renderer::CreateRTShadowMask() {
 
     m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-    // SRV for sampling in the PBR shader.
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // SRV for sampling in the PBR shader - use staging heap for persistent resources
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
         m_rtShadowMask.Reset();
-        return Result<void>::Err("Failed to allocate SRV for RT shadow mask: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for RT shadow mask: " + srvResult.Error());
     }
     m_rtShadowMaskSRV = srvResult.Value();
 
@@ -5749,12 +5806,12 @@ Result<void> Renderer::CreateRTShadowMask() {
         &srvDesc,
         m_rtShadowMaskSRV.cpu);
 
-    // UAV for DXR writes.
-    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // UAV for DXR writes - use staging heap for persistent resources
+    auto uavResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (uavResult.IsErr()) {
         m_rtShadowMask.Reset();
         m_rtShadowMaskSRV = {};
-        return Result<void>::Err("Failed to allocate UAV for RT shadow mask: " + uavResult.Error());
+        return Result<void>::Err("Failed to allocate staging UAV for RT shadow mask: " + uavResult.Error());
     }
     m_rtShadowMaskUAV = uavResult.Value();
 
@@ -5790,11 +5847,12 @@ Result<void> Renderer::CreateRTShadowMask() {
 
     m_rtShadowMaskHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-    auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Use staging heap for persistent history SRV
+    auto historySrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (historySrvResult.IsErr()) {
         m_rtShadowMaskHistory.Reset();
         m_rtShadowMaskHistorySRV = {};
-        return Result<void>::Err("Failed to allocate SRV for RT shadow mask history: " + historySrvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for RT shadow mask history: " + historySrvResult.Error());
     }
     m_rtShadowMaskHistorySRV = historySrvResult.Value();
 
@@ -5897,11 +5955,11 @@ Result<void> Renderer::CreateRTGIResources() {
 
     m_rtGIState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-      // SRV for sampling in the PBR shader.
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+      // SRV for sampling in the PBR shader - use staging heap
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
         m_rtGIColor.Reset();
-        return Result<void>::Err("Failed to allocate SRV for RT GI buffer: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for RT GI buffer: " + srvResult.Error());
     }
     m_rtGISRV = srvResult.Value();
 
@@ -5916,12 +5974,12 @@ Result<void> Renderer::CreateRTGIResources() {
         &srvDesc,
         m_rtGISRV.cpu);
 
-      // UAV for DXR writes.
-    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+      // UAV for DXR writes - use staging heap
+    auto uavResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (uavResult.IsErr()) {
         m_rtGIColor.Reset();
         m_rtGISRV = {};
-        return Result<void>::Err("Failed to allocate UAV for RT GI buffer: " + uavResult.Error());
+        return Result<void>::Err("Failed to allocate staging UAV for RT GI buffer: " + uavResult.Error());
     }
     m_rtGIUAV = uavResult.Value();
 
@@ -5954,13 +6012,14 @@ Result<void> Renderer::CreateRTGIResources() {
       m_rtGIHistory = history;
       m_rtGIHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-      auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+      // Use staging heap for persistent GI history SRV
+      auto historySrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
       if (historySrvResult.IsErr()) {
           m_rtGIColor.Reset();
           m_rtGISRV = {};
           m_rtGIUAV = {};
           m_rtGIHistory.Reset();
-          return Result<void>::Err("Failed to allocate SRV for RT GI history buffer: " + historySrvResult.Error());
+          return Result<void>::Err("Failed to allocate staging SRV for RT GI history buffer: " + historySrvResult.Error());
       }
       m_rtGIHistorySRV = historySrvResult.Value();
 
@@ -6064,11 +6123,11 @@ Result<void> Renderer::CreateRTReflectionResources() {
 
     m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-    // SRV for sampling in post-process.
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // SRV for sampling in post-process - use staging heap
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
         m_rtReflectionColor.Reset();
-        return Result<void>::Err("Failed to allocate SRV for RT reflection buffer: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for RT reflection buffer: " + srvResult.Error());
     }
     m_rtReflectionSRV = srvResult.Value();
 
@@ -6083,12 +6142,12 @@ Result<void> Renderer::CreateRTReflectionResources() {
         &srvDesc,
         m_rtReflectionSRV.cpu);
 
-    // UAV for DXR writes.
-    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // UAV for DXR writes - use staging heap
+    auto uavResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (uavResult.IsErr()) {
         m_rtReflectionColor.Reset();
         m_rtReflectionSRV = {};
-        return Result<void>::Err("Failed to allocate UAV for RT reflection buffer: " + uavResult.Error());
+        return Result<void>::Err("Failed to allocate staging UAV for RT reflection buffer: " + uavResult.Error());
     }
     m_rtReflectionUAV = uavResult.Value();
 
@@ -6122,13 +6181,14 @@ Result<void> Renderer::CreateRTReflectionResources() {
     m_rtReflectionHistory = reflHistory;
     m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-    auto reflHistorySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Use staging heap for persistent reflection history SRV
+    auto reflHistorySrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (reflHistorySrvResult.IsErr()) {
         m_rtReflectionColor.Reset();
         m_rtReflectionSRV = {};
         m_rtReflectionUAV = {};
         m_rtReflectionHistory.Reset();
-        return Result<void>::Err("Failed to allocate SRV for RT reflection history buffer: " + reflHistorySrvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for RT reflection history buffer: " + reflHistorySrvResult.Error());
     }
     m_rtReflectionHistorySRV = reflHistorySrvResult.Value();
 
@@ -6237,10 +6297,10 @@ Result<void> Renderer::CreateHDRTarget() {
         m_hdrRTV.cpu
     );
 
-    // SRV
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // SRV - use staging heap for persistent descriptors
+    auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
     if (srvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate SRV for HDR target: " + srvResult.Error());
+        return Result<void>::Err("Failed to allocate staging SRV for HDR target: " + srvResult.Error());
     }
     m_hdrSRV = srvResult.Value();
 
@@ -6306,10 +6366,10 @@ Result<void> Renderer::CreateHDRTarget() {
             );
         }
 
-        // SRV for sampling G-buffer in SSR/post
-        auto gbufSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        // SRV for sampling G-buffer in SSR/post - use staging heap for persistent descriptors
+        auto gbufSrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (gbufSrvResult.IsErr()) {
-            spdlog::warn("Failed to allocate SRV for normal/roughness G-buffer: {}", gbufSrvResult.Error());
+            spdlog::warn("Failed to allocate staging SRV for normal/roughness G-buffer: {}", gbufSrvResult.Error());
         } else {
             m_gbufferNormalRoughnessSRV = gbufSrvResult.Value();
 
@@ -6360,9 +6420,10 @@ Result<void> Renderer::CreateHDRTarget() {
         m_historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
         if (!m_historySRV.IsValid()) {
-            auto historySrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            // Use staging heap for persistent TAA history SRV
+            auto historySrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
             if (historySrvResult.IsErr()) {
-                spdlog::warn("Failed to allocate SRV for TAA history: {}", historySrvResult.Error());
+                spdlog::warn("Failed to allocate staging SRV for TAA history: {}", historySrvResult.Error());
             } else {
                 m_historySRV = historySrvResult.Value();
 
@@ -6473,9 +6534,10 @@ Result<void> Renderer::CreateHDRTarget() {
             );
         }
 
-        auto ssrSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        // Use staging heap for persistent SSR SRV (copied in post-process)
+        auto ssrSrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (ssrSrvResult.IsErr()) {
-            spdlog::warn("Failed to allocate SRV for SSR buffer: {}", ssrSrvResult.Error());
+            spdlog::warn("Failed to allocate staging SRV for SSR buffer: {}", ssrSrvResult.Error());
         } else {
             m_ssrSRV = ssrSrvResult.Value();
 
@@ -6540,9 +6602,10 @@ Result<void> Renderer::CreateHDRTarget() {
             );
         }
 
-        auto velSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        // Use staging heap for persistent velocity SRV (used in TAA)
+        auto velSrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (velSrvResult.IsErr()) {
-            spdlog::warn("Failed to allocate SRV for motion vector buffer: {}", velSrvResult.Error());
+            spdlog::warn("Failed to allocate staging SRV for motion vector buffer: {}", velSrvResult.Error());
         } else {
             m_velocitySRV = velSrvResult.Value();
 
@@ -7328,9 +7391,10 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
         out = std::make_shared<DX12Texture>(std::move(texResult.Value()));
 
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        // CRITICAL: Use staging heap for placeholder textures (copied into every material!)
+        auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate SRV for placeholder: " + srvResult.Error());
+            return Result<void>::Err("Failed to allocate staging SRV for placeholder: " + srvResult.Error());
         }
 
         auto createSRVResult = out->CreateSRV(m_device->GetDevice(), srvResult.Value());
@@ -7498,9 +7562,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
             fallback.diffuseIrradiance = m_placeholderAlbedo;
             fallback.specularPrefiltered = m_placeholderAlbedo;
         } else {
-            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            // CRITICAL: Use staging heap for environment cubemap (copied in material descriptors)
+            auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
             if (srvResult.IsErr()) {
-                spdlog::warn("Failed to allocate SRV for placeholder cubemap: {}", srvResult.Error());
+                spdlog::warn("Failed to allocate staging SRV for placeholder cubemap: {}", srvResult.Error());
                 fallback.diffuseIrradiance = m_placeholderAlbedo;
                 fallback.specularPrefiltered = m_placeholderAlbedo;
             } else {
@@ -8378,6 +8443,11 @@ void Renderer::RenderDebugLines() {
     UINT newCapacity = m_debugLineVertexCapacity;
 
     if (!m_debugLineVertexBuffer || m_debugLineVertexCapacity < requiredCapacity) {
+        // CRITICAL: If replacing an existing buffer, wait for GPU to finish using it
+        if (m_debugLineVertexBuffer) {
+            WaitForGPU();
+        }
+
         newCapacity = std::max(requiredCapacity, minCapacity);
 
         D3D12_HEAP_PROPERTIES heapProps = {};

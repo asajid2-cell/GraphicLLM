@@ -1,0 +1,72 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CortexEngine (NO Dreamer - RECOMMENDED)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/CortexEngine/build/bin/CortexEngine.exe",
+            "args": ["--no-launcher", "--no-dreamer", "--scene=rt_showcase"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/CortexEngine/build/bin",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "CortexEngine (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/CortexEngine/build/bin/CortexEngine.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/CortexEngine/build/bin",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "CortexEngine (Minimal - No LLM, No Dreamer)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/CortexEngine/build/bin/CortexEngine.exe",
+            "args": ["--no-launcher", "--no-llm", "--no-dreamer", "--scene=rt_showcase"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/CortexEngine/build/bin",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "CortexEngine (Release)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/CortexEngine/build/bin/Release/CortexEngine.exe",
+            "args": ["--no-launcher", "--no-dreamer", "--scene=rt_showcase"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/CortexEngine/build/bin/Release",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "CortexEngine (Attach to Process)",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
+        },
+        {
+            "name": "CortexEngine (Break on ALL Exceptions)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/CortexEngine/build/bin/CortexEngine.exe",
+            "args": ["--no-launcher", "--no-dreamer", "--scene=rt_showcase"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/CortexEngine/build/bin",
+            "environment": [],
+            "console": "integratedTerminal",
+            "exceptionHandling": {
+                "breakOnCppExceptions": true
+            },
+            "sourceFileMap": {
+                "Z:\328\CMPUT328-A2\codexworks\301\graphics": "${workspaceFolder}"
+            }
+        }
+    ]
+}

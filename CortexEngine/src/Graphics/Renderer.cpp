@@ -67,9 +67,18 @@ void Renderer::ReportDeviceRemoved(const char* context,
         default:                         markerName = "None"; break;
     }
 
+    auto rs = [](D3D12_RESOURCE_STATES s) {
+        return static_cast<unsigned int>(s);
+    };
+
     spdlog::error(
         "DX12 device removed or GPU fault in '{}' (hr=0x{:08X}, reason=0x{:08X}, frameCounter={}, "
-        "swapIndex={}, lastPass='{}', lastGpuMarker='{}', at {}:{})",
+        "swapIndex={}, lastPass='{}', lastGpuMarker='{}', at {}:{}). "
+        "ResourceStates: depth=0x{:X}, shadowMap=0x{:X}, hdr=0x{:X}, "
+        "rtShadowMask=0x{:X}, rtShadowMaskHistory=0x{:X}, gbufferNR=0x{:X}, "
+        "ssao=0x{:X}, ssr=0x{:X}, velocity=0x{:X}, history=0x{:X}, "
+        "taaIntermediate=0x{:X}, rtRefl=0x{:X}, rtReflHist=0x{:X}, "
+        "rtGI=0x{:X}, rtGIHist=0x{:X}",
         ctx,
         static_cast<unsigned int>(hr),
         static_cast<unsigned int>(reason),
@@ -78,7 +87,22 @@ void Renderer::ReportDeviceRemoved(const char* context,
         m_lastCompletedPass ? m_lastCompletedPass : "None",
         markerName,
         file ? file : "unknown",
-        line);
+        line,
+        rs(m_depthState),
+        rs(m_shadowMapState),
+        rs(m_hdrState),
+        rs(m_rtShadowMaskState),
+        rs(m_rtShadowMaskHistoryState),
+        rs(m_gbufferNormalRoughnessState),
+        rs(m_ssaoState),
+        rs(m_ssrState),
+        rs(m_velocityState),
+        rs(m_historyState),
+        rs(m_taaIntermediateState),
+        rs(m_rtReflectionState),
+        rs(m_rtReflectionHistoryState),
+        rs(m_rtGIState),
+        rs(m_rtGIHistoryState));
 
     m_deviceRemoved = true;
 }
@@ -1222,6 +1246,8 @@ void Renderer::BeginFrame() {
         spdlog::info("BeginFrame: recreating depth buffer for renderScale {:.2f} ({}x{})",
                      renderScale, expectedDepthWidth, expectedDepthHeight);
         m_depthBuffer.Reset();
+        m_depthStencilView = {};  // Invalidate descriptor handles before recreating
+        m_depthSRV = {};          // Prevents stale descriptor usage if CreateDepthBuffer fails
         auto depthResult = CreateDepthBuffer();
         if (depthResult.IsErr()) {
             spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());
@@ -1236,6 +1262,8 @@ void Renderer::BeginFrame() {
         spdlog::info("BeginFrame: recreating HDR target for renderScale {:.2f} ({}x{})",
                      renderScale, expectedDepthWidth, expectedDepthHeight);
         m_hdrColor.Reset();
+        m_hdrRTV = {};   // Invalidate descriptor handle before recreating
+        m_hdrSRV = {};   // Prevents stale descriptor usage if CreateHDRTarget fails
         auto hdrResult = CreateHDRTarget();
         if (hdrResult.IsErr()) {
             spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());
@@ -7701,8 +7729,10 @@ void Renderer::RenderPostProcess() {
         return;
     }
 
-    // Transition HDR/SSAO to shader resource and back buffer to render target
-    D3D12_RESOURCE_BARRIER barriers[3] = {};
+    // Transition all post-process input resources to PIXEL_SHADER_RESOURCE and back buffer to RENDER_TARGET.
+    // We need to transition: HDR, SSAO, SSR, velocity, TAA intermediate, and RT reflection buffers
+    // that will be sampled by the post-process shader.
+    D3D12_RESOURCE_BARRIER barriers[10] = {};
     UINT barrierCount = 0;
 
     if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -7725,6 +7755,62 @@ void Renderer::RenderPostProcess() {
         m_ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
+    // Transition SSR color buffer (used as t6 in post-process shader)
+    if (m_ssrColor && m_ssrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_ssrColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssrState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_ssrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition velocity buffer (used as t7 in post-process shader)
+    if (m_velocityBuffer && m_velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_velocityBuffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_velocityState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition TAA intermediate buffer (may be sampled in post-process for debugging/effects)
+    if (m_taaIntermediate && m_taaIntermediateState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_taaIntermediate.Get();
+        barriers[barrierCount].Transition.StateBefore = m_taaIntermediateState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_taaIntermediateState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition RT reflection buffer (used as t8 in post-process shader)
+    if (m_rtReflectionColor && m_rtReflectionState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_rtReflectionColor.Get();
+        barriers[barrierCount].Transition.StateBefore = m_rtReflectionState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition RT reflection history buffer (used as t9 in post-process shader)
+    if (m_rtReflectionHistory && m_rtReflectionHistoryState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_rtReflectionHistory.Get();
+        barriers[barrierCount].Transition.StateBefore = m_rtReflectionHistoryState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++barrierCount;
+        m_rtReflectionHistoryState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition back buffer to render target for post-process output
     barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barriers[barrierCount].Transition.pResource = m_window->GetCurrentBackBuffer();
     barriers[barrierCount].Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
@@ -7732,7 +7818,9 @@ void Renderer::RenderPostProcess() {
     barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     ++barrierCount;
 
-    m_commandList->ResourceBarrier(barrierCount, barriers);
+    if (barrierCount > 0) {
+        m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
 
     // Set back buffer as render target (no depth)
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();

@@ -952,17 +952,27 @@ void Engine::BuildRTShowcaseScene() {
         dragonMesh = dragonResult.Value();
         if (renderer) {
             bool allowDragonUpload = true;
-            // On 8 GB-class adapters in conservative mode, the RT showcase
-            // scene is already heavy. Keep the dragon raster path but avoid
-            // additional BLAS memory by skipping the mesh upload entirely
-            // when VRAM is especially tight. This can be relaxed later if
-            // budgets show headroom.
-            if (m_qualityMode == EngineConfig::QualityMode::Conservative && m_device) {
+            // On 8 GB-class adapters (or any time RT is enabled during init),
+            // the RT showcase scene creates extreme memory pressure during the
+            // first ~10 frames while BLAS structures are building. Defer the
+            // large dragon mesh upload to avoid device-removed errors. The mesh
+            // can be loaded later via LLM commands or scene switching.
+            //
+            // Root cause: ProcessGpuJobsPerFrame() uploads dragon (4.5 MB) while
+            // BuildTLAS() allocates BLAS scratch buffers (10s-100s of MB), causing
+            // CreateCommittedResource to fail with DEVICE_REMOVED during Present().
+            if (m_device) {
                 const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
                 const std::uint64_t mb = bytes / (1024ull * 1024ull);
+                // Skip dragon on ≤8GB cards, or if RT is enabled (to avoid init-time OOM)
                 if (mb > 0 && mb <= 8192ull) {
                     allowDragonUpload = false;
-                    spdlog::info("RTShowcase: skipping dragon mesh upload on 8 GB conservative mode to keep RT/geometry budgets safe");
+                    spdlog::info("RTShowcase: skipping dragon mesh upload on 8 GB card to prevent device-removed during RT warm-up");
+                }
+                // Also skip if ray tracing is active during scene init, regardless of VRAM
+                if (renderer && renderer->IsRayTracingEnabled()) {
+                    allowDragonUpload = false;
+                    spdlog::info("RTShowcase: deferring dragon mesh upload (RT enabled; avoiding init-time memory spike)");
                 }
             }
 

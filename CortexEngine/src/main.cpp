@@ -401,9 +401,20 @@ int main(int argc, char* argv[]) {
         config.window.width = 1280;
         config.window.height = 720;
         config.window.vsync = true;
-        // Disable DX debug layer to avoid runtime breaks/crashes on some systems
-        config.device.enableDebugLayer = false;
-        config.device.enableGPUValidation = false;  // Too slow for development
+        // Enable the DX12 debug layer by default so we get validation + DRED breadcrumbs.
+        // Force GPU-based validation OFF (it is CPU-write-only descriptor copy-incompatible and
+        // can crash on some drivers). You can opt out of the debug layer entirely via
+        // CORTEX_DISABLE_DEBUG_LAYER=1 if your driver/SDK layers are unstable.
+        config.device.enableDebugLayer = true;
+        config.device.enableGPUValidation = false;
+        if (const char* envDisableDebug = std::getenv("CORTEX_DISABLE_DEBUG_LAYER")) {
+            std::string v = envDisableDebug;
+            if (!v.empty() && v != "0" && v != "false" && v != "FALSE") {
+                config.device.enableDebugLayer = false;
+                config.device.enableGPUValidation = false;
+                spdlog::warn("DX12 debug layer disabled via CORTEX_DISABLE_DEBUG_LAYER");
+            }
+        }
 
         // Decide whether to show the launcher UI. Power users can skip it
         // via CLI or by specifying a scene/mode explicitly.

@@ -1132,6 +1132,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
 
             m_totalBLASBytes += candidateBytes;
             bytesBuiltThisFrame += candidateBytes;
+
+            // Scratch buffer is only needed for the one-time build; release it
+            // immediately so BLAS memory accounting reflects persistent usage.
+            if (blasEntry.scratch) {
+                if (m_totalBLASBytes >= blasEntry.scratchSize) {
+                    m_totalBLASBytes -= blasEntry.scratchSize;
+                }
+                blasEntry.scratch.Reset();
+                blasEntry.scratchSize = 0;
+            }
         }
 
         if (!blasEntry.blas) {

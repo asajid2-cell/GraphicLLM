@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -103,6 +104,95 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_rtReflectionHistoryState),
         rs(m_rtGIState),
         rs(m_rtGIHistoryState));
+
+    // Attempt to query DRED (Device Removed Extended Data) so we can log the
+    // last command list / breadcrumb and any page-fault information the GPU
+    // driver surfaced. This is best-effort and will silently skip if DRED is
+    // not available on the current platform.
+    if (m_device && m_device->GetDevice()) {
+        Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData1> dred1;
+        if (SUCCEEDED(m_device->GetDevice()->QueryInterface(IID_PPV_ARGS(&dred1))) && dred1) {
+            D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 autoOut{};
+            if (SUCCEEDED(dred1->GetAutoBreadcrumbsOutput1(&autoOut)) && autoOut.pHeadAutoBreadcrumbNode) {
+                // Walk to the last node in the chain; this corresponds to the
+                // most recent command list that executed before the fault.
+                const D3D12_AUTO_BREADCRUMB_NODE1* node = autoOut.pHeadAutoBreadcrumbNode;
+                std::array<const D3D12_AUTO_BREADCRUMB_NODE1*, 3> lastNodes{};
+                while (node->pNext) {
+                    lastNodes[0] = lastNodes[1];
+                    lastNodes[1] = lastNodes[2];
+                    lastNodes[2] = node;
+                    node = node->pNext;
+                }
+                lastNodes[0] = lastNodes[1];
+                lastNodes[1] = lastNodes[2];
+                lastNodes[2] = node;
+
+                const char* listName = "Unknown";
+                if (node->pCommandListDebugNameA) {
+                    listName = node->pCommandListDebugNameA;
+                }
+
+                UINT lastValue = UINT_MAX;
+                if (node->pLastBreadcrumbValue) {
+                    lastValue = *node->pLastBreadcrumbValue;
+                }
+
+                spdlog::error(
+                    "DRED: last command list='{}', breadcrumbCount={}, lastCompletedBreadcrumbValue={}",
+                    listName,
+                    node->BreadcrumbCount,
+                    lastValue);
+
+                // Log the tail of the breadcrumb chain (up to last 3 nodes) to
+                // show which command queues/lists were executing prior to the fault.
+                for (int i = 2; i >= 0; --i) {
+                    const auto* n = lastNodes[i];
+                    if (!n) continue;
+                    const char* clName = n->pCommandListDebugNameA ? n->pCommandListDebugNameA : "UnknownCL";
+                    const char* cqName = n->pCommandQueueDebugNameA ? n->pCommandQueueDebugNameA : "UnknownCQ";
+                    UINT completed = (n->pLastBreadcrumbValue) ? *n->pLastBreadcrumbValue : UINT_MAX;
+                    spdlog::error(
+                        "DRED: chain[-{}] queue='{}' list='{}' breadcrumbs={} lastCompleted={}",
+                        (2 - i),
+                        cqName,
+                        clName,
+                        n->BreadcrumbCount,
+                        completed);
+                }
+            }
+
+            D3D12_DRED_PAGE_FAULT_OUTPUT1 pageOut{};
+            if (SUCCEEDED(dred1->GetPageFaultAllocationOutput1(&pageOut))) {
+                // Log the GPU virtual address that faulted and whether DRED
+                // associated it with an existing or recently-freed allocation.
+                unsigned long long faultVA =
+                    static_cast<unsigned long long>(pageOut.PageFaultVA);
+                const char* allocType = "Unknown";
+                if (pageOut.pHeadExistingAllocationNode) {
+                    allocType = "ExistingAllocation";
+                } else if (pageOut.pHeadRecentFreedAllocationNode) {
+                    allocType = "RecentFreedAllocation";
+                }
+
+                spdlog::error(
+                    "DRED: page fault at GPU VA=0x{:016X}, allocationType={}",
+                    faultVA,
+                    allocType);
+
+                auto logAllocNode = [](const D3D12_DRED_ALLOCATION_NODE1* n, const char* label) {
+                    if (!n) return;
+                    const char* name = n->ObjectNameA ? n->ObjectNameA : "Unnamed";
+                    spdlog::error("DRED: {} allocationType={} name='{}' object={}", label,
+                                  static_cast<int>(n->AllocationType),
+                                  name,
+                                  static_cast<const void*>(n->pObject));
+                };
+                logAllocNode(pageOut.pHeadExistingAllocationNode, "ExistingAlloc");
+                logAllocNode(pageOut.pHeadRecentFreedAllocationNode, "RecentFreedAlloc");
+            }
+        }
+    }
 
     m_deviceRemoved = true;
 }
@@ -432,6 +522,22 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         spdlog::warn("Renderer: failed to create GPU breadcrumb buffer: {}", breadcrumbResult.Error());
     }
 
+    // Optional "no HDR" debug path. When CORTEX_DISABLE_HDR is set, skip the
+    // intermediate HDR/post-process pipeline and render the main pass
+    // directly into the swap-chain back buffer. This also disables effects
+    // that depend on the HDR target (TAA/SSR/SSAO/Bloom) to maximize
+    // stability when diagnosing device-removed issues.
+    if (std::getenv("CORTEX_DISABLE_HDR")) {
+        spdlog::warn("Renderer: CORTEX_DISABLE_HDR set; main pass will render directly to back buffer (HDR/TAA/SSR/SSAO/Bloom disabled)");
+        m_hdrColor.Reset();
+        m_hdrRTV = {};
+        m_hdrSRV = {};
+        SetTAAEnabled(false);
+        SetSSREnabled(false);
+        SetSSAOEnabled(false);
+        m_bloomIntensity = 0.0f;
+    }
+
     // Compile shaders and create pipeline
     auto shaderResult = CompileShaders();
     if (shaderResult.IsErr()) {
@@ -687,12 +793,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     constexpr bool kEnableShadowPass    = true;
     constexpr bool kEnableMotionVectors = true;
     constexpr bool kEnableTAA           = true;
-    constexpr bool kEnableSSR           = true;
+    constexpr bool kEnableSSRDefault    = true;
     constexpr bool kEnableParticles     = true;
-    constexpr bool kEnableSSAO          = true;
-    constexpr bool kEnableBloom         = true;
+    constexpr bool kEnableSSAODefault   = true;
+    constexpr bool kEnableBloomDefault  = true;
     // Fullscreen post-process resolve writes HDR scene color to the swap-chain back buffer.
-    constexpr bool kEnablePostProcess   = true;
+    constexpr bool kEnablePostProcessDefault = true;
     constexpr bool kEnableDebugLines    = false;
 
     if (m_deviceRemoved) {
@@ -711,6 +817,73 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     using clock = std::chrono::high_resolution_clock;
 
     m_totalTime += deltaTime;
+
+    // Optional environment toggles so we can disable heavier passes when
+    // diagnosing device-removed issues without recompiling:
+    //   CORTEX_DISABLE_SSR=1    -> skip RenderSSR()
+    //   CORTEX_DISABLE_SSAO=1   -> skip RenderSSAO()
+    //   CORTEX_DISABLE_BLOOM=1  -> skip RenderBloom()
+    static bool s_checkedPassEnv = false;
+    static bool s_disableSSR   = false;
+    static bool s_disableSSAO  = false;
+    static bool s_disableBloom = false;
+    static bool s_disableTAA   = false;
+    if (!s_checkedPassEnv) {
+        s_checkedPassEnv = true;
+        if (std::getenv("CORTEX_DISABLE_SSR")) {
+            s_disableSSR = true;
+            spdlog::warn("Renderer: CORTEX_DISABLE_SSR set; skipping SSR pass");
+        }
+        if (std::getenv("CORTEX_DISABLE_SSAO")) {
+            s_disableSSAO = true;
+            spdlog::warn("Renderer: CORTEX_DISABLE_SSAO set; skipping SSAO pass");
+        }
+        if (std::getenv("CORTEX_DISABLE_BLOOM")) {
+            s_disableBloom = true;
+            spdlog::warn("Renderer: CORTEX_DISABLE_BLOOM set; skipping Bloom pass");
+        }
+        if (std::getenv("CORTEX_DISABLE_TAA")) {
+            s_disableTAA = true;
+            spdlog::warn("Renderer: CORTEX_DISABLE_TAA set; skipping TAA resolve pass");
+        }
+    }
+
+    const bool kEnableSSR  = kEnableSSRDefault  && !s_disableSSR;
+    const bool kEnableSSAO = kEnableSSAODefault && !s_disableSSAO;
+    const bool kEnableBloom = kEnableBloomDefault && !s_disableBloom;
+    const bool kEnableTAAThisFrame = kEnableTAA && !s_disableTAA;
+
+    // Optional DXGI video memory diagnostics. When CORTEX_LOG_VRAM is set,
+    // log current GPU memory usage and budget periodically so device-removed
+    // faults under HDR/post-process load can be correlated with VRAM
+    // pressure on the user's adapter.
+    static bool s_checkedVramEnv = false;
+    static bool s_logVramUsage = false;
+    if (!s_checkedVramEnv) {
+        s_checkedVramEnv = true;
+        if (std::getenv("CORTEX_LOG_VRAM")) {
+            s_logVramUsage = true;
+            spdlog::info("Renderer: CORTEX_LOG_VRAM set; logging DXGI video memory usage periodically");
+        }
+    }
+    if (s_logVramUsage && m_device) {
+        constexpr uint64_t kLogIntervalFrames = 60;
+        if ((m_renderFrameCounter % kLogIntervalFrames) == 0) {
+            auto vramResult = m_device->QueryVideoMemoryInfo();
+            if (vramResult.IsOk()) {
+                const DX12Device::VideoMemoryInfo& info = vramResult.Value();
+                const double usageMB = static_cast<double>(info.currentUsageBytes) / (1024.0 * 1024.0);
+                const double budgetMB = static_cast<double>(info.budgetBytes) / (1024.0 * 1024.0);
+                const double availMB = static_cast<double>(info.availableForReservationBytes) / (1024.0 * 1024.0);
+                spdlog::info("VRAM: usage={:.1f} MB, budget={:.1f} MB, availableForReservation={:.1f} MB",
+                             usageMB, budgetMB, availMB);
+            } else {
+                spdlog::warn("Renderer: QueryVideoMemoryInfo failed (disabling CORTEX_LOG_VRAM): {}",
+                             vramResult.Error());
+                s_logVramUsage = false;
+            }
+        }
+    }
 
     // Ensure all environment maps are loaded before rendering the scene. This
     // trades a slightly longer startup for stable frame times once the scene
@@ -751,9 +924,18 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // Optional ultra-minimal debug frame: clear the current back buffer and
     // present, skipping all geometry, lighting, and post-process work. This
-    // is disabled in normal builds so the full renderer runs by default.
-    constexpr bool kForceMinimalFrame = false;
-    if (kForceMinimalFrame) {
+    // is controlled via an environment variable so normal builds render the
+    // full scene by default.
+    static bool s_checkedMinimalEnv = false;
+    static bool s_forceMinimalFrame = false;
+    if (!s_checkedMinimalEnv) {
+        s_checkedMinimalEnv = true;
+        if (std::getenv("CORTEX_FORCE_MINIMAL_FRAME")) {
+            s_forceMinimalFrame = true;
+            spdlog::warn("Renderer: CORTEX_FORCE_MINIMAL_FRAME set; running ultra-minimal clear-only frame path");
+        }
+    }
+    if (s_forceMinimalFrame) {
         ID3D12Resource* backBuffer = m_window->GetCurrentBackBuffer();
         if (backBuffer) {
             D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
@@ -765,6 +947,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
             bbBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
             bbBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandList->ResourceBarrier(1, &bbBarrier);
+            m_backBufferUsedAsRTThisFrame = true;
 
             const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
             m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
@@ -867,7 +1050,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // HDR TAA resolve pass (stabilizes main lighting before reflections,
     // bloom, fog, and tonemapping).
-    if (kEnableTAA) {
+    if (kEnableTAAThisFrame) {
         WriteBreadcrumb(GpuMarker::TAAResolve);
         RenderTAA();
         MarkPassComplete("RenderTAA_Done");
@@ -934,8 +1117,20 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
             std::chrono::duration_cast<std::chrono::microseconds>(tBloomEnd - tBloomStart).count() / 1000.0f;
     }
 
-    // Post-process HDR -> back buffer (or no-op if disabled)
-    if (kEnablePostProcess) {
+    // Post-process HDR -> back buffer (or no-op if disabled). Allow disabling
+    // via environment variable for targeted debugging of device-removed faults.
+    static bool s_checkedDisablePostProcessEnv = false;
+    static bool s_disablePostProcess = false;
+    if (!s_checkedDisablePostProcessEnv) {
+        s_checkedDisablePostProcessEnv = true;
+        if (std::getenv("CORTEX_DISABLE_POST_PROCESS")) {
+            s_disablePostProcess = true;
+            spdlog::warn("Renderer: CORTEX_DISABLE_POST_PROCESS set; skipping RenderPostProcess pass");
+        }
+    }
+    const bool enablePostProcess = kEnablePostProcessDefault && !s_disablePostProcess;
+
+    if (enablePostProcess) {
         const auto tPostOnlyStart = clock::now();
         WriteBreadcrumb(GpuMarker::PostProcess);
         RenderPostProcess();
@@ -1218,6 +1413,11 @@ void Renderer::BeginFrame() {
     bool needDepthResize = false;
     bool needHDRResize   = false;
 
+    // Reset per-frame back-buffer state tracking; individual passes that
+    // render directly to the swap-chain will set this when they transition
+    // the back buffer from PRESENT to RENDER_TARGET.
+    m_backBufferUsedAsRTThisFrame = false;
+
     if (m_depthBuffer) {
         D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
         if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
@@ -1338,6 +1538,15 @@ void Renderer::BeginFrame() {
     m_frameIndex = m_window->GetCurrentBackBufferIndex();
 
     if (m_fenceValues[m_frameIndex] != 0) {
+        uint64_t completedValue = m_commandQueue->GetLastCompletedFenceValue();
+        uint64_t expectedValue = m_fenceValues[m_frameIndex];
+
+        // Warn if we're about to wait (indicates GPU is behind CPU)
+        if (completedValue < expectedValue) {
+            spdlog::debug("BeginFrame waiting for GPU: frameIndex={}, expected={}, completed={}, delta={}",
+                          m_frameIndex, expectedValue, completedValue, expectedValue - completedValue);
+        }
+
         m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
     }
 
@@ -1462,7 +1671,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Transient quad vertex buffer in an upload heap; tiny and self-contained.
+    // Persistent quad vertex buffer in an upload heap; tiny and self-contained.
     struct QuadVertex { float px, py, pz; float u, v; };
     static const QuadVertex kQuadVertices[4] = {
         { -0.5f, -0.5f, 0.0f, 0.0f, 1.0f },
@@ -1471,43 +1680,51 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         {  0.5f,  0.5f, 0.0f, 1.0f, 0.0f },
     };
 
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
+    if (!m_particleQuadVertexBuffer) {
+        D3D12_HEAP_PROPERTIES quadHeapProps = {};
+        quadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+        quadHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        quadHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        quadHeapProps.CreationNodeMask = 1;
+        quadHeapProps.VisibleNodeMask = 1;
 
-    D3D12_RESOURCE_DESC vbDesc = {};
-    vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    vbDesc.Width = sizeof(kQuadVertices);
-    vbDesc.Height = 1;
-    vbDesc.DepthOrArraySize = 1;
-    vbDesc.MipLevels = 1;
-    vbDesc.Format = DXGI_FORMAT_UNKNOWN;
-    vbDesc.SampleDesc.Count = 1;
-    vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    vbDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        D3D12_RESOURCE_DESC vbDesc = {};
+        vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        vbDesc.Width = sizeof(kQuadVertices);
+        vbDesc.Height = 1;
+        vbDesc.DepthOrArraySize = 1;
+        vbDesc.MipLevels = 1;
+        vbDesc.Format = DXGI_FORMAT_UNKNOWN;
+        vbDesc.SampleDesc.Count = 1;
+        vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        vbDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    ComPtr<ID3D12Resource> quadVB;
         HRESULT hrVB = device->CreateCommittedResource(
-            &heapProps,
+            &quadHeapProps,
             D3D12_HEAP_FLAG_NONE,
             &vbDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&quadVB));
+            IID_PPV_ARGS(&m_particleQuadVertexBuffer));
         if (FAILED(hrVB)) {
             spdlog::warn("RenderParticles: failed to allocate quad vertex buffer (hr=0x{:08X})",
                          static_cast<unsigned int>(hrVB));
             CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_CreateQuadVB", hrVB);
             return;
-    }
+        }
 
-    void* quadMapped = nullptr;
-    if (SUCCEEDED(quadVB->Map(0, &readRange, &quadMapped))) {
-        memcpy(quadMapped, kQuadVertices, sizeof(kQuadVertices));
-        quadVB->Unmap(0, nullptr);
+        void* quadMapped = nullptr;
+        HRESULT mapQuadHr = m_particleQuadVertexBuffer->Map(0, &readRange, &quadMapped);
+        if (SUCCEEDED(mapQuadHr)) {
+            memcpy(quadMapped, kQuadVertices, sizeof(kQuadVertices));
+            m_particleQuadVertexBuffer->Unmap(0, nullptr);
+        } else {
+            spdlog::warn("RenderParticles: failed to map quad vertex buffer (hr=0x{:08X})",
+                         static_cast<unsigned int>(mapQuadHr));
+            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapQuadVB", mapQuadHr);
+            m_particleQuadVertexBuffer.Reset();
+            return;
+        }
     }
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
@@ -1527,7 +1744,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_commandList->SetGraphicsRootConstantBufferView(0, objAddr);
 
     D3D12_VERTEX_BUFFER_VIEW vbViews[2] = {};
-    vbViews[0].BufferLocation = quadVB->GetGPUVirtualAddress();
+    vbViews[0].BufferLocation = m_particleQuadVertexBuffer->GetGPUVirtualAddress();
     vbViews[0].StrideInBytes  = sizeof(QuadVertex);
     vbViews[0].SizeInBytes    = sizeof(kQuadVertices);
 
@@ -1631,6 +1848,7 @@ void Renderer::PrepareMainPass() {
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
+        m_backBufferUsedAsRTThisFrame = true;
         rtvs[numRtvs++] = m_window->GetCurrentRTV();
     }
 
@@ -1849,15 +2067,91 @@ void Renderer::EndFrame() {
           m_rtReflHasHistory = true;
       }
 
-    // Transition back buffer to present state
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = m_window->GetCurrentBackBuffer();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    // Ensure screen-space/post-process inputs are back in a shader-resource
+    // state by the end of the frame so future passes (or diagnostics) never
+    // observe them left in RENDER_TARGET / UNORDERED_ACCESS when Present is
+    // called, even if the main post-process resolve was skipped.
+    {
+        D3D12_RESOURCE_BARRIER ppBarriers[8] = {};
+        UINT ppCount = 0;
 
-    m_commandList->ResourceBarrier(1, &barrier);
+        if (m_ssaoTex && m_ssaoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_ssaoTex.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_ssaoState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (m_ssrColor && m_ssrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_ssrColor.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_ssrState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_ssrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (m_velocityBuffer && m_velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_velocityBuffer.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_velocityState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (m_taaIntermediate && m_taaIntermediateState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_taaIntermediate.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_taaIntermediateState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_taaIntermediateState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (m_rtReflectionColor && m_rtReflectionState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_rtReflectionColor.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_rtReflectionState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            ppBarriers[ppCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_gbufferNormalRoughnessState;
+            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++ppCount;
+            m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
+
+        if (ppCount > 0) {
+            m_commandList->ResourceBarrier(ppCount, ppBarriers);
+        }
+    }
+
+    // Transition back buffer to present state if it was used as a render
+    // target this frame. When post-process or voxel paths are disabled, the
+    // swap-chain buffer may remain in PRESENT state for the entire frame.
+    if (m_backBufferUsedAsRTThisFrame) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_window->GetCurrentBackBuffer();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+    }
 
     // Close and execute command list
     m_commandList->Close();
@@ -3892,8 +4186,10 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     }
 
     // Register geometry with the ray tracing context and enqueue a BLAS build
-    // job so RT acceleration structures can converge incrementally.
-    if (m_rayTracingSupported && m_rayTracingContext) {
+    // job so RT acceleration structures can converge incrementally. When ray
+    // tracing is disabled at runtime we skip BLAS work entirely to avoid
+    // consuming acceleration-structure memory on 8 GB-class GPUs.
+    if (m_rayTracingSupported && m_rayTracingContext && m_rayTracingEnabled) {
         m_rayTracingContext->RebuildBLASForMesh(mesh);
 
         GpuJob job{};
@@ -7811,12 +8107,14 @@ void Renderer::RenderPostProcess() {
     }
 
     // Transition back buffer to render target for post-process output
+    // Note: PRESENT and COMMON states are equivalent (both 0x0) in D3D12
     barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barriers[barrierCount].Transition.pResource = m_window->GetCurrentBackBuffer();
     barriers[barrierCount].Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     ++barrierCount;
+    m_backBufferUsedAsRTThisFrame = true;
 
     if (barrierCount > 0) {
         m_commandList->ResourceBarrier(barrierCount, barriers);
@@ -8212,6 +8510,7 @@ void Renderer::RenderVoxel(Scene::ECS_Registry* registry) {
     barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     m_commandList->ResourceBarrier(1, &barrier);
+    m_backBufferUsedAsRTThisFrame = true;
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_window->GetCurrentRTV();
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);

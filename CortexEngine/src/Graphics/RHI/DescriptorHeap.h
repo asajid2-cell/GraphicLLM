@@ -104,7 +104,7 @@ public:
 private:
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
-    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 1024;  // Large for many textures
+    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 4096;  // Increased from 1024 to support dynamic texture loading + transient allocations per frame
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;

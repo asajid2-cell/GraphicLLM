@@ -879,6 +879,10 @@ public:
     bool      m_hasPrevCamera = false;
     bool      m_rtReflHasHistory = false;
     bool      m_rtReflectionWrittenThisFrame = false;
+    // Tracks whether the swap-chain back buffer has been used as a render
+    // target in the current frame so EndFrame() can transition it back to
+    // PRESENT only when appropriate.
+    bool      m_backBufferUsedAsRTThisFrame = false;
 
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;
@@ -936,6 +940,7 @@ public:
     };
     ComPtr<ID3D12Resource> m_particleInstanceBuffer;
     UINT                   m_particleInstanceCapacity = 0;
+    ComPtr<ID3D12Resource> m_particleQuadVertexBuffer;
 
     // Frame state
     float m_totalTime = 0.0f;

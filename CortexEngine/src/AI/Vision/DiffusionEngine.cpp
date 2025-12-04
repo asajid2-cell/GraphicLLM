@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <random>
 
@@ -164,119 +165,127 @@ Cortex::Result<void> DiffusionEngine::InitializeGPU() {
         return Cortex::Result<void>::Err("Failed to read VAE engine file: " + vaePath.string());
     }
 
-    m_trtRuntime = nvinfer1::createInferRuntime(logger);
-    if (!m_trtRuntime) {
-        return Cortex::Result<void>::Err("Failed to create TensorRT runtime");
-    }
-
-    m_vaeEngine = m_trtRuntime->deserializeCudaEngine(buffer.data(), buffer.size());
-    if (!m_vaeEngine) {
-        return Cortex::Result<void>::Err("Failed to deserialize VAE engine");
-    }
-
-    m_vaeContext = m_vaeEngine->createExecutionContext();
-    if (!m_vaeContext) {
-        return Cortex::Result<void>::Err("Failed to create VAE execution context");
-    }
-
-    // TensorRT 10.x uses name-based tensor APIs for tensor shapes.
-    nvinfer1::Dims latentDims = m_vaeEngine->getTensorShape("latent");
-    nvinfer1::Dims imageDims  = m_vaeEngine->getTensorShape("image");
-
-    size_t latentElems = GetElementCount(latentDims);
-    size_t imageElems  = GetElementCount(imageDims);
-
-    // Assume FP16 engines (from --fp16); bindings hold half-precision values.
-    m_vaeLatentBytes = latentElems * sizeof(uint16_t);
-    m_vaeImageBytes  = imageElems  * sizeof(uint16_t);
-
-    // Image layout is [N, C, H, W] with N=1, C=3 for SDXL VAE.
-    if (imageDims.nbDims == 4) {
-        m_vaeHeight = static_cast<uint32_t>(imageDims.d[2]);
-        m_vaeWidth  = static_cast<uint32_t>(imageDims.d[3]);
-    }
-
-    if (cudaMalloc(&m_vaeLatentDevice, m_vaeLatentBytes) != cudaSuccess) {
-        return Cortex::Result<void>::Err("cudaMalloc failed for VAE latent buffer");
-    }
-    if (cudaMalloc(&m_vaeImageDevice, m_vaeImageBytes) != cudaSuccess) {
-        return Cortex::Result<void>::Err("cudaMalloc failed for VAE image buffer");
-    }
-
-    spdlog::info("DiffusionEngine: VAE engine initialized ({} -> {} elements)",
-                 latentElems, imageElems);
-
-    // Optionally load a UNet engine if present. We try common SDXL-Turbo sizes
-    // and treat UNet as an enhancement on top of the VAE-only path.
-    static constexpr std::array<const char*, 3> kUnetNames = {
-        "sdxl_turbo_unet_768x768.engine",
-        "sdxl_turbo_unet_512x512.engine",
-        "sdxl_turbo_unet_384x384.engine"
-    };
-
-    fs::path unetPath;
-    for (const char* name : kUnetNames) {
-        fs::path candidate = base / name;
-        if (fs::exists(candidate)) {
-            unetPath = candidate;
-            break;
+    try {
+        m_trtRuntime = nvinfer1::createInferRuntime(logger);
+        if (!m_trtRuntime) {
+            return Cortex::Result<void>::Err("Failed to create TensorRT runtime");
         }
-    }
 
-    if (!unetPath.empty()) {
-        spdlog::info("DiffusionEngine: attempting to load UNet engine from '{}'", unetPath.string());
+        m_vaeEngine = m_trtRuntime->deserializeCudaEngine(buffer.data(), buffer.size());
+        if (!m_vaeEngine) {
+            return Cortex::Result<void>::Err("Failed to deserialize VAE engine");
+        }
 
-        std::ifstream uf(unetPath, std::ios::binary | std::ios::ate);
-        if (!uf) {
-            spdlog::warn("DiffusionEngine: failed to open UNet engine file: {}", unetPath.string());
-        } else {
-            std::streamsize usize = uf.tellg();
-            uf.seekg(0, std::ios::beg);
-            std::vector<char> ubuffer(static_cast<size_t>(usize));
-            if (!uf.read(ubuffer.data(), usize)) {
-                spdlog::warn("DiffusionEngine: failed to read UNet engine file: {}", unetPath.string());
+        m_vaeContext = m_vaeEngine->createExecutionContext();
+        if (!m_vaeContext) {
+            return Cortex::Result<void>::Err("Failed to create VAE execution context");
+        }
+
+        // TensorRT 10.x uses name-based tensor APIs for tensor shapes.
+        nvinfer1::Dims latentDims = m_vaeEngine->getTensorShape("latent");
+        nvinfer1::Dims imageDims  = m_vaeEngine->getTensorShape("image");
+
+        size_t latentElems = GetElementCount(latentDims);
+        size_t imageElems  = GetElementCount(imageDims);
+
+        // Assume FP16 engines (from --fp16); bindings hold half-precision values.
+        m_vaeLatentBytes = latentElems * sizeof(uint16_t);
+        m_vaeImageBytes  = imageElems  * sizeof(uint16_t);
+
+        // Image layout is [N, C, H, W] with N=1, C=3 for SDXL VAE.
+        if (imageDims.nbDims == 4) {
+            m_vaeHeight = static_cast<uint32_t>(imageDims.d[2]);
+            m_vaeWidth  = static_cast<uint32_t>(imageDims.d[3]);
+        }
+
+        if (cudaMalloc(&m_vaeLatentDevice, m_vaeLatentBytes) != cudaSuccess) {
+            return Cortex::Result<void>::Err("cudaMalloc failed for VAE latent buffer");
+        }
+        if (cudaMalloc(&m_vaeImageDevice, m_vaeImageBytes) != cudaSuccess) {
+            return Cortex::Result<void>::Err("cudaMalloc failed for VAE image buffer");
+        }
+
+        spdlog::info("DiffusionEngine: VAE engine initialized ({} -> {} elements)",
+                     latentElems, imageElems);
+
+        // Optionally load a UNet engine if present. We try common SDXL-Turbo sizes
+        // and treat UNet as an enhancement on top of the VAE-only path.
+        static constexpr std::array<const char*, 3> kUnetNames = {
+            "sdxl_turbo_unet_768x768.engine",
+            "sdxl_turbo_unet_512x512.engine",
+            "sdxl_turbo_unet_384x384.engine"
+        };
+
+        fs::path unetPath;
+        for (const char* name : kUnetNames) {
+            fs::path candidate = base / name;
+            if (fs::exists(candidate)) {
+                unetPath = candidate;
+                break;
+            }
+        }
+
+        if (!unetPath.empty()) {
+            spdlog::info("DiffusionEngine: attempting to load UNet engine from '{}'", unetPath.string());
+
+            std::ifstream uf(unetPath, std::ios::binary | std::ios::ate);
+            if (!uf) {
+                spdlog::warn("DiffusionEngine: failed to open UNet engine file: {}", unetPath.string());
             } else {
-                m_unetEngine = m_trtRuntime->deserializeCudaEngine(ubuffer.data(), ubuffer.size());
-                if (!m_unetEngine) {
-                    spdlog::warn("DiffusionEngine: failed to deserialize UNet engine");
+                std::streamsize usize = uf.tellg();
+                uf.seekg(0, std::ios::beg);
+                std::vector<char> ubuffer(static_cast<size_t>(usize));
+                if (!uf.read(ubuffer.data(), usize)) {
+                    spdlog::warn("DiffusionEngine: failed to read UNet engine file: {}", unetPath.string());
                 } else {
-                    m_unetContext = m_unetEngine->createExecutionContext();
-                    if (!m_unetContext) {
-                        spdlog::warn("DiffusionEngine: failed to create UNet execution context");
-                        m_unetEngine = nullptr;
+                    m_unetEngine = m_trtRuntime->deserializeCudaEngine(ubuffer.data(), ubuffer.size());
+                    if (!m_unetEngine) {
+                        spdlog::warn("DiffusionEngine: failed to deserialize UNet engine");
                     } else {
-                        // TensorRT 10.x name-based tensor APIs.
-                        nvinfer1::Dims sampleDims   = m_unetEngine->getTensorShape("sample");
-                        nvinfer1::Dims timestepDims = m_unetEngine->getTensorShape("timestep");
-                        nvinfer1::Dims encDims      = m_unetEngine->getTensorShape("encoder_hidden_states");
-                        nvinfer1::Dims pooledDims   = m_unetEngine->getTensorShape("pooled_text_embeds");
-                        nvinfer1::Dims timeIdsDims  = m_unetEngine->getTensorShape("time_ids");
-                        nvinfer1::Dims outDims      = m_unetEngine->getTensorShape("out_sample");
-
-                        m_unetSampleBytes        = GetElementCount(sampleDims)   * sizeof(uint16_t);
-                        m_unetTimestepBytes      = GetElementCount(timestepDims) * sizeof(uint16_t);
-                        m_unetEncoderHiddenBytes = GetElementCount(encDims)      * sizeof(uint16_t);
-                        m_unetPooledEmbedsBytes  = GetElementCount(pooledDims)   * sizeof(uint16_t);
-                        m_unetTimeIdsBytes       = GetElementCount(timeIdsDims)  * sizeof(uint16_t);
-                        m_unetOutSampleBytes     = GetElementCount(outDims)      * sizeof(uint16_t);
-
-                        if (cudaMalloc(&m_unetSampleDevice, m_unetSampleBytes) != cudaSuccess ||
-                            cudaMalloc(&m_unetTimestepDevice, m_unetTimestepBytes) != cudaSuccess ||
-                            cudaMalloc(&m_unetEncoderHiddenDevice, m_unetEncoderHiddenBytes) != cudaSuccess ||
-                            cudaMalloc(&m_unetPooledEmbedsDevice, m_unetPooledEmbedsBytes) != cudaSuccess ||
-                            cudaMalloc(&m_unetTimeIdsDevice, m_unetTimeIdsBytes) != cudaSuccess ||
-                            cudaMalloc(&m_unetOutSampleDevice, m_unetOutSampleBytes) != cudaSuccess) {
-                            spdlog::warn("DiffusionEngine: cudaMalloc failed for one or more UNet buffers");
+                        m_unetContext = m_unetEngine->createExecutionContext();
+                        if (!m_unetContext) {
+                            spdlog::warn("DiffusionEngine: failed to create UNet execution context");
+                            m_unetEngine = nullptr;
                         } else {
-                            spdlog::info("DiffusionEngine: UNet engine initialized (latent bytes = {}, out bytes = {})",
-                                         m_unetSampleBytes, m_unetOutSampleBytes);
+                            // TensorRT 10.x name-based tensor APIs.
+                            nvinfer1::Dims sampleDims   = m_unetEngine->getTensorShape("sample");
+                            nvinfer1::Dims timestepDims = m_unetEngine->getTensorShape("timestep");
+                            nvinfer1::Dims encDims      = m_unetEngine->getTensorShape("encoder_hidden_states");
+                            nvinfer1::Dims pooledDims   = m_unetEngine->getTensorShape("pooled_text_embeds");
+                            nvinfer1::Dims timeIdsDims  = m_unetEngine->getTensorShape("time_ids");
+                            nvinfer1::Dims outDims      = m_unetEngine->getTensorShape("out_sample");
+
+                            m_unetSampleBytes        = GetElementCount(sampleDims)   * sizeof(uint16_t);
+                            m_unetTimestepBytes      = GetElementCount(timestepDims) * sizeof(uint16_t);
+                            m_unetEncoderHiddenBytes = GetElementCount(encDims)      * sizeof(uint16_t);
+                            m_unetPooledEmbedsBytes  = GetElementCount(pooledDims)   * sizeof(uint16_t);
+                            m_unetTimeIdsBytes       = GetElementCount(timeIdsDims)  * sizeof(uint16_t);
+                            m_unetOutSampleBytes     = GetElementCount(outDims)      * sizeof(uint16_t);
+
+                            if (cudaMalloc(&m_unetSampleDevice, m_unetSampleBytes) != cudaSuccess ||
+                                cudaMalloc(&m_unetTimestepDevice, m_unetTimestepBytes) != cudaSuccess ||
+                                cudaMalloc(&m_unetEncoderHiddenDevice, m_unetEncoderHiddenBytes) != cudaSuccess ||
+                                cudaMalloc(&m_unetPooledEmbedsDevice, m_unetPooledEmbedsBytes) != cudaSuccess ||
+                                cudaMalloc(&m_unetTimeIdsDevice, m_unetTimeIdsBytes) != cudaSuccess ||
+                                cudaMalloc(&m_unetOutSampleDevice, m_unetOutSampleBytes) != cudaSuccess) {
+                                spdlog::warn("DiffusionEngine: cudaMalloc failed for one or more UNet buffers");
+                            } else {
+                                spdlog::info("DiffusionEngine: UNet engine initialized (latent bytes = {}, out bytes = {})",
+                                             m_unetSampleBytes, m_unetOutSampleBytes);
+                            }
                         }
                     }
                 }
             }
+        } else {
+            spdlog::info("DiffusionEngine: no UNet engine found under '{}'; running VAE-only GPU path", base.string());
         }
-    } else {
-        spdlog::info("DiffusionEngine: no UNet engine found under '{}'; running VAE-only GPU path", base.string());
+    } catch (const std::exception& e) {
+        spdlog::error("DiffusionEngine: TensorRT exception during GPU initialization: {}", e.what());
+        return Cortex::Result<void>::Err(std::string("TensorRT GPU initialization threw exception: ") + e.what());
+    } catch (...) {
+        spdlog::error("DiffusionEngine: unknown TensorRT exception during GPU initialization");
+        return Cortex::Result<void>::Err("TensorRT GPU initialization threw unknown exception");
     }
 
     return Cortex::Result<void>::Ok();

@@ -2980,11 +2980,13 @@ void Engine::DebugDrawSceneGraph() {
     // Clear any lines generated in previous frame.
     m_renderer->ClearDebugLines();
 
-    // World origin axes
-    const glm::vec3 origin(0.0f);
-    m_renderer->AddDebugLine(origin, origin + glm::vec3(1,0,0), glm::vec4(1,0,0,1));
-    m_renderer->AddDebugLine(origin, origin + glm::vec3(0,1,0), glm::vec4(0,1,0,1));
-    m_renderer->AddDebugLine(origin, origin + glm::vec3(0,0,1), glm::vec4(0,0,1,1));
+    // World origin axes (toggled with H key along with gizmos)
+    if (m_showOriginAxes) {
+        const glm::vec3 origin(0.0f);
+        m_renderer->AddDebugLine(origin, origin + glm::vec3(1,0,0), glm::vec4(1,0,0,1));
+        m_renderer->AddDebugLine(origin, origin + glm::vec3(0,1,0), glm::vec4(0,1,0,1));
+        m_renderer->AddDebugLine(origin, origin + glm::vec3(0,0,1), glm::vec4(0,0,1,1));
+    }
 
     auto& reg = m_registry->GetRegistry();
     auto view = m_registry->View<Scene::TransformComponent>();

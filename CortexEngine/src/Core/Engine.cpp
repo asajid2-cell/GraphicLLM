@@ -332,6 +332,13 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_renderer->SetSSAOEnabled(true);
             m_renderer->SetSSREnabled(true);
             m_renderer->SetFogEnabled(true);
+            m_renderer->SetShadowsEnabled(true);
+            m_renderer->SetIBLEnabled(true);
+            m_renderer->SetBloomIntensity(0.3f);
+            m_renderer->SetExposure(1.2f);
+            m_renderer->SetParticlesEnabled(true);
+            m_renderer->SetRTReflectionsEnabled(true);
+            m_renderer->SetRTGIEnabled(true);
         }
 
         // Select render backend. The experimental voxel renderer bypasses the
@@ -731,15 +738,14 @@ void Engine::ApplyHeroVisualBaseline() {
     m_renderer->SetExposure(1.2f);
     m_renderer->SetBloomIntensity(0.3f);
 
-    // Shadow and AA defaults that balance quality and stability. Use FXAA
-    // as the default AA so presentation is stable even while TAA is being
-    // iterated on.
+    // Shadow and AA defaults that balance quality and stability. Enable both
+    // TAA and FXAA for maximum quality.
     m_renderer->SetShadowsEnabled(true);
     m_renderer->SetShadowBias(0.0005f);
     m_renderer->SetShadowPCFRadius(1.5f);
     m_renderer->SetCascadeSplitLambda(0.5f);
 
-    m_renderer->SetTAAEnabled(false);
+    m_renderer->SetTAAEnabled(true);
     m_renderer->SetFXAAEnabled(true);
 
     // Screen-space ambient occlusion and reflections enabled as baseline.
@@ -757,8 +763,8 @@ void Engine::ApplyHeroVisualBaseline() {
         1.0f, 0.2f,
         0.015f);  // secondaryAmplitude
 
-    // Neutral fog off by default for a clean studio look.
-    m_renderer->SetFogEnabled(false);
+    // Enable fog for atmospheric effects.
+    m_renderer->SetFogEnabled(true);
 
     // Reflect the new renderer state into the debug menu so sliders stay in sync.
     SyncDebugMenuFromRenderer();
@@ -1361,8 +1367,8 @@ void Engine::ProcessInput() {
                     break;
                 }
                   if (key == SDLK_H) {
-                      m_showHUD = !m_showHUD;
-                      spdlog::info("HUD {}", m_showHUD ? "ENABLED" : "DISABLED");
+                      m_showGizmos = !m_showGizmos;
+                      spdlog::info("Gizmos {}", m_showGizmos ? "ENABLED" : "DISABLED");
                       break;
                   }
                   if (key == SDLK_F8) {
@@ -1773,8 +1779,12 @@ void Engine::ProcessInput() {
 
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     // If a gizmo axis is under the cursor, begin a drag; otherwise pick entity.
+                    bool gizmoWasHit = false;
+
+                    // Only test gizmo interaction if gizmos are visible
                     glm::vec3 rayOrigin, rayDir;
-                    if (ComputeCameraRayFromMouse(m_lastMousePos.x, m_lastMousePos.y, rayOrigin, rayDir) &&
+                    if (m_showGizmos &&
+                        ComputeCameraRayFromMouse(m_lastMousePos.x, m_lastMousePos.y, rayOrigin, rayDir) &&
                         m_registry && m_selectedEntity != entt::null) {
                         auto& reg = m_registry->GetRegistry();
                         if (reg.valid(m_selectedEntity) &&
@@ -1802,6 +1812,7 @@ void Engine::ProcessInput() {
 
                             GizmoAxis hitAxis = GizmoAxis::None;
                             if (HitTestGizmoAxis(rayOrigin, rayDir, center, axes, axisLength, threshold, hitAxis)) {
+                                gizmoWasHit = true;
                                 // Begin drag along this axis.
                                 m_gizmoActiveAxis = hitAxis;
                                 m_gizmoDragging = true;
@@ -1870,17 +1881,18 @@ void Engine::ProcessInput() {
                                 } else {
                                     m_gizmoDragStartAxisParam = 0.0f;
                                 }
-                                break;
                             }
                         }
                     }
 
                     // No gizmo hit; perform standard picking.
-                    m_selectedEntity = PickEntityAt(m_lastMousePos.x, m_lastMousePos.y);
-                    if (m_selectedEntity != entt::null && m_registry &&
-                        m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
-                        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
-                        SetFocusTarget(tag.tag);
+                    if (!gizmoWasHit) {
+                        m_selectedEntity = PickEntityAt(m_lastMousePos.x, m_lastMousePos.y);
+                        if (m_selectedEntity != entt::null && m_registry &&
+                            m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+                            const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+                            SetFocusTarget(tag.tag);
+                        }
                     }
                 }
                 else if (!m_droneFlightEnabled &&
@@ -2908,6 +2920,11 @@ void Engine::UpdateGizmoHover() {
         return;
     }
 
+    // Only update hover if gizmos are visible
+    if (!m_showGizmos) {
+        return;
+    }
+
     if (!m_window || !m_registry || m_selectedEntity == entt::null) {
         return;
     }
@@ -3004,6 +3021,8 @@ void Engine::DebugDrawSceneGraph() {
         edge(0,4); edge(1,5); edge(2,6); edge(3,7);
 
         // Translation gizmo centered at c, using object-space axes in world space.
+        // Only draw if gizmos are enabled (toggle with H key)
+        if (m_showGizmos) {
         glm::vec3 axisX = glm::vec3(selT.worldMatrix * glm::vec4(1,0,0,0));
         glm::vec3 axisY = glm::vec3(selT.worldMatrix * glm::vec4(0,1,0,0));
         glm::vec3 axisZ = glm::vec3(selT.worldMatrix * glm::vec4(0,0,1,0));
@@ -3061,6 +3080,7 @@ void Engine::DebugDrawSceneGraph() {
         m_renderer->AddDebugLine(c + zOffset, zTip + zOffset, zColor);
         m_renderer->AddDebugLine(c - zOffset, zTip - zOffset, zColor);
         m_renderer->AddDebugLine(zTip - axisX*0.05f, zTip + axisX*0.05f, zColor);
+        }  // if (m_showGizmos)
     }
 }
 
@@ -3326,34 +3346,15 @@ void Engine::UpdateAutoDemo(float deltaTime) {
     m_cameraYaw = std::atan2(forward.x, forward.z);
     m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
 
-    // Periodically showcase different RTX and screen-space configurations.
+    // Keep all RTX and screen-space features enabled at all times.
     if (m_renderer) {
-        float cycle = std::fmod(m_autoDemoTime, 24.0f);
-
-        // Baseline: hybrid forward + SSR/SSAO, RTX off.
-        if (cycle < 8.0f) {
-            if (m_renderer->IsRayTracingSupported()) {
-                m_renderer->SetRayTracingEnabled(false);
-            }
-            m_renderer->SetSSREnabled(true);
-            m_renderer->SetSSAOEnabled(true);
+        // Always enable ray tracing if supported
+        if (m_renderer->IsRayTracingSupported()) {
+            m_renderer->SetRayTracingEnabled(true);
         }
-        // RTX reflections / GI enabled on top of the same scene.
-        else if (cycle < 16.0f) {
-            if (m_renderer->IsRayTracingSupported()) {
-                m_renderer->SetRayTracingEnabled(true);
-            }
-            m_renderer->SetSSREnabled(true);
-            m_renderer->SetSSAOEnabled(true);
-        }
-        // Contrast phase: keep RT on but disable SSR so reflections clearly change.
-        else {
-            if (m_renderer->IsRayTracingSupported()) {
-                m_renderer->SetRayTracingEnabled(true);
-            }
-            m_renderer->SetSSREnabled(false);
-            m_renderer->SetSSAOEnabled(true);
-        }
+        // Always keep all screen-space effects enabled
+        m_renderer->SetSSREnabled(true);
+        m_renderer->SetSSAOEnabled(true);
 
         // Ensure a pleasant studio-like environment while the demo runs.
         m_renderer->SetEnvironmentPreset("studio");

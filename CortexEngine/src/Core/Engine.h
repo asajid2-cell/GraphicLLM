@@ -251,6 +251,7 @@ private:
     bool m_showOriginAxes = true;
 
     // Translation gizmo interaction state
+    bool m_showGizmos = true;  // Toggle with H key
     GizmoAxis m_gizmoHoveredAxis = GizmoAxis::None;
     GizmoAxis m_gizmoActiveAxis  = GizmoAxis::None;
     GizmoMode m_gizmoMode        = GizmoMode::Translate;

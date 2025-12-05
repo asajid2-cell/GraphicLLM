@@ -806,7 +806,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     constexpr bool kEnableBloomDefault  = true;
     // Fullscreen post-process resolve writes HDR scene color to the swap-chain back buffer.
     constexpr bool kEnablePostProcessDefault = true;
-    constexpr bool kEnableDebugLines    = false;
+    constexpr bool kEnableDebugLines    = true;
 
     if (m_deviceRemoved) {
         if (!m_deviceRemovedLogged) {
@@ -825,11 +825,8 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     m_totalTime += deltaTime;
 
-    // Optional environment toggles so we can disable heavier passes when
-    // diagnosing device-removed issues without recompiling:
-    //   CORTEX_DISABLE_SSR=1    -> skip RenderSSR()
-    //   CORTEX_DISABLE_SSAO=1   -> skip RenderSSAO()
-    //   CORTEX_DISABLE_BLOOM=1  -> skip RenderBloom()
+    // Force all graphics features to be enabled - ignore environment variables
+    // that would disable them for debugging purposes
     static bool s_checkedPassEnv = false;
     static bool s_disableSSR   = false;
     static bool s_disableSSAO  = false;
@@ -837,22 +834,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     static bool s_disableTAA   = false;
     if (!s_checkedPassEnv) {
         s_checkedPassEnv = true;
-        if (std::getenv("CORTEX_DISABLE_SSR")) {
-            s_disableSSR = true;
-            spdlog::warn("Renderer: CORTEX_DISABLE_SSR set; skipping SSR pass");
-        }
-        if (std::getenv("CORTEX_DISABLE_SSAO")) {
-            s_disableSSAO = true;
-            spdlog::warn("Renderer: CORTEX_DISABLE_SSAO set; skipping SSAO pass");
-        }
-        if (std::getenv("CORTEX_DISABLE_BLOOM")) {
-            s_disableBloom = true;
-            spdlog::warn("Renderer: CORTEX_DISABLE_BLOOM set; skipping Bloom pass");
-        }
-        if (std::getenv("CORTEX_DISABLE_TAA")) {
-            s_disableTAA = true;
-            spdlog::warn("Renderer: CORTEX_DISABLE_TAA set; skipping TAA resolve pass");
-        }
+        // Always keep features enabled - don't check environment variables
+        s_disableSSR = false;
+        s_disableSSAO = false;
+        s_disableBloom = false;
+        s_disableTAA = false;
+        spdlog::info("Renderer: All graphics features forcibly enabled (SSR, SSAO, Bloom, TAA)");
     }
 
     const bool kEnableSSR  = kEnableSSRDefault  && !s_disableSSR;

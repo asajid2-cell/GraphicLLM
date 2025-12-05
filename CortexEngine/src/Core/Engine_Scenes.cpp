@@ -123,7 +123,8 @@ void Engine::RebuildScene(ScenePreset preset) {
     // Apply VRAM-aware quality clamping after large scene rebuilds so that
     // heavy layouts automatically fall back to safe presets when the
     // estimated GPU memory footprint is close to the adapter limit.
-    ApplyVRAMQualityGovernor();
+    // DISABLED: Keep all graphics features enabled
+    // ApplyVRAMQualityGovernor();
 }
 
 void Engine::BuildCornellScene() {
@@ -691,11 +692,18 @@ void Engine::BuildRTShowcaseScene() {
             renderer->SetFogParams(0.03f, 0.0f, 0.45f);
             renderer->SetGodRayIntensity(1.8f);
         } else {
-            // Conservative mode: keep the safe preset baseline (internal
-            // resolution ~0.75, SSR/SSAO/fog off). Only adjust exposure and
-            // bloom slightly for readability.
+            // Conservative mode: enable all graphics features for maximum quality
+            renderer->SetRenderScale(1.0f);
             renderer->SetExposure(1.1f);
             renderer->SetBloomIntensity(0.25f);
+
+            renderer->SetFXAAEnabled(true);
+            renderer->SetTAAEnabled(true);
+            renderer->SetSSREnabled(true);
+            renderer->SetSSAOEnabled(true);
+            renderer->SetFogEnabled(true);
+            renderer->SetShadowsEnabled(true);
+            renderer->SetIBLEnabled(true);
         }
 
         // Leave ray tracing disabled by default; the user can toggle it

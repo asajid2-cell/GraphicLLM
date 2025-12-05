@@ -176,6 +176,13 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
     uint32_t used = m_cbvSrvUavHeap.GetUsedCount();
     uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
 
+    // Prevent allocation when heap is completely full to avoid silent failures
+    if (used >= capacity) {
+        spdlog::error("CBV_SRV_UAV heap EXHAUSTED: {}/{} descriptors (persistent={}, transient region full)",
+                      used, capacity, m_cbvSrvUavPersistentCount);
+        return Result<DescriptorHandle>::Err("Descriptor heap exhausted");
+    }
+
     // Warn when approaching capacity (>90% full)
     if (used >= capacity * 0.9f) {
         spdlog::warn("CBV_SRV_UAV heap nearly full: {}/{} descriptors used (persistent={}, transient={})",
@@ -184,8 +191,8 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
 
     auto result = m_cbvSrvUavHeap.Allocate();
     if (result.IsErr()) {
-        spdlog::error("CBV_SRV_UAV heap EXHAUSTED: {}/{} descriptors (persistent={}, transient region full)",
-                      used, capacity, m_cbvSrvUavPersistentCount);
+        spdlog::error("CBV_SRV_UAV heap allocation failed: {}/{} descriptors",
+                      used, capacity);
     }
 
     return result;

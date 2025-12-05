@@ -46,6 +46,9 @@ struct PipelineDesc {
 
     // Blend state
     bool blendEnabled = false;
+
+    // Primitive topology type (TRIANGLE, LINE, POINT, etc.)
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 };
 
 // Pipeline State Object wrapper

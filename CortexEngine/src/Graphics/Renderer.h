@@ -33,6 +33,9 @@ namespace Cortex {
 
 namespace Cortex::Graphics {
 
+// Number of frames in flight (triple buffering)
+static constexpr uint32_t kFrameCount = 3;
+
 // Constant buffer wrapper
 template<typename T>
 struct ConstantBuffer {
@@ -379,6 +382,20 @@ public:
     // is rebuilt so the new layout does not inherit afterimages from the old
     // one.
     void ResetTemporalHistoryForSceneChange();
+    // Reset the command list state before scene changes to prevent referencing
+    // objects that are about to be deleted. This closes any pending command list
+    // and resets it to a clean state.
+    void ResetCommandList();
+
+    // Clear all cached BLAS (Bottom-Level Acceleration Structures) during scene
+    // switches. Call this AFTER ResetCommandList() has completed to ensure no
+    // GPU operations are still referencing the BLAS resources.
+    void ClearBLASCache();
+
+    // Wait for ALL in-flight frames to complete (not just the current one).
+    // Use this during scene switches to ensure frames N-1 and N-2 are also done
+    // before destroying resources they might still be using.
+    void WaitForAllFrames();
     // Dynamically register an environment map from an existing texture (used by Dreamer).
     Result<void> AddEnvironmentFromTexture(const std::shared_ptr<DX12Texture>& tex, const std::string& name);
 
@@ -493,9 +510,11 @@ public:
 #endif
     std::unique_ptr<DX12RaytracingContext> m_rayTracingContext;
 
-    ComPtr<ID3D12CommandAllocator> m_commandAllocators[3];  // One per frame
+    ComPtr<ID3D12CommandAllocator> m_commandAllocators[kFrameCount];  // One per frame
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     uint32_t m_frameIndex = 0;
+    uint64_t m_absoluteFrameIndex = 0;  // Monotonically increasing frame counter
+    bool m_commandListOpen = false;  // Tracks whether command list is currently recording
 
     // Pipeline state
     std::unique_ptr<DX12RootSignature> m_rootSignature;

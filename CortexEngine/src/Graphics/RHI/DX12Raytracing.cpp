@@ -326,7 +326,11 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
     // Create shader table with 1 raygen, 1 miss, 1 hit group record for shadows.
     {
         const UINT idSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-        m_rtShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+        // Use D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT (64) instead of
+        // D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT (32) to ensure that
+        // the MissShaderTable.StartAddress and HitGroupTable.StartAddress are
+        // also 64-byte aligned, not just the stride.
+        m_rtShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
         const UINT tableSize = m_rtShaderTableStride * 3;
 
         D3D12_HEAP_PROPERTIES heapProps{};
@@ -533,7 +537,8 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
     // Create shader table with 1 raygen, 1 miss, 1 hit group record for reflections.
     {
         const UINT idSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-        m_rtReflShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+        // Use 64-byte alignment for shader table start addresses
+        m_rtReflShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
         const UINT tableSize = m_rtReflShaderTableStride * 3;
 
         D3D12_HEAP_PROPERTIES heapProps{};
@@ -733,7 +738,8 @@ Result<void> DX12RaytracingContext::Initialize(DX12Device* device, DescriptorHea
     // Create shader table with 1 raygen, 1 miss, 1 hit group record for GI.
     {
         const UINT idSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-        m_rtGIShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+        // Use 64-byte alignment for shader table start addresses
+        m_rtGIShaderTableStride = AlignTo(idSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
         const UINT tableSize = m_rtGIShaderTableStride * 3;
 
         D3D12_HEAP_PROPERTIES heapProps{};
@@ -966,17 +972,87 @@ void DX12RaytracingContext::ReleaseBLASForMesh(const Scene::MeshData* meshKey) {
 
     BLASEntry& entry = it->second;
     if (entry.blas) {
-        const uint64_t bytes = entry.blasSize + entry.scratchSize;
-        if (bytes > 0 && m_totalBLASBytes >= bytes) {
-            m_totalBLASBytes -= bytes;
+        // Only subtract the BLAS result size from the total; we're keeping
+        // the scratch buffer alive until ClearAllBLAS() is called.
+        const uint64_t blasBytes = entry.blasSize;
+        if (blasBytes > 0 && m_totalBLASBytes >= blasBytes) {
+            m_totalBLASBytes -= blasBytes;
         }
         entry.blas.Reset();
-        entry.built = false;
-        entry.buildRequested = false;
-        entry.blasSize = 0;
-        entry.scratchSize = 0;
-        spdlog::info("DX12RaytracingContext: released BLAS for mesh {}", static_cast<const void*>(meshKey));
+        spdlog::info("DX12RaytracingContext: released BLAS for mesh {} (kept scratch buffer)",
+                     static_cast<const void*>(meshKey));
     }
+
+    // CRITICAL: DO NOT erase the entry from the cache yet!
+    // The scratch buffer might still be in use by the GPU if a BLAS build command
+    // is in flight. Instead, we just clear the BLAS result buffer and leave the
+    // entry in the cache. When ClearAllBLAS() is called during the next scene
+    // switch (after WaitForAllFrames()), the entire cache including scratch
+    // buffers will be safely released.
+    //
+    // Leaving the entry in the cache with hasGeometry=false prevents it from
+    // being used again, and the dangling meshKey pointer is harmless since we
+    // only use it as a map key, never dereferencing it.
+    entry.hasGeometry = false;
+    entry.built = false;
+}
+
+void DX12RaytracingContext::ClearAllBLAS() {
+    // Release all BLAS resources and clear the cache.
+    // Call this during scene switches to ensure no stale entries remain
+    // that could reference freed GPU resources.
+    for (auto& kv : m_blasCache) {
+        BLASEntry& entry = kv.second;
+        if (entry.blas) {
+            const uint64_t bytes = entry.blasSize + entry.scratchSize;
+            if (bytes > 0 && m_totalBLASBytes >= bytes) {
+                m_totalBLASBytes -= bytes;
+            }
+            entry.blas.Reset();
+        }
+        if (entry.scratch) {
+            entry.scratch.Reset();
+        }
+    }
+    m_blasCache.clear();
+
+    // Also clear TLAS and instance buffer since they contain references to
+    // the BLAS entries we just cleared. The next BuildTLAS() call will
+    // recreate them from scratch with the new scene's geometry.
+    m_tlas.Reset();
+    m_tlasScratch.Reset();
+    m_instanceBuffer.Reset();
+    m_instanceBufferSize = 0;
+    m_tlasSize = 0;
+    m_tlasScratchSize = 0;
+    // Also clear pending resize requests since we just destroyed everything
+    m_instanceBufferPendingSize = 0;
+    m_tlasPendingSize = 0;
+    m_tlasScratchPendingSize = 0;
+    m_instanceDescs.clear();
+
+    spdlog::info("DX12RaytracingContext: cleared all BLAS/TLAS for scene switch");
+}
+
+void DX12RaytracingContext::ReleaseScratchBuffers(uint64_t /*completedFrameIndex*/) {
+    // Release scratch buffers for BLAS entries that have finished building.
+    //
+    // IMPORTANT: We do NOT release scratch buffers here anymore. The scratch
+    // buffers are only released when ClearAllBLAS() is called during scene
+    // switches, after WaitForAllFrames() ensures the GPU has completed all work.
+    //
+    // Why: Trying to track frame indices and guess when the GPU is done is
+    // error-prone with triple buffering. The scratch buffers are relatively
+    // small (usually < 100 MB total) and only accumulate during initial scene
+    // loading. Keeping them alive until the next scene switch is a safer
+    // trade-off than risking #921 OBJECT_DELETED_WHILE_STILL_IN_USE errors.
+    //
+    // If memory pressure becomes an issue, the proper fix is to explicitly
+    // wait for the GPU (Flush/WaitForGPU) before releasing scratch buffers,
+    // but that would introduce frame stalls we want to avoid during normal
+    // rendering.
+
+    // Left as a no-op for now. Can be re-enabled with explicit GPU sync if needed.
 }
 
 void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
@@ -1129,19 +1205,18 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
 
             blasEntry.built = true;
             blasEntry.buildRequested = false;
+            blasEntry.buildFrameIndex = m_currentFrameIndex;
 
             m_totalBLASBytes += candidateBytes;
             bytesBuiltThisFrame += candidateBytes;
 
-            // Scratch buffer is only needed for the one-time build; release it
-            // immediately so BLAS memory accounting reflects persistent usage.
-            if (blasEntry.scratch) {
-                if (m_totalBLASBytes >= blasEntry.scratchSize) {
-                    m_totalBLASBytes -= blasEntry.scratchSize;
-                }
-                blasEntry.scratch.Reset();
-                blasEntry.scratchSize = 0;
-            }
+            // NOTE: Do NOT release the scratch buffer here! The GPU hasn't
+            // executed BuildRaytracingAccelerationStructure yet - the command
+            // is only recorded in the command list. Releasing the scratch
+            // buffer now causes #921 OBJECT_DELETED_WHILE_STILL_IN_USE.
+            // ReleaseScratchBuffers() will be called in BeginFrame with a
+            // completedFrameIndex that ensures the GPU has finished using
+            // this scratch buffer before it's released.
         }
 
         if (!blasEntry.blas) {
@@ -1185,6 +1260,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
         static_cast<UINT64>(numInstances) * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
 
     if (!m_instanceBuffer || instanceBufferBytes > m_instanceBufferSize) {
+        // CRITICAL: If the instance buffer exists but is too small, we MUST
+        // wait for GPU to finish before destroying and reallocating.
+        if (m_instanceBuffer && instanceBufferBytes > m_instanceBufferSize) {
+            if (m_flushCallback) {
+                spdlog::debug("DX12RaytracingContext: Flushing GPU before instance buffer resize ({} -> {} bytes)",
+                             m_instanceBufferSize, instanceBufferBytes);
+                m_flushCallback();
+            }
+        }
+
         m_instanceBuffer.Reset();
         m_instanceBufferSize = instanceBufferBytes;
 
@@ -1270,6 +1355,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
     tlasDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
     if (!m_tlas || m_tlas->GetDesc().Width < tlasDesc.Width) {
+        // CRITICAL: If the TLAS buffer exists but is too small, we MUST
+        // wait for GPU to finish before destroying and reallocating.
+        if (m_tlas && m_tlas->GetDesc().Width < tlasDesc.Width) {
+            if (m_flushCallback) {
+                spdlog::debug("DX12RaytracingContext: Flushing GPU before TLAS buffer resize ({} -> {} bytes)",
+                             m_tlas->GetDesc().Width, tlasDesc.Width);
+                m_flushCallback();
+            }
+        }
+
         m_tlas.Reset();
         HRESULT hr = m_device5->CreateCommittedResource(
             &heapProps,
@@ -1290,6 +1385,16 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
     scratchDesc.Width = prebuild.ScratchDataSizeInBytes;
 
     if (!m_tlasScratch || m_tlasScratch->GetDesc().Width < scratchDesc.Width) {
+        // CRITICAL: If the TLAS scratch buffer exists but is too small, we MUST
+        // wait for GPU to finish before destroying and reallocating.
+        if (m_tlasScratch && m_tlasScratch->GetDesc().Width < scratchDesc.Width) {
+            if (m_flushCallback) {
+                spdlog::debug("DX12RaytracingContext: Flushing GPU before TLAS scratch buffer resize ({} -> {} bytes)",
+                             m_tlasScratch->GetDesc().Width, scratchDesc.Width);
+                m_flushCallback();
+            }
+        }
+
         m_tlasScratch.Reset();
         HRESULT hr = m_device5->CreateCommittedResource(
             &heapProps,

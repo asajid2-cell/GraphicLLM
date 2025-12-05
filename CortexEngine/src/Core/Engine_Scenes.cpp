@@ -23,6 +23,11 @@ namespace {
 }
 
 void Engine::RebuildScene(ScenePreset preset) {
+    // CRITICAL: Wait for GPU before destroying entities/meshes/textures
+    if (m_renderer) {
+        m_renderer->WaitForGPU();
+    }
+
     // Clear all existing entities/components.
     m_registry->GetRegistry().clear();
     m_activeCameraEntity = entt::null;

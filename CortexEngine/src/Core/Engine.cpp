@@ -1368,7 +1368,8 @@ void Engine::ProcessInput() {
                 }
                   if (key == SDLK_H) {
                       m_showGizmos = !m_showGizmos;
-                      spdlog::info("Gizmos {}", m_showGizmos ? "ENABLED" : "DISABLED");
+                      m_showOriginAxes = m_showGizmos;  // Toggle origin axes together with gizmos
+                      spdlog::info("Gizmos/Axes {}", m_showGizmos ? "ENABLED" : "DISABLED");
                       break;
                   }
                   if (key == SDLK_F8) {
@@ -1974,6 +1975,11 @@ void Engine::ProcessInput() {
                 break;
 
             case SDL_EVENT_WINDOW_RESIZED:
+                // Ensure all GPU work (including uploads) completes before resizing
+                // swap chain buffers to avoid race conditions with in-flight frames.
+                if (m_renderer) {
+                    m_renderer->WaitForGPU();
+                }
                 m_window->OnResize(
                     static_cast<uint32_t>(event.window.data1),
                     static_cast<uint32_t>(event.window.data2)

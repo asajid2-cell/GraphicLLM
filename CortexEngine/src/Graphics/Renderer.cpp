@@ -401,6 +401,11 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
             m_rayTracingContext.reset();
             m_rayTracingSupported = false;
             m_rayTracingEnabled = false;
+        } else {
+            // Set flush callback so RT context can force GPU sync when resizing buffers
+            m_rayTracingContext->SetFlushCallback([this]() {
+                WaitForGPU();
+            });
         }
     }
 
@@ -1177,6 +1182,82 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
     m_debugLinesDisabled = false;
 }
 
+void Renderer::WaitForAllFrames() {
+    // Wait for ALL in-flight frames to complete, not just the current one.
+    // With triple buffering, frames N-1 and N-2 might still be executing
+    // and holding references to resources we're about to delete.
+    for (uint32_t i = 0; i < kFrameCount; ++i) {
+        if (m_fenceValues[i] > 0 && m_commandQueue) {
+            m_commandQueue->WaitForFenceValue(m_fenceValues[i]);
+        }
+    }
+
+    // Also flush any pending upload work
+    if (m_uploadQueue) {
+        m_uploadQueue->Flush();
+    }
+}
+
+void Renderer::ResetCommandList() {
+    // If we are mid-frame when a scene change occurs, the command list might
+    // reference objects we are about to delete. We need to:
+    // 1. Wait for ALL in-flight frames (not just current one) to complete
+    // 2. Reset ALL command allocators to clear internal resource references
+    // 3. Reset the command list with a fresh allocator
+    // 4. Clear pending GPU jobs that hold raw pointers
+    //
+    // NOTE: BLAS cache and mesh asset keys are NOT cleared here - they are
+    // cleared separately by the scene rebuild process to avoid timing issues
+    // with the command list still referencing BLAS resources.
+
+    if (!m_commandList || !m_commandQueue) {
+        return;
+    }
+
+    // Step 1: Wait for ALL in-flight GPU work to complete
+    // This ensures no GPU operations are still using resources we'll delete.
+    WaitForAllFrames();
+
+    // Step 2: Close the command list if it's open, then reset ALL allocators.
+    // We reset ALL allocators because we don't know which one the command list
+    // was using when it recorded RT commands.
+    if (m_commandListOpen) {
+        m_commandList->Close();
+        m_commandListOpen = false;
+    }
+
+    for (uint32_t i = 0; i < kFrameCount; ++i) {
+        if (m_commandAllocators[i]) {
+            m_commandAllocators[i]->Reset();
+        }
+    }
+
+    // Step 3: Reset the command list with a fresh allocator
+    // This clears all internal references - the command list is now EMPTY
+    if (m_frameIndex < kFrameCount && m_commandAllocators[m_frameIndex]) {
+        m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+        m_commandListOpen = true;
+    }
+
+    // Step 4: Clear pending GPU jobs that contain raw pointers to mesh data.
+    m_gpuJobQueue.clear();
+    m_pendingMeshJobs = 0;
+    m_pendingBLASJobs = 0;
+}
+
+void Renderer::ClearBLASCache() {
+    // Clear all BLAS entries from the ray tracing context.
+    // This MUST be called AFTER ResetCommandList() to ensure no GPU operations
+    // are still referencing these resources.
+    if (m_rayTracingContext) {
+        m_rayTracingContext->ClearAllBLAS();
+        spdlog::info("Renderer: BLAS cache cleared for scene switch");
+    }
+
+    // Also clear mesh asset keys so stale pointers don't get reused
+    m_meshAssetKeys.clear();
+}
+
 void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext || !registry) {
         return;
@@ -1213,6 +1294,11 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
         rtCmdList->ResourceBarrier(1, &barrier);
         m_rtShadowMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
+
+    // Set the current frame index so BLAS builds can track when they were
+    // recorded. This is used by ReleaseScratchBuffers() to ensure scratch
+    // buffers aren't freed until the GPU has finished using them.
+    m_rayTracingContext->SetCurrentFrameIndex(m_absoluteFrameIndex);
 
     // Build TLAS over the current ECS scene.
     m_rayTracingContext->BuildTLAS(registry, rtCmdList.Get());
@@ -1550,9 +1636,34 @@ void Renderer::BeginFrame() {
         m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
     }
 
-    // Reset command allocator and list
+    // Increment the absolute frame index. This is used for tracking BLAS build
+    // timing to ensure scratch buffers aren't released while the GPU is still
+    // using them.
+    ++m_absoluteFrameIndex;
+
+    // Now that the previous frame's GPU work is complete, release any BLAS
+    // scratch buffers that were used for acceleration structure builds.
+    // With triple buffering, when we've waited for m_fenceValues[m_frameIndex],
+    // frame (m_absoluteFrameIndex - kFrameCount) is guaranteed complete.
+    // We subtract kFrameCount to be safe: if we're at frame N, frames < N-2
+    // have definitely finished.
+    if (m_rayTracingContext) {
+        uint64_t completedFrame = (m_absoluteFrameIndex > kFrameCount)
+            ? (m_absoluteFrameIndex - kFrameCount)
+            : 0;
+        m_rayTracingContext->ReleaseScratchBuffers(completedFrame);
+    }
+
+    // Reset command allocator and list.
+    // If the command list is already open (e.g., after ResetCommandList during scene switch),
+    // we need to close it first before resetting the allocator.
+    if (m_commandListOpen) {
+        m_commandList->Close();
+        m_commandListOpen = false;
+    }
     m_commandAllocators[m_frameIndex]->Reset();
     m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+    m_commandListOpen = true;
 }
 
 void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
@@ -2197,6 +2308,7 @@ void Renderer::EndFrame() {
 
     // Close and execute command list
     m_commandList->Close();
+    m_commandListOpen = false;
     m_commandQueue->ExecuteCommandList(m_commandList.Get());
 
     // Present
@@ -3459,6 +3571,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     // Ensure graphics pipeline and root signature are bound after any compute work
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
@@ -3648,12 +3761,16 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
 
         // Select pipeline: dedicated water pipeline when available and entity
         // is tagged as a water surface; otherwise use the default PBR pipeline.
+        // Re-set topology defensively after pipeline switch to guard against
+        // future changes where water might use a different topology.
         const bool isWater = registry->HasComponent<Scene::WaterSurfaceComponent>(entity);
         if (isWater && m_waterPipeline) {
             m_commandList->SetPipelineState(m_waterPipeline->GetPipelineState());
         } else {
             m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
         }
+        // Defensive topology reset after any pipeline switch
+        m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         RefreshMaterialDescriptors(renderable);
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
@@ -7333,6 +7450,7 @@ Result<void> Renderer::CreateCommandList() {
         dbgDesc.depthWriteEnabled = false;
         dbgDesc.cullMode = D3D12_CULL_MODE_NONE;
         dbgDesc.blendEnabled = false;
+        dbgDesc.primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
 
         auto dbgPipelineResult = m_debugLinePipeline->Initialize(
             m_device->GetDevice(),

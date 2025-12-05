@@ -23,9 +23,24 @@ namespace {
 }
 
 void Engine::RebuildScene(ScenePreset preset) {
-    // CRITICAL: Wait for GPU before destroying entities/meshes/textures
+    // CRITICAL: Wait for ALL in-flight GPU frames before destroying resources.
+    // With triple buffering, frames N-1 and N-2 might still be executing and
+    // holding references to resources we're about to delete.
     if (m_renderer) {
-        m_renderer->WaitForGPU();
+        // WaitForAllFrames waits for all 3 frame fences, not just the current one.
+        // This ensures no in-flight frame is still using resources we'll delete.
+        m_renderer->WaitForAllFrames();
+
+        // Reset the command list to clear CPU-side references to resources.
+        // This closes the current recording, resets the allocator and command list
+        // so they no longer hold references to objects we're about to delete.
+        m_renderer->ResetCommandList();
+
+        // CRITICAL: Clear BLAS cache AFTER ResetCommandList() completes.
+        // At this point, the command list and allocators have been reset, so no
+        // GPU operations reference the BLAS resources anymore. Clearing the cache
+        // now prevents #921 OBJECT_DELETED_WHILE_STILL_IN_USE when RT is enabled.
+        m_renderer->ClearBLASCache();
     }
 
     // Clear all existing entities/components.
@@ -116,6 +131,11 @@ void Engine::RebuildScene(ScenePreset preset) {
         // from the previous scene.
         m_renderer->MarkVoxelGridDirty();
         m_renderer->RebuildAssetRefsFromScene(m_registry.get());
+
+        // CRITICAL: Wait for ALL in-flight frames before pruning old assets.
+        // This prevents OBJECT_DELETED_WHILE_STILL_IN_USE error #921 during scene switches.
+        m_renderer->WaitForAllFrames();
+
         m_renderer->PruneUnusedMeshes(m_registry.get());
         m_renderer->PruneUnusedTextures();
     }

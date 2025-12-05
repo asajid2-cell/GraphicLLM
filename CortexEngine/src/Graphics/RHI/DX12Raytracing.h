@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -106,6 +107,16 @@ public:
                          float nearPlane,
                          float farPlane);
 
+    // Set the current frame index for tracking BLAS build timing. This must be
+    // called each frame before BuildTLAS so we know which frame's scratch
+    // buffers are safe to release.
+    void SetCurrentFrameIndex(uint64_t frameIndex) { m_currentFrameIndex = frameIndex; }
+
+    // Set a callback function that forces a GPU sync. This is used to safely
+    // resize buffers when the GPU might still be using the old buffer.
+    using FlushCallback = std::function<void()>;
+    void SetFlushCallback(FlushCallback callback) { m_flushCallback = std::move(callback); }
+
     // Approximate GPU memory footprint of all ray tracing acceleration
     // structures (BLAS + TLAS + scratch). This value is updated when BLAS/TLAS
     // buffers are allocated or resized so the renderer can incorporate it into
@@ -137,12 +148,26 @@ public:
     // by any renderables, so RT acceleration structures do not accumulate
     // across scene rebuilds.
     void ReleaseBLASForMesh(const Scene::MeshData* meshKey);
+    // Clear all BLAS cache entries. Call this during scene switches to prevent
+    // dangling pointer issues when MeshData addresses are reused.
+    void ClearAllBLAS();
+
+    // Release scratch buffers for BLAS entries that have finished building.
+    // Call this after the GPU has completed the frame's work (e.g., after
+    // WaitForFenceValue in BeginFrame) to safely reclaim scratch memory.
+    // The completedFrameIndex parameter should be the frame index that has
+    // definitely completed on the GPU (typically currentFrameIndex - BUFFER_COUNT).
+    void ReleaseScratchBuffers(uint64_t completedFrameIndex);
 
 private:
     struct BLASEntry {
         bool hasGeometry = false;
         bool built = false;
         bool buildRequested = false;
+
+        // Frame index when the BLAS build command was recorded. The scratch
+        // buffer must not be released until this frame has completed on the GPU.
+        uint64_t buildFrameIndex = 0;
 
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 
@@ -165,9 +190,14 @@ private:
     // scratch). Updated as BLAS resources are allocated.
     uint64_t m_totalBLASBytes = 0;
 
+    // Current frame index set by the renderer. Used to track which frame a
+    // BLAS build was recorded in so scratch buffers aren't released too early.
+    uint64_t m_currentFrameIndex = 0;
+
     // TLAS and instance data.
     ComPtr<ID3D12Resource> m_instanceBuffer;
     UINT64 m_instanceBufferSize = 0;
+    UINT64 m_instanceBufferPendingSize = 0;  // Size to resize to next frame
     std::vector<D3D12_RAYTRACING_INSTANCE_DESC> m_instanceDescs;
 
     // Cached camera information used for simple near/far culling when building
@@ -182,6 +212,8 @@ private:
     ComPtr<ID3D12Resource> m_tlasScratch;
     UINT64 m_tlasSize = 0;
     UINT64 m_tlasScratchSize = 0;
+    UINT64 m_tlasPendingSize = 0;         // Size to resize to next frame
+    UINT64 m_tlasScratchPendingSize = 0;  // Size to resize to next frame
     // Approximate total GPU memory consumed by TLAS + scratch buffer.
     uint64_t m_totalTLASBytes = 0;
 
@@ -214,6 +246,9 @@ private:
     DescriptorHandle m_rtDepthSrv;
     DescriptorHandle m_rtMaskUav;
     DescriptorHandle m_rtGBufferNormalSrv;  // G-buffer normal/roughness for proper RT reflections
+
+    // Callback to force GPU sync before destroying buffers. Set by Renderer.
+    FlushCallback m_flushCallback;
 };
 
 } // namespace Cortex::Graphics

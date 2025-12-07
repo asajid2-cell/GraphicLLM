@@ -2,9 +2,11 @@
 #include "Utils/FileUtils.h"
 #include <spdlog/spdlog.h>
 #include <d3dcompiler.h>
+#include <dxcapi.h>
 #include <filesystem>
 
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "dxcompiler.lib")
 
 namespace Cortex::Graphics {
 
@@ -99,8 +101,9 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     // Define root parameters
     // We need: 4 CBVs (b0, b1, b2, b3) +
     //          descriptor table for material textures (t0-t3) +
-    //          descriptor table for shadow/IBL/RT textures (space1)
-    D3D12_ROOT_PARAMETER rootParameters[6] = {};
+    //          descriptor table for shadow/IBL/RT textures (space1) +
+    //          descriptor table for UAVs (u0-u3) for async compute
+    D3D12_ROOT_PARAMETER rootParameters[7] = {};
 
     // Parameter 0: Object constants (b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -159,6 +162,19 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[5].Descriptor.RegisterSpace = 0;
     rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+    // Parameter 6: UAV table for compute shaders (u0-u3 in space0)
+    D3D12_DESCRIPTOR_RANGE uavRange = {};
+    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    uavRange.NumDescriptors = 4;
+    uavRange.BaseShaderRegister = 0;
+    uavRange.RegisterSpace = 0;
+    uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[6].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[6].DescriptorTable.pDescriptorRanges = &uavRange;
+    rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;  // Both pixel and compute
+
     // Static sampler (s0)
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
     samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
@@ -173,7 +189,7 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
     samplerDesc.ShaderRegister = 0;
     samplerDesc.RegisterSpace = 0;
-    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;  // Both pixel and compute shaders
 
     // Create root signature
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
@@ -182,6 +198,11 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootSignatureDesc.NumStaticSamplers = 1;
     rootSignatureDesc.pStaticSamplers = &samplerDesc;
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+#ifdef ENABLE_BINDLESS
+    // Enable bindless resources (SM6.6 ResourceDescriptorHeap[] access)
+    rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+#endif
 
     // Serialize and create
     ComPtr<ID3DBlob> signature;
@@ -256,12 +277,141 @@ Result<ShaderBytecode> ShaderCompiler::CompileFromFile(
     return CompileFromSource(fileResult.Value(), entryPoint, target);
 }
 
+// Helper function to compile with DXC (SM6.6+)
+static Result<ShaderBytecode> CompileWithDXC(
+    const std::string& source,
+    const std::string& entryPoint,
+    const std::string& target)
+{
+    // Create DXC compiler instance
+    ComPtr<IDxcUtils> utils;
+    ComPtr<IDxcCompiler3> compiler;
+
+    HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    if (FAILED(hr)) {
+        return Result<ShaderBytecode>::Err("Failed to create DXC utils");
+    }
+
+    hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+    if (FAILED(hr)) {
+        return Result<ShaderBytecode>::Err("Failed to create DXC compiler");
+    }
+
+    // Convert source to wide string for DXC
+    std::wstring wEntryPoint(entryPoint.begin(), entryPoint.end());
+    std::wstring wTarget(target.begin(), target.end());
+
+    // Create source buffer
+    ComPtr<IDxcBlobEncoding> sourceBlob;
+    hr = utils->CreateBlob(source.c_str(), static_cast<UINT32>(source.size()), CP_UTF8, &sourceBlob);
+    if (FAILED(hr)) {
+        return Result<ShaderBytecode>::Err("Failed to create DXC source blob");
+    }
+
+    // Build compiler arguments
+    std::vector<LPCWSTR> arguments;
+    arguments.push_back(L"-E");
+    arguments.push_back(wEntryPoint.c_str());
+    arguments.push_back(L"-T");
+    arguments.push_back(wTarget.c_str());
+
+    // Enable bindless resources for SM6.6
+    arguments.push_back(L"-D");
+    arguments.push_back(L"ENABLE_BINDLESS=1");
+
+#ifdef _DEBUG
+    arguments.push_back(L"-Zi");              // Debug info
+    arguments.push_back(L"-Od");              // Disable optimizations
+    arguments.push_back(L"-Qembed_debug");    // Embed debug info in shader
+#else
+    arguments.push_back(L"-O3");              // Maximum optimizations
+#endif
+
+    // Column-major matrices (matches GLM)
+    arguments.push_back(L"-Zpc");
+
+    // Create DXC buffer for compilation
+    DxcBuffer sourceBuffer = {};
+    sourceBuffer.Ptr = sourceBlob->GetBufferPointer();
+    sourceBuffer.Size = sourceBlob->GetBufferSize();
+    sourceBuffer.Encoding = CP_UTF8;
+
+    // Compile shader
+    ComPtr<IDxcResult> result;
+    hr = compiler->Compile(
+        &sourceBuffer,
+        arguments.data(),
+        static_cast<UINT32>(arguments.size()),
+        nullptr,
+        IID_PPV_ARGS(&result)
+    );
+
+    if (FAILED(hr)) {
+        return Result<ShaderBytecode>::Err("DXC compilation failed");
+    }
+
+    // Get compilation status
+    HRESULT compileStatus;
+    result->GetStatus(&compileStatus);
+
+    if (FAILED(compileStatus)) {
+        // Get error messages
+        ComPtr<IDxcBlobUtf8> errors;
+        result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr);
+        if (errors && errors->GetStringLength() > 0) {
+            std::string errorMsg(errors->GetStringPointer(), errors->GetStringLength());
+            return Result<ShaderBytecode>::Err("DXC shader compilation failed: " + errorMsg);
+        }
+        return Result<ShaderBytecode>::Err("DXC shader compilation failed with unknown error");
+    }
+
+    // Get compiled shader bytecode
+    ComPtr<IDxcBlob> shaderBlob;
+    result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
+    if (!shaderBlob) {
+        return Result<ShaderBytecode>::Err("Failed to retrieve DXC shader bytecode");
+    }
+
+    ShaderBytecode bytecode;
+    bytecode.data.resize(shaderBlob->GetBufferSize());
+    memcpy(bytecode.data.data(), shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize());
+
+    spdlog::info("Shader compiled with DXC: {} ({}) - SM6.6 bindless enabled", entryPoint, target);
+    return Result<ShaderBytecode>::Ok(std::move(bytecode));
+}
+
 Result<ShaderBytecode> ShaderCompiler::CompileFromSource(
     const std::string& source,
     const std::string& entryPoint,
     const std::string& target)
 {
-    // Use default column-major packing so CPU-side GLM matrices map directly
+    // Check if target requires SM6.6 (DXC compiler)
+    bool useDXC = false;
+
+#ifdef ENABLE_BINDLESS
+    // When ENABLE_BINDLESS is defined, force SM6.6 compilation with DXC
+    // Convert SM5.1 targets to SM6.6
+    std::string dxcTarget = target;
+    if (target.find("_5_") != std::string::npos) {
+        // Replace _5_1 with _6_6
+        size_t pos = target.find("_5_");
+        dxcTarget = target.substr(0, pos) + "_6_6";
+        useDXC = true;
+    } else if (target.find("_6_") != std::string::npos) {
+        // Already SM6.x
+        useDXC = true;
+    }
+#endif
+
+    if (useDXC) {
+#ifdef ENABLE_BINDLESS
+        return CompileWithDXC(source, entryPoint, dxcTarget);
+#else
+        return Result<ShaderBytecode>::Err("DXC compilation requested but ENABLE_BINDLESS not defined");
+#endif
+    }
+
+    // Fall back to FXC (D3DCompile) for SM5.1
     UINT compileFlags = 0;
 #if defined(_DEBUG)
     compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -298,6 +448,163 @@ Result<ShaderBytecode> ShaderCompiler::CompileFromSource(
 
     spdlog::info("Shader compiled: {} ({})", entryPoint, target);
     return Result<ShaderBytecode>::Ok(std::move(bytecode));
+}
+
+// ============================================================================
+// DX12ComputeRootSignature implementation
+// ============================================================================
+
+Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
+    if (!device) {
+        return Result<void>::Err("Invalid device pointer");
+    }
+
+    // Same layout as graphics root signature but WITHOUT the input assembler flag
+    D3D12_ROOT_PARAMETER rootParameters[7] = {};
+
+    // Parameter 0: Object constants (b0)
+    rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[0].Descriptor.ShaderRegister = 0;
+    rootParameters[0].Descriptor.RegisterSpace = 0;
+    rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 1: Frame constants (b1)
+    rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[1].Descriptor.ShaderRegister = 1;
+    rootParameters[1].Descriptor.RegisterSpace = 0;
+    rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 2: Material constants (b2)
+    rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[2].Descriptor.ShaderRegister = 2;
+    rootParameters[2].Descriptor.RegisterSpace = 0;
+    rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 3: Descriptor table for textures (t0 - t9 in space0)
+    D3D12_DESCRIPTOR_RANGE descriptorRange = {};
+    descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRange.NumDescriptors = 10;
+    descriptorRange.BaseShaderRegister = 0;
+    descriptorRange.RegisterSpace = 0;
+    descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRange;
+    rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 4: Shadow + IBL SRVs (space1)
+    D3D12_DESCRIPTOR_RANGE shadowRange = {};
+    shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    shadowRange.NumDescriptors = 7;
+    shadowRange.BaseShaderRegister = 0;
+    shadowRange.RegisterSpace = 1;
+    shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[4].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[4].DescriptorTable.pDescriptorRanges = &shadowRange;
+    rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 5: Shadow constants (b3)
+    rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[5].Descriptor.ShaderRegister = 3;
+    rootParameters[5].Descriptor.RegisterSpace = 0;
+    rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Parameter 6: UAV table for compute shaders (u0-u3 in space0)
+    D3D12_DESCRIPTOR_RANGE uavRange = {};
+    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    uavRange.NumDescriptors = 4;
+    uavRange.BaseShaderRegister = 0;
+    uavRange.RegisterSpace = 0;
+    uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[6].DescriptorTable.NumDescriptorRanges = 1;
+    rootParameters[6].DescriptorTable.pDescriptorRanges = &uavRange;
+    rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Static sampler (s0)
+    D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.MipLODBias = 0.0f;
+    samplerDesc.MaxAnisotropy = 8;
+    samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    samplerDesc.MinLOD = 0.0f;
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    samplerDesc.ShaderRegister = 0;
+    samplerDesc.RegisterSpace = 0;
+    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // Create root signature WITHOUT input assembler flag (compute doesn't use IA)
+    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    rootSignatureDesc.NumParameters = _countof(rootParameters);
+    rootSignatureDesc.pParameters = rootParameters;
+    rootSignatureDesc.NumStaticSamplers = 1;
+    rootSignatureDesc.pStaticSamplers = &samplerDesc;
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;  // NO input assembler flag
+
+#ifdef ENABLE_BINDLESS
+    // Enable bindless resources (SM6.6 ResourceDescriptorHeap[] access)
+    rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+#endif
+
+    // Serialize and create
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+
+    if (FAILED(hr)) {
+        if (error) {
+            const char* errorMsg = static_cast<const char*>(error->GetBufferPointer());
+            return Result<void>::Err("Failed to serialize compute root signature: " + std::string(errorMsg));
+        }
+        return Result<void>::Err("Failed to serialize compute root signature");
+    }
+
+    hr = device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+                                      IID_PPV_ARGS(&m_rootSignature));
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create compute root signature");
+    }
+
+    return Result<void>::Ok();
+}
+
+// ============================================================================
+// DX12ComputePipeline implementation
+// ============================================================================
+
+Result<void> DX12ComputePipeline::Initialize(
+    ID3D12Device* device,
+    ID3D12RootSignature* rootSignature,
+    const ShaderBytecode& computeShader)
+{
+    if (!device || !rootSignature) {
+        return Result<void>::Err("Invalid device or root signature");
+    }
+
+    if (computeShader.data.empty()) {
+        return Result<void>::Err("Compute shader bytecode is empty");
+    }
+
+    // Create compute pipeline state
+    D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.pRootSignature = rootSignature;
+    psoDesc.CS = computeShader.GetBytecode();
+
+    HRESULT hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create compute pipeline state (HRESULT: " + std::to_string(hr) + ")");
+    }
+
+    return Result<void>::Ok();
 }
 
 } // namespace Cortex::Graphics

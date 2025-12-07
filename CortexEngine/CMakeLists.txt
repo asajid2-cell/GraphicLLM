@@ -56,6 +56,11 @@ endif()
 # Disabled by default so the project builds on machines without TensorRT.
 option(CORTEX_ENABLE_TENSORRT "Enable Dreamer GPU diffusion via TensorRT" OFF)
 
+# Phase 1: Enable SM6.6 bindless resources (requires DXC compiler and Windows 10 19H1+)
+# When enabled, shaders compile with DXC to SM6.6 and use ResourceDescriptorHeap[] for bindless textures.
+# When disabled, shaders compile with FXC to SM5.1 and use traditional descriptor tables.
+option(CORTEX_ENABLE_BINDLESS "Enable SM6.6 bindless resources" ON)
+
 # Source Files
 set(CORTEX_SOURCES
     src/Core/Engine.cpp
@@ -69,8 +74,14 @@ set(CORTEX_SOURCES
     src/Graphics/RHI/DescriptorHeap.cpp
     src/Graphics/RHI/DX12Pipeline.cpp
     src/Graphics/RHI/DX12Raytracing.cpp
+    src/Graphics/RHI/BindlessResources.cpp
     src/Graphics/AssetRegistry.cpp
     src/Graphics/TextureLoader.cpp
+    src/Graphics/GPUCulling.cpp
+    src/Graphics/RenderGraph.cpp
+    src/Graphics/VisibilityBuffer.cpp
+    src/Graphics/MeshletBuilder.cpp
+    src/Graphics/VariableRateShading.cpp
     src/Graphics/Renderer.cpp
     src/Graphics/Renderer_Bloom.cpp
     src/Graphics/Renderer_SSAO.cpp
@@ -124,6 +135,10 @@ set(CORTEX_HEADERS
     src/Graphics/MaterialState.h
     src/Graphics/TextureLoader.h
     src/Graphics/AssetRegistry.h
+    src/Graphics/RenderGraph.h
+    src/Graphics/VisibilityBuffer.h
+    src/Graphics/MeshletBuilder.h
+    src/Graphics/VariableRateShading.h
     src/Graphics/Renderer.h
     src/Graphics/ShaderTypes.h
 
@@ -173,6 +188,13 @@ target_include_directories(CortexEngine PRIVATE
 )
 
 # Compile-time defines for optional features
+if(CORTEX_ENABLE_BINDLESS)
+    target_compile_definitions(CortexEngine PRIVATE ENABLE_BINDLESS=1)
+    message(STATUS "Bindless resources ENABLED (SM6.6 with DXC)")
+else()
+    message(STATUS "Bindless resources DISABLED (SM5.1 fallback with FXC)")
+endif()
+
 if(CORTEX_ENABLE_TENSORRT)
     target_compile_definitions(CortexEngine PRIVATE CORTEX_ENABLE_TENSORRT=1)
     # Require the CUDA toolkit so that TensorRT headers (which include
@@ -216,6 +238,7 @@ target_link_libraries(CortexEngine PRIVATE
     dxgi.lib
     dxguid.lib
     d3dcompiler.lib
+    dxcompiler.lib
     user32.lib
     gdi32.lib
     comctl32.lib

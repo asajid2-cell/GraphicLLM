@@ -307,6 +307,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     spdlog::info("  Renderer initialized in {} ms",
         std::chrono::duration_cast<std::chrono::milliseconds>(tAfterRenderer - tAfterWindow).count());
 
+    // Enable GPU culling for GPU-driven rendering (Phase 1 feature)
+    m_renderer->SetGPUCullingEnabled(true);
+
     // Create ECS registry
     m_registry = std::make_unique<Scene::ECS_Registry>();
 

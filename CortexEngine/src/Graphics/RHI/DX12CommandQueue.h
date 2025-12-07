@@ -37,6 +37,9 @@ public:
     // Wait for a specific fence value (CPU blocks)
     void WaitForFenceValue(uint64_t fenceValue);
 
+    // GPU-side wait for another queue's fence (for cross-queue synchronization)
+    void WaitForQueue(ID3D12Fence* otherFence, uint64_t fenceValue);
+
     // Flush all pending GPU work (CPU blocks until GPU is idle)
     void Flush();
 

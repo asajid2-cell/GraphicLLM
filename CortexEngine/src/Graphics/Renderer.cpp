@@ -362,6 +362,19 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create upload command queue: " + uploadQueueResult.Error());
     }
 
+    // Create async compute queue for parallel workloads (SSAO, Bloom, GPU culling)
+    m_computeQueue = std::make_unique<DX12CommandQueue>();
+    auto computeQueueResult = m_computeQueue->Initialize(device->GetDevice(), D3D12_COMMAND_LIST_TYPE_COMPUTE);
+    if (computeQueueResult.IsErr()) {
+        spdlog::warn("Failed to create async compute queue: {} (compute work will run on graphics queue)",
+                     computeQueueResult.Error());
+        m_computeQueue.reset();
+        m_asyncComputeSupported = false;
+    } else {
+        m_asyncComputeSupported = true;
+        spdlog::info("Async compute queue created for parallel workloads");
+    }
+
     // Initialize swap chain (now that we have a command queue)
     auto swapChainResult = window->InitializeSwapChain(device, m_commandQueue.get());
     if (swapChainResult.IsErr()) {
@@ -373,6 +386,80 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     auto heapResult = m_descriptorManager->Initialize(device->GetDevice());
     if (heapResult.IsErr()) {
         return Result<void>::Err("Failed to create descriptor heaps: " + heapResult.Error());
+    }
+
+    // Create bindless resource manager for SM6.6 bindless access
+    m_bindlessManager = std::make_unique<BindlessResourceManager>();
+    auto bindlessResult = m_bindlessManager->Initialize(device->GetDevice(), 16384, 8192);
+    if (bindlessResult.IsErr()) {
+        spdlog::warn("Bindless resource manager initialization failed: {} (falling back to legacy descriptor tables)",
+                     bindlessResult.Error());
+        m_bindlessManager.reset();
+    } else {
+        // Set flush callback for safe deferred releases
+        m_bindlessManager->SetFlushCallback([this]() {
+            WaitForGPU();
+        });
+        spdlog::info("Bindless resource manager initialized (16384 textures, 8192 buffers)");
+
+        // Diagnostic: Show current rendering mode based on compile-time flag
+#ifdef ENABLE_BINDLESS
+        spdlog::info("Shader mode: SM6.6 bindless resources (DXC compiler, ResourceDescriptorHeap[])");
+#else
+        spdlog::info("Shader mode: SM5.1 descriptor tables (FXC fallback, traditional binding)");
+#endif
+    }
+
+    // Initialize GPU Culling pipeline for GPU-driven rendering
+    m_gpuCulling = std::make_unique<GPUCullingPipeline>();
+    auto cullingResult = m_gpuCulling->Initialize(device, m_descriptorManager.get(), m_commandQueue.get(), 65536);
+    if (cullingResult.IsErr()) {
+        spdlog::warn("GPU Culling initialization failed: {} (falling back to CPU culling)",
+                     cullingResult.Error());
+        m_gpuCulling.reset();
+        m_gpuCullingEnabled = false;
+        m_indirectDrawEnabled = false;
+    } else {
+        m_gpuCulling->SetFlushCallback([this]() {
+            WaitForGPU();
+        });
+        // GPU culling is ready but disabled by default - can be enabled via config
+        m_gpuCullingEnabled = false;
+        m_indirectDrawEnabled = false;
+        spdlog::info("GPU Culling Pipeline initialized (max 65536 instances)");
+    }
+
+    // Initialize Render Graph for declarative pass management
+    m_renderGraph = std::make_unique<RenderGraph>();
+    auto rgResult = m_renderGraph->Initialize(
+        device,
+        m_commandQueue.get(),
+        m_asyncComputeSupported ? m_computeQueue.get() : nullptr,
+        m_uploadQueue.get()
+    );
+    if (rgResult.IsErr()) {
+        spdlog::warn("RenderGraph initialization failed: {} (using legacy manual barriers)",
+                     rgResult.Error());
+        m_renderGraph.reset();
+    } else {
+        spdlog::info("RenderGraph initialized for declarative pass management");
+    }
+
+    // Initialize Visibility Buffer Renderer
+    m_visibilityBuffer = std::make_unique<VisibilityBufferRenderer>();
+    auto vbResult = m_visibilityBuffer->Initialize(
+        device,
+        m_descriptorManager.get(),
+        m_bindlessManager.get(),
+        m_window->GetWidth(),
+        m_window->GetHeight()
+    );
+    if (vbResult.IsErr()) {
+        spdlog::warn("VisibilityBuffer initialization failed: {} (using forward rendering)",
+                     vbResult.Error());
+        m_visibilityBuffer.reset();
+    } else {
+        spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
     }
 
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -425,6 +512,41 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
             sprintf_s(remBuf, "0x%08X", static_cast<unsigned int>(removed));
             return Result<void>::Err("Failed to create command allocator " + std::to_string(i) +
                                      " (hr=" + buf + ", removed=" + remBuf + ")");
+        }
+    }
+
+    // Create compute command allocators if async compute is supported
+    if (m_asyncComputeSupported) {
+        for (uint32_t i = 0; i < 3; ++i) {
+            HRESULT hr = device->GetDevice()->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_COMPUTE,
+                IID_PPV_ARGS(&m_computeAllocators[i])
+            );
+            if (FAILED(hr)) {
+                spdlog::warn("Failed to create compute allocator {}, disabling async compute", i);
+                m_asyncComputeSupported = false;
+                m_computeQueue.reset();
+                break;
+            }
+        }
+
+        // Create compute command list
+        if (m_asyncComputeSupported) {
+            HRESULT hr = device->GetDevice()->CreateCommandList(
+                0,
+                D3D12_COMMAND_LIST_TYPE_COMPUTE,
+                m_computeAllocators[0].Get(),
+                nullptr,
+                IID_PPV_ARGS(&m_computeCommandList)
+            );
+            if (FAILED(hr)) {
+                spdlog::warn("Failed to create compute command list, disabling async compute");
+                m_asyncComputeSupported = false;
+                m_computeQueue.reset();
+            } else {
+                m_computeCommandList->Close();
+                m_computeListOpen = false;
+            }
         }
     }
 
@@ -771,6 +893,32 @@ void Renderer::Shutdown() {
         m_rayTracingContext.reset();
     }
 
+    if (m_bindlessManager) {
+        m_bindlessManager->Shutdown();
+        m_bindlessManager.reset();
+    }
+
+    if (m_gpuCulling) {
+        m_gpuCulling->Shutdown();
+        m_gpuCulling.reset();
+    }
+
+    if (m_renderGraph) {
+        m_renderGraph->Shutdown();
+        m_renderGraph.reset();
+    }
+
+    // Clean up async compute resources
+    if (m_computeQueue) {
+        m_computeQueue->Flush();
+    }
+    m_computeCommandList.Reset();
+    for (auto& allocator : m_computeAllocators) {
+        allocator.Reset();
+    }
+    m_computeQueue.reset();
+    m_asyncComputeSupported = false;
+
     m_placeholderAlbedo.reset();
     m_placeholderNormal.reset();
     m_placeholderMetallic.reset();
@@ -1030,10 +1178,25 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // Classic path now acts purely as fallback to avoid double-drawing/z-fighting
     if (!drewWithHyper) {
-        // Opaque geometry first
-        WriteBreadcrumb(GpuMarker::OpaqueGeometry);
-        RenderScene(registry);
-        MarkPassComplete("RenderScene_Done");
+        // Visibility buffer path (Phase 2.1)
+        if (m_visibilityBuffer) {
+            WriteBreadcrumb(GpuMarker::OpaqueGeometry);
+            RenderVisibilityBufferPath(registry);
+            MarkPassComplete("VisibilityBuffer_Done");
+        }
+        // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
+        else if (m_gpuCullingEnabled && m_gpuCulling) {
+            WriteBreadcrumb(GpuMarker::OpaqueGeometry);
+            CollectInstancesForGPUCulling(registry);
+            DispatchGPUCulling();
+            RenderSceneIndirect(registry);
+            MarkPassComplete("RenderSceneIndirect_Done");
+        } else {
+            // Opaque geometry first (legacy per-draw path)
+            WriteBreadcrumb(GpuMarker::OpaqueGeometry);
+            RenderScene(registry);
+            MarkPassComplete("RenderScene_Done");
+        }
         // Then blended transparent/glass objects, sorted back-to-front.
         WriteBreadcrumb(GpuMarker::TransparentGeom);
         RenderTransparent(registry);
@@ -1091,7 +1254,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         const auto tSsaoStart = clock::now();
         if (kEnableSSAO) {
             WriteBreadcrumb(GpuMarker::SSAO);
-            RenderSSAO();
+            // Use async compute SSAO if available (faster compute shader path)
+            if (m_ssaoComputePipeline && m_asyncComputeSupported) {
+                RenderSSAOAsync();
+            } else {
+                RenderSSAO();
+            }
             MarkPassComplete("RenderSSAO_Done");
         } else {
             m_lastSSAOMs = 0.0f;
@@ -1591,6 +1759,14 @@ void Renderer::BeginFrame() {
     // Propagate resize to ray tracing context so it can adjust any RT targets.
     if (m_rayTracingContext && m_window) {
         m_rayTracingContext->OnResize(m_window->GetWidth(), m_window->GetHeight());
+    }
+
+    // Resize visibility buffer
+    if (m_visibilityBuffer && m_window) {
+        auto vbResizeResult = m_visibilityBuffer->Resize(m_window->GetWidth(), m_window->GetHeight());
+        if (vbResizeResult.IsErr()) {
+            spdlog::warn("VisibilityBuffer resize failed: {}", vbResizeResult.Error());
+        }
     }
 
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
@@ -3567,6 +3743,308 @@ void Renderer::RenderMotionVectors() {
     m_velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
+// =============================================================================
+// GPU-Driven Rendering (Phase 1)
+// =============================================================================
+
+void Renderer::SetGPUCullingEnabled(bool enabled) {
+    if (enabled && m_gpuCulling) {
+        m_gpuCullingEnabled = true;
+        m_indirectDrawEnabled = true;
+        spdlog::info("GPU culling enabled (indirect draw active)");
+    } else {
+        m_gpuCullingEnabled = false;
+        m_indirectDrawEnabled = false;
+        if (enabled && !m_gpuCulling) {
+            spdlog::warn("Cannot enable GPU culling: pipeline not initialized");
+        }
+    }
+}
+
+uint32_t Renderer::GetGPUCulledCount() const {
+    return m_gpuCulling ? m_gpuCulling->GetVisibleCount() : 0;
+}
+
+uint32_t Renderer::GetGPUTotalInstances() const {
+    return m_gpuCulling ? m_gpuCulling->GetTotalInstances() : 0;
+}
+
+void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
+    if (!registry || !m_gpuCulling) return;
+
+    m_gpuInstances.clear();
+    m_meshInfos.clear();
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) continue;
+        if (IsTransparentRenderable(renderable)) continue;
+        if (!renderable.mesh->gpuBuffers ||
+            !renderable.mesh->gpuBuffers->vertexBuffer ||
+            !renderable.mesh->gpuBuffers->indexBuffer) continue;
+
+        GPUInstanceData inst{};
+        inst.modelMatrix = transform.GetMatrix();
+
+        // Compute bounding sphere in object space
+        if (renderable.mesh->hasBounds) {
+            inst.boundingSphere = glm::vec4(
+                renderable.mesh->boundsCenter,
+                renderable.mesh->boundsRadius
+            );
+        } else {
+            // Default bounding sphere
+            inst.boundingSphere = glm::vec4(0.0f, 0.0f, 0.0f, 10.0f);
+        }
+
+        inst.meshIndex = static_cast<uint32_t>(m_meshInfos.size());
+        inst.materialIndex = 0; // Could map to material ID if needed
+        inst.flags = 1; // Visible by default
+
+        m_gpuInstances.push_back(inst);
+
+        // Store mesh info for indirect draw
+        MeshInfo meshInfo{};
+        meshInfo.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
+        meshInfo.startIndex = 0;
+        meshInfo.baseVertex = 0;
+        meshInfo.materialIndex = 0;
+        m_meshInfos.push_back(meshInfo);
+    }
+
+    // Debug logging for GPU culling collection
+    static uint32_t s_frameCounter = 0;
+    if (++s_frameCounter % 300 == 1) {  // Log every ~5 seconds at 60fps
+        spdlog::debug("GPU Culling: Collected {} instances for culling", m_gpuInstances.size());
+    }
+}
+
+void Renderer::DispatchGPUCulling() {
+    if (!m_gpuCulling || m_gpuInstances.empty()) return;
+
+    // Upload instances to GPU
+    auto uploadResult = m_gpuCulling->UpdateInstances(m_commandList.Get(), m_gpuInstances);
+    if (uploadResult.IsErr()) {
+        spdlog::warn("GPU culling upload failed: {}", uploadResult.Error());
+        return;
+    }
+
+    // Dispatch culling compute shader
+    auto cullResult = m_gpuCulling->DispatchCulling(
+        m_commandList.Get(),
+        m_frameDataCPU.viewProjectionMatrix,
+        glm::vec3(m_frameDataCPU.cameraPosition)
+    );
+
+    if (cullResult.IsErr()) {
+        spdlog::warn("GPU culling dispatch failed: {}", cullResult.Error());
+    }
+}
+
+void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry) {
+    if (!registry || !m_visibilityBuffer) return;
+
+    m_vbInstances.clear();
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) continue;
+        if (IsTransparentRenderable(renderable)) continue;
+        if (!renderable.mesh->gpuBuffers ||
+            !renderable.mesh->gpuBuffers->vertexBuffer ||
+            !renderable.mesh->gpuBuffers->indexBuffer) continue;
+
+        VBInstanceData inst{};
+        inst.worldMatrix = transform.GetMatrix();
+        inst.meshIndex = static_cast<uint32_t>(m_vbInstances.size());
+        inst.materialIndex = 0; // TODO: Map to actual material
+        inst.firstIndex = 0;
+        inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
+        inst.baseVertex = 0;
+
+        m_vbInstances.push_back(inst);
+    }
+
+    // Upload to visibility buffer
+    auto uploadResult = m_visibilityBuffer->UpdateInstances(m_commandList.Get(), m_vbInstances);
+    if (uploadResult.IsErr()) {
+        spdlog::warn("Failed to update visibility buffer instances: {}", uploadResult.Error());
+    }
+}
+
+void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
+    if (!m_visibilityBuffer) return;
+
+    // Collect and upload instance data
+    CollectInstancesForVisibilityBuffer(registry);
+
+    if (m_vbInstances.empty()) {
+        return;
+    }
+
+    // Phase 1: Render visibility buffer (triangle IDs)
+    auto visResult = m_visibilityBuffer->RenderVisibilityPass(
+        m_commandList.Get(),
+        m_depthBuffer.Get(),
+        m_depthStencilView.cpu,
+        m_frameDataCPU.viewProjectionMatrix
+    );
+
+    if (visResult.IsErr()) {
+        spdlog::error("Visibility pass failed: {}", visResult.Error());
+        return;
+    }
+
+    // Phase 2: Resolve materials via compute shader
+    auto resolveResult = m_visibilityBuffer->ResolveMaterials(
+        m_commandList.Get(),
+        m_depthBuffer.Get(),
+        m_depthSRV.gpu
+    );
+
+    if (resolveResult.IsErr()) {
+        spdlog::error("Material resolve failed: {}", resolveResult.Error());
+    }
+}
+
+void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
+    if (!m_gpuCulling || m_gpuInstances.empty()) {
+        // Fall back to regular rendering
+        RenderScene(registry);
+        return;
+    }
+
+    // Setup render state
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Bind descriptor heap - prefer bindless heap when SM6.6 is enabled
+    // Currently using SM5.1 fallback with descriptor tables
+    ID3D12DescriptorHeap* srvHeap = (m_bindlessManager && m_bindlessManager->GetHeap())
+        ? m_bindlessManager->GetHeap()
+        : m_descriptorManager->GetCBV_SRV_UAV_Heap();
+    ID3D12DescriptorHeap* heaps[] = { srvHeap };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    // For now, we still need to bind per-instance data since our shader expects
+    // root CBVs. Full GPU-driven would require bindless materials.
+    // This is a transitional implementation - ExecuteIndirect with per-draw root constants.
+
+    auto* cmdSig = m_gpuCulling->GetCommandSignature();
+    auto* argBuffer = m_gpuCulling->GetIndirectArgBuffer();
+
+    if (!cmdSig || !argBuffer) {
+        spdlog::warn("RenderSceneIndirect: Missing command signature or arg buffer");
+        RenderScene(registry);
+        return;
+    }
+
+    // For the transitional phase, we iterate visible instances and use indirect draws
+    // per mesh type. Full GPU-driven rendering would batch all into one ExecuteIndirect.
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    uint32_t instanceIdx = 0;
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) continue;
+        if (IsTransparentRenderable(renderable)) continue;
+        if (!renderable.mesh->gpuBuffers) continue;
+
+        if (instanceIdx >= m_gpuInstances.size()) break;
+
+        EnsureMaterialTextures(renderable);
+
+        // Setup material constants
+        MaterialConstants materialData = {};
+        materialData.albedo = renderable.albedoColor;
+        materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+        materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+
+        const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+        const auto hasNormalMap = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+        const auto hasMetallicMap = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+        const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+
+        materialData.mapFlags = glm::uvec4(
+            hasAlbedoMap ? 1u : 0u,
+            hasNormalMap ? 1u : 0u,
+            hasMetallicMap ? 1u : 0u,
+            hasRoughnessMap ? 1u : 0u
+        );
+
+        materialData.textureIndices = glm::uvec4(
+            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
+                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
+                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
+                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
+                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
+        );
+
+        ObjectConstants objectData = {};
+        objectData.modelMatrix = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
+
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+        RefreshMaterialDescriptors(renderable);
+        if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
+            m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+        }
+
+        // Bind buffers
+        D3D12_VERTEX_BUFFER_VIEW vbv = {};
+        vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+        vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+        vbv.StrideInBytes = sizeof(Vertex);
+
+        D3D12_INDEX_BUFFER_VIEW ibv = {};
+        ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+        ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+        ibv.Format = DXGI_FORMAT_R32_UINT;
+
+        m_commandList->IASetVertexBuffers(0, 1, &vbv);
+        m_commandList->IASetIndexBuffer(&ibv);
+
+        // Use ExecuteIndirect for the draw (one instance at a time for now)
+        m_commandList->ExecuteIndirect(
+            cmdSig,
+            1,
+            argBuffer,
+            instanceIdx * sizeof(DrawIndexedArguments),
+            nullptr,
+            0
+        );
+
+        ++instanceIdx;
+    }
+}
+
 void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     // Ensure graphics pipeline and root signature are bound after any compute work
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
@@ -3642,6 +4120,20 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             hasNormalMap ? 1u : 0u,
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u
+        );
+
+        // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
+        // If a texture has a valid bindless index, use it; otherwise use kInvalidBindlessIndex
+        // The shader checks for invalid indices and falls back to legacy descriptor table
+        materialData.textureIndices = glm::uvec4(
+            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
+                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
+                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
+                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
+                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
         );
 
         // Global fractal parameters (applied uniformly to all materials)
@@ -3902,6 +4394,18 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
             hasNormalMap ? 1u : 0u,
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u);
+
+        // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
+        materialData.textureIndices = glm::uvec4(
+            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
+                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
+                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
+                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
+            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
+                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
+        );
 
         materialData.fractalParams0 = glm::vec4(
             m_fractalAmplitude,
@@ -4677,6 +5181,14 @@ Result<std::shared_ptr<DX12Texture>> Renderer::LoadTextureFromFile(
         m_assetRegistry.RegisterTexture(path, bytes, kind);
     }
 
+    // Register in bindless heap for SM6.6 ResourceDescriptorHeap access
+    if (m_bindlessManager && texPtr->GetResource()) {
+        auto bindlessResult = texPtr->CreateBindlessSRV(m_bindlessManager.get());
+        if (bindlessResult.IsErr()) {
+            spdlog::warn("Failed to register texture '{}' in bindless heap: {}", path, bindlessResult.Error());
+        }
+    }
+
     // CRITICAL: Add to cache to prevent duplicate loads
     m_textureCache[cacheKey] = texPtr;
 
@@ -4725,7 +5237,17 @@ Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
         return Result<std::shared_ptr<DX12Texture>>::Err(createResult.Error());
     }
 
-    return Result<std::shared_ptr<DX12Texture>>::Ok(std::make_shared<DX12Texture>(std::move(texture)));
+    auto texPtr = std::make_shared<DX12Texture>(std::move(texture));
+
+    // Register in bindless heap for SM6.6 ResourceDescriptorHeap access
+    if (m_bindlessManager && texPtr->GetResource()) {
+        auto bindlessResult = texPtr->CreateBindlessSRV(m_bindlessManager.get());
+        if (bindlessResult.IsErr()) {
+            spdlog::warn("Failed to register Dreamer texture '{}' in bindless heap: {}", debugName, bindlessResult.Error());
+        }
+    }
+
+    return Result<std::shared_ptr<DX12Texture>>::Ok(texPtr);
 }
 
 void Renderer::ToggleShadows() {
@@ -6934,6 +7456,16 @@ Result<void> Renderer::CreateCommandList() {
         return Result<void>::Err("Failed to create root signature: " + rsResult.Error());
     }
 
+    // Create compute root signature for compute pipelines
+    m_computeRootSignature = std::make_unique<DX12ComputeRootSignature>();
+    auto computeRsResult = m_computeRootSignature->Initialize(m_device->GetDevice());
+    if (computeRsResult.IsErr()) {
+        spdlog::warn("Failed to create compute root signature: {}", computeRsResult.Error());
+        m_computeRootSignature.reset();
+    } else {
+        spdlog::info("Compute root signature created successfully");
+    }
+
       // Create pipeline
       m_pipeline = std::make_unique<DX12Pipeline>();
 
@@ -7291,6 +7823,31 @@ Result<void> Renderer::CreateCommandList() {
         }
     }
 
+    // SSAO compute pipeline (async compute version)
+    if (m_asyncComputeSupported && m_computeRootSignature) {
+        auto ssaoComputeResult = ShaderCompiler::CompileFromFile(
+            "assets/shaders/SSAO_Compute.hlsl",
+            "CSMain",
+            "cs_5_1"
+        );
+        if (ssaoComputeResult.IsOk()) {
+            m_ssaoComputePipeline = std::make_unique<DX12ComputePipeline>();
+            auto computePipelineResult = m_ssaoComputePipeline->Initialize(
+                m_device->GetDevice(),
+                m_computeRootSignature->GetRootSignature(),  // Use compute root signature!
+                ssaoComputeResult.Value()
+            );
+            if (computePipelineResult.IsErr()) {
+                spdlog::warn("Failed to create SSAO compute pipeline: {}", computePipelineResult.Error());
+                m_ssaoComputePipeline.reset();
+            } else {
+                spdlog::info("SSAO async compute pipeline created successfully");
+            }
+        } else {
+            spdlog::warn("Failed to compile SSAO compute shader: {}", ssaoComputeResult.Error());
+        }
+    }
+
     // SSR pipeline (fullscreen reflections into dedicated buffer)
     if (ssrVsResult.IsOk() && ssrPsResult.IsOk()) {
         m_ssrPipeline = std::make_unique<DX12Pipeline>();
@@ -7522,6 +8079,25 @@ Result<void> Renderer::CreatePlaceholderTexture() {
     if (roughnessResult.IsErr()) return roughnessResult;
 
     m_commandQueue->Flush();
+
+    // Register placeholder textures in bindless heap at reserved slots
+    // These are always valid and used as fallbacks when materials have no specific texture
+    if (m_bindlessManager) {
+        auto registerPlaceholder = [this](std::shared_ptr<DX12Texture>& tex, uint32_t reservedIndex) {
+            if (tex && tex->GetResource()) {
+                auto result = tex->CreateBindlessSRV(m_bindlessManager.get());
+                if (result.IsOk()) {
+                    spdlog::debug("Placeholder registered at bindless index {}", tex->GetBindlessIndex());
+                } else {
+                    spdlog::warn("Failed to register placeholder at bindless index: {}", result.Error());
+                }
+            }
+        };
+        registerPlaceholder(m_placeholderAlbedo, BindlessResourceManager::kPlaceholderAlbedoIndex);
+        registerPlaceholder(m_placeholderNormal, BindlessResourceManager::kPlaceholderNormalIndex);
+        registerPlaceholder(m_placeholderMetallic, BindlessResourceManager::kPlaceholderMetallicIndex);
+        registerPlaceholder(m_placeholderRoughness, BindlessResourceManager::kPlaceholderRoughnessIndex);
+    }
 
     spdlog::info("Placeholder textures created");
     return Result<void>::Ok();

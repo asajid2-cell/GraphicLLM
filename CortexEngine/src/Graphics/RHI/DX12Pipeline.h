@@ -100,6 +100,51 @@ private:
     ComPtr<ID3D12RootSignature> m_rootSignature;
 };
 
+// Compute Root Signature wrapper (no input assembler, compatible with compute pipelines)
+class DX12ComputeRootSignature {
+public:
+    DX12ComputeRootSignature() = default;
+    ~DX12ComputeRootSignature() = default;
+
+    DX12ComputeRootSignature(const DX12ComputeRootSignature&) = delete;
+    DX12ComputeRootSignature& operator=(const DX12ComputeRootSignature&) = delete;
+    DX12ComputeRootSignature(DX12ComputeRootSignature&&) = default;
+    DX12ComputeRootSignature& operator=(DX12ComputeRootSignature&&) = default;
+
+    // Create compute-compatible root signature (same layout as graphics but without IA flag)
+    Result<void> Initialize(ID3D12Device* device);
+
+    [[nodiscard]] ID3D12RootSignature* GetRootSignature() const { return m_rootSignature.Get(); }
+
+private:
+    ComPtr<ID3D12RootSignature> m_rootSignature;
+};
+
+// Compute Pipeline State Object wrapper
+class DX12ComputePipeline {
+public:
+    DX12ComputePipeline() = default;
+    ~DX12ComputePipeline() = default;
+
+    DX12ComputePipeline(const DX12ComputePipeline&) = delete;
+    DX12ComputePipeline& operator=(const DX12ComputePipeline&) = delete;
+    DX12ComputePipeline(DX12ComputePipeline&&) = default;
+    DX12ComputePipeline& operator=(DX12ComputePipeline&&) = default;
+
+    // Create compute pipeline with root signature and compute shader
+    Result<void> Initialize(
+        ID3D12Device* device,
+        ID3D12RootSignature* rootSignature,
+        const ShaderBytecode& computeShader
+    );
+
+    // Accessors
+    [[nodiscard]] ID3D12PipelineState* GetPipelineState() const { return m_pipelineState.Get(); }
+
+private:
+    ComPtr<ID3D12PipelineState> m_pipelineState;
+};
+
 // Shader compiler helper
 class ShaderCompiler {
 public:

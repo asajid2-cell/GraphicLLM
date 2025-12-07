@@ -32,7 +32,8 @@ Result<void> Renderer::CreateSSAOResources() {
     desc.MipLevels = 1;
     desc.Format = DXGI_FORMAT_R8_UNORM;
     desc.SampleDesc.Count = 1;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    // Allow both RTV (graphics SSAO) and UAV (compute SSAO) access
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R8_UNORM;
@@ -102,6 +103,26 @@ Result<void> Renderer::CreateSSAOResources() {
         m_ssaoTex.Get(),
         &srvDesc,
         m_ssaoSRV.cpu
+    );
+
+    // UAV for async compute SSAO
+    if (!m_ssaoUAV.IsValid()) {
+        auto uavResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (uavResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate UAV for SSAO target: " + uavResult.Error());
+        }
+        m_ssaoUAV = uavResult.Value();
+    }
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = DXGI_FORMAT_R8_UNORM;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_ssaoTex.Get(),
+        nullptr,
+        &uavDesc,
+        m_ssaoUAV.cpu
     );
 
     spdlog::info("SSAO target created: {}x{}", width, height);
@@ -217,6 +238,104 @@ void Renderer::SetSSAOParams(float radius, float bias, float intensity) {
     m_ssaoBias = b;
     m_ssaoIntensity = i;
     spdlog::info("SSAO params set to radius={}, bias={}, intensity={}", m_ssaoRadius, m_ssaoBias, m_ssaoIntensity);
+}
+
+void Renderer::RenderSSAOAsync() {
+    // Compute shader version of SSAO - runs on graphics queue for now
+    // TODO: Move to dedicated async compute queue for true parallel execution
+    if (!m_ssaoEnabled || !m_ssaoComputePipeline || !m_ssaoTex ||
+        !m_depthBuffer || !m_depthSRV.IsValid() || !m_ssaoUAV.IsValid()) {
+        return;
+    }
+
+    // Transition depth to NON_PIXEL_SHADER_RESOURCE (for compute shader access)
+    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_depthBuffer.Get();
+        barrier.Transition.StateBefore = m_depthState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Transition SSAO target to UAV
+    if (m_ssaoState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_ssaoTex.Get();
+        barrier.Transition.StateBefore = m_ssaoState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_ssaoState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    // Bind compute pipeline and root signature
+    m_commandList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_ssaoComputePipeline->GetPipelineState());
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // Bind frame constants (b1)
+    m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    // Bind depth SRV as t0 via transient descriptor
+    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthHandleResult.IsErr()) {
+        spdlog::warn("RenderSSAOAsync: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
+        return;
+    }
+    DescriptorHandle depthHandle = depthHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        depthHandle.cpu,
+        m_depthSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // Bind SRV table at slot 3 (t0-t3)
+    m_commandList->SetComputeRootDescriptorTable(3, depthHandle.gpu);
+
+    // Bind SSAO UAV as u0 via transient descriptor
+    auto uavHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (uavHandleResult.IsErr()) {
+        spdlog::warn("RenderSSAOAsync: failed to allocate transient UAV: {}", uavHandleResult.Error());
+        return;
+    }
+    DescriptorHandle uavHandle = uavHandleResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        uavHandle.cpu,
+        m_ssaoUAV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    // Bind UAV table at slot 6 (u0-u3)
+    m_commandList->SetComputeRootDescriptorTable(6, uavHandle.gpu);
+
+    // Dispatch compute work (8x8 thread groups)
+    D3D12_RESOURCE_DESC texDesc = m_ssaoTex->GetDesc();
+    UINT dispatchX = (texDesc.Width + 7) / 8;
+    UINT dispatchY = (texDesc.Height + 7) / 8;
+
+    m_commandList->Dispatch(dispatchX, dispatchY, 1);
+
+    // Transition SSAO back to SRV for reading in post-process
+    {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_ssaoTex.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_ssaoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
 }
 
 } // namespace Cortex::Graphics

@@ -6,6 +6,7 @@
 #include <cstdint> // For uint8_t
 #include <string>
 #include "DescriptorHeap.h"
+#include "BindlessResources.h"
 #include "Utils/Result.h"
 
 using Microsoft::WRL::ComPtr;
@@ -107,6 +108,16 @@ public:
     // Create Shader Resource View (SRV) for binding to shaders
     Result<void> CreateSRV(ID3D12Device* device, DescriptorHandle handle);
 
+    // Create SRV in bindless heap and store the index
+    // This is the preferred method for SM6.6 bindless rendering
+    Result<void> CreateBindlessSRV(BindlessResourceManager* bindlessManager);
+
+    // Get the bindless index for this texture (kInvalidBindlessIndex if not registered)
+    [[nodiscard]] uint32_t GetBindlessIndex() const { return m_bindlessIndex; }
+
+    // Check if texture is registered in bindless heap
+    [[nodiscard]] bool HasBindlessIndex() const { return m_bindlessIndex != kInvalidBindlessIndex; }
+
     // Cubemap initialization from 6 RGBA8 faces (order: +X,-X,+Y,-Y,+Z,-Z)
     Result<void> InitializeCubeFromFaces(
         ID3D12Device* device,
@@ -137,7 +148,8 @@ private:
     DXGI_FORMAT m_format = DXGI_FORMAT_R8G8B8A8_UNORM;
     D3D12_RESOURCE_STATES m_currentState = D3D12_RESOURCE_STATE_COMMON;
 
-    DescriptorHandle m_srvHandle;  // Shader Resource View handle
+    DescriptorHandle m_srvHandle;  // Shader Resource View handle (legacy descriptor table)
+    uint32_t m_bindlessIndex = kInvalidBindlessIndex;  // Bindless heap index for SM6.6
     bool m_isCubeMap = false;
 
     // Helper for uploading data via upload buffer

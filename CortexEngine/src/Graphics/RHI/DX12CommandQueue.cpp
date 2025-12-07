@@ -102,6 +102,20 @@ void DX12CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
     WaitForSingleObject(m_fenceEvent, INFINITE);
 }
 
+void DX12CommandQueue::WaitForQueue(ID3D12Fence* otherFence, uint64_t fenceValue) {
+    if (!m_commandQueue || !otherFence || fenceValue == 0) {
+        return;
+    }
+
+    // GPU-side wait: this queue waits for the other queue's fence to reach the specified value
+    // This enables cross-queue synchronization for async compute
+    HRESULT hr = m_commandQueue->Wait(otherFence, fenceValue);
+    if (FAILED(hr)) {
+        spdlog::error("Failed to wait for cross-queue fence: 0x{:08X}",
+                      static_cast<unsigned int>(hr));
+    }
+}
+
 void DX12CommandQueue::Flush() {
     if (!m_commandQueue || !m_fence) {
         return;

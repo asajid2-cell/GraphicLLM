@@ -87,7 +87,11 @@ cbuffer MaterialConstants : register(b2)
     float g_Metallic;
     float g_Roughness;
     float g_AO;
-    uint4 g_MapFlags;      // x: albedo, y: normal, z: metallic, w: roughness
+    float g_MaterialPad0;  // Padding for 16-byte alignment
+    // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
+    // Use 0xFFFFFFFF for invalid/unused textures
+    uint4 g_TextureIndices;  // x: albedo, y: normal, z: metallic, w: roughness
+    uint4 g_MapFlags;        // x: albedo, y: normal, z: metallic, w: roughness (legacy)
     float4 g_FractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     float4 g_FractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
@@ -95,7 +99,10 @@ cbuffer MaterialConstants : register(b2)
     float4 g_CoatParams;
 };
 
-// Texture and sampler
+// Invalid bindless index sentinel
+static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFF;
+
+// Legacy texture and sampler bindings (must be declared before helper functions)
 Texture2D g_AlbedoTexture : register(t0);
 Texture2D g_NormalTexture : register(t1);
 Texture2D g_MetallicTexture : register(t2);
@@ -108,9 +115,65 @@ Texture2D g_EnvDiffuse : register(t1, space1);
 Texture2D g_EnvSpecular : register(t2, space1);
 Texture2D<float> g_RtShadowMask : register(t3, space1);
 Texture2D<float> g_RtShadowMaskHistory : register(t4, space1);
-  Texture2D g_RtGI : register(t5, space1);
-  Texture2D g_RtGIHistory : register(t6, space1);
+Texture2D g_RtGI : register(t5, space1);
+Texture2D g_RtGIHistory : register(t6, space1);
 SamplerState g_Sampler : register(s0);
+
+// ============================================================================
+// BINDLESS TEXTURE SUPPORT (SM6.6)
+// ============================================================================
+// When ENABLE_BINDLESS is defined (requires SM6.6 / DXC compiler), we use
+// ResourceDescriptorHeap[] to sample textures directly by index. This enables
+// GPU-driven rendering where material texture choices are made entirely on
+// the GPU without CPU descriptor table binding.
+//
+// When ENABLE_BINDLESS is not defined (SM5.1 / D3DCompile), we always use
+// the legacy descriptor table textures for full backwards compatibility.
+// ============================================================================
+
+// Helper functions to sample textures with bindless fallback
+float4 SampleBindlessTexture(uint textureIndex, Texture2D fallbackTex, float2 uv, SamplerState samp)
+{
+#ifdef ENABLE_BINDLESS
+    if (textureIndex != INVALID_BINDLESS_INDEX)
+    {
+        // SM6.6 bindless access via ResourceDescriptorHeap
+        Texture2D tex = ResourceDescriptorHeap[textureIndex];
+        return tex.Sample(samp, uv);
+    }
+    else
+    {
+        return fallbackTex.Sample(samp, uv);
+    }
+#else
+    // SM5.1 fallback: always use descriptor table textures
+    return fallbackTex.Sample(samp, uv);
+#endif
+}
+
+// Sample albedo texture (with bindless support)
+float4 SampleAlbedo(float2 uv)
+{
+    return SampleBindlessTexture(g_TextureIndices.x, g_AlbedoTexture, uv, g_Sampler);
+}
+
+// Sample normal texture (with bindless support)
+float4 SampleNormal(float2 uv)
+{
+    return SampleBindlessTexture(g_TextureIndices.y, g_NormalTexture, uv, g_Sampler);
+}
+
+// Sample metallic texture (with bindless support)
+float4 SampleMetallic(float2 uv)
+{
+    return SampleBindlessTexture(g_TextureIndices.z, g_MetallicTexture, uv, g_Sampler);
+}
+
+// Sample roughness texture (with bindless support)
+float4 SampleRoughness(float2 uv)
+{
+    return SampleBindlessTexture(g_TextureIndices.w, g_RoughnessTexture, uv, g_Sampler);
+}
 
 // Vertex shader input
 struct VSInput
@@ -1171,23 +1234,27 @@ float4 DebugLinePS(DebugPSInput input) : SV_TARGET
 // Pixel Shader
 PSOutput PSMain(PSInput input)
 {
-    // Sample albedo texture
-    float4 albedoSample = g_MapFlags.x ? g_AlbedoTexture.Sample(g_Sampler, input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
+    // Sample albedo texture using bindless sampling (falls back to legacy if no bindless index)
+    bool hasAlbedoMap = (g_TextureIndices.x != INVALID_BINDLESS_INDEX) || g_MapFlags.x;
+    float4 albedoSample = hasAlbedoMap ? SampleAlbedo(input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
     float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb);
     float  baseOpacity = saturate(albedoSample.a * g_Albedo.a);
 
-    float metallic = g_MapFlags.z ? g_MetallicTexture.Sample(g_Sampler, input.texCoord).r : g_Metallic;
-    float roughness = g_MapFlags.w ? g_RoughnessTexture.Sample(g_Sampler, input.texCoord).r : g_Roughness;
+    bool hasMetallicMap = (g_TextureIndices.z != INVALID_BINDLESS_INDEX) || g_MapFlags.z;
+    bool hasRoughnessMap = (g_TextureIndices.w != INVALID_BINDLESS_INDEX) || g_MapFlags.w;
+    float metallic = hasMetallicMap ? SampleMetallic(input.texCoord).r : g_Metallic;
+    float roughness = hasRoughnessMap ? SampleRoughness(input.texCoord).r : g_Roughness;
     float ao = g_AO;
 
-    // Normal mapping
+    // Normal mapping using bindless sampling
     float3 normal = normalize(input.normal);
-    if (g_MapFlags.y) {
+    bool hasNormalMap = (g_TextureIndices.y != INVALID_BINDLESS_INDEX) || g_MapFlags.y;
+    if (hasNormalMap) {
         float3 tangent = normalize(input.tangent.xyz);
         float bitangentSign = (input.tangent.w >= 0.0f) ? 1.0f : -1.0f;
         float3 bitangent = normalize(cross(normal, tangent)) * bitangentSign;
         float3x3 TBN = float3x3(tangent, bitangent, normal);
-        float3 nSample = g_NormalTexture.Sample(g_Sampler, input.texCoord).xyz * 2.0f - 1.0f;
+        float3 nSample = SampleNormal(input.texCoord).xyz * 2.0f - 1.0f;
         normal = normalize(mul(TBN, nSample));
     }
 

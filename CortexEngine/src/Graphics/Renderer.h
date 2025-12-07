@@ -14,6 +14,10 @@
 #include "RHI/DX12Texture.h"
 #include "RHI/DescriptorHeap.h"
 #include "RHI/DX12Raytracing.h"
+#include "RHI/BindlessResources.h"
+#include "GPUCulling.h"
+#include "RenderGraph.h"
+#include "VisibilityBuffer.h"
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
 #include "Graphics/HyperGeometry/HyperGeometryEngine.h"
 #endif
@@ -361,6 +365,13 @@ public:
     [[nodiscard]] bool IsDeviceRemoved() const { return m_deviceRemoved; }
     void SetRayTracingEnabled(bool enabled);
 
+    // GPU-driven rendering (Phase 1 GPU culling + indirect draw)
+    void SetGPUCullingEnabled(bool enabled);
+    [[nodiscard]] bool IsGPUCullingEnabled() const { return m_gpuCullingEnabled && m_gpuCulling != nullptr; }
+    [[nodiscard]] bool IsIndirectDrawEnabled() const { return m_indirectDrawEnabled; }
+    [[nodiscard]] uint32_t GetGPUCulledCount() const;
+    [[nodiscard]] uint32_t GetGPUTotalInstances() const;
+
     // Experimental voxel backend toggle. When enabled, the main Render path
     // skips the traditional raster + RT pipeline and instead runs a
     // fullscreen voxel raymarch pass that visualizes the scene using a
@@ -453,6 +464,7 @@ private:
     Result<void> CreateShadowMapResources();
     void RecreateShadowMapResourcesForCurrentSize();
     Result<void> CreateHDRTarget();
+    Result<void> CreateVisibilityBuffer();
     Result<void> CreateBloomResources();
     Result<void> CreateSSAOResources();
     Result<void> CreateRTShadowMask();
@@ -472,6 +484,7 @@ private:
     void RenderTAA();
     void RenderMotionVectors();
     void RenderSSAO();
+    void RenderSSAOAsync();  // Async compute version
     void RenderBloom();
     void RenderPostProcess();
     void RenderDebugLines();
@@ -481,6 +494,15 @@ private:
     Result<void> UploadVoxelGridToGPU();
     void RenderRayTracing(Scene::ECS_Registry* registry);
     void RenderParticles(Scene::ECS_Registry* registry);
+
+    // GPU-driven rendering (Phase 1)
+    void CollectInstancesForGPUCulling(Scene::ECS_Registry* registry);
+    void DispatchGPUCulling();
+    void RenderSceneIndirect(Scene::ECS_Registry* registry);
+
+    // Visibility buffer rendering (Phase 2.1)
+    void CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry);
+    void RenderVisibilityBufferPath(Scene::ECS_Registry* registry);
 
     // Debug drawing API
 public:
@@ -504,20 +526,32 @@ public:
 
     std::unique_ptr<DX12CommandQueue> m_commandQueue;
     std::unique_ptr<DX12CommandQueue> m_uploadQueue;
+    std::unique_ptr<DX12CommandQueue> m_computeQueue;  // Async compute for parallel workloads
     std::unique_ptr<DescriptorHeapManager> m_descriptorManager;
+    std::unique_ptr<BindlessResourceManager> m_bindlessManager;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     std::unique_ptr<HyperGeometry::HyperGeometryEngine> m_hyperGeometry;
 #endif
     std::unique_ptr<DX12RaytracingContext> m_rayTracingContext;
+    std::unique_ptr<GPUCullingPipeline> m_gpuCulling;
+    std::unique_ptr<RenderGraph> m_renderGraph;
+    std::unique_ptr<VisibilityBufferRenderer> m_visibilityBuffer;
 
     ComPtr<ID3D12CommandAllocator> m_commandAllocators[kFrameCount];  // One per frame
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    // Async compute command resources
+    ComPtr<ID3D12CommandAllocator> m_computeAllocators[kFrameCount];
+    ComPtr<ID3D12GraphicsCommandList> m_computeCommandList;
+    uint64_t m_computeFenceValues[kFrameCount] = {0, 0, 0};
+    bool m_asyncComputeSupported = false;
     uint32_t m_frameIndex = 0;
     uint64_t m_absoluteFrameIndex = 0;  // Monotonically increasing frame counter
     bool m_commandListOpen = false;  // Tracks whether command list is currently recording
+    bool m_computeListOpen = false;  // Tracks compute command list state
 
     // Pipeline state
     std::unique_ptr<DX12RootSignature> m_rootSignature;
+    std::unique_ptr<DX12ComputeRootSignature> m_computeRootSignature;  // For compute shaders
     std::unique_ptr<DX12Pipeline> m_pipeline;
     // Blended variant of the main PBR pipeline used for glass/transparent
     // materials. Shares the same shaders and input layout but enables
@@ -531,6 +565,7 @@ public:
     std::unique_ptr<DX12Pipeline> m_taaPipeline;
     std::unique_ptr<DX12Pipeline> m_ssrPipeline;
     std::unique_ptr<DX12Pipeline> m_ssaoPipeline;
+    std::unique_ptr<DX12ComputePipeline> m_ssaoComputePipeline;  // Async compute version of SSAO
     std::unique_ptr<DX12Pipeline> m_motionVectorsPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomDownsamplePipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurHPipeline;
@@ -671,6 +706,7 @@ public:
     ComPtr<ID3D12Resource> m_ssaoTex;
     DescriptorHandle m_ssaoRTV;
     DescriptorHandle m_ssaoSRV;
+    DescriptorHandle m_ssaoUAV;  // For async compute SSAO
     D3D12_RESOURCE_STATES m_ssaoState = D3D12_RESOURCE_STATE_COMMON;
 
     // Screen-space reflection color buffer
@@ -844,6 +880,15 @@ public:
       // and memory headroom have been verified.
       bool m_rtReflectionsEnabled = false;
       bool m_rtGIEnabled = false;
+      // GPU-driven rendering flags
+      bool m_gpuCullingEnabled = false;    // Use GPU frustum culling
+      bool m_indirectDrawEnabled = false;  // Use ExecuteIndirect for draws
+      // Cached instance data for GPU culling (rebuilt each frame from ECS)
+      std::vector<GPUInstanceData> m_gpuInstances;
+      // Mesh info for indirect draws (maps instance -> mesh draw args)
+      std::vector<MeshInfo> m_meshInfos;
+      // Visibility buffer instance data (Phase 2.1)
+      std::vector<VBInstanceData> m_vbInstances;
       // Sticky flag set when the DX12 device reports "device removed" during
       // resource creation (typically due to GPU memory pressure). Once this
       // is true the renderer will skip further heavy work for the remainder

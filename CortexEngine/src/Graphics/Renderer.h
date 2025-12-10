@@ -889,6 +889,7 @@ public:
       std::vector<MeshInfo> m_meshInfos;
       // Visibility buffer instance data (Phase 2.1)
       std::vector<VBInstanceData> m_vbInstances;
+      std::vector<VisibilityBufferRenderer::VBMeshDrawInfo> m_vbMeshDraws;
       // Sticky flag set when the DX12 device reports "device removed" during
       // resource creation (typically due to GPU memory pressure). Once this
       // is true the renderer will skip further heavy work for the remainder

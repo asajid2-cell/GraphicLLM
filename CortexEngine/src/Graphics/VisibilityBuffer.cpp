@@ -65,6 +65,13 @@ Result<void> VisibilityBufferRenderer::Initialize(
     }
     m_instanceBuffer->SetName(L"VB_InstanceBuffer");
 
+    // Persistently map the instance buffer (upload heap allows this)
+    D3D12_RANGE readRange = {0, 0}; // We won't read from this buffer on CPU
+    hr = m_instanceBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferMapped));
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to persistently map instance buffer");
+    }
+
     // Create instance buffer SRV
     auto instanceSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
     if (instanceSrvResult.IsErr()) {
@@ -96,6 +103,12 @@ Result<void> VisibilityBufferRenderer::Initialize(
 }
 
 void VisibilityBufferRenderer::Shutdown() {
+    // Unmap instance buffer before releasing it
+    if (m_instanceBuffer && m_instanceBufferMapped) {
+        m_instanceBuffer->Unmap(0, nullptr);
+        m_instanceBufferMapped = nullptr;
+    }
+
     m_visibilityBuffer.Reset();
     m_gbufferAlbedo.Reset();
     m_gbufferNormalRoughness.Reset();
@@ -105,6 +118,7 @@ void VisibilityBufferRenderer::Shutdown() {
     m_visibilityRootSignature.Reset();
     m_resolvePipeline.Reset();
     m_resolveRootSignature.Reset();
+    m_deferredLightingCB.Reset();
 
     m_device = nullptr;
     m_descriptorManager = nullptr;
@@ -389,17 +403,17 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     // ========================================================================
     // Visibility Pass Root Signature
     // Matches VisibilityPass.hlsl:
-    //   b0: ViewProjection matrix
+    //   b0: ViewProjection matrix + mesh index (16 + 4 = 20 dwords)
     //   t0: Instance data (StructuredBuffer<VBInstanceData>)
     // ========================================================================
     {
         D3D12_ROOT_PARAMETER1 params[2] = {};
 
-        // b0: View-projection matrix (16 floats = 4x4 matrix)
+        // b0: View-projection matrix (16 floats) + mesh index (1 uint) + padding (3 uints)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 16;
+        params[0].Constants.Num32BitValues = 20;  // 16 for matrix + 4 for (meshIdx + pad)
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         // t0: Instance buffer SRV (via descriptor)
@@ -437,6 +451,8 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     //   t0: Visibility buffer SRV (Texture2D - needs descriptor table)
     //   t1: Instance data SRV (StructuredBuffer - can use root descriptor)
     //   t2: Depth buffer SRV (Texture2D - needs descriptor table)
+    //   t3: Vertex buffer (ByteAddressBuffer - can use root descriptor)
+    //   t4: Index buffer (ByteAddressBuffer - can use root descriptor)
     //   u0-u2: G-buffer UAVs (RWTexture2D - need descriptor tables)
     // ========================================================================
     {
@@ -467,13 +483,13 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
         uavRange.OffsetInDescriptorsFromTableStart = 0;
 
-        D3D12_ROOT_PARAMETER1 params[4] = {};
+        D3D12_ROOT_PARAMETER1 params[6] = {};
 
-        // b0: Resolution constants (4 uints/floats)
+        // b0: Resolution constants + view-projection matrix + mesh index (4 + 16 + 4 = 24 dwords)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 4;
+        params[0].Constants.Num32BitValues = 24;  // 4 for resolution + 16 for mat4x4 + 4 for mesh index + padding
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // t1: Instance data SRV (StructuredBuffer - can use root descriptor)
@@ -494,9 +510,21 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[3].DescriptorTable.pDescriptorRanges = &uavRange;
         params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+        // t3: Vertex buffer (ByteAddressBuffer - root descriptor)
+        params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        params[4].Descriptor.ShaderRegister = 3;
+        params[4].Descriptor.RegisterSpace = 0;
+        params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        // t4: Index buffer (ByteAddressBuffer - root descriptor)
+        params[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        params[5].Descriptor.ShaderRegister = 4;
+        params[5].Descriptor.RegisterSpace = 0;
+        params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
         rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootDesc.Desc_1_1.NumParameters = 4;
+        rootDesc.Desc_1_1.NumParameters = 6;
         rootDesc.Desc_1_1.pParameters = params;
         rootDesc.Desc_1_1.NumStaticSamplers = 0;
         rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
@@ -552,7 +580,7 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
         return Result<void>::Err("Failed to compile VisibilityPass PS: " + psResult.Error());
     }
 
-    // Input layout MUST match actual Vertex structure (52 bytes)
+    // Input layout MUST match actual Vertex structure (48 bytes)
     // Shader only uses POSITION, but IA needs full layout for correct stride
     D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -628,6 +656,301 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
     }
 
     spdlog::info("VisibilityBuffer: Material resolve pipeline created");
+
+    // ========================================================================
+    // Debug Blit Pipeline (Graphics)
+    // ========================================================================
+
+    // Compile blit shaders
+    auto blitVS = ShaderCompiler::CompileFromFile(
+        "assets/shaders/DebugBlitAlbedo.hlsl",
+        "VSMain",
+        "vs_6_6"
+    );
+    if (blitVS.IsErr()) {
+        spdlog::warn("Failed to compile DebugBlitAlbedo VS: {}", blitVS.Error());
+        // Non-critical, continue without blit support
+        return Result<void>::Ok();
+    }
+
+    auto blitPS = ShaderCompiler::CompileFromFile(
+        "assets/shaders/DebugBlitAlbedo.hlsl",
+        "PSMain",
+        "ps_6_6"
+    );
+    if (blitPS.IsErr()) {
+        spdlog::warn("Failed to compile DebugBlitAlbedo PS: {}", blitPS.Error());
+        return Result<void>::Ok();
+    }
+
+    // Create blit root signature: t0 (albedo SRV), s0 (sampler)
+    {
+        D3D12_DESCRIPTOR_RANGE1 srvRange = {};
+        srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        srvRange.NumDescriptors = 1;
+        srvRange.BaseShaderRegister = 0;
+        srvRange.RegisterSpace = 0;
+        srvRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+
+        D3D12_DESCRIPTOR_RANGE1 samplerRange = {};
+        samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        samplerRange.NumDescriptors = 1;
+        samplerRange.BaseShaderRegister = 0;
+        samplerRange.RegisterSpace = 0;
+        samplerRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+
+        D3D12_ROOT_PARAMETER1 params[2] = {};
+        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[0].DescriptorTable.NumDescriptorRanges = 1;
+        params[0].DescriptorTable.pDescriptorRanges = &srvRange;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[1].DescriptorTable.NumDescriptorRanges = 1;
+        params[1].DescriptorTable.pDescriptorRanges = &samplerRange;
+        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC blitRootDesc = {};
+        blitRootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+        blitRootDesc.Desc_1_1.NumParameters = 2;
+        blitRootDesc.Desc_1_1.pParameters = params;
+        blitRootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+        ComPtr<ID3DBlob> signature, error;
+        hr = D3D12SerializeVersionedRootSignature(&blitRootDesc, &signature, &error);
+        if (FAILED(hr)) {
+            spdlog::warn("Failed to serialize blit root signature");
+            return Result<void>::Ok();
+        }
+
+        hr = device->CreateRootSignature(
+            0, signature->GetBufferPointer(), signature->GetBufferSize(),
+            IID_PPV_ARGS(&m_blitRootSignature)
+        );
+        if (FAILED(hr)) {
+            spdlog::warn("Failed to create blit root signature");
+            return Result<void>::Ok();
+        }
+    }
+
+    // Create blit PSO (fullscreen triangle, no depth)
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC blitPsoDesc = {};
+    blitPsoDesc.pRootSignature = m_blitRootSignature.Get();
+    blitPsoDesc.VS = { blitVS.Value().data.data(), blitVS.Value().data.size() };
+    blitPsoDesc.PS = { blitPS.Value().data.data(), blitPS.Value().data.size() };
+    blitPsoDesc.BlendState.RenderTarget[0] = {
+        FALSE, FALSE,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_LOGIC_OP_NOOP,
+        D3D12_COLOR_WRITE_ENABLE_ALL
+    };
+    blitPsoDesc.SampleMask = UINT_MAX;
+    blitPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    blitPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    blitPsoDesc.RasterizerState.FrontCounterClockwise = FALSE;
+    blitPsoDesc.RasterizerState.DepthClipEnable = FALSE;
+    blitPsoDesc.RasterizerState.MultisampleEnable = FALSE;
+    blitPsoDesc.RasterizerState.AntialiasedLineEnable = FALSE;
+    blitPsoDesc.DepthStencilState.DepthEnable = FALSE;
+    blitPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    blitPsoDesc.DepthStencilState.StencilEnable = FALSE;
+    blitPsoDesc.InputLayout = { nullptr, 0 }; // No input layout
+    blitPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    blitPsoDesc.NumRenderTargets = 1;
+    blitPsoDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT; // HDR format
+    blitPsoDesc.SampleDesc.Count = 1;
+
+    hr = device->CreateGraphicsPipelineState(&blitPsoDesc, IID_PPV_ARGS(&m_blitPipeline));
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create blit PSO");
+        return Result<void>::Ok();
+    }
+
+    // Create dedicated sampler heap for blit sampler
+    D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+    samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+    samplerHeapDesc.NumDescriptors = 1;
+    samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    hr = device->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_blitSamplerHeap));
+    if (FAILED(hr)) {
+        spdlog::warn("Failed to create blit sampler heap");
+        return Result<void>::Ok();
+    }
+
+    // Create linear sampler for blit
+    D3D12_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    device->CreateSampler(&samplerDesc, m_blitSamplerHeap->GetCPUDescriptorHandleForHeapStart());
+
+    spdlog::info("VisibilityBuffer: Debug blit pipeline created");
+
+    // ========================================================================
+    // Deferred Lighting Root Signature (Graphics - Fullscreen Pass)
+    // Matches DeferredLighting.hlsl:
+    //   b0: Lighting parameters (view matrices, sun, IBL, etc.)
+    //   t0: G-buffer albedo SRV
+    //   t1: G-buffer normal+roughness SRV
+    //   t2: G-buffer emissive+metallic SRV
+    //   t3: Depth buffer SRV
+    //   t4: Environment map SRV (TextureCube)
+    //   t5: Shadow map SRV
+    //   s0: Linear sampler
+    //   s1: Shadow comparison sampler
+    // ========================================================================
+    {
+        // Descriptor ranges for G-buffer SRVs (t0-t3: 4 textures)
+        D3D12_DESCRIPTOR_RANGE1 gbufferRange = {};
+        gbufferRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        gbufferRange.NumDescriptors = 4;
+        gbufferRange.BaseShaderRegister = 0;
+        gbufferRange.RegisterSpace = 0;
+        gbufferRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+        gbufferRange.OffsetInDescriptorsFromTableStart = 0;
+
+        // Descriptor ranges for env + shadow (t4-t5: 2 textures)
+        D3D12_DESCRIPTOR_RANGE1 envShadowRange = {};
+        envShadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        envShadowRange.NumDescriptors = 2;
+        envShadowRange.BaseShaderRegister = 4;
+        envShadowRange.RegisterSpace = 0;
+        envShadowRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+        envShadowRange.OffsetInDescriptorsFromTableStart = 0;
+
+        D3D12_ROOT_PARAMETER1 params[3] = {};
+
+        // b0: Lighting parameters (root CBV descriptor - too large for inline constants)
+        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        params[0].Descriptor.ShaderRegister = 0;
+        params[0].Descriptor.RegisterSpace = 0;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // t0-t3: G-buffer + depth SRVs
+        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[1].DescriptorTable.NumDescriptorRanges = 1;
+        params[1].DescriptorTable.pDescriptorRanges = &gbufferRange;
+        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // t4-t5: Environment + shadow map SRVs
+        params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[2].DescriptorTable.NumDescriptorRanges = 1;
+        params[2].DescriptorTable.pDescriptorRanges = &envShadowRange;
+        params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // Static samplers
+        D3D12_STATIC_SAMPLER_DESC samplers[2] = {};
+
+        // s0: Linear sampler
+        samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        samplers[0].ShaderRegister = 0;
+        samplers[0].RegisterSpace = 0;
+        samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        // s1: Shadow comparison sampler
+        samplers[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        samplers[1].ShaderRegister = 1;
+        samplers[1].RegisterSpace = 0;
+        samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
+        rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+        rootDesc.Desc_1_1.NumParameters = 3;
+        rootDesc.Desc_1_1.pParameters = params;
+        rootDesc.Desc_1_1.NumStaticSamplers = 2;
+        rootDesc.Desc_1_1.pStaticSamplers = samplers;
+        rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+        ComPtr<ID3DBlob> signature, error;
+        hr = D3D12SerializeVersionedRootSignature(&rootDesc, &signature, &error);
+        if (FAILED(hr)) {
+            if (error) {
+                spdlog::warn("Failed to serialize deferred lighting root signature: {}",
+                    static_cast<const char*>(error->GetBufferPointer()));
+            } else {
+                spdlog::warn("Failed to serialize deferred lighting root signature (HRESULT: 0x{:08X})", static_cast<uint32_t>(hr));
+            }
+            return Result<void>::Ok();
+        }
+
+        hr = device->CreateRootSignature(
+            0, signature->GetBufferPointer(), signature->GetBufferSize(),
+            IID_PPV_ARGS(&m_deferredLightingRootSignature)
+        );
+        if (FAILED(hr)) {
+            spdlog::warn("Failed to create deferred lighting root signature (HRESULT: 0x{:08X})", static_cast<uint32_t>(hr));
+            return Result<void>::Ok();
+        }
+    }
+
+    // ========================================================================
+    // Deferred Lighting Pipeline (Graphics - Fullscreen)
+    // ========================================================================
+    {
+        // Compile shaders
+        auto deferredVS = ShaderCompiler::CompileFromFile(
+            "assets/shaders/DeferredLighting.hlsl",
+            "VSMain",
+            "vs_6_6"
+        );
+        if (deferredVS.IsErr()) {
+            spdlog::warn("Failed to compile deferred lighting VS: {}", deferredVS.Error());
+            return Result<void>::Ok();
+        }
+
+        auto deferredPS = ShaderCompiler::CompileFromFile(
+            "assets/shaders/DeferredLighting.hlsl",
+            "PSMain",
+            "ps_6_6"
+        );
+        if (deferredPS.IsErr()) {
+            spdlog::warn("Failed to compile deferred lighting PS: {}", deferredPS.Error());
+            return Result<void>::Ok();
+        }
+
+        // Create PSO
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredPsoDesc = {};
+        deferredPsoDesc.pRootSignature = m_deferredLightingRootSignature.Get();
+        deferredPsoDesc.VS = {deferredVS.Value().data.data(), deferredVS.Value().data.size()};
+        deferredPsoDesc.PS = {deferredPS.Value().data.data(), deferredPS.Value().data.size()};
+
+        deferredPsoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        deferredPsoDesc.SampleMask = UINT_MAX;
+
+        deferredPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        deferredPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        deferredPsoDesc.RasterizerState.DepthClipEnable = TRUE;
+
+        deferredPsoDesc.DepthStencilState.DepthEnable = FALSE;
+        deferredPsoDesc.DepthStencilState.StencilEnable = FALSE;
+
+        deferredPsoDesc.InputLayout = {nullptr, 0};
+        deferredPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        deferredPsoDesc.NumRenderTargets = 1;
+        deferredPsoDesc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT; // HDR format
+        deferredPsoDesc.SampleDesc.Count = 1;
+
+        hr = device->CreateGraphicsPipelineState(&deferredPsoDesc, IID_PPV_ARGS(&m_deferredLightingPipeline));
+        if (FAILED(hr)) {
+            spdlog::warn("Failed to create deferred lighting PSO");
+            return Result<void>::Ok();
+        }
+
+        spdlog::info("VisibilityBuffer: Deferred lighting pipeline created");
+    }
+
     spdlog::info("VisibilityBuffer pipelines created successfully");
 
     return Result<void>::Ok();
@@ -646,15 +969,12 @@ Result<void> VisibilityBufferRenderer::UpdateInstances(
         return Result<void>::Err("Too many instances for visibility buffer");
     }
 
-    uint8_t* mapped = nullptr;
-    D3D12_RANGE readRange = {0, 0};
-    HRESULT hr = m_instanceBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mapped));
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map instance buffer");
+    if (!m_instanceBufferMapped) {
+        return Result<void>::Err("Instance buffer not mapped");
     }
 
-    memcpy(mapped, instances.data(), instances.size() * sizeof(VBInstanceData));
-    m_instanceBuffer->Unmap(0, nullptr);
+    // Write to persistently mapped buffer
+    memcpy(m_instanceBufferMapped, instances.data(), instances.size() * sizeof(VBInstanceData));
 
     m_instanceCount = static_cast<uint32_t>(instances.size());
     return Result<void>::Ok();
@@ -664,8 +984,13 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     ID3D12GraphicsCommandList* cmdList,
     ID3D12Resource* depthBuffer,
     D3D12_CPU_DESCRIPTOR_HANDLE depthDSV,
-    const glm::mat4& viewProj
+    const glm::mat4& viewProj,
+    const std::vector<VBMeshDrawInfo>& meshDraws
 ) {
+    if (meshDraws.empty() || m_instanceCount == 0) {
+        return Result<void>::Ok(); // Nothing to draw
+    }
+
     // Transition visibility buffer to render target
     if (m_visibilityState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         D3D12_RESOURCE_BARRIER barrier = {};
@@ -678,7 +1003,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         m_visibilityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    // Clear visibility buffer
+    // Clear visibility buffer to 0xFFFFFFFF (background marker)
     UINT clearValues[4] = {0xFFFFFFFF, 0xFFFFFFFF, 0, 0};
     cmdList->ClearRenderTargetView(m_visibilityRTV.cpu, reinterpret_cast<float*>(clearValues), 0, nullptr);
 
@@ -691,14 +1016,74 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     cmdList->RSSetViewports(1, &viewport);
     cmdList->RSSetScissorRects(1, &scissor);
 
+    // Set pipeline state and root signature
+    cmdList->SetPipelineState(m_visibilityPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_visibilityRootSignature.Get());
+
+    // Set instance buffer (root descriptor t0) - only needs to be set once
+    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
+    cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
+
+    // Set primitive topology
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Draw each unique mesh with all instances that use it
+    // The vertex shader will filter instances based on meshIndex
+    for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
+        const auto& drawInfo = meshDraws[meshIdx];
+
+        if (!drawInfo.vertexBuffer || !drawInfo.indexBuffer || drawInfo.indexCount == 0) {
+            continue;
+        }
+
+        // Set per-mesh constants (view-projection matrix + current mesh index)
+        struct {
+            glm::mat4 viewProj;
+            uint32_t meshIndex;
+            uint32_t pad[3];
+        } perMeshData;
+        perMeshData.viewProj = viewProj;
+        perMeshData.meshIndex = meshIdx;
+        cmdList->SetGraphicsRoot32BitConstants(0, 20, &perMeshData, 0);
+
+        // Set vertex buffer for this mesh
+        D3D12_VERTEX_BUFFER_VIEW vbv = {};
+        vbv.BufferLocation = drawInfo.vertexBuffer->GetGPUVirtualAddress();
+        vbv.SizeInBytes = drawInfo.vertexCount * 48; // sizeof(Vertex) = 48 bytes
+        vbv.StrideInBytes = 48;
+        cmdList->IASetVertexBuffers(0, 1, &vbv);
+
+        // Set index buffer for this mesh
+        D3D12_INDEX_BUFFER_VIEW ibv = {};
+        ibv.BufferLocation = drawInfo.indexBuffer->GetGPUVirtualAddress();
+        ibv.SizeInBytes = drawInfo.indexCount * sizeof(uint32_t);
+        ibv.Format = DXGI_FORMAT_R32_UINT;
+        cmdList->IASetIndexBuffer(&ibv);
+
+        // Draw all instances - vertex shader filters by meshIndex
+        // DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance)
+        cmdList->DrawIndexedInstanced(
+            drawInfo.indexCount,
+            m_instanceCount,           // Draw ALL instances (VS filters by meshIndex)
+            drawInfo.firstIndex,
+            drawInfo.baseVertex,
+            0                          // Start from instance 0
+        );
+    }
+
     return Result<void>::Ok();
 }
 
 Result<void> VisibilityBufferRenderer::ResolveMaterials(
     ID3D12GraphicsCommandList* cmdList,
     ID3D12Resource* depthBuffer,
-    D3D12_GPU_DESCRIPTOR_HANDLE depthSRV
+    D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+    const std::vector<VBMeshDrawInfo>& meshDraws,
+    const glm::mat4& viewProj
 ) {
+    if (meshDraws.empty()) {
+        return Result<void>::Err("No meshes provided for material resolve");
+    }
     // Transition visibility buffer to shader resource
     if (m_visibilityState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
@@ -749,6 +1134,71 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         cmdList->ResourceBarrier(barrierCount, barriers);
     }
 
+    // Set compute pipeline
+    cmdList->SetPipelineState(m_resolvePipeline.Get());
+    cmdList->SetComputeRootSignature(m_resolveRootSignature.Get());
+
+    // Param 0 (b0): Resolution constants + view-projection matrix + mesh index
+    struct ResolutionConstants {
+        uint32_t width;
+        uint32_t height;
+        float rcpWidth;
+        float rcpHeight;
+        glm::mat4 viewProj;  // 16 floats
+        uint32_t currentMeshIndex;  // Current mesh being processed
+        uint32_t pad[3];
+    } resConsts;
+
+    // Param 1 (t1): Instance buffer SRV (root descriptor)
+    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
+    cmdList->SetComputeRootShaderResourceView(1, instanceBufferAddress);
+
+    // Param 2: Descriptor table with t0 (visibility buffer SRV) + t2 (depth SRV)
+    // NOTE: This assumes visibility and depth SRVs are contiguous in heap
+    // Proper implementation would allocate temp descriptor table and copy
+    cmdList->SetComputeRootDescriptorTable(2, m_visibilitySRV.gpu);
+
+    // Param 3: Descriptor table with u0-u2 (G-buffer UAVs)
+    // NOTE: This assumes G-buffer UAVs are contiguous in heap
+    cmdList->SetComputeRootDescriptorTable(3, m_albedoUAV.gpu);
+
+    // Dispatch material resolve for each mesh separately
+    // This ensures each mesh uses its correct vertex/index buffers
+    // The shader will process only pixels that belong to instances using that mesh
+    uint32_t dispatchX = (m_width + 7) / 8;
+    uint32_t dispatchY = (m_height + 7) / 8;
+
+    for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
+        const auto& drawInfo = meshDraws[meshIdx];
+
+        if (!drawInfo.vertexBuffer || !drawInfo.indexBuffer) {
+            continue;
+        }
+
+        // Update constant buffer with current mesh index
+        resConsts.width = m_width;
+        resConsts.height = m_height;
+        resConsts.rcpWidth = 1.0f / static_cast<float>(m_width);
+        resConsts.rcpHeight = 1.0f / static_cast<float>(m_height);
+        resConsts.viewProj = viewProj;
+        resConsts.currentMeshIndex = meshIdx;
+        cmdList->SetComputeRoot32BitConstants(0, 24, &resConsts, 0);  // 4 + 16 + 4 = 24 dwords
+
+        // Param 4 (t3): Vertex buffer for this mesh
+        D3D12_GPU_VIRTUAL_ADDRESS vertexBufferAddress = drawInfo.vertexBuffer->GetGPUVirtualAddress();
+        cmdList->SetComputeRootShaderResourceView(4, vertexBufferAddress);
+
+        // Param 5 (t4): Index buffer for this mesh
+        D3D12_GPU_VIRTUAL_ADDRESS indexBufferAddress = drawInfo.indexBuffer->GetGPUVirtualAddress();
+        cmdList->SetComputeRootShaderResourceView(5, indexBufferAddress);
+
+        // Dispatch compute shader
+        // Note: This will process the entire screen for each mesh. Pixels that don't
+        // belong to this mesh will be skipped in the shader (instance.meshIndex check).
+        // A more optimal approach would use indirect dispatch or stencil masking.
+        cmdList->Dispatch(dispatchX, dispatchY, 1);
+    }
+
     return Result<void>::Ok();
 }
 
@@ -762,6 +1212,187 @@ D3D12_GPU_DESCRIPTOR_HANDLE VisibilityBufferRenderer::GetNormalRoughnessSRV() co
 
 D3D12_GPU_DESCRIPTOR_HANDLE VisibilityBufferRenderer::GetEmissiveMetallicSRV() const {
     return m_emissiveMetallicSRV.gpu;
+}
+
+Result<void> VisibilityBufferRenderer::DebugBlitAlbedoToHDR(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+) {
+    if (!m_blitPipeline) {
+        return Result<void>::Err("Blit pipeline not initialized");
+    }
+
+    // Transition albedo to shader resource
+    if (m_albedoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_gbufferAlbedo.Get();
+        barrier.Transition.StateBefore = m_albedoState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_albedoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Set HDR buffer as render target
+    cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
+
+    // Set viewport and scissor
+    D3D12_VIEWPORT viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Set blit pipeline
+    cmdList->SetPipelineState(m_blitPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_blitRootSignature.Get());
+
+    // Set descriptor heaps (CBV/SRV/UAV heap for texture, sampler heap for sampler)
+    ID3D12DescriptorHeap* heaps[] = {
+        m_descriptorManager->GetCBV_SRV_UAV_Heap(),
+        m_blitSamplerHeap.Get()
+    };
+    cmdList->SetDescriptorHeaps(2, heaps);
+
+    // Bind albedo texture (t0)
+    cmdList->SetGraphicsRootDescriptorTable(0, m_albedoSRV.gpu);
+
+    // Bind sampler (s0)
+    cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
+
+    // Set primitive topology
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // Draw fullscreen triangle (3 vertices, no vertex buffer)
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    return Result<void>::Ok();
+}
+
+Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+    ID3D12Resource* depthBuffer,
+    D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+    D3D12_GPU_DESCRIPTOR_HANDLE envMapSRV,
+    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSRV,
+    const DeferredLightingParams& params
+) {
+    if (!m_deferredLightingPipeline) {
+        return Result<void>::Err("Deferred lighting pipeline not initialized");
+    }
+
+    // Transition G-buffers to shader resource
+    D3D12_RESOURCE_BARRIER barriers[3] = {};
+    int barrierCount = 0;
+
+    if (m_albedoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferAlbedo.Get();
+        barriers[barrierCount].Transition.StateBefore = m_albedoState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_albedoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_normalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+        barriers[barrierCount].Transition.StateBefore = m_normalRoughnessState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_normalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_emissiveMetallicState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferEmissiveMetallic.Get();
+        barriers[barrierCount].Transition.StateBefore = m_emissiveMetallicState;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_emissiveMetallicState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (barrierCount > 0) {
+        cmdList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    // Set render target
+    cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
+
+    // Set viewport and scissor
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    // Set pipeline
+    cmdList->SetPipelineState(m_deferredLightingPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_deferredLightingRootSignature.Get());
+
+    // Set descriptor heap
+    ID3D12DescriptorHeap* heaps[] = {m_descriptorManager->GetCBV_SRV_UAV_Heap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    // b0: Lighting parameters (using persistent constant buffer)
+    // Create CB on first use, reuse every frame
+    if (!m_deferredLightingCB) {
+        D3D12_HEAP_PROPERTIES uploadHeapProps = {};
+        uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC cbDesc = {};
+        cbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        cbDesc.Width = (sizeof(DeferredLightingParams) + 255) & ~255; // Align to 256 bytes
+        cbDesc.Height = 1;
+        cbDesc.DepthOrArraySize = 1;
+        cbDesc.MipLevels = 1;
+        cbDesc.SampleDesc.Count = 1;
+        cbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &uploadHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &cbDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_deferredLightingCB)
+        );
+
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create deferred lighting constant buffer");
+        }
+        m_deferredLightingCB->SetName(L"DeferredLightingCB");
+    }
+
+    // Map and update constant buffer with current frame's lighting params
+    void* mapped = nullptr;
+    HRESULT hr = m_deferredLightingCB->Map(0, nullptr, &mapped);
+    if (SUCCEEDED(hr) && mapped) {
+        memcpy(mapped, &params, sizeof(DeferredLightingParams));
+        m_deferredLightingCB->Unmap(0, nullptr);
+    }
+
+    // Bind persistent CB as root CBV
+    cmdList->SetGraphicsRootConstantBufferView(0, m_deferredLightingCB->GetGPUVirtualAddress());
+
+    // t0-t3: G-buffer + depth SRVs (descriptor table)
+    // NOTE: This assumes G-buffer SRVs and depth SRV are consecutive in heap
+    cmdList->SetGraphicsRootDescriptorTable(1, m_albedoSRV.gpu);
+
+    // t4-t5: Environment + shadow map SRVs (descriptor table)
+    // NOTE: This assumes envMapSRV and shadowMapSRV are consecutive
+    cmdList->SetGraphicsRootDescriptorTable(2, envMapSRV);
+
+    // Draw fullscreen triangle
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    return Result<void>::Ok();
 }
 
 } // namespace Cortex::Graphics

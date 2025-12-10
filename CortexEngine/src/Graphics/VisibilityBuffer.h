@@ -83,19 +83,59 @@ public:
         const std::vector<VBInstanceData>& instances
     );
 
+    // Mesh draw info for visibility pass
+    struct VBMeshDrawInfo {
+        ID3D12Resource* vertexBuffer;
+        ID3D12Resource* indexBuffer;
+        uint32_t vertexCount;   // Number of vertices (for buffer size)
+        uint32_t indexCount;
+        uint32_t firstIndex;
+        uint32_t baseVertex;
+    };
+
     // Phase 1: Render visibility buffer (triangle IDs)
     Result<void> RenderVisibilityPass(
         ID3D12GraphicsCommandList* cmdList,
         ID3D12Resource* depthBuffer,
         D3D12_CPU_DESCRIPTOR_HANDLE depthDSV,
-        const glm::mat4& viewProj
+        const glm::mat4& viewProj,
+        const std::vector<VBMeshDrawInfo>& meshDraws
     );
 
     // Phase 2: Material resolve via compute shader
     Result<void> ResolveMaterials(
         ID3D12GraphicsCommandList* cmdList,
         ID3D12Resource* depthBuffer,
-        D3D12_GPU_DESCRIPTOR_HANDLE depthSRV
+        D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+        const std::vector<VBMeshDrawInfo>& meshDraws,
+        const glm::mat4& viewProj
+    );
+
+    // Phase 3: Deferred lighting pass (PBR shading from G-buffers)
+    struct DeferredLightingParams {
+        glm::mat4 invViewProj;
+        glm::mat4 viewMatrix;
+        glm::mat4 lightViewProj;
+        glm::vec3 cameraPos;
+        float _pad0;
+        glm::vec3 sunDirection;
+        float _pad1;
+        glm::vec3 sunColor;
+        float sunIntensity;
+        float iblDiffuseIntensity;
+        float iblSpecularIntensity;
+        float _pad2[2];
+    };
+
+    Result<void> ApplyDeferredLighting(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+        ID3D12Resource* depthBuffer,
+        D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+        D3D12_GPU_DESCRIPTOR_HANDLE envMapSRV,
+        D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSRV,
+        const DeferredLightingParams& params
     );
 
     // Get output G-buffer textures
@@ -109,6 +149,13 @@ public:
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
+
+    // Debug: Blit albedo to HDR buffer for visualization
+    Result<void> DebugBlitAlbedoToHDR(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+    );
 
     // Statistics
     [[nodiscard]] uint32_t GetWidth() const { return m_width; }
@@ -150,6 +197,7 @@ private:
     // Instance data buffer
     ComPtr<ID3D12Resource> m_instanceBuffer;
     DescriptorHandle m_instanceSRV;
+    uint8_t* m_instanceBufferMapped = nullptr;  // Persistent mapping
     uint32_t m_instanceCount = 0;
     uint32_t m_maxInstances = 65536;
 
@@ -159,6 +207,17 @@ private:
 
     ComPtr<ID3D12RootSignature> m_resolveRootSignature;
     ComPtr<ID3D12PipelineState> m_resolvePipeline;
+
+    // Debug blit pipeline
+    ComPtr<ID3D12RootSignature> m_blitRootSignature;
+    ComPtr<ID3D12PipelineState> m_blitPipeline;
+    ComPtr<ID3D12DescriptorHeap> m_blitSamplerHeap;
+
+    // Deferred lighting pipeline
+    ComPtr<ID3D12RootSignature> m_deferredLightingRootSignature;
+    ComPtr<ID3D12PipelineState> m_deferredLightingPipeline;
+    ComPtr<ID3D12DescriptorHeap> m_deferredLightingSamplerHeap;
+    ComPtr<ID3D12Resource> m_deferredLightingCB;  // Persistent constant buffer for lighting params
 
     // Resource states
     D3D12_RESOURCE_STATES m_visibilityState = D3D12_RESOURCE_STATE_COMMON;

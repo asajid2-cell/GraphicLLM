@@ -1,13 +1,15 @@
-// VisibilityPass.hlsl
+// VisibilityPass.hlsl (v2 - mesh filtering)
 // Phase 1 of visibility buffer rendering: Rasterize triangle IDs
 // Output: R32G32_UINT with (triangleID + drawID, instanceID)
 
 // Root signature:
-// b0: View-projection matrix
-// b1: Instance data SRV
+// b0: View-projection matrix + current mesh index
+// t0: Instance data SRV
 
-cbuffer ViewProjection : register(b0) {
+cbuffer PerFrameData : register(b0) {
     float4x4 g_ViewProj;
+    uint g_CurrentMeshIndex;  // Current mesh being drawn
+    uint3 _pad;
 };
 
 // Instance data structure (matches VBInstanceData in C++)
@@ -43,6 +45,14 @@ PSInput VSMain(VSInput input) {
 
     // Fetch instance data
     VBInstanceData instance = g_Instances[input.instanceID];
+
+    // Filter out instances that don't use the current mesh
+    // Move vertices far outside clip space if mesh doesn't match
+    if (instance.meshIndex != g_CurrentMeshIndex) {
+        output.position = float4(10000.0, 10000.0, 10000.0, 1.0);  // Far outside clip space
+        output.instanceID = 0xFFFFFFFF;                             // Invalid instance ID
+        return output;
+    }
 
     // Transform to world space then clip space
     float4 worldPos = mul(instance.worldMatrix, float4(input.position, 1.0));

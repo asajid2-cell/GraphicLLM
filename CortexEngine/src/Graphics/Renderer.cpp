@@ -1180,12 +1180,14 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     if (!drewWithHyper) {
         // Visibility buffer path (Phase 2.1)
         if (m_visibilityBuffer) {
+            // spdlog::info("Taking visibility buffer path");  // Too noisy
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             RenderVisibilityBufferPath(registry);
             MarkPassComplete("VisibilityBuffer_Done");
         }
         // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
         else if (m_gpuCullingEnabled && m_gpuCulling) {
+            spdlog::info("Taking GPU culling path");
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             CollectInstancesForGPUCulling(registry);
             DispatchGPUCulling();
@@ -1193,6 +1195,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
             MarkPassComplete("RenderSceneIndirect_Done");
         } else {
             // Opaque geometry first (legacy per-draw path)
+            spdlog::info("Taking legacy forward rendering path");
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             RenderScene(registry);
             MarkPassComplete("RenderScene_Done");
@@ -3849,8 +3852,12 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     if (!registry || !m_visibilityBuffer) return;
 
     m_vbInstances.clear();
+    m_vbMeshDraws.clear();
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    // Map mesh pointers to their draw info index (to avoid duplicates)
+    std::unordered_map<const Scene::MeshData*, uint32_t> meshToDrawIndex;
 
     for (auto entity : view) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
@@ -3862,9 +3869,31 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             !renderable.mesh->gpuBuffers->vertexBuffer ||
             !renderable.mesh->gpuBuffers->indexBuffer) continue;
 
+        // Find or create mesh draw info
+        uint32_t meshDrawIndex = 0;
+        auto it = meshToDrawIndex.find(renderable.mesh.get());
+        if (it == meshToDrawIndex.end()) {
+            // First time seeing this mesh - create draw info
+            meshDrawIndex = static_cast<uint32_t>(m_vbMeshDraws.size());
+            meshToDrawIndex[renderable.mesh.get()] = meshDrawIndex;
+
+            VisibilityBufferRenderer::VBMeshDrawInfo drawInfo{};
+            drawInfo.vertexBuffer = renderable.mesh->gpuBuffers->vertexBuffer.Get();
+            drawInfo.indexBuffer = renderable.mesh->gpuBuffers->indexBuffer.Get();
+            drawInfo.vertexCount = static_cast<uint32_t>(renderable.mesh->positions.size());
+            drawInfo.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
+            drawInfo.firstIndex = 0;
+            drawInfo.baseVertex = 0;
+
+            m_vbMeshDraws.push_back(drawInfo);
+        } else {
+            meshDrawIndex = it->second;
+        }
+
+        // Build instance data
         VBInstanceData inst{};
         inst.worldMatrix = transform.GetMatrix();
-        inst.meshIndex = static_cast<uint32_t>(m_vbInstances.size());
+        inst.meshIndex = meshDrawIndex;  // Index into mesh draw array
         inst.materialIndex = 0; // TODO: Map to actual material
         inst.firstIndex = 0;
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
@@ -3873,7 +3902,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         m_vbInstances.push_back(inst);
     }
 
-    // Upload to visibility buffer
+    // Upload instance data to visibility buffer
     auto uploadResult = m_visibilityBuffer->UpdateInstances(m_commandList.Get(), m_vbInstances);
     if (uploadResult.IsErr()) {
         spdlog::warn("Failed to update visibility buffer instances: {}", uploadResult.Error());
@@ -3881,13 +3910,34 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 }
 
 void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
-    if (!m_visibilityBuffer) return;
+    if (!m_visibilityBuffer) {
+        spdlog::warn("VB: No visibility buffer");
+        return;
+    }
 
-    // Collect and upload instance data
+    // Collect and upload instance data + mesh draw info
     CollectInstancesForVisibilityBuffer(registry);
 
-    if (m_vbInstances.empty()) {
+    if (m_vbInstances.empty() || m_vbMeshDraws.empty()) {
+        spdlog::warn("VB: No instances collected (instances={}, meshDraws={})",
+                     m_vbInstances.size(), m_vbMeshDraws.size());
         return;
+    }
+
+    // One-time debug log for first frame
+    static bool firstFrame = true;
+    if (firstFrame) {
+        spdlog::info("VB: First frame - rendering {} instances across {} unique meshes",
+                     m_vbInstances.size(), m_vbMeshDraws.size());
+        // Log mesh indices to verify deduplication
+        std::unordered_map<uint32_t, uint32_t> meshIndexCounts;
+        for (const auto& inst : m_vbInstances) {
+            meshIndexCounts[inst.meshIndex]++;
+        }
+        for (const auto& [meshIdx, count] : meshIndexCounts) {
+            spdlog::info("  Mesh {} has {} instances", meshIdx, count);
+        }
+        firstFrame = false;
     }
 
     // Phase 1: Render visibility buffer (triangle IDs)
@@ -3895,7 +3945,8 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         m_commandList.Get(),
         m_depthBuffer.Get(),
         m_depthStencilView.cpu,
-        m_frameDataCPU.viewProjectionMatrix
+        m_frameDataCPU.viewProjectionMatrix,
+        m_vbMeshDraws
     );
 
     if (visResult.IsErr()) {
@@ -3907,11 +3958,49 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     auto resolveResult = m_visibilityBuffer->ResolveMaterials(
         m_commandList.Get(),
         m_depthBuffer.Get(),
-        m_depthSRV.gpu
+        m_depthSRV.gpu,
+        m_vbMeshDraws,
+        m_frameDataCPU.viewProjectionMatrix
     );
 
     if (resolveResult.IsErr()) {
         spdlog::error("Material resolve failed: {}", resolveResult.Error());
+        return;
+    }
+
+    // One-time debug for material resolve
+    static bool firstResolve = true;
+    if (firstResolve) {
+        spdlog::info("VB: Material resolve completed successfully");
+        firstResolve = false;
+    }
+
+    // ========================================================================
+    // TEMPORARY: Blit G-buffer albedo to HDR buffer for visualization
+    // TODO Phase 2.3: Replace with full deferred lighting pass
+    // ========================================================================
+
+    // Transition HDR buffer to render target
+    if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hdrColor.Get();
+        barrier.Transition.StateBefore = m_hdrState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    // Phase 3: Temporarily use debug blit until descriptor table issue is resolved
+    // TODO: Fix descriptor table allocation for deferred lighting
+    auto blitResult = m_visibilityBuffer->DebugBlitAlbedoToHDR(
+        m_commandList.Get(),
+        m_hdrColor.Get(),
+        m_hdrRTV.cpu
+    );
+    if (blitResult.IsErr()) {
+        spdlog::warn("Debug blit failed: {}", blitResult.Error());
     }
 }
 

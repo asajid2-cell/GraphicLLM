@@ -7,6 +7,7 @@ CortexEngine/vcpkg_installed/
 CortexEngine/build/bin/
 CortexEngine/rebuild_log.txt
 .claude/
+.vscode/
 
 # Large engine assets that can be downloaded/generated locally
 CortexEngine/models/

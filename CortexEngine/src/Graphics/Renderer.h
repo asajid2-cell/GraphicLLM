@@ -486,6 +486,10 @@ private:
     void RenderSSR();
     void RenderTAA();
     void RenderMotionVectors();
+    Result<void> InitializeTAAResolveDescriptorTable();
+    void UpdateTAAResolveDescriptorTable();
+    Result<void> InitializePostProcessDescriptorTable();
+    void UpdatePostProcessDescriptorTable();
     void RenderSSAO();
     void RenderSSAOAsync();  // Async compute version
     void RenderBloom();
@@ -852,6 +856,10 @@ public:
     Microsoft::WRL::ComPtr<ID3D12Resource> m_taaIntermediate;
     DescriptorHandle m_taaIntermediateRTV;
     D3D12_RESOURCE_STATES m_taaIntermediateState = D3D12_RESOURCE_STATE_COMMON;
+    std::array<DescriptorHandle, 10> m_taaResolveSrvTable{};
+    bool m_taaResolveSrvTableValid = false;
+    std::array<DescriptorHandle, 10> m_postProcessSrvTable{};
+    bool m_postProcessSrvTableValid = false;
 
       bool m_shadowsEnabled = true;
     float m_shadowMapSize = 2048.0f;

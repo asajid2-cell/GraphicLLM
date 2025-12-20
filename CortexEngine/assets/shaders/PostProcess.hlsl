@@ -48,7 +48,8 @@ cbuffer FrameConstants : register(b1)
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
     // w = SSR enabled (>0.5) for the post-process debug overlay
     float4   g_BloomParams;
-    // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
+    // x,y = jitter delta in UV (prevJitter - currJitter),
+    // z = TAA blend factor, w = TAA history valid (>0.5)
     float4   g_TAAParams;
     float4x4 g_ViewProjectionNoJitter;
     float4x4 g_InvViewProjectionNoJitter;
@@ -749,11 +750,11 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
 
     finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
 
-    // Clamp maximum history contribution per frame so that large objects do
-    // not accumulate very long tails of stale information. This trades more
-    // local blur for much shorter-lived ghosting, which is generally a
-    // better compromise for the dragon and floor highlights.
-    finalBlend = min(finalBlend, 0.25f);
+    // Clamp maximum history contribution per frame. Use a tighter cap on
+    // glossy surfaces where specular reflections move non-linearly and
+    // camera-only motion vectors cannot reproject perfectly.
+    float roughnessClamp = lerp(0.02f, 0.25f, saturate(surfaceRoughness / 0.6f));
+    finalBlend = min(finalBlend, roughnessClamp);
 
     finalBlend = saturate(finalBlend);
 
@@ -979,9 +980,9 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float3 hdrBlurred = hdrColor;
 
     // Simple motion blur based on velocity buffer (camera-only) in HDR space.
-    // Currently gated by the same enable flag as TAA (g_TAAParams.w) so that
-    // motion vectors and temporal filtering always move together.
-    if (g_TAAParams.w > 0.5f)
+    // Disabled by default because it can be easily confused with TAA ghosting
+    // (especially on glossy reflections) and makes temporal debugging harder.
+    if (false)
     {
         float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
         float  speed = length(vel);

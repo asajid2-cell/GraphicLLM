@@ -32,6 +32,8 @@ cbuffer CullConstants : register(b0) {
     float4 g_FrustumPlanes[6];
     float3 g_CameraPos;
     uint g_InstanceCount;
+    uint g_ForceVisible;
+    uint3 g_Pad;
 };
 
 StructuredBuffer<GPUInstanceData> g_Instances : register(t0);
@@ -59,13 +61,16 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
     float maxScale = max(max(length(scaleX), length(scaleY)), length(scaleZ));
     float worldRadius = radius * maxScale;
 
-    bool visible = true;
-    [unroll]
-    for (int i = 0; i < 6; i++) {
-        float dist = dot(g_FrustumPlanes[i].xyz, centerWS) + g_FrustumPlanes[i].w;
-        if (dist < -worldRadius) {
-            visible = false;
-            break;
+    bool visible = (g_ForceVisible != 0);
+    if (!visible) {
+        visible = true;
+        [unroll]
+        for (int i = 0; i < 6; i++) {
+            float dist = dot(g_FrustumPlanes[i].xyz, centerWS) + g_FrustumPlanes[i].w;
+            if (dist < -worldRadius) {
+                visible = false;
+                break;
+            }
         }
     }
 

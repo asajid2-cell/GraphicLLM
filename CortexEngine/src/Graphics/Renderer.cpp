@@ -431,6 +431,11 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_indirectDrawEnabled = false;
         spdlog::info("GPU Culling Pipeline initialized (max 65536 instances)");
     }
+#ifndef ENABLE_BINDLESS
+    m_gpuCullingEnabled = false;
+    m_indirectDrawEnabled = false;
+    spdlog::info("GPU culling disabled: bindless resources not enabled");
+#endif
 
     // Initialize Render Graph for declarative pass management
     m_renderGraph = std::make_unique<RenderGraph>();
@@ -3850,9 +3855,13 @@ void Renderer::DispatchGPUCulling() {
     }
 
     // Dispatch culling compute shader
+    if (m_descriptorManager) {
+        ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+        m_commandList->SetDescriptorHeaps(1, heaps);
+    }
     auto cullResult = m_gpuCulling->DispatchCulling(
         m_commandList.Get(),
-        m_frameDataCPU.viewProjectionMatrix,
+        m_frameDataCPU.viewProjectionNoJitter,
         glm::vec3(m_frameDataCPU.cameraPosition)
     );
 
@@ -4024,10 +4033,26 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     }
 
     auto* cmdSig = m_gpuCulling->GetCommandSignature();
-    auto* argBuffer = m_gpuCulling->GetVisibleCommandBuffer();
-    auto* countBuffer = m_gpuCulling->GetCommandCountBuffer();
+    if (!cmdSig) {
+        spdlog::warn("RenderSceneIndirect: missing command signature or command buffers");
+        RenderScene(registry);
+        return;
+    }
 
-    if (!cmdSig || !argBuffer || !countBuffer) {
+    const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
+    const bool bypassCompaction = (std::getenv("CORTEX_GPUCULL_BYPASS_COMPACTION") != nullptr);
+    const bool dumpCommands = (std::getenv("CORTEX_GPUCULL_DUMP_COMMANDS") != nullptr);
+
+    m_gpuCulling->SetForceVisible(forceVisible);
+
+    ID3D12Resource* argBuffer = bypassCompaction
+        ? m_gpuCulling->GetAllCommandBuffer()
+        : m_gpuCulling->GetVisibleCommandBuffer();
+    ID3D12Resource* countBuffer = bypassCompaction
+        ? nullptr
+        : m_gpuCulling->GetCommandCountBuffer();
+
+    if (!argBuffer || (!bypassCompaction && !countBuffer)) {
         spdlog::warn("RenderSceneIndirect: missing command signature or command buffers");
         RenderScene(registry);
         return;
@@ -4092,12 +4117,87 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             hasRoughnessMap ? 1u : 0u
         );
 
-        materialData.textureIndices = glm::uvec4(
-            kInvalidBindlessIndex,
-            kInvalidBindlessIndex,
-            kInvalidBindlessIndex,
-            kInvalidBindlessIndex
-        );
+        FillMaterialTextureIndices(renderable, materialData);
+
+        // Match the full material parameter setup used by the forward path.
+        materialData.fractalParams0 = glm::vec4(
+            m_fractalAmplitude,
+            m_fractalFrequency,
+            m_fractalOctaves,
+            (m_fractalAmplitude > 0.0f ? 1.0f : 0.0f));
+        materialData.fractalParams1 = glm::vec4(
+            m_fractalCoordMode,
+            m_fractalScaleX,
+            m_fractalScaleZ,
+            0.0f);
+        materialData.fractalParams2 = glm::vec4(
+            m_fractalLacunarity,
+            m_fractalGain,
+            m_fractalWarpStrength,
+            m_fractalNoiseType);
+
+        float clearCoat = 0.0f;
+        float clearCoatRoughness = 0.2f;
+        float sheenWeight = 0.0f;
+        float sssWrap = 0.0f;
+
+        float materialType = 0.0f;
+        if (!renderable.presetName.empty()) {
+            std::string presetLower = renderable.presetName;
+            std::transform(presetLower.begin(),
+                           presetLower.end(),
+                           presetLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (presetLower.find("glass") != std::string::npos) {
+                materialType = 1.0f;
+            } else if (presetLower.find("mirror") != std::string::npos) {
+                materialType = 2.0f;
+            } else if (presetLower.find("plastic") != std::string::npos) {
+                materialType = 3.0f;
+            } else if (presetLower.find("brick") != std::string::npos) {
+                materialType = 4.0f;
+            } else if (presetLower.find("brushed_metal") != std::string::npos) {
+                materialType = 6.0f;
+            } else if (presetLower.find("wood_floor") != std::string::npos) {
+                materialType = 7.0f;
+            } else if (presetLower.find("emissive") != std::string::npos ||
+                       presetLower.find("neon") != std::string::npos ||
+                       presetLower.find("light") != std::string::npos) {
+                materialType = 5.0f;
+            }
+
+            if (presetLower.find("painted_plastic") != std::string::npos ||
+                presetLower.find("plastic") != std::string::npos)
+            {
+                clearCoat = 1.0f;
+                clearCoatRoughness = 0.15f;
+            }
+            else if (presetLower.find("polished_metal") != std::string::npos ||
+                     presetLower.find("chrome") != std::string::npos)
+            {
+                clearCoat = 0.6f;
+                clearCoatRoughness = 0.08f;
+            }
+
+            if (presetLower.find("cloth") != std::string::npos ||
+                presetLower.find("velvet") != std::string::npos)
+            {
+                clearCoat = 0.0f;
+                sheenWeight = 1.0f;
+            }
+
+            if (presetLower.find("skin_ish") != std::string::npos)
+            {
+                sssWrap = 0.25f;
+            }
+            else if (presetLower.find("skin") != std::string::npos)
+            {
+                sssWrap = 0.35f;
+            }
+        }
+        materialData.fractalParams1.w = materialType;
+        materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
 
         ObjectConstants objectData = {};
         objectData.modelMatrix = transform.GetMatrix();
@@ -4148,11 +4248,35 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         return;
     }
 
-    auto uploadResult = m_gpuCulling->UpdateInstances(m_commandList.Get(), m_gpuInstances);
-    if (uploadResult.IsErr()) {
-        spdlog::warn("RenderSceneIndirect: failed to upload instances: {}", uploadResult.Error());
-        RenderScene(registry);
-        return;
+    if (dumpCommands && !bypassCompaction) {
+        static uint64_t s_lastDumpFrame = 0;
+        if ((m_renderFrameCounter % 120) == 0 && m_renderFrameCounter != s_lastDumpFrame) {
+            const uint32_t maxLog = std::min<uint32_t>(static_cast<uint32_t>(commands.size()), 2u);
+            for (uint32_t i = 0; i < maxLog; ++i) {
+                const auto& cmd = commands[i];
+                spdlog::info(
+                    "CPU Cmd[{}]: objectCBV=0x{:016X} materialCBV=0x{:016X} "
+                    "VBV(addr=0x{:016X} size={} stride={}) "
+                    "IBV(addr=0x{:016X} size={} fmt={}) "
+                    "draw(indexCount={} instanceCount={} startIndex={} baseVertex={} startInstance={})",
+                    i,
+                    static_cast<uint64_t>(cmd.objectCBV),
+                    static_cast<uint64_t>(cmd.materialCBV),
+                    static_cast<uint64_t>(cmd.vertexBuffer.BufferLocation),
+                    cmd.vertexBuffer.SizeInBytes,
+                    cmd.vertexBuffer.StrideInBytes,
+                    static_cast<uint64_t>(cmd.indexBuffer.BufferLocation),
+                    cmd.indexBuffer.SizeInBytes,
+                    static_cast<unsigned int>(cmd.indexBuffer.Format),
+                    cmd.draw.indexCountPerInstance,
+                    cmd.draw.instanceCount,
+                    cmd.draw.startIndexLocation,
+                    cmd.draw.baseVertexLocation,
+                    cmd.draw.startInstanceLocation);
+            }
+            s_lastDumpFrame = m_renderFrameCounter;
+            m_gpuCulling->RequestCommandReadback(maxLog);
+        }
     }
 
     auto commandResult = m_gpuCulling->UpdateIndirectCommands(m_commandList.Get(), commands);
@@ -4162,15 +4286,31 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         return;
     }
 
-    auto cullResult = m_gpuCulling->DispatchCulling(
-        m_commandList.Get(),
-        m_frameDataCPU.viewProjectionMatrix,
-        glm::vec3(m_frameDataCPU.cameraPosition)
-    );
-    if (cullResult.IsErr()) {
-        spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullResult.Error());
-        RenderScene(registry);
-        return;
+    if (!bypassCompaction) {
+        auto uploadResult = m_gpuCulling->UpdateInstances(m_commandList.Get(), m_gpuInstances);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("RenderSceneIndirect: failed to upload instances: {}", uploadResult.Error());
+            RenderScene(registry);
+            return;
+        }
+
+        auto cullResult = m_gpuCulling->DispatchCulling(
+            m_commandList.Get(),
+            m_frameDataCPU.viewProjectionNoJitter,
+            glm::vec3(m_frameDataCPU.cameraPosition)
+        );
+        if (cullResult.IsErr()) {
+            spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullResult.Error());
+            RenderScene(registry);
+            return;
+        }
+    } else {
+        auto prepResult = m_gpuCulling->PrepareAllCommandsForExecuteIndirect(m_commandList.Get());
+        if (prepResult.IsErr()) {
+            spdlog::warn("RenderSceneIndirect: failed to prepare all-commands buffer: {}", prepResult.Error());
+            RenderScene(registry);
+            return;
+        }
     }
 
     // Compute dispatch changes the root signature/pipeline; restore graphics state
@@ -4283,19 +4423,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             hasRoughnessMap ? 1u : 0u
         );
 
-        // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
-        // If a texture has a valid bindless index, use it; otherwise use kInvalidBindlessIndex
-        // The shader checks for invalid indices and falls back to legacy descriptor table
-        materialData.textureIndices = glm::uvec4(
-            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
-                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
-                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
-                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
-                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
-        );
+        FillMaterialTextureIndices(renderable, materialData);
 
         // Global fractal parameters (applied uniformly to all materials)
         materialData.fractalParams0 = glm::vec4(
@@ -4556,17 +4684,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u);
 
-        // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
-        materialData.textureIndices = glm::uvec4(
-            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
-                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
-                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
-                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
-                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
-        );
+        FillMaterialTextureIndices(renderable, materialData);
 
         materialData.fractalParams0 = glm::vec4(
             m_fractalAmplitude,
@@ -6212,6 +6330,56 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     }
 }
 
+void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
+                                          MaterialConstants& materialData) const {
+    uint32_t texIndices[4] = {
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex
+    };
+
+    uint32_t effectiveMapFlags[4] = {
+        materialData.mapFlags.x,
+        materialData.mapFlags.y,
+        materialData.mapFlags.z,
+        materialData.mapFlags.w
+    };
+
+    if (renderable.textures.gpuState) {
+        for (int i = 0; i < 4; ++i) {
+            const bool hasMap = (effectiveMapFlags[i] != 0u);
+            if (hasMap && renderable.textures.gpuState->descriptors[i].IsValid()) {
+                texIndices[i] = renderable.textures.gpuState->descriptors[i].index;
+            } else {
+                // Descriptor isn't ready (or map missing). Treat as no-map so
+                // shaders use constant material values instead of placeholders.
+                effectiveMapFlags[i] = 0u;
+                texIndices[i] = kInvalidBindlessIndex;
+            }
+        }
+    } else {
+        for (int i = 0; i < 4; ++i) {
+            effectiveMapFlags[i] = 0u;
+            texIndices[i] = kInvalidBindlessIndex;
+        }
+    }
+
+    materialData.mapFlags = glm::uvec4(
+        effectiveMapFlags[0],
+        effectiveMapFlags[1],
+        effectiveMapFlags[2],
+        effectiveMapFlags[3]
+    );
+
+    materialData.textureIndices = glm::uvec4(
+        texIndices[0],
+        texIndices[1],
+        texIndices[2],
+        texIndices[3]
+    );
+}
+
 void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
     if (!registry || !m_descriptorManager) {
         return;
@@ -6227,9 +6395,33 @@ void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
 
         EnsureMaterialTextures(renderable);
 
+        bool texturesChanged = false;
+        if (renderable.textures.gpuState) {
+            std::array<std::shared_ptr<DX12Texture>, 4> sources = {
+                renderable.textures.albedo ? renderable.textures.albedo : m_placeholderAlbedo,
+                renderable.textures.normal ? renderable.textures.normal : m_placeholderNormal,
+                renderable.textures.metallic ? renderable.textures.metallic : m_placeholderMetallic,
+                renderable.textures.roughness ? renderable.textures.roughness : m_placeholderRoughness
+            };
+
+            for (size_t i = 0; i < sources.size(); ++i) {
+                auto previous = renderable.textures.gpuState->sourceTextures[i].lock();
+                if (previous != sources[i]) {
+                    texturesChanged = true;
+                    break;
+                }
+            }
+        } else {
+            texturesChanged = true;
+        }
+
         const bool hasDescriptors = renderable.textures.gpuState &&
                                     renderable.textures.gpuState->descriptors[0].IsValid();
-        if (!hasDescriptors) {
+        const bool needsRefresh = !hasDescriptors ||
+                                  texturesChanged ||
+                                  (renderable.textures.gpuState &&
+                                   !renderable.textures.gpuState->descriptorsReady);
+        if (needsRefresh) {
             RefreshMaterialDescriptors(renderable);
         }
     }
@@ -6307,6 +6499,9 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         }
     }
 
+    for (size_t i = 0; i < sources.size(); ++i) {
+        state.sourceTextures[i] = sources[i];
+    }
     state.descriptorsReady = true;
 }
 

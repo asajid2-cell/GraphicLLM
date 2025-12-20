@@ -1715,7 +1715,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 }
 
-void Renderer::RenderRayTracedReflections() {
+void Renderer::RenderRayTracedReflections() { 
     if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext) {
         return;
     }
@@ -1793,9 +1793,11 @@ void Renderer::RenderRayTracedReflections() {
         } 
     } 
  
+    const bool rtReflDebugView = (m_debugViewMode == 20u || m_debugViewMode == 30u || m_debugViewMode == 31u); 
+ 
     // Optional debug clear to eliminate stale-tile/rectangle artifacts. This also
     // lets debug view 20 validate that the post-process SRV binding (t8) is correct.
-    if (s_rtReflClearMode != 0 && m_descriptorManager && m_device) { 
+    if (rtReflDebugView && s_rtReflClearMode != 0 && m_descriptorManager && m_device) { 
         auto clearUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV(); 
         if (clearUavResult.IsOk()) { 
             DescriptorHandle clearUav = clearUavResult.Value(); 
@@ -1830,12 +1832,50 @@ void Renderer::RenderRayTracedReflections() {
         } 
     } 
  
+    // RT dispatch samples the environment textures via "compute" access, so
+    // environment maps must be readable as NON_PIXEL shader resources. The
+    // raster path typically leaves them in PIXEL_SHADER_RESOURCE only.
+    auto ensureTextureNonPixelReadable = [&](const std::shared_ptr<DX12Texture>& tex) { 
+        if (!tex || !tex->GetResource()) { 
+            return; 
+        } 
+        constexpr D3D12_RESOURCE_STATES kDesired = 
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE; 
+        const D3D12_RESOURCE_STATES current = tex->GetCurrentState(); 
+        if ((current & kDesired) == kDesired) { 
+            return; 
+        } 
+        D3D12_RESOURCE_BARRIER barrier{}; 
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; 
+        barrier.Transition.pResource = tex->GetResource(); 
+        barrier.Transition.StateBefore = current; 
+        barrier.Transition.StateAfter = kDesired; 
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES; 
+        rtCmdList->ResourceBarrier(1, &barrier); 
+        tex->SetState(kDesired); 
+    }; 
+ 
+    if (!m_environmentMaps.empty()) { 
+        size_t envIndex = m_currentEnvironment; 
+        if (envIndex >= m_environmentMaps.size()) { 
+            envIndex = 0; 
+        } 
+        const EnvironmentMaps& env = m_environmentMaps[envIndex]; 
+        ensureTextureNonPixelReadable(env.diffuseIrradiance); 
+        ensureTextureNonPixelReadable(env.specularPrefiltered); 
+    } 
+ 
+    // Ensure the descriptor table (space1, t0-t6) is up to date before DXR
+    // dispatch. If environments are loaded/evicted asynchronously, the table
+    // can otherwise temporarily point at null SRVs.
+    UpdateEnvironmentDescriptorTable(); 
+ 
     DescriptorHandle envTable = m_shadowAndEnvDescriptors[0]; 
     D3D12_RESOURCE_DESC reflDesc = m_rtReflectionColor->GetDesc(); 
     const uint32_t reflW = static_cast<uint32_t>(reflDesc.Width); 
     const uint32_t reflH = static_cast<uint32_t>(reflDesc.Height); 
  
-    if (!s_rtReflSkipDispatch) { 
+    if (!(rtReflDebugView && s_rtReflSkipDispatch)) { 
         m_rayTracingContext->DispatchReflections( 
             rtCmdList.Get(), 
             m_depthSRV, 

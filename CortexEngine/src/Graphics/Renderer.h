@@ -500,6 +500,7 @@ private:
     Result<void> BuildVoxelGridFromScene(Scene::ECS_Registry* registry);
     Result<void> UploadVoxelGridToGPU();
     void RenderRayTracing(Scene::ECS_Registry* registry);
+    void RenderRayTracedReflections();
     void RenderParticles(Scene::ECS_Registry* registry);
 
     // GPU-driven rendering (Phase 1)

@@ -1395,6 +1395,14 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         MarkPassComplete("RenderTransparent_Done");
     }
 
+    // Ray-traced reflections require the current frame's normal/roughness
+    // buffer, so dispatch them after the main pass has produced it but before
+    // post-process consumes the reflection SRV.
+    if (m_rayTracingSupported && m_rayTracingEnabled && m_rayTracingContext) {
+        RenderRayTracedReflections();
+        MarkPassComplete("RenderRTReflections_Done");
+    }
+
     // Camera motion vectors for TAA/motion blur (from depth + matrices).
     if (kEnableMotionVectors && m_motionVectorsPipeline && m_velocityBuffer && m_depthBuffer) {
         WriteBreadcrumb(GpuMarker::MotionVectors);
@@ -1510,10 +1518,6 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         MarkPassComplete("RenderDebugLines_Done");
     }
 
-    // Reset per-frame RT reflection write flag so history updates only occur
-    // on frames where the DXR reflections pass actually ran.
-    m_rtReflectionWrittenThisFrame = false;
-
     EndFrame();
 
     // If desired later, we can expose total render CPU time via
@@ -1623,8 +1627,6 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
         return;
     }
 
-    const bool rtWarmingUp = IsRTWarmingUp();
-
     ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
     HRESULT hr = m_commandList.As(&rtCmdList);
     if (FAILED(hr) || !rtCmdList) {
@@ -1632,15 +1634,16 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 
     // Ensure the depth buffer is in a readable state for the DXR passes.
-    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    // DXR dispatch binds this as a compute-like SRV, so use the NON_PIXEL state.
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         depthBarrier.Transition.pResource = m_depthBuffer.Get();
         depthBarrier.Transition.StateBefore = m_depthState;
-        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     // Ensure the RT shadow mask is ready for UAV writes before the DXR pass.
@@ -1674,41 +1677,16 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 envTable);
     }
 
-    // Optional RT reflections: reuse the same TLAS and depth buffer to write
-    // a reflection color buffer that can be inspected or composed in
-    // post-process. This pass is entirely optional and disabled by default;
-    // if the reflection pipeline was not created successfully,
-    // DispatchReflections is a no-op.
-    if (!rtWarmingUp && m_rtReflectionsEnabled && m_rtReflectionColor && m_rtReflectionUAV.IsValid()) {
-        if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-            D3D12_RESOURCE_BARRIER reflBarrier{};
-            reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            reflBarrier.Transition.pResource = m_rtReflectionColor.Get();
-            reflBarrier.Transition.StateBefore = m_rtReflectionState;
-            reflBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            reflBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            rtCmdList->ResourceBarrier(1, &reflBarrier);
-            m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        }
-
-        if (m_depthSRV.IsValid() && m_gbufferNormalRoughnessSRV.IsValid()) {
-            DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
-            m_rayTracingContext->DispatchReflections(
-                rtCmdList.Get(),
-                m_depthSRV,
-                m_rtReflectionUAV,
-                m_frameConstantBuffer.gpuAddress,
-                envTable,
-                m_gbufferNormalRoughnessSRV);
-            m_rtReflectionWrittenThisFrame = true;
-        }
-    }
+    // Note: RT reflections are dispatched later (after the main pass has
+    // written the current frame's normal/roughness target). Dispatching
+    // reflections here would sample previous-frame G-buffer data and produce
+    // severe temporal instability / edge artifacts.
 
     // Optional RT diffuse GI: writes a low-frequency indirect lighting buffer
     // that can be sampled by the main PBR shader. As with reflections, this
     // pass is optional and disabled by default; DispatchGI is a no-op if the
     // GI pipeline is not available.
-    if (!rtWarmingUp && m_rtGIEnabled && m_rtGIColor && m_rtGIUAV.IsValid()) {
+    if (m_rtGIEnabled && m_rtGIColor && m_rtGIUAV.IsValid()) {
         if (m_rtGIState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
             D3D12_RESOURCE_BARRIER giBarrier{};
             giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1720,16 +1698,162 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
             m_rtGIState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
 
-        if (m_depthSRV.IsValid()) {
+        if (m_depthSRV.IsValid() && m_rayTracingContext->HasGIPipeline()) {
             DescriptorHandle envTable = m_shadowAndEnvDescriptors[0];
+            D3D12_RESOURCE_DESC giDesc = m_rtGIColor->GetDesc();
+            const uint32_t giW = static_cast<uint32_t>(giDesc.Width);
+            const uint32_t giH = static_cast<uint32_t>(giDesc.Height);
             m_rayTracingContext->DispatchGI(
                 rtCmdList.Get(),
                 m_depthSRV,
                 m_rtGIUAV,
                 m_frameConstantBuffer.gpuAddress,
-                envTable);
+                envTable,
+                giW,
+                giH);
         }
     }
+}
+
+void Renderer::RenderRayTracedReflections() {
+    if (!m_rayTracingSupported || !m_rayTracingEnabled || !m_rayTracingContext) {
+        return;
+    }
+
+    if (!m_rtReflectionsEnabled || !m_rtReflectionColor || !m_rtReflectionUAV.IsValid()) {
+        return;
+    }
+
+    if (!m_rayTracingContext->HasReflectionPipeline()) {
+        return;
+    }
+
+    ComPtr<ID3D12GraphicsCommandList4> rtCmdList;
+    HRESULT hr = m_commandList.As(&rtCmdList);
+    if (FAILED(hr) || !rtCmdList) {
+        return;
+    }
+
+    // Ensure the depth buffer is in a readable state for the DXR pass.
+    // DXR dispatch binds this as a compute-like SRV, so use the NON_PIXEL state.
+    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        rtCmdList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Ensure the current frame's normal/roughness target is readable. This is
+    // written during the main pass, so it is finally valid here.
+    if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER gbufBarrier{};
+        gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        gbufBarrier.Transition.pResource = m_gbufferNormalRoughness.Get();
+        gbufBarrier.Transition.StateBefore = m_gbufferNormalRoughnessState;
+        gbufBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        rtCmdList->ResourceBarrier(1, &gbufBarrier);
+        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (!m_depthSRV.IsValid() || !m_gbufferNormalRoughnessSRV.IsValid()) {
+        return;
+    }
+
+    if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) { 
+        D3D12_RESOURCE_BARRIER reflBarrier{}; 
+        reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; 
+        reflBarrier.Transition.pResource = m_rtReflectionColor.Get(); 
+        reflBarrier.Transition.StateBefore = m_rtReflectionState; 
+        reflBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS; 
+        reflBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES; 
+        rtCmdList->ResourceBarrier(1, &reflBarrier); 
+        m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS; 
+    } 
+ 
+    static bool s_checkedRtReflDebug = false; 
+    static int  s_rtReflClearMode = 0; 
+    static bool s_rtReflSkipDispatch = false; 
+    if (!s_checkedRtReflDebug) { 
+        s_checkedRtReflDebug = true; 
+        if (const char* mode = std::getenv("CORTEX_RTREFL_CLEAR")) { 
+            s_rtReflClearMode = std::atoi(mode); 
+            if (s_rtReflClearMode != 0) { 
+                spdlog::warn("Renderer: CORTEX_RTREFL_CLEAR={} set; clearing RT reflection target each frame (0=off,1=black,2=magenta)", 
+                             s_rtReflClearMode); 
+            } 
+        } 
+        if (std::getenv("CORTEX_RTREFL_SKIP_DXR")) { 
+            s_rtReflSkipDispatch = true; 
+            spdlog::warn("Renderer: CORTEX_RTREFL_SKIP_DXR set; skipping DXR reflection dispatch (debug)"); 
+        } 
+    } 
+ 
+    // Optional debug clear to eliminate stale-tile/rectangle artifacts. This also
+    // lets debug view 20 validate that the post-process SRV binding (t8) is correct.
+    if (s_rtReflClearMode != 0 && m_descriptorManager && m_device) { 
+        auto clearUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV(); 
+        if (clearUavResult.IsOk()) { 
+            DescriptorHandle clearUav = clearUavResult.Value(); 
+ 
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{}; 
+            uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; 
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; 
+            m_device->GetDevice()->CreateUnorderedAccessView( 
+                m_rtReflectionColor.Get(), 
+                nullptr, 
+                &uavDesc, 
+                clearUav.cpu); 
+ 
+            ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() }; 
+            rtCmdList->SetDescriptorHeaps(1, heaps); 
+ 
+            const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f }; 
+            const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f }; 
+            const float* clear = (s_rtReflClearMode == 2) ? magenta : black; 
+            rtCmdList->ClearUnorderedAccessViewFloat( 
+                clearUav.gpu, 
+                clearUav.cpu, 
+                m_rtReflectionColor.Get(), 
+                clear, 
+                0, 
+                nullptr); 
+ 
+            D3D12_RESOURCE_BARRIER clearBarrier{}; 
+            clearBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV; 
+            clearBarrier.UAV.pResource = m_rtReflectionColor.Get(); 
+            rtCmdList->ResourceBarrier(1, &clearBarrier); 
+        } 
+    } 
+ 
+    DescriptorHandle envTable = m_shadowAndEnvDescriptors[0]; 
+    D3D12_RESOURCE_DESC reflDesc = m_rtReflectionColor->GetDesc(); 
+    const uint32_t reflW = static_cast<uint32_t>(reflDesc.Width); 
+    const uint32_t reflH = static_cast<uint32_t>(reflDesc.Height); 
+ 
+    if (!s_rtReflSkipDispatch) { 
+        m_rayTracingContext->DispatchReflections( 
+            rtCmdList.Get(), 
+            m_depthSRV, 
+            m_rtReflectionUAV, 
+            m_frameConstantBuffer.gpuAddress, 
+            envTable, 
+            m_gbufferNormalRoughnessSRV, 
+            reflW, 
+            reflH); 
+    } 
+ 
+    // Ensure UAV writes are visible before post-process samples the SRV. 
+    D3D12_RESOURCE_BARRIER uavBarrier{}; 
+    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV; 
+    uavBarrier.UAV.pResource = m_rtReflectionColor.Get();
+    rtCmdList->ResourceBarrier(1, &uavBarrier);
+
+    m_rtReflectionWrittenThisFrame = true;
 }
 
 void Renderer::RebuildAssetRefsFromScene(Scene::ECS_Registry* registry) {
@@ -1858,6 +1982,10 @@ void Renderer::BeginFrame() {
     // render directly to the swap-chain will set this when they transition
     // the back buffer from PRESENT to RENDER_TARGET.
     m_backBufferUsedAsRTThisFrame = false;
+
+    // Reset per-frame RT reflection write flag so history updates only occur
+    // on frames where the DXR reflections pass actually ran.
+    m_rtReflectionWrittenThisFrame = false;
 
     // Wait for this frame's command allocator/descriptor segment to be available
     m_frameIndex = m_window->GetCurrentBackBufferIndex();
@@ -2778,19 +2906,36 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     float invWidth  = 1.0f / std::max(1.0f, internalWidth);
     float invHeight = 1.0f / std::max(1.0f, internalHeight);
 
-    glm::vec2 jitterPixels(0.0f);
-    if (m_taaEnabled) {
-        m_taaJitterPrevPixels = m_taaJitterCurrPixels;
-        float jx = Halton(m_taaSampleIndex + 1, 2) - 0.5f;
-        float jy = Halton(m_taaSampleIndex + 1, 3) - 0.5f;
-        m_taaSampleIndex++;
-        // Scale jitter so per-frame shifts are small and objects remain
-        // stable while still providing enough subpixel coverage for TAA.
-        float jitterScale = 0.15f;
-        if (!m_cameraIsMoving) {
-            // When the camera is effectively stationary, disable jitter so
-            // the image converges to a sharp, stable result without
-            // "double-exposed" edges.
+    glm::vec2 jitterPixels(0.0f); 
+    if (m_taaEnabled) { 
+        static bool s_checkedForceNoJitter = false; 
+        static bool s_forceNoJitter = false; 
+        if (!s_checkedForceNoJitter) { 
+            s_checkedForceNoJitter = true; 
+            if (std::getenv("CORTEX_TAA_FORCE_NO_JITTER")) { 
+                s_forceNoJitter = true; 
+                spdlog::warn("Renderer: CORTEX_TAA_FORCE_NO_JITTER set; disabling TAA jitter for debugging"); 
+            } 
+        } 
+ 
+        m_taaJitterPrevPixels = m_taaJitterCurrPixels; 
+        float jx = 0.0f; 
+        float jy = 0.0f; 
+        if (!s_forceNoJitter) { 
+            jx = Halton(m_taaSampleIndex + 1, 2) - 0.5f; 
+            jy = Halton(m_taaSampleIndex + 1, 3) - 0.5f; 
+            m_taaSampleIndex++; 
+        } 
+        // Scale jitter so per-frame shifts are small and objects remain 
+        // stable while still providing enough subpixel coverage for TAA. 
+        float jitterScale = 0.15f; 
+        if (s_forceNoJitter) { 
+            jitterScale = 0.0f; 
+        } 
+        if (!m_cameraIsMoving) { 
+            // When the camera is effectively stationary, disable jitter so 
+            // the image converges to a sharp, stable result without 
+            // "double-exposed" edges. 
             jitterScale = 0.0f;
         }
         jitterPixels = glm::vec2(jx, jy) * jitterScale;
@@ -3155,6 +3300,10 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_rayTracingEnabled &&
         m_rayTracingContext &&
         m_rayTracingContext->HasPipeline();
+    bool rtReflPipelineReady =
+        rtPipelineReady &&
+        m_rayTracingContext &&
+        m_rayTracingContext->HasReflectionPipeline();
     // postParams.w represents "RT sun shadows enabled" per ShaderTypes.h line 102.
     // This flag gates the RT shadow mask sampling in Basic.hlsl (line 878).
     // RT shadows are always active when the RT pipeline is ready, unlike
@@ -3192,27 +3341,39 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_ssaoBias,
         m_ssaoIntensity);
 
-    // Bloom shaping parameters. The w component is used as a small bitmask for
-    // post-process feature toggles so the shader can safely gate optional
-    // sampling without relying on other unrelated flags:
-    //   bit0: SSR enabled
-    //   bit1: RT reflections enabled
-    //   bit2: RT reflection history valid
-    uint32_t postFxFlags = 0u;
-    if (m_ssrEnabled) {
-        postFxFlags |= 1u;
-    }
-    if (rtPipelineReady && m_rtReflectionsEnabled) {
-        postFxFlags |= 2u;
-    }
-    if (m_rtReflHasHistory) {
-        postFxFlags |= 4u;
-    }
-    frameData.bloomParams = glm::vec4(
-        m_bloomThreshold,
-        m_bloomSoftKnee,
-        m_bloomMaxContribution,
-        static_cast<float>(postFxFlags));
+    // Bloom shaping parameters. The w component is used as a small bitmask for 
+    // post-process feature toggles so the shader can safely gate optional 
+    // sampling without relying on other unrelated flags: 
+    //   bit0: SSR enabled 
+    //   bit1: RT reflections enabled 
+    //   bit2: RT reflection history valid 
+    uint32_t postFxFlags = 0u; 
+    static bool s_checkedRtReflPostFxEnv = false; 
+    static bool s_disableRtReflTemporal = false; 
+    if (!s_checkedRtReflPostFxEnv) { 
+        s_checkedRtReflPostFxEnv = true; 
+        if (std::getenv("CORTEX_RTREFL_DISABLE_TEMPORAL")) { 
+            s_disableRtReflTemporal = true; 
+            spdlog::warn("Renderer: CORTEX_RTREFL_DISABLE_TEMPORAL set; disabling RT reflection temporal accumulation (debug)"); 
+        } 
+    } 
+    if (m_ssrEnabled) { 
+        postFxFlags |= 1u; 
+    } 
+    if (rtReflPipelineReady && m_rtReflectionsEnabled) { 
+        postFxFlags |= 2u; 
+    } 
+    if (rtReflPipelineReady && m_rtReflHasHistory) { 
+        postFxFlags |= 4u; 
+    } 
+    if (s_disableRtReflTemporal) { 
+        postFxFlags |= 8u; 
+    } 
+    frameData.bloomParams = glm::vec4( 
+        m_bloomThreshold, 
+        m_bloomSoftKnee, 
+        m_bloomMaxContribution, 
+        static_cast<float>(postFxFlags)); 
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.
     // Only enable TAA in the shader once we have a valid history buffer;
@@ -5850,9 +6011,11 @@ void Renderer::CycleDebugViewMode() {
     // 27 = anisotropy debug,
     // 28 = fog factor debug,
     // 29 = water debug.
-    m_debugViewMode = (m_debugViewMode + 1) % 30;
-    const char* label = nullptr;
-    switch (m_debugViewMode) {
+    // 30 = RT reflection history (post-process),
+    // 31 = RT reflection delta (current vs history).
+    m_debugViewMode = (m_debugViewMode + 1) % 32; 
+    const char* label = nullptr; 
+    switch (m_debugViewMode) { 
         case 0: label = "Shaded"; break;
         case 1: label = "Normals"; break;
         case 2: label = "Roughness"; break;
@@ -5881,12 +6044,33 @@ void Renderer::CycleDebugViewMode() {
         case 25: label = "TAA_HistoryWeight"; break;
         case 26: label = "MaterialLayers"; break;
         case 27: label = "Anisotropy_Debug"; break;
-        case 28: label = "Fog_Factor"; break;
-        case 29: label = "Water_Debug"; break;
-        default: label = "Unknown"; break;
-    }
-    spdlog::info("Debug view mode: {}", label);
-}
+        case 28: label = "Fog_Factor"; break; 
+        case 29: label = "Water_Debug"; break; 
+        case 30: label = "RT_ReflectionHistory"; break; 
+        case 31: label = "RT_ReflectionDelta"; break; 
+        default: label = "Unknown"; break; 
+    } 
+    spdlog::info("Debug view mode: {}", label); 
+    if (m_debugViewMode == 20u || m_debugViewMode == 30u || m_debugViewMode == 31u) { 
+        const bool rtSupported = m_rayTracingSupported; 
+        const bool rtEnabled = m_rayTracingEnabled; 
+        const bool reflEnabled = m_rtReflectionsEnabled; 
+        const bool hasReflRes = (m_rtReflectionColor != nullptr); 
+        const bool hasReflSrv = m_rtReflectionSRV.IsValid(); 
+        const bool hasReflHistSrv = m_rtReflectionHistorySRV.IsValid(); 
+        spdlog::info("RTRefl debug: rtSupported={} rtEnabled={} reflEnabled={} reflRes={} reflSRV={} reflHistSRV={} postTable={}", 
+                     rtSupported, rtEnabled, reflEnabled, hasReflRes, hasReflSrv, hasReflHistSrv, m_postProcessSrvTableValid); 
+        if (m_rayTracingContext) { 
+            spdlog::info("RTRefl debug: hasReflPipeline={}", m_rayTracingContext->HasReflectionPipeline()); 
+        } 
+        if (const char* mode = std::getenv("CORTEX_RTREFL_CLEAR")) {  
+            spdlog::info("RTRefl debug: CORTEX_RTREFL_CLEAR={}", mode);  
+        }  
+        if (std::getenv("CORTEX_RTREFL_SKIP_DXR")) {  
+            spdlog::info("RTRefl debug: CORTEX_RTREFL_SKIP_DXR=1");  
+        }  
+    }  
+}  
 
 void Renderer::AdjustShadowBias(float delta) {
     m_shadowBias = glm::clamp(m_shadowBias + delta, 0.00001f, 0.01f);
@@ -9388,7 +9572,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     }
 }
 
-void Renderer::RenderPostProcess() {
+void Renderer::RenderPostProcess() { 
     if (!m_postProcessPipeline || !m_hdrColor) {
         // No HDR/post-process configured; main pass may have rendered directly to back buffer
         return;
@@ -9509,9 +9693,88 @@ void Renderer::RenderPostProcess() {
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissorRect);
 
-    // Bind post-process pipeline
-    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
-    m_commandList->SetPipelineState(m_postProcessPipeline->GetPipelineState());
+    // Optional diagnostic clear for RT reflections: this runs even when the DXR
+    // reflection dispatch is disabled so debug view 20 can validate SRV binding.
+    // NOTE: This is gated behind env vars and debug view modes; it should not
+    // affect normal rendering.
+    if (m_rtReflectionColor) { 
+        static bool s_checkedRtReflPostClear = false; 
+        static int  s_rtReflPostClearMode = 0; 
+        if (!s_checkedRtReflPostClear) { 
+            s_checkedRtReflPostClear = true; 
+            if (const char* mode = std::getenv("CORTEX_RTREFL_CLEAR")) { 
+                s_rtReflPostClearMode = std::atoi(mode); 
+                if (s_rtReflPostClearMode != 0) { 
+                    spdlog::warn("Renderer: CORTEX_RTREFL_CLEAR={} set; post-process will clear RT reflection buffer for debug view validation", 
+                                 s_rtReflPostClearMode); 
+                } 
+            } 
+        } 
+ 
+        const bool rtReflDebugView = (m_debugViewMode == 20u || m_debugViewMode == 30u || m_debugViewMode == 31u); 
+        if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_descriptorManager && m_device) { 
+            // Transition to UAV for the clear.
+            if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) { 
+                D3D12_RESOURCE_BARRIER barrier{}; 
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; 
+                barrier.Transition.pResource = m_rtReflectionColor.Get(); 
+                barrier.Transition.StateBefore = m_rtReflectionState; 
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS; 
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES; 
+                m_commandList->ResourceBarrier(1, &barrier); 
+                m_rtReflectionState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS; 
+            } 
+ 
+            auto clearUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV(); 
+            if (clearUavResult.IsOk()) { 
+                DescriptorHandle clearUav = clearUavResult.Value(); 
+ 
+                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{}; 
+                uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; 
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; 
+                m_device->GetDevice()->CreateUnorderedAccessView( 
+                    m_rtReflectionColor.Get(), 
+                    nullptr, 
+                    &uavDesc, 
+                    clearUav.cpu); 
+ 
+                ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() }; 
+                m_commandList->SetDescriptorHeaps(1, heaps); 
+ 
+                const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f }; 
+                const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f }; 
+                const float* clear = (s_rtReflPostClearMode == 2) ? magenta : black; 
+                m_commandList->ClearUnorderedAccessViewFloat( 
+                    clearUav.gpu, 
+                    clearUav.cpu, 
+                    m_rtReflectionColor.Get(), 
+                    clear, 
+                    0, 
+                    nullptr); 
+ 
+                D3D12_RESOURCE_BARRIER clearBarrier{}; 
+                clearBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV; 
+                clearBarrier.UAV.pResource = m_rtReflectionColor.Get(); 
+                m_commandList->ResourceBarrier(1, &clearBarrier); 
+            } 
+ 
+            // Transition back to SRV for sampling in post-process.
+            if (m_rtReflectionState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) { 
+                D3D12_RESOURCE_BARRIER barrier{}; 
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; 
+                barrier.Transition.pResource = m_rtReflectionColor.Get(); 
+                barrier.Transition.StateBefore = m_rtReflectionState; 
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE; 
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES; 
+                m_commandList->ResourceBarrier(1, &barrier); 
+                m_rtReflectionState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE; 
+            } 
+        } 
+    } 
+ 
+    // Bind post-process pipeline 
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature()); 
+    m_commandList->SetPipelineState(m_postProcessPipeline->GetPipelineState()); 
 
     // Bind descriptor heap
     ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };

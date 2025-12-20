@@ -86,7 +86,9 @@ public:
         const DescriptorHandle& reflectionUav,
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
         const DescriptorHandle& shadowEnvTable,
-        const DescriptorHandle& normalRoughnessSrv);
+        const DescriptorHandle& normalRoughnessSrv,
+        uint32_t dispatchWidth,
+        uint32_t dispatchHeight);
 
     // Dispatch a simple RT diffuse GI pass. The caller is responsible for:
     //  - Ensuring the TLAS has been built for this frame.
@@ -99,7 +101,9 @@ public:
         const DescriptorHandle& depthSrv,
         const DescriptorHandle& giUav,
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-        const DescriptorHandle& shadowEnvTable);
+        const DescriptorHandle& shadowEnvTable,
+        uint32_t dispatchWidth,
+        uint32_t dispatchHeight);
 
     // Cache camera parameters for TLAS culling and distance-based RT tuning.
     void SetCameraParams(const glm::vec3& positionWS,
@@ -125,12 +129,12 @@ public:
         return m_totalBLASBytes + m_totalTLASBytes;
     }
 
-    [[nodiscard]] bool HasPipeline() const {
-        // A usable pipeline requires a built state object, shader table, and
-        // the persistent descriptor slots used for TLAS/depth/mask binding.
-        return m_rtStateObject && m_rtStateProps && m_rtShaderTable &&
-               m_rtTlasSrv.IsValid() && m_rtDepthSrv.IsValid() && m_rtMaskUav.IsValid();
-    }
+    [[nodiscard]] bool HasPipeline() const { 
+        // A usable pipeline requires a built state object + shader table.
+        // Descriptor binding for TLAS/depth/output is handled with transient
+        // descriptors per dispatch to avoid cross-frame aliasing.
+        return m_rtStateObject && m_rtStateProps && m_rtShaderTable; 
+    } 
 
     [[nodiscard]] bool HasReflectionPipeline() const {
         return m_rtReflStateObject && m_rtReflStateProps && m_rtReflShaderTable;

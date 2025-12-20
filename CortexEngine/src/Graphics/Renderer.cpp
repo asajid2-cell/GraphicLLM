@@ -703,8 +703,182 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         spdlog::warn("Environment maps not fully initialized: {}", envResult.Error());
     }
 
+    auto taaTableResult = InitializeTAAResolveDescriptorTable();
+    if (taaTableResult.IsErr()) {
+        spdlog::warn("TAA resolve descriptor table init failed; falling back to transient SRV packing: {}",
+                     taaTableResult.Error());
+    }
+
+    auto postTableResult = InitializePostProcessDescriptorTable();
+    if (postTableResult.IsErr()) {
+        spdlog::warn("Post-process descriptor table init failed; falling back to transient SRV packing: {}",
+                     postTableResult.Error());
+    }
+
     spdlog::info("Renderer initialized successfully");
     return Result<void>::Ok();
+}
+
+Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
+    m_taaResolveSrvTableValid = false;
+    for (auto& handle : m_taaResolveSrvTable) {
+        handle = {};
+    }
+
+    if (!m_device || !m_descriptorManager) {
+        return Result<void>::Err("Renderer not initialized");
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("D3D12 device not available");
+    }
+
+    for (size_t i = 0; i < m_taaResolveSrvTable.size(); ++i) {
+        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (handleResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate TAA resolve descriptor: " + handleResult.Error());
+        }
+        m_taaResolveSrvTable[i] = handleResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(nullptr, &srvDesc, m_taaResolveSrvTable[i].cpu);
+    }
+
+    m_taaResolveSrvTableValid = m_taaResolveSrvTable[0].IsValid();
+    return Result<void>::Ok();
+}
+
+void Renderer::UpdateTAAResolveDescriptorTable() {
+    if (!m_taaResolveSrvTableValid || !m_device) {
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return;
+    }
+
+    auto copyOrNull = [&](size_t slot,
+                          const DescriptorHandle& src,
+                          DXGI_FORMAT fmt) {
+        if (slot >= m_taaResolveSrvTable.size() || !m_taaResolveSrvTable[slot].IsValid()) {
+            return;
+        }
+        if (src.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                m_taaResolveSrvTable[slot].cpu,
+                src.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            return;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = fmt;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(nullptr, &srvDesc, m_taaResolveSrvTable[slot].cpu);
+    };
+
+    // Must match PostProcess.hlsl TAAResolvePS bindings:
+    // t0 HDR, t1 bloom, t2 SSAO, t3 history, t4 depth, t5 normal/roughness,
+    // t6 SSR, t7 velocity.
+    copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
+    copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
+    copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
+}
+
+Result<void> Renderer::InitializePostProcessDescriptorTable() {
+    m_postProcessSrvTableValid = false;
+    for (auto& handle : m_postProcessSrvTable) {
+        handle = {};
+    }
+
+    if (!m_device || !m_descriptorManager) {
+        return Result<void>::Err("Renderer not initialized");
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("D3D12 device not available");
+    }
+
+    for (size_t i = 0; i < m_postProcessSrvTable.size(); ++i) {
+        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (handleResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate post-process descriptor: " + handleResult.Error());
+        }
+        m_postProcessSrvTable[i] = handleResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(nullptr, &srvDesc, m_postProcessSrvTable[i].cpu);
+    }
+
+    m_postProcessSrvTableValid = m_postProcessSrvTable[0].IsValid();
+    return Result<void>::Ok();
+}
+
+void Renderer::UpdatePostProcessDescriptorTable() {
+    if (!m_postProcessSrvTableValid || !m_device) {
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return;
+    }
+
+    auto copyOrNull = [&](size_t slot,
+                          const DescriptorHandle& src,
+                          DXGI_FORMAT fmt) {
+        if (slot >= m_postProcessSrvTable.size() || !m_postProcessSrvTable[slot].IsValid()) {
+            return;
+        }
+        if (src.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                m_postProcessSrvTable[slot].cpu,
+                src.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            return;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = fmt;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(nullptr, &srvDesc, m_postProcessSrvTable[slot].cpu);
+    };
+
+    // Must match PostProcess.hlsl bindings:
+    // t0 HDR, t1 bloom, t2 SSAO, t3 history, t4 depth, t5 normal/roughness,
+    // t6 SSR, t7 velocity, t8 RT reflection, t9 RT reflection history.
+    copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
+    copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
+    copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
+    copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 
 void Renderer::ProcessGpuJobsPerFrame() {
@@ -3009,9 +3183,11 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_fogFalloff,
         m_fogEnabled ? 1.0f : 0.0f);
 
-    // SSAO parameters packed into aoParams
+    // SSAO parameters packed into aoParams. Disable sampling if the SSAO
+    // resources are unavailable so post-process does not read null SRVs.
+    const bool ssaoResourcesReady = (m_ssaoTex && m_ssaoSRV.IsValid());
     frameData.aoParams = glm::vec4(
-        m_ssaoEnabled ? 1.0f : 0.0f,
+        (m_ssaoEnabled && ssaoResourcesReady) ? 1.0f : 0.0f,
         m_ssaoRadius,
         m_ssaoBias,
         m_ssaoIntensity);
@@ -3475,112 +3651,117 @@ void Renderer::RenderTAA() {
     // t0 = HDR scene color, t1 = bloom (unused here), t2 = SSAO (unused),
     // t3 = TAA history, t4 = depth, t5 = normal/roughness, t6 = SSR (unused),
     // t7 = velocity.
-    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (hdrHandleResult.IsErr()) {
-        spdlog::warn("RenderTAA: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
-        return;
-    }
-    DescriptorHandle hdrHandle = hdrHandleResult.Value();
+    if (m_taaResolveSrvTableValid) {
+        UpdateTAAResolveDescriptorTable();
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_taaResolveSrvTable[0].gpu);
+    } else {
+        auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (hdrHandleResult.IsErr()) {
+            spdlog::warn("RenderTAA: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+            return;
+        }
+        DescriptorHandle hdrHandle = hdrHandleResult.Value();
 
-    device->CopyDescriptorsSimple(
-        1,
-        hdrHandle.cpu,
-        m_hdrSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // t1: bloom (unused)
-    auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (bloomAllocResult.IsOk() && m_bloomCombinedSRV.IsValid()) {
-        DescriptorHandle bloomHandle = bloomAllocResult.Value();
         device->CopyDescriptorsSimple(
             1,
-            bloomHandle.cpu,
-            m_bloomCombinedSRV.cpu,
+            hdrHandle.cpu,
+            m_hdrSRV.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
-    } else {
-        // Allocate a dummy descriptor to keep layout consistent even if bloom is missing.
-        (void)bloomAllocResult;
-    }
 
-    // t2: SSAO (unused in TAA but keep slot)
-    auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (ssaoAllocResult.IsOk() && m_ssaoSRV.IsValid()) {
-        DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
-        device->CopyDescriptorsSimple(
-            1,
-            ssaoHandle.cpu,
-            m_ssaoSRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-    } else {
-        (void)ssaoAllocResult;
-    }
-
-    // t3: TAA history
-    auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (historyAllocResult.IsErr()) {
-        spdlog::warn("RenderTAA: failed to allocate transient history SRV: {}", historyAllocResult.Error());
-        return;
-    }
-    DescriptorHandle historyHandle = historyAllocResult.Value();
-    device->CopyDescriptorsSimple(
-        1,
-        historyHandle.cpu,
-        m_historySRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // t4: depth
-    auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (depthAllocResult.IsErr()) {
-        spdlog::warn("RenderTAA: failed to allocate transient depth SRV: {}", depthAllocResult.Error());
-        return;
-    }
-    DescriptorHandle depthHandle = depthAllocResult.Value();
-    device->CopyDescriptorsSimple(
-        1,
-        depthHandle.cpu,
-        m_depthSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // t5: normal/roughness
-    auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (gbufAllocResult.IsErr()) {
-        spdlog::warn("RenderTAA: failed to allocate transient normal/roughness SRV: {}", gbufAllocResult.Error());
-        return;
-    }
-    DescriptorHandle gbufHandle = gbufAllocResult.Value();
-    device->CopyDescriptorsSimple(
-        1,
-        gbufHandle.cpu,
-        m_gbufferNormalRoughnessSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // t6: SSR (unused)
-    (void)m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-
-    // t7: velocity
-    if (m_velocitySRV.IsValid() && m_velocityBuffer) {
-        auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (velAllocResult.IsOk()) {
-            DescriptorHandle velHandle = velAllocResult.Value();
+        // t1: bloom (unused)
+        auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (bloomAllocResult.IsOk() && m_bloomCombinedSRV.IsValid()) {
+            DescriptorHandle bloomHandle = bloomAllocResult.Value();
             device->CopyDescriptorsSimple(
                 1,
-                velHandle.cpu,
-                m_velocitySRV.cpu,
+                bloomHandle.cpu,
+                m_bloomCombinedSRV.cpu,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
             );
         } else {
-            spdlog::warn("RenderTAA: failed to allocate transient velocity SRV; TAA reprojection will be disabled this frame");
+            // Allocate a dummy descriptor to keep layout consistent even if bloom is missing.
+            (void)bloomAllocResult;
         }
+
+        // t2: SSAO (unused in TAA but keep slot)
+        auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (ssaoAllocResult.IsOk() && m_ssaoSRV.IsValid()) {
+            DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
+            device->CopyDescriptorsSimple(
+                1,
+                ssaoHandle.cpu,
+                m_ssaoSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        } else {
+            (void)ssaoAllocResult;
+        }
+
+        // t3: TAA history
+        auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (historyAllocResult.IsErr()) {
+            spdlog::warn("RenderTAA: failed to allocate transient history SRV: {}", historyAllocResult.Error());
+            return;
+        }
+        DescriptorHandle historyHandle = historyAllocResult.Value();
+        device->CopyDescriptorsSimple(
+            1,
+            historyHandle.cpu,
+            m_historySRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+
+        // t4: depth
+        auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (depthAllocResult.IsErr()) {
+            spdlog::warn("RenderTAA: failed to allocate transient depth SRV: {}", depthAllocResult.Error());
+            return;
+        }
+        DescriptorHandle depthHandle = depthAllocResult.Value();
+        device->CopyDescriptorsSimple(
+            1,
+            depthHandle.cpu,
+            m_depthSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+
+        // t5: normal/roughness
+        auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (gbufAllocResult.IsErr()) {
+            spdlog::warn("RenderTAA: failed to allocate transient normal/roughness SRV: {}", gbufAllocResult.Error());
+            return;
+        }
+        DescriptorHandle gbufHandle = gbufAllocResult.Value();
+        device->CopyDescriptorsSimple(
+            1,
+            gbufHandle.cpu,
+            m_gbufferNormalRoughnessSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+
+        // t6: SSR (unused)
+        (void)m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+
+        // t7: velocity
+        if (m_velocitySRV.IsValid() && m_velocityBuffer) {
+            auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (velAllocResult.IsOk()) {
+                DescriptorHandle velHandle = velAllocResult.Value();
+                device->CopyDescriptorsSimple(
+                    1,
+                    velHandle.cpu,
+                    m_velocitySRV.cpu,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+                );
+            } else {
+                spdlog::warn("RenderTAA: failed to allocate transient velocity SRV; TAA reprojection will be disabled this frame");
+            }
+        }
+
+        m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
     }
 
-    // Bind SRV table and optional shadow/env descriptors (unused but harmless).
-    m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
@@ -9327,189 +9508,69 @@ void Renderer::RenderPostProcess() {
     // Bind frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Allocate transient descriptors for HDR (t0), bloom (t1), SSAO (t2), and optional TAA history (t3)
+    // Bind a stable SRV table for the post-process shader (t0..t9). The shader
+    // samples many slots unconditionally (e.g., RT reflections), so the table
+    // must keep fixed slot indices even when certain features are disabled.
     if (!m_hdrSRV.IsValid()) {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
     }
-
-    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (hdrHandleResult.IsErr()) {
-        spdlog::error("RenderPostProcess: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
-        return;
-    }
-    DescriptorHandle hdrHandle = hdrHandleResult.Value();
-
-    m_device->GetDevice()->CopyDescriptorsSimple(
-        1,
-        hdrHandle.cpu,
-        m_hdrSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // Optional bloom SRV (t1) - use final blurred bloom texture if available
-    DescriptorHandle bloomHandle = {};
-    if (m_bloomCombinedSRV.IsValid()) {
-        auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (bloomAllocResult.IsOk()) {
-            bloomHandle = bloomAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                bloomHandle.cpu,
-                m_bloomCombinedSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient bloom SRV, disabling bloom for this frame");
-            // Ensure post-process shader sees bloomIntensity = 0 so it won't sample t1.
-            m_frameDataCPU.timeAndExposure.w = 0.0f;
-            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
-        }
-    }
-
-    // Optional SSAO SRV (t2)
-    if (m_ssaoSRV.IsValid() && m_ssaoTex) {
-        auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (ssaoAllocResult.IsOk()) {
-            DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                ssaoHandle.cpu,
-                m_ssaoSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient SSAO SRV, disabling SSAO for this frame");
-            m_frameDataCPU.aoParams.x = 0.0f;
-            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
-        }
+    if (m_postProcessSrvTableValid) {
+        UpdatePostProcessDescriptorTable();
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_postProcessSrvTable[0].gpu);
     } else {
-        // No SSAO texture; mark AO as disabled so shader skips sampling.
-        m_frameDataCPU.aoParams.x = 0.0f;
-        m_frameConstantBuffer.UpdateData(m_frameDataCPU);
-    }
-
-    // Optional TAA history SRV (t3)
-    if (m_taaEnabled && m_hasHistory && m_historySRV.IsValid()) {
-        auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (historyAllocResult.IsOk()) {
-            DescriptorHandle historyHandle = historyAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                historyHandle.cpu,
-                m_historySRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            // Descriptor heap exhaustion is rare, but if it happens we must
-            // ensure the shader does not sample an uninitialized history SRV.
-            spdlog::warn("RenderPostProcess: failed to allocate transient history SRV, disabling TAA for this frame");
-            m_hasHistory = false;
-            m_frameDataCPU.taaParams.w = 0.0f;
-            m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+        // Fallback: pack a fixed-width transient table.
+        std::array<DescriptorHandle, 10> table{};
+        for (size_t i = 0; i < table.size(); ++i) {
+            auto allocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (allocResult.IsErr()) {
+                spdlog::error("RenderPostProcess: failed to allocate transient SRV slot {}: {}", i, allocResult.Error());
+                return;
+            }
+            table[i] = allocResult.Value();
         }
-    }
-
-    // Depth SRV (t4) for TAA reprojection and debug visualizations.
-    if (m_depthSRV.IsValid() && m_depthBuffer) {
-        auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (depthAllocResult.IsOk()) {
-            DescriptorHandle depthHandle = depthAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                depthHandle.cpu,
-                m_depthSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient depth SRV; TAA reprojection will fall back to jitter-only");
+        for (size_t i = 1; i < table.size(); ++i) {
+            if (table[i].index != table[0].index + static_cast<uint32_t>(i)) {
+                spdlog::error("RenderPostProcess: transient SRV slots are not contiguous (slot {} index {}, expected {})",
+                              i, table[i].index, table[0].index + static_cast<uint32_t>(i));
+                return;
+            }
         }
-    }
 
-    // Normal/roughness G-buffer SRV (t5) for SSR/compositing.
-    if (m_gbufferNormalRoughnessSRV.IsValid() && m_gbufferNormalRoughness) {
-        auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (gbufAllocResult.IsOk()) {
-            DescriptorHandle gbufHandle = gbufAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                gbufHandle.cpu,
-                m_gbufferNormalRoughnessSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient normal/roughness SRV; SSR compositing debug will be limited");
-        }
-    }
+        auto copyOrNull = [&](size_t slot, const DescriptorHandle& src, DXGI_FORMAT fmt) {
+            if (slot >= table.size()) {
+                return;
+            }
+            if (src.IsValid()) {
+                m_device->GetDevice()->CopyDescriptorsSimple(
+                    1,
+                    table[slot].cpu,
+                    src.cpu,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                return;
+            }
 
-    // SSR color buffer SRV (t6) holding reflection color (rgb) and weight (a).
-    if (m_ssrSRV.IsValid() && m_ssrColor) {
-        auto ssrAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (ssrAllocResult.IsOk()) {
-            DescriptorHandle ssrHandle = ssrAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                ssrHandle.cpu,
-                m_ssrSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient SSR SRV; reflections will be disabled this frame");
-        }
-    }
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = fmt;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+            m_device->GetDevice()->CreateShaderResourceView(nullptr, &srvDesc, table[slot].cpu);
+        };
 
-    // Motion vector buffer SRV (t7) for motion-aware TAA and blur.
-    if (m_velocitySRV.IsValid() && m_velocityBuffer) {
-        auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (velAllocResult.IsOk()) {
-            DescriptorHandle velHandle = velAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                velHandle.cpu,
-                m_velocitySRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient velocity SRV; motion-aware TAA/blur will be disabled this frame");
-        }
-    }
+        copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
+        copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
+        copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
+        copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    // RT reflection buffer SRV (t8) used by hybrid SSR/RT reflections. We only
-    // bind this when the reflection buffer exists; sampling in the shader is
-    // additionally gated on the RT enable flag (postParams.w).
-    if (m_rtReflectionSRV.IsValid() && m_rtReflectionColor) {
-        auto rtReflAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (rtReflAllocResult.IsOk()) {
-            DescriptorHandle rtReflHandle = rtReflAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                rtReflHandle.cpu,
-                m_rtReflectionSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection SRV; RT reflections will be disabled this frame");
-        }
+        m_commandList->SetGraphicsRootDescriptorTable(3, table[0].gpu);
     }
-
-    // Optional RT reflection history SRV (t9) used for temporal accumulation
-    // / denoising in the post-process pass. When history does not exist we
-    // simply fall back to the current RT reflection buffer only.
-    if (m_rtReflectionHistorySRV.IsValid() && m_rtReflectionHistory) {
-        auto rtReflHistAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (rtReflHistAllocResult.IsOk()) {
-            DescriptorHandle rtReflHistHandle = rtReflHistAllocResult.Value();
-            m_device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                rtReflHistHandle.cpu,
-                m_rtReflectionHistorySRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        } else {
-            spdlog::warn("RenderPostProcess: failed to allocate transient RT reflection history SRV; RT reflection temporal filtering will be disabled this frame");
-        }
-    }
-
-    // Bind SRV table starting at t0
-    m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
 
     // Bind shadow/IBL SRV table (t4-t6) for cascade visualization / skybox, if available
     if (m_shadowAndEnvDescriptors[0].IsValid()) {

@@ -771,6 +771,57 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     return float4(result, 1.0f);
 }
 
+float4 SampleRtReflectionEdgeAware(float2 sampleUV,
+                                   uint2 rtDim,
+                                   uint2 depthDim,
+                                   float centerDepth,
+                                   float3 centerN)
+{
+    float2 rtDimF = float2(max(rtDim.x, 1u), max(rtDim.y, 1u));
+    float2 coord = sampleUV * rtDimF - 0.5f;
+    int2 base = (int2)floor(coord);
+
+    int2 depthMax = int2(depthDim) - 1;
+
+    float bestW = -1.0f;
+    float4 best = float4(0.0f, 0.0f, 0.0f, 0.0f);
+
+    // Pick the half-res sample that best matches the full-res surface.
+    [unroll]
+    for (int oy = 0; oy <= 1; ++oy)
+    {
+        [unroll]
+        for (int ox = 0; ox <= 1; ++ox)
+        {
+            int2 p = base + int2(ox, oy);
+            p.x = clamp(p.x, 0, (int)rtDim.x - 1);
+            p.y = clamp(p.y, 0, (int)rtDim.y - 1);
+
+            float4 s = g_RTReflection.Load(int3(p, 0));
+            float  v = saturate(s.a);
+
+            float2 uvP = (float2(p) + 0.5f) / rtDimF;
+            int2 pix = clamp((int2)(uvP * float2(depthDim)), int2(0, 0), depthMax);
+
+            float d = g_Depth.Load(int3(pix, 0));
+            float3 n = normalize(g_NormalRoughness.Load(int3(pix, 0)).xyz * 2.0f - 1.0f);
+
+            float depthScale = lerp(420.0f, 90.0f, saturate(centerDepth));
+            float wDepth = saturate(1.0f - abs(d - centerDepth) * depthScale);
+            float wNormal = saturate((dot(n, centerN) - 0.85f) / 0.15f);
+            float w = max(v, 0.02f) * wDepth * wNormal;
+
+            if (w > bestW)
+            {
+                bestW = w;
+                best = s;
+            }
+        }
+    }
+
+    return best;
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -781,16 +832,22 @@ float4 PSMain(VSOutput input) : SV_TARGET
     //   bit0: SSR enabled
     //   bit1: RT reflections enabled
     //   bit2: RT reflection history valid
-    uint postFxFlags = (uint)(g_BloomParams.w + 0.5f);
-    bool ssrEnabled = ((postFxFlags & 1u) != 0u);
-    bool rtReflEnabled = ((postFxFlags & 2u) != 0u);
-    bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u);
+    //   bit3: disable RT reflection temporal (debug)
+    uint postFxFlags = (uint)(g_BloomParams.w + 0.5f); 
+    bool ssrEnabled = ((postFxFlags & 1u) != 0u); 
+    bool rtReflEnabled = ((postFxFlags & 2u) != 0u); 
+    bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u); 
+    bool rtReflTemporalOff = ((postFxFlags & 8u) != 0u); 
+    uint depthW, depthH;
+    g_Depth.GetDimensions(depthW, depthH);
+    uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
+    int2 depthMax = int2(depthDim) - 1;
 
     // SDF / CSG debug view renders a raymarched implicit scene instead of the
     // normal post-process chain so that SDF primitives can be inspected in
     // isolation using the current camera and light state.
     uint debugViewNow = (uint)g_DebugMode.x;
-    if (debugViewNow == 24u)
+    if (debugViewNow == 24u && !rtReflEnabled)
     {
         float3 sdfColor = RenderSDFScene(uv);
         return float4(sdfColor, 1.0f);
@@ -895,7 +952,18 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     if (rtEnabled)
     {
-        rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
+        int2 centerPix = clamp((int2)(uv * float2(depthDim)), int2(0, 0), depthMax);
+        float  centerDepth = g_Depth.Load(int3(centerPix, 0));
+        float3 centerN = normalize(g_NormalRoughness.Load(int3(centerPix, 0)).xyz * 2.0f - 1.0f);
+
+        uint rtWidth, rtHeight;
+        g_RTReflection.GetDimensions(rtWidth, rtHeight);
+        uint2 rtDim = uint2(max(rtWidth, 1u), max(rtHeight, 1u));
+        float2 texel = 1.0f / float2(rtDim);
+
+        float4 rtCenter4 = SampleRtReflectionEdgeAware(uv, rtDim, depthDim, centerDepth, centerN);
+        rtRefl = rtCenter4.rgb;
+        float  rtValid = saturate(rtCenter4.a);
         // Clamp extreme RT reflection intensity so very hot env texels do not
         // overpower the underlying BRDF/IBL term.
         const float kMaxRTIntensity = 32.0f;
@@ -909,9 +977,9 @@ float4 PSMain(VSOutput input) : SV_TARGET
         // buffer to reduce aliasing/fizzing from single-sample DXR. This is
         // followed by a simple temporal accumulation against a history
         // buffer when RT history has been populated on the CPU side.
-        float2 texel = g_PostParams.xy;
-        float3 accum = rtRefl;
-        float  total = 1.0f;
+        float  baseW = max(rtValid, 0.05f);
+        float3 accum = rtRefl * baseW;
+        float  total = baseW;
 
         float2 offsets[4] = {
             float2( texel.x,  0.0f),
@@ -924,22 +992,66 @@ float4 PSMain(VSOutput input) : SV_TARGET
         for (int i = 0; i < 4; ++i)
         {
             float2 sampleUV = saturate(uv + offsets[i]);
-            float3 sampleRT = g_RTReflection.Sample(g_Sampler, sampleUV).rgb;
-            accum += sampleRT;
-            total += 1.0f;
-        }
+            float4 sampleRT4 = SampleRtReflectionEdgeAware(sampleUV, rtDim, depthDim, centerDepth, centerN);
+            float3 sampleRT = sampleRT4.rgb;
+            float  sampleValid = saturate(sampleRT4.a);
 
-        rtRefl = accum / max(total, 1e-4f);
+            // Bilateral weights: keep RT reflections from bleeding across depth/normal edges.
+            int2 samplePix = clamp((int2)(sampleUV * float2(depthDim)), int2(0, 0), depthMax);
+            float sampleDepth = g_Depth.Load(int3(samplePix, 0));
+            float3 sampleN = normalize(g_NormalRoughness.Load(int3(samplePix, 0)).xyz * 2.0f - 1.0f);
 
-        // Temporal accumulation using a simple history buffer updated once
-        // per frame from the CPU. Only blend against history once the
-        // reflection history has been seeded (avoid sampling undefined VRAM).
-        if (rtReflHistoryValid)
-        {
-            float3 rtHist = g_RTReflectionHistory.Sample(g_Sampler, uv).rgb;
+            float depthScale = lerp(420.0f, 90.0f, saturate(centerDepth));
+            float wDepth = saturate(1.0f - abs(sampleDepth - centerDepth) * depthScale);
+            float wNormal = saturate((dot(sampleN, centerN) - 0.85f) / 0.15f);
+            float w = max(sampleValid, 0.02f) * wDepth * wNormal;
+
+            accum += sampleRT * w;
+            total += w;
+        } 
+
+        rtRefl = accum / max(total, 1e-4f); 
+ 
+        // If the RT reflection buffer has no meaningful signal, treat it as
+        // unavailable so it does not pull reflections toward black (this can
+        // look like "boxy" dark overlays when SSR confidence is low).
+        float rtSignal = max(max(abs(rtRefl.r), abs(rtRefl.g)), abs(rtRefl.b)); 
+        if (rtSignal < 1e-5f) 
+        { 
+            rtEnabled = false; 
+            rtRefl = 0.0f; 
+        } 
+ 
+        // Temporal accumulation using a simple history buffer updated once 
+        // per frame from the CPU. Only blend against history once the 
+        // reflection history has been seeded (avoid sampling undefined VRAM). 
+        if (rtReflHistoryValid && !rtReflTemporalOff)  
+        { 
+            // Reproject history using the same camera motion vectors used by TAA. 
+            float2 vel = g_Velocity.Sample(g_Sampler, uv).xy; 
+            float2 historyUV = saturate(uv + vel + g_TAAParams.xy); 
+
+            float4 rtHist4 = g_RTReflectionHistory.Sample(g_Sampler, historyUV);
+            float3 rtHist = rtHist4.rgb;
+            float  histValid = saturate(rtHist4.a);
+
             float3 diff = abs(rtRefl - rtHist);
             float maxDiffHist = max(max(diff.r, diff.g), diff.b);
-            float historyWeight = lerp(0.7f, 0.05f, saturate(maxDiffHist * 4.0f));
+
+            // Reject history on mismatched surfaces (disocclusion).
+            float historyDepth = g_Depth.SampleLevel(g_Sampler, historyUV, 0).r;
+            float3 historyN = normalize(g_NormalRoughness.SampleLevel(g_Sampler, historyUV, 0).xyz * 2.0f - 1.0f);
+            float depthOk = saturate(1.0f - abs(historyDepth - centerDepth) * 120.0f);
+            float normalOk = saturate((dot(historyN, centerN) - 0.80f) / 0.20f);
+            float reprojOk = depthOk * normalOk;
+
+            // Motion-aware temporal weight: keep this conservative to avoid edge trails.
+            float2 velPx = vel / max(g_PostParams.xy, float2(1e-6f, 1e-6f));
+            float speedPx = length(velPx);
+            float baseHist = lerp(0.25f, 0.05f, saturate(speedPx / 2.0f));
+            float historyWeight = baseHist * histValid * reprojOk;
+            historyWeight *= lerp(1.0f, 0.0f, saturate(maxDiffHist * 4.0f));
+
             rtRefl = lerp(rtRefl, rtHist, historyWeight);
         }
     }
@@ -1445,22 +1557,64 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float3 overlay = color * 0.5f + ssr * 0.5f;
         return float4(saturate(overlay), 1.0f);
     }
-    else if (g_DebugMode.x == 20.0f)
-    {
-        // RT reflection-only debug view (pre-tonemap). Shows the raw DXR
-        // reflection buffer color so the pipeline can be validated in
-        // isolation from SSR and the main PBR shading.
-        float3 rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
-        return float4(rtRefl, 1.0f);
-    }
-    else if (g_DebugMode.x == 24.0f)
-    {
-        // RT reflection ray-direction debug view. The DXR reflection pass
-        // encodes the per-pixel reflection ray direction as RGB in the
-        // reflection buffer when this mode is active (see RaytracedReflections.hlsl).
-        float3 rayVis = g_RTReflection.Sample(g_Sampler, uv).rgb;
-        return float4(rayVis, 1.0f);
-    }
+    else if (g_DebugMode.x == 20.0f) 
+    { 
+        // RT reflection-only debug view (pre-tonemap). Shows the raw DXR 
+        // reflection buffer color so the pipeline can be validated in 
+        // isolation from SSR and the main PBR shading. 
+        uint rtW = 0, rtH = 0; 
+        g_RTReflection.GetDimensions(rtW, rtH); 
+        if (rtW == 0 || rtH == 0) 
+        { 
+            // Red indicates the RT reflection SRV is unbound/null. 
+            return float4(1.0f, 0.0f, 0.0f, 1.0f); 
+        } 
+        float4 rtSample = g_RTReflection.SampleLevel(g_Sampler, uv, 0); 
+        float maxC = max(max(abs(rtSample.r), abs(rtSample.g)), abs(rtSample.b)); 
+        if (maxC < 1e-5f) 
+        { 
+            int2 pix = clamp((int2)(uv * float2(depthDim)), int2(0, 0), depthMax); 
+            float depth = g_Depth.Load(int3(pix, 0)); 
+            if (depth < 1.0f - 1e-4f) 
+            { 
+                // Green = geometry present but RT reflection buffer is zero. 
+                return float4(0.0f, 1.0f, 0.0f, 1.0f); 
+            } 
+        } 
+        // Boost visibility for debug (the RT buffer is HDR and often very dark 
+        // when displayed without tonemapping). 
+        return float4(saturate(rtSample.rgb * 4.0f), 1.0f); 
+    } 
+    else if (g_DebugMode.x == 30.0f) 
+    { 
+        // RT reflection history-only debug view (pre-tonemap). 
+        uint rtW = 0, rtH = 0; 
+        g_RTReflectionHistory.GetDimensions(rtW, rtH); 
+        if (rtW == 0 || rtH == 0) 
+        { 
+            return float4(1.0f, 0.0f, 0.0f, 1.0f); 
+        } 
+        float4 rtSample = g_RTReflectionHistory.SampleLevel(g_Sampler, uv, 0); 
+        return float4(saturate(rtSample.rgb * 4.0f), 1.0f); 
+    } 
+    else if (g_DebugMode.x == 31.0f) 
+    { 
+        // RT reflection delta: visualize absolute difference between current
+        // RT reflection and the history buffer. Useful for spotting stale-tile
+        // artifacts or reprojection/jitter mismatch.
+        float3 curr = g_RTReflection.SampleLevel(g_Sampler, uv, 0).rgb; 
+        float3 hist = g_RTReflectionHistory.SampleLevel(g_Sampler, uv, 0).rgb; 
+        float3 d = abs(curr - hist); 
+        return float4(saturate(d * 8.0f), 1.0f); 
+    } 
+    else if (g_DebugMode.x == 24.0f) 
+    { 
+        // RT reflection ray-direction debug view. The DXR reflection pass 
+        // encodes the per-pixel reflection ray direction as RGB in the 
+        // reflection buffer when this mode is active (see RaytracedReflections.hlsl). 
+        float3 rayVis = g_RTReflection.SampleLevel(g_Sampler, uv, 0).rgb; 
+        return float4(rayVis, 1.0f); 
+    } 
 
     // Shadow map cascade visualization in the top-right corner, only when
     // debug screen mode is active (g_DebugMode.x == 6). We show all three

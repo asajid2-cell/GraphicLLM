@@ -1437,66 +1437,82 @@ void DX12RaytracingContext::BuildTLAS(Scene::ECS_Registry* registry,
     }
 }
 
-void DX12RaytracingContext::DispatchRayTracing(
-    ID3D12GraphicsCommandList4* cmdList,
-    const DescriptorHandle& depthSrv,
-    const DescriptorHandle& shadowMaskUav,
-    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-    const DescriptorHandle& shadowEnvTable) {
-    if (!m_device5 || !cmdList || !m_tlas || !m_rtStateObject ||
-        !m_rtStateProps || !m_rtShaderTable ||
-        !m_rtGlobalRootSignature || !m_descriptors) {
-        return;
-    }
+void DX12RaytracingContext::DispatchRayTracing( 
+    ID3D12GraphicsCommandList4* cmdList, 
+    const DescriptorHandle& depthSrv, 
+    const DescriptorHandle& shadowMaskUav, 
+    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress, 
+    const DescriptorHandle& shadowEnvTable) { 
+    if (!m_device5 || !cmdList || !m_tlas || !m_rtStateObject || 
+        !m_rtStateProps || !m_rtShaderTable || 
+        !m_rtGlobalRootSignature || !m_descriptors) { 
+        return; 
+    } 
 
-    if (!depthSrv.IsValid() || !shadowMaskUav.IsValid() ||
-        !m_rtTlasSrv.IsValid() || !m_rtDepthSrv.IsValid() || !m_rtMaskUav.IsValid()) {
-        return;
-    }
+    if (!depthSrv.IsValid() || !shadowMaskUav.IsValid()) { 
+        return; 
+    } 
 
-    ID3D12Device* device = m_device5.Get();
-    if (!device) {
-        return;
-    }
+    ID3D12Device* device = m_device5.Get(); 
+    if (!device) { 
+        return; 
+    } 
+    if (!m_descriptors) { 
+        return; 
+    } 
+ 
+    // Allocate transient descriptor slots for this dispatch. Using persistent
+    // slots and rewriting them every frame can alias across frames when the GPU
+    // is behind, producing flicker/garbage in RT outputs.
+    auto tlasHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto depthHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto outHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    if (tlasHandleResult.IsErr() || depthHandleResult.IsErr() || outHandleResult.IsErr()) { 
+        return; 
+    } 
+ 
+    const DescriptorHandle rtTlasSrv = tlasHandleResult.Value(); 
+    const DescriptorHandle rtDepthSrv = depthHandleResult.Value(); 
+    const DescriptorHandle rtOutUav = outHandleResult.Value(); 
 
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{};
-        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress();
+    { 
+        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{}; 
+        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN; 
+        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE; 
+        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING; 
+        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress(); 
 
-        device->CreateShaderResourceView(
-            nullptr,
-            &asSrvDesc,
-            m_rtTlasSrv.cpu);
-    }
+        device->CreateShaderResourceView( 
+            nullptr, 
+            &asSrvDesc, 
+            rtTlasSrv.cpu); 
+    } 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtDepthSrv.cpu,
-        depthSrv.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtDepthSrv.cpu, 
+        depthSrv.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtMaskUav.cpu,
-        shadowMaskUav.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtOutUav.cpu, 
+        shadowMaskUav.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() };
-    cmdList->SetDescriptorHeaps(1, heaps);
+    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() }; 
+    cmdList->SetDescriptorHeaps(1, heaps); 
 
-    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get());
-    cmdList->SetPipelineState1(m_rtStateObject.Get());
+    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get()); 
+    cmdList->SetPipelineState1(m_rtStateObject.Get()); 
 
-    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress);
-    cmdList->SetComputeRootDescriptorTable(1, m_rtTlasSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(2, m_rtDepthSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(3, m_rtMaskUav.gpu);
-    if (shadowEnvTable.IsValid()) {
-        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu);
-    }
+    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress); 
+    cmdList->SetComputeRootDescriptorTable(1, rtTlasSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(2, rtDepthSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(3, rtOutUav.gpu); 
+    if (shadowEnvTable.IsValid()) { 
+        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu); 
+    } 
 
     const D3D12_GPU_VIRTUAL_ADDRESS shaderTableVA = m_rtShaderTable->GetGPUVirtualAddress();
 
@@ -1519,76 +1535,94 @@ void DX12RaytracingContext::DispatchRayTracing(
     cmdList->DispatchRays(&desc);
 }
 
-void DX12RaytracingContext::DispatchReflections(
-    ID3D12GraphicsCommandList4* cmdList,
-    const DescriptorHandle& depthSrv,
-    const DescriptorHandle& reflectionUav,
-    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-    const DescriptorHandle& shadowEnvTable,
-    const DescriptorHandle& normalRoughnessSrv) {
-    if (!m_device5 || !cmdList || !m_tlas || !m_rtReflStateObject ||
-        !m_rtReflStateProps || !m_rtReflShaderTable ||
-        !m_rtGlobalRootSignature || !m_descriptors) {
-        return;
-    }
+void DX12RaytracingContext::DispatchReflections( 
+    ID3D12GraphicsCommandList4* cmdList, 
+    const DescriptorHandle& depthSrv, 
+    const DescriptorHandle& reflectionUav, 
+    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress, 
+    const DescriptorHandle& shadowEnvTable, 
+    const DescriptorHandle& normalRoughnessSrv, 
+    uint32_t dispatchWidth, 
+    uint32_t dispatchHeight) { 
+    if (!m_device5 || !cmdList || !m_tlas || !m_rtReflStateObject || 
+        !m_rtReflStateProps || !m_rtReflShaderTable || 
+        !m_rtGlobalRootSignature || !m_descriptors) { 
+        return; 
+    } 
 
-    if (!depthSrv.IsValid() || !reflectionUav.IsValid() ||
-        !m_rtTlasSrv.IsValid() || !m_rtDepthSrv.IsValid() ||
-        !m_rtMaskUav.IsValid() || !m_rtGBufferNormalSrv.IsValid() ||
-        !normalRoughnessSrv.IsValid()) {
-        return;
-    }
+    if (!depthSrv.IsValid() || !reflectionUav.IsValid() || !normalRoughnessSrv.IsValid()) { 
+        return; 
+    } 
 
-    ID3D12Device* device = m_device5.Get();
-    if (!device) {
-        return;
-    }
+    ID3D12Device* device = m_device5.Get(); 
+    if (!device) { 
+        return; 
+    } 
+    if (!m_descriptors) { 
+        return; 
+    } 
+ 
+    // Allocate transient descriptor slots for this dispatch to avoid aliasing
+    // across frames/passes when the descriptor heap is updated while GPU work
+    // is still in-flight.
+    auto tlasHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto depthHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto outHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto normalHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    if (tlasHandleResult.IsErr() || depthHandleResult.IsErr() || outHandleResult.IsErr() || normalHandleResult.IsErr()) { 
+        return; 
+    } 
+ 
+    const DescriptorHandle rtTlasSrv = tlasHandleResult.Value(); 
+    const DescriptorHandle rtDepthSrv = depthHandleResult.Value(); 
+    const DescriptorHandle rtOutUav = outHandleResult.Value(); 
+    const DescriptorHandle rtNormalSrv = normalHandleResult.Value(); 
 
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{};
-        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress();
+    { 
+        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{}; 
+        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN; 
+        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE; 
+        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING; 
+        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress(); 
 
-        device->CreateShaderResourceView(
-            nullptr,
-            &asSrvDesc,
-            m_rtTlasSrv.cpu);
-    }
+        device->CreateShaderResourceView( 
+            nullptr, 
+            &asSrvDesc, 
+            rtTlasSrv.cpu); 
+    } 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtDepthSrv.cpu,
-        depthSrv.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtDepthSrv.cpu, 
+        depthSrv.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtMaskUav.cpu,
-        reflectionUav.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtOutUav.cpu, 
+        reflectionUav.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtGBufferNormalSrv.cpu,
-        normalRoughnessSrv.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtNormalSrv.cpu, 
+        normalRoughnessSrv.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() };
-    cmdList->SetDescriptorHeaps(1, heaps);
+    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() }; 
+    cmdList->SetDescriptorHeaps(1, heaps); 
 
-    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get());
-    cmdList->SetPipelineState1(m_rtReflStateObject.Get());
+    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get()); 
+    cmdList->SetPipelineState1(m_rtReflStateObject.Get()); 
 
-    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress);
-    cmdList->SetComputeRootDescriptorTable(1, m_rtTlasSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(2, m_rtDepthSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(3, m_rtMaskUav.gpu);
-    if (shadowEnvTable.IsValid()) {
-        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu);
-    }
-    cmdList->SetComputeRootDescriptorTable(5, m_rtGBufferNormalSrv.gpu);
+    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress); 
+    cmdList->SetComputeRootDescriptorTable(1, rtTlasSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(2, rtDepthSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(3, rtOutUav.gpu); 
+    if (shadowEnvTable.IsValid()) { 
+        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu); 
+    } 
+    cmdList->SetComputeRootDescriptorTable(5, rtNormalSrv.gpu); 
 
     const D3D12_GPU_VIRTUAL_ADDRESS shaderTableVA = m_rtReflShaderTable->GetGPUVirtualAddress();
 
@@ -1604,73 +1638,88 @@ void DX12RaytracingContext::DispatchReflections(
     desc.HitGroupTable.SizeInBytes = m_rtReflShaderTableStride;
     desc.HitGroupTable.StrideInBytes = m_rtReflShaderTableStride;
 
-    desc.Width = m_rtxWidth;
-    desc.Height = m_rtxHeight;
+    desc.Width = std::max(1u, dispatchWidth);
+    desc.Height = std::max(1u, dispatchHeight);
     desc.Depth = 1;
 
     cmdList->DispatchRays(&desc);
 }
 
-void DX12RaytracingContext::DispatchGI(
-    ID3D12GraphicsCommandList4* cmdList,
-    const DescriptorHandle& depthSrv,
-    const DescriptorHandle& giUav,
-    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
-    const DescriptorHandle& shadowEnvTable) {
-    if (!m_device5 || !cmdList || !m_tlas || !m_rtGIStateObject ||
-        !m_rtGIStateProps || !m_rtGIShaderTable ||
-        !m_rtGlobalRootSignature || !m_descriptors) {
-        return;
-    }
+void DX12RaytracingContext::DispatchGI( 
+    ID3D12GraphicsCommandList4* cmdList, 
+    const DescriptorHandle& depthSrv, 
+    const DescriptorHandle& giUav, 
+    D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress, 
+    const DescriptorHandle& shadowEnvTable, 
+    uint32_t dispatchWidth, 
+    uint32_t dispatchHeight) { 
+    if (!m_device5 || !cmdList || !m_tlas || !m_rtGIStateObject || 
+        !m_rtGIStateProps || !m_rtGIShaderTable || 
+        !m_rtGlobalRootSignature || !m_descriptors) { 
+        return; 
+    } 
 
-    if (!depthSrv.IsValid() || !giUav.IsValid() ||
-        !m_rtTlasSrv.IsValid() || !m_rtDepthSrv.IsValid() || !m_rtMaskUav.IsValid()) {
-        return;
-    }
+    if (!depthSrv.IsValid() || !giUav.IsValid()) { 
+        return; 
+    } 
 
-    ID3D12Device* device = m_device5.Get();
-    if (!device) {
-        return;
-    }
+    ID3D12Device* device = m_device5.Get(); 
+    if (!device) { 
+        return; 
+    } 
+    if (!m_descriptors) { 
+        return; 
+    } 
+ 
+    auto tlasHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto depthHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    auto outHandleResult = m_descriptors->AllocateTransientCBV_SRV_UAV(); 
+    if (tlasHandleResult.IsErr() || depthHandleResult.IsErr() || outHandleResult.IsErr()) { 
+        return; 
+    } 
+ 
+    const DescriptorHandle rtTlasSrv = tlasHandleResult.Value(); 
+    const DescriptorHandle rtDepthSrv = depthHandleResult.Value(); 
+    const DescriptorHandle rtOutUav = outHandleResult.Value(); 
 
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{};
-        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress();
+    { 
+        D3D12_SHADER_RESOURCE_VIEW_DESC asSrvDesc{}; 
+        asSrvDesc.Format = DXGI_FORMAT_UNKNOWN; 
+        asSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE; 
+        asSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING; 
+        asSrvDesc.RaytracingAccelerationStructure.Location = m_tlas->GetGPUVirtualAddress(); 
 
-        device->CreateShaderResourceView(
-            nullptr,
-            &asSrvDesc,
-            m_rtTlasSrv.cpu);
-    }
+        device->CreateShaderResourceView( 
+            nullptr, 
+            &asSrvDesc, 
+            rtTlasSrv.cpu); 
+    } 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtDepthSrv.cpu,
-        depthSrv.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtDepthSrv.cpu, 
+        depthSrv.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    device->CopyDescriptorsSimple(
-        1,
-        m_rtMaskUav.cpu,
-        giUav.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    device->CopyDescriptorsSimple( 
+        1, 
+        rtOutUav.cpu, 
+        giUav.cpu, 
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV); 
 
-    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() };
-    cmdList->SetDescriptorHeaps(1, heaps);
+    ID3D12DescriptorHeap* heaps[] = { m_descriptors->GetCBV_SRV_UAV_Heap() }; 
+    cmdList->SetDescriptorHeaps(1, heaps); 
 
-    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get());
-    cmdList->SetPipelineState1(m_rtGIStateObject.Get());
+    cmdList->SetComputeRootSignature(m_rtGlobalRootSignature.Get()); 
+    cmdList->SetPipelineState1(m_rtGIStateObject.Get()); 
 
-    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress);
-    cmdList->SetComputeRootDescriptorTable(1, m_rtTlasSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(2, m_rtDepthSrv.gpu);
-    cmdList->SetComputeRootDescriptorTable(3, m_rtMaskUav.gpu);
-    if (shadowEnvTable.IsValid()) {
-        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu);
-    }
+    cmdList->SetComputeRootConstantBufferView(0, frameCBAddress); 
+    cmdList->SetComputeRootDescriptorTable(1, rtTlasSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(2, rtDepthSrv.gpu); 
+    cmdList->SetComputeRootDescriptorTable(3, rtOutUav.gpu); 
+    if (shadowEnvTable.IsValid()) { 
+        cmdList->SetComputeRootDescriptorTable(4, shadowEnvTable.gpu); 
+    } 
 
     const D3D12_GPU_VIRTUAL_ADDRESS shaderTableVA = m_rtGIShaderTable->GetGPUVirtualAddress();
 
@@ -1686,8 +1735,8 @@ void DX12RaytracingContext::DispatchGI(
     desc.HitGroupTable.SizeInBytes = m_rtGIShaderTableStride;
     desc.HitGroupTable.StrideInBytes = m_rtGIShaderTableStride;
 
-    desc.Width = m_rtxWidth;
-    desc.Height = m_rtxHeight;
+    desc.Width = std::max(1u, dispatchWidth);
+    desc.Height = std::max(1u, dispatchHeight);
     desc.Depth = 1;
 
     cmdList->DispatchRays(&desc);

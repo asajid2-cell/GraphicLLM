@@ -105,22 +105,30 @@ float3 SampleEnvironment(float3 dir)
     return env * specIntensity;
 }
 
-// Simple helper to reconstruct world position from depth and launch index.
-float3 ReconstructWorldPosition(uint2 launchIndex, uint2 launchDims, float depth)
+float2 LaunchToUV(uint2 launchIndex, uint2 launchDims)
 {
     float2 uv;
     uv.x = (float(launchIndex.x) + 0.5f) / float(launchDims.x);
     uv.y = (float(launchIndex.y) + 0.5f) / float(launchDims.y);
+    return uv;
+}
 
+// Reconstruct world position from depth and UV using the jittered inverse
+// view-projection so the result matches the main depth/G-buffer path.
+float3 ReconstructWorldPositionUV(float2 uv, float depth)
+{
     float x = uv.x * 2.0f - 1.0f;
     float y = 1.0f - 2.0f * uv.y;
     float4 clip = float4(x, y, depth, 1.0f);
 
-    // Use the jittered inverse view-projection so depth reconstruction matches
-    // the main G-buffer/depth path. This avoids banding from inconsistent
-    // matrices; temporal filtering handles jitter-induced noise.
     float4 world = mul(g_InvViewProjMatrix, clip);
     return world.xyz / max(world.w, 1e-4f);
+}
+
+// Simple helper to reconstruct world position from depth and launch index.
+float3 ReconstructWorldPosition(uint2 launchIndex, uint2 launchDims, float depth)
+{
+    return ReconstructWorldPositionUV(LaunchToUV(launchIndex, launchDims), depth);
 }
 
 // Approximate a world-space normal using a small depth-based gradient so that
@@ -128,22 +136,33 @@ float3 ReconstructWorldPosition(uint2 launchIndex, uint2 launchDims, float depth
 // the full G-buffer in the RT pipeline.
 float3 ApproximateNormal(uint2 launchIndex, uint2 launchDims)
 {
-    float depthCenter = g_Depth.Load(int3(launchIndex, 0));
+    float2 uv = LaunchToUV(launchIndex, launchDims);
+    uint depthW, depthH;
+    g_Depth.GetDimensions(depthW, depthH);
+    uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
+    int2 depthMax = int2(depthDim) - 1;
+
+    int2 centerPix = clamp((int2)(uv * float2(depthDim)), int2(0, 0), depthMax);
+    float depthCenter = g_Depth.Load(int3(centerPix, 0));
     if (depthCenter >= 1.0f - 1e-4f)
     {
         return float3(0.0f, 1.0f, 0.0f);
     }
 
-    float3 pCenter = ReconstructWorldPosition(launchIndex, launchDims, depthCenter);
+    float2 uvCenter = (float2(centerPix) + 0.5f) / float2(depthDim);
+    float3 pCenter = ReconstructWorldPositionUV(uvCenter, depthCenter);
 
-    uint2 rightIndex = uint2(min(launchIndex.x + 1, launchDims.x - 1), launchIndex.y);
-    uint2 upIndex    = uint2(launchIndex.x, min(launchIndex.y + 1, launchDims.y - 1));
+    int2 pixR = min(centerPix + int2(1, 0), depthMax);
+    int2 pixU = min(centerPix + int2(0, 1), depthMax);
 
-    float depthRight = g_Depth.Load(int3(rightIndex, 0));
-    float depthUp    = g_Depth.Load(int3(upIndex, 0));
+    float2 uvR = (float2(pixR) + 0.5f) / float2(depthDim);
+    float2 uvU = (float2(pixU) + 0.5f) / float2(depthDim);
 
-    float3 pRight = ReconstructWorldPosition(rightIndex, launchDims, depthRight);
-    float3 pUp    = ReconstructWorldPosition(upIndex, launchDims, depthUp);
+    float depthRight = g_Depth.Load(int3(pixR, 0));
+    float depthUp    = g_Depth.Load(int3(pixU, 0));
+
+    float3 pRight = ReconstructWorldPositionUV(uvR, depthRight);
+    float3 pUp    = ReconstructWorldPositionUV(uvU, depthUp);
 
     float3 dx = pRight - pCenter;
     float3 dy = pUp - pCenter;
@@ -193,8 +212,16 @@ void ClosestHit_Reflection(inout ReflectionPayload payload, in BuiltInTriangleIn
     float3 surfaceNormal;
     if (screenUV.x >= 0.0f && screenUV.x <= 1.0f && screenUV.y >= 0.0f && screenUV.y <= 1.0f)
     {
-        // Sample G-buffer normal (stored in RGB as [0,1] encoding [-1,1])
-        float4 normalSample = g_NormalRoughness.SampleLevel(g_Sampler, screenUV, 0);
+        // Sample G-buffer normal using point Load to avoid blending across
+        // geometry edges, which shows up as outline bands in glossy RT
+        // reflections when the reflections buffer is half-resolution.
+        uint gbufW, gbufH;
+        g_NormalRoughness.GetDimensions(gbufW, gbufH);
+        uint2 gbufDim = uint2(max(gbufW, 1u), max(gbufH, 1u));
+        int2 gbufMax = int2(gbufDim) - 1;
+        int2 pix = clamp((int2)(screenUV * float2(gbufDim)), int2(0, 0), gbufMax);
+
+        float4 normalSample = g_NormalRoughness.Load(int3(pix, 0));
         surfaceNormal = normalize(normalSample.rgb * 2.0f - 1.0f);
 
         // Validate the normal; if invalid (NaN/zero), fall back to approximation
@@ -222,7 +249,19 @@ void RayGen_Reflection()
     uint2 launchIndex = DispatchRaysIndex().xy;
     uint2 launchDims  = DispatchRaysDimensions().xy;
 
-    float depth = g_Depth.Load(int3(launchIndex, 0));
+    // The reflection output buffer is half-res, but depth/gbuffer are full-res.
+    // Always sample depth by UV so the RT rays track the correct pixel footprint
+    // and don't produce edge outlines from mismatched integer loads.
+    float2 uv = LaunchToUV(launchIndex, launchDims);
+    uint debugView = (uint)g_DebugMode.x;
+
+    uint depthW, depthH;
+    g_Depth.GetDimensions(depthW, depthH);
+    uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
+    int2 depthMax = int2(depthDim) - 1;
+    int2 pix = clamp((int2)(uv * float2(depthDim)), int2(0, 0), depthMax);
+
+    float depth = g_Depth.Load(int3(pix, 0));
     if (depth >= 1.0f - 1e-4f)
     {
         // Background / far plane: no reflection information. Encode as black.
@@ -230,11 +269,16 @@ void RayGen_Reflection()
         return;
     }
 
-    float3 worldPos = ReconstructWorldPosition(launchIndex, launchDims, depth);
+    float3 worldPos = ReconstructWorldPositionUV(uv, depth);
     float3 camPos   = g_CameraPosition.xyz;
 
     float3 V = normalize(camPos - worldPos);
-    float3 N = ApproximateNormal(launchIndex, launchDims);
+    float4 nr = g_NormalRoughness.Load(int3(pix, 0));
+    float3 N = normalize(nr.rgb * 2.0f - 1.0f);
+    if (!all(isfinite(N)) || length(N) < 0.1f)
+    {
+        N = ApproximateNormal(launchIndex, launchDims);
+    }
     float3 initialR = normalize(reflect(-V, N));
 
     // Single-bounce ray tracing. Multi-bounce is disabled because we don't have
@@ -321,11 +365,14 @@ void RayGen_Reflection()
     // When the RT reflection ray-direction debug view is active (debug mode 24),
     // encode the reflection ray direction directly into RGB so the post-process
     // path can visualize the ray field. Otherwise, store the accumulated color.
-    uint debugView = (uint)g_DebugMode.x;
     float3 outColor =
         (debugView == 24u)
         ? (initialR * 0.5f + 0.5f)
         : accumulatedColor;
 
-    g_ReflectionOut[launchIndex] = float4(outColor, finalHit ? 1.0f : 0.0f);
+    // The current reflection shader samples the environment on both hit and
+    // miss, so a binary "hit/miss" validity flag creates visible discontinuity
+    // bands in the post-process (half-res upsample + filtering sees abrupt
+    // alpha edges). Treat the output as always valid for blending.
+    g_ReflectionOut[launchIndex] = float4(outColor, 1.0f);
 }

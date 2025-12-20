@@ -278,3 +278,62 @@ add_custom_command(
     VERBATIM
 )
 add_custom_target(CortexAssets ALL DEPENDS "${CORTEX_ASSET_STAMP}")
+
+# -----------------------------------------------------------------------------
+# DXR shader libraries (DXIL)
+# -----------------------------------------------------------------------------
+#
+# The ray tracing pipelines load precompiled DXIL libraries from:
+#   assets/shaders/RaytracedShadows.dxil
+#   assets/shaders/RaytracedReflections.dxil
+#   assets/shaders/RaytracedGI.dxil
+#
+# Editing the corresponding HLSL files should therefore recompile these DXIL
+# blobs, otherwise the runtime will keep using stale shaders even when the
+# HLSL sources (and other assets) are updated.
+set(CORTEX_DXC_HINTS)
+if (EXISTS "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/directx-dxc/dxc.exe")
+    list(APPEND CORTEX_DXC_HINTS "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/directx-dxc")
+endif()
+find_program(CORTEX_DXC_EXECUTABLE NAMES dxc HINTS ${CORTEX_DXC_HINTS})
+
+function(cortex_compile_dxr_lib out_dxil in_hlsl)
+    if (NOT CORTEX_DXC_EXECUTABLE)
+        message(WARNING "DXC (dxc.exe) not found; DXR shader libraries will not be recompiled")
+        return()
+    endif()
+
+    add_custom_command(
+        OUTPUT "${out_dxil}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets/shaders"
+        COMMAND "${CORTEX_DXC_EXECUTABLE}"
+                -T lib_6_3
+                -O3
+                -Qstrip_debug
+                -Fo "${out_dxil}"
+                "${in_hlsl}"
+        # Also depend on the asset stamp. The asset copy step includes legacy
+        # precompiled *.dxil blobs from the source tree; rebuilding DXIL after
+        # any asset update ensures the runtime directory ends up with the
+        # freshly compiled library rather than a stale copied file.
+        DEPENDS "${in_hlsl}" "${CORTEX_ASSET_STAMP}"
+        VERBATIM
+    )
+endfunction()
+
+set(CORTEX_DXR_SHADERS_DIR "${CMAKE_SOURCE_DIR}/assets/shaders")
+set(CORTEX_DXR_OUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets/shaders")
+
+set(CORTEX_DXR_DXIL_OUTPUTS
+    "${CORTEX_DXR_OUT_DIR}/RaytracedShadows.dxil"
+    "${CORTEX_DXR_OUT_DIR}/RaytracedReflections.dxil"
+    "${CORTEX_DXR_OUT_DIR}/RaytracedGI.dxil"
+)
+
+cortex_compile_dxr_lib("${CORTEX_DXR_OUT_DIR}/RaytracedShadows.dxil"     "${CORTEX_DXR_SHADERS_DIR}/RaytracedShadows.hlsl")
+cortex_compile_dxr_lib("${CORTEX_DXR_OUT_DIR}/RaytracedReflections.dxil" "${CORTEX_DXR_SHADERS_DIR}/RaytracedReflections.hlsl")
+cortex_compile_dxr_lib("${CORTEX_DXR_OUT_DIR}/RaytracedGI.dxil"          "${CORTEX_DXR_SHADERS_DIR}/RaytracedGI.hlsl")
+
+add_custom_target(CortexDXRShaders ALL DEPENDS ${CORTEX_DXR_DXIL_OUTPUTS})
+add_dependencies(CortexDXRShaders CortexAssets)
+add_dependencies(CortexEngine CortexDXRShaders)

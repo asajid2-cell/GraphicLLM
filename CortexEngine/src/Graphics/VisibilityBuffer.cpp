@@ -991,7 +991,34 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         return Result<void>::Ok(); // Nothing to draw
     }
 
-    // Transition visibility buffer to render target
+    // Ensure descriptor heap is bound for UAV clear.
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    // Clear visibility buffer to 0xFFFFFFFF (background marker) via UAV to avoid
+    // undefined float->uint conversions on integer RT formats.
+    if (m_visibilityState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_visibilityBuffer.Get();
+        barrier.Transition.StateBefore = m_visibilityState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_visibilityState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    const UINT clearValues[4] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
+    cmdList->ClearUnorderedAccessViewUint(
+        m_visibilityUAV.gpu,
+        m_visibilityUAV.cpu,
+        m_visibilityBuffer.Get(),
+        clearValues,
+        0,
+        nullptr
+    );
+
+    // Transition visibility buffer to render target for the visibility pass.
     if (m_visibilityState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1002,10 +1029,6 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         cmdList->ResourceBarrier(1, &barrier);
         m_visibilityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
-
-    // Clear visibility buffer to 0xFFFFFFFF (background marker)
-    UINT clearValues[4] = {0xFFFFFFFF, 0xFFFFFFFF, 0, 0};
-    cmdList->ClearRenderTargetView(m_visibilityRTV.cpu, reinterpret_cast<float*>(clearValues), 0, nullptr);
 
     // Set render target
     cmdList->OMSetRenderTargets(1, &m_visibilityRTV.cpu, FALSE, &depthDSV);
@@ -1077,12 +1100,18 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
 Result<void> VisibilityBufferRenderer::ResolveMaterials(
     ID3D12GraphicsCommandList* cmdList,
     ID3D12Resource* depthBuffer,
-    D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+    D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
     const std::vector<VBMeshDrawInfo>& meshDraws,
     const glm::mat4& viewProj
 ) {
     if (meshDraws.empty()) {
         return Result<void>::Err("No meshes provided for material resolve");
+    }
+    if (depthSRV.ptr == 0) {
+        return Result<void>::Err("Material resolve requires a valid depth SRV");
+    }
+    if (!m_device || !m_descriptorManager) {
+        return Result<void>::Err("Material resolve missing device or descriptor manager");
     }
     // Transition visibility buffer to shader resource
     if (m_visibilityState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
@@ -1137,6 +1166,8 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     // Set compute pipeline
     cmdList->SetPipelineState(m_resolvePipeline.Get());
     cmdList->SetComputeRootSignature(m_resolveRootSignature.Get());
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    cmdList->SetDescriptorHeaps(1, heaps);
 
     // Param 0 (b0): Resolution constants + view-projection matrix + mesh index
     struct ResolutionConstants {
@@ -1153,14 +1184,74 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
     cmdList->SetComputeRootShaderResourceView(1, instanceBufferAddress);
 
-    // Param 2: Descriptor table with t0 (visibility buffer SRV) + t2 (depth SRV)
-    // NOTE: This assumes visibility and depth SRVs are contiguous in heap
-    // Proper implementation would allocate temp descriptor table and copy
-    cmdList->SetComputeRootDescriptorTable(2, m_visibilitySRV.gpu);
+    // Param 2: Descriptor table with t0 (visibility) + t2 (depth).
+    // Allocate a contiguous transient range and copy the persistent SRVs into it.
+    auto visSrvResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (visSrvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate transient visibility SRV: " + visSrvResult.Error());
+    }
+    auto depthSrvResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthSrvResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate transient depth SRV: " + depthSrvResult.Error());
+    }
 
-    // Param 3: Descriptor table with u0-u2 (G-buffer UAVs)
-    // NOTE: This assumes G-buffer UAVs are contiguous in heap
-    cmdList->SetComputeRootDescriptorTable(3, m_albedoUAV.gpu);
+    DescriptorHandle visSrv = visSrvResult.Value();
+    DescriptorHandle depthSrvCopy = depthSrvResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        visSrv.cpu,
+        m_visibilitySRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        depthSrvCopy.cpu,
+        depthSRV,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    cmdList->SetComputeRootDescriptorTable(2, visSrv.gpu);
+
+    // Param 3: Descriptor table with u0-u2 (G-buffer UAVs).
+    // Allocate a contiguous transient range and copy the persistent UAVs into it.
+    auto albedoUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (albedoUavResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate transient albedo UAV: " + albedoUavResult.Error());
+    }
+    auto normalUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (normalUavResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate transient normal/roughness UAV: " + normalUavResult.Error());
+    }
+    auto emissiveUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (emissiveUavResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate transient emissive/metallic UAV: " + emissiveUavResult.Error());
+    }
+
+    DescriptorHandle albedoUavCopy = albedoUavResult.Value();
+    DescriptorHandle normalUavCopy = normalUavResult.Value();
+    DescriptorHandle emissiveUavCopy = emissiveUavResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        albedoUavCopy.cpu,
+        m_albedoUAV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        normalUavCopy.cpu,
+        m_normalRoughnessUAV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        emissiveUavCopy.cpu,
+        m_emissiveMetallicUAV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    );
+
+    cmdList->SetComputeRootDescriptorTable(3, albedoUavCopy.gpu);
 
     // Dispatch material resolve for each mesh separately
     // This ensures each mesh uses its correct vertex/index buffers
@@ -1275,13 +1366,19 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     ID3D12Resource* hdrTarget,
     D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
     ID3D12Resource* depthBuffer,
-    D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
-    D3D12_GPU_DESCRIPTOR_HANDLE envMapSRV,
-    D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSRV,
+    const DescriptorHandle& depthSRV,
+    const DescriptorHandle& envMapSRV,
+    const DescriptorHandle& shadowMapSRV,
     const DeferredLightingParams& params
 ) {
     if (!m_deferredLightingPipeline) {
         return Result<void>::Err("Deferred lighting pipeline not initialized");
+    }
+    if (!depthSRV.IsValid() || !envMapSRV.IsValid() || !shadowMapSRV.IsValid()) {
+        return Result<void>::Err("Deferred lighting requires valid depth/env/shadow SRVs");
+    }
+    if (!m_albedoSRV.IsValid() || !m_normalRoughnessSRV.IsValid() || !m_emissiveMetallicSRV.IsValid()) {
+        return Result<void>::Err("Deferred lighting requires valid G-buffer SRVs");
     }
 
     // Transition G-buffers to shader resource
@@ -1381,12 +1478,58 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     cmdList->SetGraphicsRootConstantBufferView(0, m_deferredLightingCB->GetGPUVirtualAddress());
 
     // t0-t3: G-buffer + depth SRVs (descriptor table)
-    // NOTE: This assumes G-buffer SRVs and depth SRV are consecutive in heap
-    cmdList->SetGraphicsRootDescriptorTable(1, m_albedoSRV.gpu);
+    auto albedoResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (albedoResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate albedo SRV: " + albedoResult.Error());
+    }
+    auto normalResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (normalResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate normal SRV: " + normalResult.Error());
+    }
+    auto emissiveResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (emissiveResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate emissive SRV: " + emissiveResult.Error());
+    }
+    auto depthResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (depthResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate depth SRV: " + depthResult.Error());
+    }
+
+    DescriptorHandle albedoHandle = albedoResult.Value();
+    DescriptorHandle normalHandle = normalResult.Value();
+    DescriptorHandle emissiveHandle = emissiveResult.Value();
+    DescriptorHandle depthHandle = depthResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, albedoHandle.cpu, m_albedoSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, normalHandle.cpu, m_normalRoughnessSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, emissiveHandle.cpu, m_emissiveMetallicSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, depthHandle.cpu, depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    cmdList->SetGraphicsRootDescriptorTable(1, albedoHandle.gpu);
 
     // t4-t5: Environment + shadow map SRVs (descriptor table)
-    // NOTE: This assumes envMapSRV and shadowMapSRV are consecutive
-    cmdList->SetGraphicsRootDescriptorTable(2, envMapSRV);
+    auto envResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (envResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate env SRV: " + envResult.Error());
+    }
+    auto shadowResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (shadowResult.IsErr()) {
+        return Result<void>::Err("Deferred lighting failed to allocate shadow SRV: " + shadowResult.Error());
+    }
+
+    DescriptorHandle envHandle = envResult.Value();
+    DescriptorHandle shadowHandle = shadowResult.Value();
+
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, envHandle.cpu, envMapSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1, shadowHandle.cpu, shadowMapSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    cmdList->SetGraphicsRootDescriptorTable(2, envHandle.gpu);
 
     // Draw fullscreen triangle
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

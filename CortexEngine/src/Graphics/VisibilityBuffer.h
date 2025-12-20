@@ -106,7 +106,7 @@ public:
     Result<void> ResolveMaterials(
         ID3D12GraphicsCommandList* cmdList,
         ID3D12Resource* depthBuffer,
-        D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
+        D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
         const std::vector<VBMeshDrawInfo>& meshDraws,
         const glm::mat4& viewProj
     );
@@ -132,9 +132,9 @@ public:
         ID3D12Resource* hdrTarget,
         D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
         ID3D12Resource* depthBuffer,
-        D3D12_GPU_DESCRIPTOR_HANDLE depthSRV,
-        D3D12_GPU_DESCRIPTOR_HANDLE envMapSRV,
-        D3D12_GPU_DESCRIPTOR_HANDLE shadowMapSRV,
+        const DescriptorHandle& depthSRV,
+        const DescriptorHandle& envMapSRV,
+        const DescriptorHandle& shadowMapSRV,
         const DeferredLightingParams& params
     );
 

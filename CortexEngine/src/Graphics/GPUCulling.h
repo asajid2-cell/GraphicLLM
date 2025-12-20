@@ -36,6 +36,16 @@ struct DrawIndexedArguments {
     uint32_t startInstanceLocation;
 };
 
+// Indirect command record for GPU-driven draws (root params 0,2 + IA + draw)
+struct IndirectCommand {
+    D3D12_GPU_VIRTUAL_ADDRESS objectCBV;
+    D3D12_GPU_VIRTUAL_ADDRESS materialCBV;
+    D3D12_VERTEX_BUFFER_VIEW vertexBuffer;
+    D3D12_INDEX_BUFFER_VIEW indexBuffer;
+    DrawIndexedArguments draw;
+    uint32_t padding = 0;
+};
+
 // Per-mesh info for indirect draws
 struct MeshInfo {
     uint32_t indexCount;
@@ -77,6 +87,12 @@ public:
         const std::vector<GPUInstanceData>& instances
     );
 
+    // Upload per-instance indirect commands for the current frame
+    Result<void> UpdateIndirectCommands(
+        ID3D12GraphicsCommandList* cmdList,
+        const std::vector<IndirectCommand>& commands
+    );
+
     // Execute GPU culling compute shader
     Result<void> DispatchCulling(
         ID3D12GraphicsCommandList* cmdList,
@@ -84,14 +100,9 @@ public:
         const glm::vec3& cameraPos
     );
 
-    // Get the visible instance buffer for rendering
-    [[nodiscard]] ID3D12Resource* GetVisibleInstanceBuffer() const { return m_visibleInstanceBuffer.Get(); }
-    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetVisibleInstanceBufferGPU() const {
-        return m_visibleInstanceBuffer ? m_visibleInstanceBuffer->GetGPUVirtualAddress() : 0;
-    }
-
-    // Get the indirect argument buffer for ExecuteIndirect
-    [[nodiscard]] ID3D12Resource* GetIndirectArgBuffer() const { return m_indirectArgBuffer.Get(); }
+    // Get the visible command buffer for ExecuteIndirect
+    [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer.Get(); }
+    [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer.Get(); }
 
     // Get the command signature for ExecuteIndirect
     [[nodiscard]] ID3D12CommandSignature* GetCommandSignature() const { return m_commandSignature.Get(); }
@@ -107,11 +118,17 @@ public:
     using FlushCallback = std::function<void()>;
     void SetFlushCallback(FlushCallback callback) { m_flushCallback = std::move(callback); }
 
+    // Configure the graphics root signature used for indirect commands
+    Result<void> SetGraphicsRootSignature(ID3D12RootSignature* rootSignature);
+
+    // Update visible count from the readback buffer (call after GPU fence)
+    void UpdateVisibleCountFromReadback();
+
 private:
     Result<void> CreateRootSignature();
     Result<void> CreateComputePipeline();
     Result<void> CreateBuffers();
-    Result<void> CreateCommandSignature();
+    Result<void> CreateCommandSignature(ID3D12RootSignature* rootSignature);
 
     void ExtractFrustumPlanes(const glm::mat4& viewProj, FrustumPlanes& planes);
 
@@ -128,15 +145,12 @@ private:
 
     // Buffers
     ComPtr<ID3D12Resource> m_instanceBuffer;           // All instances (upload)
-    ComPtr<ID3D12Resource> m_visibleInstanceBuffer;    // Compacted visible instances (UAV)
-    ComPtr<ID3D12Resource> m_indirectArgBuffer;        // Draw arguments for ExecuteIndirect (UAV)
-    ComPtr<ID3D12Resource> m_counterBuffer;            // Atomic counter for visible instances (UAV)
-    ComPtr<ID3D12Resource> m_counterReadback;          // CPU-readable counter
+    ComPtr<ID3D12Resource> m_allCommandBuffer;         // All indirect commands (upload)
+    ComPtr<ID3D12Resource> m_visibleCommandBuffer;     // Compacted visible commands (UAV)
+    ComPtr<ID3D12Resource> m_commandCountBuffer;       // Atomic counter for visible commands (UAV)
+    ComPtr<ID3D12Resource> m_commandCountReadback;     // CPU-readable counter
 
     // Descriptors (shader-visible for ClearUnorderedAccessViewUint)
-    DescriptorHandle m_instanceSRV;
-    DescriptorHandle m_visibleInstanceUAV;
-    DescriptorHandle m_indirectArgUAV;
     DescriptorHandle m_counterUAV;           // GPU descriptor for counter buffer
     DescriptorHandle m_counterUAVStaging;    // CPU-only descriptor for ClearUAV
 
@@ -146,8 +160,12 @@ private:
     uint32_t m_maxInstances = 65536;
     uint32_t m_totalInstances = 0;
     uint32_t m_visibleCount = 0;
+    D3D12_RESOURCE_STATES m_visibleCommandState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    D3D12_RESOURCE_STATES m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
     FlushCallback m_flushCallback;
 };
+
+static_assert(sizeof(IndirectCommand) == 72, "IndirectCommand must be 72 bytes");
 
 } // namespace Cortex::Graphics

@@ -1,4 +1,5 @@
 #include "DescriptorHeap.h"
+#include <algorithm>
 #include <spdlog/spdlog.h>
 
 namespace Cortex::Graphics {
@@ -98,7 +99,7 @@ DescriptorHandle DescriptorHeap::GetHandle(uint32_t index) const {
 
 // ========== DescriptorHeapManager Implementation ==========
 
-Result<void> DescriptorHeapManager::Initialize(ID3D12Device* device) {
+Result<void> DescriptorHeapManager::Initialize(ID3D12Device* device, uint32_t frameCount) {
     // Create RTV heap (Render Target Views)
     auto rtvResult = m_rtvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_HEAP_SIZE, false);
     if (rtvResult.IsErr()) {
@@ -125,6 +126,12 @@ Result<void> DescriptorHeapManager::Initialize(ID3D12Device* device) {
         return Result<void>::Err("Failed to create staging CBV/SRV/UAV heap: " + stagingResult.Error());
     }
 
+    m_frameCount = std::max(frameCount, 1u);
+    m_activeFrameIndex = 0;
+    m_frameActive = false;
+    m_transientActive = false;
+    UpdateTransientSegment();
+
     spdlog::info("Descriptor Heap Manager initialized (with staging heap)");
     return Result<void>::Ok();
 }
@@ -138,15 +145,28 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateDSV() {
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
-    auto result = m_cbvSrvUavHeap.Allocate();
-    if (result.IsErr()) {
+    uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
+    if (m_cbvSrvUavPersistentCount >= capacity) {
         spdlog::error("CBV_SRV_UAV persistent allocation FAILED: heap exhausted at {}/{} (persistent={})",
-                      m_cbvSrvUavHeap.GetUsedCount(), m_cbvSrvUavHeap.GetCapacity(), m_cbvSrvUavPersistentCount);
-        return result;
+                      m_cbvSrvUavPersistentCount, capacity, m_cbvSrvUavPersistentCount);
+        return Result<DescriptorHandle>::Err("Descriptor heap exhausted");
     }
 
-    auto handle = result.Value();
-    uint32_t oldPersistentCount = m_cbvSrvUavPersistentCount;
+    if (m_frameActive && m_transientActive) {
+        spdlog::warn("Persistent descriptor allocation requested after transient use; retry next frame to avoid aliasing");
+        return Result<DescriptorHandle>::Err("Persistent allocation unsafe after transient descriptors were allocated");
+    }
+
+    if (m_frameActive && m_flushCallback) {
+        m_flushCallback();
+    }
+
+    DescriptorHandle handle = m_cbvSrvUavHeap.GetHandle(m_cbvSrvUavPersistentCount);
+    if (!handle.IsValid()) {
+        spdlog::error("CBV_SRV_UAV persistent allocation FAILED: invalid handle at index {}", m_cbvSrvUavPersistentCount);
+        return Result<DescriptorHandle>::Err("Invalid descriptor handle");
+    }
+
     if (handle.index + 1 > m_cbvSrvUavPersistentCount) {
         m_cbvSrvUavPersistentCount = handle.index + 1;
 
@@ -156,6 +176,13 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
                          m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity(),
                          100.0f * m_cbvSrvUavPersistentCount / m_cbvSrvUavHeap.GetCapacity());
         }
+    }
+
+    if (m_frameActive) {
+        UpdateTransientSegment();
+        m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+    } else {
+        m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentCount);
     }
 
     return Result<DescriptorHandle>::Ok(handle);
@@ -173,46 +200,94 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateStagingCBV_SRV_UAV() {
 }
 
 Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
-    uint32_t used = m_cbvSrvUavHeap.GetUsedCount();
-    uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
-
-    // Prevent allocation when heap is completely full to avoid silent failures
-    if (used >= capacity) {
-        spdlog::error("CBV_SRV_UAV heap EXHAUSTED: {}/{} descriptors (persistent={}, transient region full)",
-                      used, capacity, m_cbvSrvUavPersistentCount);
-        return Result<DescriptorHandle>::Err("Descriptor heap exhausted");
+    if (!m_frameActive) {
+        spdlog::warn("Transient descriptor allocation before BeginFrame; defaulting to frame 0 segment");
+        BeginFrame(0);
     }
 
-    // Warn when approaching capacity (>90% full)
-    if (used >= capacity * 0.9f) {
-        spdlog::warn("CBV_SRV_UAV heap nearly full: {}/{} descriptors used (persistent={}, transient={})",
-                     used, capacity, m_cbvSrvUavPersistentCount, used - m_cbvSrvUavPersistentCount);
+    if (m_transientSegmentStart >= m_transientSegmentEnd) {
+        spdlog::error("Transient descriptor segment is empty (persistent={}, capacity={})",
+                      m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity());
+        return Result<DescriptorHandle>::Err("Transient descriptor segment is empty");
+    }
+
+    uint32_t used = m_cbvSrvUavHeap.GetUsedCount();
+    if (used < m_transientSegmentStart) {
+        m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+        used = m_transientSegmentStart;
+    }
+
+    uint32_t segmentCapacity = m_transientSegmentEnd - m_transientSegmentStart;
+    uint32_t usedInSegment = used - m_transientSegmentStart;
+
+    if (used >= m_transientSegmentEnd) {
+        spdlog::error("CBV_SRV_UAV transient segment EXHAUSTED: {}/{} descriptors (persistent={})",
+                      usedInSegment, segmentCapacity, m_cbvSrvUavPersistentCount);
+        return Result<DescriptorHandle>::Err("Transient descriptor segment exhausted");
+    }
+
+    if (segmentCapacity > 0 && usedInSegment >= static_cast<uint32_t>(segmentCapacity * 0.9f)) {
+        spdlog::warn("CBV_SRV_UAV transient segment nearly full: {}/{} descriptors (persistent={}, frame={})",
+                     usedInSegment, segmentCapacity, m_cbvSrvUavPersistentCount, m_activeFrameIndex);
     }
 
     auto result = m_cbvSrvUavHeap.Allocate();
     if (result.IsErr()) {
-        spdlog::error("CBV_SRV_UAV heap allocation failed: {}/{} descriptors",
-                      used, capacity);
+        spdlog::error("CBV_SRV_UAV transient allocation failed: {}/{} descriptors",
+                      usedInSegment, segmentCapacity);
     }
+
+    m_transientActive = true;
 
     return result;
 }
 
-void DescriptorHeapManager::ResetFrameHeaps() {
-    // Only reset the transient region of the shader-visible heap each frame.
-    // Persistent descriptors (textures, shadow maps, HDR targets, etc.) live
-    // in [0, m_cbvSrvUavPersistentCount) and are never overwritten.
+void DescriptorHeapManager::BeginFrame(uint32_t frameIndex) {
+    m_frameActive = true;
+    m_transientActive = false;
+    m_activeFrameIndex = (m_frameCount > 0) ? (frameIndex % m_frameCount) : 0;
 
-    uint32_t usedBefore = m_cbvSrvUavHeap.GetUsedCount();
-    uint32_t transientUsed = usedBefore - m_cbvSrvUavPersistentCount;
+    UpdateTransientSegment();
+    m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
 
-    m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentCount);
-
-    // Log if transient usage is high (indicates potential inefficiency)
-    if (transientUsed > 100) {
-        spdlog::debug("Frame heap reset: persistent={}, transient={} (capacity={})",
-                      m_cbvSrvUavPersistentCount, transientUsed, m_cbvSrvUavHeap.GetCapacity());
+    uint32_t segmentCapacity = (m_transientSegmentEnd > m_transientSegmentStart)
+        ? (m_transientSegmentEnd - m_transientSegmentStart)
+        : 0;
+    if (segmentCapacity == 0) {
+        spdlog::warn("Transient descriptor segment empty for frame {} (persistent={}, capacity={})",
+                     m_activeFrameIndex, m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity());
     }
+}
+
+void DescriptorHeapManager::ResetFrameHeaps() {
+    BeginFrame(0);
+}
+
+void DescriptorHeapManager::UpdateTransientSegment() {
+    const uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
+    uint32_t persistentCount = std::min(m_cbvSrvUavPersistentCount, capacity);
+
+    if (persistentCount >= capacity) {
+        m_transientSegmentStart = capacity;
+        m_transientSegmentEnd = capacity;
+        return;
+    }
+
+    uint32_t transientCapacity = capacity - persistentCount;
+    if (m_frameCount <= 1) {
+        m_transientSegmentStart = persistentCount;
+        m_transientSegmentEnd = capacity;
+        return;
+    }
+
+    uint32_t perFrame = transientCapacity / m_frameCount;
+    uint32_t remainder = transientCapacity % m_frameCount;
+    uint32_t frameIdx = std::min(m_activeFrameIndex, m_frameCount - 1);
+    uint32_t extra = (frameIdx < remainder) ? 1u : 0u;
+    uint32_t offset = perFrame * frameIdx + std::min(frameIdx, remainder);
+
+    m_transientSegmentStart = persistentCount + offset;
+    m_transientSegmentEnd = m_transientSegmentStart + perFrame + extra;
 }
 
 } // namespace Cortex::Graphics

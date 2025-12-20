@@ -256,8 +256,25 @@ if(MSVC)
     )
 endif()
 
-# Copy assets to build directory
-add_custom_command(TARGET CortexEngine POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:CortexEngine>/assets
+# Copy assets to the runtime output directory.
+#
+# Important: shader iteration often changes only files under assets/, which
+# does not trigger a relink of the CortexEngine target. A POST_BUILD step
+# therefore won't run when the executable is already up-to-date, and the app
+# ends up running stale shaders from build/bin/assets.
+#
+# Use a stamp-based custom target so asset changes are picked up on every
+# build invocation (including when only shaders are edited).
+file(GLOB_RECURSE CORTEX_ASSET_FILES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/assets/*"
 )
+set(CORTEX_ASSET_STAMP "${CMAKE_BINARY_DIR}/cortex_assets.stamp")
+add_custom_command(
+    OUTPUT "${CORTEX_ASSET_STAMP}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:CortexEngine>/assets"
+    COMMAND ${CMAKE_COMMAND} -E touch "${CORTEX_ASSET_STAMP}"
+    DEPENDS ${CORTEX_ASSET_FILES}
+    VERBATIM
+)
+add_custom_target(CortexAssets ALL DEPENDS "${CORTEX_ASSET_STAMP}")

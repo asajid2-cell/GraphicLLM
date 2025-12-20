@@ -83,9 +83,28 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     return world.xyz / max(world.w, 1e-4f);
 }
 
+// Reconstruct view-space position from depth and UV using the inverse of the
+// current (jittered) projection matrix. This is more numerically stable for
+// SSR intersection tests than comparing post-projection depth in [0..1].
+float3 ReconstructViewPosition(float2 uv, float depth)
+{
+    float x = uv.x * 2.0f - 1.0f;
+    float y = 1.0f - 2.0f * uv.y;
+    depth = saturate(depth);
+    depth = min(depth, 1.0f - 1e-4f);
+    float4 clip = float4(x, y, depth, 1.0f);
+    float4 view = mul(g_InvProjectionMatrix, clip);
+    if (!all(isfinite(view)))
+    {
+        return float3(0.0f, 0.0f, 0.0f);
+    }
+    return view.xyz / max(view.w, 1e-4f);
+}
+
 float4 SSRPS(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
+    float2 texel = g_PostParams.xy;
     float depth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
 
     // Skip background / far plane
@@ -119,12 +138,17 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // robust while still capping maximum distance to avoid long streaks.
     float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
     float3 viewDir = mul((float3x3)g_ViewMatrix, R);
+    float  originZ = viewPos.z;
 
     float maxDistance = 30.0f;
     int   maxSteps    = 64;
     float stepSize    = maxDistance / maxSteps;
 
-    float thickness = 0.03f;
+    // View-space thickness tolerance. Use a smaller thickness on glossy
+    // surfaces to avoid early self-hits that can look like a nested "inner
+    // copy" on chrome spheres, but relax it on rough surfaces to keep SSR
+    // from disappearing entirely.
+    float thicknessVS = lerp(0.03f, 0.20f, roughness);
 
     float3 hitColor = 0.0f;
     bool   hit      = false;
@@ -135,9 +159,19 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // Avoid immediate self-intersection on highly reflective curved surfaces
     // (e.g., chrome spheres) which can manifest as a nested "inner copy"
     // artifact. Start the marcher a small distance along the ray.
-    float startOffset = stepSize * 2.0f;
+    // Bias start away from the surface so the first few steps don't instantly
+    // re-hit the same depth due to quantization/precision (most noticeable on
+    // glossy curved surfaces).
+    float startOffset = stepSize * 4.0f;
+    startOffset += 0.02f * (1.0f - roughness);
     posVS += viewDir * startOffset;
     traveled += startOffset;
+
+    // Require the ray to travel a minimum distance before accepting a hit.
+    // This avoids near-origin self-hits that show up as a small nested copy
+    // on glossy curved surfaces.
+    float minHitDistance = lerp(0.25f, 0.05f, roughness);
+    float minZSeparation = lerp(0.50f, 0.10f, roughness);
 
     [loop]
     for (int i = 0; i < maxSteps; ++i)
@@ -158,7 +192,6 @@ float4 SSRPS(VSOutput input) : SV_TARGET
             break;
 
         float sceneDepth = g_Depth.SampleLevel(g_Sampler, hitUV, 0).r;
-        float rayDepth   = saturate(clip.z / clip.w);
 
         // Skip invalid/cleared depth
         if (sceneDepth <= 0.0f || sceneDepth >= 1.0f - 1e-4f)
@@ -166,8 +199,30 @@ float4 SSRPS(VSOutput input) : SV_TARGET
             continue;
         }
 
-        // Basic thickness test in depth space
-        if (abs(rayDepth - sceneDepth) < thickness)
+        // Avoid sampling almost the same pixel as the origin. This is a very
+        // common source of "inner copy" artifacts on spheres due to depth
+        // quantization and TAA jitter history.
+        float2 deltaUV = abs(hitUV - uv);
+        if (all(deltaUV < (texel * 2.0f)))
+        {
+            continue;
+        }
+
+        // View-space intersection test: compare the current ray position (posVS)
+        // against the scene depth reconstructed into view space at hitUV.
+        float3 sceneVS = ReconstructViewPosition(hitUV, sceneDepth);
+        float dz = posVS.z - sceneVS.z;
+        float zSep = abs(sceneVS.z - originZ);
+
+        // Reject near-parallel / same-surface hits by comparing normals.
+        float4 hitNR = g_NormalRoughness.SampleLevel(g_Sampler, hitUV, 0);
+        float3 hitN = normalize(hitNR.xyz * 2.0f - 1.0f);
+        bool sameSurface = dot(hitN, N) > 0.995f;
+
+        if (traveled > minHitDistance &&
+            zSep > minZSeparation &&
+            !sameSurface &&
+            dz > 0.0f && dz < thicknessVS)
         {
             hitColor = g_SceneColor.SampleLevel(g_Sampler, hitUV, 0).rgb;
             hit = true;

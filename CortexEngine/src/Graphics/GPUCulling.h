@@ -103,6 +103,7 @@ public:
     // Get the visible command buffer for ExecuteIndirect
     [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer.Get(); }
     [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer.Get(); }
+    [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const { return m_allCommandBuffer.Get(); }
 
     // Get the command signature for ExecuteIndirect
     [[nodiscard]] ID3D12CommandSignature* GetCommandSignature() const { return m_commandSignature.Get(); }
@@ -120,6 +121,13 @@ public:
 
     // Configure the graphics root signature used for indirect commands
     Result<void> SetGraphicsRootSignature(ID3D12RootSignature* rootSignature);
+
+    // Transition the full command buffer for ExecuteIndirect (no compaction).
+    Result<void> PrepareAllCommandsForExecuteIndirect(ID3D12GraphicsCommandList* cmdList);
+
+    // Debug controls
+    void SetForceVisible(bool forceVisible) { m_forceVisible = forceVisible; }
+    void RequestCommandReadback(uint32_t commandCount);
 
     // Update visible count from the readback buffer (call after GPU fence)
     void UpdateVisibleCountFromReadback();
@@ -144,11 +152,14 @@ private:
     ComPtr<ID3D12CommandSignature> m_commandSignature;
 
     // Buffers
-    ComPtr<ID3D12Resource> m_instanceBuffer;           // All instances (upload)
-    ComPtr<ID3D12Resource> m_allCommandBuffer;         // All indirect commands (upload)
+    ComPtr<ID3D12Resource> m_instanceBuffer;           // All instances (default heap)
+    ComPtr<ID3D12Resource> m_instanceUploadBuffer;     // Upload staging for instances
+    ComPtr<ID3D12Resource> m_allCommandBuffer;         // All indirect commands (default heap)
+    ComPtr<ID3D12Resource> m_allCommandUploadBuffer;   // Upload staging for commands
     ComPtr<ID3D12Resource> m_visibleCommandBuffer;     // Compacted visible commands (UAV)
     ComPtr<ID3D12Resource> m_commandCountBuffer;       // Atomic counter for visible commands (UAV)
     ComPtr<ID3D12Resource> m_commandCountReadback;     // CPU-readable counter
+    ComPtr<ID3D12Resource> m_visibleCommandReadback;   // CPU-readable command snapshot
 
     // Descriptors (shader-visible for ClearUnorderedAccessViewUint)
     DescriptorHandle m_counterUAV;           // GPU descriptor for counter buffer
@@ -162,8 +173,15 @@ private:
     uint32_t m_visibleCount = 0;
     D3D12_RESOURCE_STATES m_visibleCommandState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     D3D12_RESOURCE_STATES m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    D3D12_RESOURCE_STATES m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    D3D12_RESOURCE_STATES m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
 
     FlushCallback m_flushCallback;
+
+    bool m_forceVisible = false;
+    bool m_commandReadbackRequested = false;
+    bool m_commandReadbackPending = false;
+    uint32_t m_commandReadbackCount = 0;
 };
 
 static_assert(sizeof(IndirectCommand) == 72, "IndirectCommand must be 72 bytes");

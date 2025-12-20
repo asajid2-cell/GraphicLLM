@@ -477,6 +477,8 @@ private:
     void PrewarmMaterialDescriptors(Scene::ECS_Registry* registry);
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
+    void FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
+                                    MaterialConstants& materialData) const;
     void RenderShadowPass(Scene::ECS_Registry* registry);
     void RenderSkybox();
     void RenderScene(Scene::ECS_Registry* registry);

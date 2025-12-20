@@ -14,7 +14,32 @@ struct CullConstants {
     glm::vec4 frustumPlanes[6];
     glm::vec3 cameraPos;
     uint32_t instanceCount;
+    uint32_t forceVisible;
+    uint32_t padding[3];
 };
+
+static void LogIndirectCommand(const char* label, uint32_t index, const IndirectCommand& cmd) {
+    spdlog::info(
+        "{}[{}]: objectCBV=0x{:016X} materialCBV=0x{:016X} "
+        "VBV(addr=0x{:016X} size={} stride={}) "
+        "IBV(addr=0x{:016X} size={} fmt={}) "
+        "draw(indexCount={} instanceCount={} startIndex={} baseVertex={} startInstance={})",
+        label,
+        index,
+        static_cast<uint64_t>(cmd.objectCBV),
+        static_cast<uint64_t>(cmd.materialCBV),
+        static_cast<uint64_t>(cmd.vertexBuffer.BufferLocation),
+        cmd.vertexBuffer.SizeInBytes,
+        cmd.vertexBuffer.StrideInBytes,
+        static_cast<uint64_t>(cmd.indexBuffer.BufferLocation),
+        cmd.indexBuffer.SizeInBytes,
+        static_cast<unsigned int>(cmd.indexBuffer.Format),
+        cmd.draw.indexCountPerInstance,
+        cmd.draw.instanceCount,
+        cmd.draw.startIndexLocation,
+        cmd.draw.baseVertexLocation,
+        cmd.draw.startInstanceLocation);
+}
 
 Result<void> GPUCullingPipeline::Initialize(
     DX12Device* device,
@@ -59,10 +84,13 @@ void GPUCullingPipeline::Shutdown() {
     m_rootSignature.Reset();
     m_commandSignature.Reset();
     m_instanceBuffer.Reset();
+    m_instanceUploadBuffer.Reset();
     m_allCommandBuffer.Reset();
+    m_allCommandUploadBuffer.Reset();
     m_visibleCommandBuffer.Reset();
     m_commandCountBuffer.Reset();
     m_commandCountReadback.Reset();
+    m_visibleCommandReadback.Reset();
     m_cullConstantBuffer.Reset();
 
     spdlog::info("GPU Culling Pipeline shutdown");
@@ -179,6 +207,8 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
 
     D3D12_HEAP_PROPERTIES uploadHeap = {};
     uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_HEAP_PROPERTIES defaultHeap = {};
+    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
     D3D12_RESOURCE_DESC bufferDesc = {};
     bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -190,36 +220,56 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
     bufferDesc.SampleDesc.Count = 1;
     bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    // Instance buffer (upload heap, written by CPU each frame)
+    // Instance buffer (default heap) + upload staging
     HRESULT hr = device->CreateCommittedResource(
-        &uploadHeap,
+        &defaultHeap,
         D3D12_HEAP_FLAG_NONE,
         &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COPY_DEST,
         nullptr,
         IID_PPV_ARGS(&m_instanceBuffer)
     );
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to create instance buffer");
     }
-
-    // All-commands buffer (upload heap, written by CPU each frame)
-    bufferDesc.Width = commandBufferSize;
     hr = device->CreateCommittedResource(
         &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
         &bufferDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
+        IID_PPV_ARGS(&m_instanceUploadBuffer)
+    );
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create instance upload buffer");
+    }
+
+    // All-commands buffer (default heap) + upload staging
+    bufferDesc.Width = commandBufferSize;
+    hr = device->CreateCommittedResource(
+        &defaultHeap,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
         IID_PPV_ARGS(&m_allCommandBuffer)
     );
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to create all-commands buffer");
     }
+    hr = device->CreateCommittedResource(
+        &uploadHeap,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_allCommandUploadBuffer)
+    );
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create all-commands upload buffer");
+    }
 
     // Visible command buffer (default heap, UAV)
-    D3D12_HEAP_PROPERTIES defaultHeap = {};
-    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
     bufferDesc.Width = commandBufferSize;
     bufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
@@ -318,6 +368,8 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
         return Result<void>::Err("Failed to create culling constant buffer");
     }
 
+    m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
     return Result<void>::Ok();
 }
 
@@ -366,6 +418,36 @@ Result<void> GPUCullingPipeline::SetGraphicsRootSignature(ID3D12RootSignature* r
     return CreateCommandSignature(rootSignature);
 }
 
+Result<void> GPUCullingPipeline::PrepareAllCommandsForExecuteIndirect(ID3D12GraphicsCommandList* cmdList) {
+    if (!cmdList) {
+        return Result<void>::Err("PrepareAllCommandsForExecuteIndirect requires a valid command list");
+    }
+    if (!m_allCommandBuffer) {
+        return Result<void>::Err("All-commands buffer not initialized");
+    }
+
+    if (m_allCommandState != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_allCommandBuffer.Get();
+        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_allCommandState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    }
+
+    return Result<void>::Ok();
+}
+
+void GPUCullingPipeline::RequestCommandReadback(uint32_t commandCount) {
+    if (commandCount == 0) {
+        return;
+    }
+    m_commandReadbackRequested = true;
+    m_commandReadbackCount = commandCount;
+}
+
 void GPUCullingPipeline::UpdateVisibleCountFromReadback() {
     if (!m_commandCountReadback) {
         return;
@@ -378,6 +460,22 @@ void GPUCullingPipeline::UpdateVisibleCountFromReadback() {
         m_visibleCount = *mapped;
         m_commandCountReadback->Unmap(0, nullptr);
     }
+
+    if (m_commandReadbackPending && m_visibleCommandReadback && m_commandReadbackCount > 0) {
+        const size_t readbackBytes = static_cast<size_t>(m_commandReadbackCount) * sizeof(IndirectCommand);
+        D3D12_RANGE readRange = { 0, readbackBytes };
+        void* commandData = nullptr;
+        HRESULT cmdHr = m_visibleCommandReadback->Map(0, &readRange, &commandData);
+        if (SUCCEEDED(cmdHr) && commandData) {
+            const auto* commands = static_cast<const IndirectCommand*>(commandData);
+            const uint32_t maxLog = std::min(m_commandReadbackCount, 2u);
+            for (uint32_t i = 0; i < maxLog; ++i) {
+                LogIndirectCommand("GPU VisibleCmd", i, commands[i]);
+            }
+            m_visibleCommandReadback->Unmap(0, nullptr);
+        }
+        m_commandReadbackPending = false;
+    }
 }
 
 Result<void> GPUCullingPipeline::UpdateInstances(
@@ -388,7 +486,10 @@ Result<void> GPUCullingPipeline::UpdateInstances(
         m_totalInstances = 0;
         return Result<void>::Ok();
     }
-    if (!m_instanceBuffer) {
+    if (!cmdList) {
+        return Result<void>::Err("UpdateInstances requires a valid command list");
+    }
+    if (!m_instanceBuffer || !m_instanceUploadBuffer) {
         return Result<void>::Err("Instance buffer not initialized");
     }
 
@@ -402,22 +503,54 @@ Result<void> GPUCullingPipeline::UpdateInstances(
     // Map and upload instance data
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
-    HRESULT hr = m_instanceBuffer->Map(0, &readRange, &mappedData);
+    HRESULT hr = m_instanceUploadBuffer->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map instance buffer");
+        return Result<void>::Err("Failed to map instance upload buffer");
     }
 
     memcpy(mappedData, instances.data(), m_totalInstances * sizeof(GPUInstanceData));
-    m_instanceBuffer->Unmap(0, nullptr);
+    m_instanceUploadBuffer->Unmap(0, nullptr);
+
+    const UINT64 copyBytes = m_totalInstances * sizeof(GPUInstanceData);
+    if (copyBytes == 0) {
+        return Result<void>::Ok();
+    }
+
+    if (m_instanceState != D3D12_RESOURCE_STATE_COPY_DEST) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_instanceBuffer.Get();
+        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+
+    cmdList->CopyBufferRegion(m_instanceBuffer.Get(), 0, m_instanceUploadBuffer.Get(), 0, copyBytes);
+
+    if (m_instanceState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_instanceBuffer.Get();
+        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_instanceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
 
     return Result<void>::Ok();
 }
 
 Result<void> GPUCullingPipeline::UpdateIndirectCommands(
-    ID3D12GraphicsCommandList* /*cmdList*/,
+    ID3D12GraphicsCommandList* cmdList,
     const std::vector<IndirectCommand>& commands)
 {
-    if (!m_allCommandBuffer) {
+    if (!cmdList) {
+        return Result<void>::Err("UpdateIndirectCommands requires a valid command list");
+    }
+    if (!m_allCommandBuffer || !m_allCommandUploadBuffer) {
         return Result<void>::Err("Indirect command buffer not initialized");
     }
     if (commands.empty()) {
@@ -433,13 +566,40 @@ Result<void> GPUCullingPipeline::UpdateIndirectCommands(
 
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
-    HRESULT hr = m_allCommandBuffer->Map(0, &readRange, &mappedData);
+    HRESULT hr = m_allCommandUploadBuffer->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map indirect command buffer");
+        return Result<void>::Err("Failed to map indirect command upload buffer");
     }
 
     memcpy(mappedData, commands.data(), commandCount * sizeof(IndirectCommand));
-    m_allCommandBuffer->Unmap(0, nullptr);
+    m_allCommandUploadBuffer->Unmap(0, nullptr);
+
+    const UINT64 copyBytes = commandCount * sizeof(IndirectCommand);
+    if (copyBytes > 0) {
+        if (m_allCommandState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_allCommandBuffer.Get();
+            barrier.Transition.StateBefore = m_allCommandState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            cmdList->ResourceBarrier(1, &barrier);
+            m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
+        }
+
+        cmdList->CopyBufferRegion(m_allCommandBuffer.Get(), 0, m_allCommandUploadBuffer.Get(), 0, copyBytes);
+
+        if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_allCommandBuffer.Get();
+            barrier.Transition.StateBefore = m_allCommandState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            cmdList->ResourceBarrier(1, &barrier);
+            m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        }
+    }
 
     const uint32_t cmdCount = static_cast<uint32_t>(commandCount);
     if (m_totalInstances != cmdCount) {
@@ -526,6 +686,10 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     constants.viewProj = viewProj;
     constants.cameraPos = cameraPos;
     constants.instanceCount = m_totalInstances;
+    constants.forceVisible = m_forceVisible ? 1u : 0u;
+    constants.padding[0] = 0;
+    constants.padding[1] = 0;
+    constants.padding[2] = 0;
 
     FrustumPlanes frustum;
     ExtractFrustumPlanes(viewProj, frustum);
@@ -566,9 +730,26 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    if (m_descriptorManager) {
-        ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
-        cmdList->SetDescriptorHeaps(1, heaps);
+    if (m_instanceState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_instanceBuffer.Get();
+        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_instanceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_allCommandBuffer.Get();
+        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     // Clear the command count buffer to 0 using ClearUnorderedAccessViewUint
@@ -610,6 +791,65 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
     uavBarriers[1].UAV.pResource = m_commandCountBuffer.Get();
     cmdList->ResourceBarrier(2, uavBarriers);
+
+    if (m_commandReadbackRequested && m_commandReadbackCount > 0) {
+        const uint32_t readbackCount = std::min(m_commandReadbackCount, m_maxInstances);
+        const size_t readbackBytes = static_cast<size_t>(readbackCount) * sizeof(IndirectCommand);
+        if (!m_visibleCommandReadback ||
+            m_visibleCommandReadback->GetDesc().Width < readbackBytes) {
+            D3D12_HEAP_PROPERTIES readbackHeap = {};
+            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+            D3D12_RESOURCE_DESC readbackDesc = {};
+            readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            readbackDesc.Width = readbackBytes;
+            readbackDesc.Height = 1;
+            readbackDesc.DepthOrArraySize = 1;
+            readbackDesc.MipLevels = 1;
+            readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
+            readbackDesc.SampleDesc.Count = 1;
+            readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+            m_visibleCommandReadback.Reset();
+            HRESULT rbHr = m_device->GetDevice()->CreateCommittedResource(
+                &readbackHeap,
+                D3D12_HEAP_FLAG_NONE,
+                &readbackDesc,
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr,
+                IID_PPV_ARGS(&m_visibleCommandReadback)
+            );
+            if (FAILED(rbHr)) {
+                spdlog::warn("GPU culling: failed to create command readback buffer");
+            }
+        }
+
+        if (m_visibleCommandReadback) {
+            if (m_visibleCommandState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+                D3D12_RESOURCE_BARRIER toCopy = {};
+                toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                toCopy.Transition.pResource = m_visibleCommandBuffer.Get();
+                toCopy.Transition.StateBefore = m_visibleCommandState;
+                toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                cmdList->ResourceBarrier(1, &toCopy);
+                m_visibleCommandState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            }
+
+            cmdList->CopyBufferRegion(
+                m_visibleCommandReadback.Get(),
+                0,
+                m_visibleCommandBuffer.Get(),
+                0,
+                readbackBytes);
+
+            m_commandReadbackPending = true;
+            m_commandReadbackRequested = false;
+            m_commandReadbackCount = readbackCount;
+        } else {
+            m_commandReadbackRequested = false;
+        }
+    }
 
     // Copy command count to readback for CPU stats.
     if (m_commandCountReadback) {

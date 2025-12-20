@@ -558,11 +558,17 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         return float4(curr, 1.0f);
     }
 
+    float2 texel = g_PostParams.xy;
     float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
-    float  speed = length(vel);
 
-    // Disable TAA for very fast motion to avoid long streaks.
-    if (speed >= 0.5f)
+    // Velocity is stored in UV units. Convert to pixel units for thresholds
+    // so behaviour stays consistent across resolutions and distances.
+    float2 safeTexel = max(texel, float2(1e-6f, 1e-6f));
+    float2 velPx = vel / safeTexel;
+    float  speedPx = length(velPx);
+
+    // Disable TAA for very fast motion (in pixels) to avoid long streaks.
+    if (speedPx >= 24.0f)
     {
         if (debugView == 25u)
         {
@@ -587,7 +593,6 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float3 cMin = curr;
     float3 cMax = curr;
     bool   anyNeighborAccepted = false;
-    float2 texel = g_PostParams.xy;
     float  maxDepthDelta = 0.0f;
 
     // For a simple reactive mask we also track local luminance statistics
@@ -642,7 +647,9 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         cMax = curr;
     }
 
-    float2 historyUV = saturate(uv + vel);
+    // Motion vectors are computed in non-jittered space, so add the jitter
+    // delta to align history with the current jittered projection.
+    float2 historyUV = saturate(uv + vel + g_TAAParams.xy);
     float3 history   = g_HistoryColor.Sample(g_Sampler, historyUV).rgb;
     float3 historyClamped = clamp(history, cMin, cMax);
     float3 currClamped    = clamp(curr,    cMin, cMax);
@@ -654,24 +661,26 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float3 diff = abs(currClamped - historyClamped);
     float  maxDiff = max(max(diff.r, diff.g), diff.b);
 
-    // Roughness gating: shiny surfaces get less history in all regimes so
-    // fast-moving specular highlights do not leave long trails.
-    float roughFactor = saturate(surfaceRoughness * 0.6f + 0.2f);
+    // Roughness gating: shiny surfaces get dramatically less history in all
+    // regimes so fast-changing specular reflections do not leave "inner
+    // ghosts" (especially noticeable up close on chrome spheres).
+    float roughFactor = saturate(surfaceRoughness * 0.75f + 0.25f);
+    roughFactor *= roughFactor;
 
     float finalBlend = 0.0f;
 
     // Static: essentially locked pixels.
-    if (speed < 0.03f && maxDiff < 0.03f)
+    if (speedPx < 0.75f && maxDiff < 0.03f)
     {
         finalBlend = taaBlendBase;
     }
     // Transitional: small motion or moderate color changes.
-    else if (speed < 0.25f && maxDiff < 0.20f)
+    else if (speedPx < 6.0f && maxDiff < 0.20f)
     {
         finalBlend = taaBlendBase * 0.45f;
     }
     // High-frequency but still somewhat stable (e.g., glossy highlights):
-    else if (speed < 0.35f && maxDiff < 0.35f)
+    else if (speedPx < 10.0f && maxDiff < 0.35f)
     {
         finalBlend = taaBlendBase * 0.35f;
     }
@@ -712,6 +721,31 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
 
     float specFactor     = saturate(1.0f - surfaceRoughness);
     float reactiveMask   = saturate(max(reactiveLocal, reactiveHist) * specFactor);
+
+    // Additional reprojection validation: if the reprojected sample lands on
+    // a different surface in the current frame (depth/normal mismatch),
+    // reject history entirely. This is a strong anti-ghosting measure.
+    float historyDepth = g_Depth.SampleLevel(g_Sampler, historyUV, 0).r;
+    float4 historyNR = g_NormalRoughness.SampleLevel(g_Sampler, historyUV, 0);
+    float3 historyNormal = normalize(historyNR.xyz * 2.0f - 1.0f);
+
+    float historyDepthDelta = abs(historyDepth - centerDepth);
+    float historyNormalDot = dot(historyNormal, centerNormal);
+
+    // Tighten the reprojection match near the camera where small errors
+    // create very visible scaled ghosting.
+    float nearFactor = saturate((0.12f - centerDepth) / 0.12f);
+    float reprojDepthThreshold = lerp(depthThreshold * 2.5f, depthThreshold * 1.2f, nearFactor);
+
+    bool reprojectionMismatch =
+        (historyDepth >= 1.0f - 1e-4f) ||
+        (historyDepthDelta > reprojDepthThreshold) ||
+        (historyNormalDot < (normalThreshold - 0.05f));
+
+    if (reprojectionMismatch)
+    {
+        finalBlend = 0.0f;
+    }
 
     finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
 

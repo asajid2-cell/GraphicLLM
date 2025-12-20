@@ -474,6 +474,7 @@ private:
     void UpdateEnvironmentDescriptorTable();
     void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
     void EnforceIBLResidencyLimit();
+    void PrewarmMaterialDescriptors(Scene::ECS_Registry* registry);
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void RenderShadowPass(Scene::ECS_Registry* registry);
@@ -760,6 +761,8 @@ public:
     std::shared_ptr<DX12Texture> m_placeholderNormal;
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
+    std::array<DescriptorHandle, 4> m_fallbackMaterialDescriptors = {};
+    bool m_visibilityBufferEnabled = false;
 
     // Texture cache to prevent duplicate loads (CRITICAL for GPU memory management)
     std::unordered_map<std::string, std::shared_ptr<DX12Texture>> m_textureCache;

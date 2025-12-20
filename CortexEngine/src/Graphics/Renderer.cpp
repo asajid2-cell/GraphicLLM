@@ -383,10 +383,13 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
     // Create descriptor heaps
     m_descriptorManager = std::make_unique<DescriptorHeapManager>();
-    auto heapResult = m_descriptorManager->Initialize(device->GetDevice());
+    auto heapResult = m_descriptorManager->Initialize(device->GetDevice(), kFrameCount);
     if (heapResult.IsErr()) {
         return Result<void>::Err("Failed to create descriptor heaps: " + heapResult.Error());
     }
+    m_descriptorManager->SetFlushCallback([this]() {
+        WaitForGPU();
+    });
 
     // Create bindless resource manager for SM6.6 bindless access
     m_bindlessManager = std::make_unique<BindlessResourceManager>();
@@ -460,6 +463,10 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_visibilityBuffer.reset();
     } else {
         spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
+        m_visibilityBufferEnabled = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
+        if (!m_visibilityBufferEnabled) {
+            spdlog::info("VisibilityBuffer is disabled by default (set CORTEX_ENABLE_VISIBILITY_BUFFER=1 to enable).");
+        }
     }
 
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
@@ -1068,6 +1075,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     MarkPassComplete("BeginFrame_Done");
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
+    PrewarmMaterialDescriptors(registry);
 
     // Optional ultra-minimal debug frame: clear the current back buffer and
     // present, skipping all geometry, lighting, and post-process work. This
@@ -1179,7 +1187,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Classic path now acts purely as fallback to avoid double-drawing/z-fighting
     if (!drewWithHyper) {
         // Visibility buffer path (Phase 2.1)
-        if (m_visibilityBuffer) {
+        if (m_visibilityBuffer && m_visibilityBufferEnabled) {
             // spdlog::info("Taking visibility buffer path");  // Too noisy
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             RenderVisibilityBufferPath(registry);
@@ -1187,10 +1195,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         }
         // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
         else if (m_gpuCullingEnabled && m_gpuCulling) {
-            spdlog::info("Taking GPU culling path");
+            static uint64_t s_lastCullingPathLogFrame = 0;
+            if ((m_renderFrameCounter % 120) == 0 && m_renderFrameCounter != s_lastCullingPathLogFrame) {
+                spdlog::info("Taking GPU culling path");
+                s_lastCullingPathLogFrame = m_renderFrameCounter;
+            }
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
-            CollectInstancesForGPUCulling(registry);
-            DispatchGPUCulling();
             RenderSceneIndirect(registry);
             MarkPassComplete("RenderSceneIndirect_Done");
         } else {
@@ -1670,6 +1680,28 @@ void Renderer::BeginFrame() {
     // the back buffer from PRESENT to RENDER_TARGET.
     m_backBufferUsedAsRTThisFrame = false;
 
+    // Wait for this frame's command allocator/descriptor segment to be available
+    m_frameIndex = m_window->GetCurrentBackBufferIndex();
+    if (m_fenceValues[m_frameIndex] != 0) {
+        uint64_t completedValue = m_commandQueue->GetLastCompletedFenceValue();
+        uint64_t expectedValue = m_fenceValues[m_frameIndex];
+
+        if (completedValue < expectedValue) {
+            spdlog::debug("BeginFrame waiting for GPU: frameIndex={}, expected={}, completed={}, delta={}",
+                          m_frameIndex, expectedValue, completedValue, expectedValue - completedValue);
+        }
+
+        m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
+    }
+
+    if (m_gpuCulling) {
+        m_gpuCulling->UpdateVisibleCountFromReadback();
+    }
+
+    if (m_descriptorManager) {
+        m_descriptorManager->BeginFrame(m_frameIndex);
+    }
+
     if (m_depthBuffer) {
         D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
         if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
@@ -1776,9 +1808,6 @@ void Renderer::BeginFrame() {
     m_objectConstantBuffer.ResetOffset();
     m_materialConstantBuffer.ResetOffset();
 
-    // Reset descriptor heap ring buffer to prevent descriptor aliasing (matches CB approach)
-    m_descriptorManager->ResetFrameHeaps();
-
     // Ensure outstanding uploads are complete before reusing upload allocator
     if (m_uploadQueue) {
         for (uint64_t fence : m_uploadFences) {
@@ -1797,22 +1826,6 @@ void Renderer::BeginFrame() {
             m_uploadCommandLists[i]->Reset(m_uploadCommandAllocators[i].Get(), nullptr);
             m_uploadCommandLists[i]->Close();
         }
-    }
-
-    // Wait for this frame's command allocator to be available
-    m_frameIndex = m_window->GetCurrentBackBufferIndex();
-
-    if (m_fenceValues[m_frameIndex] != 0) {
-        uint64_t completedValue = m_commandQueue->GetLastCompletedFenceValue();
-        uint64_t expectedValue = m_fenceValues[m_frameIndex];
-
-        // Warn if we're about to wait (indicates GPU is behind CPU)
-        if (completedValue < expectedValue) {
-            spdlog::debug("BeginFrame waiting for GPU: frameIndex={}, expected={}, completed={}, delta={}",
-                          m_frameIndex, expectedValue, completedValue, expectedValue - completedValue);
-        }
-
-        m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
     }
 
     // Increment the absolute frame index. This is used for tracking BLAS build
@@ -3910,8 +3923,8 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 }
 
 void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
-    if (!m_visibilityBuffer) {
-        spdlog::warn("VB: No visibility buffer");
+    if (!m_visibilityBuffer || !m_visibilityBufferEnabled) {
+        spdlog::warn("VB: Disabled or not initialized");
         return;
     }
 
@@ -3958,7 +3971,7 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     auto resolveResult = m_visibilityBuffer->ResolveMaterials(
         m_commandList.Get(),
         m_depthBuffer.Get(),
-        m_depthSRV.gpu,
+        m_depthSRV.cpu,
         m_vbMeshDraws,
         m_frameDataCPU.viewProjectionMatrix
     );
@@ -4005,8 +4018,17 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
 }
 
 void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
-    if (!m_gpuCulling || m_gpuInstances.empty()) {
-        // Fall back to regular rendering
+    if (!registry || !m_gpuCulling) {
+        RenderScene(registry);
+        return;
+    }
+
+    auto* cmdSig = m_gpuCulling->GetCommandSignature();
+    auto* argBuffer = m_gpuCulling->GetVisibleCommandBuffer();
+    auto* countBuffer = m_gpuCulling->GetCommandCountBuffer();
+
+    if (!cmdSig || !argBuffer || !countBuffer) {
+        spdlog::warn("RenderSceneIndirect: missing command signature or command buffers");
         RenderScene(registry);
         return;
     }
@@ -4016,12 +4038,9 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // Bind descriptor heap - prefer bindless heap when SM6.6 is enabled
-    // Currently using SM5.1 fallback with descriptor tables
-    ID3D12DescriptorHeap* srvHeap = (m_bindlessManager && m_bindlessManager->GetHeap())
-        ? m_bindlessManager->GetHeap()
-        : m_descriptorManager->GetCBV_SRV_UAV_Heap();
-    ID3D12DescriptorHeap* heaps[] = { srvHeap };
+    // Bind descriptor heap (legacy CBV/SRV/UAV heap). This keeps the
+    // shadow/IBL descriptor table valid for the main shading path.
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
@@ -4029,39 +4048,32 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
-
-    // For now, we still need to bind per-instance data since our shader expects
-    // root CBVs. Full GPU-driven would require bindless materials.
-    // This is a transitional implementation - ExecuteIndirect with per-draw root constants.
-
-    auto* cmdSig = m_gpuCulling->GetCommandSignature();
-    auto* argBuffer = m_gpuCulling->GetIndirectArgBuffer();
-
-    if (!cmdSig || !argBuffer) {
-        spdlog::warn("RenderSceneIndirect: Missing command signature or arg buffer");
-        RenderScene(registry);
-        return;
+    if (m_fallbackMaterialDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
     }
 
-    // For the transitional phase, we iterate visible instances and use indirect draws
-    // per mesh type. Full GPU-driven rendering would batch all into one ExecuteIndirect.
+    m_gpuInstances.clear();
+    std::vector<IndirectCommand> commands;
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
-    uint32_t instanceIdx = 0;
-
     for (auto entity : view) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
-        if (!renderable.visible || !renderable.mesh) continue;
-        if (IsTransparentRenderable(renderable)) continue;
-        if (!renderable.mesh->gpuBuffers) continue;
-
-        if (instanceIdx >= m_gpuInstances.size()) break;
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (IsTransparentRenderable(renderable)) {
+            continue;
+        }
+        if (!renderable.mesh->gpuBuffers ||
+            !renderable.mesh->gpuBuffers->vertexBuffer ||
+            !renderable.mesh->gpuBuffers->indexBuffer) {
+            continue;
+        }
 
         EnsureMaterialTextures(renderable);
 
-        // Setup material constants
         MaterialConstants materialData = {};
         materialData.albedo = renderable.albedoColor;
         materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
@@ -4081,14 +4093,10 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         );
 
         materialData.textureIndices = glm::uvec4(
-            (renderable.textures.albedo && renderable.textures.albedo->HasBindlessIndex())
-                ? renderable.textures.albedo->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.normal && renderable.textures.normal->HasBindlessIndex())
-                ? renderable.textures.normal->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.metallic && renderable.textures.metallic->HasBindlessIndex())
-                ? renderable.textures.metallic->GetBindlessIndex() : kInvalidBindlessIndex,
-            (renderable.textures.roughness && renderable.textures.roughness->HasBindlessIndex())
-                ? renderable.textures.roughness->GetBindlessIndex() : kInvalidBindlessIndex
+            kInvalidBindlessIndex,
+            kInvalidBindlessIndex,
+            kInvalidBindlessIndex,
+            kInvalidBindlessIndex
         );
 
         ObjectConstants objectData = {};
@@ -4098,15 +4106,21 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
 
-        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
-        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
-
-        RefreshMaterialDescriptors(renderable);
-        if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
-            m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+        GPUInstanceData inst{};
+        inst.modelMatrix = transform.GetMatrix();
+        if (renderable.mesh->hasBounds) {
+            inst.boundingSphere = glm::vec4(
+                renderable.mesh->boundsCenter,
+                renderable.mesh->boundsRadius
+            );
+        } else {
+            inst.boundingSphere = glm::vec4(0.0f, 0.0f, 0.0f, 10.0f);
         }
+        inst.meshIndex = 0;
+        inst.materialIndex = 0;
+        inst.flags = 1;
+        m_gpuInstances.push_back(inst);
 
-        // Bind buffers
         D3D12_VERTEX_BUFFER_VIEW vbv = {};
         vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
         vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
@@ -4117,20 +4131,78 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
         ibv.Format = DXGI_FORMAT_R32_UINT;
 
-        m_commandList->IASetVertexBuffers(0, 1, &vbv);
-        m_commandList->IASetIndexBuffer(&ibv);
+        IndirectCommand cmd{};
+        cmd.objectCBV = objectCB;
+        cmd.materialCBV = materialCB;
+        cmd.vertexBuffer = vbv;
+        cmd.indexBuffer = ibv;
+        cmd.draw.indexCountPerInstance = static_cast<uint32_t>(renderable.mesh->indices.size());
+        cmd.draw.instanceCount = 1;
+        cmd.draw.startIndexLocation = 0;
+        cmd.draw.baseVertexLocation = 0;
+        cmd.draw.startInstanceLocation = 0;
+        commands.push_back(cmd);
+    }
 
-        // Use ExecuteIndirect for the draw (one instance at a time for now)
-        m_commandList->ExecuteIndirect(
-            cmdSig,
-            1,
-            argBuffer,
-            instanceIdx * sizeof(DrawIndexedArguments),
-            nullptr,
-            0
-        );
+    if (commands.empty()) {
+        return;
+    }
 
-        ++instanceIdx;
+    auto uploadResult = m_gpuCulling->UpdateInstances(m_commandList.Get(), m_gpuInstances);
+    if (uploadResult.IsErr()) {
+        spdlog::warn("RenderSceneIndirect: failed to upload instances: {}", uploadResult.Error());
+        RenderScene(registry);
+        return;
+    }
+
+    auto commandResult = m_gpuCulling->UpdateIndirectCommands(m_commandList.Get(), commands);
+    if (commandResult.IsErr()) {
+        spdlog::warn("RenderSceneIndirect: failed to upload commands: {}", commandResult.Error());
+        RenderScene(registry);
+        return;
+    }
+
+    auto cullResult = m_gpuCulling->DispatchCulling(
+        m_commandList.Get(),
+        m_frameDataCPU.viewProjectionMatrix,
+        glm::vec3(m_frameDataCPU.cameraPosition)
+    );
+    if (cullResult.IsErr()) {
+        spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullResult.Error());
+        RenderScene(registry);
+        return;
+    }
+
+    // Compute dispatch changes the root signature/pipeline; restore graphics state
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->SetDescriptorHeaps(1, heaps);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+    if (m_fallbackMaterialDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
+    }
+
+    const UINT maxCommands = static_cast<UINT>(commands.size());
+    m_commandList->ExecuteIndirect(
+        cmdSig,
+        maxCommands,
+        argBuffer,
+        0,
+        countBuffer,
+        0
+    );
+
+    static uint64_t s_lastCullingLogFrame = 0;
+    if ((m_renderFrameCounter % 300) == 0 && m_renderFrameCounter != s_lastCullingLogFrame) {
+        const uint32_t total = m_gpuCulling->GetTotalInstances();
+        const uint32_t visible = m_gpuCulling->GetVisibleCount();
+        const float visiblePct = (total > 0) ? (100.0f * static_cast<float>(visible) / total) : 0.0f;
+        spdlog::info("GPU Culling: total={}, visible={} ({:.1f}% visible)", total, visible, visiblePct);
+        s_lastCullingLogFrame = m_renderFrameCounter;
     }
 }
 
@@ -6140,6 +6212,29 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     }
 }
 
+void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
+    if (!registry || !m_descriptorManager) {
+        return;
+    }
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+
+        if (!renderable.mesh) {
+            continue;
+        }
+
+        EnsureMaterialTextures(renderable);
+
+        const bool hasDescriptors = renderable.textures.gpuState &&
+                                    renderable.textures.gpuState->descriptors[0].IsValid();
+        if (!hasDescriptors) {
+            RefreshMaterialDescriptors(renderable);
+        }
+    }
+}
+
 void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable) {
     auto& tex = renderable.textures;
     if (!tex.gpuState) {
@@ -7544,6 +7639,12 @@ Result<void> Renderer::CreateCommandList() {
     if (rsResult.IsErr()) {
         return Result<void>::Err("Failed to create root signature: " + rsResult.Error());
     }
+    if (m_gpuCulling) {
+        auto sigResult = m_gpuCulling->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+        if (sigResult.IsErr()) {
+            spdlog::warn("GPU Culling command signature setup failed: {}", sigResult.Error());
+        }
+    }
 
     // Create compute root signature for compute pipelines
     m_computeRootSignature = std::make_unique<DX12ComputeRootSignature>();
@@ -8169,10 +8270,38 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
     m_commandQueue->Flush();
 
+    if (m_descriptorManager && !m_fallbackMaterialDescriptors[0].IsValid()) {
+        std::array<std::shared_ptr<DX12Texture>, 4> sources = {
+            m_placeholderAlbedo,
+            m_placeholderNormal,
+            m_placeholderMetallic,
+            m_placeholderRoughness
+        };
+
+        for (int i = 0; i < 4; ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate fallback material descriptor: " + handleResult.Error());
+            }
+            m_fallbackMaterialDescriptors[i] = handleResult.Value();
+        }
+
+        for (int i = 0; i < 4; ++i) {
+            if (sources[i] && sources[i]->GetSRV().IsValid()) {
+                m_device->GetDevice()->CopyDescriptorsSimple(
+                    1,
+                    m_fallbackMaterialDescriptors[i].cpu,
+                    sources[i]->GetSRV().cpu,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+                );
+            }
+        }
+    }
+
     // Register placeholder textures in bindless heap at reserved slots
     // These are always valid and used as fallbacks when materials have no specific texture
     if (m_bindlessManager) {
-        auto registerPlaceholder = [this](std::shared_ptr<DX12Texture>& tex, uint32_t reservedIndex) {
+        auto registerPlaceholder = [this](std::shared_ptr<DX12Texture>& tex) {
             if (tex && tex->GetResource()) {
                 auto result = tex->CreateBindlessSRV(m_bindlessManager.get());
                 if (result.IsOk()) {
@@ -8182,10 +8311,27 @@ Result<void> Renderer::CreatePlaceholderTexture() {
                 }
             }
         };
-        registerPlaceholder(m_placeholderAlbedo, BindlessResourceManager::kPlaceholderAlbedoIndex);
-        registerPlaceholder(m_placeholderNormal, BindlessResourceManager::kPlaceholderNormalIndex);
-        registerPlaceholder(m_placeholderMetallic, BindlessResourceManager::kPlaceholderMetallicIndex);
-        registerPlaceholder(m_placeholderRoughness, BindlessResourceManager::kPlaceholderRoughnessIndex);
+        registerPlaceholder(m_placeholderAlbedo);
+        registerPlaceholder(m_placeholderNormal);
+        registerPlaceholder(m_placeholderMetallic);
+        registerPlaceholder(m_placeholderRoughness);
+
+        auto copyToReserved = [this](const std::shared_ptr<DX12Texture>& tex, uint32_t reservedIndex) {
+            if (!tex || !tex->GetSRV().IsValid()) {
+                return;
+            }
+            D3D12_CPU_DESCRIPTOR_HANDLE dst = m_bindlessManager->GetCPUHandle(reservedIndex);
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                dst,
+                tex->GetSRV().cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+            );
+        };
+        copyToReserved(m_placeholderAlbedo, BindlessResourceManager::kPlaceholderAlbedoIndex);
+        copyToReserved(m_placeholderNormal, BindlessResourceManager::kPlaceholderNormalIndex);
+        copyToReserved(m_placeholderMetallic, BindlessResourceManager::kPlaceholderMetallicIndex);
+        copyToReserved(m_placeholderRoughness, BindlessResourceManager::kPlaceholderRoughnessIndex);
     }
 
     spdlog::info("Placeholder textures created");

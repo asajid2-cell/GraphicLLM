@@ -4,6 +4,8 @@
 #include <wrl/client.h>
 #include <cstdint>
 #include <memory>
+#include <functional>
+#include <utility>
 #include "Utils/Result.h"
 
 using Microsoft::WRL::ComPtr;
@@ -79,7 +81,10 @@ public:
     DescriptorHeapManager() = default;
     ~DescriptorHeapManager() = default;
 
-    Result<void> Initialize(ID3D12Device* device);
+    Result<void> Initialize(ID3D12Device* device, uint32_t frameCount = 1);
+
+    using FlushCallback = std::function<void()>;
+    void SetFlushCallback(FlushCallback callback) { m_flushCallback = std::move(callback); }
 
     // Allocate descriptors from appropriate heap
     Result<DescriptorHandle> AllocateRTV();  // Render Target View
@@ -100,9 +105,12 @@ public:
     Result<DescriptorHandle> AllocateTransientCBV_SRV_UAV();
 
     // Reset allocations (for per-frame ring buffer)
-    void ResetFrameHeaps();
+    void BeginFrame(uint32_t frameIndex);
+    void ResetFrameHeaps();  // Legacy: resets frame 0 segment
 
 private:
+    void UpdateTransientSegment();
+
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
     static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 4096;  // Increased from 1024 to support dynamic texture loading + transient allocations per frame
@@ -117,6 +125,13 @@ private:
     // (textures, shadow maps, HDR targets, etc.). Transient allocations start
     // after this index and are reset every frame.
     uint32_t m_cbvSrvUavPersistentCount = 0;
+    uint32_t m_frameCount = 1;
+    uint32_t m_activeFrameIndex = 0;
+    uint32_t m_transientSegmentStart = 0;
+    uint32_t m_transientSegmentEnd = 0;
+    bool m_transientActive = false;
+    bool m_frameActive = false;
+    FlushCallback m_flushCallback;
 };
 
 } // namespace Cortex::Graphics

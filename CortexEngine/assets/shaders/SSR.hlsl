@@ -132,6 +132,13 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     float3 posVS = viewPos;
     float  traveled = 0.0f;
 
+    // Avoid immediate self-intersection on highly reflective curved surfaces
+    // (e.g., chrome spheres) which can manifest as a nested "inner copy"
+    // artifact. Start the marcher a small distance along the ray.
+    float startOffset = stepSize * 2.0f;
+    posVS += viewDir * startOffset;
+    traveled += startOffset;
+
     [loop]
     for (int i = 0; i < maxSteps; ++i)
     {

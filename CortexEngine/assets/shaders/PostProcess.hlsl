@@ -775,6 +775,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
 
+    // Post-process feature flags are packed into g_BloomParams.w on the CPU.
+    // Keep this as a small integer bitmask so the shader can gate optional
+    // sampling even in SM5.1:
+    //   bit0: SSR enabled
+    //   bit1: RT reflections enabled
+    //   bit2: RT reflection history valid
+    uint postFxFlags = (uint)(g_BloomParams.w + 0.5f);
+    bool ssrEnabled = ((postFxFlags & 1u) != 0u);
+    bool rtReflEnabled = ((postFxFlags & 2u) != 0u);
+    bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u);
+
     // SDF / CSG debug view renders a raymarched implicit scene instead of the
     // normal post-process chain so that SDF primitives can be inspected in
     // isolation using the current camera and light state.
@@ -840,7 +851,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // reflection buffer provides a fallback for regions where SSR is unreliable
     // (off-screen or failed rays). Both are applied in HDR space so they
     // participate in bloom and tonemapping.
-    float4 ssrSample   = g_SSRColor.Sample(g_Sampler, uv);
+    float4 ssrSample   = ssrEnabled ? g_SSRColor.Sample(g_Sampler, uv) : float4(0.0f, 0.0f, 0.0f, 0.0f);
     float  ssrWeightRaw = saturate(ssrSample.a);
 
     // Clamp extremely bright SSR highlights to avoid harsh color pops when
@@ -876,11 +887,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // we blend between SSR (near-field, high-confidence) and RT (fallback for
     // low-SSR-confidence regions). Debug view 23 forces RT reflections off so
     // that SSR-only behaviour can be inspected without recompiling.
-    float3 rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
-    bool   rtEnabled = (g_PostParams.w > 0.5f && (uint)g_DebugMode.x != 23u);
+    float3 rtRefl = 0.0f;
+    bool   rtEnabled = (rtReflEnabled && (uint)g_DebugMode.x != 23u);
 
     if (rtEnabled)
     {
+        rtRefl = g_RTReflection.Sample(g_Sampler, uv).rgb;
         // Clamp extreme RT reflection intensity so very hot env texels do not
         // overpower the underlying BRDF/IBL term.
         const float kMaxRTIntensity = 32.0f;
@@ -918,8 +930,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
         // Temporal accumulation using a simple history buffer updated once
         // per frame from the CPU. Only blend against history once the
-        // renderer has flagged RT history as valid (g_DebugMode.w > 0.5).
-        if (g_DebugMode.w > 0.5f)
+        // reflection history has been seeded (avoid sampling undefined VRAM).
+        if (rtReflHistoryValid)
         {
             float3 rtHist = g_RTReflectionHistory.Sample(g_Sampler, uv).rgb;
             float3 diff = abs(rtRefl - rtHist);
@@ -1267,8 +1279,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
                     case 8: // TAA
                         value = (g_TAAParams.w > 0.5f) ? 1.0f : 0.0f;
                         break;
-                    case 9: // SSR enabled flag (fed by bloomParams.w)
-                        value = (g_BloomParams.w > 0.5f) ? 1.0f : 0.0f;
+                    case 9: // SSR enabled flag
+                        value = ssrEnabled ? 1.0f : 0.0f;
                         break;
                     case 10: // SSAO
                         value = (g_AOParams.x > 0.5f) ? 1.0f : 0.0f;

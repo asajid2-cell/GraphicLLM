@@ -3192,15 +3192,27 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_ssaoBias,
         m_ssaoIntensity);
 
-    // Bloom shaping parameters. The w component is repurposed as a simple
-    // "SSR enabled" flag so the post-process debug overlay can visualize the
-    // current SSR toggle without having to infer it from the SSR buffer
-    // contents.
+    // Bloom shaping parameters. The w component is used as a small bitmask for
+    // post-process feature toggles so the shader can safely gate optional
+    // sampling without relying on other unrelated flags:
+    //   bit0: SSR enabled
+    //   bit1: RT reflections enabled
+    //   bit2: RT reflection history valid
+    uint32_t postFxFlags = 0u;
+    if (m_ssrEnabled) {
+        postFxFlags |= 1u;
+    }
+    if (rtPipelineReady && m_rtReflectionsEnabled) {
+        postFxFlags |= 2u;
+    }
+    if (m_rtReflHasHistory) {
+        postFxFlags |= 4u;
+    }
     frameData.bloomParams = glm::vec4(
         m_bloomThreshold,
         m_bloomSoftKnee,
         m_bloomMaxContribution,
-        m_ssrEnabled ? 1.0f : 0.0f);
+        static_cast<float>(postFxFlags));
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.
     // Only enable TAA in the shader once we have a valid history buffer;

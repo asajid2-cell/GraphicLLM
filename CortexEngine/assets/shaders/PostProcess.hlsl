@@ -877,7 +877,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // mid-roughness walls and floors.
     const float kMaxSSRWeight = 0.6f;
     float  wSSR = 0.0f;
-    if (roughness < 0.35f && ssrWeightRaw > 0.4f)
+    // SSR is extremely fragile on near-perfect mirrors (roughness ~ 0) and
+    // tends to self-intersect on convex glossy objects (chrome spheres),
+    // producing the classic "inner copy" ghost. Prefer IBL/RT in that regime.
+    if (roughness > 0.08f && roughness < 0.35f && ssrWeightRaw > 0.4f)
     {
         float ssrConf = ssrWeightRaw * ssrWeightRaw;
         wSSR = ssrConf * kMaxSSRWeight * gloss;

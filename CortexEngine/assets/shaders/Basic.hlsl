@@ -110,6 +110,14 @@ cbuffer MaterialConstants : register(b2)
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
     // x = clear-coat weight, y = clear-coat roughness, z/w reserved.
     float4 g_CoatParams;
+    // x = transmission factor, y = IOR, z/w reserved
+    float4 g_TransmissionParams;
+    // rgb = specular color factor (linear), w = specular factor
+    float4 g_SpecularParams;
+    // x=transmission, y=clearcoat, z=clearcoatRoughness, w=specular
+    uint4  g_TextureIndices3;
+    // x=specularColor, y/z/w unused
+    uint4  g_TextureIndices4;
 };
 
 // Invalid bindless index sentinel
@@ -250,6 +258,18 @@ VSShadowOutput VSShadow(VSInput input)
     output.texCoord = input.texCoord;
 
     return output;
+}
+
+float4 SampleBindlessTextureOrDefault(uint textureIndex, float2 uv, float4 defaultValue)
+{
+#ifdef ENABLE_BINDLESS
+    if (textureIndex != INVALID_BINDLESS_INDEX)
+    {
+        Texture2D tex = ResourceDescriptorHeap[textureIndex];
+        return tex.Sample(g_Sampler, uv);
+    }
+#endif
+    return defaultValue;
 }
 
 // Alpha-tested pixel shader for shadow maps (glTF alphaMode=MASK). We rely on
@@ -663,7 +683,7 @@ uint ComputeClusterIndex(int2 pixelCoord, float viewZ)
     return cx + cy * clusterCountX + cz * clusterCountXY;
 }
 
-float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord, float4 tangentWS, bool useClusteredLocalLights)
+float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, float2 uv, int2 pixelCoord, float4 tangentWS, bool useClusteredLocalLights)
 {
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
@@ -686,6 +706,29 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float clearCoatRoughness = saturate(g_CoatParams.y);
     float sheenWeight       = saturate(g_CoatParams.z);
     float sssWrap           = saturate(g_CoatParams.w);
+
+    // KHR_materials_transmission: treat transmissive materials as "glass"
+    // for BRDF energy split even if they are not using a preset material type.
+    float transmission = saturate(g_TransmissionParams.x);
+    if (g_TextureIndices3.x != INVALID_BINDLESS_INDEX && transmission > 0.0f)
+    {
+        float t = SampleBindlessTextureOrDefault(g_TextureIndices3.x, uv, float4(1, 1, 1, 1)).r;
+        transmission *= t;
+    }
+    isGlass = isGlass || (transmission > 0.01f);
+
+    // glTF clearcoat textures (KHR_materials_clearcoat)
+    if (g_TextureIndices3.y != INVALID_BINDLESS_INDEX)
+    {
+        float cc = SampleBindlessTextureOrDefault(g_TextureIndices3.y, uv, float4(1, 1, 1, 1)).r;
+        clearCoatWeight = saturate(clearCoatWeight * cc);
+    }
+    if (g_TextureIndices3.z != INVALID_BINDLESS_INDEX)
+    {
+        float4 ccr4 = SampleBindlessTextureOrDefault(g_TextureIndices3.z, uv, float4(0, 0, 0, 0));
+        float ccr = (ccr4.g > 1e-5f) ? ccr4.g : ccr4.r;
+        clearCoatRoughness = saturate(ccr);
+    }
 
     float anisotropy = 0.0f;
     if (anisoMetalFlag)
@@ -757,7 +800,25 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     roughness = saturate(baseRoughness + roughnessFromVariance);
     ao = saturate(ao);
 
-    float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+    // Dielectric F0 from IOR (KHR_materials_ior), modulated by KHR_materials_specular.
+    float ior = max(g_TransmissionParams.y, 1.0f);
+    float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
+    float specFactor = saturate(g_SpecularParams.w);
+    float3 specColor = saturate(g_SpecularParams.rgb);
+
+    if (g_TextureIndices3.w != INVALID_BINDLESS_INDEX)
+    {
+        float4 s = SampleBindlessTextureOrDefault(g_TextureIndices3.w, uv, float4(1, 1, 1, 1));
+        specFactor *= s.a;
+    }
+    if (g_TextureIndices4.x != INVALID_BINDLESS_INDEX)
+    {
+        float3 sc = SampleBindlessTextureOrDefault(g_TextureIndices4.x, uv, float4(1, 1, 1, 1)).rgb;
+        specColor *= sc;
+    }
+
+    float3 dielectricF0 = f0Ior.xxx * specFactor * specColor;
+    float3 F0 = lerp(dielectricF0, albedo, metallic);
     float3 totalLighting = 0.0f;
 
     bool clusterActive = false;
@@ -1474,6 +1535,19 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         clip(baseOpacity - g_MaterialPad0);
     }
 
+    // KHR_materials_transmission: approximate transmission by driving opacity.
+    // This keeps transmissive glTF materials in the transparent pass and
+    // prevents them from rendering as solid opaque surfaces.
+    float transmission = saturate(g_TransmissionParams.x);
+#ifdef ENABLE_BINDLESS
+    if (g_TextureIndices3.x != INVALID_BINDLESS_INDEX && transmission > 0.0f)
+    {
+        Texture2D transTex = ResourceDescriptorHeap[g_TextureIndices3.x];
+        transmission *= transTex.Sample(g_Sampler, input.texCoord).r;
+    }
+#endif
+    baseOpacity *= (1.0f - transmission);
+
     bool hasMetallicMap = (g_TextureIndices.z != INVALID_BINDLESS_INDEX) || g_MapFlags.z;
     bool hasRoughnessMap = (g_TextureIndices.w != INVALID_BINDLESS_INDEX) || g_MapFlags.w;
     float metallic = hasMetallicMap ? SampleMetallic(input.texCoord).r : g_Metallic;
@@ -1791,7 +1865,7 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     }
 
     int2 pixelCoord = int2(input.position.xy);
-    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord, input.tangent, useClusteredLocalLights);
+    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, input.texCoord, pixelCoord, input.tangent, useClusteredLocalLights);
 
     // glTF emissive: emissiveFactor * emissiveStrength * emissiveTexture.
     float3 emissive = max(g_EmissiveFactorStrength.rgb, 0.0f) * max(g_EmissiveFactorStrength.w, 0.0f);

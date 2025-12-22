@@ -63,6 +63,10 @@ cbuffer MaterialConstants : register(b2)
     float4 g_FractalParams1;
     float4 g_FractalParams2;
     float4 g_CoatParams;
+    float4 g_TransmissionParams;
+    float4 g_SpecularParams;
+    uint4  g_TextureIndices3;
+    uint4  g_TextureIndices4;
 };
 
 struct VSInput

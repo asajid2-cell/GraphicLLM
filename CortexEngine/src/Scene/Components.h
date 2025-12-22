@@ -100,7 +100,7 @@ struct MeshData {
 };
 
 // Renderable Component - What to draw
- struct RenderableComponent {
+struct RenderableComponent {
     std::shared_ptr<MeshData> mesh;
     struct MaterialTextures {
         std::shared_ptr<Cortex::Graphics::DX12Texture> albedo;
@@ -109,12 +109,23 @@ struct MeshData {
         std::shared_ptr<Cortex::Graphics::DX12Texture> roughness;
         std::shared_ptr<Cortex::Graphics::DX12Texture> occlusion;
         std::shared_ptr<Cortex::Graphics::DX12Texture> emissive;
+        // glTF extensions (KHR_materials_*). These are optional and default to null.
+        std::shared_ptr<Cortex::Graphics::DX12Texture> transmission;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> clearcoat;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> clearcoatRoughness;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> specular;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> specularColor;
         std::string albedoPath;
         std::string normalPath;
         std::string metallicPath;
         std::string roughnessPath;
         std::string occlusionPath;
         std::string emissivePath;
+        std::string transmissionPath;
+        std::string clearcoatPath;
+        std::string clearcoatRoughnessPath;
+        std::string specularPath;
+        std::string specularColorPath;
         std::shared_ptr<Cortex::Graphics::MaterialGPUState> gpuState;
     } textures;
 
@@ -127,6 +138,15 @@ struct MeshData {
      float emissiveStrength = 1.0f;
      float occlusionStrength = 1.0f;
      float normalScale = 1.0f;
+
+     // glTF extensions (KHR_materials_transmission / ior / specular / clearcoat).
+     // These are ignored unless a given material chooses to use them.
+     float transmissionFactor = 0.0f;          // 0 = opaque, 1 = fully transmissive (thin)
+     float ior = 1.5f;                         // index of refraction (>= 1)
+     float specularFactor = 1.0f;              // dielectric specular intensity multiplier
+     glm::vec3 specularColorFactor = glm::vec3(1.0f); // dielectric specular tint
+     float clearcoatFactor = 0.0f;             // additional glossy layer weight
+     float clearcoatRoughnessFactor = 0.0f;    // clearcoat roughness (0..1)
 
      enum class AlphaMode : uint32_t {
          Opaque = 0,

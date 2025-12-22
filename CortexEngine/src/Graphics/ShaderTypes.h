@@ -162,6 +162,17 @@ struct MaterialConstants {
     // x = clear-coat intensity (0..1), y = clear-coat roughness (0..1),
     // z,w reserved for future layering parameters.
     alignas(16) glm::vec4 coatParams;
+    // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
+    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    alignas(16) glm::vec4 transmissionParams;
+    // Specular extension (KHR_materials_specular).
+    // rgb = specular color factor (linear), w = specular factor.
+    alignas(16) glm::vec4 specularParams;
+    // Additional bindless texture indices (SM6.6 ResourceDescriptorHeap[]).
+    // textureIndices3: x=transmission, y=clearcoat, z=clearcoatRoughness, w=specular
+    // textureIndices4: x=specularColor, y/z/w unused
+    alignas(16) glm::uvec4 textureIndices3;
+    alignas(16) glm::uvec4 textureIndices4;
 };
 
 // Invalid bindless index sentinel - shaders check for this to use fallback.

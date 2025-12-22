@@ -370,6 +370,12 @@ static bool IsTransparentRenderable(const Cortex::Scene::RenderableComponent& re
         return true;
     }
 
+    // glTF transmission: treat transmissive materials as needing the blended
+    // pass even if alphaMode was authored as Opaque.
+    if (renderable.transmissionFactor > 0.001f) {
+        return true;
+    }
+
     // Legacy fallback: logical material preset name (e.g., "glass"). Keep this
     // so older scenes that relied on presets still render in the transparent
     // pass even if alphaMode isn't authored.
@@ -1361,6 +1367,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     ProcessGpuJobsPerFrame();
     MarkPassComplete("Render_BeforeBeginFrame");
 
+    // Warm per-material descriptor tables *before* BeginFrame() marks the
+    // descriptor heap as transient-active. This avoids mid-frame persistent
+    // allocations, which can trigger costly GPU flushes or fail once transient
+    // allocations have started.
+    PrewarmMaterialDescriptors(registry);
+
     // Common frame setup (depth/HDR resize, command list reset, constant
     // buffer updates) shared by both the classic raster/RT backend and the
     // experimental voxel renderer.
@@ -1381,7 +1393,6 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     MarkPassComplete("BeginFrame_Done");
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
-    PrewarmMaterialDescriptors(registry);
 
     // RenderGraph orchestration (incremental migration).
     // We build and execute HZB passes once per frame (later in the frame, so
@@ -4835,7 +4846,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
     // Build a per-frame material table (milestone: constant + bindless texture indices).
     struct MaterialKey {
-        std::array<uint32_t, 24> words{}; // includes texture indices + alpha + emissive/occlusion/normalScale
+        std::array<uint32_t, 48> words{}; // includes texture indices + extension factors
         bool operator==(const MaterialKey& other) const noexcept { return words == other.words; }
     };
     struct MaterialKeyHasher {
@@ -4857,7 +4868,12 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     };
     auto makeKey = [&](const Scene::RenderableComponent& r,
                        const glm::uvec4& textureIndices0,
-                       const glm::uvec4& textureIndices2) -> MaterialKey {
+                       const glm::uvec4& textureIndices2,
+                       const glm::uvec4& textureIndices3,
+                       const glm::uvec4& textureIndices4,
+                       const glm::vec4& coatParams,
+                       const glm::vec4& transmissionParams,
+                       const glm::vec4& specularParams) -> MaterialKey {
         MaterialKey k{};
         k.words[0] = floatBits(r.albedoColor.x);
         k.words[1] = floatBits(r.albedoColor.y);
@@ -4881,6 +4897,26 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         k.words[19] = floatBits(r.emissiveStrength);
         k.words[20] = floatBits(r.occlusionStrength);
         k.words[21] = floatBits(r.normalScale);
+        k.words[22] = floatBits(coatParams.x);
+        k.words[23] = floatBits(coatParams.y);
+        k.words[24] = floatBits(coatParams.z);
+        k.words[25] = floatBits(coatParams.w);
+        k.words[26] = floatBits(transmissionParams.x);
+        k.words[27] = floatBits(transmissionParams.y);
+        k.words[28] = floatBits(transmissionParams.z);
+        k.words[29] = floatBits(transmissionParams.w);
+        k.words[30] = floatBits(specularParams.x);
+        k.words[31] = floatBits(specularParams.y);
+        k.words[32] = floatBits(specularParams.z);
+        k.words[33] = floatBits(specularParams.w);
+        k.words[34] = textureIndices3.x;
+        k.words[35] = textureIndices3.y;
+        k.words[36] = textureIndices3.z;
+        k.words[37] = textureIndices3.w;
+        k.words[38] = textureIndices4.x;
+        k.words[39] = textureIndices4.y;
+        k.words[40] = textureIndices4.z;
+        k.words[41] = textureIndices4.w;
         return k;
     };
 
@@ -4938,11 +4974,11 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             meshDrawIndex = it->second;
         }
 
-        // Ensure the per-material descriptor table is ready so the VB resolve
-        // pass can sample textures via ResourceDescriptorHeap (bindless index =
-        // descriptor heap slot index).
+        // Ensure textures are queued/loaded. Descriptor tables are warmed via
+        // PrewarmMaterialDescriptors() early in the frame to avoid mid-frame
+        // persistent allocations (which can stall or fail once transient
+        // allocations have started).
         EnsureMaterialTextures(renderable);
-        RefreshMaterialDescriptors(renderable);
 
         const bool hasAlbedoMap =
             renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
@@ -4954,9 +4990,16 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
         const bool hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
         const bool hasEmissiveMap = static_cast<bool>(renderable.textures.emissive);
+        const bool hasTransmissionMap = static_cast<bool>(renderable.textures.transmission);
+        const bool hasClearcoatMap = static_cast<bool>(renderable.textures.clearcoat);
+        const bool hasClearcoatRoughnessMap = static_cast<bool>(renderable.textures.clearcoatRoughness);
+        const bool hasSpecularMap = static_cast<bool>(renderable.textures.specular);
+        const bool hasSpecularColorMap = static_cast<bool>(renderable.textures.specularColor);
 
         glm::uvec4 textureIndices(kInvalidBindlessIndex);
         glm::uvec4 textureIndices2(kInvalidBindlessIndex);
+        glm::uvec4 textureIndices3(kInvalidBindlessIndex);
+        glm::uvec4 textureIndices4(kInvalidBindlessIndex);
         if (renderable.textures.gpuState) {
             const auto& desc = renderable.textures.gpuState->descriptors;
             textureIndices = glm::uvec4(
@@ -4971,12 +5014,87 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                 kInvalidBindlessIndex,
                 kInvalidBindlessIndex
             );
+            textureIndices3 = glm::uvec4(
+                (hasTransmissionMap && desc[6].IsValid()) ? desc[6].index : kInvalidBindlessIndex,
+                (hasClearcoatMap && desc[7].IsValid()) ? desc[7].index : kInvalidBindlessIndex,
+                (hasClearcoatRoughnessMap && desc[8].IsValid()) ? desc[8].index : kInvalidBindlessIndex,
+                (hasSpecularMap && desc[9].IsValid()) ? desc[9].index : kInvalidBindlessIndex
+            );
+            textureIndices4 = glm::uvec4(
+                (hasSpecularColorMap && desc[10].IsValid()) ? desc[10].index : kInvalidBindlessIndex,
+                kInvalidBindlessIndex,
+                kInvalidBindlessIndex,
+                kInvalidBindlessIndex
+            );
         }
+
+        // Clear-coat / sheen / SSS parameters: keep consistent with the forward path's preset heuristics,
+        // but allow explicit glTF fields to override coat weight/roughness.
+        float clearCoat = 0.0f;
+        float clearCoatRoughness = 0.2f;
+        float sheenWeight = 0.0f;
+        float sssWrap = 0.0f;
+        if (!renderable.presetName.empty()) {
+            std::string presetLower = renderable.presetName;
+            std::transform(presetLower.begin(),
+                           presetLower.end(),
+                           presetLower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            if (presetLower.find("painted_plastic") != std::string::npos ||
+                presetLower.find("plastic") != std::string::npos)
+            {
+                clearCoat = 1.0f;
+                clearCoatRoughness = 0.15f;
+            }
+            else if (presetLower.find("polished_metal") != std::string::npos ||
+                     presetLower.find("chrome") != std::string::npos)
+            {
+                clearCoat = 0.6f;
+                clearCoatRoughness = 0.08f;
+            }
+
+            if (presetLower.find("cloth") != std::string::npos ||
+                presetLower.find("velvet") != std::string::npos)
+            {
+                clearCoat = 0.0f;
+                sheenWeight = 1.0f;
+            }
+
+            if (presetLower.find("skin_ish") != std::string::npos)
+            {
+                sssWrap = 0.25f;
+            }
+            else if (presetLower.find("skin") != std::string::npos)
+            {
+                sssWrap = 0.35f;
+            }
+        }
+        if (renderable.clearcoatFactor > 0.0f || renderable.clearcoatRoughnessFactor > 0.0f) {
+            clearCoat = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
+            clearCoatRoughness = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
+        }
+        const glm::vec4 coatParams(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
+
+        const float transmission = glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f);
+        const float ior = glm::clamp(renderable.ior, 1.0f, 2.5f);
+        const glm::vec4 transmissionParams(transmission, ior, 0.0f, 0.0f);
+
+        const glm::vec3 specColor = glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f));
+        const float specFactor = glm::clamp(renderable.specularFactor, 0.0f, 2.0f);
+        const glm::vec4 specularParams(specColor, specFactor);
 
         // Find or create material index for this renderable.
         uint32_t materialIndex = 0;
         {
-            MaterialKey key = makeKey(renderable, textureIndices, textureIndices2);
+            MaterialKey key = makeKey(renderable,
+                                      textureIndices,
+                                      textureIndices2,
+                                      textureIndices3,
+                                      textureIndices4,
+                                      coatParams,
+                                      transmissionParams,
+                                      specularParams);
             auto mit = materialToIndex.find(key);
             if (mit == materialToIndex.end()) {
                 materialIndex = static_cast<uint32_t>(vbMaterials.size());
@@ -4989,6 +5107,8 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                 mat.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
                 mat.textureIndices = textureIndices;
                 mat.textureIndices2 = textureIndices2;
+                mat.textureIndices3 = textureIndices3;
+                mat.textureIndices4 = textureIndices4;
                 mat.emissiveFactorStrength = glm::vec4(
                     glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
                     std::max(renderable.emissiveStrength, 0.0f)
@@ -4999,6 +5119,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                     0.0f,
                     0.0f
                 );
+                mat.coatParams = coatParams;
+                mat.transmissionParams = transmissionParams;
+                mat.specularParams = specularParams;
                 mat.alphaCutoff = std::max(0.0f, renderable.alphaCutoff);
                 mat.alphaMode = static_cast<uint32_t>(renderable.alphaMode);
                 mat.doubleSided = renderable.doubleSided ? 1u : 0u;
@@ -5360,10 +5483,15 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     lightingParams.screenAndCluster = glm::uvec4(
         m_visibilityBuffer->GetWidth(),
         m_visibilityBuffer->GetHeight(),
-        16u,
-        9u
+        m_visibilityBuffer->GetClusterCountX(),
+        m_visibilityBuffer->GetClusterCountY()
     );
-    lightingParams.clusterParams = glm::uvec4(24u, 128u, static_cast<uint32_t>(vbLocalLights.size()), 0u);
+    lightingParams.clusterParams = glm::uvec4(
+        m_visibilityBuffer->GetClusterCountZ(),
+        m_visibilityBuffer->GetMaxLightsPerCluster(),
+        static_cast<uint32_t>(vbLocalLights.size()),
+        0u
+    );
 
     float shadowInvW = 0.0f;
     float shadowInvH = 0.0f;
@@ -5553,7 +5681,14 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
 
         for (auto it = m_gpuCullingIdByEntity.begin(); it != m_gpuCullingIdByEntity.end();) {
             if (alive.find(it->first) == alive.end()) {
-                m_gpuCullingIdFreeList.push_back(it->second);
+                const uint32_t packedId = it->second;
+                const uint32_t slot = (packedId & 0xFFFFu);
+                if (slot < m_gpuCullingIdGeneration.size()) {
+                    // Increment generation so any stale history in this slot
+                    // is ignored when the slot is reused by a different entity.
+                    m_gpuCullingIdGeneration[slot] = static_cast<uint16_t>(m_gpuCullingIdGeneration[slot] + 1u);
+                }
+                m_gpuCullingIdFreeList.push_back(slot);
                 m_gpuCullingPrevCenterByEntity.erase(it->first);
                 it = m_gpuCullingIdByEntity.erase(it);
             } else {
@@ -5569,19 +5704,25 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             return it->second;
         }
 
-        uint32_t id = UINT32_MAX;
+        uint32_t slot = UINT32_MAX;
         if (!m_gpuCullingIdFreeList.empty()) {
-            id = m_gpuCullingIdFreeList.back();
+            slot = m_gpuCullingIdFreeList.back();
             m_gpuCullingIdFreeList.pop_back();
         } else {
-            id = m_gpuCullingNextId++;
+            slot = m_gpuCullingNextId++;
         }
 
-        if (id >= maxCullingIds) {
+        if (slot >= maxCullingIds || slot >= 65536u) {
             return UINT32_MAX;
         }
-        m_gpuCullingIdByEntity.emplace(e, id);
-        return id;
+
+        if (m_gpuCullingIdGeneration.size() <= slot) {
+            m_gpuCullingIdGeneration.resize(static_cast<size_t>(slot) + 1u, 0u);
+        }
+        const uint16_t gen = m_gpuCullingIdGeneration[slot];
+        const uint32_t packedId = (static_cast<uint32_t>(gen) << 16u) | (slot & 0xFFFFu);
+        m_gpuCullingIdByEntity.emplace(e, packedId);
+        return packedId;
     };
 
     for (auto entity : entities) {
@@ -5722,8 +5863,25 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
                 sssWrap = 0.35f;
             }
         }
+        // glTF override: allow explicit clearcoat parameters to drive the same
+        // layer used by forward shading presets.
+        if (renderable.clearcoatFactor > 0.0f || renderable.clearcoatRoughnessFactor > 0.0f) {
+            clearCoat = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
+            clearCoatRoughness = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
+        }
         materialData.fractalParams1.w = materialType;
         materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
+
+        materialData.transmissionParams = glm::vec4(
+            glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f),
+            glm::clamp(renderable.ior, 1.0f, 2.5f),
+            0.0f,
+            0.0f
+        );
+        materialData.specularParams = glm::vec4(
+            glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f)),
+            glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
+        );
 
         ObjectConstants objectData = {};
         objectData.modelMatrix = transform.GetMatrix();
@@ -5887,6 +6045,12 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
                 }
             }
 
+        }
+        // When culling is frozen for debugging, keep the result stable by
+        // disabling HZB occlusion (the HZB itself continues updating with the
+        // real camera, which can otherwise change occlusion outcomes).
+        if (freezeCulling) {
+            useHzbOcclusion = false;
         }
 
         m_gpuCulling->SetHZBForOcclusion(
@@ -6170,8 +6334,23 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
                 sssWrap = 0.35f;
             }
         }
+        if (renderable.clearcoatFactor > 0.0f || renderable.clearcoatRoughnessFactor > 0.0f) {
+            clearCoat = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
+            clearCoatRoughness = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
+        }
         materialData.fractalParams1.w = materialType;
         materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
+
+        materialData.transmissionParams = glm::vec4(
+            glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f),
+            glm::clamp(renderable.ior, 1.0f, 2.5f),
+            0.0f,
+            0.0f
+        );
+        materialData.specularParams = glm::vec4(
+            glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f)),
+            glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
+        );
 
         // Update object constants
         ObjectConstants objectData = {};
@@ -6198,7 +6377,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         // Defensive topology reset after any pipeline switch
         m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-        RefreshMaterialDescriptors(renderable);
+        // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;
         }
@@ -6483,8 +6662,23 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
                 sssWrap = 0.35f;
             }
         }
+        if (renderable.clearcoatFactor > 0.0f || renderable.clearcoatRoughnessFactor > 0.0f) {
+            clearCoat = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
+            clearCoatRoughness = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
+        }
         materialData.fractalParams1.w = materialType;
         materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
+
+        materialData.transmissionParams = glm::vec4(
+            glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f),
+            glm::clamp(renderable.ior, 1.0f, 2.5f),
+            0.0f,
+            0.0f
+        );
+        materialData.specularParams = glm::vec4(
+            glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f)),
+            glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
+        );
 
         ObjectConstants objectData = {};
         objectData.modelMatrix  = transform.GetMatrix();
@@ -6498,7 +6692,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
         m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
 
-        RefreshMaterialDescriptors(renderable);
+        // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState ||
             !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;
@@ -8123,6 +8317,13 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     tryLoad(renderable.textures.occlusionPath, renderable.textures.occlusion, false, std::shared_ptr<DX12Texture>{});
     tryLoad(renderable.textures.emissivePath, renderable.textures.emissive, true, std::shared_ptr<DX12Texture>{});
 
+    // glTF extension textures
+    tryLoad(renderable.textures.transmissionPath, renderable.textures.transmission, false, std::shared_ptr<DX12Texture>{});
+    tryLoad(renderable.textures.clearcoatPath, renderable.textures.clearcoat, false, std::shared_ptr<DX12Texture>{});
+    tryLoad(renderable.textures.clearcoatRoughnessPath, renderable.textures.clearcoatRoughness, false, std::shared_ptr<DX12Texture>{});
+    tryLoad(renderable.textures.specularPath, renderable.textures.specular, false, std::shared_ptr<DX12Texture>{});
+    tryLoad(renderable.textures.specularColorPath, renderable.textures.specularColor, true, std::shared_ptr<DX12Texture>{});
+
     if (!renderable.textures.albedo) {
         renderable.textures.albedo = m_placeholderAlbedo;
     }
@@ -8139,14 +8340,10 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
 
 void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
                                           MaterialConstants& materialData) const {
-    uint32_t texIndices[6] = {
-        kInvalidBindlessIndex, // albedo
-        kInvalidBindlessIndex, // normal
-        kInvalidBindlessIndex, // metallic
-        kInvalidBindlessIndex, // roughness
-        kInvalidBindlessIndex, // occlusion
-        kInvalidBindlessIndex  // emissive
-    };
+    uint32_t texIndices[MaterialGPUState::kSlotCount] = {};
+    for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
+        texIndices[i] = kInvalidBindlessIndex;
+    }
 
     uint32_t effectiveMapFlags[6] = {
         materialData.mapFlags.x,
@@ -8169,6 +8366,20 @@ void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& rend
                 texIndices[i] = kInvalidBindlessIndex;
             }
         }
+
+        // Extension textures don't have legacy map flags; treat non-null slots as present.
+        const bool hasTransmission = static_cast<bool>(renderable.textures.transmission);
+        const bool hasClearcoat = static_cast<bool>(renderable.textures.clearcoat);
+        const bool hasClearcoatRoughness = static_cast<bool>(renderable.textures.clearcoatRoughness);
+        const bool hasSpecular = static_cast<bool>(renderable.textures.specular);
+        const bool hasSpecularColor = static_cast<bool>(renderable.textures.specularColor);
+
+        const auto& desc = renderable.textures.gpuState->descriptors;
+        texIndices[6] = (hasTransmission && desc[6].IsValid()) ? desc[6].index : kInvalidBindlessIndex;
+        texIndices[7] = (hasClearcoat && desc[7].IsValid()) ? desc[7].index : kInvalidBindlessIndex;
+        texIndices[8] = (hasClearcoatRoughness && desc[8].IsValid()) ? desc[8].index : kInvalidBindlessIndex;
+        texIndices[9] = (hasSpecular && desc[9].IsValid()) ? desc[9].index : kInvalidBindlessIndex;
+        texIndices[10] = (hasSpecularColor && desc[10].IsValid()) ? desc[10].index : kInvalidBindlessIndex;
     } else {
         for (int i = 0; i < 6; ++i) {
             effectiveMapFlags[i] = 0u;
@@ -8201,6 +8412,19 @@ void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& rend
         kInvalidBindlessIndex,
         kInvalidBindlessIndex
     );
+
+    materialData.textureIndices3 = glm::uvec4(
+        texIndices[6],  // transmission
+        texIndices[7],  // clearcoat
+        texIndices[8],  // clearcoat roughness
+        texIndices[9]   // specular
+    );
+    materialData.textureIndices4 = glm::uvec4(
+        texIndices[10], // specular color
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex
+    );
 }
 
 void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
@@ -8220,13 +8444,18 @@ void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
 
         bool texturesChanged = false;
         if (renderable.textures.gpuState) {
-            std::array<std::shared_ptr<DX12Texture>, 6> sources = {
+            std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> sources = {
                 renderable.textures.albedo ? renderable.textures.albedo : m_placeholderAlbedo,
                 renderable.textures.normal ? renderable.textures.normal : m_placeholderNormal,
                 renderable.textures.metallic ? renderable.textures.metallic : m_placeholderMetallic,
                 renderable.textures.roughness ? renderable.textures.roughness : m_placeholderRoughness,
                 renderable.textures.occlusion,
-                renderable.textures.emissive
+                renderable.textures.emissive,
+                renderable.textures.transmission,
+                renderable.textures.clearcoat,
+                renderable.textures.clearcoatRoughness,
+                renderable.textures.specular,
+                renderable.textures.specularColor
             };
 
             for (size_t i = 0; i < sources.size(); ++i) {
@@ -8267,7 +8496,7 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
     // Allocate descriptors once per material and reuse them; textures can change,
     // but we simply overwrite the descriptor contents.
     if (!state.descriptors[0].IsValid()) {
-        for (int i = 0; i < 6; ++i) {
+        for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
@@ -8277,13 +8506,18 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         }
     }
 
-    std::array<std::shared_ptr<DX12Texture>, 6> sources = {
+    std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> sources = {
         tex.albedo ? tex.albedo : m_placeholderAlbedo,
         tex.normal ? tex.normal : m_placeholderNormal,
         tex.metallic ? tex.metallic : m_placeholderMetallic,
         tex.roughness ? tex.roughness : m_placeholderRoughness,
         tex.occlusion,
-        tex.emissive
+        tex.emissive,
+        tex.transmission,
+        tex.clearcoat,
+        tex.clearcoatRoughness,
+        tex.specular,
+        tex.specularColor
     };
 
     for (size_t i = 0; i < sources.size(); ++i) {
@@ -10548,6 +10782,32 @@ Result<void> Renderer::CreateCommandList() {
 Texture2D<float> g_Depth : register(t0);
 RWTexture2D<float> g_OutMip : register(u0);
 
+cbuffer FrameConstants : register(b1)
+{
+    float4x4 g_ViewMatrix;
+    float4x4 g_ProjectionMatrix;
+    float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
+};
+
+static float ReconstructViewZ(float2 uv, float depth)
+{
+    depth = saturate(depth);
+    // Treat far-plane/background depth as "inf" so it does not become the
+    // min-depth occluder in the pyramid.
+    if (depth >= 1.0f - 1e-4f || depth <= 0.0f)
+    {
+        return 1e9f;
+    }
+
+    float x = uv.x * 2.0f - 1.0f;
+    float y = 1.0f - 2.0f * uv.y;
+    float4 clip = float4(x, y, depth, 1.0f);
+    float4 view = mul(g_InvProjectionMatrix, clip);
+    float w = max(abs(view.w), 1e-6f);
+    return view.z / w;
+}
+
 [numthreads(8, 8, 1)]
 void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
@@ -10556,7 +10816,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (dispatchThreadId.x >= w || dispatchThreadId.y >= h) return;
 
     float d = g_Depth.Load(int3(dispatchThreadId.xy, 0));
-    g_OutMip[dispatchThreadId.xy] = d;
+    float2 uv = (float2(dispatchThreadId.xy) + 0.5f) / float2((float)w, (float)h);
+    g_OutMip[dispatchThreadId.xy] = ReconstructViewZ(uv, d);
 }
 )";
 
@@ -11553,7 +11814,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
                 m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
 
-                RefreshMaterialDescriptors(renderable);
+                // Descriptor tables are warmed via PrewarmMaterialDescriptors().
                 if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
                     m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
                 }
@@ -11669,7 +11930,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                     D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
                     m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
 
-                    RefreshMaterialDescriptors(renderable);
+                    // Descriptor tables are warmed via PrewarmMaterialDescriptors().
                     if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
                         m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
                     }

@@ -25,7 +25,10 @@ struct alignas(16) GPUInstanceData {
     uint32_t meshIndex;
     uint32_t materialIndex;
     uint32_t flags;            // visibility flags, etc.
-    uint32_t cullingId;        // stable ID for history indexing
+    // Packed stable ID for occlusion history indexing:
+    //   bits[15:0]  = slot (<= 65535)
+    //   bits[31:16] = generation (increments when a slot is recycled)
+    uint32_t cullingId;
 };
 
 // Draw argument for ExecuteIndirect (matches D3D12_DRAW_INDEXED_ARGUMENTS)
@@ -134,6 +137,7 @@ public:
     [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer.Get(); }
     [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer.Get(); }
     [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const { return m_allCommandBuffer.Get(); }
+    [[nodiscard]] ID3D12Resource* GetVisibilityMaskBuffer() const { return m_visibilityMaskBuffer.Get(); }
 
     // Get the command signature for ExecuteIndirect
     [[nodiscard]] ID3D12CommandSignature* GetCommandSignature() const { return m_commandSignature.Get(); }
@@ -194,6 +198,7 @@ private:
     ComPtr<ID3D12Resource> m_visibleCommandReadback;   // CPU-readable command snapshot
     ComPtr<ID3D12Resource> m_debugBuffer;              // Debug counters/sample (UAV)
     ComPtr<ID3D12Resource> m_debugReadback;            // CPU-readable debug snapshot
+    ComPtr<ID3D12Resource> m_visibilityMaskBuffer;     // Per-instance visibility mask bits (UAV/SRV)
 
     // Descriptors (shader-visible for ClearUnorderedAccessViewUint)
     DescriptorHandle m_counterUAV;           // GPU descriptor for counter buffer
@@ -219,6 +224,7 @@ private:
     D3D12_RESOURCE_STATES m_historyAState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_historyBState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_debugState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_visibilityMaskState = D3D12_RESOURCE_STATE_COMMON;
 
     FlushCallback m_flushCallback;
 

@@ -13,6 +13,8 @@
 // u0: Albedo UAV output
 // u1: Normal+Roughness UAV output
 // u2: Emissive+Metallic UAV output
+// u3: MaterialExt0 UAV output
+// u4: MaterialExt1 UAV output
 // s0: Static sampler (linear wrap) for bindless textures
 
 cbuffer ResolutionConstants : register(b0) {
@@ -59,6 +61,19 @@ struct VBMaterialConstants {
     uint4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
     float4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
     float4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
+    // x = clear-coat weight, y = clear-coat roughness, z = sheen weight, w = SSS wrap
+    float4 coatParams;
+    // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
+    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    float4 transmissionParams;
+    // Specular extension (KHR_materials_specular).
+    // rgb = specular color factor (linear), w = specular factor.
+    float4 specularParams;
+    // Bindless texture indices for extensions:
+    // textureIndices3: x=transmission, y=clearcoat, z=clearcoatRoughness, w=specular
+    // textureIndices4: x=specularColor, y/z/w unused
+    uint4 textureIndices3;
+    uint4 textureIndices4;
     float alphaCutoff;
     uint alphaMode; // 0=opaque, 1=mask, 2=blend
     uint doubleSided;
@@ -84,6 +99,8 @@ StructuredBuffer<VBMaterialConstants> g_Materials : register(t5);
 RWTexture2D<unorm float4> g_AlbedoOut : register(u0);        // RGBA8_UNORM (linear)
 RWTexture2D<float4> g_NormalRoughnessOut : register(u1);     // RGBA16F
 RWTexture2D<float4> g_EmissiveMetallicOut : register(u2);    // RGBA16F
+RWTexture2D<float4> g_MaterialExt0Out : register(u3);        // RGBA16F: clearcoat/IOR/specularFactor
+RWTexture2D<float4> g_MaterialExt1Out : register(u4);        // RGBA16F: specularColor/transmission
 
 SamplerState g_Sampler : register(s0);
 
@@ -222,8 +239,10 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     if (triangleID == 0xFFFFFFFF && instanceID == 0xFFFFFFFF) {
         // Write black/default values for background
         g_AlbedoOut[pixelCoord] = float4(0, 0, 0, 1);
-        g_NormalRoughnessOut[pixelCoord] = float4(0.0, 0.0, 1.0, 1.0);  // Up normal (world) + max roughness
+        g_NormalRoughnessOut[pixelCoord] = float4(0.5, 0.5, 1.0, 1.0);  // Encoded +Z normal + max roughness
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
+        g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
+        g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
         return;
     }
 
@@ -308,6 +327,12 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float metallic = 0.0;
     float ao = 1.0;
     float3 emissive = float3(0, 0, 0);
+    float clearCoatWeight = 0.0f;
+    float clearCoatRoughness = 1.0f;
+    float transmission = 0.0f;
+    float ior = 1.5f;
+    float specularFactor = 1.0f;
+    float3 specularColor = 1.0f;
 
     float2 ddxUV = float2(0.0f, 0.0f);
     float2 ddyUV = float2(0.0f, 0.0f);
@@ -321,12 +346,25 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         float occlusionStrength = saturate(mat.extraParams.x);
         float normalScale = max(mat.extraParams.y, 0.0f);
         emissive = max(mat.emissiveFactorStrength.rgb, 0.0f) * max(mat.emissiveFactorStrength.w, 0.0f);
+        clearCoatWeight = saturate(mat.coatParams.x);
+        clearCoatRoughness = saturate(mat.coatParams.y);
+        transmission = saturate(mat.transmissionParams.x);
+        ior = max(mat.transmissionParams.y, 1.0f);
+        specularColor = saturate(mat.specularParams.rgb);
+        specularFactor = saturate(mat.specularParams.w);
 
         const bool wantsGrad =
             (mat.textureIndices.x != INVALID_BINDLESS_INDEX) ||
             (mat.textureIndices.y != INVALID_BINDLESS_INDEX) ||
             (mat.textureIndices.z != INVALID_BINDLESS_INDEX) ||
-            (mat.textureIndices.w != INVALID_BINDLESS_INDEX);
+            (mat.textureIndices.w != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices2.x != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices2.y != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices3.x != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices3.y != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices3.z != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices3.w != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices4.x != INVALID_BINDLESS_INDEX);
         if (wantsGrad) {
             ddxUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, true);
             ddyUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, false);
@@ -386,6 +424,47 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         metallic = saturate(metallic);
         roughness = saturate(roughness);
         ao = saturate(ao);
+
+        // KHR_materials_transmission: transmissionTexture stored in R.
+        if (mat.textureIndices3.x != INVALID_BINDLESS_INDEX) {
+            Texture2D transTex = ResourceDescriptorHeap[mat.textureIndices3.x];
+            transmission *= transTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+        }
+
+        // KHR_materials_clearcoat: clearcoatTexture stored in R.
+        if (mat.textureIndices3.y != INVALID_BINDLESS_INDEX) {
+            Texture2D ccTex = ResourceDescriptorHeap[mat.textureIndices3.y];
+            clearCoatWeight *= ccTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+        }
+
+        // KHR_materials_clearcoat: clearcoatRoughnessTexture stored in G (fallback to R if G is zero).
+        if (mat.textureIndices3.z != INVALID_BINDLESS_INDEX) {
+            Texture2D ccrTex = ResourceDescriptorHeap[mat.textureIndices3.z];
+            float4 sample = ccrTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+            float ccr = sample.g;
+            if (ccr == 0.0f && sample.r != 0.0f) {
+                ccr = sample.r;
+            }
+            clearCoatRoughness *= ccr;
+        }
+
+        // KHR_materials_specular: specularTexture stored in A.
+        if (mat.textureIndices3.w != INVALID_BINDLESS_INDEX) {
+            Texture2D specTex = ResourceDescriptorHeap[mat.textureIndices3.w];
+            specularFactor *= specTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).a;
+        }
+
+        // KHR_materials_specular: specularColorTexture stored in RGB.
+        if (mat.textureIndices4.x != INVALID_BINDLESS_INDEX) {
+            Texture2D specColorTex = ResourceDescriptorHeap[mat.textureIndices4.x];
+            specularColor *= specColorTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+        }
+
+        clearCoatWeight = saturate(clearCoatWeight);
+        clearCoatRoughness = saturate(clearCoatRoughness);
+        transmission = saturate(transmission);
+        specularFactor = saturate(specularFactor);
+        specularColor = saturate(specularColor);
     }
 
     // Write to G-buffers
@@ -395,4 +474,6 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     g_AlbedoOut[pixelCoord] = float4(albedo, ao);
     g_NormalRoughnessOut[pixelCoord] = float4(nEnc, roughness);
     g_EmissiveMetallicOut[pixelCoord] = float4(emissive, metallic);
+    g_MaterialExt0Out[pixelCoord] = float4(clearCoatWeight, clearCoatRoughness, ior, specularFactor);
+    g_MaterialExt1Out[pixelCoord] = float4(specularColor, transmission);
 }

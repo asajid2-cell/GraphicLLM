@@ -5,6 +5,7 @@
 // Root signature:
 // b0: View-projection matrix + current mesh index
 // t0: Instance data SRV
+// t2: Optional culling mask (ByteAddressBuffer, 1 uint per instance)
 
 cbuffer PerFrameData : register(b0) {
     float4x4 g_ViewProj;
@@ -27,6 +28,7 @@ struct VBInstanceData {
 };
 
 StructuredBuffer<VBInstanceData> g_Instances : register(t0);
+ByteAddressBuffer g_CullMask : register(t2);
 
 struct VBMaterialConstants {
     float4 albedo;
@@ -60,6 +62,7 @@ struct PSInput {
     float4 position : SV_Position;
     float2 texCoord : TEXCOORD0;
     nointerpolation uint instanceID : INSTANCE_ID;
+    float cullDist : SV_CullDistance0;
 };
 
 struct PSOutput {
@@ -71,6 +74,17 @@ PSInput VSMain(VSInput input) {
 
     // Fetch instance data
     VBInstanceData instance = g_Instances[input.instanceID];
+
+    // Optional per-instance culling: when a valid mask is bound, instances with
+    // mask == 0 are culled before rasterization via SV_CullDistance.
+    uint maskBytes = 0;
+    g_CullMask.GetDimensions(maskBytes);
+    uint visible = 1u;
+    if (maskBytes >= 4u)
+    {
+        visible = g_CullMask.Load(input.instanceID * 4u);
+    }
+    output.cullDist = (visible != 0u) ? 1.0f : -1.0f;
 
     // Transform to world space then clip space
     float4 worldPos = mul(instance.worldMatrix, float4(input.position, 1.0));
@@ -97,6 +111,18 @@ PSOutput PSMainAlphaTest(PSInput input, uint primitiveID : SV_PrimitiveID) {
     PSOutput output;
 
     VBInstanceData instance = g_Instances[input.instanceID];
+
+    // Apply the same optional occlusion/frustum mask as the opaque path.
+    uint maskBytes = 0;
+    g_CullMask.GetDimensions(maskBytes);
+    if (maskBytes >= 4u)
+    {
+        uint visible = g_CullMask.Load(input.instanceID * 4u);
+        if (visible == 0u)
+        {
+            clip(-1.0f);
+        }
+    }
 
     float alpha = 1.0f;
     float cutoff = 0.5f;

@@ -56,6 +56,9 @@ struct VBMaterialConstants {
     float ao;
     float _pad0;
     uint4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
+    uint4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
+    float4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
+    float4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
     float alphaCutoff;
     uint alphaMode; // 0=opaque, 1=mask, 2=blend
     uint doubleSided;
@@ -315,6 +318,9 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         metallic = mat.metallic;
         roughness = mat.roughness;
         ao = mat.ao;
+        float occlusionStrength = saturate(mat.extraParams.x);
+        float normalScale = max(mat.extraParams.y, 0.0f);
+        emissive = max(mat.emissiveFactorStrength.rgb, 0.0f) * max(mat.emissiveFactorStrength.w, 0.0f);
 
         const bool wantsGrad =
             (mat.textureIndices.x != INVALID_BINDLESS_INDEX) ||
@@ -334,12 +340,26 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {
             Texture2D normalTex = ResourceDescriptorHeap[mat.textureIndices.y];
             float3 nTS = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).xyz * 2.0f - 1.0f;
+            nTS.xy *= normalScale;
 
             float3 T = tangent.xyz;
             T = normalize(T - normalWS * dot(normalWS, T));
             float3 B = normalize(cross(normalWS, T) * tangent.w);
             float3x3 TBN = float3x3(T, B, normalWS);
             normalWS = normalize(mul(TBN, nTS));
+        }
+
+        // Occlusion texture (glTF): stored in R, applied only to indirect (AO).
+        if (mat.textureIndices2.x != INVALID_BINDLESS_INDEX && occlusionStrength > 0.0f) {
+            Texture2D occTex = ResourceDescriptorHeap[mat.textureIndices2.x];
+            float occ = occTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+            ao *= lerp(1.0f, occ, occlusionStrength);
+        }
+
+        // Emissive texture (glTF): emissiveFactor * emissiveStrength * emissiveTexture.
+        if (mat.textureIndices2.y != INVALID_BINDLESS_INDEX) {
+            Texture2D emissiveTex = ResourceDescriptorHeap[mat.textureIndices2.y];
+            emissive *= emissiveTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
         }
 
         // glTF metallic-roughness convention:
@@ -369,7 +389,10 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     }
 
     // Write to G-buffers
+    // Match the engine-wide G-buffer convention used by Basic.hlsl / post-process:
+    // normals encoded to 0..1, roughness in .w.
+    float3 nEnc = normalWS * 0.5f + 0.5f;
     g_AlbedoOut[pixelCoord] = float4(albedo, ao);
-    g_NormalRoughnessOut[pixelCoord] = float4(normalWS, roughness);
+    g_NormalRoughnessOut[pixelCoord] = float4(nEnc, roughness);
     g_EmissiveMetallicOut[pixelCoord] = float4(emissive, metallic);
 }

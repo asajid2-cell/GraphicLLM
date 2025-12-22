@@ -7,6 +7,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <cstdint>
 
 #include "Utils/Result.h"
@@ -273,6 +274,67 @@ private:
     // Create transient resource
     RGResourceHandle CreateTransientResource(const RGResourceDesc& desc);
 
+    struct TransientPoolKey {
+        D3D12_RESOURCE_DIMENSION dimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
+        uint64_t width = 0;
+        uint32_t height = 0;
+        uint16_t depthOrArraySize = 1;
+        uint16_t mipLevels = 1;
+        DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+        D3D12_TEXTURE_LAYOUT layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        uint32_t sampleCount = 1;
+        uint32_t sampleQuality = 0;
+
+        bool operator==(const TransientPoolKey& other) const {
+            return dimension == other.dimension &&
+                   width == other.width &&
+                   height == other.height &&
+                   depthOrArraySize == other.depthOrArraySize &&
+                   mipLevels == other.mipLevels &&
+                   format == other.format &&
+                   flags == other.flags &&
+                   layout == other.layout &&
+                   sampleCount == other.sampleCount &&
+                   sampleQuality == other.sampleQuality;
+        }
+    };
+
+    struct TransientPoolKeyHash {
+        size_t operator()(const TransientPoolKey& k) const noexcept {
+            size_t h = 0;
+            auto hashCombine = [&](size_t v) {
+                h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            };
+            hashCombine(std::hash<uint32_t>{}(static_cast<uint32_t>(k.dimension)));
+            hashCombine(std::hash<uint64_t>{}(k.width));
+            hashCombine(std::hash<uint32_t>{}(k.height));
+            hashCombine(std::hash<uint32_t>{}(k.depthOrArraySize));
+            hashCombine(std::hash<uint32_t>{}(k.mipLevels));
+            hashCombine(std::hash<uint32_t>{}(static_cast<uint32_t>(k.format)));
+            hashCombine(std::hash<uint32_t>{}(static_cast<uint32_t>(k.flags)));
+            hashCombine(std::hash<uint32_t>{}(static_cast<uint32_t>(k.layout)));
+            hashCombine(std::hash<uint32_t>{}(k.sampleCount));
+            hashCombine(std::hash<uint32_t>{}(k.sampleQuality));
+            return h;
+        }
+    };
+
+    static TransientPoolKey MakePoolKey(const D3D12_RESOURCE_DESC& desc) {
+        TransientPoolKey key;
+        key.dimension = desc.Dimension;
+        key.width = desc.Width;
+        key.height = desc.Height;
+        key.depthOrArraySize = desc.DepthOrArraySize;
+        key.mipLevels = desc.MipLevels;
+        key.format = desc.Format;
+        key.flags = desc.Flags;
+        key.layout = desc.Layout;
+        key.sampleCount = desc.SampleDesc.Count;
+        key.sampleQuality = desc.SampleDesc.Quality;
+        return key;
+    }
+
     // Convert usage to D3D12 state
     D3D12_RESOURCE_STATES UsageToState(RGResourceUsage usage) const;
 
@@ -299,6 +361,13 @@ private:
 
     // Transient resources (created each frame, can alias)
     std::vector<ComPtr<ID3D12Resource>> m_transientResources;
+
+    // Simple transient resource pool to reduce CreateCommittedResource churn.
+    // Keyed by compatible D3D12_RESOURCE_DESC fields.
+    std::unordered_map<TransientPoolKey,
+                       std::vector<ComPtr<ID3D12Resource>>,
+                       TransientPoolKeyHash>
+        m_transientPool;
 
     // Statistics
     uint32_t m_culledPassCount = 0;

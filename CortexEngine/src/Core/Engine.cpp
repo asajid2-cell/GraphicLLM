@@ -1386,6 +1386,21 @@ void Engine::ProcessInput() {
                       ApplyHeroVisualBaseline();
                       break;
                   }
+                  if (key == SDLK_K) {
+                      if (m_renderer) {
+                          m_renderer->ToggleGPUCullingFreeze();
+                          spdlog::info("GPU culling freeze {} (K)",
+                                       m_renderer->IsGPUCullingFreezeEnabled() ? "ENABLED" : "DISABLED");
+                      }
+                      break;
+                  }
+                  if (key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET) {
+                      if (m_renderer && m_renderer->GetDebugViewMode() == 32) {
+                          const int delta = (key == SDLK_LEFTBRACKET) ? -1 : 1;
+                          m_renderer->AdjustHZBDebugMip(delta);
+                      }
+                      break;
+                  }
                 if (key == SDLK_PRINTSCREEN) {
                     CaptureScreenshot();
                     break;

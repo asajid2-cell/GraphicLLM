@@ -107,10 +107,14 @@ struct MeshData {
         std::shared_ptr<Cortex::Graphics::DX12Texture> normal;
         std::shared_ptr<Cortex::Graphics::DX12Texture> metallic;
         std::shared_ptr<Cortex::Graphics::DX12Texture> roughness;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> occlusion;
+        std::shared_ptr<Cortex::Graphics::DX12Texture> emissive;
         std::string albedoPath;
         std::string normalPath;
         std::string metallicPath;
         std::string roughnessPath;
+        std::string occlusionPath;
+        std::string emissivePath;
         std::shared_ptr<Cortex::Graphics::MaterialGPUState> gpuState;
     } textures;
 
@@ -119,6 +123,10 @@ struct MeshData {
      float metallic = 0.0f;
      float roughness = 0.5f;
      float ao = 1.0f;
+     glm::vec3 emissiveColor = glm::vec3(0.0f);
+     float emissiveStrength = 1.0f;
+     float occlusionStrength = 1.0f;
+     float normalScale = 1.0f;
 
      enum class AlphaMode : uint32_t {
          Opaque = 0,

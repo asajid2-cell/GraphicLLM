@@ -139,11 +139,15 @@ struct MaterialConstants {
     float metallic;
     float roughness;
     float ao;  // Ambient occlusion
-    float _pad0;  // Padding for 16-byte alignment
+    float _pad0;  // Alpha cutoff (glTF MASK) / padding
     // Bindless texture indices for SM6.6 ResourceDescriptorHeap access
     // Use 0xFFFFFFFF for invalid/unused textures (shader checks this)
     alignas(16) glm::uvec4 textureIndices;  // x: albedo, y: normal, z: metallic, w: roughness
     alignas(16) glm::uvec4 mapFlags;        // x: albedo, y: normal, z: metallic, w: roughness (legacy, for transition)
+    alignas(16) glm::uvec4 textureIndices2; // x: occlusion, y: emissive, z/w unused
+    alignas(16) glm::uvec4 mapFlags2;       // x: occlusion, y: emissive, z/w unused
+    alignas(16) glm::vec4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
+    alignas(16) glm::vec4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
     alignas(16) glm::vec4 fractalParams0;   // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     alignas(16) glm::vec4 fractalParams1;   // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     alignas(16) glm::vec4 fractalParams2;   // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)

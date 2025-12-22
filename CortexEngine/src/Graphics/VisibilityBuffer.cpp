@@ -945,6 +945,19 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
 
     spdlog::info("VisibilityBuffer: Visibility pass pipeline created");
 
+    // Double-sided visibility PSO (cull none) for glTF doubleSided materials.
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC dsDesc = psoDesc;
+        dsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        hr = device->CreateGraphicsPipelineState(&dsDesc, IID_PPV_ARGS(&m_visibilityPipelineDoubleSided));
+        if (FAILED(hr)) {
+            spdlog::warn("VisibilityBuffer: Failed to create double-sided visibility PSO (falling back to cull-back)");
+            m_visibilityPipelineDoubleSided.Reset();
+        } else {
+            spdlog::info("VisibilityBuffer: Double-sided visibility pipeline created");
+        }
+    }
+
     // Alpha-tested visibility pipeline (same VS, alpha-discard PS)
     {
         auto alphaPS = ShaderCompiler::CompileFromFile(
@@ -966,6 +979,16 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
         }
 
         spdlog::info("VisibilityBuffer: Alpha-tested visibility pipeline created");
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC alphaDsDesc = alphaDesc;
+        alphaDsDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        hr = device->CreateGraphicsPipelineState(&alphaDsDesc, IID_PPV_ARGS(&m_visibilityAlphaPipelineDoubleSided));
+        if (FAILED(hr)) {
+            spdlog::warn("VisibilityBuffer: Failed to create double-sided alpha-tested visibility PSO (falling back to cull-back)");
+            m_visibilityAlphaPipelineDoubleSided.Reset();
+        } else {
+            spdlog::info("VisibilityBuffer: Double-sided alpha-tested visibility pipeline created");
+        }
     }
 
     // ========================================================================
@@ -1816,7 +1839,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     cmdList->RSSetViewports(1, &viewport);
     cmdList->RSSetScissorRects(1, &scissor);
 
-    // Set pipeline state and root signature
+    // Set pipeline state and root signature (opaque, single-sided)
     cmdList->SetPipelineState(m_visibilityPipeline.Get());
     cmdList->SetGraphicsRootSignature(m_visibilityRootSignature.Get());
 
@@ -1827,15 +1850,12 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     // Set primitive topology
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // Draw each unique mesh with only the instances that reference it.
-    for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
-        const auto& drawInfo = meshDraws[meshIdx];
-
-        if (!drawInfo.vertexBuffer || !drawInfo.indexBuffer || drawInfo.indexCount == 0) {
-            continue;
-        }
-        if (drawInfo.instanceCount == 0) {
-            continue;
+    auto drawMeshRange = [&](uint32_t meshIdx,
+                             const VBMeshDrawInfo& drawInfo,
+                             uint32_t instanceCount,
+                             uint32_t startInstance) {
+        if (!drawInfo.vertexBuffer || !drawInfo.indexBuffer || drawInfo.indexCount == 0 || instanceCount == 0) {
+            return;
         }
 
         // Set per-mesh constants (view-projection matrix + current mesh index + material count)
@@ -1864,21 +1884,37 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         ibv.Format = DXGI_FORMAT_R32_UINT;
         cmdList->IASetIndexBuffer(&ibv);
 
-        // DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertex, startInstance)
         cmdList->DrawIndexedInstanced(
             drawInfo.indexCount,
-            drawInfo.instanceCount,
+            instanceCount,
             drawInfo.firstIndex,
             drawInfo.baseVertex,
-            drawInfo.startInstance
+            startInstance
         );
+    };
+
+    // Draw each unique mesh with only the instances that reference it (opaque, single-sided).
+    for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
+        const auto& drawInfo = meshDraws[meshIdx];
+        drawMeshRange(meshIdx, drawInfo, drawInfo.instanceCount, drawInfo.startInstance);
+    }
+
+    // Opaque, double-sided (cull none).
+    if (m_visibilityPipelineDoubleSided) {
+        cmdList->SetPipelineState(m_visibilityPipelineDoubleSided.Get());
+        cmdList->SetGraphicsRootSignature(m_visibilityRootSignature.Get());
+        cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
+    }
+    for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
+        const auto& drawInfo = meshDraws[meshIdx];
+        drawMeshRange(meshIdx, drawInfo, drawInfo.instanceCountDoubleSided, drawInfo.startInstanceDoubleSided);
     }
 
     // Alpha-tested visibility pass (cutout materials)
     if (m_visibilityAlphaPipeline && m_visibilityAlphaRootSignature && m_materialBuffer) {
         bool anyAlpha = false;
         for (const auto& drawInfo : meshDraws) {
-            if (drawInfo.instanceCountAlpha > 0) {
+            if (drawInfo.instanceCountAlpha > 0 || drawInfo.instanceCountAlphaDoubleSided > 0) {
                 anyAlpha = true;
                 break;
             }
@@ -1893,44 +1929,19 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
 
             for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
                 const auto& drawInfo = meshDraws[meshIdx];
+                drawMeshRange(meshIdx, drawInfo, drawInfo.instanceCountAlpha, drawInfo.startInstanceAlpha);
+            }
 
-                if (!drawInfo.vertexBuffer || !drawInfo.indexBuffer || drawInfo.indexCount == 0) {
-                    continue;
-                }
-                if (drawInfo.instanceCountAlpha == 0) {
-                    continue;
-                }
-
-                struct {
-                    glm::mat4 viewProj;
-                    uint32_t meshIndex;
-                    uint32_t materialCount;
-                    uint32_t pad[2];
-                } perMeshData;
-                perMeshData.viewProj = viewProj;
-                perMeshData.meshIndex = meshIdx;
-                perMeshData.materialCount = m_materialCount;
-                cmdList->SetGraphicsRoot32BitConstants(0, 20, &perMeshData, 0);
-
-                D3D12_VERTEX_BUFFER_VIEW vbv = {};
-                vbv.BufferLocation = drawInfo.vertexBuffer->GetGPUVirtualAddress();
-                vbv.SizeInBytes = drawInfo.vertexCount * 48; // sizeof(Vertex) = 48 bytes
-                vbv.StrideInBytes = 48;
-                cmdList->IASetVertexBuffers(0, 1, &vbv);
-
-                D3D12_INDEX_BUFFER_VIEW ibv = {};
-                ibv.BufferLocation = drawInfo.indexBuffer->GetGPUVirtualAddress();
-                ibv.SizeInBytes = drawInfo.indexCount * sizeof(uint32_t);
-                ibv.Format = DXGI_FORMAT_R32_UINT;
-                cmdList->IASetIndexBuffer(&ibv);
-
-                cmdList->DrawIndexedInstanced(
-                    drawInfo.indexCount,
-                    drawInfo.instanceCountAlpha,
-                    drawInfo.firstIndex,
-                    drawInfo.baseVertex,
-                    drawInfo.startInstanceAlpha
-                );
+            // Alpha-tested, double-sided (cull none).
+            if (m_visibilityAlphaPipelineDoubleSided) {
+                cmdList->SetPipelineState(m_visibilityAlphaPipelineDoubleSided.Get());
+                cmdList->SetGraphicsRootSignature(m_visibilityAlphaRootSignature.Get());
+                cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
+                cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer->GetGPUVirtualAddress());
+            }
+            for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
+                const auto& drawInfo = meshDraws[meshIdx];
+                drawMeshRange(meshIdx, drawInfo, drawInfo.instanceCountAlphaDoubleSided, drawInfo.startInstanceAlphaDoubleSided);
             }
         }
     }
@@ -2486,16 +2497,18 @@ Result<void> VisibilityBufferRenderer::EnsureBRDFLUT(ID3D12GraphicsCommandList* 
     const uint32_t groupCount = (kBrdfLutSize + 7u) / 8u;
     cmdList->Dispatch(groupCount, groupCount, 1);
 
-    // Transition to SRV for sampling in deferred lighting.
+    // Transition to SRV for sampling in deferred lighting and DXR/compute consumers.
     {
+        constexpr D3D12_RESOURCE_STATES kSrvState =
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_brdfLut.Get();
         barrier.Transition.StateBefore = m_brdfLutState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kSrvState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_brdfLutState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_brdfLutState = kSrvState;
     }
 
     m_brdfLutReady = true;
@@ -2535,38 +2548,41 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
         }
     }
 
-    // Transition G-buffers to shader resource
+    // Transition G-buffers to shader resource (pixel + non-pixel) so the
+    // results can be sampled by post-process and DXR without additional barriers.
+    constexpr D3D12_RESOURCE_STATES kSrvState =
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     D3D12_RESOURCE_BARRIER barriers[3] = {};
     int barrierCount = 0;
 
-    if (m_albedoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_albedoState != kSrvState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_gbufferAlbedo.Get();
         barriers[barrierCount].Transition.StateBefore = m_albedoState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
-        m_albedoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_albedoState = kSrvState;
     }
 
-    if (m_normalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_normalRoughnessState != kSrvState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
         barriers[barrierCount].Transition.StateBefore = m_normalRoughnessState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
-        m_normalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_normalRoughnessState = kSrvState;
     }
 
-    if (m_emissiveMetallicState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_emissiveMetallicState != kSrvState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_gbufferEmissiveMetallic.Get();
         barriers[barrierCount].Transition.StateBefore = m_emissiveMetallicState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
-        m_emissiveMetallicState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_emissiveMetallicState = kSrvState;
     }
 
     if (barrierCount > 0) {

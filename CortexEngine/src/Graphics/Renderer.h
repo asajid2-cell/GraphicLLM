@@ -184,6 +184,7 @@ public:
     // Debug/inspection controls
     void ToggleShadows();
     void CycleDebugViewMode();
+    void AdjustHZBDebugMip(int delta);
     void AdjustShadowBias(float delta);
     void AdjustShadowPCFRadius(float delta);
     void AdjustCascadeSplitLambda(float delta);
@@ -193,6 +194,7 @@ public:
     [[nodiscard]] float GetExposure() const { return m_exposure; }
     [[nodiscard]] bool GetShadowsEnabled() const { return m_shadowsEnabled; }
     [[nodiscard]] int GetDebugViewMode() const { return static_cast<int>(m_debugViewMode); }
+    [[nodiscard]] uint32_t GetHZBDebugMip() const { return m_hzbDebugMip; }
     [[nodiscard]] float GetShadowBias() const { return m_shadowBias; }
     [[nodiscard]] float GetShadowPCFRadius() const { return m_shadowPCFRadius; }
     [[nodiscard]] float GetCascadeSplitLambda() const { return m_cascadeSplitLambda; }
@@ -370,6 +372,9 @@ public:
     // GPU-driven rendering (Phase 1 GPU culling + indirect draw)
     void SetGPUCullingEnabled(bool enabled);
     [[nodiscard]] bool IsGPUCullingEnabled() const { return m_gpuCullingEnabled && m_gpuCulling != nullptr; }
+    void SetGPUCullingFreeze(bool enabled) { m_gpuCullingFreeze = enabled; }
+    void ToggleGPUCullingFreeze() { m_gpuCullingFreeze = !m_gpuCullingFreeze; }
+    [[nodiscard]] bool IsGPUCullingFreezeEnabled() const { return m_gpuCullingFreeze; }
     [[nodiscard]] bool IsIndirectDrawEnabled() const { return m_indirectDrawEnabled; }
     [[nodiscard]] uint32_t GetGPUCulledCount() const;
     [[nodiscard]] uint32_t GetGPUTotalInstances() const;
@@ -588,6 +593,9 @@ public:
     std::unique_ptr<DX12Pipeline> m_transparentPipeline;
     std::unique_ptr<DX12Pipeline> m_depthOnlyPipeline;
     std::unique_ptr<DX12Pipeline> m_shadowPipeline;
+    std::unique_ptr<DX12Pipeline> m_shadowPipelineDoubleSided;
+    std::unique_ptr<DX12Pipeline> m_shadowAlphaPipeline;
+    std::unique_ptr<DX12Pipeline> m_shadowAlphaDoubleSidedPipeline;
     // Fullscreen / post pipelines
     std::unique_ptr<DX12Pipeline> m_postProcessPipeline;
     std::unique_ptr<DX12Pipeline> m_taaPipeline;
@@ -692,6 +700,9 @@ public:
 
     // Hierarchical Z-buffer (depth pyramid) built from the main depth buffer.
     ComPtr<ID3D12Resource> m_hzbTexture;
+    // SRV spanning the full mip chain (mip 0..mipCount-1). Used for debug
+    // visualization and any pass that wants to sample multiple mips.
+    DescriptorHandle m_hzbFullSRV;
     std::vector<DescriptorHandle> m_hzbMipSRVStaging;
     std::vector<DescriptorHandle> m_hzbMipUAVStaging;
     uint32_t m_hzbMipCount = 0;
@@ -699,6 +710,7 @@ public:
     uint32_t m_hzbHeight = 0;
     D3D12_RESOURCE_STATES m_hzbState = D3D12_RESOURCE_STATE_COMMON;
     bool m_hzbValid = false;
+    uint32_t m_hzbDebugMip = 0;
 
     // Captured camera state associated with the currently valid HZB.
     // This is used by occlusion culling to project bounds in the same space
@@ -914,6 +926,7 @@ public:
     uint32_t m_localShadowCount = 0;
     bool     m_localShadowBudgetWarningEmitted = false;
     glm::mat4 m_localLightViewProjMatrices[kMaxShadowedLocalLights]{};
+    std::array<entt::entity, kMaxShadowedLocalLights> m_localShadowEntities{};
 
     // Camera-followed shadow frustum parameters
     float m_shadowOrthoRange = 20.0f;
@@ -941,6 +954,7 @@ public:
       // GPU-driven rendering flags
       bool m_gpuCullingEnabled = false;    // Use GPU frustum culling
       bool m_indirectDrawEnabled = false;  // Use ExecuteIndirect for draws
+      bool m_gpuCullingFreeze = false;     // Freeze culling frustum (debug)
       // Cached instance data for GPU culling (rebuilt each frame from ECS)
       std::vector<GPUInstanceData> m_gpuInstances;
       // Mesh info for indirect draws (maps instance -> mesh draw args)
@@ -948,6 +962,8 @@ public:
       // Visibility buffer instance data (Phase 2.1)
       std::vector<VBInstanceData> m_vbInstances;
       std::vector<VisibilityBufferRenderer::VBMeshDrawInfo> m_vbMeshDraws;
+      bool m_vbPlannedThisFrame = false;
+      bool m_vbRenderedThisFrame = false;
       // Sticky flag set when the DX12 device reports "device removed" during
       // resource creation (typically due to GPU memory pressure). Once this
       // is true the renderer will skip further heavy work for the remainder

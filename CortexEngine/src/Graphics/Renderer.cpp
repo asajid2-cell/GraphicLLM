@@ -547,9 +547,15 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_visibilityBuffer.reset();
     } else {
         spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
-        m_visibilityBufferEnabled = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
-        if (!m_visibilityBufferEnabled) {
-            spdlog::info("VisibilityBuffer is disabled by default (set CORTEX_ENABLE_VISIBILITY_BUFFER=1 to enable).");
+        const bool vbDisabled = (std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr);
+        const bool vbEnabledLegacy = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
+        m_visibilityBufferEnabled = !vbDisabled;
+        if (vbDisabled) {
+            spdlog::info("VisibilityBuffer disabled via CORTEX_DISABLE_VISIBILITY_BUFFER=1 (using forward rendering).");
+        } else if (vbEnabledLegacy) {
+            spdlog::info("VisibilityBuffer explicitly enabled via CORTEX_ENABLE_VISIBILITY_BUFFER=1.");
+        } else {
+            spdlog::info("VisibilityBuffer enabled by default (set CORTEX_DISABLE_VISIBILITY_BUFFER=1 to disable).");
         }
     }
 
@@ -873,7 +879,14 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
     copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
     copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-    copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormal.IsValid()) {
+            normalSrv = vbNormal;
+        }
+    }
+    copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
     copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
     copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
 }
@@ -953,8 +966,23 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
     copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
     copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-    copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormal.IsValid()) {
+            normalSrv = vbNormal;
+        }
+    }
+    copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    // Debug mode: HZB mip visualization reuses the SSR slot (t6) to avoid
+    // expanding the post-process descriptor table/root signature.
+    DescriptorHandle slot6 = m_ssrSRV;
+    DXGI_FORMAT slot6Fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    if (m_debugViewMode == 32u && m_hzbValid && m_hzbFullSRV.IsValid()) {
+        slot6 = m_hzbFullSRV;
+        slot6Fmt = DXGI_FORMAT_R32_FLOAT;
+    }
+    copyOrNull(6, slot6, slot6Fmt);
     copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
     copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
     copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -1212,6 +1240,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // buffer index so logs can be correlated easily.
     ++m_renderFrameCounter;
     MarkPassComplete("Render_Entry");
+    m_vbRenderedThisFrame = false;
 
     // All passes enabled by default; per-feature runtime flags (m_ssaoEnabled,
     // m_ssrEnabled, etc.) still control whether they actually run.
@@ -1449,32 +1478,50 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     // Classic path now acts purely as fallback to avoid double-drawing/z-fighting
     if (!drewWithHyper) {
-        // Visibility buffer path (Phase 2.1)
-        if (m_visibilityBuffer && m_visibilityBufferEnabled) {
-            // spdlog::info("Taking visibility buffer path");  // Too noisy
+        const bool vbEnabled = (m_visibilityBuffer && m_visibilityBufferEnabled);
+        if (vbEnabled) {
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             RenderVisibilityBufferPath(registry);
             MarkPassComplete("VisibilityBuffer_Done");
         }
-        // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
-        else if (m_gpuCullingEnabled && m_gpuCulling) {
-            using clock = std::chrono::steady_clock;
-            static clock::time_point s_lastCullingPathLog{};
-            const auto now = clock::now();
-            if (s_lastCullingPathLog.time_since_epoch().count() == 0 ||
-                (now - s_lastCullingPathLog) > std::chrono::seconds(20)) {
-                spdlog::info("Taking GPU culling path");
-                s_lastCullingPathLog = now;
+
+        // If VB is disabled or fails to produce a lit HDR frame (e.g. no instances),
+        // fall back to the existing opaque render paths for robustness.
+        if (!vbEnabled || !m_vbRenderedThisFrame) {
+            if (vbEnabled && !m_vbRenderedThisFrame) {
+                // Ensure depth is writable for the fallback draw path.
+                if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+                    D3D12_RESOURCE_BARRIER barrier{};
+                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    barrier.Transition.pResource = m_depthBuffer.Get();
+                    barrier.Transition.StateBefore = m_depthState;
+                    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+                    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                    m_commandList->ResourceBarrier(1, &barrier);
+                    m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+                }
             }
-            WriteBreadcrumb(GpuMarker::OpaqueGeometry);
-            RenderSceneIndirect(registry);
-            MarkPassComplete("RenderSceneIndirect_Done");
-        } else {
-            // Opaque geometry first (legacy per-draw path)
-            spdlog::info("Taking legacy forward rendering path");
-            WriteBreadcrumb(GpuMarker::OpaqueGeometry);
-            RenderScene(registry);
-            MarkPassComplete("RenderScene_Done");
+
+            // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
+            if (m_gpuCullingEnabled && m_gpuCulling) {
+                using clock = std::chrono::steady_clock;
+                static clock::time_point s_lastCullingPathLog{};
+                const auto now = clock::now();
+                if (s_lastCullingPathLog.time_since_epoch().count() == 0 ||
+                    (now - s_lastCullingPathLog) > std::chrono::seconds(20)) {
+                    spdlog::info("Taking GPU culling path");
+                    s_lastCullingPathLog = now;
+                }
+                WriteBreadcrumb(GpuMarker::OpaqueGeometry);
+                RenderSceneIndirect(registry);
+                MarkPassComplete("RenderSceneIndirect_Done");
+            } else {
+                // Opaque geometry first (legacy per-draw path)
+                spdlog::info("Taking legacy forward rendering path");
+                WriteBreadcrumb(GpuMarker::OpaqueGeometry);
+                RenderScene(registry);
+                MarkPassComplete("RenderScene_Done");
+            }
         }
         // Then blended transparent/glass objects, sorted back-to-front.
         WriteBreadcrumb(GpuMarker::TransparentGeom);
@@ -1515,6 +1562,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         if (s_enableHzb) {
             spdlog::info("HZB enabled (RenderGraph builder: {})", s_useRgHzb ? "yes" : "no");
         }
+    }
+    // If the user selects the HZB debug view at runtime, force-enable HZB
+    // building so the debug view always has valid data without requiring an env var.
+    if (!s_enableHzb && m_debugViewMode == 32u) {
+        s_enableHzb = true;
+        spdlog::info("HZB enabled (forced by debug view)");
     }
     if (s_enableHzb) {
         if (s_useRgHzb && m_renderGraph && m_device && m_commandList && m_descriptorManager &&
@@ -1583,7 +1636,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     // Screen-space reflections using HDR + depth + G-buffer (optional).
     const auto tPostStart = clock::now();
 
-    if (kEnableSSR && m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor && m_gbufferNormalRoughness) {
+    if (kEnableSSR && m_ssrEnabled && m_ssrPipeline && m_ssrColor && m_hdrColor) {
         const auto tSsrStart = clock::now();
         // Dedicated helper keeps SSR logic contained.
         WriteBreadcrumb(GpuMarker::SSR);
@@ -1905,20 +1958,33 @@ void Renderer::RenderRayTracedReflections() {
         m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
-    // Ensure the current frame's normal/roughness target is readable. This is
-    // written during the main pass, so it is finally valid here.
-    if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
-        D3D12_RESOURCE_BARRIER gbufBarrier{};
-        gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        gbufBarrier.Transition.pResource = m_gbufferNormalRoughness.Get();
-        gbufBarrier.Transition.StateBefore = m_gbufferNormalRoughnessState;
-        gbufBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &gbufBarrier);
-        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    constexpr D3D12_RESOURCE_STATES kSrvNonPixel =
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormal.IsValid()) {
+            normalSrv = vbNormal;
+        }
     }
 
-    if (!m_depthSRV.IsValid() || !m_gbufferNormalRoughnessSRV.IsValid()) {
+    // Ensure the current frame's normal/roughness target is readable. The VB
+    // path leaves its G-buffer in a combined SRV state after deferred lighting.
+    if (!m_vbRenderedThisFrame) {
+        if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != kSrvNonPixel) {
+            D3D12_RESOURCE_BARRIER gbufBarrier{};
+            gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            gbufBarrier.Transition.pResource = m_gbufferNormalRoughness.Get();
+            gbufBarrier.Transition.StateBefore = m_gbufferNormalRoughnessState;
+            gbufBarrier.Transition.StateAfter = kSrvNonPixel;
+            gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            rtCmdList->ResourceBarrier(1, &gbufBarrier);
+            m_gbufferNormalRoughnessState = kSrvNonPixel;
+        }
+    }
+
+    if (!m_depthSRV.IsValid() || !normalSrv.IsValid()) {
         return;
     }
 
@@ -2040,7 +2106,7 @@ void Renderer::RenderRayTracedReflections() {
             m_rtReflectionUAV, 
             m_frameConstantBuffer.gpuAddress, 
             envTable, 
-            m_gbufferNormalRoughnessSRV, 
+            normalSrv, 
             reflW, 
             reflH); 
     } 
@@ -2093,6 +2159,8 @@ void Renderer::RebuildAssetRefsFromScene(Scene::ECS_Registry* registry) {
         refPath(renderable.textures.normalPath);
         refPath(renderable.textures.metallicPath);
         refPath(renderable.textures.roughnessPath);
+        refPath(renderable.textures.occlusionPath);
+        refPath(renderable.textures.emissivePath);
     }
 }
 
@@ -3058,6 +3126,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     // flag sticky so we do not spam logs every frame.
     m_hasLocalShadow = false;
     m_localShadowCount = 0;
+    m_localShadowEntities.fill(entt::null);
 
     // Find active camera
     auto cameraView = registry->View<Scene::CameraComponent, Scene::TransformComponent>();
@@ -3269,6 +3338,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
                 uint32_t slice = kShadowCascadeCount + localIndex;
 
                 shadowIndex = static_cast<float>(slice);
+                m_localShadowEntities[localIndex] = entity;
                 localLightPos[localIndex] = lightXform.position;
                 localLightDir[localIndex] = dir;
                 localLightRange[localIndex] = lightComp.range;
@@ -3496,6 +3566,15 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         // Normalize selected row (0..14) into 0..1 for the shader.
         selectedNorm = glm::clamp(static_cast<float>(m_debugOverlaySelectedRow) / 14.0f, 0.0f, 1.0f);
     }
+    float debugParamZ = selectedNorm;
+    if (m_debugViewMode == 32u) {
+        // HZB debug view: repurpose debugMode.z as a normalized mip selector.
+        if (m_hzbMipCount > 1) {
+            debugParamZ = glm::clamp(static_cast<float>(m_hzbDebugMip) / static_cast<float>(m_hzbMipCount - 1u), 0.0f, 1.0f);
+        } else {
+            debugParamZ = 0.0f;
+        }
+    }
     // debugMode.w is used as a coarse "RT history valid" flag across the
     // shading and post-process passes. Treat history as valid once any of
     // the RT pipelines (shadows, GI, reflections) has produced at least one
@@ -3506,7 +3585,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     frameData.debugMode = glm::vec4(
         static_cast<float>(m_debugViewMode),
         overlayFlag,
-        selectedNorm,
+        debugParamZ,
         rtHistoryValid);
 
     // Post-process parameters: reciprocal resolution, FXAA flag, and an extra
@@ -3559,12 +3638,29 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_ssaoBias,
         m_ssaoIntensity);
 
-    // Bloom shaping parameters. The w component is used as a small bitmask for 
-    // post-process feature toggles so the shader can safely gate optional 
-    // sampling without relying on other unrelated flags: 
-    //   bit0: SSR enabled 
-    //   bit1: RT reflections enabled 
-    //   bit2: RT reflection history valid 
+    // Bloom shaping parameters. The w component is used as a small bitmask for
+    // post-process feature toggles so the shader can safely gate optional
+    // sampling without relying on other unrelated flags:
+    //   bit0: SSR enabled
+    //   bit1: RT reflections enabled
+    //   bit2: RT reflection history valid
+    //   bit3: disable RT reflection temporal (debug)
+    //   bit4: visibility-buffer path active this frame (HUD / debug)
+    m_vbPlannedThisFrame = false;
+    if (m_visibilityBufferEnabled && m_visibilityBuffer && registry) {
+        auto renderableView = registry->View<Scene::RenderableComponent>();
+        for (auto entity : renderableView) {
+            const auto& renderable = renderableView.get<Scene::RenderableComponent>(entity);
+            if (!renderable.visible || !renderable.mesh) {
+                continue;
+            }
+            if (IsTransparentRenderable(renderable)) {
+                continue;
+            }
+            m_vbPlannedThisFrame = true;
+            break;
+        }
+    }
     uint32_t postFxFlags = 0u; 
     static bool s_checkedRtReflPostFxEnv = false; 
     static bool s_disableRtReflTemporal = false; 
@@ -3587,6 +3683,9 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     if (s_disableRtReflTemporal) { 
         postFxFlags |= 8u; 
     } 
+    if (m_vbPlannedThisFrame) {
+        postFxFlags |= 16u;
+    }
     frameData.bloomParams = glm::vec4( 
         m_bloomThreshold, 
         m_bloomSoftKnee, 
@@ -3711,7 +3810,18 @@ void Renderer::RenderSkybox() {
 }
 
 void Renderer::RenderSSR() {
-    if (!m_ssrPipeline || !m_ssrColor || !m_hdrColor || !m_gbufferNormalRoughness || !m_depthBuffer) {
+    if (!m_ssrPipeline || !m_ssrColor || !m_hdrColor || !m_depthBuffer) {
+        return;
+    }
+
+    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormal.IsValid()) {
+            normalSrv = vbNormal;
+        }
+    }
+    if (!normalSrv.IsValid()) {
         return;
     }
 
@@ -3739,14 +3849,16 @@ void Renderer::RenderSSR() {
         m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
-        barriers[barrierCount].Transition.StateBefore = m_gbufferNormalRoughnessState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (!m_vbRenderedThisFrame) {
+        if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+            barriers[barrierCount].Transition.StateBefore = m_gbufferNormalRoughnessState;
+            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCount;
+            m_gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
     }
 
     if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -3837,7 +3949,7 @@ void Renderer::RenderSSR() {
     m_device->GetDevice()->CopyDescriptorsSimple(
         1,
         gbufHandle.cpu,
-        m_gbufferNormalRoughnessSRV.cpu,
+        normalSrv.cpu,
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
     );
 
@@ -3878,6 +3990,14 @@ void Renderer::RenderTAA() {
     ID3D12Device* device = m_device->GetDevice();
     if (!device || !m_commandList) {
         return;
+    }
+
+    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormal.IsValid()) {
+            normalSrv = vbNormal;
+        }
     }
 
     // If we do not yet have valid history (first frame after resize or after
@@ -4127,7 +4247,7 @@ void Renderer::RenderTAA() {
         device->CopyDescriptorsSimple(
             1,
             gbufHandle.cpu,
-            m_gbufferNormalRoughnessSRV.cpu,
+            normalSrv.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
 
@@ -4490,7 +4610,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     std::unordered_map<const Scene::MeshData*, uint32_t> meshToDrawIndex;
     // Per-mesh instance buckets to guarantee each mesh draws only its own instances.
     std::vector<std::vector<VBInstanceData>> opaqueInstancesPerMesh;
+    std::vector<std::vector<VBInstanceData>> opaqueDoubleSidedInstancesPerMesh;
     std::vector<std::vector<VBInstanceData>> alphaMaskedInstancesPerMesh;
+    std::vector<std::vector<VBInstanceData>> alphaMaskedDoubleSidedInstancesPerMesh;
 
     // Stable entity order so per-instance/material indices don't thrash frame-to-frame.
     std::vector<entt::entity> stableEntities;
@@ -4505,7 +4627,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
     // Build a per-frame material table (milestone: constant + bindless texture indices).
     struct MaterialKey {
-        std::array<uint32_t, 14> words{}; // albedo rgba + metallic + roughness + ao + 4 texture indices + alphaCutoff + alphaMode + doubleSided
+        std::array<uint32_t, 24> words{}; // includes texture indices + alpha + emissive/occlusion/normalScale
         bool operator==(const MaterialKey& other) const noexcept { return words == other.words; }
     };
     struct MaterialKeyHasher {
@@ -4526,7 +4648,8 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         return bits;
     };
     auto makeKey = [&](const Scene::RenderableComponent& r,
-                       const glm::uvec4& textureIndices) -> MaterialKey {
+                       const glm::uvec4& textureIndices0,
+                       const glm::uvec4& textureIndices2) -> MaterialKey {
         MaterialKey k{};
         k.words[0] = floatBits(r.albedoColor.x);
         k.words[1] = floatBits(r.albedoColor.y);
@@ -4535,13 +4658,21 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         k.words[4] = floatBits(r.metallic);
         k.words[5] = floatBits(r.roughness);
         k.words[6] = floatBits(r.ao);
-        k.words[7] = textureIndices.x;
-        k.words[8] = textureIndices.y;
-        k.words[9] = textureIndices.z;
-        k.words[10] = textureIndices.w;
-        k.words[11] = floatBits(r.alphaCutoff);
-        k.words[12] = static_cast<uint32_t>(r.alphaMode);
-        k.words[13] = r.doubleSided ? 1u : 0u;
+        k.words[7] = textureIndices0.x;
+        k.words[8] = textureIndices0.y;
+        k.words[9] = textureIndices0.z;
+        k.words[10] = textureIndices0.w;
+        k.words[11] = textureIndices2.x; // occlusion
+        k.words[12] = textureIndices2.y; // emissive
+        k.words[13] = floatBits(r.alphaCutoff);
+        k.words[14] = static_cast<uint32_t>(r.alphaMode);
+        k.words[15] = r.doubleSided ? 1u : 0u;
+        k.words[16] = floatBits(r.emissiveColor.x);
+        k.words[17] = floatBits(r.emissiveColor.y);
+        k.words[18] = floatBits(r.emissiveColor.z);
+        k.words[19] = floatBits(r.emissiveStrength);
+        k.words[20] = floatBits(r.occlusionStrength);
+        k.words[21] = floatBits(r.normalScale);
         return k;
     };
 
@@ -4579,8 +4710,12 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             drawInfo.baseVertex = 0;
             drawInfo.startInstance = 0;
             drawInfo.instanceCount = 0;
+            drawInfo.startInstanceDoubleSided = 0;
+            drawInfo.instanceCountDoubleSided = 0;
             drawInfo.startInstanceAlpha = 0;
             drawInfo.instanceCountAlpha = 0;
+            drawInfo.startInstanceAlphaDoubleSided = 0;
+            drawInfo.instanceCountAlphaDoubleSided = 0;
             drawInfo.vertexBufferIndex = renderable.mesh->gpuBuffers->vbRawSRVIndex;
             drawInfo.indexBufferIndex = renderable.mesh->gpuBuffers->ibRawSRVIndex;
             drawInfo.vertexStrideBytes = renderable.mesh->gpuBuffers->vertexStrideBytes;
@@ -4588,7 +4723,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
             m_vbMeshDraws.push_back(drawInfo);
             opaqueInstancesPerMesh.emplace_back();
+            opaqueDoubleSidedInstancesPerMesh.emplace_back();
             alphaMaskedInstancesPerMesh.emplace_back();
+            alphaMaskedDoubleSidedInstancesPerMesh.emplace_back();
         } else {
             meshDrawIndex = it->second;
         }
@@ -4607,8 +4744,11 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
         const bool hasRoughnessMap =
             renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+        const bool hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
+        const bool hasEmissiveMap = static_cast<bool>(renderable.textures.emissive);
 
         glm::uvec4 textureIndices(kInvalidBindlessIndex);
+        glm::uvec4 textureIndices2(kInvalidBindlessIndex);
         if (renderable.textures.gpuState) {
             const auto& desc = renderable.textures.gpuState->descriptors;
             textureIndices = glm::uvec4(
@@ -4617,12 +4757,18 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                 (hasMetallicMap && desc[2].IsValid()) ? desc[2].index : kInvalidBindlessIndex,
                 (hasRoughnessMap && desc[3].IsValid()) ? desc[3].index : kInvalidBindlessIndex
             );
+            textureIndices2 = glm::uvec4(
+                (hasOcclusionMap && desc[4].IsValid()) ? desc[4].index : kInvalidBindlessIndex,
+                (hasEmissiveMap && desc[5].IsValid()) ? desc[5].index : kInvalidBindlessIndex,
+                kInvalidBindlessIndex,
+                kInvalidBindlessIndex
+            );
         }
 
         // Find or create material index for this renderable.
         uint32_t materialIndex = 0;
         {
-            MaterialKey key = makeKey(renderable, textureIndices);
+            MaterialKey key = makeKey(renderable, textureIndices, textureIndices2);
             auto mit = materialToIndex.find(key);
             if (mit == materialToIndex.end()) {
                 materialIndex = static_cast<uint32_t>(vbMaterials.size());
@@ -4634,6 +4780,17 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                 mat.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
                 mat.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
                 mat.textureIndices = textureIndices;
+                mat.textureIndices2 = textureIndices2;
+                mat.emissiveFactorStrength = glm::vec4(
+                    glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
+                    std::max(renderable.emissiveStrength, 0.0f)
+                );
+                mat.extraParams = glm::vec4(
+                    glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+                    std::max(renderable.normalScale, 0.0f),
+                    0.0f,
+                    0.0f
+                );
                 mat.alphaCutoff = std::max(0.0f, renderable.alphaCutoff);
                 mat.alphaMode = static_cast<uint32_t>(renderable.alphaMode);
                 mat.doubleSided = renderable.doubleSided ? 1u : 0u;
@@ -4660,10 +4817,20 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
         inst.baseVertex = 0;
 
-        if (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask) {
-            alphaMaskedInstancesPerMesh[meshDrawIndex].push_back(inst);
+        const bool isMask = (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask);
+        const bool isDoubleSided = renderable.doubleSided;
+        if (isMask) {
+            if (isDoubleSided) {
+                alphaMaskedDoubleSidedInstancesPerMesh[meshDrawIndex].push_back(inst);
+            } else {
+                alphaMaskedInstancesPerMesh[meshDrawIndex].push_back(inst);
+            }
         } else {
-            opaqueInstancesPerMesh[meshDrawIndex].push_back(inst);
+            if (isDoubleSided) {
+                opaqueDoubleSidedInstancesPerMesh[meshDrawIndex].push_back(inst);
+            } else {
+                opaqueInstancesPerMesh[meshDrawIndex].push_back(inst);
+            }
         }
     }
 
@@ -4673,7 +4840,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         size_t total = 0;
         for (size_t i = 0; i < opaqueInstancesPerMesh.size(); ++i) {
             total += opaqueInstancesPerMesh[i].size();
+            total += opaqueDoubleSidedInstancesPerMesh[i].size();
             total += alphaMaskedInstancesPerMesh[i].size();
+            total += alphaMaskedDoubleSidedInstancesPerMesh[i].size();
         }
         m_vbInstances.reserve(total);
 
@@ -4681,7 +4850,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(m_vbMeshDraws.size()); ++meshIdx) {
             auto& draw = m_vbMeshDraws[meshIdx];
             const auto& opaqueBucket = opaqueInstancesPerMesh[meshIdx];
+            const auto& opaqueDsBucket = opaqueDoubleSidedInstancesPerMesh[meshIdx];
             const auto& alphaBucket = alphaMaskedInstancesPerMesh[meshIdx];
+            const auto& alphaDsBucket = alphaMaskedDoubleSidedInstancesPerMesh[meshIdx];
 
             draw.startInstance = start;
             draw.instanceCount = static_cast<uint32_t>(opaqueBucket.size());
@@ -4689,11 +4860,23 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             m_vbInstances.insert(m_vbInstances.end(), opaqueBucket.begin(), opaqueBucket.end());
             start += draw.instanceCount;
 
+            draw.startInstanceDoubleSided = start;
+            draw.instanceCountDoubleSided = static_cast<uint32_t>(opaqueDsBucket.size());
+
+            m_vbInstances.insert(m_vbInstances.end(), opaqueDsBucket.begin(), opaqueDsBucket.end());
+            start += draw.instanceCountDoubleSided;
+
             draw.startInstanceAlpha = start;
             draw.instanceCountAlpha = static_cast<uint32_t>(alphaBucket.size());
 
             m_vbInstances.insert(m_vbInstances.end(), alphaBucket.begin(), alphaBucket.end());
             start += draw.instanceCountAlpha;
+
+            draw.startInstanceAlphaDoubleSided = start;
+            draw.instanceCountAlphaDoubleSided = static_cast<uint32_t>(alphaDsBucket.size());
+
+            m_vbInstances.insert(m_vbInstances.end(), alphaDsBucket.begin(), alphaDsBucket.end());
+            start += draw.instanceCountAlphaDoubleSided;
         }
     }
 
@@ -4883,8 +5066,23 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
             outLight.direction_cosInner = glm::vec4(dir, cosInner);
             outLight.color_range = glm::vec4(radiance, range);
 
-            // Local light shadows not supported in VB deferred yet.
+            // Match the forward path's local-shadow slice selection by
+            // reusing the per-frame mapping computed in UpdateFrameConstants.
             float shadowIndex = -1.0f;
+            if (m_shadowsEnabled &&
+                lightComp.castsShadows &&
+                lightComp.type == Scene::LightType::Spot &&
+                m_hasLocalShadow &&
+                m_localShadowCount > 0)
+            {
+                uint32_t maxLocal = std::min(m_localShadowCount, kMaxShadowedLocalLights);
+                for (uint32_t i = 0; i < maxLocal; ++i) {
+                    if (m_localShadowEntities[i] == e) {
+                        shadowIndex = static_cast<float>(kShadowCascadeCount + i);
+                        break;
+                    }
+                }
+            }
 
             glm::vec2 areaHalfSize(0.0f);
             if (lightComp.type == Scene::LightType::AreaRect) {
@@ -4908,7 +5106,7 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     VisibilityBufferRenderer::DeferredLightingParams lightingParams{};
     lightingParams.invViewProj = m_frameDataCPU.invViewProjectionMatrix;
     lightingParams.viewMatrix = m_frameDataCPU.viewMatrix;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 6; ++i) {
         lightingParams.lightViewProjection[i] = m_frameDataCPU.lightViewProjection[i];
     }
     lightingParams.cameraPosition = m_frameDataCPU.cameraPosition;
@@ -4971,6 +5169,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     );
     if (lightResult.IsErr()) {
         spdlog::warn("VB deferred lighting failed: {}", lightResult.Error());
+        m_vbRenderedThisFrame = false;
+    } else {
+        m_vbRenderedThisFrame = true;
     }
 }
 
@@ -4990,7 +5191,8 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
     const bool bypassCompaction = (std::getenv("CORTEX_GPUCULL_BYPASS_COMPACTION") != nullptr);
     const bool dumpCommands = (std::getenv("CORTEX_GPUCULL_DUMP_COMMANDS") != nullptr);
-    const bool freezeCulling = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
+    const bool freezeCullingEnv = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
+    const bool freezeCulling = freezeCullingEnv || m_gpuCullingFreeze;
     const bool debugCulling = (std::getenv("CORTEX_GPUCULL_DEBUG") != nullptr);
 
     m_gpuCulling->SetForceVisible(forceVisible);
@@ -5110,17 +5312,40 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
         materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
         materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData._pad0 =
+            (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask)
+                ? glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f)
+                : 0.0f;
 
         const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
         const auto hasNormalMap = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
         const auto hasMetallicMap = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
         const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+        const auto hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
+        const auto hasEmissiveMap = static_cast<bool>(renderable.textures.emissive);
 
         materialData.mapFlags = glm::uvec4(
             hasAlbedoMap ? 1u : 0u,
             hasNormalMap ? 1u : 0u,
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u
+        );
+        materialData.mapFlags2 = glm::uvec4(
+            hasOcclusionMap ? 1u : 0u,
+            hasEmissiveMap ? 1u : 0u,
+            0u,
+            0u
+        );
+
+        materialData.emissiveFactorStrength = glm::vec4(
+            glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
+            std::max(renderable.emissiveStrength, 0.0f)
+        );
+        materialData.extraParams = glm::vec4(
+            glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+            std::max(renderable.normalScale, 0.0f),
+            0.0f,
+            0.0f
         );
 
         FillMaterialTextureIndices(renderable, materialData);
@@ -5310,18 +5535,31 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         }
 
         static bool s_freezeCaptured = false;
+        static bool s_prevFreezeEnabled = false;
         static glm::mat4 s_frozenViewProj(1.0f);
         static glm::vec3 s_frozenCameraPos(0.0f);
 
         glm::mat4 viewProjForCulling = m_frameDataCPU.viewProjectionNoJitter;
         glm::vec3 cameraPosForCulling = glm::vec3(m_frameDataCPU.cameraPosition);
 
-        if (freezeCulling) {
+        if (!freezeCulling) {
+            if (s_prevFreezeEnabled) {
+                spdlog::info("GPU culling freeze disabled");
+            }
+            s_freezeCaptured = false;
+            s_prevFreezeEnabled = false;
+        } else {
+            if (!s_prevFreezeEnabled) {
+                // Transitioning from unfrozen -> frozen; capture fresh view.
+                s_freezeCaptured = false;
+                s_prevFreezeEnabled = true;
+            }
             if (!s_freezeCaptured) {
                 s_freezeCaptured = true;
                 s_frozenViewProj = viewProjForCulling;
                 s_frozenCameraPos = cameraPosForCulling;
-                spdlog::warn("GPU culling freeze enabled (CORTEX_GPUCULL_FREEZE=1): capturing view on frame {}",
+                spdlog::warn("GPU culling freeze enabled ({}): capturing view on frame {}",
+                             freezeCullingEnv ? "env CORTEX_GPUCULL_FREEZE=1" : "K toggle",
                              m_renderFrameCounter);
             }
             viewProjForCulling = s_frozenViewProj;
@@ -5527,16 +5765,39 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
         materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
         materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData._pad0 =
+            (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask)
+                ? glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f)
+                : 0.0f;
 
         const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
         const auto hasNormalMap = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
         const auto hasMetallicMap = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
         const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+        const auto hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
+        const auto hasEmissiveMap = static_cast<bool>(renderable.textures.emissive);
         materialData.mapFlags = glm::uvec4(
             hasAlbedoMap ? 1u : 0u,
             hasNormalMap ? 1u : 0u,
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u
+        );
+        materialData.mapFlags2 = glm::uvec4(
+            hasOcclusionMap ? 1u : 0u,
+            hasEmissiveMap ? 1u : 0u,
+            0u,
+            0u
+        );
+
+        materialData.emissiveFactorStrength = glm::vec4(
+            glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
+            std::max(renderable.emissiveStrength, 0.0f)
+        );
+        materialData.extraParams = glm::vec4(
+            glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+            std::max(renderable.normalScale, 0.0f),
+            0.0f,
+            0.0f
         );
 
         FillMaterialTextureIndices(renderable, materialData);
@@ -5806,17 +6067,40 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         materialData.metallic  = glm::clamp(renderable.metallic, 0.0f, 1.0f);
         materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
         materialData.ao        = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData._pad0 =
+            (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask)
+                ? glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f)
+                : 0.0f;
 
         const auto hasAlbedoMap    = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
         const auto hasNormalMap    = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
         const auto hasMetallicMap  = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
         const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+        const auto hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
+        const auto hasEmissiveMap = static_cast<bool>(renderable.textures.emissive);
 
         materialData.mapFlags = glm::uvec4(
             hasAlbedoMap ? 1u : 0u,
             hasNormalMap ? 1u : 0u,
             hasMetallicMap ? 1u : 0u,
             hasRoughnessMap ? 1u : 0u);
+        materialData.mapFlags2 = glm::uvec4(
+            hasOcclusionMap ? 1u : 0u,
+            hasEmissiveMap ? 1u : 0u,
+            0u,
+            0u
+        );
+
+        materialData.emissiveFactorStrength = glm::vec4(
+            glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
+            std::max(renderable.emissiveStrength, 0.0f)
+        );
+        materialData.extraParams = glm::vec4(
+            glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+            std::max(renderable.normalScale, 0.0f),
+            0.0f,
+            0.0f
+        );
 
         FillMaterialTextureIndices(renderable, materialData);
 
@@ -6833,7 +7117,8 @@ void Renderer::CycleDebugViewMode() {
     // 29 = water debug.
     // 30 = RT reflection history (post-process),
     // 31 = RT reflection delta (current vs history).
-    m_debugViewMode = (m_debugViewMode + 1) % 32; 
+    // 32 = HZB mip debug (depth pyramid).
+    m_debugViewMode = (m_debugViewMode + 1) % 33; 
     const char* label = nullptr; 
     switch (m_debugViewMode) { 
         case 0: label = "Shaded"; break;
@@ -6868,6 +7153,7 @@ void Renderer::CycleDebugViewMode() {
         case 29: label = "Water_Debug"; break; 
         case 30: label = "RT_ReflectionHistory"; break; 
         case 31: label = "RT_ReflectionDelta"; break; 
+        case 32: label = "HZB_Mip"; break;
         default: label = "Unknown"; break; 
     } 
     spdlog::info("Debug view mode: {}", label); 
@@ -6891,6 +7177,25 @@ void Renderer::CycleDebugViewMode() {
         }  
     }  
 }  
+
+void Renderer::AdjustHZBDebugMip(int delta) {
+    if (delta == 0) {
+        return;
+    }
+
+    if (m_hzbMipCount <= 1) {
+        m_hzbDebugMip = 0;
+        return;
+    }
+
+    const int maxMip = static_cast<int>(m_hzbMipCount) - 1;
+    const int next = std::clamp(static_cast<int>(m_hzbDebugMip) + delta, 0, maxMip);
+    if (static_cast<uint32_t>(next) == m_hzbDebugMip) {
+        return;
+    }
+    m_hzbDebugMip = static_cast<uint32_t>(next);
+    spdlog::info("HZB debug mip set to {}/{}", m_hzbDebugMip, maxMip);
+}
 
 void Renderer::AdjustShadowBias(float delta) {
     m_shadowBias = glm::clamp(m_shadowBias + delta, 0.00001f, 0.01f);
@@ -6937,7 +7242,7 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 
 void Renderer::SetDebugViewMode(int mode) {
     // Clamp to the full range of supported debug modes.
-    int clamped = std::max(0, std::min(mode, 31));
+    int clamped = std::max(0, std::min(mode, 32));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -7512,6 +7817,8 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
     tryLoad(renderable.textures.normalPath, renderable.textures.normal, false, m_placeholderNormal);
     tryLoad(renderable.textures.metallicPath, renderable.textures.metallic, false, m_placeholderMetallic);
     tryLoad(renderable.textures.roughnessPath, renderable.textures.roughness, false, m_placeholderRoughness);
+    tryLoad(renderable.textures.occlusionPath, renderable.textures.occlusion, false, std::shared_ptr<DX12Texture>{});
+    tryLoad(renderable.textures.emissivePath, renderable.textures.emissive, true, std::shared_ptr<DX12Texture>{});
 
     if (!renderable.textures.albedo) {
         renderable.textures.albedo = m_placeholderAlbedo;
@@ -7529,22 +7836,26 @@ void Renderer::EnsureMaterialTextures(Scene::RenderableComponent& renderable) {
 
 void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
                                           MaterialConstants& materialData) const {
-    uint32_t texIndices[4] = {
-        kInvalidBindlessIndex,
-        kInvalidBindlessIndex,
-        kInvalidBindlessIndex,
-        kInvalidBindlessIndex
+    uint32_t texIndices[6] = {
+        kInvalidBindlessIndex, // albedo
+        kInvalidBindlessIndex, // normal
+        kInvalidBindlessIndex, // metallic
+        kInvalidBindlessIndex, // roughness
+        kInvalidBindlessIndex, // occlusion
+        kInvalidBindlessIndex  // emissive
     };
 
-    uint32_t effectiveMapFlags[4] = {
+    uint32_t effectiveMapFlags[6] = {
         materialData.mapFlags.x,
         materialData.mapFlags.y,
         materialData.mapFlags.z,
-        materialData.mapFlags.w
+        materialData.mapFlags.w,
+        materialData.mapFlags2.x,
+        materialData.mapFlags2.y
     };
 
     if (renderable.textures.gpuState) {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 6; ++i) {
             const bool hasMap = (effectiveMapFlags[i] != 0u);
             if (hasMap && renderable.textures.gpuState->descriptors[i].IsValid()) {
                 texIndices[i] = renderable.textures.gpuState->descriptors[i].index;
@@ -7556,7 +7867,7 @@ void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& rend
             }
         }
     } else {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 6; ++i) {
             effectiveMapFlags[i] = 0u;
             texIndices[i] = kInvalidBindlessIndex;
         }
@@ -7568,12 +7879,24 @@ void Renderer::FillMaterialTextureIndices(const Scene::RenderableComponent& rend
         effectiveMapFlags[2],
         effectiveMapFlags[3]
     );
+    materialData.mapFlags2 = glm::uvec4(
+        effectiveMapFlags[4],
+        effectiveMapFlags[5],
+        0u,
+        0u
+    );
 
     materialData.textureIndices = glm::uvec4(
         texIndices[0],
         texIndices[1],
         texIndices[2],
         texIndices[3]
+    );
+    materialData.textureIndices2 = glm::uvec4(
+        texIndices[4],
+        texIndices[5],
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex
     );
 }
 
@@ -7594,11 +7917,13 @@ void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
 
         bool texturesChanged = false;
         if (renderable.textures.gpuState) {
-            std::array<std::shared_ptr<DX12Texture>, 4> sources = {
+            std::array<std::shared_ptr<DX12Texture>, 6> sources = {
                 renderable.textures.albedo ? renderable.textures.albedo : m_placeholderAlbedo,
                 renderable.textures.normal ? renderable.textures.normal : m_placeholderNormal,
                 renderable.textures.metallic ? renderable.textures.metallic : m_placeholderMetallic,
-                renderable.textures.roughness ? renderable.textures.roughness : m_placeholderRoughness
+                renderable.textures.roughness ? renderable.textures.roughness : m_placeholderRoughness,
+                renderable.textures.occlusion,
+                renderable.textures.emissive
             };
 
             for (size_t i = 0; i < sources.size(); ++i) {
@@ -7639,7 +7964,7 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
     // Allocate descriptors once per material and reuse them; textures can change,
     // but we simply overwrite the descriptor contents.
     if (!state.descriptors[0].IsValid()) {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 6; ++i) {
             auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
             if (handleResult.IsErr()) {
                 spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
@@ -7649,18 +7974,26 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         }
     }
 
-    std::array<std::shared_ptr<DX12Texture>, 4> sources = {
+    std::array<std::shared_ptr<DX12Texture>, 6> sources = {
         tex.albedo ? tex.albedo : m_placeholderAlbedo,
         tex.normal ? tex.normal : m_placeholderNormal,
         tex.metallic ? tex.metallic : m_placeholderMetallic,
-        tex.roughness ? tex.roughness : m_placeholderRoughness
+        tex.roughness ? tex.roughness : m_placeholderRoughness,
+        tex.occlusion,
+        tex.emissive
     };
 
     for (size_t i = 0; i < sources.size(); ++i) {
-        auto fallback = (i == 0) ? m_placeholderAlbedo :
-                        (i == 1) ? m_placeholderNormal :
-                        (i == 2) ? m_placeholderMetallic :
-                                   m_placeholderRoughness;
+        std::shared_ptr<DX12Texture> fallback;
+        if (i == 0) {
+            fallback = m_placeholderAlbedo;
+        } else if (i == 1) {
+            fallback = m_placeholderNormal;
+        } else if (i == 2) {
+            fallback = m_placeholderMetallic;
+        } else if (i == 3) {
+            fallback = m_placeholderRoughness;
+        }
 
         DescriptorHandle srcHandle;
         if (sources[i] && sources[i]->GetSRV().IsValid()) {
@@ -7826,11 +8159,13 @@ Result<void> Renderer::CreateHZBResources() {
     }
 
     m_hzbTexture.Reset();
+    m_hzbFullSRV = {};
     m_hzbMipSRVStaging.clear();
     m_hzbMipUAVStaging.clear();
     m_hzbWidth = width;
     m_hzbHeight = height;
     m_hzbMipCount = mipCount;
+    m_hzbDebugMip = 0;
     m_hzbState = D3D12_RESOURCE_STATE_COMMON;
     m_hzbValid = false;
     m_hzbCaptureValid = false;
@@ -7918,6 +8253,31 @@ Result<void> Renderer::CreateHZBResources() {
 
         m_hzbMipSRVStaging.push_back(srvHandle);
         m_hzbMipUAVStaging.push_back(uavHandle);
+    }
+
+    // Create a full-mip SRV for debug visualizations and any shader that wants
+    // to explicitly choose a mip level (e.g., occlusion/HZB debug).
+    {
+        auto fullSrvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (fullSrvResult.IsErr()) {
+            return Result<void>::Err("CreateHZBResources: failed to allocate full-mip SRV: " + fullSrvResult.Error());
+        }
+        m_hzbFullSRV = fullSrvResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC fullDesc{};
+        fullDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        fullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        fullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        fullDesc.Texture2D.MostDetailedMip = 0;
+        fullDesc.Texture2D.MipLevels = static_cast<UINT>(mipCount);
+        fullDesc.Texture2D.PlaneSlice = 0;
+        fullDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        m_device->GetDevice()->CreateShaderResourceView(
+            m_hzbTexture.Get(),
+            &fullDesc,
+            m_hzbFullSRV.cpu
+        );
     }
 
     spdlog::info("HZB resources created: {}x{}, mips={}", width, height, mipCount);
@@ -9282,6 +9642,15 @@ Result<void> Renderer::CreateCommandList() {
         return Result<void>::Err("Failed to compile shadow vertex shader: " + shadowVsResult.Error());
     }
 
+    auto shadowPsAlphaResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "PSShadowAlphaTest",
+        "ps_5_1"
+    );
+    if (shadowPsAlphaResult.IsErr()) {
+        spdlog::warn("Failed to compile alpha-tested shadow pixel shader: {}", shadowPsAlphaResult.Error());
+    }
+
     auto postVsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/PostProcess.hlsl",
         "VSMain",
@@ -9669,6 +10038,52 @@ Result<void> Renderer::CreateCommandList() {
 
     if (shadowPipelineResult.IsErr()) {
         return Result<void>::Err("Failed to create shadow pipeline: " + shadowPipelineResult.Error());
+    }
+
+    // Shadow-map variants:
+    // - Double-sided: cull none (for glTF doubleSided).
+    // - Alpha-tested: pixel shader clip (for glTF alphaMode=MASK).
+    {
+        m_shadowPipelineDoubleSided = std::make_unique<DX12Pipeline>();
+        PipelineDesc shadowDoubleDesc = shadowDesc;
+        shadowDoubleDesc.cullMode = D3D12_CULL_MODE_NONE;
+        auto dsResult = m_shadowPipelineDoubleSided->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            shadowDoubleDesc
+        );
+        if (dsResult.IsErr()) {
+            spdlog::warn("Failed to create double-sided shadow pipeline: {}", dsResult.Error());
+            m_shadowPipelineDoubleSided.reset();
+        }
+
+        if (shadowPsAlphaResult.IsOk()) {
+            m_shadowAlphaPipeline = std::make_unique<DX12Pipeline>();
+            PipelineDesc shadowAlphaDesc = shadowDesc;
+            shadowAlphaDesc.pixelShader = shadowPsAlphaResult.Value();
+            auto alphaResult = m_shadowAlphaPipeline->Initialize(
+                m_device->GetDevice(),
+                m_rootSignature->GetRootSignature(),
+                shadowAlphaDesc
+            );
+            if (alphaResult.IsErr()) {
+                spdlog::warn("Failed to create alpha-tested shadow pipeline: {}", alphaResult.Error());
+                m_shadowAlphaPipeline.reset();
+            }
+
+            m_shadowAlphaDoubleSidedPipeline = std::make_unique<DX12Pipeline>();
+            PipelineDesc shadowAlphaDsDesc = shadowAlphaDesc;
+            shadowAlphaDsDesc.cullMode = D3D12_CULL_MODE_NONE;
+            auto alphaDsResult = m_shadowAlphaDoubleSidedPipeline->Initialize(
+                m_device->GetDevice(),
+                m_rootSignature->GetRootSignature(),
+                shadowAlphaDsDesc
+            );
+            if (alphaDsResult.IsErr()) {
+                spdlog::warn("Failed to create alpha-tested double-sided shadow pipeline: {}", alphaDsResult.Error());
+                m_shadowAlphaDoubleSidedPipeline.reset();
+            }
+        }
     }
 
     // Post-process pipeline (fullscreen pass)
@@ -10707,10 +11122,17 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
 
-    // Set pipeline / root signature once
+    // Root signature + descriptor heap for optional alpha-tested shadow draws.
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
-    m_commandList->SetPipelineState(m_shadowPipeline->GetPipelineState());
+    if (m_descriptorManager) {
+        ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+        m_commandList->SetDescriptorHeaps(1, heaps);
+    }
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    DX12Pipeline* currentPipeline = m_shadowPipeline.get();
+    if (currentPipeline) {
+        m_commandList->SetPipelineState(currentPipeline->GetPipelineState());
+    }
 
     for (uint32_t cascadeIndex = 0; cascadeIndex < kShadowCascadeCount; ++cascadeIndex) {
         // Update shadow constants with current cascade index. Use a
@@ -10745,6 +11167,26 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
                 continue;
             }
+            if (IsTransparentRenderable(renderable)) {
+                continue;
+            }
+
+            const bool alphaTest = (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask);
+            const bool doubleSided = renderable.doubleSided;
+
+            DX12Pipeline* desired = m_shadowPipeline.get();
+            if (alphaTest) {
+                desired = doubleSided ? m_shadowAlphaDoubleSidedPipeline.get() : m_shadowAlphaPipeline.get();
+            } else {
+                desired = doubleSided ? m_shadowPipelineDoubleSided.get() : m_shadowPipeline.get();
+            }
+            if (!desired) {
+                desired = m_shadowPipeline.get();
+            }
+            if (desired && desired != currentPipeline) {
+                currentPipeline = desired;
+                m_commandList->SetPipelineState(currentPipeline->GetPipelineState());
+            }
 
             ObjectConstants objectData = {};
             objectData.modelMatrix = transform.GetMatrix();
@@ -10752,6 +11194,36 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
 
             D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
             m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+            if (alphaTest && (m_shadowAlphaPipeline || m_shadowAlphaDoubleSidedPipeline)) {
+                EnsureMaterialTextures(renderable);
+                MaterialConstants materialData{};
+                materialData.albedo = renderable.albedoColor;
+                materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+                materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+                materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+                materialData._pad0 = glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f);
+
+                const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+                const auto hasNormalMap = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+                const auto hasMetallicMap = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+                const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+                materialData.mapFlags = glm::uvec4(
+                    hasAlbedoMap ? 1u : 0u,
+                    hasNormalMap ? 1u : 0u,
+                    hasMetallicMap ? 1u : 0u,
+                    hasRoughnessMap ? 1u : 0u
+                );
+                FillMaterialTextureIndices(renderable, materialData);
+
+                D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
+                m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+                RefreshMaterialDescriptors(renderable);
+                if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
+                    m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+                }
+            }
 
             if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
                 D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -10811,6 +11283,26 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
                     continue;
                 }
+                if (IsTransparentRenderable(renderable)) {
+                    continue;
+                }
+
+                const bool alphaTest = (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask);
+                const bool doubleSided = renderable.doubleSided;
+
+                DX12Pipeline* desired = m_shadowPipeline.get();
+                if (alphaTest) {
+                    desired = doubleSided ? m_shadowAlphaDoubleSidedPipeline.get() : m_shadowAlphaPipeline.get();
+                } else {
+                    desired = doubleSided ? m_shadowPipelineDoubleSided.get() : m_shadowPipeline.get();
+                }
+                if (!desired) {
+                    desired = m_shadowPipeline.get();
+                }
+                if (desired && desired != currentPipeline) {
+                    currentPipeline = desired;
+                    m_commandList->SetPipelineState(currentPipeline->GetPipelineState());
+                }
 
                 ObjectConstants objectData = {};
                 objectData.modelMatrix = transform.GetMatrix();
@@ -10818,6 +11310,36 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
 
                 D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
                 m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                if (alphaTest && (m_shadowAlphaPipeline || m_shadowAlphaDoubleSidedPipeline)) {
+                    EnsureMaterialTextures(renderable);
+                    MaterialConstants materialData{};
+                    materialData.albedo = renderable.albedoColor;
+                    materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+                    materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+                    materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+                    materialData._pad0 = glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f);
+
+                    const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+                    const auto hasNormalMap = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+                    const auto hasMetallicMap = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+                    const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+                    materialData.mapFlags = glm::uvec4(
+                        hasAlbedoMap ? 1u : 0u,
+                        hasNormalMap ? 1u : 0u,
+                        hasMetallicMap ? 1u : 0u,
+                        hasRoughnessMap ? 1u : 0u
+                    );
+                    FillMaterialTextureIndices(renderable, materialData);
+
+                    D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
+                    m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+                    RefreshMaterialDescriptors(renderable);
+                    if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
+                        m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+                    }
+                }
 
                 if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
                     D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -10861,7 +11383,7 @@ void Renderer::RenderPostProcess() {
     // Transition all post-process input resources to PIXEL_SHADER_RESOURCE and back buffer to RENDER_TARGET.
     // We need to transition: HDR, SSAO, SSR, velocity, TAA intermediate, and RT reflection buffers
     // that will be sampled by the post-process shader.
-    D3D12_RESOURCE_BARRIER barriers[10] = {};
+    D3D12_RESOURCE_BARRIER barriers[11] = {};
     UINT barrierCount = 0;
 
     if (m_hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -10893,6 +11415,22 @@ void Renderer::RenderPostProcess() {
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
         m_ssrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // HZB debug view reuses slot t6; ensure the pyramid is pixel-shader readable.
+    const bool wantsHzbDebug = (m_debugViewMode == 32u);
+    if (wantsHzbDebug && m_hzbTexture) {
+        const D3D12_RESOURCE_STATES desired =
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        if (m_hzbState != desired) {
+            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Transition.pResource = m_hzbTexture.Get();
+            barriers[barrierCount].Transition.StateBefore = m_hzbState;
+            barriers[barrierCount].Transition.StateAfter = desired;
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCount;
+            m_hzbState = desired;
+        }
     }
 
     // Transition velocity buffer (used as t7 in post-process shader)
@@ -11118,8 +11656,21 @@ void Renderer::RenderPostProcess() {
         copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
         copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
         copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-        copyOrNull(5, m_gbufferNormalRoughnessSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
+        if (m_vbRenderedThisFrame && m_visibilityBuffer) {
+            const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
+            if (vbNormal.IsValid()) {
+                normalSrv = vbNormal;
+            }
+        }
+        copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        DescriptorHandle slot6 = m_ssrSRV;
+        DXGI_FORMAT slot6Fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        if (m_debugViewMode == 32u && m_hzbValid && m_hzbFullSRV.IsValid()) {
+            slot6 = m_hzbFullSRV;
+            slot6Fmt = DXGI_FORMAT_R32_FLOAT;
+        }
+        copyOrNull(6, slot6, slot6Fmt);
         copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
         copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
         copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);

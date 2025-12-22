@@ -100,6 +100,7 @@ void RenderGraph::Shutdown() {
     m_passes.clear();
     m_resources.clear();
     m_transientResources.clear();
+    m_transientPool.clear();
     m_finalStates.clear();
     m_device = nullptr;
     m_graphicsQueue = nullptr;
@@ -108,6 +109,15 @@ void RenderGraph::Shutdown() {
 }
 
 void RenderGraph::BeginFrame() {
+    // Return last frame's transient resources to the pool.
+    for (const auto& res : m_transientResources) {
+        if (!res) {
+            continue;
+        }
+        const auto key = MakePoolKey(res->GetDesc());
+        m_transientPool[key].push_back(res);
+    }
+
     // Clear passes from previous frame
     m_passes.clear();
     m_resources.clear();
@@ -235,14 +245,28 @@ RGResourceHandle RenderGraph::CreateTransientResource(const RGResourceDesc& desc
         clearValue = &clearValueData;
     }
 
-    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &resDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        clearValue,
-        IID_PPV_ARGS(&resource)
-    );
+    // Try to reuse a compatible resource from the pool.
+    const auto poolKey = MakePoolKey(resDesc);
+    auto poolIt = m_transientPool.find(poolKey);
+    if (poolIt != m_transientPool.end() && !poolIt->second.empty()) {
+        resource = poolIt->second.back();
+        poolIt->second.pop_back();
+        if (!resource) {
+            resource.Reset();
+        }
+    }
+
+    HRESULT hr = S_OK;
+    if (!resource) {
+        hr = m_device->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &resDesc,
+            D3D12_RESOURCE_STATE_COMMON,
+            clearValue,
+            IID_PPV_ARGS(&resource)
+        );
+    }
 
     if (FAILED(hr)) {
         spdlog::error("RenderGraph: Failed to create transient resource '{}'", desc.debugName);
@@ -274,35 +298,42 @@ RGResourceHandle RenderGraph::CreateTransientResource(const RGResourceDesc& desc
 }
 
 D3D12_RESOURCE_STATES RenderGraph::UsageToState(RGResourceUsage usage) const {
+    // State mapping must be composable where legal, but some usages imply an
+    // exclusive state (RTV/DSV write/UAV/copy-dst/present).
+    //
+    // Note: This is a "minimum required" state mapping; specific resources
+    // (e.g., depth used as SRV + DSV read-only) may require additional flags.
+
+    if (HasFlag(usage, RGResourceUsage::Present)) {
+        return D3D12_RESOURCE_STATE_PRESENT;
+    }
+    if (HasFlag(usage, RGResourceUsage::CopyDst)) {
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+    if (HasFlag(usage, RGResourceUsage::DepthStencilWrite)) {
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+    if (HasFlag(usage, RGResourceUsage::RenderTarget)) {
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+    if (HasFlag(usage, RGResourceUsage::UnorderedAccess)) {
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 
+    if (HasFlag(usage, RGResourceUsage::DepthStencilRead)) {
+        state |= D3D12_RESOURCE_STATE_DEPTH_READ;
+    }
     if (HasFlag(usage, RGResourceUsage::ShaderResource)) {
         state |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                  D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
-    if (HasFlag(usage, RGResourceUsage::UnorderedAccess)) {
-        state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // UAV is exclusive
-    }
-    if (HasFlag(usage, RGResourceUsage::RenderTarget)) {
-        state = D3D12_RESOURCE_STATE_RENDER_TARGET;  // RTV is exclusive
-    }
-    if (HasFlag(usage, RGResourceUsage::DepthStencilWrite)) {
-        state = D3D12_RESOURCE_STATE_DEPTH_WRITE;  // DSV write is exclusive
-    }
-    if (HasFlag(usage, RGResourceUsage::DepthStencilRead)) {
-        state |= D3D12_RESOURCE_STATE_DEPTH_READ;
-    }
     if (HasFlag(usage, RGResourceUsage::CopySrc)) {
         state |= D3D12_RESOURCE_STATE_COPY_SOURCE;
     }
-    if (HasFlag(usage, RGResourceUsage::CopyDst)) {
-        state = D3D12_RESOURCE_STATE_COPY_DEST;  // Copy dest is exclusive
-    }
     if (HasFlag(usage, RGResourceUsage::IndirectArgument)) {
         state |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-    }
-    if (HasFlag(usage, RGResourceUsage::Present)) {
-        state = D3D12_RESOURCE_STATE_PRESENT;
     }
 
     return state;
@@ -597,6 +628,56 @@ Result<void> RenderGraph::Compile() {
     ComputeBarriers();
 
     m_compiled = true;
+
+    if (std::getenv("CORTEX_RG_DUMP") != nullptr) {
+        auto stateToString = [](D3D12_RESOURCE_STATES s) -> std::string {
+            // Bitmask-friendly rendering of common composite states.
+            if (s == D3D12_RESOURCE_STATE_COMMON) {
+                // Note: PRESENT is also 0.
+                return "COMMON/PRESENT";
+            }
+
+            std::string out;
+            auto add = [&](const char* tag) {
+                if (!out.empty()) {
+                    out += "|";
+                }
+                out += tag;
+            };
+
+            if ((s & D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER) != 0) add("VB|CB");
+            if ((s & D3D12_RESOURCE_STATE_INDEX_BUFFER) != 0) add("IB");
+            if ((s & D3D12_RESOURCE_STATE_RENDER_TARGET) != 0) add("RTV");
+            if ((s & D3D12_RESOURCE_STATE_UNORDERED_ACCESS) != 0) add("UAV");
+            if ((s & D3D12_RESOURCE_STATE_DEPTH_WRITE) != 0) add("DEPTH_WRITE");
+            if ((s & D3D12_RESOURCE_STATE_DEPTH_READ) != 0) add("DEPTH_READ");
+            if ((s & D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) != 0) add("PIXEL_SRV");
+            if ((s & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) != 0) add("NON_PIXEL_SRV");
+            if ((s & D3D12_RESOURCE_STATE_COPY_DEST) != 0) add("COPY_DST");
+            if ((s & D3D12_RESOURCE_STATE_COPY_SOURCE) != 0) add("COPY_SRC");
+            if ((s & D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) != 0) add("INDIRECT");
+
+            if (out.empty()) {
+                out = "UNKNOWN";
+            }
+            return out;
+        };
+
+        spdlog::info("RG dump: passes={}, culled={}, barriers={}", m_passes.size(), m_culledPassCount, m_totalBarrierCount);
+        for (uint32_t id = 0; id < static_cast<uint32_t>(m_resources.size()); ++id) {
+            const auto& res = m_resources[id];
+            const auto& states = res.subresourceStates;
+            const D3D12_RESOURCE_STATES first = states.empty() ? D3D12_RESOURCE_STATE_COMMON : states[0];
+            const bool uniform = states.empty() ? true : AreAllSubresourcesInState(states, first);
+            spdlog::info("  RG res[{}] '{}' ext={} transient={} state={}{}",
+                         id,
+                         res.name,
+                         res.isExternal ? 1 : 0,
+                         res.isTransient ? 1 : 0,
+                         stateToString(uniform ? first : D3D12_RESOURCE_STATE_COMMON),
+                         uniform ? "" : " (per-subresource)");
+        }
+    }
 
     spdlog::debug("RenderGraph compiled: {} passes, {} culled, {} barriers",
                   m_passes.size(), m_culledPassCount, m_totalBarrierCount);

@@ -8,7 +8,7 @@
 
 // G-buffer inputs
 Texture2D<float4> g_GBufferAlbedo : register(t0);           // RGB = albedo (linear), A = AO
-Texture2D<float4> g_GBufferNormalRoughness : register(t1);  // RGB = normal, A = roughness
+Texture2D<float4> g_GBufferNormalRoughness : register(t1);  // RGB = encoded normal (0..1), A = roughness
 Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A = metallic
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 
@@ -35,7 +35,7 @@ SamplerState g_ShadowSampler : register(s1);
 cbuffer PerFrameData : register(b0) {
     float4x4 g_InvViewProj;                // Inverse view-projection for position reconstruction
     float4x4 g_ViewMatrix;
-    float4x4 g_LightViewProjection[3];     // Cascaded shadow matrices (0..2)
+    float4x4 g_LightViewProjection[6];     // 0..2 cascades, 3..5 local shadowed lights
 
     float4 g_CameraPosition;               // xyz = camera position (world)
     float4 g_SunDirection;                 // xyz = direction-to-light (world)
@@ -247,6 +247,48 @@ float ComputeShadow(float3 worldPos, float3 normal) {
     return lerp(shadowPrimary, shadowSecondary, blend);
 }
 
+// Local light shadow evaluation for a shadow-mapped spotlight. Matches the
+// CPU convention used by Basic.hlsl: light.params.y holds the shadow-map
+// slice index in the shared shadow-map array (3..5 for local lights).
+float ComputeLocalLightShadow(float3 worldPos, float3 normal, float3 lightDir, float shadowIndex)
+{
+    if (g_ShadowParams.z < 0.5f) {
+        return 1.0f;
+    }
+    if (shadowIndex < 0.0f) {
+        return 1.0f;
+    }
+
+    uint slice = (uint)shadowIndex;
+    slice = min(slice, 5u);
+
+    float4 lightClip = mul(g_LightViewProjection[slice], float4(worldPos, 1.0f));
+    if (lightClip.w <= 1e-4f || !all(isfinite(lightClip))) {
+        return 1.0f;
+    }
+
+    float3 lightNDC = lightClip.xyz / lightClip.w;
+    if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
+        lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
+        lightNDC.z < 0.0f  || lightNDC.z > 1.0f) {
+        return 1.0f;
+    }
+
+    float2 shadowUV;
+    shadowUV.x = 0.5f * lightNDC.x + 0.5f;
+    shadowUV.y = -0.5f * lightNDC.y + 0.5f;
+
+    float currentDepth = lightNDC.z;
+
+    float bias = g_ShadowParams.x * 0.5f;
+    float pcfRadius = g_ShadowParams.y * 0.75f;
+
+    float ndotl = saturate(dot(normalize(normal), normalize(lightDir)));
+    bias *= lerp(1.5f, 0.5f, ndotl);
+
+    return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, slice);
+}
+
 // Reconstruct world position from depth
 float3 ReconstructWorldPosition(float2 uv, float depth) {
     // Convert UV and depth to NDC
@@ -292,7 +334,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     // Unpack G-buffer data
     float3 albedoColor = albedo.rgb;
     float ao = saturate(albedo.a);
-    float3 normal = normalize(normalRoughness.xyz);
+    float3 normal = normalize(normalRoughness.xyz * 2.0f - 1.0f);
     float roughness = normalRoughness.w;
     float3 emissive = emissiveMetallic.rgb;
     float metallic = emissiveMetallic.a;
@@ -347,7 +389,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     // Direct lighting (sun)
     float3 directLight = (kD * albedoColor / PI + specular) * g_SunRadiance.rgb * NdotL * shadow;
 
-    // Clustered local lights (no local shadows yet).
+    // Clustered local lights.
     if (g_ClusterParams.z > 0u) {
         uint width = g_ScreenAndCluster.x;
         uint height = g_ScreenAndCluster.y;
@@ -433,7 +475,11 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             float3 kS_l = F_l;
             float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
 
-            directLight += (kD_l * albedoColor / PI + spec_l) * radiance * NdotLl;
+            float shadowLocal = 1.0f;
+            if (type == 2.0f && light.params.y >= 0.0f) {
+                shadowLocal = ComputeLocalLightShadow(worldPos, normal, Ll, light.params.y);
+            }
+            directLight += (kD_l * albedoColor / PI + spec_l) * radiance * NdotLl * shadowLocal;
         }
     }
 

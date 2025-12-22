@@ -92,6 +92,10 @@ cbuffer MaterialConstants : register(b2)
     // Use 0xFFFFFFFF for invalid/unused textures
     uint4 g_TextureIndices;  // x: albedo, y: normal, z: metallic, w: roughness
     uint4 g_MapFlags;        // x: albedo, y: normal, z: metallic, w: roughness (legacy)
+    uint4 g_TextureIndices2; // x: occlusion, y: emissive, z/w unused
+    uint4 g_MapFlags2;       // x: occlusion, y: emissive, z/w unused
+    float4 g_EmissiveFactorStrength; // rgb emissive factor, w emissive strength
+    float4 g_ExtraParams;            // x occlusion strength, y normal scale, z/w reserved
     float4 g_FractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     float4 g_FractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
@@ -221,6 +225,7 @@ PSInput VSMain(VSInput input)
 struct VSShadowOutput
 {
     float4 position : SV_POSITION;
+    float2 texCoord : TEXCOORD0;
 };
 
 VSShadowOutput VSShadow(VSInput input)
@@ -233,8 +238,18 @@ VSShadowOutput VSShadow(VSInput input)
     // shadowed lights (3-5). Clamp to the last valid matrix.
     sliceIndex = min(sliceIndex, 5u);
     output.position = mul(g_LightViewProjection[sliceIndex], worldPos);
+    output.texCoord = input.texCoord;
 
     return output;
+}
+
+// Alpha-tested pixel shader for shadow maps (glTF alphaMode=MASK). We rely on
+// g_MaterialPad0 as the alpha cutoff when drawing masked materials.
+void PSShadowAlphaTest(VSShadowOutput input)
+{
+    float alphaCutoff = g_MaterialPad0;
+    float alpha = SampleAlbedo(input.texCoord).a * g_Albedo.a;
+    clip(alpha - alphaCutoff);
 }
 
 static const float PI = 3.14159265f;
@@ -1240,11 +1255,19 @@ PSOutput PSMain(PSInput input)
     float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb);
     float  baseOpacity = saturate(albedoSample.a * g_Albedo.a);
 
+    // Alpha-masked (cutout) materials use g_MaterialPad0 as the cutoff.
+    // Keep alpha-blended materials in the transparent pass (no cutoff).
+    if (g_MaterialPad0 > 0.0f)
+    {
+        clip(baseOpacity - g_MaterialPad0);
+    }
+
     bool hasMetallicMap = (g_TextureIndices.z != INVALID_BINDLESS_INDEX) || g_MapFlags.z;
     bool hasRoughnessMap = (g_TextureIndices.w != INVALID_BINDLESS_INDEX) || g_MapFlags.w;
     float metallic = hasMetallicMap ? SampleMetallic(input.texCoord).r : g_Metallic;
     float roughness = hasRoughnessMap ? SampleRoughness(input.texCoord).r : g_Roughness;
     float ao = g_AO;
+    float occlusionStrength = saturate(g_ExtraParams.x);
 
     // Normal mapping using bindless sampling
     float3 normal = normalize(input.normal);
@@ -1255,8 +1278,21 @@ PSOutput PSMain(PSInput input)
         float3 bitangent = normalize(cross(normal, tangent)) * bitangentSign;
         float3x3 TBN = float3x3(tangent, bitangent, normal);
         float3 nSample = SampleNormal(input.texCoord).xyz * 2.0f - 1.0f;
+        // glTF normalScale: scale X/Y and renormalize.
+        float normalScale = max(g_ExtraParams.y, 0.0f);
+        nSample.xy *= normalScale;
         normal = normalize(mul(TBN, nSample));
     }
+
+#ifdef ENABLE_BINDLESS
+    // Occlusion texture (glTF): stored in R, applied only to indirect.
+    if (g_TextureIndices2.x != INVALID_BINDLESS_INDEX && occlusionStrength > 0.0f)
+    {
+        Texture2D occTex = ResourceDescriptorHeap[g_TextureIndices2.x];
+        float occ = occTex.Sample(g_Sampler, input.texCoord).r;
+        ao *= lerp(1.0f, occ, occlusionStrength);
+    }
+#endif
 
     // Fractal normal perturbation (normal-only "bump" using procedural heightfield)
     float amplitude  = g_FractalParams0.x;
@@ -1544,6 +1580,17 @@ PSOutput PSMain(PSInput input)
 
     int2 pixelCoord = int2(input.position.xy);
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord, input.tangent);
+
+    // glTF emissive: emissiveFactor * emissiveStrength * emissiveTexture.
+    float3 emissive = max(g_EmissiveFactorStrength.rgb, 0.0f) * max(g_EmissiveFactorStrength.w, 0.0f);
+#ifdef ENABLE_BINDLESS
+    if (g_TextureIndices2.y != INVALID_BINDLESS_INDEX)
+    {
+        Texture2D emTex = ResourceDescriptorHeap[g_TextureIndices2.y];
+        emissive *= emTex.Sample(g_Sampler, input.texCoord).rgb;
+    }
+#endif
+    color += emissive;
 
     // Emissive / neon materials: add a simple self-illumination term derived
     // from the albedo color so that glowing panels and signs contribute

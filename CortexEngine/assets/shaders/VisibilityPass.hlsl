@@ -35,6 +35,9 @@ struct VBMaterialConstants {
     float ao;
     float _pad0;
     uint4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
+    uint4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
+    float4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
+    float4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
     float alphaCutoff;
     uint alphaMode; // 0=opaque, 1=mask, 2=blend
     uint doubleSided;

@@ -48,6 +48,9 @@ struct alignas(16) VBMaterialConstants {
     float ao;
     float _pad0;
     alignas(16) glm::uvec4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
+    alignas(16) glm::uvec4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
+    glm::vec4 emissiveFactorStrength;       // rgb emissive factor, w emissive strength
+    glm::vec4 extraParams;                  // x occlusion strength, y normal scale, z/w reserved
     float alphaCutoff;  // For alpha-masked materials (alphaMode == Mask)
     uint32_t alphaMode; // 0=opaque, 1=mask, 2=blend
     uint32_t doubleSided;
@@ -132,9 +135,15 @@ public:
         // Contiguous range of instances in the VB instance buffer that reference this mesh.
         uint32_t startInstance;
         uint32_t instanceCount;
+        // Double-sided opaque instances (cull none).
+        uint32_t startInstanceDoubleSided;
+        uint32_t instanceCountDoubleSided;
         // Alpha-masked instances are drawn in a separate alpha-tested visibility pass.
         uint32_t startInstanceAlpha;
         uint32_t instanceCountAlpha;
+        // Double-sided alpha-masked instances (cull none + alpha test).
+        uint32_t startInstanceAlphaDoubleSided;
+        uint32_t instanceCountAlphaDoubleSided;
         // Persistent bindless SRV indices (ResourceDescriptorHeap[]) for per-mesh VB/IB buffers.
         uint32_t vertexBufferIndex;
         uint32_t indexBufferIndex;
@@ -173,7 +182,7 @@ public:
     struct DeferredLightingParams {
         glm::mat4 invViewProj;
         glm::mat4 viewMatrix;
-        alignas(16) glm::mat4 lightViewProjection[3];  // Cascades 0..2
+        alignas(16) glm::mat4 lightViewProjection[6];  // 0..2 cascades, 3..5 local shadowed lights
         glm::vec4 cameraPosition;                      // xyz = camera world pos
         glm::vec4 sunDirection;                        // xyz = direction-to-light (world)
         glm::vec4 sunRadiance;                         // rgb = sun radiance (color * intensity)
@@ -209,6 +218,10 @@ public:
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetAlbedoSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetNormalRoughnessSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetEmissiveMetallicSRV() const;
+
+    [[nodiscard]] const DescriptorHandle& GetAlbedoSRVHandle() const { return m_albedoSRV; }
+    [[nodiscard]] const DescriptorHandle& GetNormalRoughnessSRVHandle() const { return m_normalRoughnessSRV; }
+    [[nodiscard]] const DescriptorHandle& GetEmissiveMetallicSRVHandle() const { return m_emissiveMetallicSRV; }
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
@@ -287,8 +300,10 @@ private:
     // Pipelines
     ComPtr<ID3D12RootSignature> m_visibilityRootSignature;
     ComPtr<ID3D12PipelineState> m_visibilityPipeline;
+    ComPtr<ID3D12PipelineState> m_visibilityPipelineDoubleSided;
     ComPtr<ID3D12RootSignature> m_visibilityAlphaRootSignature;
     ComPtr<ID3D12PipelineState> m_visibilityAlphaPipeline;
+    ComPtr<ID3D12PipelineState> m_visibilityAlphaPipelineDoubleSided;
 
     ComPtr<ID3D12RootSignature> m_resolveRootSignature;
     ComPtr<ID3D12PipelineState> m_resolvePipeline;

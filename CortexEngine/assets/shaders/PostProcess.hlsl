@@ -1,4 +1,4 @@
-// Fullscreen post-process: exposure, ACES tonemapping, gamma, simple bloom stub
+﻿// Fullscreen post-process: exposure, ACES tonemapping, gamma, simple bloom stub
 
 // Frame constants must match ShaderTypes.h / Basic.hlsl exactly
 cbuffer FrameConstants : register(b1)
@@ -833,11 +833,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
     //   bit1: RT reflections enabled
     //   bit2: RT reflection history valid
     //   bit3: disable RT reflection temporal (debug)
+    //   bit4: visibility-buffer path active (HUD / debug)
     uint postFxFlags = (uint)(g_BloomParams.w + 0.5f); 
     bool ssrEnabled = ((postFxFlags & 1u) != 0u); 
     bool rtReflEnabled = ((postFxFlags & 2u) != 0u); 
     bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u); 
     bool rtReflTemporalOff = ((postFxFlags & 8u) != 0u); 
+    bool vbActive = ((postFxFlags & 16u) != 0u);
     uint depthW, depthH;
     g_Depth.GetDimensions(depthW, depthH);
     uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
@@ -1324,6 +1326,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
             if (uv.y < headerY)
             {
                 panelColor = float3(0.0f, 0.35f, 0.55f);
+
+                // Render-path indicator glyph in the header:
+                // 'B' = visibility-buffer path, 'F' = forward fallback.
+                int glyphId = vbActive ? GL_B : GL_F_;
+                float2 iconOrigin = float2(panelX + (1.0f - panelX) * 0.05f, headerY * 0.20f);
+                float2 iconSize = float2((1.0f - panelX) * 0.10f, headerY * 0.60f);
+                float iconAlpha = SampleGlyph(glyphId, uv, iconOrigin, iconSize);
+                if (iconAlpha > 0.01f)
+                {
+                    panelColor = lerp(panelColor, float3(1.0f, 1.0f, 1.0f), iconAlpha);
+                }
             }
 
             // Subtle horizontal stripes.
@@ -1343,7 +1356,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
                 // Row label on the left side. This uses a tiny bitmap font
                 // rendered entirely in the shader, but we allocate a bit more
-                // space so the glyphs form legible 3–4 letter abbreviations
+                // space so the glyphs form legible 3-4 letter abbreviations
                 // instead of a dense QR-like block.
                 float labelWidthNorm = 0.30f; // fraction of panel width
                 float2 rowOrigin = float2(panelX, headerY + row * rowHeight);
@@ -1556,6 +1569,31 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float3 ssr = g_SSRColor.Sample(g_Sampler, uv).rgb;
         float3 overlay = color * 0.5f + ssr * 0.5f;
         return float4(saturate(overlay), 1.0f);
+    }
+    else if (g_DebugMode.x == 32.0f)
+    {
+        // HZB mip debug view.
+        // The engine binds the HZB full-mip SRV into the g_SSRColor slot (t6)
+        // for this debug mode. g_DebugMode.z selects the mip in [0..1].
+        uint width = 0, height = 0, mipCount = 0;
+        g_SSRColor.GetDimensions(0, width, height, mipCount);
+        if (width == 0 || height == 0 || mipCount == 0)
+        {
+            // Magenta = SRV missing/unbound.
+            return float4(1.0f, 0.0f, 1.0f, 1.0f);
+        }
+
+        uint mip = 0;
+        if (mipCount > 1)
+        {
+            mip = (uint)round(saturate(g_DebugMode.z) * (mipCount - 1));
+        }
+
+        float d = g_SSRColor.SampleLevel(g_Sampler, uv, mip).r;
+        // Near depth is 0, far is 1. Invert for visibility.
+        float v = saturate(1.0f - d);
+        v = pow(v, 0.7f);
+        return float4(v.xxx, 1.0f);
     }
     else if (g_DebugMode.x == 20.0f) 
     { 

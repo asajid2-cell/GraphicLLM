@@ -1030,6 +1030,11 @@ public:
     // PRESENT only when appropriate.
     bool      m_backBufferUsedAsRTThisFrame = false;
 
+    // When enabled, specific passes skip their internal ResourceBarrier calls
+    // because an outer RenderGraph is responsible for transitions.
+    bool      m_shadowPassSkipTransitions = false;
+    bool      m_postProcessSkipTransitions = false;
+
     // Global fractal surface parameters (applied uniformly to all materials)
     float m_fractalAmplitude = 0.0f;
     float m_fractalFrequency = 0.5f;

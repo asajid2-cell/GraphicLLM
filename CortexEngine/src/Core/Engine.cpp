@@ -638,6 +638,12 @@ void Engine::Shutdown() {
         m_llmInitThread.join();
     }
 
+    // Ensure the GPU is idle before we start destroying any scene/UI resources
+    // that may own D3D12 objects referenced by in-flight command lists.
+    if (m_renderer) {
+        m_renderer->WaitForGPU();
+    }
+
     // Persist last used debug menu state
     SaveDebugMenuStateToDisk(UI::DebugMenu::GetState());
     UI::DebugMenu::Shutdown();

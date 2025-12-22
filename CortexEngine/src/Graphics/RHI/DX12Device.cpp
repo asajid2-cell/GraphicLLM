@@ -1,6 +1,7 @@
 #include "DX12Device.h"
 #include <spdlog/spdlog.h>
 #include <dxgidebug.h>
+#include <Windows.h>
 
 namespace Cortex::Graphics {
 
@@ -140,9 +141,10 @@ Result<void> DX12Device::CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel) {
     // non-breaking to avoid overly chatty behavior.
     ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(m_device.As(&infoQueue))) {
-        // Only break on corruption; log other severities without breaking so we can keep
-        // running through descriptor validation errors for investigation.
-        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+        // Only break when a debugger is attached; otherwise a "break on
+        // corruption" turns into a hard crash on shutdown for end users.
+        infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION,
+                                      IsDebuggerPresent() ? TRUE : FALSE);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, FALSE);
         infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, FALSE);
 

@@ -19,7 +19,7 @@ struct alignas(16) CullConstants {
     glm::uvec4 occlusionParams0;  // x=forceVisible, y=hzbEnabled, z=hzbMipCount, w=streakThreshold
     glm::uvec4 occlusionParams1;  // x=hzbWidth, y=hzbHeight, z=historySize, w=debugEnabled
     glm::vec4 occlusionParams2;   // x=invW, y=invH, z=proj00, w=proj11
-    glm::vec4 occlusionParams3;   // x=near, y=far, z=epsilon, w=unused
+    glm::vec4 occlusionParams3;   // x=near, y=far, z=epsilon, w=cameraMotionWS
     glm::mat4 hzbViewMatrix;
     glm::mat4 hzbViewProjMatrix;
     glm::vec4 hzbCameraPos;       // xyz=cameraPosWS
@@ -750,9 +750,9 @@ void GPUCullingPipeline::UpdateVisibleCountFromReadback() {
 
     if (m_commandReadbackPending && m_visibleCommandReadback && m_commandReadbackCount > 0) {
         const size_t readbackBytes = static_cast<size_t>(m_commandReadbackCount) * sizeof(IndirectCommand);
-        D3D12_RANGE readRange = { 0, readbackBytes };
+        D3D12_RANGE cmdReadRange = { 0, readbackBytes };
         void* commandData = nullptr;
-        HRESULT cmdHr = m_visibleCommandReadback->Map(0, &readRange, &commandData);
+        HRESULT cmdHr = m_visibleCommandReadback->Map(0, &cmdReadRange, &commandData);
         if (SUCCEEDED(cmdHr) && commandData) {
             const auto* commands = static_cast<const IndirectCommand*>(commandData);
             const uint32_t maxLog = std::min(m_commandReadbackCount, 2u);
@@ -1027,7 +1027,9 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     constants.occlusionParams2 = glm::vec4(invW, invH, proj[0][0], proj[1][1]);
 
     constexpr float kHzbEpsilon = 0.0025f;
-    constants.occlusionParams3 = glm::vec4(m_hzbNearPlane, m_hzbFarPlane, kHzbEpsilon, 0.0f);
+    const float cameraMotionWS =
+        glm::length(glm::vec3(constants.cameraPos[0], constants.cameraPos[1], constants.cameraPos[2]) - m_hzbCameraPosWS);
+    constants.occlusionParams3 = glm::vec4(m_hzbNearPlane, m_hzbFarPlane, kHzbEpsilon, cameraMotionWS);
     constants.hzbViewMatrix = m_hzbViewMatrix;
     constants.hzbViewProjMatrix = m_hzbViewProjMatrix;
     constants.hzbCameraPos = glm::vec4(m_hzbCameraPosWS, 0.0f);

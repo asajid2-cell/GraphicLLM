@@ -2,7 +2,8 @@
 // Shared PBR helpers used by both forward (Basic.hlsl) and VB deferred
 // (DeferredLighting.hlsl) paths to avoid shading drift.
 
-#pragma once
+#ifndef CORTEX_PBR_LIGHTING_HLSLI
+#define CORTEX_PBR_LIGHTING_HLSLI
 
 static const float PI = 3.14159265f;
 
@@ -122,3 +123,5 @@ float3 EvaluateSpecularIBL_SplitSum(float3 prefiltered,
 {
     return prefiltered * (F0 * brdf.x + brdf.y);
 }
+
+#endif // CORTEX_PBR_LIGHTING_HLSLI

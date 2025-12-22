@@ -275,7 +275,47 @@ Result<ShaderBytecode> ShaderCompiler::CompileFromFile(
         return Result<ShaderBytecode>::Err(fileResult.Error());
     }
 
+#ifdef ENABLE_BINDLESS
     return CompileFromSource(fileResult.Value(), entryPoint, target);
+#else
+    // FXC path: compile from file so #include directives work via the
+    // standard file include handler (relative to the resolved shader path).
+    UINT compileFlags = 0;
+#if defined(_DEBUG)
+    compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+    std::wstring wPath = resolvedPath.wstring();
+
+    ComPtr<ID3DBlob> shaderBlob;
+    ComPtr<ID3DBlob> errorBlob;
+    HRESULT hr = D3DCompileFromFile(
+        wPath.c_str(),
+        nullptr,
+        D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        entryPoint.c_str(),
+        target.c_str(),
+        compileFlags,
+        0,
+        &shaderBlob,
+        &errorBlob
+    );
+
+    if (FAILED(hr)) {
+        if (errorBlob) {
+            const char* errorMsg = static_cast<const char*>(errorBlob->GetBufferPointer());
+            return Result<ShaderBytecode>::Err("Shader compilation failed: " + std::string(errorMsg));
+        }
+        return Result<ShaderBytecode>::Err("Shader compilation failed with unknown error");
+    }
+
+    ShaderBytecode bytecode;
+    bytecode.data.resize(shaderBlob->GetBufferSize());
+    memcpy(bytecode.data.data(), shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize());
+
+    spdlog::info("Shader compiled: {} ({})", entryPoint, target);
+    return Result<ShaderBytecode>::Ok(std::move(bytecode));
+#endif
 }
 
 // Helper function to compile with DXC (SM6.6+)

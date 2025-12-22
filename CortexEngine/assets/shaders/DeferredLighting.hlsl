@@ -13,8 +13,8 @@ Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 
 // Environment/shadow maps (matching forward renderer)
-TextureCube<float4> g_EnvDiffuse : register(t4);
-TextureCube<float4> g_EnvSpecular : register(t5);
+Texture2D<float4> g_EnvDiffuse : register(t4);  // lat-long (equirect) irradiance
+Texture2D<float4> g_EnvSpecular : register(t5); // lat-long (equirect) prefiltered specular
 Texture2DArray<float> g_ShadowMap : register(t6);
 Texture2D<float2> g_BRDFLUT : register(t7);
 
@@ -48,9 +48,104 @@ cbuffer PerFrameData : register(b0) {
     float4 g_ProjectionParams;             // x=proj11, y=proj22, z=nearZ, w=farZ
     uint4  g_ScreenAndCluster;             // x=width, y=height, z=clusterCountX, w=clusterCountY
     uint4  g_ClusterParams;                // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
+    uint4  g_ReflectionProbeParams;        // x=probeTableSRVIndex, y=probeCount, z/w unused
 };
 
 static const float PI = 3.14159265f;
+static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
+
+struct ReflectionProbe {
+    float4 centerBlend; // xyz center (world), w blend distance
+    float4 extents;     // xyz half extents (world)
+    uint4  envIndices;  // x diffuse env SRV index, y specular env SRV index
+};
+
+float2 DirectionToLatLong(float3 dir)
+{
+    dir = normalize(dir);
+    if (!all(isfinite(dir))) {
+        dir = float3(0.0f, 0.0f, 1.0f);
+    }
+
+    float phi = atan2(-dir.z, dir.x);              // [-PI, PI]
+    float theta = asin(clamp(dir.y, -1.0f, 1.0f)); // [-PI/2, PI/2]
+
+    float2 uv;
+    uv.x = 0.5f + phi / (2.0f * PI);
+    uv.y = 0.5f - theta / PI;
+    return uv;
+}
+
+float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex)
+{
+    float2 uv = DirectionToLatLong(dir);
+#ifdef ENABLE_BINDLESS
+    if (diffuseIndex != INVALID_BINDLESS_INDEX) {
+        Texture2D<float4> tex = ResourceDescriptorHeap[diffuseIndex];
+        return tex.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
+    }
+#endif
+    return g_EnvDiffuse.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
+}
+
+float3 SampleEnvSpecular(float3 dir, float mipLevel, uint specularIndex)
+{
+    float2 uv = DirectionToLatLong(dir);
+#ifdef ENABLE_BINDLESS
+    if (specularIndex != INVALID_BINDLESS_INDEX) {
+        Texture2D<float4> tex = ResourceDescriptorHeap[specularIndex];
+        return tex.SampleLevel(g_LinearSampler, uv, mipLevel).rgb;
+    }
+#endif
+    return g_EnvSpecular.SampleLevel(g_LinearSampler, uv, mipLevel).rgb;
+}
+
+float ComputeProbeWeight(float3 worldPos, float3 center, float3 extents, float blendDistance)
+{
+    float3 d = abs(worldPos - center) - extents;
+    float3 outside = max(d, 0.0f);
+    float distOutside = max(max(outside.x, outside.y), outside.z);
+    if (distOutside <= 0.0f) {
+        return 1.0f;
+    }
+    if (blendDistance <= 1e-5f) {
+        return 0.0f;
+    }
+    return saturate(1.0f - (distOutside / blendDistance));
+}
+
+float3 BoxProjectReflection(float3 worldPos, float3 reflDir, float3 center, float3 extents)
+{
+    float3 dir = normalize(reflDir);
+    if (!all(isfinite(dir))) {
+        return float3(0.0f, 0.0f, 1.0f);
+    }
+
+    float3 boxMin = center - extents;
+    float3 boxMax = center + extents;
+
+    float3 invDir = rcp(max(abs(dir), 1e-6f)) * sign(dir);
+    float3 t0 = (boxMin - worldPos) * invDir;
+    float3 t1 = (boxMax - worldPos) * invDir;
+
+    float3 tmin = min(t0, t1);
+    float3 tmax = max(t0, t1);
+
+    float tNear = max(max(tmin.x, tmin.y), tmin.z);
+    float tFar = min(min(tmax.x, tmax.y), tmax.z);
+
+    if (tNear > tFar) {
+        return dir;
+    }
+
+    float tHit = (tNear > 0.0f) ? tNear : tFar;
+    if (tHit <= 0.0f || !isfinite(tHit)) {
+        return dir;
+    }
+
+    float3 hitPos = worldPos + dir * tHit;
+    return normalize(hitPos - center);
+}
 
 // --- PBR Helper Functions ---
 
@@ -344,7 +439,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float3 worldFar = ReconstructWorldPosition(input.texCoord, 1.0f);
         float3 viewDir = normalize(worldFar - g_CameraPosition.xyz);
         float iblSpec = (g_EnvParams.z > 0.5f) ? g_EnvParams.y : 0.0f;
-        float3 sky = g_EnvSpecular.SampleLevel(g_LinearSampler, viewDir, 0.0f).rgb * iblSpec;
+        float3 sky = SampleEnvSpecular(viewDir, 0.0f, INVALID_BINDLESS_INDEX) * iblSpec;
         return float4(sky, 1.0f);
     }
 
@@ -492,18 +587,66 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
     float3 kD_ibl = (1.0 - metallic) * (1.0 - Fibl);
 
-    // Simple diffuse IBL (could be improved with irradiance map)
+    uint diffuseEnvIndex = INVALID_BINDLESS_INDEX;
+    uint specularEnvIndex = INVALID_BINDLESS_INDEX;
+    float3 specDir = reflect(-V, normal);
+    float3 specDirGlobal = specDir;
+    float probeWeight = 0.0f;
+
+#ifdef ENABLE_BINDLESS
+    const uint probeCount = g_ReflectionProbeParams.y;
+    const uint probeTableIndex = g_ReflectionProbeParams.x;
+    if (probeCount > 0u && probeTableIndex != INVALID_BINDLESS_INDEX)
+    {
+        StructuredBuffer<ReflectionProbe> probes = ResourceDescriptorHeap[probeTableIndex];
+
+        float bestW = 0.0f;
+        uint bestI = 0u;
+
+        const uint kMaxProbeIter = 64u;
+        uint count = min(probeCount, kMaxProbeIter);
+        [loop]
+        for (uint i = 0u; i < count; ++i)
+        {
+            ReflectionProbe p = probes[i];
+            float w = ComputeProbeWeight(worldPos, p.centerBlend.xyz, p.extents.xyz, p.centerBlend.w);
+            if (w > bestW)
+            {
+                bestW = w;
+                bestI = i;
+            }
+        }
+
+        if (bestW > 0.0f)
+        {
+            ReflectionProbe p = probes[bestI];
+            diffuseEnvIndex = p.envIndices.x;
+            specularEnvIndex = p.envIndices.y;
+            specDir = BoxProjectReflection(worldPos, specDir, p.centerBlend.xyz, p.extents.xyz);
+            probeWeight = bestW;
+        }
+    }
+#endif
+
+    if (g_ReflectionProbeParams.z == 1u) {
+        return float4(probeWeight.xxx, 1.0f);
+    }
+
+    // Diffuse IBL (irradiance)
     if (iblEnabled && g_EnvParams.x > 0.0f) {
-        float3 irradiance = g_EnvDiffuse.SampleLevel(g_LinearSampler, normal, 0.0f).rgb;
+        float3 irradianceGlobal = SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX);
+        float3 irradianceLocal = SampleEnvDiffuse(normal, diffuseEnvIndex);
+        float3 irradiance = lerp(irradianceGlobal, irradianceLocal, probeWeight);
         diffuseIBL = irradiance * albedoColor * kD_ibl;
     }
 
-    // Specular IBL (reflection)
+    // Specular IBL (split-sum)
     if (iblEnabled && g_EnvParams.y > 0.0f) {
-        float3 R = reflect(-V, normal);
         float maxMip = g_ShadowInvSizeAndSpecMaxMip.z;
         float mipLevel = roughness * maxMip;
-        float3 prefilteredColor = g_EnvSpecular.SampleLevel(g_LinearSampler, R, mipLevel).rgb;
+        float3 specGlobal = SampleEnvSpecular(specDirGlobal, mipLevel, INVALID_BINDLESS_INDEX);
+        float3 specLocal = SampleEnvSpecular(specDir, mipLevel, specularEnvIndex);
+        float3 prefilteredColor = lerp(specGlobal, specLocal, probeWeight);
         float2 brdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(roughness)), 0.0f);
         specularIBL = prefilteredColor * (F0 * brdf.x + brdf.y);
     }

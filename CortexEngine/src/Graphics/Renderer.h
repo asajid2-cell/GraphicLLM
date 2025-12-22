@@ -139,6 +139,8 @@ struct ConstantBuffer {
 // Main renderer class
 class Renderer {
 public:
+    struct EnvironmentMaps;
+
     Renderer() = default;
     ~Renderer();
 
@@ -481,6 +483,7 @@ private:
     Result<void> CreateRTGIResources();
     Result<void> InitializeEnvironmentMaps();
     void UpdateEnvironmentDescriptorTable();
+    void EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env);
     void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
     void EnforceIBLResidencyLimit();
     void PrewarmMaterialDescriptors(Scene::ECS_Registry* registry);
@@ -848,6 +851,10 @@ public:
         std::string path;   // source file on disk (if any)
         std::shared_ptr<DX12Texture> diffuseIrradiance;    // low-frequency env for diffuse
         std::shared_ptr<DX12Texture> specularPrefiltered;  // mip-chain env for specular
+        // Optional persistent shader-visible SRVs for bindless access via
+        // ResourceDescriptorHeap[] (used by VB deferred reflection probes).
+        DescriptorHandle diffuseIrradianceSRV{};
+        DescriptorHandle specularPrefilteredSRV{};
     };
 
     std::vector<EnvironmentMaps> m_environmentMaps;

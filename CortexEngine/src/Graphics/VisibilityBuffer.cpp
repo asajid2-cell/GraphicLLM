@@ -127,6 +127,63 @@ Result<void> VisibilityBufferRenderer::Initialize(
         m_materialCount = 0;
     }
 
+    // Create a reflection probe table buffer (upload heap, persistently mapped).
+    // This is populated per-frame by the renderer and accessed via bindless
+    // index (ResourceDescriptorHeap[]) in deferred lighting.
+    {
+        D3D12_HEAP_PROPERTIES probeHeapProps{};
+        probeHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC probeDesc{};
+        probeDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        probeDesc.Width = static_cast<UINT64>(m_maxReflectionProbes) * sizeof(VBReflectionProbe);
+        probeDesc.Height = 1;
+        probeDesc.DepthOrArraySize = 1;
+        probeDesc.MipLevels = 1;
+        probeDesc.Format = DXGI_FORMAT_UNKNOWN;
+        probeDesc.SampleDesc.Count = 1;
+        probeDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        HRESULT hrProbe = m_device->GetDevice()->CreateCommittedResource(
+            &probeHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &probeDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_reflectionProbeBuffer)
+        );
+        if (FAILED(hrProbe)) {
+            return Result<void>::Err("Failed to create VB reflection probe buffer");
+        }
+        m_reflectionProbeBuffer->SetName(L"VB_ReflectionProbeBuffer");
+
+        D3D12_RANGE readRangeProbe{0, 0};
+        hrProbe = m_reflectionProbeBuffer->Map(0, &readRangeProbe, reinterpret_cast<void**>(&m_reflectionProbeBufferMapped));
+        if (FAILED(hrProbe)) {
+            return Result<void>::Err("Failed to persistently map VB reflection probe buffer");
+        }
+
+        auto probeSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (probeSrvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate VB reflection probe SRV: " + probeSrvResult.Error());
+        }
+        m_reflectionProbeSRV = probeSrvResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC probeSrvDesc{};
+        probeSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        probeSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        probeSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        probeSrvDesc.Buffer.FirstElement = 0;
+        probeSrvDesc.Buffer.NumElements = m_maxReflectionProbes;
+        probeSrvDesc.Buffer.StructureByteStride = sizeof(VBReflectionProbe);
+        probeSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        m_device->GetDevice()->CreateShaderResourceView(
+            m_reflectionProbeBuffer.Get(), &probeSrvDesc, m_reflectionProbeSRV.cpu
+        );
+
+        m_reflectionProbeCount = 0;
+    }
+
     // Create a default-sized mesh table buffer (upload heap, persistently mapped).
     // This is populated per-frame by ResolveMaterials and consumed by compute shaders.
     {
@@ -190,6 +247,10 @@ void VisibilityBufferRenderer::Shutdown() {
         m_meshTableBuffer->Unmap(0, nullptr);
         m_meshTableBufferMapped = nullptr;
     }
+    if (m_reflectionProbeBuffer && m_reflectionProbeBufferMapped) {
+        m_reflectionProbeBuffer->Unmap(0, nullptr);
+        m_reflectionProbeBufferMapped = nullptr;
+    }
 
     m_visibilityBuffer.Reset();
     m_gbufferAlbedo.Reset();
@@ -198,6 +259,7 @@ void VisibilityBufferRenderer::Shutdown() {
     m_instanceBuffer.Reset();
     m_materialBuffer.Reset();
     m_meshTableBuffer.Reset();
+    m_reflectionProbeBuffer.Reset();
     m_visibilityPipeline.Reset();
     m_visibilityRootSignature.Reset();
     m_resolvePipeline.Reset();
@@ -577,6 +639,9 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         rootDesc.Desc_1_1.NumStaticSamplers = 1;
         rootDesc.Desc_1_1.pStaticSamplers = &sampler;
         rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+#ifdef ENABLE_BINDLESS
+        rootDesc.Desc_1_1.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+#endif
 
         ComPtr<ID3DBlob> signature, error;
         HRESULT hr = D3D12SerializeVersionedRootSignature(&rootDesc, &signature, &error);
@@ -1505,6 +1570,9 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
         rootDesc.Desc_1_1.NumStaticSamplers = 2;
         rootDesc.Desc_1_1.pStaticSamplers = samplers;
         rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+#ifdef ENABLE_BINDLESS
+        rootDesc.Desc_1_1.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+#endif
 
         ComPtr<ID3DBlob> signature, error;
         hr = D3D12SerializeVersionedRootSignature(&rootDesc, &signature, &error);
@@ -1679,6 +1747,86 @@ Result<void> VisibilityBufferRenderer::UpdateMaterials(
     }
 
     memcpy(m_materialBufferMapped, materials.data(), materials.size() * sizeof(VBMaterialConstants));
+    return Result<void>::Ok();
+}
+
+Result<void> VisibilityBufferRenderer::UpdateReflectionProbes(
+    ID3D12GraphicsCommandList* cmdList,
+    const std::vector<VBReflectionProbe>& probes
+) {
+    (void)cmdList;
+
+    m_reflectionProbeCount = static_cast<uint32_t>(probes.size());
+    if (probes.empty()) {
+        return Result<void>::Ok();
+    }
+
+    if (probes.size() > m_maxReflectionProbes) {
+        if (m_flushCallback) {
+            m_flushCallback();
+        }
+
+        uint32_t newCap = m_maxReflectionProbes;
+        while (newCap < static_cast<uint32_t>(probes.size())) {
+            newCap = std::max(1u, newCap * 2u);
+        }
+        m_maxReflectionProbes = newCap;
+
+        if (m_reflectionProbeBuffer && m_reflectionProbeBufferMapped) {
+            m_reflectionProbeBuffer->Unmap(0, nullptr);
+            m_reflectionProbeBufferMapped = nullptr;
+        }
+        m_reflectionProbeBuffer.Reset();
+
+        D3D12_HEAP_PROPERTIES heapProps{};
+        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC bufferDesc{};
+        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        bufferDesc.Width = static_cast<UINT64>(m_maxReflectionProbes) * sizeof(VBReflectionProbe);
+        bufferDesc.Height = 1;
+        bufferDesc.DepthOrArraySize = 1;
+        bufferDesc.MipLevels = 1;
+        bufferDesc.SampleDesc.Count = 1;
+        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_reflectionProbeBuffer)
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to resize VB reflection probe buffer");
+        }
+        m_reflectionProbeBuffer->SetName(L"VB_ReflectionProbeBuffer");
+
+        D3D12_RANGE readRange{0, 0};
+        hr = m_reflectionProbeBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_reflectionProbeBufferMapped));
+        if (FAILED(hr) || !m_reflectionProbeBufferMapped) {
+            return Result<void>::Err("Failed to map resized VB reflection probe buffer");
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = m_maxReflectionProbes;
+        srvDesc.Buffer.StructureByteStride = sizeof(VBReflectionProbe);
+        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        m_device->GetDevice()->CreateShaderResourceView(
+            m_reflectionProbeBuffer.Get(), &srvDesc, m_reflectionProbeSRV.cpu
+        );
+    }
+
+    if (!m_reflectionProbeBufferMapped) {
+        return Result<void>::Err("VB reflection probe buffer not mapped");
+    }
+
+    memcpy(m_reflectionProbeBufferMapped, probes.data(), probes.size() * sizeof(VBReflectionProbe));
     return Result<void>::Ok();
 }
 

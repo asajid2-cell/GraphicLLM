@@ -370,13 +370,9 @@ static bool IsTransparentRenderable(const Cortex::Scene::RenderableComponent& re
         return true;
     }
 
-    // Primary signal: explicit alpha on the material color.
-    const float opacity = renderable.albedoColor.a;
-    if (opacity < 0.99f) {
-        return true;
-    }
-
-    // Secondary signal: logical material preset name (e.g., "glass").
+    // Legacy fallback: logical material preset name (e.g., "glass"). Keep this
+    // so older scenes that relied on presets still render in the transparent
+    // pass even if alphaMode isn't authored.
     if (!renderable.presetName.empty()) {
         std::string presetLower = renderable.presetName;
         std::transform(presetLower.begin(),
@@ -1272,21 +1268,37 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
     m_totalTime += deltaTime;
 
-    // Force all graphics features to be enabled - ignore environment variables
-    // that would disable them for debugging purposes
+    // Optional feature overrides via env vars (kept lightweight so the
+    // renderer can be debugged without recompiling).
     static bool s_checkedPassEnv = false;
+    static bool s_forceEnableFeatures = false;
     static bool s_disableSSR   = false;
     static bool s_disableSSAO  = false;
     static bool s_disableBloom = false;
     static bool s_disableTAA   = false;
     if (!s_checkedPassEnv) {
         s_checkedPassEnv = true;
-        // Always keep features enabled - don't check environment variables
-        s_disableSSR = false;
-        s_disableSSAO = false;
-        s_disableBloom = false;
-        s_disableTAA = false;
-        spdlog::info("Renderer: All graphics features forcibly enabled (SSR, SSAO, Bloom, TAA)");
+        s_forceEnableFeatures = (std::getenv("CORTEX_FORCE_ENABLE_FEATURES") != nullptr);
+        if (!s_forceEnableFeatures) {
+            s_disableSSR = (std::getenv("CORTEX_DISABLE_SSR") != nullptr);
+            s_disableSSAO = (std::getenv("CORTEX_DISABLE_SSAO") != nullptr);
+            s_disableBloom = (std::getenv("CORTEX_DISABLE_BLOOM") != nullptr);
+            s_disableTAA = (std::getenv("CORTEX_DISABLE_TAA") != nullptr);
+        } else {
+            s_disableSSR = false;
+            s_disableSSAO = false;
+            s_disableBloom = false;
+            s_disableTAA = false;
+            spdlog::warn("Renderer: CORTEX_FORCE_ENABLE_FEATURES set; env disables ignored (SSR/SSAO/Bloom/TAA)");
+        }
+
+        if (s_disableSSR || s_disableSSAO || s_disableBloom || s_disableTAA) {
+            spdlog::info("Renderer: env disables active (SSR={} SSAO={} Bloom={} TAA={})",
+                         s_disableSSR ? "off" : "on",
+                         s_disableSSAO ? "off" : "on",
+                         s_disableBloom ? "off" : "on",
+                         s_disableTAA ? "off" : "on");
+        }
     }
 
     const bool kEnableSSR  = kEnableSSRDefault  && !s_disableSSR;
@@ -1368,6 +1380,12 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
     PrewarmMaterialDescriptors(registry);
+
+    // RenderGraph orchestration (incremental migration).
+    // We build and execute HZB passes once per frame (later in the frame, so
+    // we can import resources with their *current* states after other passes
+    // have run).
+    bool rgHasPendingHzb = false;
 
     // Optional ultra-minimal debug frame: clear the current back buffer and
     // present, skipping all geometry, lighting, and post-process work. This
@@ -1582,39 +1600,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                              static_cast<bool>(m_hzbTexture), m_hzbMipCount,
                              m_hzbMipSRVStaging.size(), m_hzbMipUAVStaging.size());
             } else {
-                m_renderGraph->BeginFrame();
-
-                const RGResourceHandle depthHandle =
-                    m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth");
-                const RGResourceHandle hzbHandle =
-                    m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
-
-                AddHZBFromDepthPasses_RG(*m_renderGraph, depthHandle, hzbHandle);
-
-                const auto execResult = m_renderGraph->Execute(m_commandList.Get());
-                if (execResult.IsErr()) {
-                    spdlog::warn("HZB RG: Execute failed: {}", execResult.Error());
-                } else {
-                    static bool s_logged = false;
-                    if (!s_logged) {
-                        s_logged = true;
-                        spdlog::info("HZB RG: passes={}, barriers={}",
-                                     m_renderGraph->GetPassCount(), m_renderGraph->GetBarrierCount());
-                    }
-
-                    m_depthState = m_renderGraph->GetResourceState(depthHandle);
-                    m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
-                    m_hzbValid = true;
-
-                    m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
-                    m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
-                    m_hzbCaptureCameraPosWS = m_cameraPositionWS;
-                    m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
-                    m_hzbCaptureNearPlane = m_cameraNearPlane;
-                    m_hzbCaptureFarPlane = m_cameraFarPlane;
-                    m_hzbCaptureFrameCounter = m_renderFrameCounter;
-                    m_hzbCaptureValid = true;
-                }
+                rgHasPendingHzb = true;
             }
         } else {
             BuildHZBFromDepth();
@@ -1693,6 +1679,45 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         const auto tBloomEnd = clock::now();
         m_lastBloomMs =
             std::chrono::duration_cast<std::chrono::microseconds>(tBloomEnd - tBloomStart).count() / 1000.0f;
+    }
+
+    // Execute RenderGraph work once per frame, right before post-process
+    // (which is the final fullscreen resolve).
+    if (rgHasPendingHzb && s_useRgHzb && m_renderGraph && m_device && m_commandList &&
+        m_descriptorManager && m_depthBuffer && m_depthSRV.IsValid() && m_hzbTexture) {
+        m_renderGraph->BeginFrame();
+        const RGResourceHandle depthHandle =
+            m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth");
+        const RGResourceHandle hzbHandle =
+            m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
+        AddHZBFromDepthPasses_RG(*m_renderGraph, depthHandle, hzbHandle);
+
+        const auto execResult = m_renderGraph->Execute(m_commandList.Get());
+        if (execResult.IsErr()) {
+            spdlog::warn("HZB RG: Execute failed: {}", execResult.Error());
+        } else {
+            static bool s_logged = false;
+            if (!s_logged) {
+                s_logged = true;
+                spdlog::info("HZB RG: passes={}, barriers={}",
+                             m_renderGraph->GetPassCount(), m_renderGraph->GetBarrierCount());
+            }
+
+            m_depthState = m_renderGraph->GetResourceState(depthHandle);
+            m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
+            m_hzbValid = true;
+
+            m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
+            m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
+            m_hzbCaptureCameraPosWS = m_cameraPositionWS;
+            m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
+            m_hzbCaptureNearPlane = m_cameraNearPlane;
+            m_hzbCaptureFarPlane = m_cameraFarPlane;
+            m_hzbCaptureFrameCounter = m_renderFrameCounter;
+            m_hzbCaptureValid = true;
+
+            m_renderGraph->EndFrame();
+        }
     }
 
     // Post-process HDR -> back buffer (or no-op if disabled). Allow disabling
@@ -5154,6 +5179,63 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     }
     lightingParams.shadowInvSizeAndSpecMaxMip = glm::vec4(shadowInvW, shadowInvH, specularMaxMip, 0.0f);
 
+    // Upload reflection probes for VB deferred IBL selection (optional).
+    std::vector<VBReflectionProbe> vbProbes;
+    vbProbes.reserve(64);
+    if (registry) {
+        auto probeView = registry->View<Scene::ReflectionProbeComponent, Scene::TransformComponent>();
+        for (auto entity : probeView) {
+            const auto& probe = probeView.get<Scene::ReflectionProbeComponent>(entity);
+            const auto& transform = probeView.get<Scene::TransformComponent>(entity);
+            if (probe.enabled == 0u) {
+                continue;
+            }
+
+            const glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
+            const glm::vec3 scaleWS(
+                glm::length(glm::vec3(transform.worldMatrix[0])),
+                glm::length(glm::vec3(transform.worldMatrix[1])),
+                glm::length(glm::vec3(transform.worldMatrix[2]))
+            );
+            const glm::vec3 extentsWS = glm::max(glm::vec3(0.0f), probe.extents) * glm::max(scaleWS, glm::vec3(0.0f));
+
+            uint32_t diffuseIndex = kInvalidBindlessIndex;
+            uint32_t specularIndex = kInvalidBindlessIndex;
+            if (probe.environmentIndex < m_environmentMaps.size()) {
+                auto& env = m_environmentMaps[probe.environmentIndex];
+                EnsureEnvironmentBindlessSRVs(env);
+                if (env.diffuseIrradianceSRV.IsValid()) {
+                    diffuseIndex = env.diffuseIrradianceSRV.index;
+                }
+                if (env.specularPrefilteredSRV.IsValid()) {
+                    specularIndex = env.specularPrefilteredSRV.index;
+                }
+            }
+
+            VBReflectionProbe out{};
+            out.centerBlend = glm::vec4(centerWS, std::max(0.0f, probe.blendDistance));
+            out.extents = glm::vec4(extentsWS, 0.0f);
+            out.envIndices = glm::uvec4(diffuseIndex, specularIndex, 0u, 0u);
+            vbProbes.push_back(out);
+
+            if (vbProbes.size() >= 64) {
+                break;
+            }
+        }
+    }
+
+    auto probeUpload = m_visibilityBuffer->UpdateReflectionProbes(m_commandList.Get(), vbProbes);
+    if (probeUpload.IsErr()) {
+        spdlog::warn("VB reflection probe upload failed: {}", probeUpload.Error());
+    }
+    const uint32_t probeDebugMode = (std::getenv("CORTEX_VB_DEBUG_PROBES") != nullptr) ? 1u : 0u;
+    lightingParams.reflectionProbeParams = glm::uvec4(
+        m_visibilityBuffer->GetReflectionProbeTableIndex(),
+        static_cast<uint32_t>(vbProbes.size()),
+        probeDebugMode,
+        0u
+    );
+
     DescriptorHandle envDiffuseSRV = m_shadowAndEnvDescriptors[1];
     DescriptorHandle envSpecularSRV = m_shadowAndEnvDescriptors[2];
     auto lightResult = m_visibilityBuffer->ApplyDeferredLighting(
@@ -6035,6 +6117,41 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
                   // Draw far-to-near for correct alpha blending.
                   return a.depth > b.depth;
               });
+
+    // Bind HDR + depth explicitly for the transparent pass. Render HDR only
+    // (no normal/roughness writes) so post-processing continues to consume the
+    // opaque/VB normal buffer.
+    if (!m_hdrColor || !m_depthBuffer) {
+        return;
+    }
+
+    if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hdrColor.Get();
+        barrier.Transition.StateBefore = m_hdrState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT viewport{};
+    viewport.Width = static_cast<float>(m_window->GetWidth());
+    viewport.Height = static_cast<float>(m_window->GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    D3D12_RECT scissorRect{};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
+    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
 
     // Root signature, pipeline, descriptor heap, and primitive topology for
     // main geometry were already set in PrepareMainPass. We rebind the
@@ -9620,6 +9737,15 @@ Result<void> Renderer::CreateCommandList() {
         return Result<void>::Err("Failed to compile pixel shader: " + psResult.Error());
     }
 
+    auto psTransparentResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Basic.hlsl",
+        "PSMainTransparent",
+        "ps_5_1"
+    );
+    if (psTransparentResult.IsErr()) {
+        spdlog::warn("Failed to compile transparent pixel shader: {}", psTransparentResult.Error());
+    }
+
     auto skyboxVsResult = ShaderCompiler::CompileFromFile(
         "assets/shaders/Basic.hlsl",
         "SkyboxVS",
@@ -9828,17 +9954,23 @@ Result<void> Renderer::CreateCommandList() {
     // materials. Uses the same shaders and input layout but enables
     // alpha blending and disables depth writes so transparent surfaces
     // can be rendered over the opaque scene in a separate pass.
-    m_transparentPipeline = std::make_unique<DX12Pipeline>();
-    PipelineDesc transparentDesc = pipelineDesc;
-    transparentDesc.blendEnabled = true;
-    transparentDesc.depthWriteEnabled = false;
+    if (psTransparentResult.IsOk()) {
+        m_transparentPipeline = std::make_unique<DX12Pipeline>();
+        PipelineDesc transparentDesc = pipelineDesc;
+        transparentDesc.pixelShader = psTransparentResult.Value();
+        transparentDesc.numRenderTargets = 1; // HDR only (do not overwrite normal/roughness RT)
+        transparentDesc.blendEnabled = true;
+        transparentDesc.depthWriteEnabled = false;
 
-    auto transparentResult = m_transparentPipeline->Initialize(
-        m_device->GetDevice(),
-        m_rootSignature->GetRootSignature(),
-        transparentDesc);
-    if (transparentResult.IsErr()) {
-        spdlog::warn("Failed to create transparent pipeline: {}", transparentResult.Error());
+        auto transparentResult = m_transparentPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            transparentDesc);
+        if (transparentResult.IsErr()) {
+            spdlog::warn("Failed to create transparent pipeline: {}", transparentResult.Error());
+            m_transparentPipeline.reset();
+        }
+    } else {
         m_transparentPipeline.reset();
     }
 
@@ -10720,54 +10852,11 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         EnvironmentMaps fallback;
         fallback.name = "Placeholder";
 
-        // Build a simple 1x1 white cubemap as a safe fallback so that
-        // TextureCube sampling in shaders always has a valid resource.
-        std::vector<std::vector<uint8_t>> faces(6);
-        for (int f = 0; f < 6; ++f) {
-            faces[f].resize(4); // 1x1 RGBA8
-            faces[f][0] = 255;
-            faces[f][1] = 255;
-            faces[f][2] = 255;
-            faces[f][3] = 255;
-        }
-
-        DX12Texture tex;
-        auto initCube = tex.InitializeCubeFromFaces(
-            m_device->GetDevice(),
-            m_commandQueue->GetCommandQueue(),
-            faces,
-            1,
-            DXGI_FORMAT_R8G8B8A8_UNORM,
-            "EnvPlaceholder"
-        );
-        if (initCube.IsErr()) {
-            spdlog::warn("Failed to create placeholder cubemap environment: {}", initCube.Error());
-            fallback.diffuseIrradiance = m_placeholderAlbedo;
-            fallback.specularPrefiltered = m_placeholderAlbedo;
-        } else {
-            // CRITICAL: Use staging heap for environment cubemap (copied in material descriptors)
-            auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
-            if (srvResult.IsErr()) {
-                spdlog::warn("Failed to allocate staging SRV for placeholder cubemap: {}", srvResult.Error());
-                fallback.diffuseIrradiance = m_placeholderAlbedo;
-                fallback.specularPrefiltered = m_placeholderAlbedo;
-            } else {
-                auto createSRVResult = tex.CreateSRV(m_device->GetDevice(), srvResult.Value());
-                if (createSRVResult.IsErr()) {
-                    spdlog::warn("Failed to create SRV for placeholder cubemap: {}", createSRVResult.Error());
-                    fallback.diffuseIrradiance = m_placeholderAlbedo;
-                    fallback.specularPrefiltered = m_placeholderAlbedo;
-                } else {
-                    uint64_t fence = m_uploadQueue ? m_uploadQueue->Signal() : 0;
-                    if (m_uploadQueue && fence != 0) {
-                        m_commandQueue->GetCommandQueue()->Wait(m_uploadQueue->GetFence(), fence);
-                    }
-                    auto cubePtr = std::make_shared<DX12Texture>(std::move(tex));
-                    fallback.diffuseIrradiance = cubePtr;
-                    fallback.specularPrefiltered = cubePtr;
-                }
-            }
-        }
+        // The engine's IBL shaders treat environment maps as lat-long 2D
+        // textures. Use the existing placeholder 2D texture so SRV dimension
+        // matches both forward and deferred/VB sampling.
+        fallback.diffuseIrradiance = m_placeholderAlbedo;
+        fallback.specularPrefiltered = m_placeholderAlbedo;
 
         m_environmentMaps.push_back(fallback);
     }
@@ -10878,7 +10967,8 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
         if (envIndex >= m_environmentMaps.size()) {
             envIndex = 0;
         }
-        const EnvironmentMaps& env = m_environmentMaps[envIndex];
+        EnvironmentMaps& env = m_environmentMaps[envIndex];
+        EnsureEnvironmentBindlessSRVs(env);
 
         if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
             diffuseSrc = env.diffuseIrradiance->GetSRV();
@@ -10941,6 +11031,59 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
             1,
             m_shadowAndEnvDescriptors[5].cpu,
             m_rtGISRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+}
+
+void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {
+    if (!m_device || !m_descriptorManager) {
+        return;
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return;
+    }
+
+    auto ensureHandle = [&](DescriptorHandle& handle, const char* label) -> bool {
+        if (handle.IsValid()) {
+            return true;
+        }
+        auto alloc = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (alloc.IsErr()) {
+            spdlog::warn("Failed to allocate bindless environment SRV ({}): {}", label, alloc.Error());
+            return false;
+        }
+        handle = alloc.Value();
+        return true;
+    };
+
+    DescriptorHandle diffuseSrc;
+    if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
+        diffuseSrc = env.diffuseIrradiance->GetSRV();
+    } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        diffuseSrc = m_placeholderAlbedo->GetSRV();
+    }
+
+    DescriptorHandle specularSrc;
+    if (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid()) {
+        specularSrc = env.specularPrefiltered->GetSRV();
+    } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        specularSrc = m_placeholderAlbedo->GetSRV();
+    }
+
+    if (diffuseSrc.IsValid() && ensureHandle(env.diffuseIrradianceSRV, "diffuse")) {
+        device->CopyDescriptorsSimple(
+            1,
+            env.diffuseIrradianceSRV.cpu,
+            diffuseSrc.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+    if (specularSrc.IsValid() && ensureHandle(env.specularPrefilteredSRV, "specular")) {
+        device->CopyDescriptorsSimple(
+            1,
+            env.specularPrefilteredSRV.cpu,
+            specularSrc.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 }

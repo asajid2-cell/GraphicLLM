@@ -1658,6 +1658,13 @@ PSOutput PSMain(PSInput input)
     return MakePSOutput(float4(color, finalOpacity), normal, roughness);
 }
 
+// Transparent-only variant: render HDR color without writing normal/roughness.
+// This keeps the post stack's normal/roughness buffer stable for opaque/VB.
+float4 PSMainTransparent(PSInput input) : SV_Target0
+{
+    return PSMain(input).color;
+}
+
 // === Skybox full-screen pass using the same FrameConstants / IBL maps ===
 struct SkyboxVSOutput
 {

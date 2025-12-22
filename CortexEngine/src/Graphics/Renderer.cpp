@@ -1465,12 +1465,15 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::ShadowPass);
 
         static bool s_checkedRgShadowsEnv = false;
-        static bool s_useRgShadows = false;
+        static bool s_useRgShadows = true;
         if (!s_checkedRgShadowsEnv) {
             s_checkedRgShadowsEnv = true;
-            s_useRgShadows = (std::getenv("CORTEX_USE_RG_SHADOWS") != nullptr);
-            if (s_useRgShadows) {
-                spdlog::info("Shadow pass: RenderGraph transitions enabled (CORTEX_USE_RG_SHADOWS=1)");
+            const bool disable = (std::getenv("CORTEX_DISABLE_RG_SHADOWS") != nullptr);
+            s_useRgShadows = !disable;
+            if (disable) {
+                spdlog::info("Shadow pass: RenderGraph transitions disabled (CORTEX_DISABLE_RG_SHADOWS=1)");
+            } else {
+                spdlog::info("Shadow pass: RenderGraph transitions enabled (default)");
             }
         }
 
@@ -1749,12 +1752,15 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     const bool enablePostProcess = kEnablePostProcessDefault && !s_disablePostProcess;
 
     static bool s_checkedRgPostEnv = false;
-    static bool s_useRgPost = false;
+    static bool s_useRgPost = true;
     if (!s_checkedRgPostEnv) {
         s_checkedRgPostEnv = true;
-        s_useRgPost = (std::getenv("CORTEX_USE_RG_POST") != nullptr);
-        if (s_useRgPost) {
-            spdlog::info("Post-process: RenderGraph transitions enabled (CORTEX_USE_RG_POST=1)");
+        const bool disable = (std::getenv("CORTEX_DISABLE_RG_POST") != nullptr);
+        s_useRgPost = !disable;
+        if (disable) {
+            spdlog::info("Post-process: RenderGraph transitions disabled (CORTEX_DISABLE_RG_POST=1)");
+        } else {
+            spdlog::info("Post-process: RenderGraph transitions enabled (default)");
         }
     }
 

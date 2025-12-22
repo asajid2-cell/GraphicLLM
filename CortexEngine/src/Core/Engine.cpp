@@ -523,6 +523,15 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         dbg.cascade0ResolutionScale = m_renderer->GetCascadeResolutionScale(0);
         dbg.bloomIntensity = m_renderer->GetBloomIntensity();
         dbg.cameraBaseSpeed = m_cameraBaseSpeed;
+        dbg.shadowsEnabled = m_renderer->GetShadowsEnabled();
+        dbg.pcssEnabled = m_renderer->IsPCSS();
+        dbg.fxaaEnabled = m_renderer->IsFXAAEnabled();
+        dbg.taaEnabled = m_renderer->IsTAAEnabled();
+        dbg.ssrEnabled = m_renderer->GetSSREnabled();
+        dbg.ssaoEnabled = m_renderer->GetSSAOEnabled();
+        dbg.iblEnabled = m_renderer->GetIBLEnabled();
+        dbg.fogEnabled = m_renderer->IsFogEnabled();
+        dbg.rayTracingEnabled = m_renderer->IsRayTracingSupported() && m_renderer->IsRayTracingEnabled();
         // Initialize fractal debug defaults (can be overridden from JSON)
         dbg.fractalAmplitude = 0.0f;
         dbg.fractalFrequency = 0.5f;

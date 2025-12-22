@@ -238,6 +238,13 @@ public:
     [[nodiscard]] const DescriptorHandle& GetNormalRoughnessSRVHandle() const { return m_normalRoughnessSRV; }
     [[nodiscard]] const DescriptorHandle& GetEmissiveMetallicSRVHandle() const { return m_emissiveMetallicSRV; }
     [[nodiscard]] uint32_t GetReflectionProbeTableIndex() const { return m_reflectionProbeSRV.index; }
+    [[nodiscard]] uint32_t GetLocalLightsTableIndex() const { return m_localLightsSRV.index; }
+    [[nodiscard]] uint32_t GetClusterRangesTableIndex() const { return m_clusterRangesSRV.index; }
+    [[nodiscard]] uint32_t GetClusterLightIndicesTableIndex() const { return m_clusterLightIndicesSRV.index; }
+    [[nodiscard]] uint32_t GetClusterCountX() const { return m_clusterCountX; }
+    [[nodiscard]] uint32_t GetClusterCountY() const { return m_clusterCountY; }
+    [[nodiscard]] uint32_t GetClusterCountZ() const { return m_clusterCountZ; }
+    [[nodiscard]] uint32_t GetMaxLightsPerCluster() const { return m_maxLightsPerCluster; }
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
@@ -319,6 +326,7 @@ private:
     uint8_t* m_localLightsBufferMapped = nullptr;
     uint32_t m_localLightCount = 0;
     uint32_t m_maxLocalLights = 2048;
+    DescriptorHandle m_localLightsSRV;
 
     // Pipelines
     ComPtr<ID3D12RootSignature> m_visibilityRootSignature;
@@ -341,6 +349,8 @@ private:
     // Clustered light list buffers (default heap)
     ComPtr<ID3D12Resource> m_clusterRangesBuffer;      // RWStructuredBuffer<uint2>
     ComPtr<ID3D12Resource> m_clusterLightIndicesBuffer; // RWStructuredBuffer<uint>
+    DescriptorHandle m_clusterRangesSRV;
+    DescriptorHandle m_clusterLightIndicesSRV;
 
     uint32_t m_clusterCountX = 16;
     uint32_t m_clusterCountY = 9;

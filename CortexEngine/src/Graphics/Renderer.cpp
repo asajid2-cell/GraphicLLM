@@ -3750,6 +3750,24 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_waterSecondaryAmplitude,
         m_waterSteepness);
 
+    // Default clustered-light parameters for forward+ transparency. These are
+    // overridden by the VB path once the per-frame local light buffer and
+    // clustered lists are built.
+    frameData.screenAndCluster = glm::uvec4(
+        static_cast<uint32_t>(m_window ? m_window->GetWidth() : 0),
+        static_cast<uint32_t>(m_window ? m_window->GetHeight() : 0),
+        16u,
+        9u
+    );
+    frameData.clusterParams = glm::uvec4(24u, 128u, 0u, 0u);
+    frameData.clusterSRVIndices = glm::uvec4(kInvalidBindlessIndex, kInvalidBindlessIndex, kInvalidBindlessIndex, 0u);
+    frameData.projectionParams = glm::vec4(
+        frameData.projectionMatrix[0][0],
+        frameData.projectionMatrix[1][1],
+        m_cameraNearPlane,
+        m_cameraFarPlane
+    );
+
     // Previous and inverse view-projection matrices for TAA reprojection and
     // motion vectors. We store the *non-jittered* view-projection from the
     // previous frame so that motion vectors do not encode TAA jitter; jitter
@@ -5126,6 +5144,36 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     auto vbLightUpload = m_visibilityBuffer->UpdateLocalLights(m_commandList.Get(), vbLocalLights);
     if (vbLightUpload.IsErr()) {
         spdlog::warn("VB local light upload failed: {}", vbLightUpload.Error());
+    }
+
+    // Populate the per-frame clustered-light constants used by forward+ transparency.
+    // This keeps the transparent pass in sync with the VB clustered lighting.
+    {
+        const uint32_t localLightCount = static_cast<uint32_t>(vbLocalLights.size());
+
+        const uint32_t localLightsIndex = m_visibilityBuffer->GetLocalLightsTableIndex();
+        const uint32_t rangesIndex = m_visibilityBuffer->GetClusterRangesTableIndex();
+        const uint32_t indicesIndex = m_visibilityBuffer->GetClusterLightIndicesTableIndex();
+
+        m_frameDataCPU.screenAndCluster = glm::uvec4(
+            m_visibilityBuffer->GetWidth(),
+            m_visibilityBuffer->GetHeight(),
+            m_visibilityBuffer->GetClusterCountX(),
+            m_visibilityBuffer->GetClusterCountY()
+        );
+        m_frameDataCPU.clusterParams = glm::uvec4(
+            m_visibilityBuffer->GetClusterCountZ(),
+            m_visibilityBuffer->GetMaxLightsPerCluster(),
+            localLightCount,
+            0u
+        );
+        m_frameDataCPU.clusterSRVIndices = glm::uvec4(localLightsIndex, rangesIndex, indicesIndex, 0u);
+
+        const float proj11 = m_frameDataCPU.projectionMatrix[0][0];
+        const float proj22 = m_frameDataCPU.projectionMatrix[1][1];
+        m_frameDataCPU.projectionParams = glm::vec4(proj11, proj22, m_cameraNearPlane, m_cameraFarPlane);
+
+        m_frameConstantBuffer.UpdateData(m_frameDataCPU);
     }
 
     VisibilityBufferRenderer::DeferredLightingParams lightingParams{};

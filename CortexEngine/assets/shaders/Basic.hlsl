@@ -1,6 +1,8 @@
 // Basic PBR-style vertex and pixel shaders
 // Implements forward rendering with texture support
 
+#include "PBR_Lighting.hlsli"
+
 // Constant buffers - must match ShaderTypes.h
 cbuffer ObjectConstants : register(b0)
 {
@@ -74,6 +76,13 @@ cbuffer FrameConstants : register(b1)
     // x = primary wave dir X,  y = primary wave dir Z,
     // z = secondary amplitude, w = steepness (0..1)
     float4 g_WaterParams1;
+
+    // Clustered lighting parameters for forward+ transparency (populated by the VB path).
+    // SRV indices refer to the global shader-visible CBV/SRV/UAV heap.
+    uint4  g_ScreenAndCluster;   // x=width, y=height, z=clusterCountX, w=clusterCountY
+    uint4  g_ClusterParams;      // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
+    uint4  g_ClusterSRVIndices;  // x=localLights, y=clusterRanges, z=clusterIndices, w unused
+    float4 g_ProjectionParams;   // x=proj11, y=proj22, z=nearZ, w=farZ
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -252,7 +261,6 @@ void PSShadowAlphaTest(VSShadowOutput input)
     clip(alpha - alphaCutoff);
 }
 
-static const float PI = 3.14159265f;
 static const float SHADOW_MAP_SIZE = 2048.0f;
 static const uint LIGHT_TYPE_DIRECTIONAL = 0;
 static const uint LIGHT_TYPE_POINT       = 1;
@@ -361,42 +369,6 @@ float3 ApplyACESFilm(float3 x)
     const float d = 0.59f;
     const float e = 0.14f;
     return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
-}
-
-float DistributionGGX(float NdotH, float roughness)
-{
-    float a     = max(roughness * roughness, 0.04f);
-    float a2    = a * a;
-    float denom = (NdotH * NdotH * (a2 - 1.0f) + 1.0f);
-    return a2 / max(PI * denom * denom, 1e-4f);
-}
-
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = max(roughness + 1.0f, 1.0f);
-    float k = (r * r) / 8.0f;
-    return NdotV / max(NdotV * (1.0f - k) + k, 1e-4f);
-}
-
-float GeometrySmith(float NdotV, float NdotL, float roughness)
-{
-    float gv = GeometrySchlickGGX(NdotV, roughness);
-    float gl = GeometrySchlickGGX(NdotL, roughness);
-    return gv * gl;
-}
-
-float3 FresnelSchlick(float cosTheta, float3 F0)
-{
-    return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
-}
-
-// Slightly modified Fresnel for image-based lighting that
-// softens the response at high roughness to avoid overly dark metals.
-float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
-{
-    float3 oneMinusR = 1.0f - roughness;
-    float3 F90 = saturate(F0 + (1.0f - F0) * 0.5f);
-    return F0 + (F90 - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
 // Map a direction vector to lat-long environment UVs for an equirectangular
@@ -649,7 +621,49 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, slice);
   }
 
-float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord, float4 tangentWS)
+uint ComputeClusterZ(float viewZ)
+{
+    uint clusterCountZ = g_ClusterParams.x;
+    if (clusterCountZ == 0u) {
+        return 0u;
+    }
+
+    float nearZ = max(g_ProjectionParams.z, 1e-4f);
+    float farZ = max(g_ProjectionParams.w, nearZ + 1e-3f);
+
+    viewZ = max(viewZ, nearZ);
+    float denom = log(max(farZ / nearZ, 1.0001f));
+    float t = (denom > 0.0f) ? (log(viewZ / nearZ) / denom) : 0.0f;
+    t = saturate(t);
+
+    uint z = (uint)floor(t * (float)clusterCountZ);
+    return min(z, clusterCountZ - 1u);
+}
+
+uint ComputeClusterIndex(int2 pixelCoord, float viewZ)
+{
+    uint width = max(g_ScreenAndCluster.x, 1u);
+    uint height = max(g_ScreenAndCluster.y, 1u);
+    uint clusterCountX = max(g_ScreenAndCluster.z, 1u);
+    uint clusterCountY = max(g_ScreenAndCluster.w, 1u);
+
+    uint tileW = (width + clusterCountX - 1u) / clusterCountX;
+    uint tileH = (height + clusterCountY - 1u) / clusterCountY;
+    tileW = max(tileW, 1u);
+    tileH = max(tileH, 1u);
+
+    uint px = (uint)clamp(pixelCoord.x, 0, (int)width - 1);
+    uint py = (uint)clamp(pixelCoord.y, 0, (int)height - 1);
+
+    uint cx = min(px / tileW, clusterCountX - 1u);
+    uint cy = min(py / tileH, clusterCountY - 1u);
+    uint cz = ComputeClusterZ(viewZ);
+
+    uint clusterCountXY = clusterCountX * clusterCountY;
+    return cx + cy * clusterCountX + cz * clusterCountXY;
+}
+
+float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float metallic, float roughness, float ao, int2 pixelCoord, float4 tangentWS, bool useClusteredLocalLights)
 {
     float3 viewDir = normalize(g_CameraPosition.xyz - worldPos);
 
@@ -746,7 +760,24 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
     float3 totalLighting = 0.0f;
 
+    bool clusterActive = false;
     uint lightCount = g_LightCount.x;
+
+#ifdef ENABLE_BINDLESS
+    clusterActive =
+        useClusteredLocalLights &&
+        (g_ClusterParams.z > 0u) &&
+        (g_ClusterParams.x > 0u) &&
+        (g_ClusterSRVIndices.x != INVALID_BINDLESS_INDEX) &&
+        (g_ClusterSRVIndices.y != INVALID_BINDLESS_INDEX) &&
+        (g_ClusterSRVIndices.z != INVALID_BINDLESS_INDEX);
+
+    // When clustered light lists are available, keep the classic forward loop
+    // for the sun only to avoid double-counting local lights.
+    if (clusterActive) {
+        lightCount = min(lightCount, 1u);
+    }
+#endif
 
     [loop]
     for (uint i = 0; i < lightCount; ++i)
@@ -1030,6 +1061,187 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         totalLighting += contribution;
     }
 
+#ifdef ENABLE_BINDLESS
+    // Forward+ for transparent materials: accumulate clustered local lights.
+    if (clusterActive)
+    {
+        StructuredBuffer<Light> localLights = ResourceDescriptorHeap[g_ClusterSRVIndices.x];
+        StructuredBuffer<uint2> clusterRanges = ResourceDescriptorHeap[g_ClusterSRVIndices.y];
+        StructuredBuffer<uint> clusterLightIndices = ResourceDescriptorHeap[g_ClusterSRVIndices.z];
+
+        float viewZ = mul(g_ViewMatrix, float4(worldPos, 1.0f)).z;
+        uint clusterIndex = ComputeClusterIndex(pixelCoord, viewZ);
+        uint2 range = clusterRanges[clusterIndex];
+
+        uint base = range.x;
+        uint count = min(range.y, g_ClusterParams.y);
+
+        [loop]
+        for (uint li = 0; li < count; ++li)
+        {
+            uint lightIndex = clusterLightIndices[base + li];
+            if (lightIndex >= g_ClusterParams.z) {
+                continue;
+            }
+
+            Light light = localLights[lightIndex];
+            uint type = (uint)light.position_type.w;
+            if (type == LIGHT_TYPE_DIRECTIONAL) {
+                continue;
+            }
+
+            float3 lightDir;
+            float attenuation = 1.0f;
+            float3 radiance = light.color_range.rgb;
+
+            const bool isPointLike = (type == LIGHT_TYPE_POINT ||
+                                      type == LIGHT_TYPE_SPOT  ||
+                                      type == LIGHT_TYPE_AREA_RECT);
+
+            if (isPointLike)
+            {
+                float3 toLight = light.position_type.xyz - worldPos;
+                float dist = length(toLight);
+                if (dist <= 1e-4f)
+                {
+                    continue;
+                }
+                lightDir = toLight / dist;
+
+                float rangeMeters = max(light.color_range.w, 0.001f);
+                float falloff = saturate(1.0f - dist / rangeMeters);
+                attenuation = falloff * falloff;
+
+                if (type == LIGHT_TYPE_SPOT)
+                {
+                    float3 spotDir = normalize(light.direction_cosInner.xyz);
+                    float cosTheta = dot(-lightDir, spotDir);
+                    float cosInner = light.direction_cosInner.w;
+                    float cosOuter = light.params.x;
+                    float spotFactor = saturate((cosTheta - cosOuter) / max(cosInner - cosOuter, 1e-4f));
+                    attenuation *= spotFactor * spotFactor;
+                }
+                else if (type == LIGHT_TYPE_AREA_RECT)
+                {
+                    attenuation = max(attenuation, 0.35f);
+                }
+            }
+            else
+            {
+                lightDir = normalize(light.direction_cosInner.xyz);
+            }
+
+            float3 halfDir = normalize(viewDir + lightDir);
+
+            float NdotL = saturate(dot(normal, lightDir));
+            float NdotV = saturate(dot(normal, viewDir));
+            float NdotH = saturate(dot(normal, halfDir));
+            float VdotH = saturate(dot(viewDir, halfDir));
+
+            if (NdotL <= 0.0f || NdotV <= 0.0f)
+            {
+                continue;
+            }
+
+            float3 F = FresnelSchlick(VdotH, F0);
+            float  D;
+            float  roughForLight = roughness;
+            if (type == LIGHT_TYPE_AREA_RECT)
+            {
+                roughForLight = saturate(roughness * 1.5f + 0.05f);
+            }
+            if (anisotropy > 0.01f)
+            {
+                float alpha  = roughForLight * roughForLight;
+                float alphaX = alpha * (1.0f + anisotropy);
+                float alphaY = alpha / max(1.0f + anisotropy, 1e-3f);
+
+                float3 H = halfDir;
+                float3 Ht = float3(dot(H, T), dot(H, B), dot(H, normal));
+
+                float denomH = Ht.x * Ht.x / (alphaX * alphaX) +
+                               Ht.y * Ht.y / (alphaY * alphaY) +
+                               Ht.z * Ht.z / (alpha  * alpha);
+                denomH = max(denomH, 1e-4f);
+                float denom2 = denomH * denomH;
+                D = 1.0f / (PI * alphaX * alphaY * denom2);
+            }
+            else
+            {
+                D = DistributionGGX(NdotH, roughForLight);
+            }
+            float G = GeometrySmith(NdotV, NdotL, roughForLight);
+
+            float3 numerator = D * G * F;
+            float  denom = max(4.0f * NdotV * NdotL, 1e-4f);
+            float3 specular = numerator / denom;
+
+            float coatWeight = clearCoatWeight;
+            if (coatWeight > 0.001f)
+            {
+                float coatRough = saturate(clearCoatRoughness);
+                float3 F_coat = FresnelSchlick(VdotH, float3(0.04f, 0.04f, 0.04f));
+                float  D_coat = DistributionGGX(NdotH, coatRough);
+                float  G_coat = GeometrySmith(NdotV, NdotL, coatRough);
+
+                float3 coatSpec = (D_coat * G_coat * F_coat) / max(4.0f * NdotV * NdotL, 1e-4f);
+                coatSpec = min(coatSpec, 4.0f.xxx);
+
+                specular = lerp(specular, specular * (1.0f - coatWeight) + coatSpec * coatWeight, coatWeight);
+            }
+
+            specular = min(specular, 4.0f.xxx);
+            if (isPlastic)
+            {
+                specular *= 1.25f;
+            }
+
+            float3 sheenColor = albedo;
+            if (sheenWeight > 0.01f)
+            {
+                float oneMinusNL = 1.0f - NdotL;
+                float oneMinusNV = 1.0f - NdotV;
+                float sheen = pow(saturate(oneMinusNL), 4.0f) * pow(saturate(oneMinusNV), 4.0f);
+                float3 sheenTerm = sheenWeight * sheen * sheenColor * radiance * attenuation;
+                specular += sheenTerm / max(NdotL, 1e-4f);
+            }
+
+            float3 kd = (1.0f - F) * (1.0f - metallic);
+            if (isGlass) {
+                kd *= 0.1f;
+            }
+            float3 diffuse = kd * albedo / PI;
+
+            if (sssWrap > 0.01f)
+            {
+                float lambert = max(NdotL, 1e-4f);
+                float wrapped = saturate((NdotL + sssWrap) / (1.0f + sssWrap));
+                float scale = wrapped / lambert;
+                diffuse *= scale;
+            }
+
+            float3 contribution = (diffuse + specular) * radiance * NdotL * attenuation;
+
+            float  lum = dot(contribution, float3(0.299f, 0.587f, 0.114f));
+            const float kLightLuminanceKnee = 64.0f;
+            if (lum > 1e-3f)
+            {
+                float compress = kLightLuminanceKnee / (lum + kLightLuminanceKnee);
+                contribution *= compress;
+            }
+
+            float shadowIndex = light.params.y;
+            if (shadowIndex >= 0.0f)
+            {
+                float shadow = ComputeLocalLightShadow(worldPos, normal, lightDir, shadowIndex);
+                contribution *= shadow;
+            }
+
+            totalLighting += contribution;
+        }
+    }
+#endif
+
     // Image-based lighting (IBL) using environment maps when available.
     // Expose the debug view mode for the entire lighting function so that
     // both IBL-specialized views and RT GI gating can branch on it.
@@ -1247,7 +1459,7 @@ float4 DebugLinePS(DebugPSInput input) : SV_TARGET
 }
 
 // Pixel Shader
-PSOutput PSMain(PSInput input)
+PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
 {
     // Sample albedo texture using bindless sampling (falls back to legacy if no bindless index)
     bool hasAlbedoMap = (g_TextureIndices.x != INVALID_BINDLESS_INDEX) || g_MapFlags.x;
@@ -1579,7 +1791,7 @@ PSOutput PSMain(PSInput input)
     }
 
     int2 pixelCoord = int2(input.position.xy);
-    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord, input.tangent);
+    float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, pixelCoord, input.tangent, useClusteredLocalLights);
 
     // glTF emissive: emissiveFactor * emissiveStrength * emissiveTexture.
     float3 emissive = max(g_EmissiveFactorStrength.rgb, 0.0f) * max(g_EmissiveFactorStrength.w, 0.0f);
@@ -1658,11 +1870,16 @@ PSOutput PSMain(PSInput input)
     return MakePSOutput(float4(color, finalOpacity), normal, roughness);
 }
 
+PSOutput PSMain(PSInput input)
+{
+    return PSMainInternal(input, false);
+}
+
 // Transparent-only variant: render HDR color without writing normal/roughness.
 // This keeps the post stack's normal/roughness buffer stable for opaque/VB.
 float4 PSMainTransparent(PSInput input) : SV_Target0
 {
-    return PSMain(input).color;
+    return PSMainInternal(input, true).color;
 }
 
 // === Skybox full-screen pass using the same FrameConstants / IBL maps ===

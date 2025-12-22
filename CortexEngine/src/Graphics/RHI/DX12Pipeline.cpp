@@ -4,6 +4,7 @@
 #include <d3dcompiler.h>
 #include <dxcapi.h>
 #include <filesystem>
+#include <unordered_set>
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -297,6 +298,13 @@ static Result<ShaderBytecode> CompileWithDXC(
         return Result<ShaderBytecode>::Err("Failed to create DXC compiler");
     }
 
+    // Default include handler so shaders can use #include "foo.hlsli".
+    ComPtr<IDxcIncludeHandler> includeHandler;
+    hr = utils->CreateDefaultIncludeHandler(&includeHandler);
+    if (FAILED(hr)) {
+        return Result<ShaderBytecode>::Err("Failed to create DXC include handler");
+    }
+
     // Convert source to wide string for DXC
     std::wstring wEntryPoint(entryPoint.begin(), entryPoint.end());
     std::wstring wTarget(target.begin(), target.end());
@@ -330,6 +338,47 @@ static Result<ShaderBytecode> CompileWithDXC(
     // Column-major matrices (matches GLM)
     arguments.push_back(L"-Zpc");
 
+    // Include search paths. We support running from both the repo root and
+    // build/bin, so probe a few likely locations relative to the current
+    // working directory.
+    std::vector<std::wstring> includeDirsStorage;
+    {
+        namespace fs = std::filesystem;
+        fs::path cwd = fs::current_path();
+
+        std::unordered_set<std::wstring> seen;
+        includeDirsStorage.reserve(8);
+
+        auto addIncludeDir = [&](const fs::path& dir) {
+            if (dir.empty()) {
+                return;
+            }
+            std::error_code ec;
+            if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec)) {
+                return;
+            }
+            std::wstring w = dir.wstring();
+            if (seen.insert(w).second) {
+                includeDirsStorage.push_back(std::move(w));
+            }
+        };
+
+        const fs::path relA = fs::path("assets") / "shaders";
+        const fs::path relB = fs::path("CortexEngine") / "assets" / "shaders";
+
+        addIncludeDir(cwd / relA);
+        addIncludeDir(cwd / relB);
+        addIncludeDir(cwd.parent_path() / relA);
+        addIncludeDir(cwd.parent_path() / relB);
+        addIncludeDir(cwd.parent_path().parent_path() / relA);
+        addIncludeDir(cwd.parent_path().parent_path() / relB);
+    }
+
+    for (const auto& dir : includeDirsStorage) {
+        arguments.push_back(L"-I");
+        arguments.push_back(dir.c_str());
+    }
+
     // Create DXC buffer for compilation
     DxcBuffer sourceBuffer = {};
     sourceBuffer.Ptr = sourceBlob->GetBufferPointer();
@@ -342,7 +391,7 @@ static Result<ShaderBytecode> CompileWithDXC(
         &sourceBuffer,
         arguments.data(),
         static_cast<UINT32>(arguments.size()),
-        nullptr,
+        includeHandler.Get(),
         IID_PPV_ARGS(&result)
     );
 

@@ -13,12 +13,14 @@ Texture2D<float4> g_GBufferAlbedo : register(t0);           // RGB = albedo (lin
 Texture2D<float4> g_GBufferNormalRoughness : register(t1);  // RGB = encoded normal (0..1), A = roughness
 Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A = metallic
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
+Texture2D<float4> g_GBufferMaterialExt0 : register(t4);      // RGBA16F: x=clearcoat, y=coatRough, z=IOR, w=specFactor
+Texture2D<float4> g_GBufferMaterialExt1 : register(t5);      // RGBA16F: rgb=specColor, a=transmission (unused in deferred)
 
 // Environment/shadow maps (matching forward renderer)
-Texture2D<float4> g_EnvDiffuse : register(t4);  // lat-long (equirect) irradiance
-Texture2D<float4> g_EnvSpecular : register(t5); // lat-long (equirect) prefiltered specular
-Texture2DArray<float> g_ShadowMap : register(t6);
-Texture2D<float2> g_BRDFLUT : register(t7);
+Texture2D<float4> g_EnvDiffuse : register(t6);  // lat-long (equirect) irradiance
+Texture2D<float4> g_EnvSpecular : register(t7); // lat-long (equirect) prefiltered specular
+Texture2DArray<float> g_ShadowMap : register(t8);
+Texture2D<float2> g_BRDFLUT : register(t9);
 
 struct Light {
     float4 position_type;
@@ -27,9 +29,9 @@ struct Light {
     float4 params;
 };
 
-StructuredBuffer<Light> g_LocalLights : register(t8);
-StructuredBuffer<uint2> g_ClusterRanges : register(t9);
-StructuredBuffer<uint> g_ClusterLightIndices : register(t10);
+StructuredBuffer<Light> g_LocalLights : register(t10);
+StructuredBuffer<uint2> g_ClusterRanges : register(t11);
+StructuredBuffer<uint> g_ClusterLightIndices : register(t12);
 
 SamplerState g_LinearSampler : register(s0);
 SamplerState g_ShadowSampler : register(s1);
@@ -379,6 +381,8 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float4 albedo = g_GBufferAlbedo.Load(int3(pixelCoord, 0));
     float4 normalRoughness = g_GBufferNormalRoughness.Load(int3(pixelCoord, 0));
     float4 emissiveMetallic = g_GBufferEmissiveMetallic.Load(int3(pixelCoord, 0));
+    float4 materialExt0 = g_GBufferMaterialExt0.Load(int3(pixelCoord, 0));
+    float4 materialExt1 = g_GBufferMaterialExt1.Load(int3(pixelCoord, 0));
     float depth = g_DepthBuffer.Load(int3(pixelCoord, 0));
 
     // Unpack G-buffer data
@@ -388,6 +392,12 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float roughness = normalRoughness.w;
     float3 emissive = emissiveMetallic.rgb;
     float metallic = emissiveMetallic.a;
+
+    float clearCoatWeight = saturate(materialExt0.x);
+    float clearCoatRoughness = saturate(materialExt0.y);
+    float ior = max(materialExt0.z, 1.0f);
+    float specularFactor = saturate(materialExt0.w);
+    float3 specularColor = saturate(materialExt1.rgb);
 
     // Check for background pixels (depth = 1.0)
     if (depth >= 0.9999) {
@@ -405,8 +415,10 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
     float NdotV = max(dot(normal, V), 0.0);
 
-    // PBR material properties
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedoColor, metallic);
+    // PBR material properties (KHR_materials_ior + KHR_materials_specular).
+    float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
+    float3 dielectricF0 = f0Ior.xxx * specularFactor * specularColor;
+    float3 F0 = lerp(dielectricF0, albedoColor, metallic);
 
     // --- Directional Light (Sun) ---
     // Convention: g_SunDirection.xyz is direction-to-light (matches Basic.hlsl).
@@ -429,6 +441,16 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 numerator = NDF * G * F;
     float denominator = 4.0 * NdotV * NdotL;
     float3 specular = numerator / max(denominator, 0.001);
+
+    // Optional clearcoat layer: match Basic.hlsl behavior (second dielectric lobe).
+    if (clearCoatWeight > 0.01f) {
+        float coatBlend = clearCoatWeight * 0.8f;
+        float3 F_coat = FresnelSchlick(max(dot(H, V), 0.0f), float3(0.04f, 0.04f, 0.04f));
+        float  D_coat = DistributionGGX(normal, H, clearCoatRoughness);
+        float  G_coat = GeometrySmith(normal, V, L, clearCoatRoughness);
+        float3 specCoat = (D_coat * G_coat * F_coat) / max(denominator, 0.001f);
+        specular = lerp(specular, specCoat, coatBlend);
+    }
 
     float3 kS = F;
     float3 kD = (1.0 - kS) * (1.0 - metallic);
@@ -522,6 +544,15 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             float denom_l = 4.0f * NdotV * NdotLl;
             float3 spec_l = numerator_l / max(denom_l, 0.001f);
 
+            if (clearCoatWeight > 0.01f) {
+                float coatBlend = clearCoatWeight * 0.8f;
+                float3 F_coat = FresnelSchlick(max(dot(Hl, V), 0.0f), float3(0.04f, 0.04f, 0.04f));
+                float  D_coat = DistributionGGX(normal, Hl, clearCoatRoughness);
+                float  G_coat = GeometrySmith(normal, V, Ll, clearCoatRoughness);
+                float3 specCoat = (D_coat * G_coat * F_coat) / max(denom_l, 0.001f);
+                spec_l = lerp(spec_l, specCoat, coatBlend);
+            }
+
             float3 kS_l = F_l;
             float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
 
@@ -604,6 +635,18 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         float3 prefilteredColor = lerp(specGlobal, specLocal, probeWeight);
         float2 brdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(roughness)), 0.0f);
         specularIBL = prefilteredColor * (F0 * brdf.x + brdf.y);
+
+        if (clearCoatWeight > 0.01f) {
+            float coatBlend = clearCoatWeight * 0.8f;
+            float coatMip = clearCoatRoughness * maxMip;
+            float3 coatGlobal = SampleEnvSpecular(specDirGlobal, coatMip, INVALID_BINDLESS_INDEX);
+            float3 coatLocal = SampleEnvSpecular(specDir, coatMip, specularEnvIndex);
+            float3 coatPref = lerp(coatGlobal, coatLocal, probeWeight);
+            float2 coatBrdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(clearCoatRoughness)), 0.0f);
+            float3 coatF0 = float3(0.04f, 0.04f, 0.04f);
+            float3 coatIBL = coatPref * (coatF0 * coatBrdf.x + coatBrdf.y);
+            specularIBL = lerp(specularIBL, coatIBL, coatBlend);
+        }
     }
 
     // Apply ambient occlusion to indirect lighting only (not direct sun).

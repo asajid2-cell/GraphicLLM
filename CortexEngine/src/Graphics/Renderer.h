@@ -531,6 +531,9 @@ private:
     };
     std::unordered_map<entt::entity, uint32_t, EntityHash> m_gpuCullingIdByEntity;
     std::vector<uint32_t> m_gpuCullingIdFreeList;
+    // Per-slot generation counters to prevent occlusion-history smear when
+    // cullingId slots are recycled (packed into cullingId as gen<<16 | slot).
+    std::vector<uint16_t> m_gpuCullingIdGeneration;
     uint32_t m_gpuCullingNextId = 0;
 
     // Previous frame world-space centers for motion-inflated occlusion culling.

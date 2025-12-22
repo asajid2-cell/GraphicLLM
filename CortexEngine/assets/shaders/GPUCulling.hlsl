@@ -36,7 +36,7 @@ cbuffer CullConstants : register(b0) {
     uint4 g_OcclusionParams0; // x=forceVisible, y=hzbEnabled, z=hzbMipCount, w=streakThreshold
     uint4 g_OcclusionParams1; // x=hzbWidth, y=hzbHeight, z=historySize, w=debugEnabled
     float4 g_OcclusionParams2; // x=invW, y=invH, z=proj00, w=proj11
-    float4 g_OcclusionParams3; // x=near, y=far, z=epsilon, w=cameraMotionWS
+    float4 g_OcclusionParams3; // x=near, y=far, z=epsilonViewZ, w=cameraMotionWS
     float4x4 g_HZBViewMatrix;
     float4x4 g_HZBViewProjMatrix;
     float4 g_HZBCameraPos;
@@ -50,6 +50,7 @@ RWStructuredBuffer<IndirectCommand> g_VisibleCommands : register(u0);
 RWByteAddressBuffer g_CommandCount : register(u1);
 RWByteAddressBuffer g_OcclusionHistoryOut : register(u2);
 RWByteAddressBuffer g_Debug : register(u3);
+RWByteAddressBuffer g_VisibilityMask : register(u4);
 
 static uint CeilDivPow2(uint value, uint mip) {
     const uint denom = (1u << mip);
@@ -98,7 +99,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
 
     const float2 hzbInvSize = g_OcclusionParams2.xy;
     const float2 hzbProjScale = g_OcclusionParams2.zw;
-    const float hzbEpsilon = g_OcclusionParams3.z;
+    const float hzbEpsilon = max(g_OcclusionParams3.z, 0.0f);
 
     bool visible = (forceVisible != 0);
     if (!visible) {
@@ -122,10 +123,15 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
     uint prevStreak = 0;
     uint newStreak = 0;
     const uint historySize = g_OcclusionParams1.z;
-    const uint historyIdx = instance.cullingId;
+    const uint packedCullingId = instance.cullingId;
+    const uint historyIdx = (packedCullingId & 0xFFFFu);
+    const uint historyGen = (packedCullingId >> 16u);
     const bool historyValid = (historyIdx < historySize);
     if (hzbEnabled != 0 && historyValid) {
-        prevStreak = g_OcclusionHistoryIn.Load(historyIdx * 4u);
+        const uint packedHistory = g_OcclusionHistoryIn.Load(historyIdx * 4u);
+        const uint storedGen = (packedHistory >> 16u);
+        const uint storedStreak = (packedHistory & 0xFFFFu);
+        prevStreak = (storedGen == historyGen) ? storedStreak : 0u;
     }
 
     bool occluded = false;
@@ -171,24 +177,28 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
                     uint2 coord01 = min((uint2)(float2(uvMin.x, uvMax.y) * float2((float)mipW, (float)mipH)), uint2(mipW - 1u, mipH - 1u));
                     uint2 coord11 = min((uint2)(uvMax * float2((float)mipW, (float)mipH)), uint2(mipW - 1u, mipH - 1u));
 
-                    float hzbDepth = g_HZB.Load(int3((int2)coord00, (int)mip));
-                    hzbDepth = max(hzbDepth, g_HZB.Load(int3((int2)coord10, (int)mip)));
-                    hzbDepth = max(hzbDepth, g_HZB.Load(int3((int2)coord01, (int)mip)));
-                    hzbDepth = max(hzbDepth, g_HZB.Load(int3((int2)coord11, (int)mip)));
-                    dbgHzbDepth = hzbDepth;
+                    // HZB stores view-space Z (min-depth pyramid). For a conservative
+                    // visibility decision, sample multiple points and take the
+                    // maximum of the sampled min-depth values (least-occluding).
+                    float hzbViewZ = g_HZB.Load(int3((int2)coord00, (int)mip));
+                    hzbViewZ = max(hzbViewZ, g_HZB.Load(int3((int2)coord10, (int)mip)));
+                    hzbViewZ = max(hzbViewZ, g_HZB.Load(int3((int2)coord01, (int)mip)));
+                    hzbViewZ = max(hzbViewZ, g_HZB.Load(int3((int2)coord11, (int)mip)));
+                    dbgHzbDepth = hzbViewZ;
 
                     // Compute the sphere's nearest point to the HZB camera in world space.
                     float3 toCenter = centerWS - g_HZBCameraPos.xyz;
                     float lenSq = dot(toCenter, toCenter);
                     float3 dir = (lenSq > 1e-8f) ? (toCenter * rsqrt(lenSq)) : float3(0.0f, 0.0f, 1.0f);
                     float3 nearWS = centerWS - dir * worldRadius;
+                    const float3 nearVS = mul(g_HZBViewMatrix, float4(nearWS, 1.0f)).xyz;
+                    const float nearViewZ = nearVS.z;
+                    dbgNearDepth = nearViewZ;
 
-                    const float4 clipNear = mul(g_HZBViewProjMatrix, float4(nearWS, 1.0f));
-                    if (abs(clipNear.w) > 1e-6f) {
-                        const float nearDepth = saturate(clipNear.z / clipNear.w);
-                        dbgNearDepth = nearDepth;
-                        occluded = (nearDepth > (hzbDepth + hzbEpsilon));
-                    }
+                    // Distance-scaled epsilon in view-space to keep the test
+                    // stable across near/far/FOV changes.
+                    const float epsilonViewZ = max(hzbEpsilon, 0.001f * nearViewZ);
+                    occluded = (nearViewZ > (hzbViewZ + epsilonViewZ));
                 }
             }
         }
@@ -204,7 +214,8 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
         } else {
             newStreak = 0u;
         }
-        g_OcclusionHistoryOut.Store(historyIdx * 4u, newStreak);
+        const uint packedOut = (historyGen << 16u) | (newStreak & 0xFFFFu);
+        g_OcclusionHistoryOut.Store(historyIdx * 4u, packedOut);
     }
 
     if (debugEnabled != 0) {
@@ -233,4 +244,9 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
         g_CommandCount.InterlockedAdd(0, 1, visibleIdx);
         g_VisibleCommands[visibleIdx] = g_AllCommands[instanceIdx];
     }
+
+    // Always write a per-instance visibility bit for consumers (e.g. VB
+    // raster passes) that want to skip occluded instances without changing
+    // the draw submission path.
+    g_VisibilityMask.Store(instanceIdx * 4u, (visible && !occluded) ? 1u : 0u);
 }

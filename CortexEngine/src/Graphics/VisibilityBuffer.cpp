@@ -291,6 +291,8 @@ void VisibilityBufferRenderer::Shutdown() {
     m_gbufferAlbedo.Reset();
     m_gbufferNormalRoughness.Reset();
     m_gbufferEmissiveMetallic.Reset();
+    m_gbufferMaterialExt0.Reset();
+    m_gbufferMaterialExt1.Reset();
     m_instanceBuffer.Reset();
     m_materialBuffer.Reset();
     m_meshTableBuffer.Reset();
@@ -335,6 +337,8 @@ Result<void> VisibilityBufferRenderer::Resize(uint32_t width, uint32_t height) {
     m_gbufferAlbedo.Reset();
     m_gbufferNormalRoughness.Reset();
     m_gbufferEmissiveMetallic.Reset();
+    m_gbufferMaterialExt0.Reset();
+    m_gbufferMaterialExt1.Reset();
     auto gbResult = CreateGBuffers();
     if (gbResult.IsErr()) {
         return gbResult;
@@ -586,6 +590,106 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferEmissiveMetallic.Get(), nullptr, &uavDesc, m_emissiveMetallicUAV.cpu);
     }
 
+    // Material extension buffer 0 (RGBA16F): clearcoat/specular/IOR
+    {
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = m_width;
+        desc.Height = m_height;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.SampleDesc.Count = 1;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_COMMON, &clearValue,
+            IID_PPV_ARGS(&m_gbufferMaterialExt0)
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create VB material ext0 buffer");
+        }
+        m_gbufferMaterialExt0->SetName(L"VB_GBuffer_MaterialExt0");
+        m_materialExt0State = D3D12_RESOURCE_STATE_COMMON;
+
+        auto rtvResult = m_descriptorManager->AllocateRTV();
+        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 RTV");
+        m_materialExt0RTV = rtvResult.Value();
+        m_device->GetDevice()->CreateRenderTargetView(m_gbufferMaterialExt0.Get(), nullptr, m_materialExt0RTV.cpu);
+
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 SRV");
+        m_materialExt0SRV = srvResult.Value();
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt0.Get(), &srvDesc, m_materialExt0SRV.cpu);
+
+        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 UAV");
+        m_materialExt0UAV = uavResult.Value();
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferMaterialExt0.Get(), nullptr, &uavDesc, m_materialExt0UAV.cpu);
+    }
+
+    // Material extension buffer 1 (RGBA16F): specular color + transmission
+    {
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = m_width;
+        desc.Height = m_height;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.SampleDesc.Count = 1;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_COMMON, &clearValue,
+            IID_PPV_ARGS(&m_gbufferMaterialExt1)
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create VB material ext1 buffer");
+        }
+        m_gbufferMaterialExt1->SetName(L"VB_GBuffer_MaterialExt1");
+        m_materialExt1State = D3D12_RESOURCE_STATE_COMMON;
+
+        auto rtvResult = m_descriptorManager->AllocateRTV();
+        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 RTV");
+        m_materialExt1RTV = rtvResult.Value();
+        m_device->GetDevice()->CreateRenderTargetView(m_gbufferMaterialExt1.Get(), nullptr, m_materialExt1RTV.cpu);
+
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 SRV");
+        m_materialExt1SRV = srvResult.Value();
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt1.Get(), &srvDesc, m_materialExt1SRV.cpu);
+
+        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 UAV");
+        m_materialExt1UAV = uavResult.Value();
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferMaterialExt1.Get(), nullptr, &uavDesc, m_materialExt1UAV.cpu);
+    }
+
     return Result<void>::Ok();
 }
 
@@ -706,7 +810,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     //   t2: Depth buffer SRV (Texture2D - needs descriptor table)
     //   t3: Mesh table SRV (StructuredBuffer - can use root descriptor)
     //   t5: Material constants SRV (StructuredBuffer - can use root descriptor)
-    //   u0-u2: G-buffer UAVs (RWTexture2D - need descriptor tables)
+    //   u0-u4: G-buffer UAVs (RWTexture2D - need descriptor tables)
     //   s0: Linear wrap sampler for material textures
     // ========================================================================
     {
@@ -728,10 +832,10 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         srvRanges[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
         srvRanges[1].OffsetInDescriptorsFromTableStart = 1;
 
-        // u0-u2: G-buffer UAVs (3 consecutive UAVs)
+        // u0-u4: G-buffer UAVs (5 consecutive UAVs)
         D3D12_DESCRIPTOR_RANGE1 uavRange = {};
         uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        uavRange.NumDescriptors = 3;
+        uavRange.NumDescriptors = 5;
         uavRange.BaseShaderRegister = 0;
         uavRange.RegisterSpace = 0;
         uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
@@ -758,7 +862,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[2].DescriptorTable.pDescriptorRanges = srvRanges;
         params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        // u0-u2: G-buffer UAVs (descriptor table)
+        // u0-u4: G-buffer UAVs (descriptor table)
         params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[3].DescriptorTable.NumDescriptorRanges = 1;
         params[3].DescriptorTable.pDescriptorRanges = &uavRange;
@@ -1538,31 +1642,33 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
     //   t1: G-buffer normal+roughness SRV
     //   t2: G-buffer emissive+metallic SRV
     //   t3: Depth buffer SRV
-    //   t4: Diffuse irradiance environment SRV (TextureCube)
-    //   t5: Specular prefiltered environment SRV (TextureCube)
-    //   t6: Shadow map array SRV (Texture2DArray)
-    //   t7: BRDF LUT SRV (Texture2D<float2>)
-    //   t8: Local lights (StructuredBuffer<Light>)
-    //   t9: Cluster ranges (StructuredBuffer<uint2>)
-    //   t10: Cluster light indices (StructuredBuffer<uint>)
+    //   t4: Material extension 0 SRV (clearcoat/IOR/specular)
+    //   t5: Material extension 1 SRV (specularColor/transmission)
+    //   t6: Diffuse irradiance environment SRV (lat-long)
+    //   t7: Specular prefiltered environment SRV (lat-long)
+    //   t8: Shadow map array SRV (Texture2DArray)
+    //   t9: BRDF LUT SRV (Texture2D<float2>)
+    //   t10: Local lights (StructuredBuffer<Light>)
+    //   t11: Cluster ranges (StructuredBuffer<uint2>)
+    //   t12: Cluster light indices (StructuredBuffer<uint>)
     //   s0: Linear sampler
     //   s1: Shadow sampler
     // ========================================================================
     {
-        // Descriptor ranges for G-buffer SRVs (t0-t3: 4 textures)
+        // Descriptor ranges for G-buffer SRVs (t0-t5: 6 textures)
         D3D12_DESCRIPTOR_RANGE1 gbufferRange = {};
         gbufferRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        gbufferRange.NumDescriptors = 4;
+        gbufferRange.NumDescriptors = 6;
         gbufferRange.BaseShaderRegister = 0;
         gbufferRange.RegisterSpace = 0;
         gbufferRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
         gbufferRange.OffsetInDescriptorsFromTableStart = 0;
 
-        // Descriptor ranges for env + shadow + BRDF LUT (t4-t7: 4 textures)
+        // Descriptor ranges for env + shadow + BRDF LUT (t6-t9: 4 textures)
         D3D12_DESCRIPTOR_RANGE1 envShadowRange = {};
         envShadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         envShadowRange.NumDescriptors = 4;
-        envShadowRange.BaseShaderRegister = 4;
+        envShadowRange.BaseShaderRegister = 6;
         envShadowRange.RegisterSpace = 0;
         envShadowRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
         envShadowRange.OffsetInDescriptorsFromTableStart = 0;
@@ -1575,33 +1681,33 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
         params[0].Descriptor.RegisterSpace = 0;
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t0-t3: G-buffer + depth SRVs
+        // t0-t5: G-buffer + depth + material extension SRVs
         params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[1].DescriptorTable.NumDescriptorRanges = 1;
         params[1].DescriptorTable.pDescriptorRanges = &gbufferRange;
         params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t4-t7: Environment + shadow map + BRDF LUT SRVs
+        // t6-t9: Environment + shadow map + BRDF LUT SRVs
         params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[2].DescriptorTable.NumDescriptorRanges = 1;
         params[2].DescriptorTable.pDescriptorRanges = &envShadowRange;
         params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t8: Local lights SRV (root descriptor)
+        // t10: Local lights SRV (root descriptor)
         params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-        params[3].Descriptor.ShaderRegister = 8;
+        params[3].Descriptor.ShaderRegister = 10;
         params[3].Descriptor.RegisterSpace = 0;
         params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t9: Cluster ranges SRV (root descriptor)
+        // t11: Cluster ranges SRV (root descriptor)
         params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-        params[4].Descriptor.ShaderRegister = 9;
+        params[4].Descriptor.ShaderRegister = 11;
         params[4].Descriptor.RegisterSpace = 0;
         params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-        // t10: Cluster light indices SRV (root descriptor)
+        // t12: Cluster light indices SRV (root descriptor)
         params[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-        params[5].Descriptor.ShaderRegister = 10;
+        params[5].Descriptor.ShaderRegister = 12;
         params[5].Descriptor.RegisterSpace = 0;
         params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
@@ -2214,7 +2320,7 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     }
 
     // Transition G-buffers to UAV
-    D3D12_RESOURCE_BARRIER barriers[3] = {};
+    D3D12_RESOURCE_BARRIER barriers[5] = {};
     int barrierCount = 0;
 
     if (m_albedoState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
@@ -2245,6 +2351,26 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
         m_emissiveMetallicState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    if (m_materialExt0State != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt0.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt0State;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt0State = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    if (m_materialExt1State != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt1.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt1State;
+        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt1State = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     if (barrierCount > 0) {
@@ -2383,9 +2509,9 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
 
     cmdList->SetComputeRootDescriptorTable(2, visDepthTable.gpu);
 
-    // Param 3: Descriptor table with u0-u2 (G-buffer UAVs).
+    // Param 3: Descriptor table with u0-u4 (G-buffer UAVs).
     // Allocate a contiguous transient range and copy the persistent UAVs into it.
-    auto gbufferUavTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(3);
+    auto gbufferUavTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(5);
     if (gbufferUavTableResult.IsErr()) {
         return Result<void>::Err("Failed to allocate transient UAV table for G-buffers: " + gbufferUavTableResult.Error());
     }
@@ -2397,10 +2523,16 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     normalUavDst.ptr += static_cast<SIZE_T>(descriptorSize);
     D3D12_CPU_DESCRIPTOR_HANDLE emissiveUavDst = gbufferUavTable.cpu;
     emissiveUavDst.ptr += static_cast<SIZE_T>(descriptorSize) * 2;
+    D3D12_CPU_DESCRIPTOR_HANDLE ext0UavDst = gbufferUavTable.cpu;
+    ext0UavDst.ptr += static_cast<SIZE_T>(descriptorSize) * 3;
+    D3D12_CPU_DESCRIPTOR_HANDLE ext1UavDst = gbufferUavTable.cpu;
+    ext1UavDst.ptr += static_cast<SIZE_T>(descriptorSize) * 4;
 
     m_device->GetDevice()->CopyDescriptorsSimple(1, albedoUavDst, m_albedoUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_device->GetDevice()->CopyDescriptorsSimple(1, normalUavDst, m_normalRoughnessUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_device->GetDevice()->CopyDescriptorsSimple(1, emissiveUavDst, m_emissiveMetallicUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(1, ext0UavDst, m_materialExt0UAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(1, ext1UavDst, m_materialExt1UAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     cmdList->SetComputeRootDescriptorTable(3, gbufferUavTable.gpu);
 
@@ -2771,6 +2903,9 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     if (!m_albedoSRV.IsValid() || !m_normalRoughnessSRV.IsValid() || !m_emissiveMetallicSRV.IsValid()) {
         return Result<void>::Err("Deferred lighting requires valid G-buffer SRVs");
     }
+    if (!m_materialExt0SRV.IsValid() || !m_materialExt1SRV.IsValid()) {
+        return Result<void>::Err("Deferred lighting requires valid material extension G-buffer SRVs");
+    }
     {
         auto brdfResult = EnsureBRDFLUT(cmdList);
         if (brdfResult.IsErr()) {
@@ -2788,7 +2923,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     // results can be sampled by post-process and DXR without additional barriers.
     constexpr D3D12_RESOURCE_STATES kSrvState =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    D3D12_RESOURCE_BARRIER barriers[3] = {};
+    D3D12_RESOURCE_BARRIER barriers[5] = {};
     int barrierCount = 0;
 
     if (m_albedoState != kSrvState) {
@@ -2819,6 +2954,26 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
         m_emissiveMetallicState = kSrvState;
+    }
+
+    if (m_materialExt0State != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt0.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt0State;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt0State = kSrvState;
+    }
+
+    if (m_materialExt1State != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt1.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt1State;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt1State = kSrvState;
     }
 
     if (barrierCount > 0) {
@@ -2889,8 +3044,8 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
         return Result<void>::Err("Deferred lighting requires valid shadowInvSize (set from shadow map dimensions)");
     }
 
-    // t0-t3: G-buffer + depth SRVs (descriptor table)
-    auto gbufferTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+    // t0-t5: G-buffer + depth + material extension SRVs (descriptor table)
+    auto gbufferTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(6);
     if (gbufferTableResult.IsErr()) {
         return Result<void>::Err("Deferred lighting failed to allocate G-buffer SRV table: " + gbufferTableResult.Error());
     }
@@ -2905,15 +3060,21 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     dst2.ptr += static_cast<SIZE_T>(descriptorSize2) * 2;
     D3D12_CPU_DESCRIPTOR_HANDLE dst3 = gbufferTable.cpu;
     dst3.ptr += static_cast<SIZE_T>(descriptorSize2) * 3;
+    D3D12_CPU_DESCRIPTOR_HANDLE dst4 = gbufferTable.cpu;
+    dst4.ptr += static_cast<SIZE_T>(descriptorSize2) * 4;
+    D3D12_CPU_DESCRIPTOR_HANDLE dst5 = gbufferTable.cpu;
+    dst5.ptr += static_cast<SIZE_T>(descriptorSize2) * 5;
 
     m_device->GetDevice()->CopyDescriptorsSimple(1, dst0, m_albedoSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_device->GetDevice()->CopyDescriptorsSimple(1, dst1, m_normalRoughnessSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_device->GetDevice()->CopyDescriptorsSimple(1, dst2, m_emissiveMetallicSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_device->GetDevice()->CopyDescriptorsSimple(1, dst3, depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(1, dst4, m_materialExt0SRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_device->GetDevice()->CopyDescriptorsSimple(1, dst5, m_materialExt1SRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable.gpu);
 
-    // t4-t7: Environment (diffuse+specular) + shadow map + BRDF LUT SRVs (descriptor table)
+    // t6-t9: Environment (diffuse+specular) + shadow map + BRDF LUT SRVs (descriptor table)
     auto envShadowTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
     if (envShadowTableResult.IsErr()) {
         return Result<void>::Err("Deferred lighting failed to allocate env/shadow SRV table: " + envShadowTableResult.Error());
@@ -2935,7 +3096,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
 
     cmdList->SetGraphicsRootDescriptorTable(2, envShadowTable.gpu);
 
-    // t8-t10: Clustered deferred resources (root SRVs). These may be null when localLightCount==0.
+    // t10-t12: Clustered deferred resources (root SRVs). These may be null when localLightCount==0.
     const D3D12_GPU_VIRTUAL_ADDRESS lightsVA =
         (m_localLightCount > 0 && m_localLightsBuffer) ? m_localLightsBuffer->GetGPUVirtualAddress() : 0;
     const D3D12_GPU_VIRTUAL_ADDRESS rangesVA =
@@ -2955,3 +3116,11 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
 }
 
 } // namespace Cortex::Graphics
+
+D3D12_GPU_DESCRIPTOR_HANDLE Cortex::Graphics::VisibilityBufferRenderer::GetMaterialExt0SRV() const {
+    return m_materialExt0SRV.gpu;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Cortex::Graphics::VisibilityBufferRenderer::GetMaterialExt1SRV() const {
+    return m_materialExt1SRV.gpu;
+}

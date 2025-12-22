@@ -1589,10 +1589,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
             mip = (uint)round(saturate(g_DebugMode.z) * (mipCount - 1));
         }
 
-        float d = g_SSRColor.SampleLevel(g_Sampler, uv, mip).r;
-        // Near depth is 0, far is 1. Invert for visibility.
-        float v = saturate(1.0f - d);
-        v = pow(v, 0.7f);
+        // HZB stores view-space Z (meters/units). Map to a readable grayscale.
+        float viewZ = g_SSRColor.SampleLevel(g_Sampler, uv, mip).r;
+        float farZ = max(g_CascadeSplits.w, 1e-3f);
+        // Treat "inf"/invalid depth as far.
+        if (viewZ > 1e8f || viewZ <= 0.0f)
+        {
+            viewZ = farZ;
+        }
+
+        float t = saturate(viewZ / farZ);
+        float v = pow(1.0f - t, 0.7f);
         return float4(v.xxx, 1.0f);
     }
     else if (g_DebugMode.x == 20.0f) 

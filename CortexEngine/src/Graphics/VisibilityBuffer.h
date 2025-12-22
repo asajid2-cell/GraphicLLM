@@ -51,6 +51,19 @@ struct alignas(16) VBMaterialConstants {
     alignas(16) glm::uvec4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
     glm::vec4 emissiveFactorStrength;       // rgb emissive factor, w emissive strength
     glm::vec4 extraParams;                  // x occlusion strength, y normal scale, z/w reserved
+    // x = clear-coat weight, y = clear-coat roughness, z = sheen weight, w = SSS wrap
+    glm::vec4 coatParams;
+    // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
+    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    glm::vec4 transmissionParams;
+    // Specular extension (KHR_materials_specular).
+    // rgb = specular color factor (linear), w = specular factor.
+    glm::vec4 specularParams;
+    // Bindless texture indices for extensions:
+    // textureIndices3: x=transmission, y=clearcoat, z=clearcoatRoughness, w=specular
+    // textureIndices4: x=specularColor, y/z/w unused
+    alignas(16) glm::uvec4 textureIndices3;
+    alignas(16) glm::uvec4 textureIndices4;
     float alphaCutoff;  // For alpha-masked materials (alphaMode == Mask)
     uint32_t alphaMode; // 0=opaque, 1=mask, 2=blend
     uint32_t doubleSided;
@@ -171,7 +184,8 @@ public:
         ID3D12Resource* depthBuffer,
         D3D12_CPU_DESCRIPTOR_HANDLE depthDSV,
         const glm::mat4& viewProj,
-        const std::vector<VBMeshDrawInfo>& meshDraws
+        const std::vector<VBMeshDrawInfo>& meshDraws,
+        D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress = 0
     );
 
     // Phase 2: Material resolve via compute shader
@@ -229,14 +243,21 @@ public:
     [[nodiscard]] ID3D12Resource* GetAlbedoBuffer() const { return m_gbufferAlbedo.Get(); }
     [[nodiscard]] ID3D12Resource* GetNormalRoughnessBuffer() const { return m_gbufferNormalRoughness.Get(); }
     [[nodiscard]] ID3D12Resource* GetEmissiveMetallicBuffer() const { return m_gbufferEmissiveMetallic.Get(); }
+    [[nodiscard]] ID3D12Resource* GetMaterialExt0Buffer() const { return m_gbufferMaterialExt0.Get(); }
+    [[nodiscard]] ID3D12Resource* GetMaterialExt1Buffer() const { return m_gbufferMaterialExt1.Get(); }
 
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetAlbedoSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetNormalRoughnessSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetEmissiveMetallicSRV() const;
+    [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetMaterialExt0SRV() const;
+    [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetMaterialExt1SRV() const;
 
     [[nodiscard]] const DescriptorHandle& GetAlbedoSRVHandle() const { return m_albedoSRV; }
     [[nodiscard]] const DescriptorHandle& GetNormalRoughnessSRVHandle() const { return m_normalRoughnessSRV; }
     [[nodiscard]] const DescriptorHandle& GetEmissiveMetallicSRVHandle() const { return m_emissiveMetallicSRV; }
+    [[nodiscard]] const DescriptorHandle& GetMaterialExt0SRVHandle() const { return m_materialExt0SRV; }
+    [[nodiscard]] const DescriptorHandle& GetMaterialExt1SRVHandle() const { return m_materialExt1SRV; }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetNormalRoughnessRTV() const { return m_normalRoughnessRTV.cpu; }
     [[nodiscard]] uint32_t GetReflectionProbeTableIndex() const { return m_reflectionProbeSRV.index; }
     [[nodiscard]] uint32_t GetLocalLightsTableIndex() const { return m_localLightsSRV.index; }
     [[nodiscard]] uint32_t GetClusterRangesTableIndex() const { return m_clusterRangesSRV.index; }
@@ -290,10 +311,14 @@ private:
     ComPtr<ID3D12Resource> m_gbufferAlbedo;
     ComPtr<ID3D12Resource> m_gbufferNormalRoughness; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferEmissiveMetallic; // RGBA16_FLOAT
+    ComPtr<ID3D12Resource> m_gbufferMaterialExt0; // RGBA16_FLOAT
+    ComPtr<ID3D12Resource> m_gbufferMaterialExt1; // RGBA16_FLOAT
 
     DescriptorHandle m_albedoRTV, m_albedoSRV, m_albedoUAV;
     DescriptorHandle m_normalRoughnessRTV, m_normalRoughnessSRV, m_normalRoughnessUAV;
     DescriptorHandle m_emissiveMetallicRTV, m_emissiveMetallicSRV, m_emissiveMetallicUAV;
+    DescriptorHandle m_materialExt0RTV, m_materialExt0SRV, m_materialExt0UAV;
+    DescriptorHandle m_materialExt1RTV, m_materialExt1SRV, m_materialExt1UAV;
 
     // Instance data buffer
     ComPtr<ID3D12Resource> m_instanceBuffer;
@@ -382,6 +407,8 @@ private:
     D3D12_RESOURCE_STATES m_albedoState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_normalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_emissiveMetallicState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_materialExt0State = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_materialExt1State = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_brdfLutState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_clusterRangesState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_clusterLightIndicesState = D3D12_RESOURCE_STATE_COMMON;

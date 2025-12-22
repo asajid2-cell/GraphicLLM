@@ -101,6 +101,7 @@ void GPUCullingPipeline::Shutdown() {
     m_cullConstantBuffer.Reset();
     m_occlusionHistoryA.Reset();
     m_occlusionHistoryB.Reset();
+    m_visibilityMaskBuffer.Reset();
     m_dummyHzbTexture.Reset();
 
     spdlog::info("GPU Culling Pipeline shutdown");
@@ -177,9 +178,10 @@ Result<void> GPUCullingPipeline::CreateRootSignature() {
     // 5: UAV - Command count buffer (atomic append)
     // 6: UAV - Occlusion history (output)
     // 7: UAV - Debug counters/sample (u3)
-    // 8: SRV table - HZB texture (t2)
+    // 8: UAV - Visibility mask (u4, one uint32 per instance)
+    // 9: SRV table - HZB texture (t2)
 
-    D3D12_ROOT_PARAMETER1 rootParams[9] = {};
+    D3D12_ROOT_PARAMETER1 rootParams[10] = {};
     D3D12_DESCRIPTOR_RANGE1 hzbRange{};
     hzbRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     hzbRange.NumDescriptors = 1;
@@ -244,15 +246,22 @@ Result<void> GPUCullingPipeline::CreateRootSignature() {
     rootParams[7].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
     rootParams[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // SRV descriptor table for HZB texture (t2)
-    rootParams[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParams[8].DescriptorTable.NumDescriptorRanges = 1;
-    rootParams[8].DescriptorTable.pDescriptorRanges = &hzbRange;
+    // UAV for per-instance visibility mask (raw buffer)
+    rootParams[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+    rootParams[8].Descriptor.ShaderRegister = 4;
+    rootParams[8].Descriptor.RegisterSpace = 0;
+    rootParams[8].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
     rootParams[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // SRV descriptor table for HZB texture (t2)
+    rootParams[9].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParams[9].DescriptorTable.NumDescriptorRanges = 1;
+    rootParams[9].DescriptorTable.pDescriptorRanges = &hzbRange;
+    rootParams[9].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc = {};
     rootSigDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-    rootSigDesc.Desc_1_1.NumParameters = 9;
+    rootSigDesc.Desc_1_1.NumParameters = static_cast<UINT>(_countof(rootParams));
     rootSigDesc.Desc_1_1.pParameters = rootParams;
     rootSigDesc.Desc_1_1.NumStaticSamplers = 0;
     rootSigDesc.Desc_1_1.pStaticSamplers = nullptr;
@@ -423,6 +432,28 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
     );
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to create command count readback buffer");
+    }
+
+    // Visibility mask buffer (one uint32 per instance). Consumers can bind this
+    // as a ByteAddressBuffer SRV to skip drawing occluded instances.
+    {
+        D3D12_RESOURCE_DESC maskDesc = bufferDesc;
+        maskDesc.Width = static_cast<UINT64>(m_maxInstances) * sizeof(uint32_t);
+        maskDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+        hr = device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &maskDesc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            IID_PPV_ARGS(&m_visibilityMaskBuffer)
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create visibility mask buffer");
+        }
+        m_visibilityMaskBuffer->SetName(L"GPUCullingVisibilityMask");
+        m_visibilityMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     // Debug buffer (counters + sample). Writes are gated by constants, but the
@@ -1026,7 +1057,9 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     const glm::mat4 proj = m_hzbViewProjMatrix * glm::inverse(m_hzbViewMatrix);
     constants.occlusionParams2 = glm::vec4(invW, invH, proj[0][0], proj[1][1]);
 
-    constexpr float kHzbEpsilon = 0.0025f;
+    // View-space depth epsilon (meters/units). This is intentionally larger than
+    // the old NDC-depth epsilon because HZB now stores view-space Z.
+    constexpr float kHzbEpsilon = 0.02f;
     const float cameraMotionWS =
         glm::length(glm::vec3(constants.cameraPos[0], constants.cameraPos[1], constants.cameraPos[2]) - m_hzbCameraPosWS);
     constants.occlusionParams3 = glm::vec4(m_hzbNearPlane, m_hzbFarPlane, kHzbEpsilon, cameraMotionWS);
@@ -1051,6 +1084,17 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     m_cullConstantBuffer->Unmap(0, nullptr);
 
     // Ensure UAV resources are in the correct state before clearing/dispatch.
+    if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_allCommandBuffer.Get();
+        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
     if (m_visibleCommandState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1071,6 +1115,17 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
         m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    if (m_visibilityMaskBuffer && m_visibilityMaskState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_visibilityMaskBuffer.Get();
+        barrier.Transition.StateBefore = m_visibilityMaskState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_visibilityMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     // Keep the debug UAV in a valid state for dispatch even when debug writes are disabled.
@@ -1210,14 +1265,15 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     cmdList->SetComputeRootUnorderedAccessView(5, m_commandCountBuffer->GetGPUVirtualAddress());
     cmdList->SetComputeRootUnorderedAccessView(6, historyOut ? historyOut->GetGPUVirtualAddress() : 0);
     cmdList->SetComputeRootUnorderedAccessView(7, m_debugBuffer ? m_debugBuffer->GetGPUVirtualAddress() : 0);
-    cmdList->SetComputeRootDescriptorTable(8, m_hzbSrv.gpu);
+    cmdList->SetComputeRootUnorderedAccessView(8, m_visibilityMaskBuffer ? m_visibilityMaskBuffer->GetGPUVirtualAddress() : 0);
+    cmdList->SetComputeRootDescriptorTable(9, m_hzbSrv.gpu);
 
     // Dispatch compute shader (64 threads per group)
     uint32_t numGroups = (m_totalInstances + 63) / 64;
     cmdList->Dispatch(numGroups, 1, 1);
 
     // Barrier to ensure compute writes are visible
-    D3D12_RESOURCE_BARRIER uavBarriers[4] = {};
+    D3D12_RESOURCE_BARRIER uavBarriers[5] = {};
     uavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
     uavBarriers[0].UAV.pResource = m_visibleCommandBuffer.Get();
     uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
@@ -1225,6 +1281,11 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     uavBarriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
     uavBarriers[2].UAV.pResource = historyOut;
     uint32_t uavBarrierCount = historyOut ? 3u : 2u;
+    if (m_visibilityMaskBuffer) {
+        uavBarriers[uavBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        uavBarriers[uavBarrierCount].UAV.pResource = m_visibilityMaskBuffer.Get();
+        ++uavBarrierCount;
+    }
     if (m_debugEnabled && m_debugBuffer) {
         uavBarriers[uavBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         uavBarriers[uavBarrierCount].UAV.pResource = m_debugBuffer.Get();
@@ -1324,7 +1385,7 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     }
 
     // Transition buffers for ExecuteIndirect.
-    D3D12_RESOURCE_BARRIER postBarriers[2] = {};
+    D3D12_RESOURCE_BARRIER postBarriers[3] = {};
     UINT postCount = 0;
 
     if (m_commandCountState != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
@@ -1345,6 +1406,16 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++postCount;
         m_visibleCommandState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    }
+
+    if (m_visibilityMaskBuffer && m_visibilityMaskState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        postBarriers[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        postBarriers[postCount].Transition.pResource = m_visibilityMaskBuffer.Get();
+        postBarriers[postCount].Transition.StateBefore = m_visibilityMaskState;
+        postBarriers[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++postCount;
+        m_visibilityMaskState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     if (postCount > 0) {

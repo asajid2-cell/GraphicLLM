@@ -186,6 +186,17 @@ struct CameraComponent {
     [[nodiscard]] glm::mat4 GetViewMatrix(const TransformComponent& transform) const;
 };
 
+// Reflection probe volume used for local image-based lighting selection in the
+// deferred/VB path. The probe defines an axis-aligned box in world space
+// (center from TransformComponent, half-extents from this component scaled by
+// the world matrix). Blend distance defines a soft transition outside the box.
+struct ReflectionProbeComponent {
+    glm::vec3 extents = glm::vec3(5.0f);  // half-size in local space
+    float blendDistance = 1.0f;           // world-space fade region outside extents
+    uint32_t environmentIndex = 0;        // index into Renderer::m_environmentMaps
+    uint32_t enabled = 1;                 // 0 = disabled
+};
+
 // Marker component for planar water surfaces. Any renderable entity tagged
 // with this component is treated as part of the water system (wave
 // displacement, water shading, and buoyancy queries).

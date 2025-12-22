@@ -66,6 +66,14 @@ struct alignas(16) VBMeshTableEntry {
     uint32_t indexFormat;         // 0 = R32_UINT, 1 = R16_UINT
 };
 
+// Reflection probe volume used by deferred lighting for local IBL selection.
+// Env indices refer to the global CBV/SRV/UAV heap (ResourceDescriptorHeap[]).
+struct alignas(16) VBReflectionProbe {
+    glm::vec4 centerBlend;   // xyz = center (world), w = blend distance
+    glm::vec4 extents;       // xyz = half-extents (world), w unused
+    glm::uvec4 envIndices;   // x = diffuse env SRV index, y = specular env SRV index
+};
+
 // Material resolve output (written to G-buffer by compute shader)
 struct VBMaterialOutput {
     glm::vec4 albedo;           // RGB + alpha
@@ -116,6 +124,12 @@ public:
     Result<void> UpdateMaterials(
         ID3D12GraphicsCommandList* cmdList,
         const std::vector<VBMaterialConstants>& materials
+    );
+
+    // Update per-frame reflection probe data for local IBL selection.
+    Result<void> UpdateReflectionProbes(
+        ID3D12GraphicsCommandList* cmdList,
+        const std::vector<VBReflectionProbe>& probes
     );
 
     // Upload a per-frame local light buffer for clustered deferred shading (excludes the directional sun).
@@ -193,6 +207,7 @@ public:
         glm::vec4 projectionParams;                    // x=proj11, y=proj22, z=nearZ, w=farZ
         alignas(16) glm::uvec4 screenAndCluster;       // x=width, y=height, z=clusterCountX, w=clusterCountY
         alignas(16) glm::uvec4 clusterParams;          // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
+        alignas(16) glm::uvec4 reflectionProbeParams;  // x=probeTableSRVIndex, y=probeCount, z/w unused
     };
 
     Result<void> ApplyDeferredLighting(
@@ -222,6 +237,7 @@ public:
     [[nodiscard]] const DescriptorHandle& GetAlbedoSRVHandle() const { return m_albedoSRV; }
     [[nodiscard]] const DescriptorHandle& GetNormalRoughnessSRVHandle() const { return m_normalRoughnessSRV; }
     [[nodiscard]] const DescriptorHandle& GetEmissiveMetallicSRVHandle() const { return m_emissiveMetallicSRV; }
+    [[nodiscard]] uint32_t GetReflectionProbeTableIndex() const { return m_reflectionProbeSRV.index; }
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
@@ -284,6 +300,13 @@ private:
     uint8_t* m_materialBufferMapped = nullptr;
     uint32_t m_materialCount = 0;
     uint32_t m_maxMaterials = 4096;
+
+    // Reflection probe table (upload heap, persistently mapped)
+    ComPtr<ID3D12Resource> m_reflectionProbeBuffer;
+    uint8_t* m_reflectionProbeBufferMapped = nullptr;
+    uint32_t m_reflectionProbeCount = 0;
+    uint32_t m_maxReflectionProbes = 256;
+    DescriptorHandle m_reflectionProbeSRV;
 
     // Mesh table buffer (upload heap, persistently mapped)
     ComPtr<ID3D12Resource> m_meshTableBuffer;

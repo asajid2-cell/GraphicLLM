@@ -100,7 +100,7 @@ struct MeshData {
 };
 
 // Renderable Component - What to draw
-struct RenderableComponent {
+ struct RenderableComponent {
     std::shared_ptr<MeshData> mesh;
     struct MaterialTextures {
         std::shared_ptr<Cortex::Graphics::DX12Texture> albedo;
@@ -114,13 +114,22 @@ struct RenderableComponent {
         std::shared_ptr<Cortex::Graphics::MaterialGPUState> gpuState;
     } textures;
 
-    // Material properties
-    glm::vec4 albedoColor = glm::vec4(1.0f);
-    float metallic = 0.0f;
-    float roughness = 0.5f;
-    float ao = 1.0f;
-    // Optional logical material preset (e.g. "chrome", "gold") used by LLM commands.
-    std::string presetName;
+     // Material properties
+     glm::vec4 albedoColor = glm::vec4(1.0f);
+     float metallic = 0.0f;
+     float roughness = 0.5f;
+     float ao = 1.0f;
+
+     enum class AlphaMode : uint32_t {
+         Opaque = 0,
+         Mask = 1,
+         Blend = 2,
+     };
+     AlphaMode alphaMode = AlphaMode::Opaque;
+     float alphaCutoff = 0.5f; // Used when alphaMode == Mask.
+     bool doubleSided = false;
+     // Optional logical material preset (e.g. "chrome", "gold") used by LLM commands.
+     std::string presetName;
 
     // Visibility
     bool visible = true;

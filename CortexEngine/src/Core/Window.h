@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <d3d12.h>
+#include "Graphics/RHI/D3D12Includes.h"
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 #include <string>

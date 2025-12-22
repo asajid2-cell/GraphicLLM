@@ -6,6 +6,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE // DirectX uses [0,1] depth range (not [-1,1])
 
 #include <glm/glm.hpp>
+#include "RHI/BindlessConstants.h"
 
 // Shared structures between C++ and HLSL shaders
 // IMPORTANT: Alignment must match HLSL constant buffer rules (16-byte alignment)
@@ -151,10 +152,7 @@ struct MaterialConstants {
     alignas(16) glm::vec4 coatParams;
 };
 
-// Note: kInvalidBindlessIndex is defined in BindlessResources.h
-// Forward-declare it here for files that don't include BindlessResources.h
-#ifndef CORTEX_BINDLESS_RESOURCES_H
-constexpr uint32_t kInvalidBindlessIndex = 0xFFFFFFFF;
-#endif
+// Invalid bindless index sentinel - shaders check for this to use fallback.
+// kInvalidBindlessIndex is defined in RHI/BindlessConstants.h
 
 } // namespace Cortex::Graphics

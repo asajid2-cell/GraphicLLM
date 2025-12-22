@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d12.h>
+#include "D3D12Includes.h"
 #include <wrl/client.h>
 #include <cstdint>
 #include <memory>
@@ -103,6 +103,9 @@ public:
 
     // Allocate transient descriptors (per-frame ring buffer region)
     Result<DescriptorHandle> AllocateTransientCBV_SRV_UAV();
+    // Allocate a contiguous range of transient descriptors and return the base handle.
+    // The caller is responsible for writing into [base, base+count).
+    Result<DescriptorHandle> AllocateTransientCBV_SRV_UAVRange(uint32_t count);
 
     // Reset allocations (for per-frame ring buffer)
     void BeginFrame(uint32_t frameIndex);

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <d3d12.h>
+#include "RHI/D3D12Includes.h"
 #include <wrl/client.h>
 #include <memory>
 #include <vector>
 #include <functional>
-#include <glm/glm.hpp>
 
 #include "Utils/Result.h"
 #include "RHI/DescriptorHeap.h"
+#include "ShaderTypes.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -20,21 +20,47 @@ class DescriptorHeapManager;
 class BindlessResourceManager;
 
 // Visibility buffer data layout:
-// R32G32_UINT: x = triangleID (24 bits) + drawID (8 bits), y = instanceID
+// R32G32_UINT: x = primitiveID, y = instanceID
 struct VisBufferPayload {
-    uint32_t triangleAndDrawID;  // tri[23:0] | draw[31:24]
+    uint32_t primitiveID;
     uint32_t instanceID;
 };
 
 // Per-instance data for visibility buffer rendering
 struct alignas(16) VBInstanceData {
     glm::mat4 worldMatrix;
+    glm::mat4 prevWorldMatrix;
+    glm::mat4 normalMatrix;  // World-space normal transform (inverse-transpose)
     uint32_t meshIndex;       // Index into mesh buffer array
     uint32_t materialIndex;   // Index into material buffer
     uint32_t firstIndex;      // Start index in global index buffer
     uint32_t indexCount;      // Number of indices
     uint32_t baseVertex;      // Base vertex offset
     uint32_t _pad[3];
+};
+
+// Minimal material constants for visibility-buffer material resolve (milestone: constant-only materials).
+// Keep this small and stable; later we can extend with texture indices and map flags to match ShaderTypes.h.
+struct alignas(16) VBMaterialConstants {
+    glm::vec4 albedo;   // rgba
+    float metallic;
+    float roughness;
+    float ao;
+    float _pad0;
+    alignas(16) glm::uvec4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
+    float alphaCutoff;  // For alpha-masked materials (alphaMode == Mask)
+    uint32_t alphaMode; // 0=opaque, 1=mask, 2=blend
+    uint32_t doubleSided;
+    uint32_t _pad1;
+};
+
+// Per-mesh lookup table entry for bindless buffer access in compute shaders.
+// Indices refer to the global CBV/SRV/UAV descriptor heap (ResourceDescriptorHeap[]).
+struct alignas(16) VBMeshTableEntry {
+    uint32_t vertexBufferIndex;   // bindless descriptor index for ByteAddressBuffer SRV
+    uint32_t indexBufferIndex;    // bindless descriptor index for ByteAddressBuffer SRV
+    uint32_t vertexStrideBytes;   // bytes per vertex (interleaved)
+    uint32_t indexFormat;         // 0 = R32_UINT, 1 = R16_UINT
 };
 
 // Material resolve output (written to G-buffer by compute shader)
@@ -83,6 +109,18 @@ public:
         const std::vector<VBInstanceData>& instances
     );
 
+    // Update per-material constant data for current frame.
+    Result<void> UpdateMaterials(
+        ID3D12GraphicsCommandList* cmdList,
+        const std::vector<VBMaterialConstants>& materials
+    );
+
+    // Upload a per-frame local light buffer for clustered deferred shading (excludes the directional sun).
+    Result<void> UpdateLocalLights(
+        ID3D12GraphicsCommandList* cmdList,
+        const std::vector<Light>& localLights
+    );
+
     // Mesh draw info for visibility pass
     struct VBMeshDrawInfo {
         ID3D12Resource* vertexBuffer;
@@ -91,6 +129,17 @@ public:
         uint32_t indexCount;
         uint32_t firstIndex;
         uint32_t baseVertex;
+        // Contiguous range of instances in the VB instance buffer that reference this mesh.
+        uint32_t startInstance;
+        uint32_t instanceCount;
+        // Alpha-masked instances are drawn in a separate alpha-tested visibility pass.
+        uint32_t startInstanceAlpha;
+        uint32_t instanceCountAlpha;
+        // Persistent bindless SRV indices (ResourceDescriptorHeap[]) for per-mesh VB/IB buffers.
+        uint32_t vertexBufferIndex;
+        uint32_t indexBufferIndex;
+        uint32_t vertexStrideBytes;
+        uint32_t indexFormat; // 0 = R32_UINT, 1 = R16_UINT
     };
 
     // Phase 1: Render visibility buffer (triangle IDs)
@@ -111,20 +160,30 @@ public:
         const glm::mat4& viewProj
     );
 
+    // Optional: compute per-pixel motion vectors from the visibility buffer.
+    // Writes UV velocity (prevUV - currUV) into the provided velocity UAV resource.
+    Result<void> ComputeMotionVectors(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* velocityBuffer,
+        const std::vector<VBMeshDrawInfo>& meshDraws,
+        D3D12_GPU_VIRTUAL_ADDRESS frameConstantsAddress
+    );
+
     // Phase 3: Deferred lighting pass (PBR shading from G-buffers)
     struct DeferredLightingParams {
         glm::mat4 invViewProj;
         glm::mat4 viewMatrix;
-        glm::mat4 lightViewProj;
-        glm::vec3 cameraPos;
-        float _pad0;
-        glm::vec3 sunDirection;
-        float _pad1;
-        glm::vec3 sunColor;
-        float sunIntensity;
-        float iblDiffuseIntensity;
-        float iblSpecularIntensity;
-        float _pad2[2];
+        alignas(16) glm::mat4 lightViewProjection[3];  // Cascades 0..2
+        glm::vec4 cameraPosition;                      // xyz = camera world pos
+        glm::vec4 sunDirection;                        // xyz = direction-to-light (world)
+        glm::vec4 sunRadiance;                         // rgb = sun radiance (color * intensity)
+        glm::vec4 cascadeSplits;                       // x,y,z = split depths (view space), w = far plane
+        glm::vec4 shadowParams;                        // x=bias, y=pcfRadius(texels), z=enabled, w=pcssEnabled
+        glm::vec4 envParams;                           // x=diffuse IBL, y=specular IBL, z=enabled, w unused
+        glm::vec4 shadowInvSizeAndSpecMaxMip;          // xy = 1/shadowMapDim, z = specular max mip, w unused
+        glm::vec4 projectionParams;                    // x=proj11, y=proj22, z=nearZ, w=farZ
+        alignas(16) glm::uvec4 screenAndCluster;       // x=width, y=height, z=clusterCountX, w=clusterCountY
+        alignas(16) glm::uvec4 clusterParams;          // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
     };
 
     Result<void> ApplyDeferredLighting(
@@ -133,10 +192,14 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
         ID3D12Resource* depthBuffer,
         const DescriptorHandle& depthSRV,
-        const DescriptorHandle& envMapSRV,
+        const DescriptorHandle& envDiffuseSRV,
+        const DescriptorHandle& envSpecularSRV,
         const DescriptorHandle& shadowMapSRV,
         const DeferredLightingParams& params
     );
+
+    // Optional: Build per-cluster light lists for the current frame (clustered deferred).
+    Result<void> BuildClusteredLightLists(ID3D12GraphicsCommandList* cmdList, const DeferredLightingParams& params);
 
     // Get output G-buffer textures
     [[nodiscard]] ID3D12Resource* GetAlbedoBuffer() const { return m_gbufferAlbedo.Get(); }
@@ -171,6 +234,7 @@ private:
     Result<void> CreateGBuffers();
     Result<void> CreatePipelines();
     Result<void> CreateRootSignatures();
+    Result<void> EnsureBRDFLUT(ID3D12GraphicsCommandList* cmdList);
 
     DX12Device* m_device = nullptr;
     DescriptorHeapManager* m_descriptorManager = nullptr;
@@ -186,7 +250,8 @@ private:
     DescriptorHandle m_visibilityUAV;
 
     // G-buffer outputs from material resolve
-    ComPtr<ID3D12Resource> m_gbufferAlbedo;          // RGBA8_UNORM_SRGB
+    // Albedo is stored as R8G8B8A8_TYPELESS with UNORM SRV/UAV views (linear) for UAV legality.
+    ComPtr<ID3D12Resource> m_gbufferAlbedo;
     ComPtr<ID3D12Resource> m_gbufferNormalRoughness; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferEmissiveMetallic; // RGBA16_FLOAT
 
@@ -201,12 +266,49 @@ private:
     uint32_t m_instanceCount = 0;
     uint32_t m_maxInstances = 65536;
 
+    // Material constants buffer (upload heap, persistently mapped)
+    ComPtr<ID3D12Resource> m_materialBuffer;
+    uint8_t* m_materialBufferMapped = nullptr;
+    uint32_t m_materialCount = 0;
+    uint32_t m_maxMaterials = 4096;
+
+    // Mesh table buffer (upload heap, persistently mapped)
+    ComPtr<ID3D12Resource> m_meshTableBuffer;
+    uint8_t* m_meshTableBufferMapped = nullptr;
+    uint32_t m_meshCount = 0;
+    uint32_t m_maxMeshes = 4096;
+
+    // Local light buffer (upload heap, persistently mapped)
+    ComPtr<ID3D12Resource> m_localLightsBuffer;
+    uint8_t* m_localLightsBufferMapped = nullptr;
+    uint32_t m_localLightCount = 0;
+    uint32_t m_maxLocalLights = 2048;
+
     // Pipelines
     ComPtr<ID3D12RootSignature> m_visibilityRootSignature;
     ComPtr<ID3D12PipelineState> m_visibilityPipeline;
+    ComPtr<ID3D12RootSignature> m_visibilityAlphaRootSignature;
+    ComPtr<ID3D12PipelineState> m_visibilityAlphaPipeline;
 
     ComPtr<ID3D12RootSignature> m_resolveRootSignature;
     ComPtr<ID3D12PipelineState> m_resolvePipeline;
+
+    ComPtr<ID3D12RootSignature> m_motionVectorsRootSignature;
+    ComPtr<ID3D12PipelineState> m_motionVectorsPipeline;
+
+    // Clustered light culling pipeline (compute)
+    ComPtr<ID3D12RootSignature> m_clusterRootSignature;
+    ComPtr<ID3D12PipelineState> m_clusterPipeline;
+
+    // Clustered light list buffers (default heap)
+    ComPtr<ID3D12Resource> m_clusterRangesBuffer;      // RWStructuredBuffer<uint2>
+    ComPtr<ID3D12Resource> m_clusterLightIndicesBuffer; // RWStructuredBuffer<uint>
+
+    uint32_t m_clusterCountX = 16;
+    uint32_t m_clusterCountY = 9;
+    uint32_t m_clusterCountZ = 24;
+    uint32_t m_maxLightsPerCluster = 128;
+    uint32_t m_clusterCount = 0;
 
     // Debug blit pipeline
     ComPtr<ID3D12RootSignature> m_blitRootSignature;
@@ -219,11 +321,22 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_deferredLightingSamplerHeap;
     ComPtr<ID3D12Resource> m_deferredLightingCB;  // Persistent constant buffer for lighting params
 
+    // BRDF LUT (split-sum IBL)
+    ComPtr<ID3D12Resource> m_brdfLut;
+    DescriptorHandle m_brdfLutSRV;
+    DescriptorHandle m_brdfLutUAV;
+    ComPtr<ID3D12RootSignature> m_brdfLutRootSignature;
+    ComPtr<ID3D12PipelineState> m_brdfLutPipeline;
+    bool m_brdfLutReady = false;
+
     // Resource states
     D3D12_RESOURCE_STATES m_visibilityState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_albedoState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_normalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_emissiveMetallicState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_brdfLutState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_clusterRangesState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_clusterLightIndicesState = D3D12_RESOURCE_STATE_COMMON;
 
     FlushCallback m_flushCallback;
 };

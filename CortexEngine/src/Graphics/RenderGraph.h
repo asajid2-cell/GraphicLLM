@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d12.h>
+#include "RHI/D3D12Includes.h"
 #include <wrl/client.h>
 #include <vector>
 #include <string>
@@ -101,7 +101,8 @@ struct RGResourceDesc {
 // Internal resource data tracked by the graph
 struct RGResource {
     ID3D12Resource* resource = nullptr;          // The actual D3D12 resource
-    D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;
+    // Tracked state per-subresource (size == subresource count, or 1 for buffers).
+    std::vector<D3D12_RESOURCE_STATES> subresourceStates;
     RGResourceDesc desc;
     bool isExternal = false;                     // True if resource lifetime is external
     bool isTransient = false;                    // True if created/destroyed by graph
@@ -118,19 +119,41 @@ enum class RGPassType {
 // Forward declaration
 class RenderGraph;
 
+// Subresource-aware resource access declaration.
+struct RGResourceAccess {
+    RGResourceHandle handle;
+    RGResourceUsage usage = RGResourceUsage::None;
+    uint32_t subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+};
+
+// Optional aliasing barrier declaration. Only meaningful when two resources
+// alias the same heap memory via placed resources.
+struct RGAliasingBarrier {
+    RGResourceHandle before;
+    RGResourceHandle after;
+};
+
 // Render pass builder - used to declare resource dependencies
 class RGPassBuilder {
 public:
     RGPassBuilder(RenderGraph* graph, size_t passIndex);
 
     // Read a resource as SRV
-    RGPassBuilder& Read(RGResourceHandle handle, RGResourceUsage usage = RGResourceUsage::ShaderResource);
+    RGPassBuilder& Read(RGResourceHandle handle,
+                        RGResourceUsage usage = RGResourceUsage::ShaderResource,
+                        uint32_t subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
     // Write to a resource (RTV, UAV, DSV)
-    RGPassBuilder& Write(RGResourceHandle handle, RGResourceUsage usage);
+    RGPassBuilder& Write(RGResourceHandle handle,
+                         RGResourceUsage usage,
+                         uint32_t subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
     // Read and write (UAV)
-    RGPassBuilder& ReadWrite(RGResourceHandle handle);
+    RGPassBuilder& ReadWrite(RGResourceHandle handle,
+                             uint32_t subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+
+    // Declare an aliasing barrier (placed resources sharing memory).
+    RGPassBuilder& Alias(RGResourceHandle before, RGResourceHandle after);
 
     // Set pass type for queue selection
     RGPassBuilder& SetType(RGPassType type);
@@ -148,10 +171,15 @@ struct RGPass {
     std::string name;
     RGPassType type = RGPassType::Graphics;
 
+    // Optional aliasing barriers required before executing this pass.
+    std::vector<RGAliasingBarrier> aliasing;
+
     // Resources read by this pass
-    std::vector<std::pair<RGResourceHandle, RGResourceUsage>> reads;
+    std::vector<RGResourceAccess> reads;
     // Resources written by this pass
-    std::vector<std::pair<RGResourceHandle, RGResourceUsage>> writes;
+    std::vector<RGResourceAccess> writes;
+    // Resources read+written by this pass (declared via ReadWrite()).
+    std::vector<RGResourceAccess> readWrites;
 
     // Execution callback
     using ExecuteCallback = std::function<void(ID3D12GraphicsCommandList*, const RenderGraph&)>;
@@ -219,6 +247,7 @@ public:
     // Get resource by handle (for execute callbacks)
     ID3D12Resource* GetResource(RGResourceHandle handle) const;
     D3D12_RESOURCE_STATES GetResourceState(RGResourceHandle handle) const;
+    D3D12_RESOURCE_STATES GetResourceState(RGResourceHandle handle, uint32_t subresource) const;
 
     // Get current frame's final resource states (for external tracking)
     const std::unordered_map<RGResourceHandle, D3D12_RESOURCE_STATES, RGResourceHandleHash>&
@@ -236,8 +265,10 @@ private:
     size_t AddPassInternal(const std::string& name, RGPass::ExecuteCallback execute);
 
     // Register resource usage for a pass
-    void RegisterRead(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage);
-    void RegisterWrite(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage);
+    void RegisterRead(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage, uint32_t subresource);
+    void RegisterWrite(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage, uint32_t subresource);
+    void RegisterReadWrite(size_t passIndex, RGResourceHandle handle, uint32_t subresource);
+    void RegisterAliasing(size_t passIndex, RGResourceHandle before, RGResourceHandle after);
 
     // Create transient resource
     RGResourceHandle CreateTransientResource(const RGResourceDesc& desc);

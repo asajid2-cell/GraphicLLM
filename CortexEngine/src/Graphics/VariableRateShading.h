@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d12.h>
+#include "RHI/D3D12Includes.h"
 #include <wrl/client.h>
 #include <memory>
 #include <functional>

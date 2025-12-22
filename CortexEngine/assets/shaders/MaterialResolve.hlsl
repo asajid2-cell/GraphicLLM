@@ -8,11 +8,12 @@
 // t0: Visibility buffer SRV
 // t1: Instance data
 // t2: Depth buffer SRV
-// t3: Global vertex buffer (ByteAddressBuffer)
-// t4: Global index buffer (ByteAddressBuffer)
+// t3: Mesh table (StructuredBuffer)
+// t5: Material constants (StructuredBuffer)
 // u0: Albedo UAV output
 // u1: Normal+Roughness UAV output
 // u2: Emissive+Metallic UAV output
+// s0: Static sampler (linear wrap) for bindless textures
 
 cbuffer ResolutionConstants : register(b0) {
     uint g_Width;
@@ -20,13 +21,16 @@ cbuffer ResolutionConstants : register(b0) {
     float g_RcpWidth;
     float g_RcpHeight;
     float4x4 g_ViewProj;  // View-projection matrix for computing clip-space barycentrics
-    uint g_CurrentMeshIndex;  // Current mesh being processed (for multi-mesh support)
-    uint3 _pad2;
+    uint g_MaterialCount;
+    uint g_MeshCount;
+    uint2 _pad2;
 };
 
 // Instance data structure (matches VBInstanceData in C++)
 struct VBInstanceData {
     float4x4 worldMatrix;
+    float4x4 prevWorldMatrix;
+    float4x4 normalMatrix; // inverse-transpose (world-space normal transform)
     uint meshIndex;
     uint materialIndex;
     uint firstIndex;
@@ -44,41 +48,102 @@ struct Vertex {
     // Total: 48 bytes
 };
 
+// Minimal material constants (matches VBMaterialConstants in C++)
+struct VBMaterialConstants {
+    float4 albedo;
+    float metallic;
+    float roughness;
+    float ao;
+    float _pad0;
+    uint4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
+    float alphaCutoff;
+    uint alphaMode; // 0=opaque, 1=mask, 2=blend
+    uint doubleSided;
+    uint _pad1;
+};
+
+// Per-mesh table entry (matches VBMeshTableEntry in C++)
+struct VBMeshTableEntry {
+    uint vertexBufferIndex;
+    uint indexBufferIndex;
+    uint vertexStrideBytes;
+    uint indexFormat; // 0 = R32_UINT, 1 = R16_UINT
+};
+
 // Visibility buffer input
 Texture2D<uint2> g_VisibilityBuffer : register(t0);
 StructuredBuffer<VBInstanceData> g_Instances : register(t1);
 Texture2D<float> g_DepthBuffer : register(t2);
-ByteAddressBuffer g_VertexBuffer : register(t3);
-ByteAddressBuffer g_IndexBuffer : register(t4);
+StructuredBuffer<VBMeshTableEntry> g_MeshTable : register(t3);
+StructuredBuffer<VBMaterialConstants> g_Materials : register(t5);
 
 // G-buffer UAV outputs
-RWTexture2D<unorm float4> g_AlbedoOut : register(u0);        // RGBA8_SRGB
+RWTexture2D<unorm float4> g_AlbedoOut : register(u0);        // RGBA8_UNORM (linear)
 RWTexture2D<float4> g_NormalRoughnessOut : register(u1);     // RGBA16F
 RWTexture2D<float4> g_EmissiveMetallicOut : register(u2);    // RGBA16F
 
-// Load a vertex from the global vertex buffer
-Vertex LoadVertex(uint vertexIndex) {
-    // Vertex stride = 48 bytes (12+12+16+8)
-    uint offset = vertexIndex * 48;
+SamplerState g_Sampler : register(s0);
+
+static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
+
+float2 ComputeUVGrad(float2 uv0, float2 uv1, float2 uv2,
+                     float2 screen0, float2 screen1, float2 screen2,
+                     bool wantDx)
+{
+    // Compute dUV/dx and dUV/dy from triangle UVs and screen-space positions.
+    // screen* are in normalized [0,1]; convert to pixel units for stability.
+    float2 p0 = screen0 * float2((float)g_Width, (float)g_Height);
+    float2 p1 = screen1 * float2((float)g_Width, (float)g_Height);
+    float2 p2 = screen2 * float2((float)g_Width, (float)g_Height);
+
+    float2 dp1 = p1 - p0;
+    float2 dp2 = p2 - p0;
+    float2 duv1 = uv1 - uv0;
+    float2 duv2 = uv2 - uv0;
+
+    float det = dp1.x * dp2.y - dp1.y * dp2.x;
+    if (abs(det) < 1e-8f) {
+        return float2(0.0f, 0.0f);
+    }
+    float invDet = 1.0f / det;
+
+    float2 dUVdx = (duv1 * dp2.y - duv2 * dp1.y) * invDet;
+    float2 dUVdy = (-duv1 * dp2.x + duv2 * dp1.x) * invDet;
+    return wantDx ? dUVdx : dUVdy;
+}
+
+// Load a vertex from the per-mesh vertex buffer (raw SRV -> ByteAddressBuffer)
+Vertex LoadVertex(ByteAddressBuffer vertexBuffer, uint vertexIndex, uint vertexStrideBytes) {
+    uint offset = vertexIndex * vertexStrideBytes;
 
     Vertex v;
-    v.position = asfloat(g_VertexBuffer.Load3(offset + 0));
-    v.normal = asfloat(g_VertexBuffer.Load3(offset + 12));
-    v.tangent = asfloat(g_VertexBuffer.Load4(offset + 24));
-    v.texCoord = asfloat(g_VertexBuffer.Load2(offset + 40));
+    v.position = asfloat(vertexBuffer.Load3(offset + 0));
+    v.normal = asfloat(vertexBuffer.Load3(offset + 12));
+    v.tangent = asfloat(vertexBuffer.Load4(offset + 24));
+    v.texCoord = asfloat(vertexBuffer.Load2(offset + 40));
 
     return v;
 }
 
 // Load triangle indices
-uint3 LoadTriangleIndices(uint triangleID, uint firstIndex, uint baseVertex) {
-    uint indexOffset = (firstIndex + triangleID * 3) * 4; // 4 bytes per uint32 index
+uint LoadIndex16(ByteAddressBuffer indexBuffer, uint byteOffset) {
+    uint word = indexBuffer.Load(byteOffset & ~3u);
+    return ((byteOffset & 2u) != 0u) ? ((word >> 16) & 0xFFFFu) : (word & 0xFFFFu);
+}
+
+uint LoadIndex(ByteAddressBuffer indexBuffer, uint byteOffset, uint indexFormat) {
+    // indexFormat: 0=R32_UINT, 1=R16_UINT
+    return (indexFormat == 1u) ? LoadIndex16(indexBuffer, byteOffset) : indexBuffer.Load(byteOffset);
+}
+
+uint3 LoadTriangleIndices(ByteAddressBuffer indexBuffer, uint triangleID, uint firstIndex, uint baseVertex, uint indexFormat) {
+    uint indexStrideBytes = (indexFormat == 1u) ? 2u : 4u;
+    uint indexOffset = (firstIndex + triangleID * 3u) * indexStrideBytes;
 
     uint3 indices;
-    indices.x = g_IndexBuffer.Load(indexOffset + 0) + baseVertex;
-    indices.y = g_IndexBuffer.Load(indexOffset + 4) + baseVertex;
-    indices.z = g_IndexBuffer.Load(indexOffset + 8) + baseVertex;
-
+    indices.x = LoadIndex(indexBuffer, indexOffset + indexStrideBytes * 0u, indexFormat) + baseVertex;
+    indices.y = LoadIndex(indexBuffer, indexOffset + indexStrideBytes * 1u, indexFormat) + baseVertex;
+    indices.z = LoadIndex(indexBuffer, indexOffset + indexStrideBytes * 2u, indexFormat) + baseVertex;
     return indices;
 }
 
@@ -147,18 +212,14 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
     // Read visibility buffer
     uint2 visData = g_VisibilityBuffer[pixelCoord];
-    uint packedTriangleAndDraw = visData.x;
+    uint triangleID = visData.x;
     uint instanceID = visData.y;
 
-    // Unpack triangle ID and draw ID
-    uint triangleID = packedTriangleAndDraw & 0x00FFFFFF;
-    uint drawID = (packedTriangleAndDraw >> 24) & 0xFF;
-
     // Check for background pixels (cleared to 0xFFFFFFFF)
-    if (packedTriangleAndDraw == 0xFFFFFFFF && instanceID == 0xFFFFFFFF) {
+    if (triangleID == 0xFFFFFFFF && instanceID == 0xFFFFFFFF) {
         // Write black/default values for background
         g_AlbedoOut[pixelCoord] = float4(0, 0, 0, 1);
-        g_NormalRoughnessOut[pixelCoord] = float4(0.5, 0.5, 1.0, 1.0);  // Encoded up normal + max roughness
+        g_NormalRoughnessOut[pixelCoord] = float4(0.0, 0.0, 1.0, 1.0);  // Up normal (world) + max roughness
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
         return;
     }
@@ -166,19 +227,21 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     // Fetch instance data
     VBInstanceData instance = g_Instances[instanceID];
 
-    // Skip pixels that don't belong to the current mesh being processed
-    // This allows us to dispatch material resolve once per mesh with correct vertex/index buffers
-    if (instance.meshIndex != g_CurrentMeshIndex) {
-        return;  // Skip this pixel - it belongs to a different mesh
+    if (g_MeshCount == 0 || instance.meshIndex >= g_MeshCount) {
+        return;
     }
 
+    VBMeshTableEntry mesh = g_MeshTable[instance.meshIndex];
+    ByteAddressBuffer vertexBuffer = ResourceDescriptorHeap[mesh.vertexBufferIndex];
+    ByteAddressBuffer indexBuffer = ResourceDescriptorHeap[mesh.indexBufferIndex];
+
     // Load triangle indices
-    uint3 indices = LoadTriangleIndices(triangleID, instance.firstIndex, instance.baseVertex);
+    uint3 indices = LoadTriangleIndices(indexBuffer, triangleID, instance.firstIndex, instance.baseVertex, mesh.indexFormat);
 
     // Load vertices
-    Vertex v0 = LoadVertex(indices.x);
-    Vertex v1 = LoadVertex(indices.y);
-    Vertex v2 = LoadVertex(indices.z);
+    Vertex v0 = LoadVertex(vertexBuffer, indices.x, mesh.vertexStrideBytes);
+    Vertex v1 = LoadVertex(vertexBuffer, indices.y, mesh.vertexStrideBytes);
+    Vertex v2 = LoadVertex(vertexBuffer, indices.z, mesh.vertexStrideBytes);
 
     // Transform vertices to world space
     float3 worldPos0 = mul(instance.worldMatrix, float4(v0.position, 1.0)).xyz;
@@ -222,38 +285,91 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     // Interpolate vertex attributes using barycentric coordinates
     float2 texCoord = v0.texCoord * bary.x + v1.texCoord * bary.y + v2.texCoord * bary.z;
 
-    float3 normal = v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z;
-    normal = normalize(mul((float3x3)instance.worldMatrix, normal));
+    float3 normalOS = v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z;
+
+    // Correct normal transform for non-uniform scale: inverse-transpose of upper-left 3x3.
+    float3 normalWS = mul((float3x3)instance.normalMatrix, normalOS);
+    if (!all(isfinite(normalWS)) || dot(normalWS, normalWS) < 1e-12f) {
+        normalWS = float3(0.0f, 0.0f, 1.0f);
+    } else {
+        normalWS = normalize(normalWS);
+    }
 
     float4 tangent = v0.tangent * bary.x + v1.tangent * bary.y + v2.tangent * bary.z;
     tangent.xyz = normalize(mul((float3x3)instance.worldMatrix, tangent.xyz));
 
-    // TODO: Sample material textures using instance.materialIndex
-    // For now, use mesh index to show different meshes in different colors
-
-    // Color each mesh differently to verify the pipeline is working
-    float3 meshColors[8] = {
-        float3(1.0, 0.2, 0.2),  // Red
-        float3(0.2, 1.0, 0.2),  // Green
-        float3(0.2, 0.2, 1.0),  // Blue
-        float3(1.0, 1.0, 0.2),  // Yellow
-        float3(1.0, 0.2, 1.0),  // Magenta
-        float3(0.2, 1.0, 1.0),  // Cyan
-        float3(1.0, 0.6, 0.2),  // Orange
-        float3(0.6, 0.2, 1.0)   // Purple
-    };
-    float3 albedo = meshColors[instance.meshIndex % 8];
-
-    // Use interpolated normal
-    float3 normalEncoded = normal * 0.5 + 0.5;
-
+    // Material evaluation: constants in g_Materials[instance.materialIndex] and optional bindless textures.
     // Default PBR values (mid-roughness, non-metallic)
+    float3 albedo = float3(0.5, 0.5, 0.5);
     float roughness = 0.5;
     float metallic = 0.0;
+    float ao = 1.0;
     float3 emissive = float3(0, 0, 0);
 
+    float2 ddxUV = float2(0.0f, 0.0f);
+    float2 ddyUV = float2(0.0f, 0.0f);
+
+    if (g_MaterialCount > 0 && instance.materialIndex < g_MaterialCount) {
+        VBMaterialConstants mat = g_Materials[instance.materialIndex];
+        albedo = mat.albedo.rgb;
+        metallic = mat.metallic;
+        roughness = mat.roughness;
+        ao = mat.ao;
+
+        const bool wantsGrad =
+            (mat.textureIndices.x != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices.y != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices.z != INVALID_BINDLESS_INDEX) ||
+            (mat.textureIndices.w != INVALID_BINDLESS_INDEX);
+        if (wantsGrad) {
+            ddxUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, true);
+            ddyUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, false);
+        }
+
+        if (mat.textureIndices.x != INVALID_BINDLESS_INDEX) {
+            Texture2D albedoTex = ResourceDescriptorHeap[mat.textureIndices.x];
+            albedo = albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+        }
+
+        if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {
+            Texture2D normalTex = ResourceDescriptorHeap[mat.textureIndices.y];
+            float3 nTS = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).xyz * 2.0f - 1.0f;
+
+            float3 T = tangent.xyz;
+            T = normalize(T - normalWS * dot(normalWS, T));
+            float3 B = normalize(cross(normalWS, T) * tangent.w);
+            float3x3 TBN = float3x3(T, B, normalWS);
+            normalWS = normalize(mul(TBN, nTS));
+        }
+
+        // glTF metallic-roughness convention:
+        // - If metallic+roughness are the same texture (or one is missing), treat it as packed:
+        //   roughness = G, metallic = B.
+        // - Otherwise, sample separate scalar maps (assume scalar stored in R).
+        const uint metalIdx = mat.textureIndices.z;
+        const uint roughIdx = mat.textureIndices.w;
+        if (metalIdx != INVALID_BINDLESS_INDEX || roughIdx != INVALID_BINDLESS_INDEX) {
+            if (metalIdx == roughIdx || metalIdx == INVALID_BINDLESS_INDEX || roughIdx == INVALID_BINDLESS_INDEX) {
+                const uint mrIdx = (roughIdx != INVALID_BINDLESS_INDEX) ? roughIdx : metalIdx;
+                Texture2D mrTex = ResourceDescriptorHeap[mrIdx];
+                float4 mr = mrTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
+                roughness = mr.g;
+                metallic = mr.b;
+            } else {
+                Texture2D metalTex = ResourceDescriptorHeap[metalIdx];
+                Texture2D roughTex = ResourceDescriptorHeap[roughIdx];
+                metallic = metalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                roughness = roughTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+            }
+        }
+
+        metallic = saturate(metallic);
+        roughness = saturate(roughness);
+        ao = saturate(ao);
+    }
+
     // Write to G-buffers
-    g_AlbedoOut[pixelCoord] = float4(albedo, 1.0);
-    g_NormalRoughnessOut[pixelCoord] = float4(normalEncoded, roughness);
+    g_AlbedoOut[pixelCoord] = float4(albedo, ao);
+    g_NormalRoughnessOut[pixelCoord] = float4(normalWS, roughness);
     g_EmissiveMetallicOut[pixelCoord] = float4(emissive, metallic);
 }

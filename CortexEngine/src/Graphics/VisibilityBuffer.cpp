@@ -221,6 +221,41 @@ Result<void> VisibilityBufferRenderer::Initialize(
         m_meshCount = 0;
     }
 
+    // Reserve persistent SRV slots for clustered-light resources so shaders can
+    // access them via ResourceDescriptorHeap[] without per-frame allocations.
+    {
+        auto localLightsSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (localLightsSrvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate VB local lights SRV: " + localLightsSrvResult.Error());
+        }
+        m_localLightsSRV = localLightsSrvResult.Value();
+
+        auto clusterRangesSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (clusterRangesSrvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate VB cluster ranges SRV: " + clusterRangesSrvResult.Error());
+        }
+        m_clusterRangesSRV = clusterRangesSrvResult.Value();
+
+        auto clusterIndicesSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (clusterIndicesSrvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate VB cluster indices SRV: " + clusterIndicesSrvResult.Error());
+        }
+        m_clusterLightIndicesSRV = clusterIndicesSrvResult.Value();
+
+        // Initialize descriptors to null; they'll be updated once resources exist.
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
+        nullSrv.Format = DXGI_FORMAT_UNKNOWN;
+        nullSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullSrv.Buffer.FirstElement = 0;
+        nullSrv.Buffer.NumElements = 1;
+        nullSrv.Buffer.StructureByteStride = sizeof(uint32_t);
+        nullSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, m_localLightsSRV.cpu);
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, m_clusterRangesSRV.cpu);
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, m_clusterLightIndicesSRV.cpu);
+    }
+
     // Create pipelines
     auto pipelineResult = CreatePipelines();
     if (pipelineResult.IsErr()) {
@@ -267,6 +302,10 @@ void VisibilityBufferRenderer::Shutdown() {
     m_motionVectorsPipeline.Reset();
     m_motionVectorsRootSignature.Reset();
     m_deferredLightingCB.Reset();
+
+    m_localLightsSRV = {};
+    m_clusterRangesSRV = {};
+    m_clusterLightIndicesSRV = {};
 
     m_device = nullptr;
     m_descriptorManager = nullptr;
@@ -1184,6 +1223,31 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
             m_clusterLightIndicesState = D3D12_RESOURCE_STATE_COMMON;
         }
 
+        // Create persistent SRVs for the clustered light lists so forward+ and
+        // deferred shaders can sample them via ResourceDescriptorHeap[].
+        if (m_clusterRangesSRV.IsValid() && m_clusterRangesBuffer) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = m_clusterCount;
+            srvDesc.Buffer.StructureByteStride = sizeof(uint32_t) * 2; // uint2
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            m_device->GetDevice()->CreateShaderResourceView(m_clusterRangesBuffer.Get(), &srvDesc, m_clusterRangesSRV.cpu);
+        }
+        if (m_clusterLightIndicesSRV.IsValid() && m_clusterLightIndicesBuffer) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = m_clusterCount * m_maxLightsPerCluster;
+            srvDesc.Buffer.StructureByteStride = sizeof(uint32_t);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            m_device->GetDevice()->CreateShaderResourceView(m_clusterLightIndicesBuffer.Get(), &srvDesc, m_clusterLightIndicesSRV.cpu);
+        }
+
         spdlog::info("VisibilityBuffer: Clustered light culling pipeline created (clusters={}x{}x{}, maxLightsPerCluster={})",
                      m_clusterCountX, m_clusterCountY, m_clusterCountZ, m_maxLightsPerCluster);
     }
@@ -1888,6 +1952,18 @@ Result<void> VisibilityBufferRenderer::UpdateLocalLights(
         if (FAILED(hr) || !m_localLightsBufferMapped) {
             return Result<void>::Err("Failed to map resized VB local lights buffer");
         }
+
+        if (m_localLightsSRV.IsValid()) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = m_maxLocalLights;
+            srvDesc.Buffer.StructureByteStride = sizeof(Light);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            m_device->GetDevice()->CreateShaderResourceView(m_localLightsBuffer.Get(), &srvDesc, m_localLightsSRV.cpu);
+        }
     }
 
     if (!m_localLightsBufferMapped) {
@@ -1921,6 +1997,18 @@ Result<void> VisibilityBufferRenderer::UpdateLocalLights(
         hr = m_localLightsBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_localLightsBufferMapped));
         if (FAILED(hr) || !m_localLightsBufferMapped) {
             return Result<void>::Err("Failed to map VB local lights buffer");
+        }
+
+        if (m_localLightsSRV.IsValid()) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = m_maxLocalLights;
+            srvDesc.Buffer.StructureByteStride = sizeof(Light);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            m_device->GetDevice()->CreateShaderResourceView(m_localLightsBuffer.Get(), &srvDesc, m_localLightsSRV.cpu);
         }
     }
 

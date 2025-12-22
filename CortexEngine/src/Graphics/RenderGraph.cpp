@@ -625,9 +625,9 @@ void RenderGraph::ComputeBarriers() {
     m_totalBarrierCount = 0;
     m_finalStates.clear();
 
-    // Track UAV write hazards per-subresource. When a resource stays in UAV state
+    // Track UAV ordering hazards per-subresource. When a resource stays in UAV state
     // across passes, transitions won't be emitted, but UAV->UAV ordering may still
-    // require an explicit UAV barrier.
+    // require an explicit UAV barrier (read/write ordering).
     std::vector<std::vector<uint8_t>> uavWritePending;
     uavWritePending.resize(m_resources.size());
     for (size_t i = 0; i < m_resources.size(); ++i) {
@@ -701,41 +701,44 @@ void RenderGraph::ComputeBarriers() {
             }
 
             // If both states are UAV, transitions will not be emitted; insert a UAV barrier
-            // if the previous pass wrote UAV data for this subresource.
+            // if any previous UAV access (read or write) for this subresource is pending.
             if (currentState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS && uavPending[sub] != 0) {
                 emitUavBarrier(pass, access.handle.id);
             }
 
-            uavPending[sub] = isWriteAccess ? 1u : 0u;
+            // Mark that this pass performed a UAV access; a subsequent UAV access
+            // in a later pass requires ordering via a UAV barrier when no transition
+            // occurs between them.
+            uavPending[sub] = 1u;
         };
 
         if (access.subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) {
             const D3D12_RESOURCE_STATES first = states[0];
             const bool uniform = AreAllSubresourcesInState(states, first);
 
-            if (uniform) {
-                // UAV hazard when staying in UAV state across passes.
-                if (required == D3D12_RESOURCE_STATE_UNORDERED_ACCESS &&
-                    first == D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-                    const bool anyPending = std::any_of(
-                        uavPending.begin(), uavPending.end(), [](uint8_t v) { return v != 0; });
-                    if (anyPending) {
-                        emitUavBarrier(pass, access.handle.id);
+                if (uniform) {
+                    // UAV hazard when staying in UAV state across passes.
+                    if (required == D3D12_RESOURCE_STATE_UNORDERED_ACCESS &&
+                        first == D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+                        const bool anyPending = std::any_of(
+                            uavPending.begin(), uavPending.end(), [](uint8_t v) { return v != 0; });
+                        if (anyPending) {
+                            emitUavBarrier(pass, access.handle.id);
+                        }
+                        std::fill(uavPending.begin(), uavPending.end(), 1u);
+                    } else if (required != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+                        std::fill(uavPending.begin(), uavPending.end(), 0u);
+                    } else {
+                        // Transition into UAV: pending hazard is cleared by the transition.
+                        std::fill(uavPending.begin(), uavPending.end(), 1u);
                     }
-                    std::fill(uavPending.begin(), uavPending.end(), isWriteAccess ? 1u : 0u);
-                } else if (required != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-                    std::fill(uavPending.begin(), uavPending.end(), 0u);
-                } else {
-                    // Transition into UAV: pending hazard is cleared by the transition.
-                    std::fill(uavPending.begin(), uavPending.end(), isWriteAccess ? 1u : 0u);
-                }
 
-                if (first != required) {
-                    emitTransition(pass, access.handle.id, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, first, required);
-                    std::fill(states.begin(), states.end(), required);
+                    if (first != required) {
+                        emitTransition(pass, access.handle.id, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, first, required);
+                        std::fill(states.begin(), states.end(), required);
+                    }
+                    return;
                 }
-                return;
-            }
 
             // Mixed per-subresource state: emit per-subresource barriers.
             for (uint32_t sub = 0; sub < static_cast<uint32_t>(states.size()); ++sub) {

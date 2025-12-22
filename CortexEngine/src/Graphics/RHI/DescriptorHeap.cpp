@@ -242,6 +242,57 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAV() {
     return result;
 }
 
+Result<DescriptorHandle> DescriptorHeapManager::AllocateTransientCBV_SRV_UAVRange(uint32_t count) {
+    if (count == 0) {
+        return Result<DescriptorHandle>::Err("Transient descriptor range allocation requires count > 0");
+    }
+
+    if (!m_frameActive) {
+        spdlog::warn("Transient descriptor range allocation before BeginFrame; defaulting to frame 0 segment");
+        BeginFrame(0);
+    }
+
+    if (m_transientSegmentStart >= m_transientSegmentEnd) {
+        spdlog::error("Transient descriptor segment is empty (persistent={}, capacity={})",
+                      m_cbvSrvUavPersistentCount, m_cbvSrvUavHeap.GetCapacity());
+        return Result<DescriptorHandle>::Err("Transient descriptor segment is empty");
+    }
+
+    uint32_t used = m_cbvSrvUavHeap.GetUsedCount();
+    if (used < m_transientSegmentStart) {
+        m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+        used = m_transientSegmentStart;
+    }
+
+    const uint32_t segmentCapacity = m_transientSegmentEnd - m_transientSegmentStart;
+    const uint32_t usedInSegment = used - m_transientSegmentStart;
+
+    if (used + count > m_transientSegmentEnd) {
+        spdlog::error("CBV_SRV_UAV transient segment cannot fit range: used {}/{} need {} (persistent={}, frame={})",
+                      usedInSegment, segmentCapacity, count, m_cbvSrvUavPersistentCount, m_activeFrameIndex);
+        return Result<DescriptorHandle>::Err("Transient descriptor segment range exhausted");
+    }
+
+    if (segmentCapacity > 0) {
+        const uint32_t after = usedInSegment + count;
+        if (after >= static_cast<uint32_t>(segmentCapacity * 0.9f)) {
+            spdlog::warn("CBV_SRV_UAV transient segment nearly full after range alloc: {}/{} descriptors (persistent={}, frame={})",
+                         after, segmentCapacity, m_cbvSrvUavPersistentCount, m_activeFrameIndex);
+        }
+    }
+
+    DescriptorHandle base = m_cbvSrvUavHeap.GetHandle(used);
+    if (!base.IsValid()) {
+        spdlog::error("CBV_SRV_UAV transient range base handle invalid (used={}, capacity={}, persistent={}, frame={})",
+                      used, m_cbvSrvUavHeap.GetCapacity(), m_cbvSrvUavPersistentCount, m_activeFrameIndex);
+        return Result<DescriptorHandle>::Err("Transient descriptor range base handle invalid");
+    }
+    // Reserve the range by advancing the heap cursor.
+    m_cbvSrvUavHeap.ResetFrom(used + count);
+    m_transientActive = true;
+    return Result<DescriptorHandle>::Ok(base);
+}
+
 void DescriptorHeapManager::BeginFrame(uint32_t frameIndex) {
     m_frameActive = true;
     m_transientActive = false;

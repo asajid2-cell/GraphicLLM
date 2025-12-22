@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d12.h>
+#include "RHI/D3D12Includes.h"
 #include <wrl/client.h>
 #include <vector>
 #include <functional>
@@ -21,10 +21,11 @@ class DescriptorHeapManager;
 struct alignas(16) GPUInstanceData {
     glm::mat4 modelMatrix;
     glm::vec4 boundingSphere;  // xyz = center (object space), w = radius
+    glm::vec4 prevCenterWS;     // xyz = previous frame center (world space)
     uint32_t meshIndex;
     uint32_t materialIndex;
     uint32_t flags;            // visibility flags, etc.
-    uint32_t _pad;
+    uint32_t cullingId;        // stable ID for history indexing
 };
 
 // Draw argument for ExecuteIndirect (matches D3D12_DRAW_INDEXED_ARGUMENTS)
@@ -64,6 +65,19 @@ struct FrustumPlanes {
 // Outputs a compacted list of visible instances and indirect draw arguments.
 class GPUCullingPipeline {
 public:
+    struct DebugStats {
+        bool enabled = false;
+        bool valid = false;
+        uint32_t tested = 0;
+        uint32_t frustumCulled = 0;
+        uint32_t occluded = 0;
+        uint32_t visible = 0;
+        uint32_t sampleMip = 0;
+        float sampleNearDepth = 0.0f;
+        float sampleHzbDepth = 0.0f;
+        uint32_t sampleFlags = 0;
+    };
+
     GPUCullingPipeline() = default;
     ~GPUCullingPipeline() = default;
 
@@ -100,6 +114,22 @@ public:
         const glm::vec3& cameraPos
     );
 
+    // Optional HZB occlusion inputs (built from the main depth buffer).
+    // When enabled, the compute shader uses the depth pyramid to reject
+    // instances hidden behind near-depth occluders, with a small hysteresis
+    // history to reduce popping.
+    void SetHZBForOcclusion(
+        ID3D12Resource* hzbTexture,
+        uint32_t hzbWidth,
+        uint32_t hzbHeight,
+        uint32_t hzbMipCount,
+        const glm::mat4& hzbViewMatrix,
+        const glm::mat4& hzbViewProjMatrix,
+        const glm::vec3& hzbCameraPosWS,
+        float cameraNearPlane,
+        float cameraFarPlane,
+        bool enabled);
+
     // Get the visible command buffer for ExecuteIndirect
     [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer.Get(); }
     [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer.Get(); }
@@ -127,6 +157,8 @@ public:
 
     // Debug controls
     void SetForceVisible(bool forceVisible) { m_forceVisible = forceVisible; }
+    void SetDebugEnabled(bool enabled) { m_debugEnabled = enabled; }
+    [[nodiscard]] DebugStats GetDebugStats() const { return m_debugStats; }
     void RequestCommandReadback(uint32_t commandCount);
 
     // Update visible count from the readback buffer (call after GPU fence)
@@ -160,10 +192,19 @@ private:
     ComPtr<ID3D12Resource> m_commandCountBuffer;       // Atomic counter for visible commands (UAV)
     ComPtr<ID3D12Resource> m_commandCountReadback;     // CPU-readable counter
     ComPtr<ID3D12Resource> m_visibleCommandReadback;   // CPU-readable command snapshot
+    ComPtr<ID3D12Resource> m_debugBuffer;              // Debug counters/sample (UAV)
+    ComPtr<ID3D12Resource> m_debugReadback;            // CPU-readable debug snapshot
 
     // Descriptors (shader-visible for ClearUnorderedAccessViewUint)
     DescriptorHandle m_counterUAV;           // GPU descriptor for counter buffer
     DescriptorHandle m_counterUAVStaging;    // CPU-only descriptor for ClearUAV
+    DescriptorHandle m_historyAUAV;
+    DescriptorHandle m_historyAUAVStaging;
+    DescriptorHandle m_historyBUAV;
+    DescriptorHandle m_historyBUAVStaging;
+    DescriptorHandle m_hzbSrv;
+    DescriptorHandle m_debugUAV;
+    DescriptorHandle m_debugUAVStaging;
 
     // Constants
     ComPtr<ID3D12Resource> m_cullConstantBuffer;
@@ -175,10 +216,37 @@ private:
     D3D12_RESOURCE_STATES m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     D3D12_RESOURCE_STATES m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
     D3D12_RESOURCE_STATES m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
+    D3D12_RESOURCE_STATES m_historyAState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_historyBState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_debugState = D3D12_RESOURCE_STATE_COMMON;
 
     FlushCallback m_flushCallback;
 
     bool m_forceVisible = false;
+    bool m_debugEnabled = false;
+    bool m_debugReadbackPending = false;
+    DebugStats m_debugStats{};
+
+    // Occlusion culling inputs (owned by renderer; pointer is valid for the duration
+    // of the dispatch). SRV for sampling is created in the descriptor manager heap.
+    ID3D12Resource* m_hzbTexture = nullptr;
+    uint32_t m_hzbWidth = 0;
+    uint32_t m_hzbHeight = 0;
+    uint32_t m_hzbMipCount = 0;
+    glm::mat4 m_hzbViewMatrix{1.0f};
+    glm::mat4 m_hzbViewProjMatrix{1.0f};
+    glm::vec3 m_hzbCameraPosWS{0.0f};
+    float m_hzbNearPlane = 0.1f;
+    float m_hzbFarPlane = 1000.0f;
+    bool m_hzbEnabled = false;
+
+    // Per-instance occlusion hysteresis history (ping-pong).
+    ComPtr<ID3D12Resource> m_occlusionHistoryA;
+    ComPtr<ID3D12Resource> m_occlusionHistoryB;
+    ComPtr<ID3D12Resource> m_dummyHzbTexture;
+    bool m_historyPingPong = false;
+    bool m_historyInitialized = false;
+
     bool m_commandReadbackRequested = false;
     bool m_commandReadbackPending = false;
     uint32_t m_commandReadbackCount = 0;

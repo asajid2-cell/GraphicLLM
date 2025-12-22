@@ -1,7 +1,7 @@
 // Minimal D3DX12 helper subset (avoids newer SDK dependencies)
 #pragma once
 
-#include <d3d12.h>
+#include "D3D12Includes.h"
 
 struct CD3DX12_RANGE {
     CD3DX12_RANGE() = default;

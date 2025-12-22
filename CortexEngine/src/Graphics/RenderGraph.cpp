@@ -3,32 +3,64 @@
 #include "RHI/DX12CommandQueue.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <cassert>
+#include <unordered_set>
 
 namespace Cortex::Graphics {
+
+namespace {
+uint32_t GetSubresourceCount(const D3D12_RESOURCE_DESC& desc) {
+    if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER) {
+        return 1;
+    }
+
+    const uint32_t mipLevels = std::max<uint32_t>(1u, desc.MipLevels);
+    if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) {
+        return mipLevels;
+    }
+
+    const uint32_t arraySize = std::max<uint32_t>(1u, desc.DepthOrArraySize);
+    return mipLevels * arraySize;
+}
+
+bool AreAllSubresourcesInState(const std::vector<D3D12_RESOURCE_STATES>& states,
+                              D3D12_RESOURCE_STATES state) {
+    for (const auto& s : states) {
+        if (s != state) {
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
 
 // RGPassBuilder implementation
 RGPassBuilder::RGPassBuilder(RenderGraph* graph, size_t passIndex)
     : m_graph(graph), m_passIndex(passIndex) {}
 
-RGPassBuilder& RGPassBuilder::Read(RGResourceHandle handle, RGResourceUsage usage) {
+RGPassBuilder& RGPassBuilder::Read(RGResourceHandle handle, RGResourceUsage usage, uint32_t subresource) {
     if (handle.IsValid()) {
-        m_graph->RegisterRead(m_passIndex, handle, usage);
+        m_graph->RegisterRead(m_passIndex, handle, usage, subresource);
     }
     return *this;
 }
 
-RGPassBuilder& RGPassBuilder::Write(RGResourceHandle handle, RGResourceUsage usage) {
+RGPassBuilder& RGPassBuilder::Write(RGResourceHandle handle, RGResourceUsage usage, uint32_t subresource) {
     if (handle.IsValid()) {
-        m_graph->RegisterWrite(m_passIndex, handle, usage);
+        m_graph->RegisterWrite(m_passIndex, handle, usage, subresource);
     }
     return *this;
 }
 
-RGPassBuilder& RGPassBuilder::ReadWrite(RGResourceHandle handle) {
+RGPassBuilder& RGPassBuilder::ReadWrite(RGResourceHandle handle, uint32_t subresource) {
     if (handle.IsValid()) {
-        m_graph->RegisterRead(m_passIndex, handle, RGResourceUsage::UnorderedAccess);
-        m_graph->RegisterWrite(m_passIndex, handle, RGResourceUsage::UnorderedAccess);
+        m_graph->RegisterReadWrite(m_passIndex, handle, subresource);
     }
+    return *this;
+}
+
+RGPassBuilder& RGPassBuilder::Alias(RGResourceHandle before, RGResourceHandle after) {
+    m_graph->RegisterAliasing(m_passIndex, before, after);
     return *this;
 }
 
@@ -96,7 +128,7 @@ RGResourceHandle RenderGraph::ImportResource(ID3D12Resource* resource,
 
     RGResource rgRes;
     rgRes.resource = resource;
-    rgRes.currentState = currentState;
+    rgRes.subresourceStates.assign(GetSubresourceCount(resource->GetDesc()), currentState);
     rgRes.isExternal = true;
     rgRes.isTransient = false;
     rgRes.name = name.empty() ? "ExternalResource" : name;
@@ -116,15 +148,34 @@ size_t RenderGraph::AddPassInternal(const std::string& name, RGPass::ExecuteCall
     return m_passes.size() - 1;
 }
 
-void RenderGraph::RegisterRead(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage) {
+void RenderGraph::RegisterRead(size_t passIndex,
+                               RGResourceHandle handle,
+                               RGResourceUsage usage,
+                               uint32_t subresource) {
     if (passIndex < m_passes.size()) {
-        m_passes[passIndex].reads.push_back({handle, usage});
+        m_passes[passIndex].reads.push_back(RGResourceAccess{handle, usage, subresource});
     }
 }
 
-void RenderGraph::RegisterWrite(size_t passIndex, RGResourceHandle handle, RGResourceUsage usage) {
+void RenderGraph::RegisterWrite(size_t passIndex,
+                                RGResourceHandle handle,
+                                RGResourceUsage usage,
+                                uint32_t subresource) {
     if (passIndex < m_passes.size()) {
-        m_passes[passIndex].writes.push_back({handle, usage});
+        m_passes[passIndex].writes.push_back(RGResourceAccess{handle, usage, subresource});
+    }
+}
+
+void RenderGraph::RegisterReadWrite(size_t passIndex, RGResourceHandle handle, uint32_t subresource) {
+    if (passIndex < m_passes.size()) {
+        m_passes[passIndex].readWrites.push_back(
+            RGResourceAccess{handle, RGResourceUsage::UnorderedAccess, subresource});
+    }
+}
+
+void RenderGraph::RegisterAliasing(size_t passIndex, RGResourceHandle before, RGResourceHandle after) {
+    if (passIndex < m_passes.size()) {
+        m_passes[passIndex].aliasing.push_back(RGAliasingBarrier{before, after});
     }
 }
 
@@ -209,7 +260,7 @@ RGResourceHandle RenderGraph::CreateTransientResource(const RGResourceDesc& desc
 
     RGResource rgRes;
     rgRes.resource = resource.Get();
-    rgRes.currentState = D3D12_RESOURCE_STATE_COMMON;
+    rgRes.subresourceStates.assign(GetSubresourceCount(resource->GetDesc()), D3D12_RESOURCE_STATE_COMMON);
     rgRes.desc = desc;
     rgRes.isExternal = false;
     rgRes.isTransient = true;
@@ -258,68 +309,196 @@ D3D12_RESOURCE_STATES RenderGraph::UsageToState(RGResourceUsage usage) const {
 }
 
 void RenderGraph::ComputeBarriers() {
-    // Track current state of each resource across passes
-    std::unordered_map<uint32_t, D3D12_RESOURCE_STATES> currentStates;
+    m_totalBarrierCount = 0;
+    m_finalStates.clear();
 
-    // Initialize with imported resource states
+    // Track UAV write hazards per-subresource. When a resource stays in UAV state
+    // across passes, transitions won't be emitted, but UAV->UAV ordering may still
+    // require an explicit UAV barrier.
+    std::vector<std::vector<uint8_t>> uavWritePending;
+    uavWritePending.resize(m_resources.size());
     for (size_t i = 0; i < m_resources.size(); ++i) {
-        currentStates[static_cast<uint32_t>(i)] = m_resources[i].currentState;
+        const auto& states = m_resources[i].subresourceStates;
+        const size_t count = states.empty() ? 1u : states.size();
+        uavWritePending[i].assign(count, 0);
     }
 
-    m_totalBarrierCount = 0;
+    auto emitTransition = [&](RGPass& pass,
+                              uint32_t resourceId,
+                              uint32_t subresource,
+                              D3D12_RESOURCE_STATES stateBefore,
+                              D3D12_RESOURCE_STATES stateAfter) {
+        if (stateBefore == stateAfter) {
+            return;
+        }
+
+        D3D12_RESOURCE_BARRIER barrier = {};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_resources[resourceId].resource;
+        barrier.Transition.StateBefore = stateBefore;
+        barrier.Transition.StateAfter = stateAfter;
+        barrier.Transition.Subresource = subresource;
+        pass.preBarriers.push_back(barrier);
+        m_totalBarrierCount++;
+    };
+
+    // Deduplicate UAV barriers within a pass (UAV barrier is per-resource).
+    std::vector<uint8_t> uavBarrierEmitted;
+    uavBarrierEmitted.resize(m_resources.size());
+
+    auto emitUavBarrier = [&](RGPass& pass, uint32_t resourceId) {
+        if (resourceId >= uavBarrierEmitted.size()) {
+            return;
+        }
+        if (uavBarrierEmitted[resourceId] != 0) {
+            return;
+        }
+        uavBarrierEmitted[resourceId] = 1;
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barrier.UAV.pResource = m_resources[resourceId].resource;
+        pass.preBarriers.push_back(barrier);
+        m_totalBarrierCount++;
+    };
+
+    auto transitionAccess = [&](RGPass& pass, const RGResourceAccess& access, bool isWriteAccess) {
+        if (!access.handle.IsValid() || access.handle.id >= m_resources.size()) {
+            return;
+        }
+
+        RGResource& rgRes = m_resources[access.handle.id];
+        if (rgRes.subresourceStates.empty()) {
+            rgRes.subresourceStates.assign(1, D3D12_RESOURCE_STATE_COMMON);
+        }
+
+        const D3D12_RESOURCE_STATES required = UsageToState(access.usage);
+        auto& states = rgRes.subresourceStates;
+        auto& uavPending = uavWritePending[access.handle.id];
+
+        auto handleUavHazard = [&](uint32_t sub, D3D12_RESOURCE_STATES currentState) {
+            if (required != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+                if (sub < uavPending.size()) {
+                    uavPending[sub] = 0;
+                }
+                return;
+            }
+
+            if (sub >= uavPending.size()) {
+                return;
+            }
+
+            // If both states are UAV, transitions will not be emitted; insert a UAV barrier
+            // if the previous pass wrote UAV data for this subresource.
+            if (currentState == D3D12_RESOURCE_STATE_UNORDERED_ACCESS && uavPending[sub] != 0) {
+                emitUavBarrier(pass, access.handle.id);
+            }
+
+            uavPending[sub] = isWriteAccess ? 1u : 0u;
+        };
+
+        if (access.subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) {
+            const D3D12_RESOURCE_STATES first = states[0];
+            const bool uniform = AreAllSubresourcesInState(states, first);
+
+            if (uniform) {
+                // UAV hazard when staying in UAV state across passes.
+                if (required == D3D12_RESOURCE_STATE_UNORDERED_ACCESS &&
+                    first == D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+                    const bool anyPending = std::any_of(
+                        uavPending.begin(), uavPending.end(), [](uint8_t v) { return v != 0; });
+                    if (anyPending) {
+                        emitUavBarrier(pass, access.handle.id);
+                    }
+                    std::fill(uavPending.begin(), uavPending.end(), isWriteAccess ? 1u : 0u);
+                } else if (required != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+                    std::fill(uavPending.begin(), uavPending.end(), 0u);
+                } else {
+                    // Transition into UAV: pending hazard is cleared by the transition.
+                    std::fill(uavPending.begin(), uavPending.end(), isWriteAccess ? 1u : 0u);
+                }
+
+                if (first != required) {
+                    emitTransition(pass, access.handle.id, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, first, required);
+                    std::fill(states.begin(), states.end(), required);
+                }
+                return;
+            }
+
+            // Mixed per-subresource state: emit per-subresource barriers.
+            for (uint32_t sub = 0; sub < static_cast<uint32_t>(states.size()); ++sub) {
+                const D3D12_RESOURCE_STATES current = states[sub];
+                handleUavHazard(sub, current);
+                if (current != required) {
+                    emitTransition(pass, access.handle.id, sub, current, required);
+                    states[sub] = required;
+                }
+            }
+            return;
+        }
+
+        const uint32_t sub = access.subresource;
+        if (sub >= static_cast<uint32_t>(states.size())) {
+            spdlog::error("RenderGraph: Pass '{}' requested subresource {} for '{}' ({} subresources)",
+                          pass.name, sub, rgRes.name, states.size());
+            return;
+        }
+
+        const D3D12_RESOURCE_STATES current = states[sub];
+        handleUavHazard(sub, current);
+        if (current != required) {
+            emitTransition(pass, access.handle.id, sub, current, required);
+            states[sub] = required;
+        }
+    };
 
     for (auto& pass : m_passes) {
-        if (pass.culled) continue;
+        if (pass.culled) {
+            continue;
+        }
 
         pass.preBarriers.clear();
         pass.postBarriers.clear();
+        std::fill(uavBarrierEmitted.begin(), uavBarrierEmitted.end(), 0);
 
-        // Compute required states for reads
-        for (const auto& [handle, usage] : pass.reads) {
-            if (!handle.IsValid() || handle.id >= m_resources.size()) continue;
-
-            D3D12_RESOURCE_STATES required = UsageToState(usage);
-            D3D12_RESOURCE_STATES current = currentStates[handle.id];
-
-            if (current != required) {
-                D3D12_RESOURCE_BARRIER barrier = {};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_resources[handle.id].resource;
-                barrier.Transition.StateBefore = current;
-                barrier.Transition.StateAfter = required;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                pass.preBarriers.push_back(barrier);
-                currentStates[handle.id] = required;
-                m_totalBarrierCount++;
+        // Explicit aliasing barriers (placed resources only).
+        for (const auto& alias : pass.aliasing) {
+            ID3D12Resource* before = nullptr;
+            ID3D12Resource* after = nullptr;
+            if (alias.before.IsValid() && alias.before.id < m_resources.size()) {
+                before = m_resources[alias.before.id].resource;
             }
+            if (alias.after.IsValid() && alias.after.id < m_resources.size()) {
+                after = m_resources[alias.after.id].resource;
+            }
+
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+            barrier.Aliasing.pResourceBefore = before;
+            barrier.Aliasing.pResourceAfter = after;
+            pass.preBarriers.push_back(barrier);
+            m_totalBarrierCount++;
         }
 
-        // Compute required states for writes
-        for (const auto& [handle, usage] : pass.writes) {
-            if (!handle.IsValid() || handle.id >= m_resources.size()) continue;
-
-            D3D12_RESOURCE_STATES required = UsageToState(usage);
-            D3D12_RESOURCE_STATES current = currentStates[handle.id];
-
-            if (current != required) {
-                D3D12_RESOURCE_BARRIER barrier = {};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_resources[handle.id].resource;
-                barrier.Transition.StateBefore = current;
-                barrier.Transition.StateAfter = required;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                pass.preBarriers.push_back(barrier);
-                currentStates[handle.id] = required;
-                m_totalBarrierCount++;
-            }
+        for (const auto& access : pass.reads) {
+            transitionAccess(pass, access, false);
+        }
+        for (const auto& access : pass.readWrites) {
+            transitionAccess(pass, access, true);
+        }
+        for (const auto& access : pass.writes) {
+            transitionAccess(pass, access, true);
         }
     }
 
-    // Store final states for external tracking
-    for (const auto& [id, state] : currentStates) {
+    // Store final (uniform) states for external tracking.
+    for (uint32_t id = 0; id < static_cast<uint32_t>(m_resources.size()); ++id) {
+        const auto& states = m_resources[id].subresourceStates;
+        const D3D12_RESOURCE_STATES first = states.empty() ? D3D12_RESOURCE_STATE_COMMON : states[0];
+        const bool uniform = states.empty() ? true : AreAllSubresourcesInState(states, first);
+
         RGResourceHandle handle;
         handle.id = id;
-        m_finalStates[handle] = state;
+        m_finalStates[handle] = uniform ? first : D3D12_RESOURCE_STATE_COMMON;
     }
 }
 
@@ -342,6 +521,77 @@ Result<void> RenderGraph::Compile() {
 
     // First cull unused passes
     CullPasses();
+
+    // Debug validation: a pass must declare ReadWrite() if it both reads and writes
+    // the same subresource; this catches accidental SRV+UAV mismatches.
+    for (const auto& pass : m_passes) {
+        if (pass.culled) {
+            continue;
+        }
+
+        std::unordered_set<uint64_t> readSubs;
+        std::unordered_set<uint64_t> writeSubs;
+        std::unordered_set<uint64_t> readWriteSubs;
+
+        auto addExpanded = [&](const RGResourceAccess& access, std::unordered_set<uint64_t>& dst) -> bool {
+            if (!access.handle.IsValid() || access.handle.id >= m_resources.size()) {
+                return true;
+            }
+
+            const auto& states = m_resources[access.handle.id].subresourceStates;
+            const uint32_t subCount = states.empty() ? 1u : static_cast<uint32_t>(states.size());
+
+            auto addOne = [&](uint32_t sub) {
+                const uint64_t key = (static_cast<uint64_t>(access.handle.id) << 32) | sub;
+                dst.insert(key);
+            };
+
+            if (access.subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) {
+                for (uint32_t sub = 0; sub < subCount; ++sub) {
+                    addOne(sub);
+                }
+                return true;
+            }
+
+            if (access.subresource >= subCount) {
+                spdlog::error("RenderGraph: Pass '{}' requested subresource {} for '{}' ({} subresources)",
+                              pass.name, access.subresource, m_resources[access.handle.id].name, subCount);
+                return false;
+            }
+
+            addOne(access.subresource);
+            return true;
+        };
+
+        for (const auto& access : pass.reads) {
+            if (!addExpanded(access, readSubs)) {
+                return Result<void>::Err("RenderGraph Compile validation failed (invalid read subresource)");
+            }
+        }
+        for (const auto& access : pass.writes) {
+            if (!addExpanded(access, writeSubs)) {
+                return Result<void>::Err("RenderGraph Compile validation failed (invalid write subresource)");
+            }
+        }
+        for (const auto& access : pass.readWrites) {
+            if (!addExpanded(access, readWriteSubs)) {
+                return Result<void>::Err("RenderGraph Compile validation failed (invalid readwrite subresource)");
+            }
+        }
+
+        for (const auto& key : readSubs) {
+            if (writeSubs.contains(key) && !readWriteSubs.contains(key)) {
+                const uint32_t resId = static_cast<uint32_t>(key >> 32);
+                const uint32_t sub = static_cast<uint32_t>(key & 0xFFFFFFFFu);
+                spdlog::error("RenderGraph: Pass '{}' both reads+writes '{}' subresource {} without ReadWrite()",
+                              pass.name, (resId < m_resources.size() ? m_resources[resId].name : "Unknown"), sub);
+#ifndef NDEBUG
+                assert(false && "RenderGraph: pass reads+writes same subresource without ReadWrite()");
+#endif
+                return Result<void>::Err("RenderGraph Compile validation failed (read+write without ReadWrite)");
+            }
+        }
+    }
 
     // Then compute barriers
     ComputeBarriers();
@@ -413,9 +663,35 @@ D3D12_RESOURCE_STATES RenderGraph::GetResourceState(RGResourceHandle handle) con
         return it->second;
     }
     if (handle.IsValid() && handle.id < m_resources.size()) {
-        return m_resources[handle.id].currentState;
+        const auto& states = m_resources[handle.id].subresourceStates;
+        if (states.empty()) {
+            return D3D12_RESOURCE_STATE_COMMON;
+        }
+        const D3D12_RESOURCE_STATES first = states[0];
+        return AreAllSubresourcesInState(states, first) ? first : D3D12_RESOURCE_STATE_COMMON;
     }
     return D3D12_RESOURCE_STATE_COMMON;
+}
+
+D3D12_RESOURCE_STATES RenderGraph::GetResourceState(RGResourceHandle handle, uint32_t subresource) const {
+    if (!handle.IsValid() || handle.id >= m_resources.size()) {
+        return D3D12_RESOURCE_STATE_COMMON;
+    }
+
+    if (subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) {
+        return GetResourceState(handle);
+    }
+
+    const auto& states = m_resources[handle.id].subresourceStates;
+    if (states.empty()) {
+        return D3D12_RESOURCE_STATE_COMMON;
+    }
+
+    if (subresource >= static_cast<uint32_t>(states.size())) {
+        return D3D12_RESOURCE_STATE_COMMON;
+    }
+
+    return states[subresource];
 }
 
 } // namespace Cortex::Graphics

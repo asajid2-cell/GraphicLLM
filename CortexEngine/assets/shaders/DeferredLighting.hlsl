@@ -2,36 +2,52 @@
 // Phase 2.2: Deferred lighting pass for visibility buffer
 // Reads G-buffers and applies PBR lighting
 
+// Temporary debug views (compile-time).
+// 0 = off, 1 = normals, 2 = NdotL, 3 = clustered occupancy
+#define DEFERRED_DEBUG_VIEW 0
+
 // G-buffer inputs
-Texture2D<float4> g_GBufferAlbedo : register(t0);           // RGB = albedo, A = alpha
+Texture2D<float4> g_GBufferAlbedo : register(t0);           // RGB = albedo (linear), A = AO
 Texture2D<float4> g_GBufferNormalRoughness : register(t1);  // RGB = normal, A = roughness
 Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A = metallic
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 
 // Environment/shadow maps (matching forward renderer)
-TextureCube<float4> g_EnvironmentMap : register(t4);
-Texture2D<float> g_ShadowMap : register(t5);
+TextureCube<float4> g_EnvDiffuse : register(t4);
+TextureCube<float4> g_EnvSpecular : register(t5);
+Texture2DArray<float> g_ShadowMap : register(t6);
+Texture2D<float2> g_BRDFLUT : register(t7);
+
+struct Light {
+    float4 position_type;
+    float4 direction_cosInner;
+    float4 color_range;
+    float4 params;
+};
+
+StructuredBuffer<Light> g_LocalLights : register(t8);
+StructuredBuffer<uint2> g_ClusterRanges : register(t9);
+StructuredBuffer<uint> g_ClusterLightIndices : register(t10);
 
 SamplerState g_LinearSampler : register(s0);
-SamplerComparisonState g_ShadowSampler : register(s1);
+SamplerState g_ShadowSampler : register(s1);
 
 cbuffer PerFrameData : register(b0) {
-    float4x4 g_InvViewProj;          // Inverse view-projection for position reconstruction
+    float4x4 g_InvViewProj;                // Inverse view-projection for position reconstruction
     float4x4 g_ViewMatrix;
-    float4x4 g_LightViewProj;        // Shadow map view-projection
+    float4x4 g_LightViewProjection[3];     // Cascaded shadow matrices (0..2)
 
-    float3 g_CameraPos;
-    float _pad0;
+    float4 g_CameraPosition;               // xyz = camera position (world)
+    float4 g_SunDirection;                 // xyz = direction-to-light (world)
+    float4 g_SunRadiance;                  // rgb = color * intensity
 
-    float3 g_SunDirection;           // Directional light direction
-    float _pad1;
-
-    float3 g_SunColor;               // Directional light color
-    float g_SunIntensity;
-
-    float g_IBLDiffuseIntensity;     // Image-based lighting diffuse
-    float g_IBLSpecularIntensity;    // Image-based lighting specular
-    float2 _pad2;
+    float4 g_CascadeSplits;                // x,y,z = split depths in view space, w = far plane
+    float4 g_ShadowParams;                 // x=bias, y=pcfRadius(texels), z=enabled, w=pcssEnabled
+    float4 g_EnvParams;                    // x=diffuse IBL, y=specular IBL, z=IBL enabled, w unused
+    float4 g_ShadowInvSizeAndSpecMaxMip;   // xy = 1/shadowMapDim, z = specular max mip, w unused
+    float4 g_ProjectionParams;             // x=proj11, y=proj22, z=nearZ, w=farZ
+    uint4  g_ScreenAndCluster;             // x=width, y=height, z=clusterCountX, w=clusterCountY
+    uint4  g_ClusterParams;                // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
 };
 
 static const float PI = 3.14159265f;
@@ -77,32 +93,158 @@ float3 FresnelSchlick(float cosTheta, float3 F0) {
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-// Simple PCF shadow sampling
-float SampleShadow(float3 worldPos) {
-    // Transform to shadow map space
-    float4 shadowPos = mul(g_LightViewProj, float4(worldPos, 1.0));
-    shadowPos.xyz /= shadowPos.w;
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness) {
+    float3 F90 = max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0);
+    return F0 + (F90 - F0) * pow(1.0 - cosTheta, 5.0);
+}
 
-    // Convert to texture coordinates
-    float2 shadowUV = shadowPos.xy * float2(0.5, -0.5) + 0.5;
+uint ComputeClusterZ(float viewZ)
+{
+    float nearZ = g_ProjectionParams.z;
+    float farZ = g_ProjectionParams.w;
+    uint clusterCountZ = g_ClusterParams.x;
 
-    // Out of shadow map bounds = fully lit
-    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || shadowPos.z < 0.0) {
-        return 1.0;
-    }
+    viewZ = max(viewZ, nearZ);
+    float denom = log(max(farZ / nearZ, 1.0001f));
+    float t = (denom > 0.0f) ? (log(viewZ / nearZ) / denom) : 0.0f;
+    t = saturate(t);
 
-    // Simple PCF 3x3
-    float shadow = 0.0;
-    float2 texelSize = 1.0 / float2(2048.0, 2048.0);
+    uint z = (uint)floor(t * (float)clusterCountZ);
+    return min(z, clusterCountZ - 1u);
+}
 
+float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius, uint cascadeIndex) {
+    float2 texelSize = g_ShadowInvSizeAndSpecMaxMip.xy;
+
+    float shadow = 0.0f;
+    int samples = 0;
+
+    [unroll]
     for (int x = -1; x <= 1; ++x) {
+        [unroll]
         for (int y = -1; y <= 1; ++y) {
-            float2 offset = float2(x, y) * texelSize;
-            shadow += g_ShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadowUV + offset, shadowPos.z - 0.001);
+            float2 offset = float2(x, y) * texelSize * pcfRadius;
+            float depthSample = g_ShadowMap.Sample(g_ShadowSampler, float3(shadowUV + offset, cascadeIndex)).r;
+            shadow += (currentDepth - bias > depthSample) ? 0.0f : 1.0f;
+            samples++;
         }
     }
 
-    return shadow / 9.0;
+    return shadow / max(samples, 1);
+}
+
+float ComputeShadowCascade(float3 worldPos, float3 normal, uint cascadeIndex) {
+    cascadeIndex = min(cascadeIndex, 2u);
+
+    float4 lightClip = mul(g_LightViewProjection[cascadeIndex], float4(worldPos, 1.0f));
+    if (lightClip.w <= 1e-4f || !all(isfinite(lightClip))) {
+        return 1.0f;
+    }
+
+    float3 lightNDC = lightClip.xyz / lightClip.w;
+    if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
+        lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
+        lightNDC.z < 0.0f || lightNDC.z > 1.0f) {
+        return 1.0f;
+    }
+
+    float2 shadowUV;
+    shadowUV.x = 0.5f * lightNDC.x + 0.5f;
+    shadowUV.y = -0.5f * lightNDC.y + 0.5f;
+
+    float currentDepth = lightNDC.z;
+
+    float bias = g_ShadowParams.x;
+    float pcfRadius = g_ShadowParams.y;
+
+    float cascadeScale = 1.0f + (float)cascadeIndex * 0.5f;
+    bias *= cascadeScale;
+
+    float3 lightDirWS = normalize(g_SunDirection.xyz);
+    float ndotl = saturate(dot(normal, lightDirWS));
+    bias *= lerp(1.5f, 0.5f, ndotl);
+
+    if (g_ShadowParams.w > 0.5f) {
+        float2 texelSize = g_ShadowInvSizeAndSpecMaxMip.xy;
+        float searchRadius = pcfRadius * 2.5f;
+
+        float avgBlocker = 0.0f;
+        int blockerCount = 0;
+
+        [unroll]
+        for (int x = -1; x <= 1; ++x) {
+            [unroll]
+            for (int y = -1; y <= 1; ++y) {
+                float2 offset = float2(x, y) * texelSize * searchRadius;
+                float depthSample = g_ShadowMap.Sample(g_ShadowSampler, float3(shadowUV + offset, cascadeIndex)).r;
+                if (depthSample + bias < currentDepth) {
+                    avgBlocker += depthSample;
+                    blockerCount++;
+                }
+            }
+        }
+
+        if (blockerCount > 0) {
+            avgBlocker /= blockerCount;
+            float penumbra = saturate((currentDepth - avgBlocker) / max(avgBlocker, 1e-4f));
+            pcfRadius *= (1.0f + penumbra * 4.0f);
+        }
+    }
+
+    return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, cascadeIndex);
+}
+
+float ComputeShadow(float3 worldPos, float3 normal) {
+    if (g_ShadowParams.z < 0.5f) {
+        return 1.0f;
+    }
+
+    float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
+    float depth = viewPos.z;
+
+    float split0 = g_CascadeSplits.x;
+    float split1 = g_CascadeSplits.y;
+
+    uint primary = 0;
+    uint secondary = 0;
+    float blend = 0.0f;
+
+    float range0 = max(split0 * 0.2f, 4.0f);
+    float range1 = max(split1 * 0.2f, 8.0f);
+
+    if (depth <= split0) {
+        primary = 0;
+        secondary = 1;
+        float d = split0 - depth;
+        blend = saturate(1.0f - d / range0);
+    } else if (depth <= split1) {
+        float d0 = depth - split0;
+        float d1 = split1 - depth;
+        primary = 1;
+        if (d0 < d1) {
+            secondary = 0;
+            blend = saturate(1.0f - d0 / range0);
+        } else {
+            secondary = 2;
+            blend = saturate(1.0f - d1 / range1);
+        }
+    } else {
+        primary = 2;
+        secondary = 1;
+        float d = depth - split1;
+        blend = saturate(1.0f - d / range1);
+    }
+
+    primary = min(primary, 2u);
+    secondary = min(secondary, 2u);
+
+    float shadowPrimary = ComputeShadowCascade(worldPos, normal, primary);
+    if (blend <= 0.001f || primary == secondary) {
+        return shadowPrimary;
+    }
+
+    float shadowSecondary = ComputeShadowCascade(worldPos, normal, secondary);
+    return lerp(shadowPrimary, shadowSecondary, blend);
 }
 
 // Reconstruct world position from depth
@@ -149,6 +291,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Unpack G-buffer data
     float3 albedoColor = albedo.rgb;
+    float ao = saturate(albedo.a);
     float3 normal = normalize(normalRoughness.xyz);
     float roughness = normalRoughness.w;
     float3 emissive = emissiveMetallic.rgb;
@@ -156,24 +299,35 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Check for background pixels (depth = 1.0)
     if (depth >= 0.9999) {
-        // Sky/background - could sample environment map here
-        return float4(0.0, 0.0, 0.0, 1.0);
+        float3 worldFar = ReconstructWorldPosition(input.texCoord, 1.0f);
+        float3 viewDir = normalize(worldFar - g_CameraPosition.xyz);
+        float iblSpec = (g_EnvParams.z > 0.5f) ? g_EnvParams.y : 0.0f;
+        float3 sky = g_EnvSpecular.SampleLevel(g_LinearSampler, viewDir, 0.0f).rgb * iblSpec;
+        return float4(sky, 1.0f);
     }
 
     // Reconstruct world position from depth
     float3 worldPos = ReconstructWorldPosition(input.texCoord, depth);
 
     // View direction
-    float3 V = normalize(g_CameraPos - worldPos);
+    float3 V = normalize(g_CameraPosition.xyz - worldPos);
+    float NdotV = max(dot(normal, V), 0.0);
 
     // PBR material properties
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedoColor, metallic);
 
     // --- Directional Light (Sun) ---
-    float3 L = normalize(-g_SunDirection);
+    // Convention: g_SunDirection.xyz is direction-to-light (matches Basic.hlsl).
+    float3 L = normalize(g_SunDirection.xyz);
     float3 H = normalize(V + L);
 
     float NdotL = max(dot(normal, L), 0.0);
+
+#if DEFERRED_DEBUG_VIEW == 1
+    return float4(normal * 0.5f + 0.5f, 1.0f);
+#elif DEFERRED_DEBUG_VIEW == 2
+    return float4(NdotL.xxx, 1.0f);
+#endif
 
     // Cook-Torrance BRDF
     float NDF = DistributionGGX(normal, H, roughness);
@@ -181,35 +335,139 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
     float3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(normal, V), 0.0) * NdotL;
+    float denominator = 4.0 * NdotV * NdotL;
     float3 specular = numerator / max(denominator, 0.001);
 
     float3 kS = F;
     float3 kD = (1.0 - kS) * (1.0 - metallic);
 
     // Shadow
-    float shadow = SampleShadow(worldPos);
+    float shadow = ComputeShadow(worldPos, normal);
 
-    // Direct lighting
-    float3 directLight = (kD * albedoColor / PI + specular) * g_SunColor * g_SunIntensity * NdotL * shadow;
+    // Direct lighting (sun)
+    float3 directLight = (kD * albedoColor / PI + specular) * g_SunRadiance.rgb * NdotL * shadow;
+
+    // Clustered local lights (no local shadows yet).
+    if (g_ClusterParams.z > 0u) {
+        uint width = g_ScreenAndCluster.x;
+        uint height = g_ScreenAndCluster.y;
+        uint clusterCountX = g_ScreenAndCluster.z;
+        uint clusterCountY = g_ScreenAndCluster.w;
+
+        uint tileW = (width + clusterCountX - 1u) / clusterCountX;
+        uint tileH = (height + clusterCountY - 1u) / clusterCountY;
+
+        uint cx = min(pixelCoord.x / max(tileW, 1u), clusterCountX - 1u);
+        uint cy = min(pixelCoord.y / max(tileH, 1u), clusterCountY - 1u);
+
+        float viewZ = mul(g_ViewMatrix, float4(worldPos, 1.0f)).z;
+        uint cz = ComputeClusterZ(viewZ);
+
+        uint clusterIndex = cx + cy * clusterCountX + cz * (clusterCountX * clusterCountY);
+        uint2 range = g_ClusterRanges[clusterIndex];
+        uint base = range.x;
+        uint count = min(range.y, g_ClusterParams.y);
+
+#if DEFERRED_DEBUG_VIEW == 3
+        float occ = (g_ClusterParams.y > 0u) ? (float)count / (float)g_ClusterParams.y : 0.0f;
+        return float4(occ.xxx, 1.0f);
+#endif
+
+        [loop]
+        for (uint i = 0; i < count; ++i) {
+            uint lightIndex = g_ClusterLightIndices[base + i];
+            if (lightIndex >= g_ClusterParams.z) {
+                continue;
+            }
+
+            Light light = g_LocalLights[lightIndex];
+            float type = light.position_type.w;
+            if (type < 0.5f) {
+                continue;
+            }
+
+            float3 lightPos = light.position_type.xyz;
+            float3 toLight = lightPos - worldPos;
+            float dist = length(toLight);
+            if (dist < 1e-3f) {
+                continue;
+            }
+
+            float rangeMeters = light.color_range.w;
+            if (rangeMeters <= 0.0f || dist > rangeMeters) {
+                continue;
+            }
+
+            float3 Ll = toLight / dist;
+            float NdotLl = max(dot(normal, Ll), 0.0f);
+            if (NdotLl <= 0.0f) {
+                continue;
+            }
+
+            float att = saturate(1.0f - dist / rangeMeters);
+            att *= att;
+            float invDist2 = 1.0f / max(dist * dist, 1e-3f);
+
+            // Spot cone attenuation (approx).
+            if (type > 1.5f && type < 2.5f) {
+                float3 spotDir = normalize(light.direction_cosInner.xyz);
+                float cosInner = light.direction_cosInner.w;
+                float cosOuter = light.params.x;
+                float cosTheta = dot(spotDir, normalize(worldPos - lightPos));
+                float spot = saturate((cosTheta - cosOuter) / max(cosInner - cosOuter, 1e-3f));
+                spot = spot * spot;
+                att *= spot;
+            }
+
+            float3 radiance = light.color_range.rgb * (att * invDist2);
+
+            float3 Hl = normalize(V + Ll);
+            float NDF_l = DistributionGGX(normal, Hl, roughness);
+            float G_l = GeometrySmith(normal, V, Ll, roughness);
+            float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
+
+            float3 numerator_l = NDF_l * G_l * F_l;
+            float denom_l = 4.0f * NdotV * NdotLl;
+            float3 spec_l = numerator_l / max(denom_l, 0.001f);
+
+            float3 kS_l = F_l;
+            float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
+
+            directLight += (kD_l * albedoColor / PI + spec_l) * radiance * NdotLl;
+        }
+    }
 
     // --- Image-Based Lighting (IBL) ---
-    float3 ambient = float3(0.03, 0.03, 0.03); // Fallback ambient
+    float3 ambient = float3(0.03, 0.03, 0.03); // Fallback ambient (indirect only)
+    const bool iblEnabled = (g_EnvParams.z > 0.5f);
+
+    float3 diffuseIBL = 0.0f;
+    float3 specularIBL = 0.0f;
+    float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
+    float3 kD_ibl = (1.0 - metallic) * (1.0 - Fibl);
 
     // Simple diffuse IBL (could be improved with irradiance map)
-    if (g_IBLDiffuseIntensity > 0.0) {
-        float3 irradiance = g_EnvironmentMap.SampleLevel(g_LinearSampler, normal, 5.0).rgb; // High mip = diffuse
-        ambient = irradiance * albedoColor * g_IBLDiffuseIntensity;
+    if (iblEnabled && g_EnvParams.x > 0.0f) {
+        float3 irradiance = g_EnvDiffuse.SampleLevel(g_LinearSampler, normal, 0.0f).rgb;
+        diffuseIBL = irradiance * albedoColor * kD_ibl;
     }
 
     // Specular IBL (reflection)
-    if (g_IBLSpecularIntensity > 0.0) {
+    if (iblEnabled && g_EnvParams.y > 0.0f) {
         float3 R = reflect(-V, normal);
-        float mipLevel = roughness * 5.0; // Rougher = higher mip
-        float3 prefilteredColor = g_EnvironmentMap.SampleLevel(g_LinearSampler, R, mipLevel).rgb;
-        float3 specularIBL = prefilteredColor * (F * g_IBLSpecularIntensity);
-        ambient += specularIBL;
+        float maxMip = g_ShadowInvSizeAndSpecMaxMip.z;
+        float mipLevel = roughness * maxMip;
+        float3 prefilteredColor = g_EnvSpecular.SampleLevel(g_LinearSampler, R, mipLevel).rgb;
+        float2 brdf = g_BRDFLUT.SampleLevel(g_LinearSampler, float2(saturate(NdotV), saturate(roughness)), 0.0f);
+        specularIBL = prefilteredColor * (F0 * brdf.x + brdf.y);
     }
+
+    // Apply ambient occlusion to indirect lighting only (not direct sun).
+    float aoDiffuse = ao;
+    float aoSpec = lerp(ao, 1.0f, roughness);
+    ambient *= aoDiffuse;
+    ambient += diffuseIBL * g_EnvParams.x * aoDiffuse;
+    ambient += specularIBL * g_EnvParams.y * aoSpec;
 
     // Final color
     float3 color = directLight + ambient + emissive;

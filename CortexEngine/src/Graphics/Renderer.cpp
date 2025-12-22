@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "RenderGraph.h"
 #include "Core/Window.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -8,9 +9,11 @@
 #include <cmath>
 #include <chrono>
 #include <array>
+#include <cstring>
 #include <limits>
 #include <filesystem>
 #include <algorithm>
+#include <unordered_set>
 #include <cstdio>
 #include <cstdlib>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -20,6 +23,78 @@
 #include <stdio.h>
 
 namespace Cortex::Graphics {
+
+namespace {
+
+FrustumPlanes ExtractFrustumPlanesCPU(const glm::mat4& viewProj) {
+    FrustumPlanes planes{};
+
+    planes.planes[0] = glm::vec4(
+        viewProj[0][3] + viewProj[0][0],
+        viewProj[1][3] + viewProj[1][0],
+        viewProj[2][3] + viewProj[2][0],
+        viewProj[3][3] + viewProj[3][0]);
+
+    planes.planes[1] = glm::vec4(
+        viewProj[0][3] - viewProj[0][0],
+        viewProj[1][3] - viewProj[1][0],
+        viewProj[2][3] - viewProj[2][0],
+        viewProj[3][3] - viewProj[3][0]);
+
+    planes.planes[2] = glm::vec4(
+        viewProj[0][3] + viewProj[0][1],
+        viewProj[1][3] + viewProj[1][1],
+        viewProj[2][3] + viewProj[2][1],
+        viewProj[3][3] + viewProj[3][1]);
+
+    planes.planes[3] = glm::vec4(
+        viewProj[0][3] - viewProj[0][1],
+        viewProj[1][3] - viewProj[1][1],
+        viewProj[2][3] - viewProj[2][1],
+        viewProj[3][3] - viewProj[3][1]);
+
+    // D3D-style depth (LH_ZO): near plane is row2, far is row4-row2.
+    planes.planes[4] = glm::vec4(
+        viewProj[0][2],
+        viewProj[1][2],
+        viewProj[2][2],
+        viewProj[3][2]);
+
+    planes.planes[5] = glm::vec4(
+        viewProj[0][3] - viewProj[0][2],
+        viewProj[1][3] - viewProj[1][2],
+        viewProj[2][3] - viewProj[2][2],
+        viewProj[3][3] - viewProj[3][2]);
+
+    for (int i = 0; i < 6; ++i) {
+        float len = glm::length(glm::vec3(planes.planes[i]));
+        if (len > 0.0001f) {
+            planes.planes[i] /= len;
+        }
+    }
+
+    return planes;
+}
+
+bool SphereIntersectsFrustumCPU(const FrustumPlanes& frustum, const glm::vec3& center, float radius) {
+    for (int i = 0; i < 6; ++i) {
+        const glm::vec4 p = frustum.planes[i];
+        const float dist = glm::dot(glm::vec3(p), center) + p.w;
+        if (dist < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
+float GetMaxWorldScale(const glm::mat4& worldMatrix) {
+    const glm::vec3 col0 = glm::vec3(worldMatrix[0]);
+    const glm::vec3 col1 = glm::vec3(worldMatrix[1]);
+    const glm::vec3 col2 = glm::vec3(worldMatrix[2]);
+    return glm::max(glm::max(glm::length(col0), glm::length(col1)), glm::length(col2));
+}
+
+} // namespace
 
 Renderer::~Renderer() {
     // Ensure GPU is completely idle before any member destructors run
@@ -291,6 +366,10 @@ static float Halton(uint32_t index, uint32_t base) {
 // Glass presets default to partial alpha and should be rendered in a
 // separate blended pass after opaque geometry.
 static bool IsTransparentRenderable(const Cortex::Scene::RenderableComponent& renderable) {
+    if (renderable.alphaMode == Cortex::Scene::RenderableComponent::AlphaMode::Blend) {
+        return true;
+    }
+
     // Primary signal: explicit alpha on the material color.
     const float opacity = renderable.albedoColor.a;
     if (opacity < 0.99f) {
@@ -1251,6 +1330,11 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         MarkPassComplete("BeginFrame_DeviceRemoved");
         return;
     }
+
+    // VB instance/mesh lists are rebuilt only when the VB path is taken; clear
+    // them every frame so downstream passes (motion vectors) don't see stale data.
+    m_vbInstances.clear();
+    m_vbMeshDraws.clear();
     MarkPassComplete("BeginFrame_Done");
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
@@ -1374,10 +1458,13 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         }
         // Fallback: GPU culling path (Phase 1 GPU-driven rendering)
         else if (m_gpuCullingEnabled && m_gpuCulling) {
-            static uint64_t s_lastCullingPathLogFrame = 0;
-            if ((m_renderFrameCounter % 120) == 0 && m_renderFrameCounter != s_lastCullingPathLogFrame) {
+            using clock = std::chrono::steady_clock;
+            static clock::time_point s_lastCullingPathLog{};
+            const auto now = clock::now();
+            if (s_lastCullingPathLog.time_since_epoch().count() == 0 ||
+                (now - s_lastCullingPathLog) > std::chrono::seconds(20)) {
                 spdlog::info("Taking GPU culling path");
-                s_lastCullingPathLogFrame = m_renderFrameCounter;
+                s_lastCullingPathLog = now;
             }
             WriteBreadcrumb(GpuMarker::OpaqueGeometry);
             RenderSceneIndirect(registry);
@@ -1408,6 +1495,77 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         WriteBreadcrumb(GpuMarker::MotionVectors);
         RenderMotionVectors();
         MarkPassComplete("RenderMotionVectors_Done");
+    }
+
+    // Optional HZB build (depth pyramid) for future occlusion culling and debug.
+    // Disabled by default; enable via env vars:
+    //   - CORTEX_ENABLE_HZB=1 (build HZB each frame)
+    //   - CORTEX_USE_RG_HZB=1 (use RenderGraph-backed builder)
+    static bool s_checkedHzbEnv = false;
+    static bool s_enableHzb = false;
+    static bool s_useRgHzb = false;
+    if (!s_checkedHzbEnv) {
+        s_checkedHzbEnv = true;
+        s_enableHzb = (std::getenv("CORTEX_ENABLE_HZB") != nullptr) || (std::getenv("CORTEX_USE_RG_HZB") != nullptr);
+        s_useRgHzb = (std::getenv("CORTEX_USE_RG_HZB") != nullptr);
+        // If GPU culling requests HZB occlusion, ensure the pyramid is built.
+        if (std::getenv("CORTEX_GPUCULL_USE_HZB") != nullptr) {
+            s_enableHzb = true;
+        }
+        if (s_enableHzb) {
+            spdlog::info("HZB enabled (RenderGraph builder: {})", s_useRgHzb ? "yes" : "no");
+        }
+    }
+    if (s_enableHzb) {
+        if (s_useRgHzb && m_renderGraph && m_device && m_commandList && m_descriptorManager &&
+            m_depthBuffer && m_depthSRV.IsValid()) {
+            auto resResult = CreateHZBResources();
+            if (resResult.IsErr()) {
+                spdlog::warn("HZB RG: {}", resResult.Error());
+            } else if (!m_hzbTexture || m_hzbMipCount == 0 ||
+                       m_hzbMipSRVStaging.size() != m_hzbMipCount ||
+                       m_hzbMipUAVStaging.size() != m_hzbMipCount) {
+                spdlog::warn("HZB RG: invalid resources (texture={}, mips={}, srvs={}, uavs={})",
+                             static_cast<bool>(m_hzbTexture), m_hzbMipCount,
+                             m_hzbMipSRVStaging.size(), m_hzbMipUAVStaging.size());
+            } else {
+                m_renderGraph->BeginFrame();
+
+                const RGResourceHandle depthHandle =
+                    m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth");
+                const RGResourceHandle hzbHandle =
+                    m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
+
+                AddHZBFromDepthPasses_RG(*m_renderGraph, depthHandle, hzbHandle);
+
+                const auto execResult = m_renderGraph->Execute(m_commandList.Get());
+                if (execResult.IsErr()) {
+                    spdlog::warn("HZB RG: Execute failed: {}", execResult.Error());
+                } else {
+                    static bool s_logged = false;
+                    if (!s_logged) {
+                        s_logged = true;
+                        spdlog::info("HZB RG: passes={}, barriers={}",
+                                     m_renderGraph->GetPassCount(), m_renderGraph->GetBarrierCount());
+                    }
+
+                    m_depthState = m_renderGraph->GetResourceState(depthHandle);
+                    m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
+                    m_hzbValid = true;
+
+                    m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
+                    m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
+                    m_hzbCaptureCameraPosWS = m_cameraPositionWS;
+                    m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
+                    m_hzbCaptureNearPlane = m_cameraNearPlane;
+                    m_hzbCaptureFarPlane = m_cameraFarPlane;
+                    m_hzbCaptureFrameCounter = m_renderFrameCounter;
+                    m_hzbCaptureValid = true;
+                }
+            }
+        } else {
+            BuildHZBFromDepth();
+        }
     }
 
     // HDR TAA resolve pass (stabilizes main lighting before reflections,
@@ -2223,11 +2381,26 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     std::vector<ParticleInstance> instances;
     instances.reserve(1024);
 
+    const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_frameDataCPU.viewProjectionNoJitter);
+
     for (auto entity : view) {
         auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         glm::vec3 emitterWorldPos = glm::vec3(transform.worldMatrix[3]);
+
+        // Conservative per-emitter frustum culling. This is most meaningful for
+        // local-space emitters; for world-space emitters we still do per-particle
+        // culling below.
+        if (emitter.localSpace) {
+            const float maxSpeed =
+                glm::length(emitter.initialVelocity) + glm::length(emitter.velocityRandom);
+            const float conservativeRadius =
+                glm::max(0.5f, maxSpeed * emitter.lifetime + glm::max(emitter.sizeStart, emitter.sizeEnd));
+            if (!SphereIntersectsFrustumCPU(frustum, emitterWorldPos, conservativeRadius)) {
+                continue;
+            }
+        }
 
         for (const auto& p : emitter.particles) {
             if (p.age >= p.lifetime) {
@@ -2242,6 +2415,11 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             inst.position = emitter.localSpace ? (emitterWorldPos + p.position) : p.position;
             inst.size     = p.size;
             inst.color    = p.color;
+
+            if (!SphereIntersectsFrustumCPU(frustum, inst.position, glm::max(0.01f, inst.size))) {
+                continue;
+            }
+
             instances.push_back(inst);
         }
 
@@ -4070,7 +4248,39 @@ void Renderer::RenderTAA() {
 }
 
 void Renderer::RenderMotionVectors() {
-    if (!m_motionVectorsPipeline || !m_velocityBuffer || !m_depthBuffer) {
+    if (!m_velocityBuffer) {
+        return;
+    }
+
+    // When the visibility-buffer path is active, compute per-object motion vectors
+    // from VB + barycentrics (better stability for TAA/SSR/RT).
+    if (m_visibilityBufferEnabled && m_visibilityBuffer && !m_vbMeshDraws.empty() && !m_vbInstances.empty()) {
+        // Transition velocity buffer for UAV writes.
+        if (m_velocityState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_velocityBuffer.Get();
+            barrier.Transition.StateBefore = m_velocityState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_velocityState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        }
+
+        auto mvResult = m_visibilityBuffer->ComputeMotionVectors(
+            m_commandList.Get(),
+            m_velocityBuffer.Get(),
+            m_vbMeshDraws,
+            m_frameConstantBuffer.gpuAddress
+        );
+        if (mvResult.IsErr()) {
+            spdlog::warn("VB motion vectors failed; falling back to camera-only: {}", mvResult.Error());
+        } else {
+            return;
+        }
+    }
+
+    if (!m_motionVectorsPipeline || !m_depthBuffer) {
         return;
     }
 
@@ -4184,6 +4394,10 @@ uint32_t Renderer::GetGPUTotalInstances() const {
     return m_gpuCulling ? m_gpuCulling->GetTotalInstances() : 0;
 }
 
+GPUCullingPipeline::DebugStats Renderer::GetGPUCullingDebugStats() const {
+    return m_gpuCulling ? m_gpuCulling->GetDebugStats() : GPUCullingPipeline::DebugStats{};
+}
+
 void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
     if (!registry || !m_gpuCulling) return;
 
@@ -4274,8 +4488,71 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
     // Map mesh pointers to their draw info index (to avoid duplicates)
     std::unordered_map<const Scene::MeshData*, uint32_t> meshToDrawIndex;
+    // Per-mesh instance buckets to guarantee each mesh draws only its own instances.
+    std::vector<std::vector<VBInstanceData>> opaqueInstancesPerMesh;
+    std::vector<std::vector<VBInstanceData>> alphaMaskedInstancesPerMesh;
 
+    // Stable entity order so per-instance/material indices don't thrash frame-to-frame.
+    std::vector<entt::entity> stableEntities;
+    stableEntities.reserve(static_cast<size_t>(view.size_hint()));
     for (auto entity : view) {
+        stableEntities.push_back(entity);
+    }
+    std::sort(stableEntities.begin(), stableEntities.end(),
+              [](entt::entity a, entt::entity b) {
+                  return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
+              });
+
+    // Build a per-frame material table (milestone: constant + bindless texture indices).
+    struct MaterialKey {
+        std::array<uint32_t, 14> words{}; // albedo rgba + metallic + roughness + ao + 4 texture indices + alphaCutoff + alphaMode + doubleSided
+        bool operator==(const MaterialKey& other) const noexcept { return words == other.words; }
+    };
+    struct MaterialKeyHasher {
+        size_t operator()(const MaterialKey& key) const noexcept {
+            uint64_t h = 1469598103934665603ull;
+            for (uint32_t w : key.words) {
+                h ^= static_cast<uint64_t>(w);
+                h *= 1099511628211ull;
+            }
+            return static_cast<size_t>(h);
+        }
+    };
+
+    auto floatBits = [](float v) -> uint32_t {
+        uint32_t bits = 0;
+        static_assert(sizeof(bits) == sizeof(v), "floatBits expects 32-bit float");
+        std::memcpy(&bits, &v, sizeof(bits));
+        return bits;
+    };
+    auto makeKey = [&](const Scene::RenderableComponent& r,
+                       const glm::uvec4& textureIndices) -> MaterialKey {
+        MaterialKey k{};
+        k.words[0] = floatBits(r.albedoColor.x);
+        k.words[1] = floatBits(r.albedoColor.y);
+        k.words[2] = floatBits(r.albedoColor.z);
+        k.words[3] = floatBits(r.albedoColor.w);
+        k.words[4] = floatBits(r.metallic);
+        k.words[5] = floatBits(r.roughness);
+        k.words[6] = floatBits(r.ao);
+        k.words[7] = textureIndices.x;
+        k.words[8] = textureIndices.y;
+        k.words[9] = textureIndices.z;
+        k.words[10] = textureIndices.w;
+        k.words[11] = floatBits(r.alphaCutoff);
+        k.words[12] = static_cast<uint32_t>(r.alphaMode);
+        k.words[13] = r.doubleSided ? 1u : 0u;
+        return k;
+    };
+
+    std::unordered_map<MaterialKey, uint32_t, MaterialKeyHasher> materialToIndex;
+    std::vector<VBMaterialConstants> vbMaterials;
+    vbMaterials.reserve(static_cast<size_t>(view.size_hint()));
+
+    // Track previous-frame world matrices for per-object motion vectors.
+    static std::unordered_map<uint32_t, glm::mat4> s_prevWorldByEntity;
+
+    for (auto entity : stableEntities) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
@@ -4300,22 +4577,130 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             drawInfo.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
             drawInfo.firstIndex = 0;
             drawInfo.baseVertex = 0;
+            drawInfo.startInstance = 0;
+            drawInfo.instanceCount = 0;
+            drawInfo.startInstanceAlpha = 0;
+            drawInfo.instanceCountAlpha = 0;
+            drawInfo.vertexBufferIndex = renderable.mesh->gpuBuffers->vbRawSRVIndex;
+            drawInfo.indexBufferIndex = renderable.mesh->gpuBuffers->ibRawSRVIndex;
+            drawInfo.vertexStrideBytes = renderable.mesh->gpuBuffers->vertexStrideBytes;
+            drawInfo.indexFormat = renderable.mesh->gpuBuffers->indexFormat;
 
             m_vbMeshDraws.push_back(drawInfo);
+            opaqueInstancesPerMesh.emplace_back();
+            alphaMaskedInstancesPerMesh.emplace_back();
         } else {
             meshDrawIndex = it->second;
         }
 
+        // Ensure the per-material descriptor table is ready so the VB resolve
+        // pass can sample textures via ResourceDescriptorHeap (bindless index =
+        // descriptor heap slot index).
+        EnsureMaterialTextures(renderable);
+        RefreshMaterialDescriptors(renderable);
+
+        const bool hasAlbedoMap =
+            renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+        const bool hasNormalMap =
+            renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+        const bool hasMetallicMap =
+            renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+        const bool hasRoughnessMap =
+            renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+
+        glm::uvec4 textureIndices(kInvalidBindlessIndex);
+        if (renderable.textures.gpuState) {
+            const auto& desc = renderable.textures.gpuState->descriptors;
+            textureIndices = glm::uvec4(
+                (hasAlbedoMap && desc[0].IsValid()) ? desc[0].index : kInvalidBindlessIndex,
+                (hasNormalMap && desc[1].IsValid()) ? desc[1].index : kInvalidBindlessIndex,
+                (hasMetallicMap && desc[2].IsValid()) ? desc[2].index : kInvalidBindlessIndex,
+                (hasRoughnessMap && desc[3].IsValid()) ? desc[3].index : kInvalidBindlessIndex
+            );
+        }
+
+        // Find or create material index for this renderable.
+        uint32_t materialIndex = 0;
+        {
+            MaterialKey key = makeKey(renderable, textureIndices);
+            auto mit = materialToIndex.find(key);
+            if (mit == materialToIndex.end()) {
+                materialIndex = static_cast<uint32_t>(vbMaterials.size());
+                materialToIndex.emplace(key, materialIndex);
+
+                VBMaterialConstants mat{};
+                mat.albedo = renderable.albedoColor;
+                mat.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+                mat.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+                mat.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+                mat.textureIndices = textureIndices;
+                mat.alphaCutoff = std::max(0.0f, renderable.alphaCutoff);
+                mat.alphaMode = static_cast<uint32_t>(renderable.alphaMode);
+                mat.doubleSided = renderable.doubleSided ? 1u : 0u;
+                vbMaterials.push_back(mat);
+            } else {
+                materialIndex = mit->second;
+            }
+        }
+
         // Build instance data
         VBInstanceData inst{};
-        inst.worldMatrix = transform.GetMatrix();
+        const glm::mat4 currWorld = transform.GetMatrix();
+        const uint32_t entityKey = static_cast<uint32_t>(entity);
+        auto prevIt = s_prevWorldByEntity.find(entityKey);
+        const glm::mat4 prevWorld = (prevIt != s_prevWorldByEntity.end()) ? prevIt->second : currWorld;
+        s_prevWorldByEntity[entityKey] = currWorld;
+
+        inst.worldMatrix = currWorld;
+        inst.prevWorldMatrix = prevWorld;
+        inst.normalMatrix = transform.normalMatrix;
         inst.meshIndex = meshDrawIndex;  // Index into mesh draw array
-        inst.materialIndex = 0; // TODO: Map to actual material
+        inst.materialIndex = materialIndex;
         inst.firstIndex = 0;
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
         inst.baseVertex = 0;
 
-        m_vbInstances.push_back(inst);
+        if (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask) {
+            alphaMaskedInstancesPerMesh[meshDrawIndex].push_back(inst);
+        } else {
+            opaqueInstancesPerMesh[meshDrawIndex].push_back(inst);
+        }
+    }
+
+    // Flatten per-mesh buckets into a single instance buffer, and record the
+    // contiguous range [startInstance, startInstance + instanceCount) for each mesh.
+    {
+        size_t total = 0;
+        for (size_t i = 0; i < opaqueInstancesPerMesh.size(); ++i) {
+            total += opaqueInstancesPerMesh[i].size();
+            total += alphaMaskedInstancesPerMesh[i].size();
+        }
+        m_vbInstances.reserve(total);
+
+        uint32_t start = 0;
+        for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(m_vbMeshDraws.size()); ++meshIdx) {
+            auto& draw = m_vbMeshDraws[meshIdx];
+            const auto& opaqueBucket = opaqueInstancesPerMesh[meshIdx];
+            const auto& alphaBucket = alphaMaskedInstancesPerMesh[meshIdx];
+
+            draw.startInstance = start;
+            draw.instanceCount = static_cast<uint32_t>(opaqueBucket.size());
+
+            m_vbInstances.insert(m_vbInstances.end(), opaqueBucket.begin(), opaqueBucket.end());
+            start += draw.instanceCount;
+
+            draw.startInstanceAlpha = start;
+            draw.instanceCountAlpha = static_cast<uint32_t>(alphaBucket.size());
+
+            m_vbInstances.insert(m_vbInstances.end(), alphaBucket.begin(), alphaBucket.end());
+            start += draw.instanceCountAlpha;
+        }
+    }
+
+    // Upload per-frame material table (used by MaterialResolve.hlsl).
+    auto matResult = m_visibilityBuffer->UpdateMaterials(m_commandList.Get(), vbMaterials);
+    if (matResult.IsErr()) {
+        spdlog::warn("Failed to update VB material table: {}", matResult.Error());
     }
 
     // Upload instance data to visibility buffer
@@ -4357,6 +4742,18 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     }
 
     // Phase 1: Render visibility buffer (triangle IDs)
+    // Depth must be writable for the visibility pass.
+    if (m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_depthBuffer.Get();
+        barrier.Transition.StateBefore = m_depthState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+
     auto visResult = m_visibilityBuffer->RenderVisibilityPass(
         m_commandList.Get(),
         m_depthBuffer.Get(),
@@ -4371,6 +4768,18 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     }
 
     // Phase 2: Resolve materials via compute shader
+    // Depth must be readable for the material resolve compute pass.
+    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_depthBuffer.Get();
+        barrier.Transition.StateBefore = m_depthState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
     auto resolveResult = m_visibilityBuffer->ResolveMaterials(
         m_commandList.Get(),
         m_depthBuffer.Get(),
@@ -4392,8 +4801,7 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     }
 
     // ========================================================================
-    // TEMPORARY: Blit G-buffer albedo to HDR buffer for visualization
-    // TODO Phase 2.3: Replace with full deferred lighting pass
+    // Phase 3: Deferred lighting (PBR) into HDR target
     // ========================================================================
 
     // Transition HDR buffer to render target
@@ -4408,15 +4816,161 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    // Phase 3: Temporarily use debug blit until descriptor table issue is resolved
-    // TODO: Fix descriptor table allocation for deferred lighting
-    auto blitResult = m_visibilityBuffer->DebugBlitAlbedoToHDR(
+    // Depth must be readable for the fullscreen lighting pass.
+    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_depthBuffer.Get();
+        barrier.Transition.StateBefore = m_depthState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    // Upload local lights for clustered deferred shading (VB path).
+    std::vector<Light> vbLocalLights;
+    if (registry) {
+        auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
+        std::vector<entt::entity> lightEntities;
+        lightEntities.reserve(static_cast<size_t>(lightView.size_hint()));
+        for (auto e : lightView) {
+            lightEntities.push_back(e);
+        }
+        std::sort(lightEntities.begin(), lightEntities.end(),
+                  [](entt::entity a, entt::entity b) {
+                      return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
+                  });
+
+        vbLocalLights.reserve(lightEntities.size());
+        for (auto e : lightEntities) {
+            auto& lightComp = lightView.get<Scene::LightComponent>(e);
+            auto& lightXform = lightView.get<Scene::TransformComponent>(e);
+
+            if (lightComp.type == Scene::LightType::Directional) {
+                continue;
+            }
+
+            glm::vec3 color = glm::max(lightComp.color, glm::vec3(0.0f));
+            float intensity = std::max(lightComp.intensity, 0.0f);
+            glm::vec3 radiance = color * intensity;
+
+            // Ignore degenerate lights.
+            float range = std::max(lightComp.range, 0.0f);
+            if (range <= 0.0f || glm::length(radiance) <= 0.0f) {
+                continue;
+            }
+
+            Light outLight{};
+            float gpuType = 1.0f;
+            if (lightComp.type == Scene::LightType::Point) {
+                gpuType = 1.0f;
+            } else if (lightComp.type == Scene::LightType::Spot) {
+                gpuType = 2.0f;
+            } else if (lightComp.type == Scene::LightType::AreaRect) {
+                gpuType = 3.0f;
+            }
+
+            outLight.position_type = glm::vec4(lightXform.position, gpuType);
+
+            glm::vec3 forwardLS = lightXform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+            glm::vec3 dir = glm::normalize(forwardLS);
+            float innerRad = glm::radians(lightComp.innerConeDegrees);
+            float outerRad = glm::radians(lightComp.outerConeDegrees);
+            float cosInner = std::cos(innerRad);
+            float cosOuter = std::cos(outerRad);
+
+            outLight.direction_cosInner = glm::vec4(dir, cosInner);
+            outLight.color_range = glm::vec4(radiance, range);
+
+            // Local light shadows not supported in VB deferred yet.
+            float shadowIndex = -1.0f;
+
+            glm::vec2 areaHalfSize(0.0f);
+            if (lightComp.type == Scene::LightType::AreaRect) {
+                areaHalfSize = 0.5f * glm::max(lightComp.areaSize, glm::vec2(0.0f));
+            }
+
+            outLight.params = glm::vec4(cosOuter, shadowIndex, areaHalfSize.x, areaHalfSize.y);
+            vbLocalLights.push_back(outLight);
+        }
+    }
+
+    if (vbLocalLights.size() > 2048) {
+        vbLocalLights.resize(2048);
+    }
+
+    auto vbLightUpload = m_visibilityBuffer->UpdateLocalLights(m_commandList.Get(), vbLocalLights);
+    if (vbLightUpload.IsErr()) {
+        spdlog::warn("VB local light upload failed: {}", vbLightUpload.Error());
+    }
+
+    VisibilityBufferRenderer::DeferredLightingParams lightingParams{};
+    lightingParams.invViewProj = m_frameDataCPU.invViewProjectionMatrix;
+    lightingParams.viewMatrix = m_frameDataCPU.viewMatrix;
+    for (int i = 0; i < 3; ++i) {
+        lightingParams.lightViewProjection[i] = m_frameDataCPU.lightViewProjection[i];
+    }
+    lightingParams.cameraPosition = m_frameDataCPU.cameraPosition;
+    lightingParams.sunDirection = m_frameDataCPU.lights[0].direction_cosInner;
+    lightingParams.sunRadiance = glm::vec4(glm::vec3(m_frameDataCPU.lights[0].color_range), 1.0f);
+    lightingParams.cascadeSplits = m_frameDataCPU.cascadeSplits;
+    lightingParams.shadowParams = m_frameDataCPU.shadowParams;
+    lightingParams.envParams = glm::vec4(m_frameDataCPU.envParams.x, m_frameDataCPU.envParams.y, m_frameDataCPU.envParams.z, 0.0f);
+
+    const float proj11 = m_frameDataCPU.projectionMatrix[0][0];
+    const float proj22 = m_frameDataCPU.projectionMatrix[1][1];
+    lightingParams.projectionParams = glm::vec4(proj11, proj22, m_cameraNearPlane, m_cameraFarPlane);
+    lightingParams.screenAndCluster = glm::uvec4(
+        m_visibilityBuffer->GetWidth(),
+        m_visibilityBuffer->GetHeight(),
+        16u,
+        9u
+    );
+    lightingParams.clusterParams = glm::uvec4(24u, 128u, static_cast<uint32_t>(vbLocalLights.size()), 0u);
+
+    float shadowInvW = 0.0f;
+    float shadowInvH = 0.0f;
+    if (m_shadowMap) {
+        auto shadowDesc = m_shadowMap->GetDesc();
+        shadowInvW = (shadowDesc.Width > 0) ? (1.0f / static_cast<float>(shadowDesc.Width)) : 0.0f;
+        shadowInvH = (shadowDesc.Height > 0) ? (1.0f / static_cast<float>(shadowDesc.Height)) : shadowInvW;
+    } else if (m_shadowMapSize > 0.0f) {
+        shadowInvW = 1.0f / m_shadowMapSize;
+        shadowInvH = shadowInvW;
+    }
+
+    float specularMaxMip = 0.0f;
+    if (!m_environmentMaps.empty()) {
+        size_t envIndex = m_currentEnvironment;
+        if (envIndex >= m_environmentMaps.size()) {
+            envIndex = 0;
+        }
+        const auto& env = m_environmentMaps[envIndex];
+        if (env.specularPrefiltered) {
+            uint32_t mips = env.specularPrefiltered->GetMipLevels();
+            if (mips > 0) {
+                specularMaxMip = static_cast<float>(mips - 1);
+            }
+        }
+    }
+    lightingParams.shadowInvSizeAndSpecMaxMip = glm::vec4(shadowInvW, shadowInvH, specularMaxMip, 0.0f);
+
+    DescriptorHandle envDiffuseSRV = m_shadowAndEnvDescriptors[1];
+    DescriptorHandle envSpecularSRV = m_shadowAndEnvDescriptors[2];
+    auto lightResult = m_visibilityBuffer->ApplyDeferredLighting(
         m_commandList.Get(),
         m_hdrColor.Get(),
-        m_hdrRTV.cpu
+        m_hdrRTV.cpu,
+        m_depthBuffer.Get(),
+        m_depthSRV,
+        envDiffuseSRV,
+        envSpecularSRV,
+        m_shadowMapSRV,
+        lightingParams
     );
-    if (blitResult.IsErr()) {
-        spdlog::warn("Debug blit failed: {}", blitResult.Error());
+    if (lightResult.IsErr()) {
+        spdlog::warn("VB deferred lighting failed: {}", lightResult.Error());
     }
 }
 
@@ -4436,8 +4990,11 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
     const bool bypassCompaction = (std::getenv("CORTEX_GPUCULL_BYPASS_COMPACTION") != nullptr);
     const bool dumpCommands = (std::getenv("CORTEX_GPUCULL_DUMP_COMMANDS") != nullptr);
+    const bool freezeCulling = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
+    const bool debugCulling = (std::getenv("CORTEX_GPUCULL_DEBUG") != nullptr);
 
     m_gpuCulling->SetForceVisible(forceVisible);
+    m_gpuCulling->SetDebugEnabled(debugCulling);
 
     ID3D12Resource* argBuffer = bypassCompaction
         ? m_gpuCulling->GetAllCommandBuffer()
@@ -4475,7 +5032,62 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     std::vector<IndirectCommand> commands;
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+
+    // Stable entity ordering improves temporal stability for any per-instance
+    // history indexed by instance order (e.g., occlusion hysteresis).
+    std::vector<entt::entity> entities;
+    entities.reserve(static_cast<size_t>(view.size_hint()));
     for (auto entity : view) {
+        entities.push_back(entity);
+    }
+    std::sort(entities.begin(), entities.end(),
+              [](entt::entity a, entt::entity b) {
+                  return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
+              });
+
+    // Reclaim culling IDs for entities that no longer exist in the renderable view.
+    // This keeps the ID space bounded by the max GPU culling instance capacity.
+    {
+        std::unordered_set<entt::entity, Renderer::EntityHash> alive;
+        alive.reserve(entities.size());
+        for (auto e : entities) {
+            alive.insert(e);
+        }
+
+        for (auto it = m_gpuCullingIdByEntity.begin(); it != m_gpuCullingIdByEntity.end();) {
+            if (alive.find(it->first) == alive.end()) {
+                m_gpuCullingIdFreeList.push_back(it->second);
+                m_gpuCullingPrevCenterByEntity.erase(it->first);
+                it = m_gpuCullingIdByEntity.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    const uint32_t maxCullingIds = m_gpuCulling->GetMaxInstances();
+    auto getOrAllocateCullingId = [&](entt::entity e) -> uint32_t {
+        auto it = m_gpuCullingIdByEntity.find(e);
+        if (it != m_gpuCullingIdByEntity.end()) {
+            return it->second;
+        }
+
+        uint32_t id = UINT32_MAX;
+        if (!m_gpuCullingIdFreeList.empty()) {
+            id = m_gpuCullingIdFreeList.back();
+            m_gpuCullingIdFreeList.pop_back();
+        } else {
+            id = m_gpuCullingNextId++;
+        }
+
+        if (id >= maxCullingIds) {
+            return UINT32_MAX;
+        }
+        m_gpuCullingIdByEntity.emplace(e, id);
+        return id;
+    };
+
+    for (auto entity : entities) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
@@ -4602,17 +5214,26 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
 
         GPUInstanceData inst{};
         inst.modelMatrix = transform.GetMatrix();
+        glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
         if (renderable.mesh->hasBounds) {
             inst.boundingSphere = glm::vec4(
                 renderable.mesh->boundsCenter,
                 renderable.mesh->boundsRadius
             );
+            centerWS = glm::vec3(transform.worldMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
         } else {
             inst.boundingSphere = glm::vec4(0.0f, 0.0f, 0.0f, 10.0f);
         }
         inst.meshIndex = 0;
         inst.materialIndex = 0;
         inst.flags = 1;
+        inst.cullingId = getOrAllocateCullingId(entity);
+        {
+            auto prevIt = m_gpuCullingPrevCenterByEntity.find(entity);
+            const glm::vec3 prev = (prevIt != m_gpuCullingPrevCenterByEntity.end()) ? prevIt->second : centerWS;
+            inst.prevCenterWS = glm::vec4(prev, 0.0f);
+            m_gpuCullingPrevCenterByEntity[entity] = centerWS;
+        }
         m_gpuInstances.push_back(inst);
 
         D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -4688,15 +5309,116 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             return;
         }
 
-        auto cullResult = m_gpuCulling->DispatchCulling(
-            m_commandList.Get(),
-            m_frameDataCPU.viewProjectionNoJitter,
-            glm::vec3(m_frameDataCPU.cameraPosition)
-        );
-        if (cullResult.IsErr()) {
-            spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullResult.Error());
-            RenderScene(registry);
-            return;
+        static bool s_freezeCaptured = false;
+        static glm::mat4 s_frozenViewProj(1.0f);
+        static glm::vec3 s_frozenCameraPos(0.0f);
+
+        glm::mat4 viewProjForCulling = m_frameDataCPU.viewProjectionNoJitter;
+        glm::vec3 cameraPosForCulling = glm::vec3(m_frameDataCPU.cameraPosition);
+
+        if (freezeCulling) {
+            if (!s_freezeCaptured) {
+                s_freezeCaptured = true;
+                s_frozenViewProj = viewProjForCulling;
+                s_frozenCameraPos = cameraPosForCulling;
+                spdlog::warn("GPU culling freeze enabled (CORTEX_GPUCULL_FREEZE=1): capturing view on frame {}",
+                             m_renderFrameCounter);
+            }
+            viewProjForCulling = s_frozenViewProj;
+            cameraPosForCulling = s_frozenCameraPos;
+        }
+
+        // Optional HZB occlusion culling. We build the HZB late in the frame
+        // and consume it on the next frame's culling dispatch; only enable
+        // when we have a fresh capture and camera motion is low to avoid
+        // false occlusion during fast movement.
+        bool useHzbOcclusion = false;
+        if (std::getenv("CORTEX_GPUCULL_USE_HZB") != nullptr &&
+            m_hzbValid && m_hzbCaptureValid && m_hzbTexture && m_hzbMipCount > 0) {
+            // Require the HZB capture to be from the immediately previous frame.
+            if (m_hzbCaptureFrameCounter + 1u == m_renderFrameCounter) {
+                const float dist = glm::length(m_cameraPositionWS - m_hzbCaptureCameraPosWS);
+                const glm::vec3 fwdNow = glm::normalize(m_cameraForwardWS);
+                const glm::vec3 fwdThen = glm::normalize(m_hzbCaptureCameraForwardWS);
+                const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
+                // Conservative gates: allow only small camera movement/rotation.
+                constexpr float kMaxHzbDist = 0.35f;          // meters/units
+                constexpr float kMaxHzbAngleDeg = 2.0f;       // degrees
+                const float angleDeg = std::acos(dotFwd) * (180.0f / glm::pi<float>());
+                useHzbOcclusion = (dist <= kMaxHzbDist) && (angleDeg <= kMaxHzbAngleDeg);
+            }
+
+        }
+
+        m_gpuCulling->SetHZBForOcclusion(
+            useHzbOcclusion ? m_hzbTexture.Get() : nullptr,
+            m_hzbWidth,
+            m_hzbHeight,
+            m_hzbMipCount,
+            m_hzbCaptureViewMatrix,
+            m_hzbCaptureViewProjMatrix,
+            m_hzbCaptureCameraPosWS,
+            m_hzbCaptureNearPlane,
+            m_hzbCaptureFarPlane,
+            useHzbOcclusion);
+
+        if (useHzbOcclusion && m_renderGraph) {
+            m_renderGraph->BeginFrame();
+            const RGResourceHandle hzbHandle =
+                m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
+
+            std::string cullError;
+            m_renderGraph->AddPass(
+                "GPUCulling_DispatchHZB",
+                [&](RGPassBuilder& builder) {
+                    builder.SetType(RGPassType::Compute);
+                    builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
+                },
+                [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
+                    auto cullResult =
+                        m_gpuCulling->DispatchCulling(cmdList, viewProjForCulling, cameraPosForCulling);
+                    if (cullResult.IsErr()) {
+                        cullError = cullResult.Error();
+                    }
+                });
+
+            const auto execResult = m_renderGraph->Execute(m_commandList.Get());
+            if (execResult.IsErr()) {
+                spdlog::warn("RenderSceneIndirect: RenderGraph execute failed: {}", execResult.Error());
+                RenderScene(registry);
+                return;
+            }
+            if (!cullError.empty()) {
+                spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullError);
+                RenderScene(registry);
+                return;
+            }
+
+            m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
+        } else {
+            // Ensure the HZB resource is in an SRV-readable state for compute.
+            if (useHzbOcclusion &&
+                (m_hzbState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
+                D3D12_RESOURCE_BARRIER barrier{};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = m_hzbTexture.Get();
+                barrier.Transition.StateBefore = m_hzbState;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                m_commandList->ResourceBarrier(1, &barrier);
+                m_hzbState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            }
+
+            auto cullResult = m_gpuCulling->DispatchCulling(
+                m_commandList.Get(),
+                viewProjForCulling,
+                cameraPosForCulling
+            );
+            if (cullResult.IsErr()) {
+                spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullResult.Error());
+                RenderScene(registry);
+                return;
+            }
         }
     } else {
         auto prepResult = m_gpuCulling->PrepareAllCommandsForExecuteIndirect(m_commandList.Get());
@@ -5006,6 +5728,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     drawList.reserve(static_cast<size_t>(view.size_hint()));
 
     const glm::vec3 cameraPos = glm::vec3(m_frameDataCPU.cameraPosition);
+    const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_frameDataCPU.viewProjectionNoJitter);
 
     // Collect transparent entities and compute a simple distance-based depth
     // for back-to-front sorting.
@@ -5017,6 +5740,23 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
             continue;
         }
         if (!IsTransparentRenderable(renderable)) {
+            continue;
+        }
+
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+
+        glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
+        float radiusWS = 1.0f;
+        if (renderable.mesh->hasBounds) {
+            centerWS =
+                glm::vec3(transform.worldMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+            const float maxScale = GetMaxWorldScale(transform.worldMatrix);
+            radiusWS = renderable.mesh->boundsRadius * maxScale;
+        }
+
+        if (!SphereIntersectsFrustumCPU(frustum, centerWS, radiusWS)) {
             continue;
         }
 
@@ -5312,6 +6052,11 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         return Result<void>::Err("Mesh has no vertex or index data");
     }
 
+    // Ensure bounds exist for CPU/GPU culling paths (loaders may not compute them).
+    if (!mesh->hasBounds) {
+        mesh->UpdateBounds();
+    }
+
     // Interleave vertex data (position, normal, tangent, texcoord)
     std::vector<Vertex> vertices;
     vertices.reserve(mesh->positions.size());
@@ -5508,6 +6253,41 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     // Store GPU buffers with lifetime tied to mesh
     gpuBuffers->vertexBuffer = vertexBuffer;
     gpuBuffers->indexBuffer = indexBuffer;
+
+    // Register raw SRVs for bindless access (VB resolve / VB motion vectors).
+    // These occupy persistent slots in the shader-visible CBV/SRV/UAV heap so
+    // per-frame resolve does not need to synthesize SRVs.
+    if (m_descriptorManager) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
+        rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
+        rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        rawSrv.Buffer.FirstElement = 0;
+        rawSrv.Buffer.StructureByteStride = 0;
+        rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+        auto vbSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        auto ibSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (vbSrvResult.IsOk() && ibSrvResult.IsOk()) {
+            DescriptorHandle vbSrv = vbSrvResult.Value();
+            DescriptorHandle ibSrv = ibSrvResult.Value();
+
+            rawSrv.Buffer.NumElements = static_cast<UINT>(vbSize / 4u);
+            device->CreateShaderResourceView(vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
+
+            rawSrv.Buffer.NumElements = static_cast<UINT>(ibSize / 4u);
+            device->CreateShaderResourceView(indexBuffer.Get(), &rawSrv, ibSrv.cpu);
+
+            gpuBuffers->vbRawSRVIndex = vbSrv.index;
+            gpuBuffers->ibRawSRVIndex = ibSrv.index;
+            gpuBuffers->vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
+            gpuBuffers->indexFormat = 0u; // R32_UINT
+        } else {
+            spdlog::warn("UploadMesh: failed to allocate persistent SRVs for VB resolve (vb={}, ib={})",
+                         vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok",
+                         ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok");
+        }
+    }
     mesh->gpuBuffers = gpuBuffers;
 
     // Register approximate geometry footprint in the asset registry so the
@@ -6157,7 +6937,7 @@ void Renderer::SetShadowsEnabled(bool enabled) {
 
 void Renderer::SetDebugViewMode(int mode) {
     // Clamp to the full range of supported debug modes.
-    int clamped = std::max(0, std::min(mode, 25));
+    int clamped = std::max(0, std::min(mode, 31));
     if (static_cast<uint32_t>(clamped) == m_debugViewMode) {
         return;
     }
@@ -7016,6 +7796,384 @@ Result<void> Renderer::CreateDepthBuffer() {
 
     spdlog::info("Depth buffer created");
     return Result<void>::Ok();
+}
+
+static uint32_t CalcHZBMipCount(uint32_t width, uint32_t height) {
+    width = std::max(1u, width);
+    height = std::max(1u, height);
+
+    uint32_t mipCount = 1;
+    while (width > 1 || height > 1) {
+        width = (width + 1u) / 2u;
+        height = (height + 1u) / 2u;
+        ++mipCount;
+    }
+    return mipCount;
+}
+
+Result<void> Renderer::CreateHZBResources() {
+    if (!m_device || !m_descriptorManager || !m_depthBuffer) {
+        return Result<void>::Err("CreateHZBResources: renderer not initialized or depth buffer missing");
+    }
+
+    const D3D12_RESOURCE_DESC depthDesc = m_depthBuffer->GetDesc();
+    const uint32_t width = std::max<uint32_t>(1u, static_cast<uint32_t>(depthDesc.Width));
+    const uint32_t height = std::max<uint32_t>(1u, depthDesc.Height);
+    const uint32_t mipCount = CalcHZBMipCount(width, height);
+
+    if (m_hzbTexture && m_hzbWidth == width && m_hzbHeight == height && m_hzbMipCount == mipCount) {
+        return Result<void>::Ok();
+    }
+
+    m_hzbTexture.Reset();
+    m_hzbMipSRVStaging.clear();
+    m_hzbMipUAVStaging.clear();
+    m_hzbWidth = width;
+    m_hzbHeight = height;
+    m_hzbMipCount = mipCount;
+    m_hzbState = D3D12_RESOURCE_STATE_COMMON;
+    m_hzbValid = false;
+    m_hzbCaptureValid = false;
+    m_hzbCaptureFrameCounter = 0;
+
+    D3D12_RESOURCE_DESC hzbDesc{};
+    hzbDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    hzbDesc.Alignment = 0;
+    hzbDesc.Width = width;
+    hzbDesc.Height = height;
+    hzbDesc.DepthOrArraySize = 1;
+    hzbDesc.MipLevels = static_cast<UINT16>(mipCount);
+    hzbDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    hzbDesc.SampleDesc.Count = 1;
+    hzbDesc.SampleDesc.Quality = 0;
+    hzbDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    hzbDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &hzbDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS(&m_hzbTexture)
+    );
+
+    if (FAILED(hr)) {
+        m_hzbTexture.Reset();
+        return Result<void>::Err("CreateHZBResources: failed to create HZB texture");
+    }
+
+    m_hzbTexture->SetName(L"HZBTexture");
+
+    m_hzbMipSRVStaging.reserve(mipCount);
+    m_hzbMipUAVStaging.reserve(mipCount);
+
+    for (uint32_t mip = 0; mip < mipCount; ++mip) {
+        auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<void>::Err("CreateHZBResources: failed to allocate staging SRV: " + srvResult.Error());
+        }
+        auto uavResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (uavResult.IsErr()) {
+            return Result<void>::Err("CreateHZBResources: failed to allocate staging UAV: " + uavResult.Error());
+        }
+
+        DescriptorHandle srvHandle = srvResult.Value();
+        DescriptorHandle uavHandle = uavResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MostDetailedMip = mip;
+        srvDesc.Texture2D.MipLevels = 1;
+        srvDesc.Texture2D.PlaneSlice = 0;
+        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        m_device->GetDevice()->CreateShaderResourceView(
+            m_hzbTexture.Get(),
+            &srvDesc,
+            srvHandle.cpu
+        );
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+        uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        uavDesc.Texture2D.MipSlice = mip;
+        uavDesc.Texture2D.PlaneSlice = 0;
+
+        m_device->GetDevice()->CreateUnorderedAccessView(
+            m_hzbTexture.Get(),
+            nullptr,
+            &uavDesc,
+            uavHandle.cpu
+        );
+
+        m_hzbMipSRVStaging.push_back(srvHandle);
+        m_hzbMipUAVStaging.push_back(uavHandle);
+    }
+
+    spdlog::info("HZB resources created: {}x{}, mips={}", width, height, mipCount);
+    return Result<void>::Ok();
+}
+
+void Renderer::BuildHZBFromDepth() {
+    if (!m_device || !m_commandList || !m_descriptorManager) {
+        return;
+    }
+    if (!m_computeRootSignature || !m_hzbInitPipeline || !m_hzbDownsamplePipeline) {
+        return;
+    }
+    if (!m_depthBuffer || !m_depthSRV.IsValid()) {
+        return;
+    }
+
+    auto resResult = CreateHZBResources();
+    if (resResult.IsErr()) {
+        spdlog::warn("BuildHZBFromDepth: {}", resResult.Error());
+        return;
+    }
+    if (!m_hzbTexture || m_hzbMipCount == 0 || m_hzbMipSRVStaging.size() != m_hzbMipCount ||
+        m_hzbMipUAVStaging.size() != m_hzbMipCount) {
+        return;
+    }
+
+    // Depth -> SRV for compute.
+    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE &&
+        m_depthState != (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_depthBuffer.Get();
+        barrier.Transition.StateBefore = m_depthState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+
+    // HZB -> UAV for writes.
+    if (m_hzbState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hzbTexture.Get();
+        barrier.Transition.StateBefore = m_hzbState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_hzbState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    m_commandList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+    m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    auto bindTransient = [&](DescriptorHandle src, uint32_t rootParamIndex) -> bool {
+        auto tmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (tmp.IsErr()) {
+            return false;
+        }
+        DescriptorHandle dst = tmp.Value();
+        m_device->GetDevice()->CopyDescriptorsSimple(
+            1,
+            dst.cpu,
+            src.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+        m_commandList->SetComputeRootDescriptorTable(rootParamIndex, dst.gpu);
+        return true;
+    };
+
+    auto dispatchForDims = [&](uint32_t w, uint32_t h) {
+        const UINT groupX = (w + 7) / 8;
+        const UINT groupY = (h + 7) / 8;
+        m_commandList->Dispatch(groupX, groupY, 1);
+    };
+
+    // Init mip 0 from full-res depth.
+    m_commandList->SetPipelineState(m_hzbInitPipeline->GetPipelineState());
+    if (!bindTransient(m_depthSRV, 3)) {
+        return;
+    }
+    if (!bindTransient(m_hzbMipUAVStaging[0], 6)) {
+        return;
+    }
+    dispatchForDims(m_hzbWidth, m_hzbHeight);
+
+    // Transition mip0 to SRV for subsequent downsample.
+    {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hzbTexture.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = 0;
+        m_commandList->ResourceBarrier(1, &barrier);
+    }
+
+    uint32_t mipW = m_hzbWidth;
+    uint32_t mipH = m_hzbHeight;
+
+    // Downsample chain: mip i reads mip i-1 and writes mip i.
+    for (uint32_t mip = 1; mip < m_hzbMipCount; ++mip) {
+        mipW = (mipW + 1u) / 2u;
+        mipH = (mipH + 1u) / 2u;
+
+        m_commandList->SetPipelineState(m_hzbDownsamplePipeline->GetPipelineState());
+        if (!bindTransient(m_hzbMipSRVStaging[mip - 1], 3)) {
+            return;
+        }
+        if (!bindTransient(m_hzbMipUAVStaging[mip], 6)) {
+            return;
+        }
+
+        dispatchForDims(mipW, mipH);
+
+        // Transition output mip to SRV for next pass / final consumption.
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hzbTexture.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = mip;
+        m_commandList->ResourceBarrier(1, &barrier);
+    }
+
+    m_hzbState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    m_hzbValid = true;
+
+    // Capture the camera state associated with this HZB build so GPU occlusion
+    // culling can safely project bounds using the same camera basis/depth space.
+    m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
+    m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
+    m_hzbCaptureCameraPosWS = m_cameraPositionWS;
+    m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
+    m_hzbCaptureNearPlane = m_cameraNearPlane;
+    m_hzbCaptureFarPlane = m_cameraFarPlane;
+    m_hzbCaptureFrameCounter = m_renderFrameCounter;
+    m_hzbCaptureValid = true;
+}
+
+void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle depthHandle, RGResourceHandle hzbHandle) {
+    if (!m_device || !m_descriptorManager || !m_computeRootSignature ||
+        !m_hzbInitPipeline || !m_hzbDownsamplePipeline) {
+        return;
+    }
+
+    graph.AddPass(
+        "HZB_InitMip0",
+        [&](RGPassBuilder& builder) {
+            builder.SetType(RGPassType::Compute);
+            builder.Read(depthHandle, RGResourceUsage::ShaderResource);
+            builder.Write(hzbHandle, RGResourceUsage::UnorderedAccess, 0);
+        },
+        [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
+            cmdList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
+            cmdList->SetPipelineState(m_hzbInitPipeline->GetPipelineState());
+
+            ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+            cmdList->SetDescriptorHeaps(1, heaps);
+
+            cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+            auto srvTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (srvTmp.IsErr()) {
+                return;
+            }
+            auto uavTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (uavTmp.IsErr()) {
+                return;
+            }
+
+            const DescriptorHandle depthSrv = srvTmp.Value();
+            const DescriptorHandle outUav = uavTmp.Value();
+
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1, depthSrv.cpu, m_depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1, outUav.cpu, m_hzbMipUAVStaging[0].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+            cmdList->SetComputeRootDescriptorTable(3, depthSrv.gpu);
+            cmdList->SetComputeRootDescriptorTable(6, outUav.gpu);
+
+            const UINT groupX = (m_hzbWidth + 7) / 8;
+            const UINT groupY = (m_hzbHeight + 7) / 8;
+            cmdList->Dispatch(groupX, groupY, 1);
+        }
+    );
+
+    uint32_t mipW = m_hzbWidth;
+    uint32_t mipH = m_hzbHeight;
+
+    for (uint32_t mip = 1; mip < m_hzbMipCount; ++mip) {
+        mipW = (mipW + 1u) / 2u;
+        mipH = (mipH + 1u) / 2u;
+
+        const std::string passName = "HZB_DownsampleMip" + std::to_string(mip);
+        const uint32_t inMip = mip - 1;
+        const uint32_t outMip = mip;
+        const uint32_t outW = mipW;
+        const uint32_t outH = mipH;
+
+        graph.AddPass(
+            passName,
+            [&](RGPassBuilder& builder) {
+                builder.SetType(RGPassType::Compute);
+                builder.Read(hzbHandle, RGResourceUsage::ShaderResource, inMip);
+                builder.Write(hzbHandle, RGResourceUsage::UnorderedAccess, outMip);
+            },
+            [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
+                cmdList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
+                cmdList->SetPipelineState(m_hzbDownsamplePipeline->GetPipelineState());
+
+                ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+                cmdList->SetDescriptorHeaps(1, heaps);
+
+                cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+                auto srvTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+                if (srvTmp.IsErr()) {
+                    return;
+                }
+                auto uavTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+                if (uavTmp.IsErr()) {
+                    return;
+                }
+
+                const DescriptorHandle inSrv = srvTmp.Value();
+                const DescriptorHandle outUav = uavTmp.Value();
+
+                m_device->GetDevice()->CopyDescriptorsSimple(
+                    1, inSrv.cpu, m_hzbMipSRVStaging[inMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                m_device->GetDevice()->CopyDescriptorsSimple(
+                    1, outUav.cpu, m_hzbMipUAVStaging[outMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+                cmdList->SetComputeRootDescriptorTable(3, inSrv.gpu);
+                cmdList->SetComputeRootDescriptorTable(6, outUav.gpu);
+
+                const UINT groupX = (outW + 7) / 8;
+                const UINT groupY = (outH + 7) / 8;
+                cmdList->Dispatch(groupX, groupY, 1);
+            }
+        );
+    }
+
+    // Anchor: request a final SRV-readable state for all subresources.
+    graph.AddPass(
+        "HZB_Finalize",
+        [&](RGPassBuilder& builder) {
+            builder.SetType(RGPassType::Compute);
+            builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
+        },
+        [&](ID3D12GraphicsCommandList*, const RenderGraph&) {}
+    );
 }
 
 Result<void> Renderer::CreateShadowMapResources() {
@@ -7985,6 +9143,7 @@ Result<void> Renderer::CreateHDRTarget() {
 
     D3D12_RESOURCE_DESC velDesc = desc;
     velDesc.Format = DXGI_FORMAT_R16G16_FLOAT;
+    velDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
     D3D12_CLEAR_VALUE velClear = {};
     velClear.Format = velDesc.Format;
@@ -8647,6 +9806,87 @@ Result<void> Renderer::CreateCommandList() {
             }
         } else {
             spdlog::warn("Failed to compile SSAO compute shader: {}", ssaoComputeResult.Error());
+        }
+    }
+
+    // HZB compute pipelines (depth pyramid) - used by optional occlusion culling.
+    if (m_computeRootSignature) {
+        static const char* kHzbInitCS = R"(
+Texture2D<float> g_Depth : register(t0);
+RWTexture2D<float> g_OutMip : register(u0);
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    uint w, h;
+    g_OutMip.GetDimensions(w, h);
+    if (dispatchThreadId.x >= w || dispatchThreadId.y >= h) return;
+
+    float d = g_Depth.Load(int3(dispatchThreadId.xy, 0));
+    g_OutMip[dispatchThreadId.xy] = d;
+}
+)";
+
+        static const char* kHzbDownsampleCS = R"(
+Texture2D<float> g_InMip : register(t0);
+RWTexture2D<float> g_OutMip : register(u0);
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    uint outW, outH;
+    g_OutMip.GetDimensions(outW, outH);
+    if (dispatchThreadId.x >= outW || dispatchThreadId.y >= outH) return;
+
+    uint inW, inH;
+    g_InMip.GetDimensions(inW, inH);
+    const int2 inMax = int2(int(inW) - 1, int(inH) - 1);
+
+    int2 base = int2(dispatchThreadId.xy) * 2;
+    int2 c0 = clamp(base, int2(0, 0), inMax);
+    int2 c1 = clamp(base + int2(1, 0), int2(0, 0), inMax);
+    int2 c2 = clamp(base + int2(0, 1), int2(0, 0), inMax);
+    int2 c3 = clamp(base + int2(1, 1), int2(0, 0), inMax);
+
+    float d0 = g_InMip.Load(int3(c0, 0));
+    float d1 = g_InMip.Load(int3(c1, 0));
+    float d2 = g_InMip.Load(int3(c2, 0));
+    float d3 = g_InMip.Load(int3(c3, 0));
+
+    g_OutMip[dispatchThreadId.xy] = min(min(d0, d1), min(d2, d3));
+}
+)";
+
+        auto hzbInitResult = ShaderCompiler::CompileFromSource(kHzbInitCS, "CSMain", "cs_5_1");
+        if (hzbInitResult.IsOk()) {
+            m_hzbInitPipeline = std::make_unique<DX12ComputePipeline>();
+            auto initResult = m_hzbInitPipeline->Initialize(
+                m_device->GetDevice(),
+                m_computeRootSignature->GetRootSignature(),
+                hzbInitResult.Value()
+            );
+            if (initResult.IsErr()) {
+                spdlog::warn("Failed to create HZB init compute pipeline: {}", initResult.Error());
+                m_hzbInitPipeline.reset();
+            }
+        } else {
+            spdlog::warn("Failed to compile HZB init compute shader: {}", hzbInitResult.Error());
+        }
+
+        auto hzbDownResult = ShaderCompiler::CompileFromSource(kHzbDownsampleCS, "CSMain", "cs_5_1");
+        if (hzbDownResult.IsOk()) {
+            m_hzbDownsamplePipeline = std::make_unique<DX12ComputePipeline>();
+            auto downResult = m_hzbDownsamplePipeline->Initialize(
+                m_device->GetDevice(),
+                m_computeRootSignature->GetRootSignature(),
+                hzbDownResult.Value()
+            );
+            if (downResult.IsErr()) {
+                spdlog::warn("Failed to create HZB downsample compute pipeline: {}", downResult.Error());
+                m_hzbDownsamplePipeline.reset();
+            }
+        } else {
+            spdlog::warn("Failed to compile HZB downsample compute shader: {}", hzbDownResult.Error());
         }
     }
 

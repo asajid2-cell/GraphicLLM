@@ -361,6 +361,7 @@ Result<std::shared_ptr<Scene::MeshData>> LoadGLTFMesh(const std::string& pathStr
     mesh->normals   = std::move(normals);
     mesh->texCoords = std::move(uvs);
     mesh->indices   = std::move(indices);
+    mesh->UpdateBounds();
 
     spdlog::info("Loaded glTF mesh '{}' (verts={}, indices={})",
                  path.string(),

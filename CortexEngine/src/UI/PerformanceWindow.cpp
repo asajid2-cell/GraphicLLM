@@ -177,7 +177,25 @@ void RefreshStats() {
         SetWindowTextW(g_perf.txtFrame, buffer);
     }
     if (g_perf.txtFPS) {
-        swprintf_s(buffer, L"Passes: Main=%.2f ms  RT=%.2f ms  Post=%.2f ms", mainMs, rtMs, postMs);
+        wchar_t cullExtra[256];
+        cullExtra[0] = L'\0';
+        if (renderer->IsGPUCullingEnabled()) {
+            const uint32_t total = renderer->GetGPUTotalInstances();
+            const uint32_t visible = renderer->GetGPUCulledCount();
+            const auto dbg = renderer->GetGPUCullingDebugStats();
+            if (dbg.enabled && dbg.valid) {
+                swprintf_s(cullExtra,
+                           L"  | Cull: %u/%u vis  occ=%u fr=%u test=%u mip=%u near=%.3f hzb=%.3f",
+                           visible, total, dbg.occluded, dbg.frustumCulled, dbg.tested,
+                           dbg.sampleMip, dbg.sampleNearDepth, dbg.sampleHzbDepth);
+            } else {
+                swprintf_s(cullExtra, L"  | Cull: %u/%u vis", visible, total);
+            }
+        }
+
+        swprintf_s(buffer,
+                   L"Passes: Main=%.2f ms  RT=%.2f ms  Post=%.2f ms%s",
+                   mainMs, rtMs, postMs, cullExtra);
         SetWindowTextW(g_perf.txtFPS, buffer);
     }
 

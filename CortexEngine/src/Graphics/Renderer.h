@@ -2,10 +2,12 @@
 
 #include <memory>
 #include <array>
+#include <vector>
 #include <unordered_map>
 #include <string>
 #include <algorithm>
 #include <deque>
+#include <type_traits>
 #include <spdlog/spdlog.h>
 #include "Core/Window.h"
 #include "RHI/DX12Device.h"
@@ -371,6 +373,7 @@ public:
     [[nodiscard]] bool IsIndirectDrawEnabled() const { return m_indirectDrawEnabled; }
     [[nodiscard]] uint32_t GetGPUCulledCount() const;
     [[nodiscard]] uint32_t GetGPUTotalInstances() const;
+    [[nodiscard]] GPUCullingPipeline::DebugStats GetGPUCullingDebugStats() const;
 
     // Experimental voxel backend toggle. When enabled, the main Render path
     // skips the traditional raster + RT pipeline and instead runs a
@@ -457,6 +460,7 @@ private:
 #endif
 
     Result<void> CreateDepthBuffer();
+    Result<void> CreateHZBResources();
     Result<void> CreateCommandList();
     Result<void> CompileShaders();
     Result<void> CreatePipeline();
@@ -486,6 +490,8 @@ private:
     void RenderSSR();
     void RenderTAA();
     void RenderMotionVectors();
+    void BuildHZBFromDepth();
+    void AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle depthHandle, RGResourceHandle hzbHandle);
     Result<void> InitializeTAAResolveDescriptorTable();
     void UpdateTAAResolveDescriptorTable();
     Result<void> InitializePostProcessDescriptorTable();
@@ -507,6 +513,20 @@ private:
     void CollectInstancesForGPUCulling(Scene::ECS_Registry* registry);
     void DispatchGPUCulling();
     void RenderSceneIndirect(Scene::ECS_Registry* registry);
+
+    // Stable IDs for occlusion history indexing (maps entity -> cullingId).
+    struct EntityHash {
+        size_t operator()(entt::entity e) const noexcept {
+            using Underlying = std::underlying_type_t<entt::entity>;
+            return std::hash<Underlying>{}(static_cast<Underlying>(e));
+        }
+    };
+    std::unordered_map<entt::entity, uint32_t, EntityHash> m_gpuCullingIdByEntity;
+    std::vector<uint32_t> m_gpuCullingIdFreeList;
+    uint32_t m_gpuCullingNextId = 0;
+
+    // Previous frame world-space centers for motion-inflated occlusion culling.
+    std::unordered_map<entt::entity, glm::vec3, EntityHash> m_gpuCullingPrevCenterByEntity;
 
     // Visibility buffer rendering (Phase 2.1)
     void CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry);
@@ -574,6 +594,8 @@ public:
     std::unique_ptr<DX12Pipeline> m_ssrPipeline;
     std::unique_ptr<DX12Pipeline> m_ssaoPipeline;
     std::unique_ptr<DX12ComputePipeline> m_ssaoComputePipeline;  // Async compute version of SSAO
+    std::unique_ptr<DX12ComputePipeline> m_hzbInitPipeline;
+    std::unique_ptr<DX12ComputePipeline> m_hzbDownsamplePipeline;
     std::unique_ptr<DX12Pipeline> m_motionVectorsPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomDownsamplePipeline;
     std::unique_ptr<DX12Pipeline> m_bloomBlurHPipeline;
@@ -667,6 +689,28 @@ public:
     DescriptorHandle m_depthStencilView;
     DescriptorHandle m_depthSRV;
     D3D12_RESOURCE_STATES m_depthState = D3D12_RESOURCE_STATE_COMMON;
+
+    // Hierarchical Z-buffer (depth pyramid) built from the main depth buffer.
+    ComPtr<ID3D12Resource> m_hzbTexture;
+    std::vector<DescriptorHandle> m_hzbMipSRVStaging;
+    std::vector<DescriptorHandle> m_hzbMipUAVStaging;
+    uint32_t m_hzbMipCount = 0;
+    uint32_t m_hzbWidth = 0;
+    uint32_t m_hzbHeight = 0;
+    D3D12_RESOURCE_STATES m_hzbState = D3D12_RESOURCE_STATE_COMMON;
+    bool m_hzbValid = false;
+
+    // Captured camera state associated with the currently valid HZB.
+    // This is used by occlusion culling to project bounds in the same space
+    // as the depth pyramid, and to safely gate HZB usage on camera motion.
+    glm::mat4 m_hzbCaptureViewMatrix{1.0f};
+    glm::mat4 m_hzbCaptureViewProjMatrix{1.0f};
+    glm::vec3 m_hzbCaptureCameraPosWS{0.0f};
+    glm::vec3 m_hzbCaptureCameraForwardWS{0.0f, 0.0f, 1.0f};
+    float m_hzbCaptureNearPlane = 0.1f;
+    float m_hzbCaptureFarPlane = 1000.0f;
+    uint64_t m_hzbCaptureFrameCounter = 0;
+    bool m_hzbCaptureValid = false;
 
     // Shadow map (directional light, cascaded)
     ComPtr<ID3D12Resource> m_shadowMap;

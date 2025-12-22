@@ -2,7 +2,7 @@
 
 #define CORTEX_BINDLESS_RESOURCES_H
 
-#include <d3d12.h>
+#include "D3D12Includes.h"
 #include <wrl/client.h>
 #include <cstdint>
 #include <vector>
@@ -11,15 +11,13 @@
 
 #include "Utils/Result.h"
 #include "DescriptorHeap.h"
+#include "BindlessConstants.h"
 
 using Microsoft::WRL::ComPtr;
 
 namespace Cortex::Graphics {
 
 class DX12Device;
-
-// Invalid bindless index sentinel - shaders check for this to use fallback
-constexpr uint32_t kInvalidBindlessIndex = 0xFFFFFFFF;
 
 // Bindless Resource Manager
 // Manages a single large shader-visible descriptor heap for SM6.6 bindless access.

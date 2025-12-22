@@ -1,6 +1,6 @@
 #pragma once
 
-#include <d3d12.h>
+#include "D3D12Includes.h"
 #include <wrl/client.h>
 #include <vector>
 #include <cstdint> // For uint8_t

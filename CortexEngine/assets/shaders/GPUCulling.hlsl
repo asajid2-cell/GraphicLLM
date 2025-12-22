@@ -34,9 +34,9 @@ cbuffer CullConstants : register(b0) {
     float3 g_CameraPos;
     uint g_InstanceCount;
     uint4 g_OcclusionParams0; // x=forceVisible, y=hzbEnabled, z=hzbMipCount, w=streakThreshold
-    uint4 g_OcclusionParams1; // x=hzbWidth, y=hzbHeight
+    uint4 g_OcclusionParams1; // x=hzbWidth, y=hzbHeight, z=historySize, w=debugEnabled
     float4 g_OcclusionParams2; // x=invW, y=invH, z=proj00, w=proj11
-    float4 g_OcclusionParams3; // x=near, y=far, z=epsilon
+    float4 g_OcclusionParams3; // x=near, y=far, z=epsilon, w=cameraMotionWS
     float4x4 g_HZBViewMatrix;
     float4x4 g_HZBViewProjMatrix;
     float4 g_HZBCameraPos;
@@ -85,7 +85,8 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
     // Inflate bounds based on object motion to avoid false occlusion/popping
     // when instances move while the HZB is from the previous frame.
     const float motion = length(centerWS - instance.prevCenterWS.xyz);
-    worldRadius += motion;
+    const float cameraMotionWS = max(g_OcclusionParams3.w, 0.0f);
+    worldRadius += (motion + cameraMotionWS);
 
     const uint forceVisible = g_OcclusionParams0.x;
     const uint hzbEnabled = g_OcclusionParams0.y;
@@ -146,7 +147,13 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
                     const float2 radiusNdc = (worldRadius * hzbProjScale) / viewZ;
                     const float2 radiusPx = abs(radiusNdc) * float2(0.5f * (float)hzbWidth, 0.5f * (float)hzbHeight);
                     const float r = max(1.0f, max(radiusPx.x, radiusPx.y));
-                    const uint mip = min(hzbMipCount - 1u, (uint)max(0.0f, floor(log2(r))));
+                    uint mip = min(hzbMipCount - 1u, (uint)max(0.0f, floor(log2(r))));
+
+                    // Under motion, bias toward more detailed mips to reduce false occlusion
+                    // from coarse min-depth tiles that are temporally misaligned.
+                    if (motion + cameraMotionWS > 0.001f && mip > 0u) {
+                        mip -= 1u;
+                    }
 
                     const uint mipW = max(1u, CeilDivPow2(hzbWidth, mip));
                     const uint mipH = max(1u, CeilDivPow2(hzbHeight, mip));

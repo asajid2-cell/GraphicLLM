@@ -1171,7 +1171,9 @@ void Renderer::ApplySafeQualityPreset() {
 void Renderer::Shutdown() {
     // CRITICAL FIX: Wait for GPU to finish all work before destroying resources
     // Otherwise we get OBJECT_DELETED_WHILE_STILL_IN_USE crash
+    spdlog::info("Renderer shutdown: waiting for GPU idle...");
     WaitForGPU();
+    spdlog::info("Renderer shutdown: GPU idle, releasing resources...");
 
     if (m_commandQueue) {
         m_commandQueue->Flush();
@@ -1461,7 +1463,59 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     if (kEnableShadowPass && m_shadowsEnabled && m_shadowMap && m_shadowPipeline) {
         const auto tShadowStart = clock::now();
         WriteBreadcrumb(GpuMarker::ShadowPass);
-        RenderShadowPass(registry);
+
+        static bool s_checkedRgShadowsEnv = false;
+        static bool s_useRgShadows = false;
+        if (!s_checkedRgShadowsEnv) {
+            s_checkedRgShadowsEnv = true;
+            s_useRgShadows = (std::getenv("CORTEX_USE_RG_SHADOWS") != nullptr);
+            if (s_useRgShadows) {
+                spdlog::info("Shadow pass: RenderGraph transitions enabled (CORTEX_USE_RG_SHADOWS=1)");
+            }
+        }
+
+        if (s_useRgShadows && m_renderGraph && m_commandList) {
+            m_renderGraph->BeginFrame();
+            const RGResourceHandle shadowHandle =
+                m_renderGraph->ImportResource(m_shadowMap.Get(), m_shadowMapState, "ShadowMap");
+
+            std::string shadowError;
+            m_renderGraph->AddPass(
+                "ShadowPass",
+                [&](RGPassBuilder& builder) {
+                    builder.SetType(RGPassType::Graphics);
+                    builder.Write(shadowHandle, RGResourceUsage::DepthStencilWrite);
+                },
+                [&](ID3D12GraphicsCommandList*, const RenderGraph&) {
+                    m_shadowPassSkipTransitions = true;
+                    RenderShadowPass(registry);
+                    m_shadowPassSkipTransitions = false;
+                });
+
+            // Transition for sampling in the main shading path.
+            m_renderGraph->AddPass(
+                "ShadowFinalize",
+                [&](RGPassBuilder& builder) {
+                    builder.SetType(RGPassType::Graphics);
+                    builder.Read(shadowHandle, RGResourceUsage::ShaderResource);
+                },
+                [&](ID3D12GraphicsCommandList*, const RenderGraph&) {});
+
+            const auto execResult = m_renderGraph->Execute(m_commandList.Get());
+            if (execResult.IsErr()) {
+                shadowError = execResult.Error();
+            } else {
+                m_shadowMapState = m_renderGraph->GetResourceState(shadowHandle);
+            }
+            m_renderGraph->EndFrame();
+
+            if (!shadowError.empty()) {
+                spdlog::warn("Shadow RG: {} (falling back to legacy barriers)", shadowError);
+                RenderShadowPass(registry);
+            }
+        } else {
+            RenderShadowPass(registry);
+        }
         MarkPassComplete("RenderShadowPass_Done");
         const auto tShadowEnd = clock::now();
         m_lastShadowPassMs =
@@ -1681,45 +1735,6 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
             std::chrono::duration_cast<std::chrono::microseconds>(tBloomEnd - tBloomStart).count() / 1000.0f;
     }
 
-    // Execute RenderGraph work once per frame, right before post-process
-    // (which is the final fullscreen resolve).
-    if (rgHasPendingHzb && s_useRgHzb && m_renderGraph && m_device && m_commandList &&
-        m_descriptorManager && m_depthBuffer && m_depthSRV.IsValid() && m_hzbTexture) {
-        m_renderGraph->BeginFrame();
-        const RGResourceHandle depthHandle =
-            m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth");
-        const RGResourceHandle hzbHandle =
-            m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
-        AddHZBFromDepthPasses_RG(*m_renderGraph, depthHandle, hzbHandle);
-
-        const auto execResult = m_renderGraph->Execute(m_commandList.Get());
-        if (execResult.IsErr()) {
-            spdlog::warn("HZB RG: Execute failed: {}", execResult.Error());
-        } else {
-            static bool s_logged = false;
-            if (!s_logged) {
-                s_logged = true;
-                spdlog::info("HZB RG: passes={}, barriers={}",
-                             m_renderGraph->GetPassCount(), m_renderGraph->GetBarrierCount());
-            }
-
-            m_depthState = m_renderGraph->GetResourceState(depthHandle);
-            m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
-            m_hzbValid = true;
-
-            m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
-            m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
-            m_hzbCaptureCameraPosWS = m_cameraPositionWS;
-            m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
-            m_hzbCaptureNearPlane = m_cameraNearPlane;
-            m_hzbCaptureFarPlane = m_cameraFarPlane;
-            m_hzbCaptureFrameCounter = m_renderFrameCounter;
-            m_hzbCaptureValid = true;
-
-            m_renderGraph->EndFrame();
-        }
-    }
-
     // Post-process HDR -> back buffer (or no-op if disabled). Allow disabling
     // via environment variable for targeted debugging of device-removed faults.
     static bool s_checkedDisablePostProcessEnv = false;
@@ -1733,14 +1748,158 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     }
     const bool enablePostProcess = kEnablePostProcessDefault && !s_disablePostProcess;
 
+    static bool s_checkedRgPostEnv = false;
+    static bool s_useRgPost = false;
+    if (!s_checkedRgPostEnv) {
+        s_checkedRgPostEnv = true;
+        s_useRgPost = (std::getenv("CORTEX_USE_RG_POST") != nullptr);
+        if (s_useRgPost) {
+            spdlog::info("Post-process: RenderGraph transitions enabled (CORTEX_USE_RG_POST=1)");
+        }
+    }
+
+    const bool canRunRg = (m_renderGraph && m_device && m_commandList && m_descriptorManager);
+    const bool wantsRgHzbThisFrame =
+        rgHasPendingHzb && s_useRgHzb && canRunRg && m_depthBuffer && m_depthSRV.IsValid() && m_hzbTexture;
+    const bool wantsRgPostThisFrame =
+        enablePostProcess && s_useRgPost && canRunRg && m_postProcessPipeline && m_hdrColor &&
+        m_window && m_window->GetCurrentBackBuffer();
+
+    bool ranPostProcessInRg = false;
+
+    // Execute RenderGraph work once per frame, right before post-process (which
+    // is the final fullscreen resolve). When enabled, we include both the HZB
+    // build and post-process transitions in the same RenderGraph execution.
+    if (wantsRgHzbThisFrame || wantsRgPostThisFrame) {
+        m_renderGraph->BeginFrame();
+
+        RGResourceHandle depthHandle{};
+        RGResourceHandle hzbHandle{};
+        if (wantsRgHzbThisFrame) {
+            depthHandle = m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth");
+            hzbHandle = m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
+            AddHZBFromDepthPasses_RG(*m_renderGraph, depthHandle, hzbHandle);
+        }
+
+        RGResourceHandle hdrHandle{};
+        RGResourceHandle ssaoHandle{};
+        RGResourceHandle ssrHandle{};
+        RGResourceHandle velocityHandle{};
+        RGResourceHandle taaHandle{};
+        RGResourceHandle rtReflHandle{};
+        RGResourceHandle rtReflHistHandle{};
+        RGResourceHandle backBufferHandle{};
+
+        if (wantsRgPostThisFrame) {
+            // Import post-process inputs using the renderer's current tracked states.
+            hdrHandle = m_renderGraph->ImportResource(m_hdrColor.Get(), m_hdrState, "HDR");
+            if (m_ssaoTex) {
+                ssaoHandle = m_renderGraph->ImportResource(m_ssaoTex.Get(), m_ssaoState, "SSAO");
+            }
+            if (m_ssrColor) {
+                ssrHandle = m_renderGraph->ImportResource(m_ssrColor.Get(), m_ssrState, "SSRColor");
+            }
+            if (m_velocityBuffer) {
+                velocityHandle = m_renderGraph->ImportResource(m_velocityBuffer.Get(), m_velocityState, "Velocity");
+            }
+            if (m_taaIntermediate) {
+                taaHandle = m_renderGraph->ImportResource(m_taaIntermediate.Get(), m_taaIntermediateState, "TAAIntermediate");
+            }
+            if (m_rtReflectionColor) {
+                rtReflHandle = m_renderGraph->ImportResource(m_rtReflectionColor.Get(), m_rtReflectionState, "RTReflection");
+            }
+            if (m_rtReflectionHistory) {
+                rtReflHistHandle = m_renderGraph->ImportResource(m_rtReflectionHistory.Get(), m_rtReflectionHistoryState, "RTReflectionHistory");
+            }
+
+            // Back buffer is normally still in PRESENT at this point.
+            backBufferHandle = m_renderGraph->ImportResource(
+                m_window->GetCurrentBackBuffer(),
+                D3D12_RESOURCE_STATE_PRESENT,
+                "BackBuffer");
+
+            // If the HZB debug view is active, the post-process shader expects the
+            // HZB full SRV bound in the SSR slot; request SRV state for the HZB.
+            const bool wantsHzbDebug = (m_debugViewMode == 32u);
+            if (wantsHzbDebug && m_hzbTexture && !hzbHandle.IsValid()) {
+                hzbHandle = m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB_Debug");
+            }
+
+            m_renderGraph->AddPass(
+                "PostProcess",
+                [&](RGPassBuilder& builder) {
+                    builder.SetType(RGPassType::Graphics);
+                    builder.Read(hdrHandle, RGResourceUsage::ShaderResource);
+                    if (ssaoHandle.IsValid()) builder.Read(ssaoHandle, RGResourceUsage::ShaderResource);
+                    if (ssrHandle.IsValid()) builder.Read(ssrHandle, RGResourceUsage::ShaderResource);
+                    if (velocityHandle.IsValid()) builder.Read(velocityHandle, RGResourceUsage::ShaderResource);
+                    if (taaHandle.IsValid()) builder.Read(taaHandle, RGResourceUsage::ShaderResource);
+                    if (rtReflHandle.IsValid()) builder.Read(rtReflHandle, RGResourceUsage::ShaderResource);
+                    if (rtReflHistHandle.IsValid()) builder.Read(rtReflHistHandle, RGResourceUsage::ShaderResource);
+                    if (hzbHandle.IsValid() && wantsHzbDebug) builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
+                    builder.Write(backBufferHandle, RGResourceUsage::RenderTarget);
+                },
+                [&](ID3D12GraphicsCommandList*, const RenderGraph&) {
+                    m_postProcessSkipTransitions = true;
+                    RenderPostProcess();
+                    m_postProcessSkipTransitions = false;
+                    ranPostProcessInRg = true;
+                });
+        }
+
+        const auto execResult = m_renderGraph->Execute(m_commandList.Get());
+        if (execResult.IsErr()) {
+            spdlog::warn("RenderGraph end-of-frame: Execute failed: {}", execResult.Error());
+        } else {
+            static bool s_logged = false;
+            if (!s_logged && wantsRgHzbThisFrame) {
+                s_logged = true;
+                spdlog::info("HZB RG: passes={}, barriers={}",
+                             m_renderGraph->GetPassCount(), m_renderGraph->GetBarrierCount());
+            }
+
+            if (wantsRgHzbThisFrame) {
+                m_depthState = m_renderGraph->GetResourceState(depthHandle);
+                m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
+                m_hzbValid = true;
+
+                m_hzbCaptureViewMatrix = m_frameDataCPU.viewMatrix;
+                m_hzbCaptureViewProjMatrix = m_frameDataCPU.viewProjectionMatrix;
+                m_hzbCaptureCameraPosWS = m_cameraPositionWS;
+                m_hzbCaptureCameraForwardWS = glm::normalize(m_cameraForwardWS);
+                m_hzbCaptureNearPlane = m_cameraNearPlane;
+                m_hzbCaptureFarPlane = m_cameraFarPlane;
+                m_hzbCaptureFrameCounter = m_renderFrameCounter;
+                m_hzbCaptureValid = true;
+            }
+
+            if (wantsRgPostThisFrame) {
+                m_hdrState = m_renderGraph->GetResourceState(hdrHandle);
+                if (ssaoHandle.IsValid()) m_ssaoState = m_renderGraph->GetResourceState(ssaoHandle);
+                if (ssrHandle.IsValid()) m_ssrState = m_renderGraph->GetResourceState(ssrHandle);
+                if (velocityHandle.IsValid()) m_velocityState = m_renderGraph->GetResourceState(velocityHandle);
+                if (taaHandle.IsValid()) m_taaIntermediateState = m_renderGraph->GetResourceState(taaHandle);
+                if (rtReflHandle.IsValid()) m_rtReflectionState = m_renderGraph->GetResourceState(rtReflHandle);
+                if (rtReflHistHandle.IsValid()) m_rtReflectionHistoryState = m_renderGraph->GetResourceState(rtReflHistHandle);
+                if (hzbHandle.IsValid() && (m_debugViewMode == 32u)) m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
+            }
+
+            m_renderGraph->EndFrame();
+        }
+    }
+
     if (enablePostProcess) {
-        const auto tPostOnlyStart = clock::now();
-        WriteBreadcrumb(GpuMarker::PostProcess);
-        RenderPostProcess();
-        MarkPassComplete("RenderPostProcess_Done");
-        const auto tPostOnlyEnd = clock::now();
-        m_lastPostMs =
-            std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
+        if (!ranPostProcessInRg) {
+            const auto tPostOnlyStart = clock::now();
+            WriteBreadcrumb(GpuMarker::PostProcess);
+            RenderPostProcess();
+            MarkPassComplete("RenderPostProcess_Done");
+            const auto tPostOnlyEnd = clock::now();
+            m_lastPostMs =
+                std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
+        } else {
+            MarkPassComplete("RenderPostProcess_Done");
+        }
     } else {
         m_lastPostMs = 0.0f;
         MarkPassComplete("RenderPostProcess_Skipped");
@@ -3538,7 +3697,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
                 up = glm::vec3(0.0f, 0.0f, 1.0f);
             }
 
-            glm::mat4 lightView = glm::lookAtLH(localLightPos[i], localLightPos[i] + dir, up);
+            glm::mat4 spotLightView = glm::lookAtLH(localLightPos[i], localLightPos[i] + dir, up);
 
             float nearPlane = 0.1f;
             float farPlane = std::max(localLightRange[i], 1.0f);
@@ -3549,7 +3708,7 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
             fovYLocal = glm::clamp(fovYLocal, glm::radians(10.0f), glm::radians(170.0f));
 
             glm::mat4 lightProj = glm::perspectiveLH_ZO(fovYLocal, 1.0f, nearPlane, farPlane);
-            glm::mat4 lightViewProj = lightProj * lightView;
+            glm::mat4 lightViewProj = lightProj * spotLightView;
 
             m_localLightViewProjMatrices[i] = lightViewProj;
 
@@ -5697,23 +5856,29 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         }
 
         // Optional HZB occlusion culling. We build the HZB late in the frame
-        // and consume it on the next frame's culling dispatch; only enable
-        // when we have a fresh capture and camera motion is low to avoid
-        // false occlusion during fast movement.
+        // and consume it on the next frame's culling dispatch.
         bool useHzbOcclusion = false;
         if (std::getenv("CORTEX_GPUCULL_USE_HZB") != nullptr &&
             m_hzbValid && m_hzbCaptureValid && m_hzbTexture && m_hzbMipCount > 0) {
             // Require the HZB capture to be from the immediately previous frame.
             if (m_hzbCaptureFrameCounter + 1u == m_renderFrameCounter) {
-                const float dist = glm::length(m_cameraPositionWS - m_hzbCaptureCameraPosWS);
-                const glm::vec3 fwdNow = glm::normalize(m_cameraForwardWS);
-                const glm::vec3 fwdThen = glm::normalize(m_hzbCaptureCameraForwardWS);
-                const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
-                // Conservative gates: allow only small camera movement/rotation.
-                constexpr float kMaxHzbDist = 0.35f;          // meters/units
-                constexpr float kMaxHzbAngleDeg = 2.0f;       // degrees
-                const float angleDeg = std::acos(dotFwd) * (180.0f / glm::pi<float>());
-                useHzbOcclusion = (dist <= kMaxHzbDist) && (angleDeg <= kMaxHzbAngleDeg);
+                const bool strictGate = (std::getenv("CORTEX_GPUCULL_HZB_STRICT_GATE") != nullptr);
+                if (!strictGate) {
+                    // Motion robustness is handled conservatively in the shader
+                    // via inflated footprints + mip bias; do not hard-disable
+                    // occlusion on camera movement by default.
+                    useHzbOcclusion = true;
+                } else {
+                    const float dist = glm::length(m_cameraPositionWS - m_hzbCaptureCameraPosWS);
+                    const glm::vec3 fwdNow = glm::normalize(m_cameraForwardWS);
+                    const glm::vec3 fwdThen = glm::normalize(m_hzbCaptureCameraForwardWS);
+                    const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
+                    // Conservative gates: allow only small camera movement/rotation.
+                    constexpr float kMaxHzbDist = 0.35f;          // meters/units
+                    constexpr float kMaxHzbAngleDeg = 2.0f;       // degrees
+                    const float angleDeg = std::acos(dotFwd) * (180.0f / glm::pi<float>());
+                    useHzbOcclusion = (dist <= kMaxHzbDist) && (angleDeg <= kMaxHzbAngleDeg);
+                }
             }
 
         }
@@ -5730,40 +5895,7 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             m_hzbCaptureFarPlane,
             useHzbOcclusion);
 
-        if (useHzbOcclusion && m_renderGraph) {
-            m_renderGraph->BeginFrame();
-            const RGResourceHandle hzbHandle =
-                m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB");
-
-            std::string cullError;
-            m_renderGraph->AddPass(
-                "GPUCulling_DispatchHZB",
-                [&](RGPassBuilder& builder) {
-                    builder.SetType(RGPassType::Compute);
-                    builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
-                },
-                [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
-                    auto cullResult =
-                        m_gpuCulling->DispatchCulling(cmdList, viewProjForCulling, cameraPosForCulling);
-                    if (cullResult.IsErr()) {
-                        cullError = cullResult.Error();
-                    }
-                });
-
-            const auto execResult = m_renderGraph->Execute(m_commandList.Get());
-            if (execResult.IsErr()) {
-                spdlog::warn("RenderSceneIndirect: RenderGraph execute failed: {}", execResult.Error());
-                RenderScene(registry);
-                return;
-            }
-            if (!cullError.empty()) {
-                spdlog::warn("RenderSceneIndirect: culling dispatch failed: {}", cullError);
-                RenderScene(registry);
-                return;
-            }
-
-            m_hzbState = m_renderGraph->GetResourceState(hzbHandle);
-        } else {
+        {
             // Ensure the HZB resource is in an SRV-readable state for compute.
             if (useHzbOcclusion &&
                 (m_hzbState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
@@ -8246,7 +8378,7 @@ Result<void> Renderer::CreateDepthBuffer() {
         char buf[64];
         sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
         char dim[64];
-        sprintf_s(dim, "%ux%u", depthDesc.Width, depthDesc.Height);
+        sprintf_s(dim, "%llux%u", static_cast<unsigned long long>(depthDesc.Width), depthDesc.Height);
         return Result<void>::Err(std::string("Failed to create depth buffer (")
                                  + dim + ", scale=" + std::to_string(scale)
                                  + ", hr=" + buf + ")");
@@ -10796,6 +10928,9 @@ void Renderer::WaitForGPU() {
     if (m_uploadQueue) {
         m_uploadQueue->Flush();
     }
+    if (m_computeQueue) {
+        m_computeQueue->Flush();
+    }
 }
 
 Result<void> Renderer::InitializeEnvironmentMaps() {
@@ -11300,15 +11435,17 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     }
 
     // Transition shadow map to depth write
-    if (m_shadowMapState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_shadowMap.Get();
-        barrier.Transition.StateBefore = m_shadowMapState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandList->ResourceBarrier(1, &barrier);
-        m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (!m_shadowPassSkipTransitions) {
+        if (m_shadowMapState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_shadowMap.Get();
+            barrier.Transition.StateBefore = m_shadowMapState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        }
     }
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
@@ -11553,15 +11690,17 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     }
 
     // Transition shadow map for sampling
-    if (m_shadowMapState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_shadowMap.Get();
-        barrier.Transition.StateBefore = m_shadowMapState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandList->ResourceBarrier(1, &barrier);
-        m_shadowMapState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (!m_shadowPassSkipTransitions) {
+        if (m_shadowMapState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_shadowMap.Get();
+            barrier.Transition.StateBefore = m_shadowMapState;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_shadowMapState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        }
     }
 }
 
@@ -11571,6 +11710,10 @@ void Renderer::RenderPostProcess() {
         return;
     }
 
+    if (m_postProcessSkipTransitions) {
+        // RenderGraph is responsible for resource transitions in this mode.
+        m_backBufferUsedAsRTThisFrame = true;
+    } else {
     // Transition all post-process input resources to PIXEL_SHADER_RESOURCE and back buffer to RENDER_TARGET.
     // We need to transition: HDR, SSAO, SSR, velocity, TAA intermediate, and RT reflection buffers
     // that will be sampled by the post-process shader.
@@ -11680,6 +11823,7 @@ void Renderer::RenderPostProcess() {
 
     if (barrierCount > 0) {
         m_commandList->ResourceBarrier(barrierCount, barriers);
+    }
     }
 
     // Set back buffer as render target (no depth)

@@ -495,6 +495,7 @@ private:
     void RenderSkybox();
     void RenderScene(Scene::ECS_Registry* registry);
     void RenderOverlays(Scene::ECS_Registry* registry);
+    void RenderWaterSurfaces(Scene::ECS_Registry* registry);
     void RenderTransparent(Scene::ECS_Registry* registry);
     void RenderSSR();
     void RenderTAA();
@@ -622,6 +623,7 @@ public:
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
     std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
     std::unique_ptr<DX12Pipeline> m_waterPipeline;
+    std::unique_ptr<DX12Pipeline> m_waterOverlayPipeline;
     std::unique_ptr<DX12Pipeline> m_particlePipeline;
     // Experimental fullscreen voxel renderer pipeline (SV_VertexID triangle).
     std::unique_ptr<DX12Pipeline> m_voxelPipeline;
@@ -705,6 +707,7 @@ public:
     // Depth buffer
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorHandle m_depthStencilView;
+    DescriptorHandle m_depthStencilViewReadOnly;
     DescriptorHandle m_depthSRV;
     D3D12_RESOURCE_STATES m_depthState = D3D12_RESOURCE_STATE_COMMON;
 

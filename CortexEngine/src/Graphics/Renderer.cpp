@@ -1658,6 +1658,10 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
          }
          // Depth-tested overlay/decal pass (lane markings, UI planes, etc.)
          RenderOverlays(registry);
+         // Water/liquid surfaces are rendered as a dedicated depth-tested,
+         // depth-write-disabled pass after opaque/decals to avoid coplanar
+         // fighting with ground planes.
+         RenderWaterSurfaces(registry);
          // Then blended transparent/glass objects, sorted back-to-front.
          WriteBreadcrumb(GpuMarker::TransparentGeom);
          RenderTransparent(registry);
@@ -2608,6 +2612,7 @@ void Renderer::BeginFrame() {
                      renderScale, expectedDepthWidth, expectedDepthHeight);
         m_depthBuffer.Reset();
         m_depthStencilView = {};  // Invalidate descriptor handles before recreating
+        m_depthStencilViewReadOnly = {};
         m_depthSRV = {};          // Prevents stale descriptor usage if CreateDepthBuffer fails
         auto depthResult = CreateDepthBuffer();
         if (depthResult.IsErr()) {
@@ -4953,6 +4958,7 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) continue;
+        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
@@ -5238,6 +5244,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) continue;
+        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
@@ -6217,6 +6224,9 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         if (!renderable.visible || !renderable.mesh) {
             continue;
         }
+        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) {
+            continue;
+        }
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
             continue;
         }
@@ -6939,8 +6949,23 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
+    // Depth-test overlays without writing depth. If we have a read-only DSV,
+    // keep the depth buffer in DEPTH_READ; otherwise fall back to DEPTH_WRITE.
+    const bool hasReadOnlyDsv = m_depthStencilViewReadOnly.IsValid();
+    const D3D12_RESOURCE_STATES desiredDepthState = hasReadOnlyDsv ? kDepthSampleState : D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (m_depthState != desiredDepthState) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = desiredDepthState;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = desiredDepthState;
+    }
+
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthStencilViewReadOnly.cpu : m_depthStencilView.cpu;
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     D3D12_VIEWPORT viewport{};
@@ -7070,6 +7095,131 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
     }
 }
 
+void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
+    if (!registry || !m_waterOverlayPipeline || !m_hdrColor || !m_depthBuffer) {
+        return;
+    }
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    if (view.begin() == view.end()) {
+        return;
+    }
+
+    // Ensure HDR is writable.
+    if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hdrColor.Get();
+        barrier.Transition.StateBefore = m_hdrState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    // Depth-test water without writing depth. Prefer read-only DSV so the depth
+    // buffer can stay in DEPTH_READ after VB resolve.
+    const bool hasReadOnlyDsv = m_depthStencilViewReadOnly.IsValid();
+    const D3D12_RESOURCE_STATES desiredDepthState = hasReadOnlyDsv ? kDepthSampleState : D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (m_depthState != desiredDepthState) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = desiredDepthState;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = desiredDepthState;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthStencilViewReadOnly.cpu : m_depthStencilView.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT viewport{};
+    viewport.Width = static_cast<float>(m_window->GetWidth());
+    viewport.Height = static_cast<float>(m_window->GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    D3D12_RECT scissorRect{};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
+    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_waterOverlayPipeline->GetPipelineState());
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    for (auto entity : view) {
+        if (!registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) {
+            continue;
+        }
+
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+
+        EnsureMaterialTextures(renderable);
+
+        MaterialConstants materialData{};
+        materialData.albedo    = renderable.albedoColor;
+        materialData.metallic  = 0.0f;
+        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+        materialData.ao        = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData._pad0     = 0.0f;
+        materialData.mapFlags  = glm::uvec4(0u);
+        materialData.mapFlags2 = glm::uvec4(0u);
+
+        ObjectConstants objectData{};
+        objectData.modelMatrix  = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
+
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+        if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
+            m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+        } else if (m_fallbackMaterialDescriptors[0].IsValid()) {
+            m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
+        }
+
+        if (renderable.mesh->gpuBuffers &&
+            renderable.mesh->gpuBuffers->vertexBuffer &&
+            renderable.mesh->gpuBuffers->indexBuffer) {
+            D3D12_VERTEX_BUFFER_VIEW vbv{};
+            vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+            vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+            vbv.StrideInBytes = sizeof(Vertex);
+
+            D3D12_INDEX_BUFFER_VIEW ibv{};
+            ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+            ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+            ibv.Format = DXGI_FORMAT_R32_UINT;
+
+            m_commandList->IASetVertexBuffers(0, 1, &vbv);
+            m_commandList->IASetIndexBuffer(&ibv);
+            m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+        }
+    }
+}
+
 void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     if (!registry || !m_transparentPipeline) {
         return;
@@ -7098,6 +7248,9 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         auto& transform  = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) {
             continue;
         }
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
@@ -7157,8 +7310,23 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
+    // Transparent geometry should depth-test against the opaque scene but not
+    // write depth. Use a read-only DSV when available.
+    const bool hasReadOnlyDsv = m_depthStencilViewReadOnly.IsValid();
+    const D3D12_RESOURCE_STATES desiredDepthState = hasReadOnlyDsv ? kDepthSampleState : D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (m_depthState != desiredDepthState) {
+        D3D12_RESOURCE_BARRIER depthBarrier{};
+        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        depthBarrier.Transition.pResource = m_depthBuffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthState;
+        depthBarrier.Transition.StateAfter = desiredDepthState;
+        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &depthBarrier);
+        m_depthState = desiredDepthState;
+    }
+
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthStencilViewReadOnly.cpu : m_depthStencilView.cpu;
     m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     D3D12_VIEWPORT viewport{};
@@ -9232,6 +9400,7 @@ Result<void> Renderer::CreateDepthBuffer() {
     if (FAILED(hr)) {
         m_depthBuffer.Reset();
         m_depthStencilView = {};
+        m_depthStencilViewReadOnly = {};
         m_depthSRV = {};
 
         CORTEX_REPORT_DEVICE_REMOVED("CreateDepthBuffer", hr);
@@ -9254,6 +9423,7 @@ Result<void> Renderer::CreateDepthBuffer() {
     }
 
     m_depthStencilView = dsvResult.Value();
+    m_depthStencilViewReadOnly = {};
 
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
     dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -9265,6 +9435,22 @@ Result<void> Renderer::CreateDepthBuffer() {
         &dsvDesc,
         m_depthStencilView.cpu
     );
+
+    // Create a read-only DSV so we can depth-test while the depth buffer is in
+    // DEPTH_READ (e.g., after VB resolve / post passes).
+    auto roDsvResult = m_descriptorManager->AllocateDSV();
+    if (roDsvResult.IsErr()) {
+        spdlog::warn("Failed to allocate read-only DSV (continuing without): {}", roDsvResult.Error());
+    } else {
+        m_depthStencilViewReadOnly = roDsvResult.Value();
+        D3D12_DEPTH_STENCIL_VIEW_DESC roDesc = dsvDesc;
+        roDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+        m_device->GetDevice()->CreateDepthStencilView(
+            m_depthBuffer.Get(),
+            &roDesc,
+            m_depthStencilViewReadOnly.cpu
+        );
+    }
 
     // Create SRV for depth sampling (SSAO) - use staging heap for persistent descriptors
     auto srvResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
@@ -11136,6 +11322,7 @@ Result<void> Renderer::CreateCommandList() {
         transparentDesc.numRenderTargets = 1; // HDR only (do not overwrite normal/roughness RT)
         transparentDesc.blendEnabled = true;
         transparentDesc.depthWriteEnabled = false;
+        transparentDesc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
         auto transparentResult = m_transparentPipeline->Initialize(
             m_device->GetDevice(),
@@ -11174,6 +11361,11 @@ Result<void> Renderer::CreateCommandList() {
         m_overlayPipeline.reset();
     }
 
+    if (!waterVsResult.IsOk() || !waterPsResult.IsOk()) {
+        m_waterPipeline.reset();
+        m_waterOverlayPipeline.reset();
+    }
+
     // Depth-only pipeline for prepass: reuse the main vertex shader and
     // input layout, but omit a pixel shader and disable color render
     // targets so we only populate the depth buffer.
@@ -11204,6 +11396,7 @@ Result<void> Renderer::CreateCommandList() {
     // signature as the main PBR pipeline but a tailored shader pair.
     if (waterVsResult.IsOk() && waterPsResult.IsOk()) {
         m_waterPipeline = std::make_unique<DX12Pipeline>();
+        m_waterOverlayPipeline = std::make_unique<DX12Pipeline>();
 
         PipelineDesc waterDesc = {};
         waterDesc.vertexShader = waterVsResult.Value();
@@ -11224,6 +11417,25 @@ Result<void> Renderer::CreateCommandList() {
         if (waterPipelineResult.IsErr()) {
             spdlog::warn("Failed to create water pipeline: {}", waterPipelineResult.Error());
             m_waterPipeline.reset();
+        }
+
+        // Depth-tested overlay variant for rendering water after opaque passes.
+        // Uses blending and disables depth writes to prevent coplanar fighting.
+        PipelineDesc waterOverlayDesc = waterDesc;
+        waterOverlayDesc.numRenderTargets = 1; // HDR only
+        waterOverlayDesc.depthWriteEnabled = false;
+        waterOverlayDesc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        waterOverlayDesc.blendEnabled = true;
+        waterOverlayDesc.depthBias = -1;
+        waterOverlayDesc.slopeScaledDepthBias = -1.0f;
+
+        auto waterOverlayResult = m_waterOverlayPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            waterOverlayDesc);
+        if (waterOverlayResult.IsErr()) {
+            spdlog::warn("Failed to create water overlay pipeline: {}", waterOverlayResult.Error());
+            m_waterOverlayPipeline.reset();
         }
     }
 

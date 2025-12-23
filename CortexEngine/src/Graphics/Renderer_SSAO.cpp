@@ -4,6 +4,13 @@
 
 namespace Cortex::Graphics {
 
+namespace {
+constexpr D3D12_RESOURCE_STATES kDepthSampleState =
+    D3D12_RESOURCE_STATE_DEPTH_READ |
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+}
+
 Result<void> Renderer::CreateSSAOResources() {
     if (!m_device || !m_descriptorManager || !m_window) {
         return Result<void>::Err("Renderer not initialized for SSAO target creation");
@@ -134,16 +141,16 @@ void Renderer::RenderSSAO() {
         return;
     }
 
-    // Transition depth to SRV for sampling
-    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    // Transition depth to SRV for sampling (include DEPTH_READ for depth resources).
+    if (m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_depthBuffer.Get();
         barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     // Transition SSAO target to render target state
@@ -248,16 +255,16 @@ void Renderer::RenderSSAOAsync() {
         return;
     }
 
-    // Transition depth to NON_PIXEL_SHADER_RESOURCE (for compute shader access)
-    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    // Transition depth for compute shader access (include DEPTH_READ for depth resources).
+    if (m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_depthBuffer.Get();
         barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     // Transition SSAO target to UAV
@@ -282,41 +289,51 @@ void Renderer::RenderSSAOAsync() {
     // Bind frame constants (b1)
     m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Bind depth SRV as t0 via transient descriptor
-    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (depthHandleResult.IsErr()) {
-        spdlog::warn("RenderSSAOAsync: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
+    // Root signature expects fixed-width descriptor tables:
+    //   Param 3: t0-t9 (10 SRVs)
+    //   Param 6: u0-u3 (4 UAVs)
+    // Allocate full ranges so later transient allocations can't overwrite
+    // descriptors within a bound table (debug layer treats them as static).
+    auto depthTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+    if (depthTableResult.IsErr()) {
+        spdlog::warn("RenderSSAOAsync: failed to allocate transient depth SRV table: {}", depthTableResult.Error());
         return;
     }
-    DescriptorHandle depthHandle = depthHandleResult.Value();
+    DescriptorHandle depthTableBase = depthTableResult.Value();
 
-    m_device->GetDevice()->CopyDescriptorsSimple(
-        1,
-        depthHandle.cpu,
-        m_depthSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    // Bind SRV table at slot 3 (t0-t3)
-    m_commandList->SetComputeRootDescriptorTable(3, depthHandle.gpu);
-
-    // Bind SSAO UAV as u0 via transient descriptor
-    auto uavHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (uavHandleResult.IsErr()) {
-        spdlog::warn("RenderSSAOAsync: failed to allocate transient UAV: {}", uavHandleResult.Error());
+    auto uavTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+    if (uavTableResult.IsErr()) {
+        spdlog::warn("RenderSSAOAsync: failed to allocate transient UAV table: {}", uavTableResult.Error());
         return;
     }
-    DescriptorHandle uavHandle = uavHandleResult.Value();
+    DescriptorHandle uavTableBase = uavTableResult.Value();
 
-    m_device->GetDevice()->CopyDescriptorsSimple(
-        1,
-        uavHandle.cpu,
-        m_ssaoUAV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
+    const UINT inc = m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    for (uint32_t i = 0; i < 10; ++i) {
+        D3D12_CPU_DESCRIPTOR_HANDLE dst = depthTableBase.cpu;
+        dst.ptr += static_cast<SIZE_T>(i) * inc;
+        m_device->GetDevice()->CopyDescriptorsSimple(
+            1,
+            dst,
+            m_depthSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
 
-    // Bind UAV table at slot 6 (u0-u3)
-    m_commandList->SetComputeRootDescriptorTable(6, uavHandle.gpu);
+    for (uint32_t i = 0; i < 4; ++i) {
+        D3D12_CPU_DESCRIPTOR_HANDLE dst = uavTableBase.cpu;
+        dst.ptr += static_cast<SIZE_T>(i) * inc;
+        m_device->GetDevice()->CopyDescriptorsSimple(
+            1,
+            dst,
+            m_ssaoUAV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
+    }
+
+    // Bind SRV/UAV tables.
+    m_commandList->SetComputeRootDescriptorTable(3, depthTableBase.gpu);
+    m_commandList->SetComputeRootDescriptorTable(6, uavTableBase.gpu);
 
     // Dispatch compute work (8x8 thread groups)
     D3D12_RESOURCE_DESC texDesc = m_ssaoTex->GetDesc();

@@ -187,7 +187,10 @@ Result<void> GPUCullingPipeline::CreateRootSignature() {
     hzbRange.NumDescriptors = 1;
     hzbRange.BaseShaderRegister = 2;
     hzbRange.RegisterSpace = 0;
-    hzbRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    // HZB is rebuilt later in the same command list (for next-frame occlusion),
+    // so the underlying resource data is not static over the lifetime of the
+    // command list.
+    hzbRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
     hzbRange.OffsetInDescriptorsFromTableStart = 0;
 
     // CBV for constants

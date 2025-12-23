@@ -923,9 +923,9 @@ public:
     Microsoft::WRL::ComPtr<ID3D12Resource> m_taaIntermediate;
     DescriptorHandle m_taaIntermediateRTV;
     D3D12_RESOURCE_STATES m_taaIntermediateState = D3D12_RESOURCE_STATE_COMMON;
-    std::array<DescriptorHandle, 10> m_taaResolveSrvTable{};
+    std::array<std::array<DescriptorHandle, 10>, kFrameCount> m_taaResolveSrvTables{};
     bool m_taaResolveSrvTableValid = false;
-    std::array<DescriptorHandle, 10> m_postProcessSrvTable{};
+    std::array<std::array<DescriptorHandle, 10>, kFrameCount> m_postProcessSrvTables{};
     bool m_postProcessSrvTableValid = false;
 
       bool m_shadowsEnabled = true;
@@ -965,6 +965,9 @@ public:
       bool m_gpuCullingEnabled = false;    // Use GPU frustum culling
       bool m_indirectDrawEnabled = false;  // Use ExecuteIndirect for draws
       bool m_gpuCullingFreeze = false;     // Freeze culling frustum (debug)
+      bool m_gpuCullingFreezeCaptured = false;
+      glm::mat4 m_gpuCullingFrozenViewProj{1.0f};
+      glm::vec3 m_gpuCullingFrozenCameraPos{0.0f};
       // Cached instance data for GPU culling (rebuilt each frame from ECS)
       std::vector<GPUInstanceData> m_gpuInstances;
       // Mesh info for indirect draws (maps instance -> mesh draw args)

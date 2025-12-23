@@ -26,6 +26,11 @@ namespace Cortex::Graphics {
 
 namespace {
 
+constexpr D3D12_RESOURCE_STATES kDepthSampleState =
+    D3D12_RESOURCE_STATE_DEPTH_READ |
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
 FrustumPlanes ExtractFrustumPlanesCPU(const glm::mat4& viewProj) {
     FrustumPlanes planes{};
 
@@ -808,8 +813,10 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
 
 Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
     m_taaResolveSrvTableValid = false;
-    for (auto& handle : m_taaResolveSrvTable) {
-        handle = {};
+    for (auto& table : m_taaResolveSrvTables) {
+        for (auto& handle : table) {
+            handle = {};
+        }
     }
 
     if (!m_device || !m_descriptorManager) {
@@ -821,22 +828,40 @@ Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
         return Result<void>::Err("D3D12 device not available");
     }
 
-    for (size_t i = 0; i < m_taaResolveSrvTable.size(); ++i) {
-        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate TAA resolve descriptor: " + handleResult.Error());
-        }
-        m_taaResolveSrvTable[i] = handleResult.Value();
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(nullptr, &srvDesc, m_taaResolveSrvTable[i].cpu);
+    for (size_t frame = 0; frame < kFrameCount; ++frame) {
+        for (size_t i = 0; i < m_taaResolveSrvTables[frame].size(); ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate TAA resolve descriptor: " + handleResult.Error());
+            }
+            m_taaResolveSrvTables[frame][i] = handleResult.Value();
+            device->CreateShaderResourceView(nullptr, &srvDesc, m_taaResolveSrvTables[frame][i].cpu);
+        }
     }
 
-    m_taaResolveSrvTableValid = m_taaResolveSrvTable[0].IsValid();
+    m_taaResolveSrvTableValid = true;
+    for (size_t frame = 0; frame < kFrameCount && m_taaResolveSrvTableValid; ++frame) {
+        if (!m_taaResolveSrvTables[frame][0].IsValid()) {
+            m_taaResolveSrvTableValid = false;
+            break;
+        }
+
+        const uint32_t base = m_taaResolveSrvTables[frame][0].index;
+        for (size_t i = 1; i < m_taaResolveSrvTables[frame].size(); ++i) {
+            if (!m_taaResolveSrvTables[frame][i].IsValid() ||
+                m_taaResolveSrvTables[frame][i].index != base + static_cast<uint32_t>(i)) {
+                spdlog::warn("TAA resolve SRV table is not contiguous for frame {}; falling back to transient packing", frame);
+                m_taaResolveSrvTableValid = false;
+                break;
+            }
+        }
+    }
     return Result<void>::Ok();
 }
 
@@ -850,18 +875,11 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
         return;
     }
 
-    auto copyOrNull = [&](size_t slot,
-                          const DescriptorHandle& src,
-                          DXGI_FORMAT fmt) {
-        if (slot >= m_taaResolveSrvTable.size() || !m_taaResolveSrvTable[slot].IsValid()) {
-            return;
-        }
-        if (src.IsValid()) {
-            device->CopyDescriptorsSimple(
-                1,
-                m_taaResolveSrvTable[slot].cpu,
-                src.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    auto& table = m_taaResolveSrvTables[m_frameIndex % kFrameCount];
+    auto writeOrNull = [&](size_t slot,
+                           ID3D12Resource* resource,
+                           DXGI_FORMAT fmt) {
+        if (slot >= table.size() || !table[slot].IsValid()) {
             return;
         }
 
@@ -870,33 +888,43 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(nullptr, &srvDesc, m_taaResolveSrvTable[slot].cpu);
+        device->CreateShaderResourceView(nullptr, &srvDesc, table[slot].cpu);
+        if (resource) {
+            device->CreateShaderResourceView(resource, &srvDesc, table[slot].cpu);
+        }
     };
 
     // Must match PostProcess.hlsl TAAResolvePS bindings:
     // t0 HDR, t1 bloom, t2 SSAO, t3 history, t4 depth, t5 normal/roughness,
     // t6 SSR, t7 velocity.
-    copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
-    copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
-    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
-        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
-        if (vbNormal.IsValid()) {
-            normalSrv = vbNormal;
-        }
+    writeOrNull(0, m_hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    ID3D12Resource* bloomRes = nullptr;
+    if (m_bloomIntensity > 0.0f) {
+        bloomRes = (kBloomLevels > 1) ? m_bloomTexA[1].Get() : m_bloomTexA[0].Get();
     }
-    copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(6, m_ssrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
+    writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
+
+    writeOrNull(2, m_ssaoTex.Get(), DXGI_FORMAT_R8_UNORM);
+    writeOrNull(3, m_historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(4, m_depthBuffer.Get(), DXGI_FORMAT_R32_FLOAT);
+
+    ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+    if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+        normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
+    }
+    writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    writeOrNull(6, m_ssrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(7, m_velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
 }
 
 Result<void> Renderer::InitializePostProcessDescriptorTable() {
     m_postProcessSrvTableValid = false;
-    for (auto& handle : m_postProcessSrvTable) {
-        handle = {};
+    for (auto& table : m_postProcessSrvTables) {
+        for (auto& handle : table) {
+            handle = {};
+        }
     }
 
     if (!m_device || !m_descriptorManager) {
@@ -908,22 +936,39 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         return Result<void>::Err("D3D12 device not available");
     }
 
-    for (size_t i = 0; i < m_postProcessSrvTable.size(); ++i) {
-        auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate post-process descriptor: " + handleResult.Error());
-        }
-        m_postProcessSrvTable[i] = handleResult.Value();
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(nullptr, &srvDesc, m_postProcessSrvTable[i].cpu);
+    for (size_t frame = 0; frame < kFrameCount; ++frame) {
+        for (size_t i = 0; i < m_postProcessSrvTables[frame].size(); ++i) {
+            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (handleResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate post-process descriptor: " + handleResult.Error());
+            }
+            m_postProcessSrvTables[frame][i] = handleResult.Value();
+            device->CreateShaderResourceView(nullptr, &srvDesc, m_postProcessSrvTables[frame][i].cpu);
+        }
     }
 
-    m_postProcessSrvTableValid = m_postProcessSrvTable[0].IsValid();
+    m_postProcessSrvTableValid = true;
+    for (size_t frame = 0; frame < kFrameCount && m_postProcessSrvTableValid; ++frame) {
+        if (!m_postProcessSrvTables[frame][0].IsValid()) {
+            m_postProcessSrvTableValid = false;
+            break;
+        }
+        const uint32_t base = m_postProcessSrvTables[frame][0].index;
+        for (size_t i = 1; i < m_postProcessSrvTables[frame].size(); ++i) {
+            if (!m_postProcessSrvTables[frame][i].IsValid() ||
+                m_postProcessSrvTables[frame][i].index != base + static_cast<uint32_t>(i)) {
+                spdlog::warn("Post-process SRV table is not contiguous for frame {}; falling back to transient packing", frame);
+                m_postProcessSrvTableValid = false;
+                break;
+            }
+        }
+    }
     return Result<void>::Ok();
 }
 
@@ -937,18 +982,12 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         return;
     }
 
-    auto copyOrNull = [&](size_t slot,
-                          const DescriptorHandle& src,
-                          DXGI_FORMAT fmt) {
-        if (slot >= m_postProcessSrvTable.size() || !m_postProcessSrvTable[slot].IsValid()) {
-            return;
-        }
-        if (src.IsValid()) {
-            device->CopyDescriptorsSimple(
-                1,
-                m_postProcessSrvTable[slot].cpu,
-                src.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    auto& table = m_postProcessSrvTables[m_frameIndex % kFrameCount];
+    auto writeOrNull = [&](size_t slot,
+                           ID3D12Resource* resource,
+                           DXGI_FORMAT fmt,
+                           uint32_t mipLevels = 1) {
+        if (slot >= table.size() || !table[slot].IsValid()) {
             return;
         }
 
@@ -956,38 +995,45 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         srvDesc.Format = fmt;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(nullptr, &srvDesc, m_postProcessSrvTable[slot].cpu);
+        srvDesc.Texture2D.MipLevels = mipLevels;
+        device->CreateShaderResourceView(nullptr, &srvDesc, table[slot].cpu);
+        if (resource) {
+            device->CreateShaderResourceView(resource, &srvDesc, table[slot].cpu);
+        }
     };
 
     // Must match PostProcess.hlsl bindings:
     // t0 HDR, t1 bloom, t2 SSAO, t3 history, t4 depth, t5 normal/roughness,
     // t6 SSR, t7 velocity, t8 RT reflection, t9 RT reflection history.
-    copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
-    copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-    DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
-    if (m_vbRenderedThisFrame && m_visibilityBuffer) {
-        const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
-        if (vbNormal.IsValid()) {
-            normalSrv = vbNormal;
-        }
+    writeOrNull(0, m_hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    ID3D12Resource* bloomRes = nullptr;
+    if (m_bloomIntensity > 0.0f) {
+        bloomRes = (kBloomLevels > 1) ? m_bloomTexA[1].Get() : m_bloomTexA[0].Get();
     }
-    copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
+
+    writeOrNull(2, m_ssaoTex.Get(), DXGI_FORMAT_R8_UNORM);
+    writeOrNull(3, m_historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(4, m_depthBuffer.Get(), DXGI_FORMAT_R32_FLOAT);
+
+    ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+    if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+        normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
+    }
+    writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
     // Debug mode: HZB mip visualization reuses the SSR slot (t6) to avoid
     // expanding the post-process descriptor table/root signature.
-    DescriptorHandle slot6 = m_ssrSRV;
-    DXGI_FORMAT slot6Fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    if (m_debugViewMode == 32u && m_hzbValid && m_hzbFullSRV.IsValid()) {
-        slot6 = m_hzbFullSRV;
-        slot6Fmt = DXGI_FORMAT_R32_FLOAT;
+    if (m_debugViewMode == 32u && m_hzbTexture && m_hzbMipCount > 0) {
+        writeOrNull(6, m_hzbTexture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbMipCount);
+    } else {
+        writeOrNull(6, m_ssrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     }
-    copyOrNull(6, slot6, slot6Fmt);
-    copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
-    copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    writeOrNull(7, m_velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
+    writeOrNull(8, m_rtReflectionColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(9, m_rtReflectionHistory.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 }
 
 void Renderer::ProcessGpuJobsPerFrame() {
@@ -1630,31 +1676,24 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         MarkPassComplete("RenderMotionVectors_Done");
     }
 
-    // Optional HZB build (depth pyramid) for future occlusion culling and debug.
-    // Disabled by default; enable via env vars:
-    //   - CORTEX_ENABLE_HZB=1 (build HZB each frame)
-    //   - CORTEX_USE_RG_HZB=1 (use RenderGraph-backed builder)
+    // HZB build (depth pyramid): engine-wide visibility primitive used for
+    // occlusion culling (GPU culling + VB visibility) and debug views.
     static bool s_checkedHzbEnv = false;
     static bool s_enableHzb = false;
     static bool s_useRgHzb = false;
     if (!s_checkedHzbEnv) {
         s_checkedHzbEnv = true;
-        s_enableHzb = (std::getenv("CORTEX_ENABLE_HZB") != nullptr) || (std::getenv("CORTEX_USE_RG_HZB") != nullptr);
-        s_useRgHzb = (std::getenv("CORTEX_USE_RG_HZB") != nullptr);
-        // If GPU culling requests HZB occlusion, ensure the pyramid is built.
-        if (std::getenv("CORTEX_GPUCULL_USE_HZB") != nullptr) {
-            s_enableHzb = true;
-        }
+        s_enableHzb = (std::getenv("CORTEX_DISABLE_HZB") == nullptr);
+        // RenderGraph-backed builder is the default (subresource-aware mips).
+        s_useRgHzb = (std::getenv("CORTEX_DISABLE_RG_HZB") == nullptr);
         if (s_enableHzb) {
             spdlog::info("HZB enabled (RenderGraph builder: {})", s_useRgHzb ? "yes" : "no");
+        } else {
+            spdlog::info("HZB disabled (CORTEX_DISABLE_HZB=1)");
         }
     }
-    // If the user selects the HZB debug view at runtime, force-enable HZB
-    // building so the debug view always has valid data without requiring an env var.
-    if (!s_enableHzb && m_debugViewMode == 32u) {
-        s_enableHzb = true;
-        spdlog::info("HZB enabled (forced by debug view)");
-    }
+    // HZB is enabled by default. If it is explicitly disabled via env var,
+    // do not override that choice for debug views.
     if (s_enableHzb) {
         if (s_useRgHzb && m_renderGraph && m_device && m_commandList && m_descriptorManager &&
             m_depthBuffer && m_depthSRV.IsValid()) {
@@ -1667,6 +1706,10 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                 spdlog::warn("HZB RG: invalid resources (texture={}, mips={}, srvs={}, uavs={})",
                              static_cast<bool>(m_hzbTexture), m_hzbMipCount,
                              m_hzbMipSRVStaging.size(), m_hzbMipUAVStaging.size());
+            } else if (!m_hzbMipSRVStaging.empty() && !m_hzbMipSRVStaging[0].IsValid()) {
+                spdlog::warn("HZB RG: staging SRV handle invalid (mip0 cpu ptr=0)");
+            } else if (!m_hzbMipUAVStaging.empty() && !m_hzbMipUAVStaging[0].IsValid()) {
+                spdlog::warn("HZB RG: staging UAV handle invalid (mip0 cpu ptr=0)");
             } else {
                 rgHasPendingHzb = true;
             }
@@ -1801,6 +1844,10 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         RGResourceHandle hdrHandle{};
         RGResourceHandle ssaoHandle{};
         RGResourceHandle ssrHandle{};
+        RGResourceHandle bloomHandle{};
+        RGResourceHandle historyHandle{};
+        RGResourceHandle depthPpHandle{};
+        RGResourceHandle normalHandle{};
         RGResourceHandle velocityHandle{};
         RGResourceHandle taaHandle{};
         RGResourceHandle rtReflHandle{};
@@ -1810,11 +1857,37 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
         if (wantsRgPostThisFrame) {
             // Import post-process inputs using the renderer's current tracked states.
             hdrHandle = m_renderGraph->ImportResource(m_hdrColor.Get(), m_hdrState, "HDR");
+            if (m_historyColor) {
+                historyHandle = m_renderGraph->ImportResource(m_historyColor.Get(), m_historyState, "TAAHistory");
+            }
+            if (m_depthBuffer) {
+                depthPpHandle = m_renderGraph->ImportResource(m_depthBuffer.Get(), m_depthState, "Depth_Post");
+            }
             if (m_ssaoTex) {
                 ssaoHandle = m_renderGraph->ImportResource(m_ssaoTex.Get(), m_ssaoState, "SSAO");
             }
             if (m_ssrColor) {
                 ssrHandle = m_renderGraph->ImportResource(m_ssrColor.Get(), m_ssrState, "SSRColor");
+            }
+            if (m_bloomIntensity > 0.0f) {
+                ID3D12Resource* bloomRes = (kBloomLevels > 1) ? m_bloomTexA[1].Get() : m_bloomTexA[0].Get();
+                if (bloomRes) {
+                    const uint32_t level = (kBloomLevels > 1) ? 1u : 0u;
+                    bloomHandle = m_renderGraph->ImportResource(bloomRes, m_bloomState[level][0], "BloomCombined");
+                }
+            }
+            {
+                ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+                D3D12_RESOURCE_STATES normalState = m_gbufferNormalRoughnessState;
+                if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+                    normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
+                    // VB guarantees the resolved G-buffers are in SRV state before post-process.
+                    normalState =
+                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                }
+                if (normalRes) {
+                    normalHandle = m_renderGraph->ImportResource(normalRes, normalState, "NormalRoughness");
+                }
             }
             if (m_velocityBuffer) {
                 velocityHandle = m_renderGraph->ImportResource(m_velocityBuffer.Get(), m_velocityState, "Velocity");
@@ -1842,26 +1915,32 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                 hzbHandle = m_renderGraph->ImportResource(m_hzbTexture.Get(), m_hzbState, "HZB_Debug");
             }
 
-            m_renderGraph->AddPass(
-                "PostProcess",
-                [&](RGPassBuilder& builder) {
-                    builder.SetType(RGPassType::Graphics);
-                    builder.Read(hdrHandle, RGResourceUsage::ShaderResource);
-                    if (ssaoHandle.IsValid()) builder.Read(ssaoHandle, RGResourceUsage::ShaderResource);
-                    if (ssrHandle.IsValid()) builder.Read(ssrHandle, RGResourceUsage::ShaderResource);
-                    if (velocityHandle.IsValid()) builder.Read(velocityHandle, RGResourceUsage::ShaderResource);
-                    if (taaHandle.IsValid()) builder.Read(taaHandle, RGResourceUsage::ShaderResource);
-                    if (rtReflHandle.IsValid()) builder.Read(rtReflHandle, RGResourceUsage::ShaderResource);
-                    if (rtReflHistHandle.IsValid()) builder.Read(rtReflHistHandle, RGResourceUsage::ShaderResource);
-                    if (hzbHandle.IsValid() && wantsHzbDebug) builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
-                    builder.Write(backBufferHandle, RGResourceUsage::RenderTarget);
-                },
-                [&](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                    m_postProcessSkipTransitions = true;
-                    RenderPostProcess();
-                    m_postProcessSkipTransitions = false;
-                    ranPostProcessInRg = true;
-                });
+                m_renderGraph->AddPass(
+                    "PostProcess",
+                    [&](RGPassBuilder& builder) {
+                        builder.SetType(RGPassType::Graphics);
+                        builder.Read(hdrHandle, RGResourceUsage::ShaderResource);
+                        if (bloomHandle.IsValid()) builder.Read(bloomHandle, RGResourceUsage::ShaderResource);
+                        if (ssaoHandle.IsValid()) builder.Read(ssaoHandle, RGResourceUsage::ShaderResource);
+                        if (historyHandle.IsValid()) builder.Read(historyHandle, RGResourceUsage::ShaderResource);
+                        if (depthPpHandle.IsValid()) {
+                            builder.Read(depthPpHandle, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead);
+                        }
+                        if (normalHandle.IsValid()) builder.Read(normalHandle, RGResourceUsage::ShaderResource);
+                        if (ssrHandle.IsValid()) builder.Read(ssrHandle, RGResourceUsage::ShaderResource);
+                        if (velocityHandle.IsValid()) builder.Read(velocityHandle, RGResourceUsage::ShaderResource);
+                        if (taaHandle.IsValid()) builder.Read(taaHandle, RGResourceUsage::ShaderResource);
+                        if (rtReflHandle.IsValid()) builder.Read(rtReflHandle, RGResourceUsage::ShaderResource);
+                        if (rtReflHistHandle.IsValid()) builder.Read(rtReflHistHandle, RGResourceUsage::ShaderResource);
+                        if (hzbHandle.IsValid() && wantsHzbDebug) builder.Read(hzbHandle, RGResourceUsage::ShaderResource);
+                        builder.Write(backBufferHandle, RGResourceUsage::RenderTarget);
+                    },
+                    [&](ID3D12GraphicsCommandList*, const RenderGraph&) {
+                        m_postProcessSkipTransitions = true;
+                        RenderPostProcess();
+                        m_postProcessSkipTransitions = false;
+                        ranPostProcessInRg = true;
+                    });
         }
 
         const auto execResult = m_renderGraph->Execute(m_commandList.Get());
@@ -1892,8 +1971,17 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
             if (wantsRgPostThisFrame) {
                 m_hdrState = m_renderGraph->GetResourceState(hdrHandle);
+                if (bloomHandle.IsValid()) {
+                    const uint32_t level = (kBloomLevels > 1) ? 1u : 0u;
+                    m_bloomState[level][0] = m_renderGraph->GetResourceState(bloomHandle);
+                }
                 if (ssaoHandle.IsValid()) m_ssaoState = m_renderGraph->GetResourceState(ssaoHandle);
                 if (ssrHandle.IsValid()) m_ssrState = m_renderGraph->GetResourceState(ssrHandle);
+                if (historyHandle.IsValid()) m_historyState = m_renderGraph->GetResourceState(historyHandle);
+                if (depthPpHandle.IsValid()) m_depthState = m_renderGraph->GetResourceState(depthPpHandle);
+                if (!m_vbRenderedThisFrame && normalHandle.IsValid()) {
+                    m_gbufferNormalRoughnessState = m_renderGraph->GetResourceState(normalHandle);
+                }
                 if (velocityHandle.IsValid()) m_velocityState = m_renderGraph->GetResourceState(velocityHandle);
                 if (taaHandle.IsValid()) m_taaIntermediateState = m_renderGraph->GetResourceState(taaHandle);
                 if (rtReflHandle.IsValid()) m_rtReflectionState = m_renderGraph->GetResourceState(rtReflHandle);
@@ -2046,16 +2134,16 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 
     // Ensure the depth buffer is in a readable state for the DXR passes.
-    // DXR dispatch binds this as a compute-like SRV, so use the NON_PIXEL state.
-    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    // Depth resources should include DEPTH_READ when sampled as SRVs.
+    if (m_depthBuffer && m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         depthBarrier.Transition.pResource = m_depthBuffer.Get();
         depthBarrier.Transition.StateBefore = m_depthState;
-        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        depthBarrier.Transition.StateAfter = kDepthSampleState;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     // Ensure the RT shadow mask is ready for UAV writes before the DXR pass.
@@ -2147,16 +2235,16 @@ void Renderer::RenderRayTracedReflections() {
     }
 
     // Ensure the depth buffer is in a readable state for the DXR pass.
-    // DXR dispatch binds this as a compute-like SRV, so use the NON_PIXEL state.
-    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    // Depth resources should include DEPTH_READ when sampled as SRVs.
+    if (m_depthBuffer && m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         depthBarrier.Transition.pResource = m_depthBuffer.Get();
         depthBarrier.Transition.StateBefore = m_depthState;
-        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        depthBarrier.Transition.StateAfter = kDepthSampleState;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     constexpr D3D12_RESOURCE_STATES kSrvNonPixel =
@@ -2222,7 +2310,7 @@ void Renderer::RenderRayTracedReflections() {
  
     // Optional debug clear to eliminate stale-tile/rectangle artifacts. This also
     // lets debug view 20 validate that the post-process SRV binding (t8) is correct.
-    if (rtReflDebugView && s_rtReflClearMode != 0 && m_descriptorManager && m_device) { 
+    if (rtReflDebugView && s_rtReflClearMode != 0 && m_descriptorManager && m_device && m_rtReflectionUAV.IsValid()) { 
         auto clearUavResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV(); 
         if (clearUavResult.IsOk()) { 
             DescriptorHandle clearUav = clearUavResult.Value(); 
@@ -2242,9 +2330,12 @@ void Renderer::RenderRayTracedReflections() {
             const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f }; 
             const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f }; 
             const float* clear = (s_rtReflClearMode == 2) ? magenta : black; 
+            // ClearUnorderedAccessView requires a CPU-visible, CPU-readable descriptor handle.
+            // Use the persistent staging UAV as the CPU handle and the transient shader-visible
+            // descriptor as the GPU handle.
             rtCmdList->ClearUnorderedAccessViewFloat( 
                 clearUav.gpu, 
-                clearUav.cpu, 
+                m_rtReflectionUAV.cpu, 
                 m_rtReflectionColor.Get(), 
                 clear, 
                 0, 
@@ -2630,6 +2721,14 @@ void Renderer::BeginFrame() {
     m_commandAllocators[m_frameIndex]->Reset();
     m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
     m_commandListOpen = true;
+
+    // Root signature uses CBV/SRV/UAV heap direct indexing; bind heaps once
+    // immediately after Reset() so subsequent Set*RootSignature calls satisfy
+    // D3D12 validation (and so compute/RT paths inherit a valid heap binding).
+    if (m_descriptorManager) {
+        ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+        m_commandList->SetDescriptorHeaps(1, heaps);
+    }
 }
 
 void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
@@ -4080,14 +4179,14 @@ void Renderer::RenderSSR() {
         }
     }
 
-    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_depthState != kDepthSampleState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
         barriers[barrierCount].Transition.StateBefore = m_depthState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     if (barrierCount > 0) {
@@ -4165,12 +4264,38 @@ void Renderer::RenderSSR() {
     }
     DescriptorHandle gbufHandle = gbufHandleResult.Value();
 
-    m_device->GetDevice()->CopyDescriptorsSimple(
-        1,
-        gbufHandle.cpu,
-        normalSrv.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
+    // Avoid CopyDescriptorsSimple from shader-visible heaps (VB path); write the SRV directly.
+    ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+    if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+        normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
+    }
+    D3D12_SHADER_RESOURCE_VIEW_DESC gbufSrvDesc{};
+    gbufSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    gbufSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    gbufSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    gbufSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(normalRes, &gbufSrvDesc, gbufHandle.cpu);
+
+    // IMPORTANT: Root parameter 3 is a descriptor table sized for t0-t9.
+    // We must allocate/initialize all 10 descriptors so later transient
+    // allocations don't overwrite descriptors within the bound table.
+    auto writeNullSrv = [&](DescriptorHandle handle, DXGI_FORMAT fmt) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+        nullDesc.Format = fmt;
+        nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullDesc.Texture2D.MipLevels = 1;
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, handle.cpu);
+    };
+    for (int slot = 3; slot < 10; ++slot) {
+        auto dummyResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (dummyResult.IsErr()) {
+            spdlog::warn("RenderSSR: failed to allocate dummy SRV slot {}: {}", slot, dummyResult.Error());
+            return;
+        }
+        // Format is irrelevant for unused slots; keep it consistent with HDR SRVs.
+        writeNullSrv(dummyResult.Value(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    }
 
     // Bind SRV table at slot 3 (t0-t2)
     m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
@@ -4302,14 +4427,14 @@ void Renderer::RenderTAA() {
         m_hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_depthBuffer && m_depthState != kDepthSampleState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
         barriers[barrierCount].Transition.StateBefore = m_depthState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     if (m_gbufferNormalRoughness && m_gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -4383,7 +4508,7 @@ void Renderer::RenderTAA() {
     // t7 = velocity.
     if (m_taaResolveSrvTableValid) {
         UpdateTAAResolveDescriptorTable();
-        m_commandList->SetGraphicsRootDescriptorTable(3, m_taaResolveSrvTable[0].gpu);
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_taaResolveSrvTables[m_frameIndex % kFrameCount][0].gpu);
     } else {
         auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
         if (hdrHandleResult.IsErr()) {
@@ -4463,12 +4588,17 @@ void Renderer::RenderTAA() {
             return;
         }
         DescriptorHandle gbufHandle = gbufAllocResult.Value();
-        device->CopyDescriptorsSimple(
-            1,
-            gbufHandle.cpu,
-            normalSrv.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
+        // Avoid CopyDescriptorsSimple from shader-visible heaps (VB path); write the SRV directly.
+        ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+        if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+            normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
+        }
+        D3D12_SHADER_RESOURCE_VIEW_DESC normalSrvDesc{};
+        normalSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        normalSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        normalSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        normalSrvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(normalRes, &normalSrvDesc, gbufHandle.cpu);
 
         // t6: SSR (unused)
         (void)m_descriptorManager->AllocateTransientCBV_SRV_UAV();
@@ -4486,6 +4616,56 @@ void Renderer::RenderTAA() {
                 );
             } else {
                 spdlog::warn("RenderTAA: failed to allocate transient velocity SRV; TAA reprojection will be disabled this frame");
+            }
+        }
+
+        // t8: RT reflections (optional)
+        {
+            auto rtAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (rtAllocResult.IsErr()) {
+                spdlog::warn("RenderTAA: failed to allocate transient RT reflection SRV slot: {}", rtAllocResult.Error());
+                return;
+            }
+            DescriptorHandle rtHandle = rtAllocResult.Value();
+            if (m_rtReflectionSRV.IsValid()) {
+                device->CopyDescriptorsSimple(
+                    1,
+                    rtHandle.cpu,
+                    m_rtReflectionSRV.cpu,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+                );
+            } else {
+                D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+                nullDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                nullDesc.Texture2D.MipLevels = 1;
+                device->CreateShaderResourceView(nullptr, &nullDesc, rtHandle.cpu);
+            }
+        }
+
+        // t9: RT reflection history (optional)
+        {
+            auto rtHistAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (rtHistAllocResult.IsErr()) {
+                spdlog::warn("RenderTAA: failed to allocate transient RT reflection history SRV slot: {}", rtHistAllocResult.Error());
+                return;
+            }
+            DescriptorHandle rtHistHandle = rtHistAllocResult.Value();
+            if (m_rtReflectionHistorySRV.IsValid()) {
+                device->CopyDescriptorsSimple(
+                    1,
+                    rtHistHandle.cpu,
+                    m_rtReflectionHistorySRV.cpu,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+                );
+            } else {
+                D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+                nullDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                nullDesc.Texture2D.MipLevels = 1;
+                device->CreateShaderResourceView(nullptr, &nullDesc, rtHistHandle.cpu);
             }
         }
 
@@ -4637,14 +4817,14 @@ void Renderer::RenderMotionVectors() {
         m_velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_depthState != kDepthSampleState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barriers[barrierCount].Transition.pResource = m_depthBuffer.Get();
         barriers[barrierCount].Transition.StateBefore = m_depthState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     if (barrierCount > 0) {
@@ -4697,6 +4877,26 @@ void Renderer::RenderMotionVectors() {
         m_depthSRV.cpu,
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
     );
+
+    // Root parameter 3 is sized for t0-t9; allocate dummy SRVs for the
+    // remaining slots so later transient allocations don't overwrite within
+    // the bound table.
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+        nullDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullDesc.Texture2D.MipLevels = 1;
+
+        for (int slot = 1; slot < 10; ++slot) {
+            auto dummyResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+            if (dummyResult.IsErr()) {
+                spdlog::warn("RenderMotionVectors: failed to allocate dummy SRV slot {}: {}", slot, dummyResult.Error());
+                return;
+            }
+            m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, dummyResult.Value().cpu);
+        }
+    }
 
     m_commandList->SetGraphicsRootDescriptorTable(3, depthHandle.gpu);
 
@@ -4843,6 +5043,60 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
               [](entt::entity a, entt::entity b) {
                   return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
               });
+
+    // Maintain stable packed culling IDs for occlusion history indexing.
+    // IDs are packed as (generation << 16) | slot, where generation increments
+    // whenever a slot is recycled to prevent history smear.
+    const uint32_t maxCullingIds = (m_gpuCulling ? m_gpuCulling->GetMaxInstances() : 65536u);
+    {
+        std::unordered_set<entt::entity, Renderer::EntityHash> alive;
+        alive.reserve(stableEntities.size());
+        for (auto e : stableEntities) {
+            alive.insert(e);
+        }
+
+        for (auto it = m_gpuCullingIdByEntity.begin(); it != m_gpuCullingIdByEntity.end();) {
+            if (alive.find(it->first) == alive.end()) {
+                const uint32_t packedId = it->second;
+                const uint32_t slot = (packedId & 0xFFFFu);
+                if (slot < m_gpuCullingIdGeneration.size()) {
+                    m_gpuCullingIdGeneration[slot] = static_cast<uint16_t>(m_gpuCullingIdGeneration[slot] + 1u);
+                }
+                m_gpuCullingIdFreeList.push_back(slot);
+                m_gpuCullingPrevCenterByEntity.erase(it->first);
+                it = m_gpuCullingIdByEntity.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    auto getOrAllocateCullingId = [&](entt::entity e) -> uint32_t {
+        auto it = m_gpuCullingIdByEntity.find(e);
+        if (it != m_gpuCullingIdByEntity.end()) {
+            return it->second;
+        }
+
+        uint32_t slot = UINT32_MAX;
+        if (!m_gpuCullingIdFreeList.empty()) {
+            slot = m_gpuCullingIdFreeList.back();
+            m_gpuCullingIdFreeList.pop_back();
+        } else {
+            slot = m_gpuCullingNextId++;
+        }
+
+        if (slot >= maxCullingIds || slot >= 65536u) {
+            return UINT32_MAX;
+        }
+
+        if (m_gpuCullingIdGeneration.size() <= slot) {
+            m_gpuCullingIdGeneration.resize(static_cast<size_t>(slot) + 1u, 0u);
+        }
+        const uint16_t gen = m_gpuCullingIdGeneration[slot];
+        const uint32_t packedId = (static_cast<uint32_t>(gen) << 16u) | (slot & 0xFFFFu);
+        m_gpuCullingIdByEntity.emplace(e, packedId);
+        return packedId;
+    };
 
     // Build a per-frame material table (milestone: constant + bindless texture indices).
     struct MaterialKey {
@@ -5147,6 +5401,28 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         inst.firstIndex = 0;
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
         inst.baseVertex = 0;
+        inst.flags = 0u;
+        inst.cullingId = getOrAllocateCullingId(entity);
+
+        // Bounding sphere in object space (used for GPU occlusion culling).
+        if (renderable.mesh->hasBounds) {
+            inst.boundingSphere = glm::vec4(renderable.mesh->boundsCenter, renderable.mesh->boundsRadius);
+        } else {
+            inst.boundingSphere = glm::vec4(0.0f, 0.0f, 0.0f, 10.0f);
+        }
+
+        // Previous center for motion-inflated occlusion tests (stored in world space).
+        glm::vec3 currCenterWS = glm::vec3(currWorld[3]);
+        if (renderable.mesh->hasBounds) {
+            currCenterWS = glm::vec3(currWorld * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+        }
+        glm::vec3 prevCenterWS = currCenterWS;
+        auto prevCenterIt = m_gpuCullingPrevCenterByEntity.find(entity);
+        if (prevCenterIt != m_gpuCullingPrevCenterByEntity.end()) {
+            prevCenterWS = prevCenterIt->second;
+        }
+        m_gpuCullingPrevCenterByEntity[entity] = currCenterWS;
+        inst.prevCenterWS = glm::vec4(prevCenterWS, 0.0f);
 
         const bool isMask = (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask);
         const bool isDoubleSided = renderable.doubleSided;
@@ -5239,6 +5515,111 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         return;
     }
 
+    // Optional: use the GPU culling pipeline to produce a per-instance
+    // visibility mask for the VB path. The visibility pass consumes this mask
+    // via SV_CullDistance, so occluded instances do not rasterize.
+    D3D12_GPU_VIRTUAL_ADDRESS vbCullMaskAddress = 0;
+    if (m_gpuCullingEnabled && m_gpuCulling) {
+        const uint32_t maxInstances = m_gpuCulling->GetMaxInstances();
+        if (m_vbInstances.size() > maxInstances) {
+            spdlog::warn("VB: instance count {} exceeds GPU culling capacity {}; disabling VB cull mask this frame",
+                         m_vbInstances.size(), maxInstances);
+        } else {
+        std::vector<GPUInstanceData> cullInstances;
+        cullInstances.reserve(m_vbInstances.size());
+        for (const auto& vbInst : m_vbInstances) {
+            GPUInstanceData inst{};
+            inst.modelMatrix = vbInst.worldMatrix;
+            inst.boundingSphere = vbInst.boundingSphere;
+            inst.prevCenterWS = vbInst.prevCenterWS;
+            inst.meshIndex = vbInst.meshIndex;
+            inst.materialIndex = vbInst.materialIndex;
+            inst.flags = vbInst.flags;
+            inst.cullingId = vbInst.cullingId;
+            cullInstances.push_back(inst);
+        }
+
+        auto uploadResult = m_gpuCulling->UpdateInstances(m_commandList.Get(), cullInstances);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("VB: GPU culling upload failed: {}", uploadResult.Error());
+        } else {
+            const bool freezeCullingEnv = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
+            const bool freezeCulling = freezeCullingEnv || m_gpuCullingFreeze;
+
+            glm::mat4 viewProjForCulling = m_frameDataCPU.viewProjectionNoJitter;
+            glm::vec3 cameraPosForCulling = glm::vec3(m_frameDataCPU.cameraPosition);
+            if (!freezeCulling) {
+                m_gpuCullingFreezeCaptured = false;
+            } else {
+                if (!m_gpuCullingFreezeCaptured) {
+                    m_gpuCullingFreezeCaptured = true;
+                    m_gpuCullingFrozenViewProj = viewProjForCulling;
+                    m_gpuCullingFrozenCameraPos = cameraPosForCulling;
+                    spdlog::warn("GPU culling freeze enabled ({}): capturing view on frame {}",
+                                 freezeCullingEnv ? "env CORTEX_GPUCULL_FREEZE=1" : "K toggle",
+                                 m_renderFrameCounter);
+                }
+                viewProjForCulling = m_gpuCullingFrozenViewProj;
+                cameraPosForCulling = m_gpuCullingFrozenCameraPos;
+            }
+
+            // HZB occlusion is enabled for the VB path by default when a valid
+            // previous-frame pyramid exists (can be disabled via env var).
+            static bool s_checkedEnv = false;
+            static bool s_disableHzb = false;
+            if (!s_checkedEnv) {
+                s_checkedEnv = true;
+                s_disableHzb = (std::getenv("CORTEX_DISABLE_VB_HZB") != nullptr);
+                if (s_disableHzb) {
+                    spdlog::info("VB: HZB occlusion disabled (CORTEX_DISABLE_VB_HZB=1)");
+                }
+            }
+
+            bool useHzbOcclusion = false;
+            if (!s_disableHzb &&
+                m_hzbValid && m_hzbCaptureValid && m_hzbTexture && m_hzbMipCount > 0 &&
+                (m_hzbCaptureFrameCounter + 1u == m_renderFrameCounter)) {
+                useHzbOcclusion = true;
+            }
+            if (freezeCulling) {
+                useHzbOcclusion = false;
+            }
+
+            m_gpuCulling->SetHZBForOcclusion(
+                useHzbOcclusion ? m_hzbTexture.Get() : nullptr,
+                m_hzbWidth,
+                m_hzbHeight,
+                m_hzbMipCount,
+                m_hzbCaptureViewMatrix,
+                m_hzbCaptureViewProjMatrix,
+                m_hzbCaptureCameraPosWS,
+                m_hzbCaptureNearPlane,
+                m_hzbCaptureFarPlane,
+                useHzbOcclusion);
+
+            if (useHzbOcclusion &&
+                m_hzbTexture &&
+                (m_hzbState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
+                D3D12_RESOURCE_BARRIER barrier{};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = m_hzbTexture.Get();
+                barrier.Transition.StateBefore = m_hzbState;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                m_commandList->ResourceBarrier(1, &barrier);
+                m_hzbState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            }
+
+            auto cullResult = m_gpuCulling->DispatchCulling(m_commandList.Get(), viewProjForCulling, cameraPosForCulling);
+            if (cullResult.IsErr()) {
+                spdlog::warn("VB: GPU culling dispatch failed: {}", cullResult.Error());
+            } else if (auto* mask = m_gpuCulling->GetVisibilityMaskBuffer()) {
+                vbCullMaskAddress = mask->GetGPUVirtualAddress();
+            }
+        }
+        }
+    }
+
     // One-time debug log for first frame
     static bool firstFrame = true;
     if (firstFrame) {
@@ -5273,7 +5654,8 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         m_depthBuffer.Get(),
         m_depthStencilView.cpu,
         m_frameDataCPU.viewProjectionMatrix,
-        m_vbMeshDraws
+        m_vbMeshDraws,
+        vbCullMaskAddress
     );
 
     if (visResult.IsErr()) {
@@ -5283,15 +5665,15 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
 
     // Phase 2: Resolve materials via compute shader
     // Depth must be readable for the material resolve compute pass.
-    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    if (m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_depthBuffer.Get();
         barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     auto resolveResult = m_visibilityBuffer->ResolveMaterials(
@@ -5331,15 +5713,15 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     }
 
     // Depth must be readable for the fullscreen lighting pass.
-    if (m_depthState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_depthBuffer.Get();
         barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     // Upload local lights for clustered deferred shading (VB path).
@@ -5577,8 +5959,30 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         0u
     );
 
-    DescriptorHandle envDiffuseSRV = m_shadowAndEnvDescriptors[1];
-    DescriptorHandle envSpecularSRV = m_shadowAndEnvDescriptors[2];
+    // VB deferred lighting builds its own SRV table each frame. Copy sources
+    // must be CPU-readable staging descriptors (CopyDescriptorsSimple reads
+    // the source on the CPU), so do not use shader-visible heap entries here.
+    DescriptorHandle envDiffuseSRV{};
+    DescriptorHandle envSpecularSRV{};
+    if (!m_environmentMaps.empty()) {
+        size_t envIndex = m_currentEnvironment;
+        if (envIndex >= m_environmentMaps.size()) {
+            envIndex = 0;
+        }
+        EnvironmentMaps& env = m_environmentMaps[envIndex];
+        if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
+            envDiffuseSRV = env.diffuseIrradiance->GetSRV();
+        }
+        if (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid()) {
+            envSpecularSRV = env.specularPrefiltered->GetSRV();
+        }
+    }
+    if (!envDiffuseSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        envDiffuseSRV = m_placeholderAlbedo->GetSRV();
+    }
+    if (!envSpecularSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+        envSpecularSRV = m_placeholderAlbedo->GetSRV();
+    }
     auto lightResult = m_visibilityBuffer->ApplyDeferredLighting(
         m_commandList.Get(),
         m_hdrColor.Get(),
@@ -5987,42 +6391,38 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             return;
         }
 
-        static bool s_freezeCaptured = false;
-        static bool s_prevFreezeEnabled = false;
-        static glm::mat4 s_frozenViewProj(1.0f);
-        static glm::vec3 s_frozenCameraPos(0.0f);
-
         glm::mat4 viewProjForCulling = m_frameDataCPU.viewProjectionNoJitter;
         glm::vec3 cameraPosForCulling = glm::vec3(m_frameDataCPU.cameraPosition);
 
         if (!freezeCulling) {
-            if (s_prevFreezeEnabled) {
-                spdlog::info("GPU culling freeze disabled");
-            }
-            s_freezeCaptured = false;
-            s_prevFreezeEnabled = false;
+            m_gpuCullingFreezeCaptured = false;
         } else {
-            if (!s_prevFreezeEnabled) {
-                // Transitioning from unfrozen -> frozen; capture fresh view.
-                s_freezeCaptured = false;
-                s_prevFreezeEnabled = true;
-            }
-            if (!s_freezeCaptured) {
-                s_freezeCaptured = true;
-                s_frozenViewProj = viewProjForCulling;
-                s_frozenCameraPos = cameraPosForCulling;
+            if (!m_gpuCullingFreezeCaptured) {
+                m_gpuCullingFreezeCaptured = true;
+                m_gpuCullingFrozenViewProj = viewProjForCulling;
+                m_gpuCullingFrozenCameraPos = cameraPosForCulling;
                 spdlog::warn("GPU culling freeze enabled ({}): capturing view on frame {}",
                              freezeCullingEnv ? "env CORTEX_GPUCULL_FREEZE=1" : "K toggle",
                              m_renderFrameCounter);
             }
-            viewProjForCulling = s_frozenViewProj;
-            cameraPosForCulling = s_frozenCameraPos;
+            viewProjForCulling = m_gpuCullingFrozenViewProj;
+            cameraPosForCulling = m_gpuCullingFrozenCameraPos;
         }
 
         // Optional HZB occlusion culling. We build the HZB late in the frame
         // and consume it on the next frame's culling dispatch.
+        static bool s_checkedGpuCullHzbEnv = false;
+        static bool s_disableGpuCullHzb = false;
+        if (!s_checkedGpuCullHzbEnv) {
+            s_checkedGpuCullHzbEnv = true;
+            s_disableGpuCullHzb = (std::getenv("CORTEX_DISABLE_GPUCULL_HZB") != nullptr);
+            if (s_disableGpuCullHzb) {
+                spdlog::info("GPU culling: HZB occlusion disabled (CORTEX_DISABLE_GPUCULL_HZB=1)");
+            }
+        }
+
         bool useHzbOcclusion = false;
-        if (std::getenv("CORTEX_GPUCULL_USE_HZB") != nullptr &&
+        if (!s_disableGpuCullHzb &&
             m_hzbValid && m_hzbCaptureValid && m_hzbTexture && m_hzbMipCount > 0) {
             // Require the HZB capture to be from the immediately previous frame.
             if (m_hzbCaptureFrameCounter + 1u == m_renderFrameCounter) {
@@ -8672,10 +9072,13 @@ static uint32_t CalcHZBMipCount(uint32_t width, uint32_t height) {
     width = std::max(1u, width);
     height = std::max(1u, height);
 
+    // D3D12 mip-chain sizing uses floor division each level:
+    //   next = max(1, current / 2).
+    // The maximum mip count is therefore based on the largest dimension.
+    uint32_t maxDim = std::max(width, height);
     uint32_t mipCount = 1;
-    while (width > 1 || height > 1) {
-        width = (width + 1u) / 2u;
-        height = (height + 1u) / 2u;
+    while (maxDim > 1u) {
+        maxDim >>= 1u;
         ++mipCount;
     }
     return mipCount;
@@ -8842,17 +9245,16 @@ void Renderer::BuildHZBFromDepth() {
         return;
     }
 
-    // Depth -> SRV for compute.
-    if (m_depthState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE &&
-        m_depthState != (D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) {
+    // Depth -> SRV for compute (include DEPTH_READ for depth resources).
+    if (m_depthState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         barrier.Transition.pResource = m_depthBuffer.Get();
         barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_depthState = kDepthSampleState;
     }
 
     // HZB -> UAV for writes.
@@ -8872,19 +9274,70 @@ void Renderer::BuildHZBFromDepth() {
     m_commandList->SetDescriptorHeaps(1, heaps);
     m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    auto bindTransient = [&](DescriptorHandle src, uint32_t rootParamIndex) -> bool {
-        auto tmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (tmp.IsErr()) {
+    const UINT descriptorInc =
+        m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    auto offsetHandle = [&](DescriptorHandle base, uint32_t offset) -> DescriptorHandle {
+        DescriptorHandle out = base;
+        out.index = base.index + offset;
+        out.cpu.ptr = base.cpu.ptr + static_cast<SIZE_T>(offset) * descriptorInc;
+        out.gpu.ptr = base.gpu.ptr + static_cast<UINT64>(offset) * descriptorInc;
+        return out;
+    };
+
+    // Compute root signature tables are fixed-size:
+    // - root param 3: SRVs t0-t9 (10 descriptors)
+    // - root param 6: UAVs u0-u3 (4 descriptors)
+    // We must allocate+populate the full ranges so later transient allocations
+    // don't overwrite descriptors within a bound table.
+    auto bindSrvTableT0 = [&](DescriptorHandle src) -> bool {
+        if (!src.IsValid()) {
+            spdlog::error("BuildHZBFromDepth: invalid SRV staging descriptor");
             return false;
         }
-        DescriptorHandle dst = tmp.Value();
-        m_device->GetDevice()->CopyDescriptorsSimple(
-            1,
-            dst.cpu,
-            src.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-        m_commandList->SetComputeRootDescriptorTable(rootParamIndex, dst.gpu);
+        auto baseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+        if (baseRes.IsErr()) {
+            return false;
+        }
+        const DescriptorHandle base = baseRes.Value();
+        m_device->GetDevice()->CopyDescriptorsSimple(1, base.cpu, src.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+        nullDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullDesc.Texture2D.MipLevels = 1;
+        for (uint32_t i = 1; i < 10; ++i) {
+            const DescriptorHandle h = offsetHandle(base, i);
+            m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, h.cpu);
+        }
+
+        m_commandList->SetComputeRootDescriptorTable(3, base.gpu);
+        return true;
+    };
+
+    auto bindUavTableU0 = [&](DescriptorHandle src) -> bool {
+        if (!src.IsValid()) {
+            spdlog::error("BuildHZBFromDepth: invalid UAV staging descriptor");
+            return false;
+        }
+        auto baseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+        if (baseRes.IsErr()) {
+            return false;
+        }
+        const DescriptorHandle base = baseRes.Value();
+        m_device->GetDevice()->CopyDescriptorsSimple(1, base.cpu, src.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC nullDesc{};
+        nullDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        nullDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        nullDesc.Texture2D.MipSlice = 0;
+        nullDesc.Texture2D.PlaneSlice = 0;
+        for (uint32_t i = 1; i < 4; ++i) {
+            const DescriptorHandle h = offsetHandle(base, i);
+            m_device->GetDevice()->CreateUnorderedAccessView(nullptr, nullptr, &nullDesc, h.cpu);
+        }
+
+        m_commandList->SetComputeRootDescriptorTable(6, base.gpu);
         return true;
     };
 
@@ -8896,10 +9349,10 @@ void Renderer::BuildHZBFromDepth() {
 
     // Init mip 0 from full-res depth.
     m_commandList->SetPipelineState(m_hzbInitPipeline->GetPipelineState());
-    if (!bindTransient(m_depthSRV, 3)) {
+    if (!bindSrvTableT0(m_depthSRV)) {
         return;
     }
-    if (!bindTransient(m_hzbMipUAVStaging[0], 6)) {
+    if (!bindUavTableU0(m_hzbMipUAVStaging[0])) {
         return;
     }
     dispatchForDims(m_hzbWidth, m_hzbHeight);
@@ -8924,10 +9377,10 @@ void Renderer::BuildHZBFromDepth() {
         mipH = (mipH + 1u) / 2u;
 
         m_commandList->SetPipelineState(m_hzbDownsamplePipeline->GetPipelineState());
-        if (!bindTransient(m_hzbMipSRVStaging[mip - 1], 3)) {
+        if (!bindSrvTableT0(m_hzbMipSRVStaging[mip - 1])) {
             return;
         }
-        if (!bindTransient(m_hzbMipUAVStaging[mip], 6)) {
+        if (!bindUavTableU0(m_hzbMipUAVStaging[mip])) {
             return;
         }
 
@@ -8968,10 +9421,10 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
         "HZB_InitMip0",
         [&](RGPassBuilder& builder) {
             builder.SetType(RGPassType::Compute);
-            builder.Read(depthHandle, RGResourceUsage::ShaderResource);
+            builder.Read(depthHandle, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead);
             builder.Write(hzbHandle, RGResourceUsage::UnorderedAccess, 0);
         },
-        [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
+        [this](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
             cmdList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
             cmdList->SetPipelineState(m_hzbInitPipeline->GetPipelineState());
 
@@ -8980,25 +9433,65 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
 
             cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-            auto srvTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (srvTmp.IsErr()) {
+            const UINT descriptorInc =
+                m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            auto offsetHandle = [&](DescriptorHandle base, uint32_t offset) -> DescriptorHandle {
+                DescriptorHandle out = base;
+                out.index = base.index + offset;
+                out.cpu.ptr = base.cpu.ptr + static_cast<SIZE_T>(offset) * descriptorInc;
+                out.gpu.ptr = base.gpu.ptr + static_cast<UINT64>(offset) * descriptorInc;
+                return out;
+            };
+
+            auto srvBaseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+            if (srvBaseRes.IsErr()) {
                 return;
             }
-            auto uavTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (uavTmp.IsErr()) {
+            auto uavBaseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+            if (uavBaseRes.IsErr()) {
                 return;
             }
 
-            const DescriptorHandle depthSrv = srvTmp.Value();
-            const DescriptorHandle outUav = uavTmp.Value();
+            const DescriptorHandle depthSrvBase = srvBaseRes.Value();
+            const DescriptorHandle outUavBase = uavBaseRes.Value();
+
+            if (!m_depthSRV.IsValid() || m_hzbMipUAVStaging.empty() || !m_hzbMipUAVStaging[0].IsValid()) {
+                spdlog::error("HZB RG: invalid staging descriptors (depthSRV={}, hzbUAV0={}, uavCount={})",
+                              m_depthSRV.IsValid(), (m_hzbMipUAVStaging.empty() ? false : m_hzbMipUAVStaging[0].IsValid()),
+                              m_hzbMipUAVStaging.size());
+                return;
+            }
 
             m_device->GetDevice()->CopyDescriptorsSimple(
-                1, depthSrv.cpu, m_depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                1, depthSrvBase.cpu, m_depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             m_device->GetDevice()->CopyDescriptorsSimple(
-                1, outUav.cpu, m_hzbMipUAVStaging[0].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                1, outUavBase.cpu, m_hzbMipUAVStaging[0].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-            cmdList->SetComputeRootDescriptorTable(3, depthSrv.gpu);
-            cmdList->SetComputeRootDescriptorTable(6, outUav.gpu);
+            // Populate remaining SRV/UAV slots with null descriptors (table sizes are fixed).
+            {
+                D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
+                nullSrv.Format = DXGI_FORMAT_R32_FLOAT;
+                nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                nullSrv.Texture2D.MipLevels = 1;
+                for (uint32_t i = 1; i < 10; ++i) {
+                    const DescriptorHandle h = offsetHandle(depthSrvBase, i);
+                    m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, h.cpu);
+                }
+
+                D3D12_UNORDERED_ACCESS_VIEW_DESC nullUav{};
+                nullUav.Format = DXGI_FORMAT_R32_FLOAT;
+                nullUav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                nullUav.Texture2D.MipSlice = 0;
+                nullUav.Texture2D.PlaneSlice = 0;
+                for (uint32_t i = 1; i < 4; ++i) {
+                    const DescriptorHandle h = offsetHandle(outUavBase, i);
+                    m_device->GetDevice()->CreateUnorderedAccessView(nullptr, nullptr, &nullUav, h.cpu);
+                }
+            }
+
+            cmdList->SetComputeRootDescriptorTable(3, depthSrvBase.gpu);
+            cmdList->SetComputeRootDescriptorTable(6, outUavBase.gpu);
 
             const UINT groupX = (m_hzbWidth + 7) / 8;
             const UINT groupY = (m_hzbHeight + 7) / 8;
@@ -9026,7 +9519,7 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
                 builder.Read(hzbHandle, RGResourceUsage::ShaderResource, inMip);
                 builder.Write(hzbHandle, RGResourceUsage::UnorderedAccess, outMip);
             },
-            [&](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
+            [this, inMip, outMip, outW, outH](ID3D12GraphicsCommandList* cmdList, const RenderGraph&) {
                 cmdList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
                 cmdList->SetPipelineState(m_hzbDownsamplePipeline->GetPipelineState());
 
@@ -9035,25 +9528,66 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
 
                 cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-                auto srvTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-                if (srvTmp.IsErr()) {
+                const UINT descriptorInc =
+                    m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                auto offsetHandle = [&](DescriptorHandle base, uint32_t offset) -> DescriptorHandle {
+                    DescriptorHandle out = base;
+                    out.index = base.index + offset;
+                    out.cpu.ptr = base.cpu.ptr + static_cast<SIZE_T>(offset) * descriptorInc;
+                    out.gpu.ptr = base.gpu.ptr + static_cast<UINT64>(offset) * descriptorInc;
+                    return out;
+                };
+
+                auto srvBaseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+                if (srvBaseRes.IsErr()) {
                     return;
                 }
-                auto uavTmp = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-                if (uavTmp.IsErr()) {
+                auto uavBaseRes = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+                if (uavBaseRes.IsErr()) {
                     return;
                 }
 
-                const DescriptorHandle inSrv = srvTmp.Value();
-                const DescriptorHandle outUav = uavTmp.Value();
+                const DescriptorHandle inSrvBase = srvBaseRes.Value();
+                const DescriptorHandle outUavBase = uavBaseRes.Value();
+
+                if (m_hzbMipSRVStaging.size() <= inMip || !m_hzbMipSRVStaging[inMip].IsValid() ||
+                    m_hzbMipUAVStaging.size() <= outMip || !m_hzbMipUAVStaging[outMip].IsValid()) {
+                    spdlog::error("HZB RG: invalid staging descriptors for mip {} (inSRV={}, outUAV={})",
+                                  outMip,
+                                  (m_hzbMipSRVStaging.size() > inMip && m_hzbMipSRVStaging[inMip].IsValid()),
+                                  (m_hzbMipUAVStaging.size() > outMip && m_hzbMipUAVStaging[outMip].IsValid()));
+                    return;
+                }
 
                 m_device->GetDevice()->CopyDescriptorsSimple(
-                    1, inSrv.cpu, m_hzbMipSRVStaging[inMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                    1, inSrvBase.cpu, m_hzbMipSRVStaging[inMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
                 m_device->GetDevice()->CopyDescriptorsSimple(
-                    1, outUav.cpu, m_hzbMipUAVStaging[outMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                    1, outUavBase.cpu, m_hzbMipUAVStaging[outMip].cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-                cmdList->SetComputeRootDescriptorTable(3, inSrv.gpu);
-                cmdList->SetComputeRootDescriptorTable(6, outUav.gpu);
+                {
+                    D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
+                    nullSrv.Format = DXGI_FORMAT_R32_FLOAT;
+                    nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                    nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                    nullSrv.Texture2D.MipLevels = 1;
+                    for (uint32_t i = 1; i < 10; ++i) {
+                        const DescriptorHandle h = offsetHandle(inSrvBase, i);
+                        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, h.cpu);
+                    }
+
+                    D3D12_UNORDERED_ACCESS_VIEW_DESC nullUav{};
+                    nullUav.Format = DXGI_FORMAT_R32_FLOAT;
+                    nullUav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                    nullUav.Texture2D.MipSlice = 0;
+                    nullUav.Texture2D.PlaneSlice = 0;
+                    for (uint32_t i = 1; i < 4; ++i) {
+                        const DescriptorHandle h = offsetHandle(outUavBase, i);
+                        m_device->GetDevice()->CreateUnorderedAccessView(nullptr, nullptr, &nullUav, h.cpu);
+                    }
+                }
+
+                cmdList->SetComputeRootDescriptorTable(3, inSrvBase.gpu);
+                cmdList->SetComputeRootDescriptorTable(6, outUavBase.gpu);
 
                 const UINT groupX = (outW + 7) / 8;
                 const UINT groupY = (outH + 7) / 8;
@@ -11718,11 +12252,13 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
 
     // Root signature + descriptor heap for optional alpha-tested shadow draws.
-    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    // When bindless is enabled the root signature is HEAP_DIRECTLY_INDEXED, so
+    // the CBV/SRV/UAV heap must be bound before setting the root signature.
     if (m_descriptorManager) {
         ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
         m_commandList->SetDescriptorHeaps(1, heaps);
     }
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     DX12Pipeline* currentPipeline = m_shadowPipeline.get();
     if (currentPipeline) {
@@ -12132,7 +12668,7 @@ void Renderer::RenderPostProcess() {
         } 
  
         const bool rtReflDebugView = (m_debugViewMode == 20u || m_debugViewMode == 30u || m_debugViewMode == 31u); 
-        if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_descriptorManager && m_device) { 
+        if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_descriptorManager && m_device && m_rtReflectionUAV.IsValid()) { 
             // Transition to UAV for the clear.
             if (m_rtReflectionState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) { 
                 D3D12_RESOURCE_BARRIER barrier{}; 
@@ -12164,9 +12700,12 @@ void Renderer::RenderPostProcess() {
                 const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f }; 
                 const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f }; 
                 const float* clear = (s_rtReflPostClearMode == 2) ? magenta : black; 
+                // ClearUnorderedAccessView requires a CPU-visible, CPU-readable descriptor handle.
+                // Use the persistent staging UAV as the CPU handle and the transient shader-visible
+                // descriptor as the GPU handle.
                 m_commandList->ClearUnorderedAccessViewFloat( 
                     clearUav.gpu, 
-                    clearUav.cpu, 
+                    m_rtReflectionUAV.cpu, 
                     m_rtReflectionColor.Get(), 
                     clear, 
                     0, 
@@ -12212,7 +12751,7 @@ void Renderer::RenderPostProcess() {
     }
     if (m_postProcessSrvTableValid) {
         UpdatePostProcessDescriptorTable();
-        m_commandList->SetGraphicsRootDescriptorTable(3, m_postProcessSrvTable[0].gpu);
+        m_commandList->SetGraphicsRootDescriptorTable(3, m_postProcessSrvTables[m_frameIndex % kFrameCount][0].gpu);
     } else {
         // Fallback: pack a fixed-width transient table.
         std::array<DescriptorHandle, 10> table{};
@@ -12232,50 +12771,41 @@ void Renderer::RenderPostProcess() {
             }
         }
 
-        auto copyOrNull = [&](size_t slot, const DescriptorHandle& src, DXGI_FORMAT fmt) {
+        auto writeOrNull = [&](size_t slot, ID3D12Resource* resource, DXGI_FORMAT fmt, uint32_t mipLevels = 1) {
             if (slot >= table.size()) {
                 return;
             }
-            if (src.IsValid()) {
-                m_device->GetDevice()->CopyDescriptorsSimple(
-                    1,
-                    table[slot].cpu,
-                    src.cpu,
-                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-                return;
-            }
 
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
             srvDesc.Format = fmt;
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Texture2D.MipLevels = 1;
-            m_device->GetDevice()->CreateShaderResourceView(nullptr, &srvDesc, table[slot].cpu);
+            srvDesc.Texture2D.MipLevels = mipLevels;
+            m_device->GetDevice()->CreateShaderResourceView(resource, &srvDesc, table[slot].cpu);
         };
 
-        copyOrNull(0, m_hdrSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        copyOrNull(1, m_bloomCombinedSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        copyOrNull(2, m_ssaoSRV, DXGI_FORMAT_R8_UNORM);
-        copyOrNull(3, m_historySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        copyOrNull(4, m_depthSRV, DXGI_FORMAT_R32_FLOAT);
-        DescriptorHandle normalSrv = m_gbufferNormalRoughnessSRV;
-        if (m_vbRenderedThisFrame && m_visibilityBuffer) {
-            const DescriptorHandle& vbNormal = m_visibilityBuffer->GetNormalRoughnessSRVHandle();
-            if (vbNormal.IsValid()) {
-                normalSrv = vbNormal;
-            }
+        writeOrNull(0, m_hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+        ID3D12Resource* bloomRes = nullptr;
+        if (m_bloomIntensity > 0.0f) {
+            bloomRes = (kBloomLevels > 1) ? m_bloomTexA[1].Get() : m_bloomTexA[0].Get();
         }
-        copyOrNull(5, normalSrv, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        DescriptorHandle slot6 = m_ssrSRV;
-        DXGI_FORMAT slot6Fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        if (m_debugViewMode == 32u && m_hzbValid && m_hzbFullSRV.IsValid()) {
-            slot6 = m_hzbFullSRV;
-            slot6Fmt = DXGI_FORMAT_R32_FLOAT;
+        writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
+        writeOrNull(2, m_ssaoTex.Get(), DXGI_FORMAT_R8_UNORM);
+        writeOrNull(3, m_historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+        writeOrNull(4, m_depthBuffer.Get(), DXGI_FORMAT_R32_FLOAT);
+        ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
+        if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
+            normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
         }
-        copyOrNull(6, slot6, slot6Fmt);
-        copyOrNull(7, m_velocitySRV, DXGI_FORMAT_R16G16_FLOAT);
-        copyOrNull(8, m_rtReflectionSRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        copyOrNull(9, m_rtReflectionHistorySRV, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
+        if (m_debugViewMode == 32u && m_hzbTexture && m_hzbMipCount > 0) {
+            writeOrNull(6, m_hzbTexture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbMipCount);
+        } else {
+            writeOrNull(6, m_ssrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+        }
+        writeOrNull(7, m_velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
+        writeOrNull(8, m_rtReflectionColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+        writeOrNull(9, m_rtReflectionHistory.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
         m_commandList->SetGraphicsRootDescriptorTable(3, table[0].gpu);
     }

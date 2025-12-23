@@ -37,6 +37,8 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
         }
     }
 
+    m_debugLayerEnabled = debugLayerEnabled;
+
     if (debugLayerEnabled) {
         EnableDRED();
     }
@@ -67,6 +69,7 @@ Result<void> DX12Device::Initialize(const DeviceConfig& config) {
 }
 
 void DX12Device::Shutdown() {
+    UnregisterInfoQueueCallback();
     m_device.Reset();
     m_adapter.Reset();
     m_factory.Reset();
@@ -156,6 +159,8 @@ Result<void> DX12Device::CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel) {
         infoQueue->PushStorageFilter(&filter);
     }
 
+    RegisterInfoQueueCallback();
+
     return Result<void>::Ok();
 }
 
@@ -212,6 +217,59 @@ void DX12Device::EnableDRED() {
         spdlog::info("DX12 DRED (auto-breadcrumbs + page fault reporting) enabled");
     } else {
         spdlog::warn("DX12 DRED settings interface not available; device-removed diagnostics limited");
+    }
+}
+
+void DX12Device::RegisterInfoQueueCallback() {
+    if (!m_device || !m_debugLayerEnabled || m_infoQueueCallbackRegistered) {
+        return;
+    }
+
+    ComPtr<ID3D12InfoQueue1> infoQueue1;
+    if (FAILED(m_device.As(&infoQueue1)) || !infoQueue1) {
+        return;
+    }
+
+    const HRESULT hr = infoQueue1->RegisterMessageCallback(
+        &DX12Device::InfoQueueCallback,
+        D3D12_MESSAGE_CALLBACK_FLAG_NONE,
+        this,
+        &m_infoQueueCallbackCookie);
+    if (SUCCEEDED(hr)) {
+        m_infoQueueCallbackRegistered = true;
+        spdlog::info("DX12 InfoQueue callback registered");
+    }
+}
+
+void DX12Device::UnregisterInfoQueueCallback() {
+    if (!m_device || !m_infoQueueCallbackRegistered) {
+        return;
+    }
+
+    ComPtr<ID3D12InfoQueue1> infoQueue1;
+    if (SUCCEEDED(m_device.As(&infoQueue1)) && infoQueue1) {
+        infoQueue1->UnregisterMessageCallback(m_infoQueueCallbackCookie);
+    }
+
+    m_infoQueueCallbackRegistered = false;
+    m_infoQueueCallbackCookie = 0;
+}
+
+void CALLBACK DX12Device::InfoQueueCallback(D3D12_MESSAGE_CATEGORY category,
+                                           D3D12_MESSAGE_SEVERITY severity,
+                                           D3D12_MESSAGE_ID id,
+                                           LPCSTR pDescription,
+                                           void* pContext) {
+    (void)category;
+    (void)pContext;
+
+    if (!pDescription) {
+        return;
+    }
+
+    // Keep the callback lightweight and only surface high-severity issues.
+    if (severity == D3D12_MESSAGE_SEVERITY_CORRUPTION || severity == D3D12_MESSAGE_SEVERITY_ERROR) {
+        spdlog::error("D3D12 validation: id={} {}", static_cast<int>(id), pDescription);
     }
 }
 

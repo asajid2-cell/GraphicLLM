@@ -36,7 +36,14 @@ struct alignas(16) VBInstanceData {
     uint32_t firstIndex;      // Start index in global index buffer
     uint32_t indexCount;      // Number of indices
     uint32_t baseVertex;      // Base vertex offset
-    uint32_t _pad[3];
+    // Bounding sphere in object space: xyz = center, w = radius.
+    glm::vec4 boundingSphere;
+    // Previous frame center in world space: xyz = center, w unused.
+    glm::vec4 prevCenterWS;
+    // Packed stable occlusion-history ID (gen<<16 | slot).
+    uint32_t cullingId;
+    uint32_t flags;
+    uint32_t _pad[2];
 };
 
 // Minimal material constants for visibility-buffer material resolve (milestone: constant-only materials).
@@ -266,6 +273,9 @@ public:
     [[nodiscard]] uint32_t GetClusterCountY() const { return m_clusterCountY; }
     [[nodiscard]] uint32_t GetClusterCountZ() const { return m_clusterCountZ; }
     [[nodiscard]] uint32_t GetMaxLightsPerCluster() const { return m_maxLightsPerCluster; }
+    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetDummyCullMaskAddress() const {
+        return m_dummyCullMaskBuffer ? m_dummyCullMaskBuffer->GetGPUVirtualAddress() : 0;
+    }
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
@@ -305,6 +315,7 @@ private:
     DescriptorHandle m_visibilityRTV;
     DescriptorHandle m_visibilitySRV;
     DescriptorHandle m_visibilityUAV;
+    DescriptorHandle m_visibilityUAVStaging;
 
     // G-buffer outputs from material resolve
     // Albedo is stored as R8G8B8A8_TYPELESS with UNORM SRV/UAV views (linear) for UAV legality.
@@ -339,6 +350,10 @@ private:
     uint32_t m_reflectionProbeCount = 0;
     uint32_t m_maxReflectionProbes = 256;
     DescriptorHandle m_reflectionProbeSRV;
+
+    // Small 4-byte buffer used when no GPU cull mask is available. Shaders
+    // guard against out-of-range reads so a single uint32 is sufficient.
+    ComPtr<ID3D12Resource> m_dummyCullMaskBuffer;
 
     // Mesh table buffer (upload heap, persistently mapped)
     ComPtr<ID3D12Resource> m_meshTableBuffer;

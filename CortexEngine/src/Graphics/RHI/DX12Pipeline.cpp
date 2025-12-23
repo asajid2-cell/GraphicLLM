@@ -548,33 +548,40 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
         return Result<void>::Err("Invalid device pointer");
     }
 
-    // Same layout as graphics root signature but WITHOUT the input assembler flag
-    D3D12_ROOT_PARAMETER rootParameters[7] = {};
+    // Same layout as graphics root signature but WITHOUT the input assembler flag.
+    // Use Root Signature 1.1 so descriptor range volatility can be specified.
+    D3D12_ROOT_PARAMETER1 rootParameters[7] = {};
 
     // Parameter 0: Object constants (b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[0].Descriptor.ShaderRegister = 0;
     rootParameters[0].Descriptor.RegisterSpace = 0;
+    rootParameters[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Parameter 1: Frame constants (b1)
     rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[1].Descriptor.ShaderRegister = 1;
     rootParameters[1].Descriptor.RegisterSpace = 0;
+    rootParameters[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Parameter 2: Material constants (b2)
     rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[2].Descriptor.ShaderRegister = 2;
     rootParameters[2].Descriptor.RegisterSpace = 0;
+    rootParameters[2].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Parameter 3: Descriptor table for textures (t0 - t9 in space0)
-    D3D12_DESCRIPTOR_RANGE descriptorRange = {};
+    D3D12_DESCRIPTOR_RANGE1 descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRange.NumDescriptors = 10;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
+    // These SRVs often reference resources that are written later in the same
+    // command list (e.g., depth/HZB), so mark the underlying data as volatile.
+    descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -583,11 +590,12 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Parameter 4: Shadow + IBL SRVs (space1)
-    D3D12_DESCRIPTOR_RANGE shadowRange = {};
+    D3D12_DESCRIPTOR_RANGE1 shadowRange = {};
     shadowRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     shadowRange.NumDescriptors = 7;
     shadowRange.BaseShaderRegister = 0;
     shadowRange.RegisterSpace = 1;
+    shadowRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -599,14 +607,16 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters[5].Descriptor.ShaderRegister = 3;
     rootParameters[5].Descriptor.RegisterSpace = 0;
+    rootParameters[5].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Parameter 6: UAV table for compute shaders (u0-u3 in space0)
-    D3D12_DESCRIPTOR_RANGE uavRange = {};
+    D3D12_DESCRIPTOR_RANGE1 uavRange = {};
     uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     uavRange.NumDescriptors = 4;
     uavRange.BaseShaderRegister = 0;
     uavRange.RegisterSpace = 0;
+    uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
     uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -630,23 +640,23 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     samplerDesc.RegisterSpace = 0;
     samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // Create root signature WITHOUT input assembler flag (compute doesn't use IA)
-    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-    rootSignatureDesc.NumParameters = _countof(rootParameters);
-    rootSignatureDesc.pParameters = rootParameters;
-    rootSignatureDesc.NumStaticSamplers = 1;
-    rootSignatureDesc.pStaticSamplers = &samplerDesc;
-    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;  // NO input assembler flag
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    rootSignatureDesc.Desc_1_1.NumParameters = _countof(rootParameters);
+    rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
+    rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
+    rootSignatureDesc.Desc_1_1.pStaticSamplers = &samplerDesc;
+    rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;  // NO input assembler flag
 
 #ifdef ENABLE_BINDLESS
     // Enable bindless resources (SM6.6 ResourceDescriptorHeap[] access)
-    rootSignatureDesc.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+    rootSignatureDesc.Desc_1_1.Flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
 #endif
 
     // Serialize and create
     ComPtr<ID3DBlob> signature;
     ComPtr<ID3DBlob> error;
-    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+    HRESULT hr = D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error);
 
     if (FAILED(hr)) {
         if (error) {

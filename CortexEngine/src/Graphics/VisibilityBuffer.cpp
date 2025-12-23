@@ -262,6 +262,45 @@ Result<void> VisibilityBufferRenderer::Initialize(
         return pipelineResult;
     }
 
+    // Dummy cull mask buffer (4 bytes). Used when no GPU culling mask is
+    // available so the visibility pass can still bind a valid SRV root
+    // descriptor (binding 0 is invalid for root SRVs).
+    {
+        D3D12_HEAP_PROPERTIES dummyHeapProps{};
+        dummyHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC dummyBufferDesc{};
+        dummyBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        dummyBufferDesc.Width = sizeof(uint32_t);
+        dummyBufferDesc.Height = 1;
+        dummyBufferDesc.DepthOrArraySize = 1;
+        dummyBufferDesc.MipLevels = 1;
+        dummyBufferDesc.SampleDesc.Count = 1;
+        dummyBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        HRESULT dummyHr = m_device->GetDevice()->CreateCommittedResource(
+            &dummyHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &dummyBufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_dummyCullMaskBuffer)
+        );
+        if (FAILED(dummyHr)) {
+            return Result<void>::Err("Failed to create VB dummy cull mask buffer");
+        }
+        m_dummyCullMaskBuffer->SetName(L"VB_DummyCullMask");
+
+        uint32_t* mapped = nullptr;
+        D3D12_RANGE dummyReadRange{0, 0};
+        dummyHr = m_dummyCullMaskBuffer->Map(0, &dummyReadRange, reinterpret_cast<void**>(&mapped));
+        if (FAILED(dummyHr) || !mapped) {
+            return Result<void>::Err("Failed to map VB dummy cull mask buffer");
+        }
+        *mapped = 1u;
+        m_dummyCullMaskBuffer->Unmap(0, nullptr);
+    }
+
     spdlog::info("VisibilityBuffer initialized ({}x{}, max {} instances)",
                  m_width, m_height, m_maxInstances);
 
@@ -297,6 +336,7 @@ void VisibilityBufferRenderer::Shutdown() {
     m_materialBuffer.Reset();
     m_meshTableBuffer.Reset();
     m_reflectionProbeBuffer.Reset();
+    m_dummyCullMaskBuffer.Reset();
     m_visibilityPipeline.Reset();
     m_visibilityRootSignature.Reset();
     m_resolvePipeline.Reset();
@@ -419,12 +459,20 @@ Result<void> VisibilityBufferRenderer::CreateVisibilityBuffer() {
         return Result<void>::Err("Failed to allocate visibility UAV");
     }
     m_visibilityUAV = uavResult.Value();
+    auto uavStagingResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+    if (uavStagingResult.IsErr()) {
+        return Result<void>::Err("Failed to allocate visibility UAV staging descriptor");
+    }
+    m_visibilityUAVStaging = uavStagingResult.Value();
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = DXGI_FORMAT_R32G32_UINT;
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     m_device->GetDevice()->CreateUnorderedAccessView(
         m_visibilityBuffer.Get(), nullptr, &uavDesc, m_visibilityUAV.cpu
+    );
+    m_device->GetDevice()->CreateUnorderedAccessView(
+        m_visibilityBuffer.Get(), nullptr, &uavDesc, m_visibilityUAVStaging.cpu
     );
 
     return Result<void>::Ok();
@@ -699,9 +747,10 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     // Matches VisibilityPass.hlsl:
     //   b0: ViewProjection matrix + mesh index (16 + 4 = 20 dwords)
     //   t0: Instance data (StructuredBuffer<VBInstanceData>)
+    //   t2: Optional culling mask (ByteAddressBuffer)
     // ========================================================================
     {
-        D3D12_ROOT_PARAMETER1 params[2] = {};
+        D3D12_ROOT_PARAMETER1 params[3] = {};
 
         // b0: View-projection matrix (16 floats) + mesh index (1 uint) + padding (3 uints)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -716,9 +765,15 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[1].Descriptor.RegisterSpace = 0;
         params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
+        // t2: Optional culling mask SRV (raw buffer)
+        params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        params[2].Descriptor.ShaderRegister = 2;
+        params[2].Descriptor.RegisterSpace = 0;
+        params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
         rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootDesc.Desc_1_1.NumParameters = 2;
+        rootDesc.Desc_1_1.NumParameters = _countof(params);
         rootDesc.Desc_1_1.pParameters = params;
         rootDesc.Desc_1_1.NumStaticSamplers = 0;
         rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -744,10 +799,11 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     //   b0: ViewProjection matrix + mesh index + material count (20 dwords)
     //   t0: Instance data (StructuredBuffer<VBInstanceData>)
     //   t1: Material constants (StructuredBuffer<VBMaterialConstants>)
+    //   t2: Optional culling mask (ByteAddressBuffer)
     //   s0: Linear wrap sampler for baseColor alpha test
     // ========================================================================
     {
-        D3D12_ROOT_PARAMETER1 params[3] = {};
+        D3D12_ROOT_PARAMETER1 params[4] = {};
 
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
@@ -764,6 +820,11 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[2].Descriptor.ShaderRegister = 1;
         params[2].Descriptor.RegisterSpace = 0;
         params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        params[3].Descriptor.ShaderRegister = 2;
+        params[3].Descriptor.RegisterSpace = 0;
+        params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_STATIC_SAMPLER_DESC sampler{};
         sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -2127,7 +2188,8 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     ID3D12Resource* depthBuffer,
     D3D12_CPU_DESCRIPTOR_HANDLE depthDSV,
     const glm::mat4& viewProj,
-    const std::vector<VBMeshDrawInfo>& meshDraws
+    const std::vector<VBMeshDrawInfo>& meshDraws,
+    D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress
 ) {
     if (meshDraws.empty() || m_instanceCount == 0) {
         return Result<void>::Ok(); // Nothing to draw
@@ -2153,7 +2215,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     const UINT clearValues[4] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
     cmdList->ClearUnorderedAccessViewUint(
         m_visibilityUAV.gpu,
-        m_visibilityUAV.cpu,
+        m_visibilityUAVStaging.cpu,
         m_visibilityBuffer.Get(),
         clearValues,
         0,
@@ -2189,6 +2251,15 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
     cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
 
+    // Optional per-instance culling mask (root descriptor t2). Root SRVs must
+    // always bind a valid GPU VA; use a small dummy buffer when the caller
+    // doesn't provide a cull mask.
+    const bool hasCullMask = (cullMaskAddress != 0);
+    if (!hasCullMask) {
+        cullMaskAddress = GetDummyCullMaskAddress();
+    }
+    cmdList->SetGraphicsRootShaderResourceView(2, cullMaskAddress);
+
     // Set primitive topology
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -2205,11 +2276,13 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
             glm::mat4 viewProj;
             uint32_t meshIndex;
             uint32_t materialCount;
-            uint32_t pad[2];
+            uint32_t cullMaskCount;
+            uint32_t pad;
         } perMeshData;
         perMeshData.viewProj = viewProj;
         perMeshData.meshIndex = meshIdx;
         perMeshData.materialCount = m_materialCount;
+        perMeshData.cullMaskCount = hasCullMask ? m_instanceCount : 0u;
         cmdList->SetGraphicsRoot32BitConstants(0, 20, &perMeshData, 0);
 
         // Set vertex buffer for this mesh
@@ -2268,6 +2341,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
 
             cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
             cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootShaderResourceView(3, cullMaskAddress);
 
             for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
                 const auto& drawInfo = meshDraws[meshIdx];
@@ -2280,6 +2354,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
                 cmdList->SetGraphicsRootSignature(m_visibilityAlphaRootSignature.Get());
                 cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
                 cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootShaderResourceView(3, cullMaskAddress);
             }
             for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
                 const auto& drawInfo = meshDraws[meshIdx];
@@ -2301,8 +2376,9 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     if (meshDraws.empty()) {
         return Result<void>::Err("No meshes provided for material resolve");
     }
-    if (depthSRV.ptr == 0) {
-        return Result<void>::Err("Material resolve requires a valid depth SRV");
+    (void)depthSRV; // SRV is written directly from depthBuffer below.
+    if (!depthBuffer) {
+        return Result<void>::Err("Material resolve requires a valid depth buffer");
     }
     if (!m_device || !m_descriptorManager) {
         return Result<void>::Err("Material resolve missing device or descriptor manager");
@@ -2504,8 +2580,20 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     D3D12_CPU_DESCRIPTOR_HANDLE depthDst = visDepthTable.cpu;
     depthDst.ptr += static_cast<SIZE_T>(descriptorSize);
 
-    m_device->GetDevice()->CopyDescriptorsSimple(1, visDst, m_visibilitySRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, depthDst, depthSRV, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    // Avoid CopyDescriptorsSimple from shader-visible heaps; write the descriptors directly.
+    D3D12_SHADER_RESOURCE_VIEW_DESC visSrvDesc{};
+    visSrvDesc.Format = DXGI_FORMAT_R32G32_UINT;
+    visSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    visSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    visSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_visibilityBuffer.Get(), &visSrvDesc, visDst);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc{};
+    depthSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(depthBuffer, &depthSrvDesc, depthDst);
 
     cmdList->SetComputeRootDescriptorTable(2, visDepthTable.gpu);
 
@@ -2528,11 +2616,30 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     D3D12_CPU_DESCRIPTOR_HANDLE ext1UavDst = gbufferUavTable.cpu;
     ext1UavDst.ptr += static_cast<SIZE_T>(descriptorSize) * 4;
 
-    m_device->GetDevice()->CopyDescriptorsSimple(1, albedoUavDst, m_albedoUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, normalUavDst, m_normalRoughnessUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, emissiveUavDst, m_emissiveMetallicUAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, ext0UavDst, m_materialExt0UAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, ext1UavDst, m_materialExt1UAV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    D3D12_UNORDERED_ACCESS_VIEW_DESC albedoUavDesc{};
+    albedoUavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    albedoUavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferAlbedo.Get(), nullptr, &albedoUavDesc, albedoUavDst);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC normalUavDesc{};
+    normalUavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    normalUavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferNormalRoughness.Get(), nullptr, &normalUavDesc, normalUavDst);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC emissiveUavDesc{};
+    emissiveUavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    emissiveUavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferEmissiveMetallic.Get(), nullptr, &emissiveUavDesc, emissiveUavDst);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC ext0UavDesc{};
+    ext0UavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext0UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferMaterialExt0.Get(), nullptr, &ext0UavDesc, ext0UavDst);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC ext1UavDesc{};
+    ext1UavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext1UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->GetDevice()->CreateUnorderedAccessView(m_gbufferMaterialExt1.Get(), nullptr, &ext1UavDesc, ext1UavDst);
 
     cmdList->SetComputeRootDescriptorTable(3, gbufferUavTable.gpu);
 
@@ -2613,8 +2720,12 @@ Result<void> VisibilityBufferRenderer::ComputeMotionVectors(
         return Result<void>::Err("VB motion vectors failed to allocate transient visibility SRV: " + visTableResult.Error());
     }
     DescriptorHandle visTable = visTableResult.Value();
-    m_device->GetDevice()->CopyDescriptorsSimple(
-        1, visTable.cpu, m_visibilitySRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    D3D12_SHADER_RESOURCE_VIEW_DESC visSrvDesc{};
+    visSrvDesc.Format = DXGI_FORMAT_R32G32_UINT;
+    visSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    visSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    visSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_visibilityBuffer.Get(), &visSrvDesc, visTable.cpu);
     cmdList->SetComputeRootDescriptorTable(4, visTable.gpu);
 
     // u0: velocity UAV table (create UAV descriptor in transient heap)
@@ -2897,14 +3008,12 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     if (!m_deferredLightingPipeline) {
         return Result<void>::Err("Deferred lighting pipeline not initialized");
     }
-    if (!depthSRV.IsValid() || !envDiffuseSRV.IsValid() || !envSpecularSRV.IsValid() || !shadowMapSRV.IsValid()) {
-        return Result<void>::Err("Deferred lighting requires valid depth/envDiffuse/envSpecular/shadow SRVs");
+    (void)depthSRV; // SRVs are written directly from the resources below.
+    if (!depthBuffer) {
+        return Result<void>::Err("Deferred lighting requires a valid depth buffer");
     }
-    if (!m_albedoSRV.IsValid() || !m_normalRoughnessSRV.IsValid() || !m_emissiveMetallicSRV.IsValid()) {
-        return Result<void>::Err("Deferred lighting requires valid G-buffer SRVs");
-    }
-    if (!m_materialExt0SRV.IsValid() || !m_materialExt1SRV.IsValid()) {
-        return Result<void>::Err("Deferred lighting requires valid material extension G-buffer SRVs");
+    if (!envDiffuseSRV.IsValid() || !envSpecularSRV.IsValid() || !shadowMapSRV.IsValid()) {
+        return Result<void>::Err("Deferred lighting requires valid envDiffuse/envSpecular/shadow SRVs");
     }
     {
         auto brdfResult = EnsureBRDFLUT(cmdList);
@@ -3065,12 +3174,48 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     D3D12_CPU_DESCRIPTOR_HANDLE dst5 = gbufferTable.cpu;
     dst5.ptr += static_cast<SIZE_T>(descriptorSize2) * 5;
 
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst0, m_albedoSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst1, m_normalRoughnessSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst2, m_emissiveMetallicSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst3, depthSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst4, m_materialExt0SRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, dst5, m_materialExt1SRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    // Avoid CopyDescriptorsSimple from shader-visible heaps; write the descriptors directly.
+    D3D12_SHADER_RESOURCE_VIEW_DESC albedoSrvDesc{};
+    albedoSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    albedoSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    albedoSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    albedoSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferAlbedo.Get(), &albedoSrvDesc, dst0);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC normalSrvDesc{};
+    normalSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    normalSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    normalSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    normalSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferNormalRoughness.Get(), &normalSrvDesc, dst1);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC emissiveSrvDesc{};
+    emissiveSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    emissiveSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    emissiveSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    emissiveSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferEmissiveMetallic.Get(), &emissiveSrvDesc, dst2);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc{};
+    depthSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(depthBuffer, &depthSrvDesc, dst3);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC ext0SrvDesc{};
+    ext0SrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext0SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    ext0SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    ext0SrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt0.Get(), &ext0SrvDesc, dst4);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC ext1SrvDesc{};
+    ext1SrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext1SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    ext1SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    ext1SrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt1.Get(), &ext1SrvDesc, dst5);
 
     cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable.gpu);
 
@@ -3089,10 +3234,32 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     D3D12_CPU_DESCRIPTOR_HANDLE brdfDst = envShadowTable.cpu;
     brdfDst.ptr += static_cast<SIZE_T>(descriptorSize2) * 3;
 
-    m_device->GetDevice()->CopyDescriptorsSimple(1, envDst, envDiffuseSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, specDst, envSpecularSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, shadowDst, shadowMapSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_device->GetDevice()->CopyDescriptorsSimple(1, brdfDst, m_brdfLutSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    // Environment/shadow come from the renderer; these must be CPU-readable
+    // staging descriptors (CopyDescriptorsSimple reads the source on the CPU).
+    auto copyOrNull = [&](D3D12_CPU_DESCRIPTOR_HANDLE dst, const DescriptorHandle& src, DXGI_FORMAT fmt) {
+        if (src.IsValid()) {
+            m_device->GetDevice()->CopyDescriptorsSimple(1, dst, src.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            return;
+        }
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
+        nullSrv.Format = fmt;
+        nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullSrv.Texture2D.MipLevels = 1;
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, dst);
+    };
+
+    copyOrNull(envDst, envDiffuseSRV, DXGI_FORMAT_R8G8B8A8_UNORM);
+    copyOrNull(specDst, envSpecularSRV, DXGI_FORMAT_R8G8B8A8_UNORM);
+    copyOrNull(shadowDst, shadowMapSRV, DXGI_FORMAT_R32_FLOAT);
+
+    // BRDF LUT is owned by the VB system; write directly to avoid copying from shader-visible heaps.
+    D3D12_SHADER_RESOURCE_VIEW_DESC brdfSrvDesc{};
+    brdfSrvDesc.Format = DXGI_FORMAT_R16G16_FLOAT;
+    brdfSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    brdfSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    brdfSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_brdfLut.Get(), &brdfSrvDesc, brdfDst);
 
     cmdList->SetGraphicsRootDescriptorTable(2, envShadowTable.gpu);
 

@@ -6,6 +6,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE // DirectX uses [0,1] depth range (not [-1,1])
 
 #include <glm/glm.hpp>
+#include <cstddef>
 #include "RHI/BindlessConstants.h"
 
 // Shared structures between C++ and HLSL shaders
@@ -140,6 +141,14 @@ struct FrameConstants {
     alignas(16) glm::uvec4 clusterSRVIndices;  // x=localLights, y=clusterRanges, z=clusterIndices, w unused
     glm::vec4 projectionParams;                // x=proj11, y=proj22, z=nearZ, w=farZ (for cluster Z slicing)
 };
+
+// The visibility-buffer material resolve path reads vertices via ByteAddressBuffer
+// with fixed offsets (0/12/24/40). Fail fast if the CPU vertex layout diverges.
+static_assert(sizeof(Vertex) == 48, "Vertex must be tightly packed (48 bytes) for VB resolve");
+static_assert(offsetof(Vertex, position) == 0, "Vertex.position offset must be 0");
+static_assert(offsetof(Vertex, normal) == 12, "Vertex.normal offset must be 12");
+static_assert(offsetof(Vertex, tangent) == 24, "Vertex.tangent offset must be 24");
+static_assert(offsetof(Vertex, texCoord) == 40, "Vertex.texCoord offset must be 40");
 
 // Material properties
 struct MaterialConstants {

@@ -175,6 +175,16 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
     }
 
+    // Robustness guard: skip invalid triangle IDs.
+    const uint first = instance.firstIndex;
+    const uint count = instance.indexCount;
+    const uint triFirst = first + triangleID * 3u;
+    if (count < 3u || triFirst + 2u >= first + count)
+    {
+        g_VelocityOut[pixelCoord] = float2(0.0f, 0.0f);
+        return;
+    }
+
     VBMeshTableEntry mesh = g_MeshTable[instance.meshIndex];
     ByteAddressBuffer vertexBuffer = ResourceDescriptorHeap[mesh.vertexBufferIndex];
     ByteAddressBuffer indexBuffer = ResourceDescriptorHeap[mesh.indexBufferIndex];

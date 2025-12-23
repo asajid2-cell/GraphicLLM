@@ -494,6 +494,7 @@ private:
     void RenderShadowPass(Scene::ECS_Registry* registry);
     void RenderSkybox();
     void RenderScene(Scene::ECS_Registry* registry);
+    void RenderOverlays(Scene::ECS_Registry* registry);
     void RenderTransparent(Scene::ECS_Registry* registry);
     void RenderSSR();
     void RenderTAA();
@@ -592,6 +593,9 @@ public:
     std::unique_ptr<DX12RootSignature> m_rootSignature;
     std::unique_ptr<DX12ComputeRootSignature> m_computeRootSignature;  // For compute shaders
     std::unique_ptr<DX12Pipeline> m_pipeline;
+    // Depth-tested, depth-write-disabled overlay pipeline (decals/markings) that
+    // renders HDR-only so it does not disturb GBuffer/normal targets.
+    std::unique_ptr<DX12Pipeline> m_overlayPipeline;
     // Blended variant of the main PBR pipeline used for glass/transparent
     // materials. Shares the same shaders and input layout but enables
     // alpha blending and disables depth writes so transparent surfaces can

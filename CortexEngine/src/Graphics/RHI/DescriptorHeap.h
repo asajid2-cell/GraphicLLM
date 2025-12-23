@@ -101,6 +101,12 @@ public:
         return m_cbvSrvUavHeap.GetCapacity();
     }
 
+    // Get a CBV/SRV/UAV handle for a specific heap index. This is primarily
+    // used to materialize handles inside a contiguous transient range.
+    [[nodiscard]] DescriptorHandle GetCBV_SRV_UAVHandle(uint32_t index) const {
+        return m_cbvSrvUavHeap.GetHandle(index);
+    }
+
     // Allocate transient descriptors (per-frame ring buffer region)
     Result<DescriptorHandle> AllocateTransientCBV_SRV_UAV();
     // Allocate a contiguous range of transient descriptors and return the base handle.
@@ -116,9 +122,9 @@ private:
 
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
-    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 16384;  // Headroom for bindless textures + per-frame transient tables without aliasing
-    static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 8192;  // CPU-only staging heap for persistent SRVs (copied into shader-visible heap as needed)
-    static constexpr uint32_t CBV_SRV_UAV_PERSISTENT_RESERVE = 8192;  // Fixed prefix reserved for persistent descriptors; transient regions start after this
+    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 65536;  // Headroom for bindless resources + per-frame transient tables
+    static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 32768;  // CPU-only staging heap for persistent SRVs (copied into shader-visible heap as needed)
+    static constexpr uint32_t CBV_SRV_UAV_PERSISTENT_RESERVE = 16384;  // Fixed prefix reserved for persistent descriptors; transient regions start after this
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;

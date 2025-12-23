@@ -11,7 +11,9 @@ cbuffer PerFrameData : register(b0) {
     float4x4 g_ViewProj;
     uint g_CurrentMeshIndex;  // Current mesh being drawn
     uint g_MaterialCount;
-    uint2 _pad;
+    // When 0, the cull mask is treated as "not bound" and all instances are visible.
+    uint g_CullMaskCount;
+    uint _pad;
 };
 
 // Instance data structure (matches VBInstanceData in C++)
@@ -24,7 +26,11 @@ struct VBInstanceData {
     uint firstIndex;
     uint indexCount;
     uint baseVertex;
-    uint3 _pad;
+    float4 boundingSphere;  // xyz = center (object space), w = radius
+    float4 prevCenterWS;    // xyz = previous frame center (world space)
+    uint cullingId;         // packed gen<<16|slot
+    uint flags;
+    uint2 _pad2;
 };
 
 StructuredBuffer<VBInstanceData> g_Instances : register(t0);
@@ -77,11 +83,8 @@ PSInput VSMain(VSInput input) {
 
     // Optional per-instance culling: when a valid mask is bound, instances with
     // mask == 0 are culled before rasterization via SV_CullDistance.
-    uint maskBytes = 0;
-    g_CullMask.GetDimensions(maskBytes);
     uint visible = 1u;
-    if (maskBytes >= 4u)
-    {
+    if (g_CullMaskCount != 0u && input.instanceID < g_CullMaskCount) {
         visible = g_CullMask.Load(input.instanceID * 4u);
     }
     output.cullDist = (visible != 0u) ? 1.0f : -1.0f;
@@ -113,10 +116,7 @@ PSOutput PSMainAlphaTest(PSInput input, uint primitiveID : SV_PrimitiveID) {
     VBInstanceData instance = g_Instances[input.instanceID];
 
     // Apply the same optional occlusion/frustum mask as the opaque path.
-    uint maskBytes = 0;
-    g_CullMask.GetDimensions(maskBytes);
-    if (maskBytes >= 4u)
-    {
+    if (g_CullMaskCount != 0u && input.instanceID < g_CullMaskCount) {
         uint visible = g_CullMask.Load(input.instanceID * 4u);
         if (visible == 0u)
         {

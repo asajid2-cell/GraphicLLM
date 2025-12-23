@@ -1,6 +1,11 @@
 #pragma once
 
 #include "D3D12Includes.h"
+#if __has_include(<d3d12sdklayers.h>)
+#include <d3d12sdklayers.h>
+#elif __has_include(<directx/d3d12sdklayers.h>)
+#include <directx/d3d12sdklayers.h>
+#endif
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 #include <memory>
@@ -65,6 +70,14 @@ private:
     Result<void> CreateDevice(D3D_FEATURE_LEVEL minFeatureLevel);
     void CheckTearingSupport();
     void EnableDRED();
+    void RegisterInfoQueueCallback();
+    void UnregisterInfoQueueCallback();
+
+    static void CALLBACK InfoQueueCallback(D3D12_MESSAGE_CATEGORY category,
+                                          D3D12_MESSAGE_SEVERITY severity,
+                                          D3D12_MESSAGE_ID id,
+                                          LPCSTR pDescription,
+                                          void* pContext);
 
     ComPtr<IDXGIFactory6> m_factory;
     ComPtr<IDXGIAdapter1> m_adapter;
@@ -73,6 +86,10 @@ private:
     std::uint64_t m_dedicatedVideoMemoryBytes = 0;
 
     bool m_supportsTearing = false;
+
+    bool m_debugLayerEnabled = false;
+    DWORD m_infoQueueCallbackCookie = 0;
+    bool m_infoQueueCallbackRegistered = false;
 };
 
 } // namespace Cortex::Graphics

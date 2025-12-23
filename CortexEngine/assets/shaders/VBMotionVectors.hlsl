@@ -62,7 +62,11 @@ struct VBInstanceData
     uint firstIndex;
     uint indexCount;
     uint baseVertex;
-    uint3 _pad;
+    float4 boundingSphere;  // xyz = center (object space), w = radius
+    float4 prevCenterWS;    // xyz = previous frame center (world space)
+    uint cullingId;         // packed gen<<16|slot
+    uint flags;
+    uint2 _pad2;
 };
 
 struct VBMeshTableEntry

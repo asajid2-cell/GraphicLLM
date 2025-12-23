@@ -1177,7 +1177,8 @@ void Engine::BuildRTShowcaseScene() {
         entt::entity rim = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(rim, "Courtyard_PoolRim");
         auto& rt = m_registry->AddComponent<Scene::TransformComponent>(rim);
-        rt.position = glm::vec3(0.0f, 0.0f, courtyardZ);
+        // Avoid coplanar z-fighting with Courtyard_Floor.
+        rt.position = glm::vec3(0.0f, 0.002f, courtyardZ);
 
         auto& rr = m_registry->AddComponent<Scene::RenderableComponent>(rim);
         rr.mesh = poolPlane;
@@ -1621,7 +1622,8 @@ void Engine::BuildGodRaysScene() {
         entt::entity rim = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(rim, "GodRays_PoolRim");
         auto& rimXf = m_registry->AddComponent<TransformComponent>(rim);
-        rimXf.position = glm::vec3(0.0f, 0.0f, 4.0f);
+        // Avoid coplanar z-fighting with GodRays_Floor.
+        rimXf.position = glm::vec3(0.0f, 0.002f, 4.0f);
 
         auto& rimR = m_registry->AddComponent<Scene::RenderableComponent>(rim);
         rimR.mesh = poolMesh;

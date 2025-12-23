@@ -1566,7 +1566,9 @@ void CommandQueue::BuildRoadRegion(const ScenePlanCommand::Region& region,
     auto road = std::make_shared<AddEntityCommand>();
     road->entityType = AddEntityCommand::EntityType::Plane;
     road->name = region.name.empty() ? "Road" : region.name;
-    road->position = center;
+    // Roads are typically authored as ground overlays; nudge upward slightly
+    // to avoid coplanar fighting with existing floor/terrain planes.
+    road->position = center + glm::vec3(0.0f, 0.002f, 0.0f);
     road->scale = glm::vec3(size.x, 1.0f, size.z);
     road->color = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
     ExecuteAddEntity(road.get(), registry, renderer);

@@ -3510,7 +3510,8 @@ void Engine::BuildDragonStudioScene() {
         entt::entity rimEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(rimEntity, "PoolRim");
         auto& rimXform = m_registry->AddComponent<Scene::TransformComponent>(rimEntity);
-        rimXform.position = glm::vec3(0.0f, 0.0f, poolZ);
+        // Avoid coplanar z-fighting with the studio floor plane.
+        rimXform.position = glm::vec3(0.0f, 0.002f, poolZ);
         rimXform.scale = glm::vec3(1.0f);
 
         auto& rimRenderable = m_registry->AddComponent<Scene::RenderableComponent>(rimEntity);

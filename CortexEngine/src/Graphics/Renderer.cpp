@@ -11346,8 +11346,11 @@ Result<void> Renderer::CreateCommandList() {
         overlayDesc.blendEnabled = false;
         overlayDesc.depthWriteEnabled = false;
         overlayDesc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        overlayDesc.depthBias = -1;
-        overlayDesc.slopeScaledDepthBias = -1.0f;
+        // D3D12 depth bias units are extremely small for D32/D24 depth formats.
+        // Use a stronger negative bias so coplanar overlays (decals/markings)
+        // reliably win the depth test without needing per-asset Y offsets.
+        overlayDesc.depthBias = -2000;
+        overlayDesc.slopeScaledDepthBias = -2.0f;
 
         auto overlayResult = m_overlayPipeline->Initialize(
             m_device->GetDevice(),
@@ -11426,8 +11429,8 @@ Result<void> Renderer::CreateCommandList() {
         waterOverlayDesc.depthWriteEnabled = false;
         waterOverlayDesc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
         waterOverlayDesc.blendEnabled = true;
-        waterOverlayDesc.depthBias = -1;
-        waterOverlayDesc.slopeScaledDepthBias = -1.0f;
+        waterOverlayDesc.depthBias = -2000;
+        waterOverlayDesc.slopeScaledDepthBias = -2.0f;
 
         auto waterOverlayResult = m_waterOverlayPipeline->Initialize(
             m_device->GetDevice(),

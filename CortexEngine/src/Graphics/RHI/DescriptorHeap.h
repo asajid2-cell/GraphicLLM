@@ -116,8 +116,9 @@ private:
 
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
-    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 4096;  // Increased from 1024 to support dynamic texture loading + transient allocations per frame
-    static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 2048;  // CPU-only staging heap for persistent SRVs
+    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 16384;  // Headroom for bindless textures + per-frame transient tables without aliasing
+    static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 8192;  // CPU-only staging heap for persistent SRVs (copied into shader-visible heap as needed)
+    static constexpr uint32_t CBV_SRV_UAV_PERSISTENT_RESERVE = 8192;  // Fixed prefix reserved for persistent descriptors; transient regions start after this
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
@@ -128,6 +129,7 @@ private:
     // (textures, shadow maps, HDR targets, etc.). Transient allocations start
     // after this index and are reset every frame.
     uint32_t m_cbvSrvUavPersistentCount = 0;
+    uint32_t m_cbvSrvUavPersistentReserved = 0;
     uint32_t m_frameCount = 1;
     uint32_t m_activeFrameIndex = 0;
     uint32_t m_transientSegmentStart = 0;

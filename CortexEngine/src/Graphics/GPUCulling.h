@@ -207,7 +207,11 @@ private:
     DescriptorHandle m_historyAUAVStaging;
     DescriptorHandle m_historyBUAV;
     DescriptorHandle m_historyBUAVStaging;
+    // HZB SRV binding:
+    // - m_hzbSrv: shader-visible fallback SRV that always points to the dummy HZB (never rewritten while GPU is in-flight)
+    // - m_hzbSrvStaging: CPU-only SRV updated to either the real HZB or dummy; copied into a per-frame transient slot at dispatch time
     DescriptorHandle m_hzbSrv;
+    DescriptorHandle m_hzbSrvStaging;
     DescriptorHandle m_debugUAV;
     DescriptorHandle m_debugUAVStaging;
 

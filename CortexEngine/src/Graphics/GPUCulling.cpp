@@ -139,16 +139,15 @@ void GPUCullingPipeline::SetHZBForOcclusion(
         return;
     }
 
-    // Ensure we always have a valid descriptor table binding for t2, even when
-    // occlusion is disabled. This avoids leaving the root parameter unset.
-    if (!m_hzbSrv.IsValid()) {
-        auto srvRes = m_descriptorManager->AllocateCBV_SRV_UAV();
+    // Update a CPU-only staging SRV; we copy it into a per-frame transient slot
+    // during DispatchCulling() to avoid rewriting in-flight shader-visible descriptors.
+    if (!m_hzbSrvStaging.IsValid()) {
+        auto srvRes = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvRes.IsOk()) {
-            m_hzbSrv = srvRes.Value();
+            m_hzbSrvStaging = srvRes.Value();
         }
     }
-
-    if (!m_hzbSrv.IsValid()) {
+    if (!m_hzbSrvStaging.IsValid()) {
         return;
     }
 
@@ -165,7 +164,7 @@ void GPUCullingPipeline::SetHZBForOcclusion(
     srvDesc.Texture2D.MipLevels = (m_hzbEnabled ? static_cast<UINT>(m_hzbMipCount) : 1u);
     srvDesc.Texture2D.PlaneSlice = 0;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-    device->CreateShaderResourceView(srvResource, &srvDesc, m_hzbSrv.cpu);
+    device->CreateShaderResourceView(srvResource, &srvDesc, m_hzbSrvStaging.cpu);
 }
 
 Result<void> GPUCullingPipeline::CreateRootSignature() {
@@ -653,6 +652,12 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
         }
         m_hzbSrv = hzbSrvRes.Value();
 
+        auto hzbSrvStagingRes = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (hzbSrvStagingRes.IsErr()) {
+            return Result<void>::Err("Failed to allocate HZB staging SRV descriptor");
+        }
+        m_hzbSrvStaging = hzbSrvStagingRes.Value();
+
         D3D12_SHADER_RESOURCE_VIEW_DESC hzbSrvDesc{};
         hzbSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
         hzbSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -660,6 +665,7 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
         hzbSrvDesc.Texture2D.MostDetailedMip = 0;
         hzbSrvDesc.Texture2D.MipLevels = 1;
         device->CreateShaderResourceView(m_dummyHzbTexture.Get(), &hzbSrvDesc, m_hzbSrv.cpu);
+        device->CreateShaderResourceView(m_dummyHzbTexture.Get(), &hzbSrvDesc, m_hzbSrvStaging.cpu);
     }
 
     // Constant buffer
@@ -1041,7 +1047,7 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     constants.instanceCount = m_totalInstances;
 
     const uint32_t hzbEnabled =
-        (m_hzbEnabled && m_hzbTexture && m_hzbSrv.IsValid()) ? 1u : 0u;
+        (m_hzbEnabled && m_hzbTexture && (m_hzbMipCount > 0) && (m_hzbWidth > 0) && (m_hzbHeight > 0)) ? 1u : 0u;
     constexpr uint32_t kOcclusionStreakThreshold = 2u;
     constants.occlusionParams0 = glm::uvec4(
         m_forceVisible ? 1u : 0u,
@@ -1269,7 +1275,22 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     cmdList->SetComputeRootUnorderedAccessView(6, historyOut ? historyOut->GetGPUVirtualAddress() : 0);
     cmdList->SetComputeRootUnorderedAccessView(7, m_debugBuffer ? m_debugBuffer->GetGPUVirtualAddress() : 0);
     cmdList->SetComputeRootUnorderedAccessView(8, m_visibilityMaskBuffer ? m_visibilityMaskBuffer->GetGPUVirtualAddress() : 0);
-    cmdList->SetComputeRootDescriptorTable(9, m_hzbSrv.gpu);
+
+    // Bind HZB SRV via a per-frame transient slot to avoid rewriting a shader-visible
+    // descriptor that may still be referenced by an in-flight command list.
+    DescriptorHandle hzbSrvForDispatch = m_hzbSrv; // fallback dummy (always valid)
+    if (m_descriptorManager && m_hzbSrvStaging.IsValid()) {
+        auto transientRes = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        if (transientRes.IsOk()) {
+            hzbSrvForDispatch = transientRes.Value();
+            m_device->GetDevice()->CopyDescriptorsSimple(
+                1,
+                hzbSrvForDispatch.cpu,
+                m_hzbSrvStaging.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        }
+    }
+    cmdList->SetComputeRootDescriptorTable(9, hzbSrvForDispatch.gpu);
 
     // Dispatch compute shader (64 threads per group)
     uint32_t numGroups = (m_totalInstances + 63) / 64;

@@ -130,6 +130,14 @@ Result<void> DescriptorHeapManager::Initialize(ID3D12Device* device, uint32_t fr
     m_activeFrameIndex = 0;
     m_frameActive = false;
     m_transientActive = false;
+    m_cbvSrvUavPersistentReserved = 0;
+    {
+        const uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
+        // Reserve a fixed prefix for persistent descriptors so transient per-frame
+        // allocations never shift when textures load mid-run (avoids descriptor aliasing
+        // with in-flight command lists).
+        m_cbvSrvUavPersistentReserved = std::min(CBV_SRV_UAV_PERSISTENT_RESERVE, capacity);
+    }
     UpdateTransientSegment();
 
     spdlog::info("Descriptor Heap Manager initialized (with staging heap)");
@@ -157,8 +165,40 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
         return Result<DescriptorHandle>::Err("Persistent allocation unsafe after transient descriptors were allocated");
     }
 
-    if (m_frameActive && m_flushCallback) {
-        m_flushCallback();
+    // Ensure persistent allocations cannot encroach into transient segments that may
+    // still be referenced by in-flight command lists. We enforce a fixed reserved
+    // prefix for persistent descriptors; if exceeded, require a flush (GPU idle)
+    // and expand the reserved region (reducing transient capacity).
+    if (m_cbvSrvUavPersistentReserved == 0) {
+        m_cbvSrvUavPersistentReserved = std::min(CBV_SRV_UAV_PERSISTENT_RESERVE, capacity);
+    }
+    if (m_cbvSrvUavPersistentCount >= m_cbvSrvUavPersistentReserved) {
+        if (m_frameActive && m_flushCallback) {
+            m_flushCallback();
+        }
+
+        uint32_t newReserve = m_cbvSrvUavPersistentReserved;
+        if (newReserve == 0) newReserve = 1;
+        while (newReserve <= m_cbvSrvUavPersistentCount && newReserve < capacity) {
+            newReserve = std::min(capacity, std::max(newReserve * 2u, m_cbvSrvUavPersistentCount + 1u));
+        }
+        if (newReserve <= m_cbvSrvUavPersistentCount) {
+            spdlog::error("CBV_SRV_UAV persistent reserve exhausted: used={}, reserve={}, capacity={}",
+                          m_cbvSrvUavPersistentCount, m_cbvSrvUavPersistentReserved, capacity);
+            return Result<DescriptorHandle>::Err("Persistent descriptor reserve exhausted");
+        }
+
+        if (newReserve != m_cbvSrvUavPersistentReserved) {
+            spdlog::warn("Expanding persistent descriptor reserve: {} -> {} (capacity={})",
+                         m_cbvSrvUavPersistentReserved, newReserve, capacity);
+            m_cbvSrvUavPersistentReserved = newReserve;
+            UpdateTransientSegment();
+            if (m_frameActive) {
+                m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+            } else {
+                m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentReserved);
+            }
+        }
     }
 
     DescriptorHandle handle = m_cbvSrvUavHeap.GetHandle(m_cbvSrvUavPersistentCount);
@@ -182,7 +222,11 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
         UpdateTransientSegment();
         m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
     } else {
-        m_cbvSrvUavHeap.ResetFrom(m_cbvSrvUavPersistentCount);
+        // Keep the transient region reserved even outside of a frame so that
+        // background loading cannot overwrite descriptors that may be used for
+        // transient tables on the next frame.
+        const uint32_t reserve = std::min(m_cbvSrvUavPersistentReserved, m_cbvSrvUavHeap.GetCapacity());
+        m_cbvSrvUavHeap.ResetFrom(std::max(m_cbvSrvUavPersistentCount, reserve));
     }
 
     return Result<DescriptorHandle>::Ok(handle);
@@ -316,17 +360,27 @@ void DescriptorHeapManager::ResetFrameHeaps() {
 
 void DescriptorHeapManager::UpdateTransientSegment() {
     const uint32_t capacity = m_cbvSrvUavHeap.GetCapacity();
-    uint32_t persistentCount = std::min(m_cbvSrvUavPersistentCount, capacity);
+    const uint32_t reserved = (m_cbvSrvUavPersistentReserved > 0)
+        ? std::min(m_cbvSrvUavPersistentReserved, capacity)
+        : std::min(CBV_SRV_UAV_PERSISTENT_RESERVE, capacity);
+    uint32_t persistentBase = reserved;
 
-    if (persistentCount >= capacity) {
+    if (m_cbvSrvUavPersistentCount > persistentBase) {
+        // This should be rare: it means we've exceeded the reserved persistent prefix.
+        // At this point, transient capacity is compromised; keep correctness by
+        // moving the base forward (requires flush at allocation time).
+        persistentBase = std::min(m_cbvSrvUavPersistentCount, capacity);
+    }
+
+    if (persistentBase >= capacity) {
         m_transientSegmentStart = capacity;
         m_transientSegmentEnd = capacity;
         return;
     }
 
-    uint32_t transientCapacity = capacity - persistentCount;
+    uint32_t transientCapacity = capacity - persistentBase;
     if (m_frameCount <= 1) {
-        m_transientSegmentStart = persistentCount;
+        m_transientSegmentStart = persistentBase;
         m_transientSegmentEnd = capacity;
         return;
     }
@@ -337,7 +391,7 @@ void DescriptorHeapManager::UpdateTransientSegment() {
     uint32_t extra = (frameIdx < remainder) ? 1u : 0u;
     uint32_t offset = perFrame * frameIdx + std::min(frameIdx, remainder);
 
-    m_transientSegmentStart = persistentCount + offset;
+    m_transientSegmentStart = persistentBase + offset;
     m_transientSegmentEnd = m_transientSegmentStart + perFrame + extra;
 }
 

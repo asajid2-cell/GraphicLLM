@@ -38,6 +38,9 @@ struct PipelineDesc {
     // Rasterizer state
     D3D12_CULL_MODE cullMode = D3D12_CULL_MODE_NONE; // draw both sides to avoid accidental culling
     bool wireframe = false;
+    int depthBias = 0;
+    float depthBiasClamp = 0.0f;
+    float slopeScaledDepthBias = 0.0f;
 
     // Depth state
     bool depthTestEnabled = true;

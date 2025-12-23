@@ -257,6 +257,21 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         return;
     }
 
+    // Robustness: guard against invalid triangle IDs (can happen if the
+    // visibility pass emits a global SV_PrimitiveID across instances on some
+    // backends, or if instance/index counts are inconsistent).
+    const uint first = instance.firstIndex;
+    const uint count = instance.indexCount;
+    const uint triFirst = first + triangleID * 3u;
+    if (count < 3u || triFirst + 2u >= first + count) {
+        g_AlbedoOut[pixelCoord] = float4(0, 0, 0, 1);
+        g_NormalRoughnessOut[pixelCoord] = float4(0.5, 0.5, 1.0, 1.0);
+        g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
+        g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
+        g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
+        return;
+    }
+
     VBMeshTableEntry mesh = g_MeshTable[instance.meshIndex];
     ByteAddressBuffer vertexBuffer = ResourceDescriptorHeap[mesh.vertexBufferIndex];
     ByteAddressBuffer indexBuffer = ResourceDescriptorHeap[mesh.indexBufferIndex];

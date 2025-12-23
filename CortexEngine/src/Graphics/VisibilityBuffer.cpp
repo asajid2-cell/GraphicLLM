@@ -1163,13 +1163,13 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
         return Result<void>::Err("Failed to compile VisibilityPass PS: " + psResult.Error());
     }
 
-    // Input layout MUST match actual Vertex structure (48 bytes)
-    // Shader only uses POSITION, but IA needs full layout for correct stride
+    // Input layout MUST match the actual Vertex structure. Do not hardcode
+    // offsets/stride here; GLM type alignment can change field packing.
     D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, static_cast<UINT>(offsetof(Vertex, position)), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, static_cast<UINT>(offsetof(Vertex, normal)),   D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, static_cast<UINT>(offsetof(Vertex, tangent)),  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, static_cast<UINT>(offsetof(Vertex, texCoord)), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
     // Graphics pipeline state for visibility pass
@@ -2288,15 +2288,23 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         // Set vertex buffer for this mesh
         D3D12_VERTEX_BUFFER_VIEW vbv = {};
         vbv.BufferLocation = drawInfo.vertexBuffer->GetGPUVirtualAddress();
-        vbv.SizeInBytes = drawInfo.vertexCount * 48; // sizeof(Vertex) = 48 bytes
-        vbv.StrideInBytes = 48;
+        const uint32_t stride = (drawInfo.vertexStrideBytes > 0) ? drawInfo.vertexStrideBytes : static_cast<uint32_t>(sizeof(Vertex));
+        const uint64_t vbBytesNeeded = static_cast<uint64_t>(drawInfo.vertexCount) * static_cast<uint64_t>(stride);
+        const uint64_t vbBytesAvail = drawInfo.vertexBuffer->GetDesc().Width;
+        const uint64_t vbBytes = std::min(vbBytesNeeded, vbBytesAvail);
+        vbv.SizeInBytes = static_cast<UINT>(std::min<uint64_t>(vbBytes, static_cast<uint64_t>(UINT_MAX)));
+        vbv.StrideInBytes = stride;
         cmdList->IASetVertexBuffers(0, 1, &vbv);
 
         // Set index buffer for this mesh
         D3D12_INDEX_BUFFER_VIEW ibv = {};
         ibv.BufferLocation = drawInfo.indexBuffer->GetGPUVirtualAddress();
-        ibv.SizeInBytes = drawInfo.indexCount * sizeof(uint32_t);
-        ibv.Format = DXGI_FORMAT_R32_UINT;
+        const uint32_t indexStride = (drawInfo.indexFormat == 1u) ? 2u : 4u;
+        const uint64_t ibBytesNeeded = static_cast<uint64_t>(drawInfo.indexCount) * static_cast<uint64_t>(indexStride);
+        const uint64_t ibBytesAvail = drawInfo.indexBuffer->GetDesc().Width;
+        const uint64_t ibBytes = std::min(ibBytesNeeded, ibBytesAvail);
+        ibv.SizeInBytes = static_cast<UINT>(std::min<uint64_t>(ibBytes, static_cast<uint64_t>(UINT_MAX)));
+        ibv.Format = (drawInfo.indexFormat == 1u) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         cmdList->IASetIndexBuffer(&ibv);
 
         cmdList->DrawIndexedInstanced(

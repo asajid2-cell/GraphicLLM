@@ -28,9 +28,9 @@ Result<void> DX12Pipeline::Initialize(
     rasterizerDesc.CullMode = desc.cullMode;
     // Our meshes use counter-clockwise winding for front faces
     rasterizerDesc.FrontCounterClockwise = TRUE;
-    rasterizerDesc.DepthBias = 0;
-    rasterizerDesc.DepthBiasClamp = 0.0f;
-    rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+    rasterizerDesc.DepthBias = desc.depthBias;
+    rasterizerDesc.DepthBiasClamp = desc.depthBiasClamp;
+    rasterizerDesc.SlopeScaledDepthBias = desc.slopeScaledDepthBias;
     rasterizerDesc.DepthClipEnable = TRUE;
     rasterizerDesc.MultisampleEnable = FALSE;
     rasterizerDesc.AntialiasedLineEnable = FALSE;

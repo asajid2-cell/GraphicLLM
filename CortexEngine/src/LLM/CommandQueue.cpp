@@ -496,8 +496,14 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
         desiredPos += placementBias * 0.15f;
     }
 
-    // keep entities off the floor plane to reduce z-fighting on y=0
-    desiredPos.y = std::max(desiredPos.y, 0.5f);
+    // Keep most entities off the floor plane to reduce z-fighting on y=0.
+    // Planar primitives (planes/quads) are commonly used for ground-aligned
+    // elements and decals, so allow them to sit near y=0 with small offsets.
+    const bool allowNearGround =
+        (cmd->entityType == AddEntityCommand::EntityType::Plane) ||
+        (cmd->entityType == AddEntityCommand::EntityType::Quad) ||
+        (cmd->entityType == AddEntityCommand::EntityType::Line);
+    desiredPos.y = std::max(desiredPos.y, allowNearGround ? 0.0f : 0.5f);
     if (cmd->disableCollisionAvoidance) {
         transform.position = ClampToWorld(desiredPos);
     } else {
@@ -539,6 +545,9 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
     renderable.textures.normal = renderer->GetPlaceholderNormal();
     renderable.textures.metallic = renderer->GetPlaceholderMetallic();
     renderable.textures.roughness = renderer->GetPlaceholderRoughness();
+    renderable.renderLayer = cmd->isDecal
+        ? Scene::RenderableComponent::RenderLayer::Overlay
+        : Scene::RenderableComponent::RenderLayer::Opaque;
 
     m_lookup.TrackEntity(entity, name, cmd->entityType, renderable.albedoColor);
 
@@ -1564,7 +1573,7 @@ void CommandQueue::BuildRoadRegion(const ScenePlanCommand::Region& region,
 
     auto lanes = std::make_shared<AddPatternCommand>();
     lanes->pattern = AddPatternCommand::PatternType::Row;
-    lanes->element = "plane";
+    lanes->element = "thin_plane";
     lanes->count = 6;
     lanes->hasRegionBox = false;
     lanes->regionMin = center + glm::vec3(0.0f, 0.01f, 0.0f);
@@ -1692,6 +1701,7 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
         // Hook for future terrain support; currently we place patterns slightly above ground plane.
         return 0.5f;
     };
+    const float heightOffset = center.y - sampleHeight(center);
 
     for (int i = 0; i < count; ++i) {
         glm::vec3 localOffset(0.0f);
@@ -1749,7 +1759,7 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
         }
 
         glm::vec3 worldPos = center + localOffset;
-        worldPos.y = sampleHeight(worldPos);
+        worldPos.y = sampleHeight(worldPos) + heightOffset;
         worldPos = SanitizeVec3(worldPos);
 
         // Optional jitter for structured patterns to avoid perfectly rigid rows/grids/rings.
@@ -1817,6 +1827,11 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
             std::string lowered = cmd->element;
             std::transform(lowered.begin(), lowered.end(), lowered.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (lowered == "thin_plane" ||
+                lowered.find("decal") != std::string::npos ||
+                lowered.find("lane") != std::string::npos) {
+                elemCmd.isDecal = true;
+            }
             if (!cmd->hasElementScale &&
                 (lowered == "grass_blade" || lowered == "grass blade" || lowered == "grass")) {
                 elemCmd.scale = glm::vec3(0.05f, 0.6f, 0.4f);

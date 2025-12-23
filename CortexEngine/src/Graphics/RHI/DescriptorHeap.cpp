@@ -160,10 +160,7 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
         return Result<DescriptorHandle>::Err("Descriptor heap exhausted");
     }
 
-    if (m_frameActive && m_transientActive) {
-        spdlog::warn("Persistent descriptor allocation requested after transient use; retry next frame to avoid aliasing");
-        return Result<DescriptorHandle>::Err("Persistent allocation unsafe after transient descriptors were allocated");
-    }
+    const bool transientUsedThisFrame = (m_frameActive && m_transientActive);
 
     // Ensure persistent allocations cannot encroach into transient segments that may
     // still be referenced by in-flight command lists. We enforce a fixed reserved
@@ -173,6 +170,16 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
         m_cbvSrvUavPersistentReserved = std::min(CBV_SRV_UAV_PERSISTENT_RESERVE, capacity);
     }
     if (m_cbvSrvUavPersistentCount >= m_cbvSrvUavPersistentReserved) {
+        // Growing the persistent reserve changes the start of transient segments.
+        // If we've already handed out transient descriptors this frame, growing the
+        // reserve would risk aliasing those in-flight transient tables. In that case,
+        // force callers (async streaming) to retry on a later frame.
+        if (transientUsedThisFrame) {
+            spdlog::warn("CBV_SRV_UAV persistent reserve exhausted mid-frame (used={}, reserve={}); retry next frame to avoid transient aliasing",
+                         m_cbvSrvUavPersistentCount, m_cbvSrvUavPersistentReserved);
+            return Result<DescriptorHandle>::Err("Persistent reserve exhausted after transient allocations");
+        }
+
         if (m_frameActive && m_flushCallback) {
             m_flushCallback();
         }
@@ -219,8 +226,13 @@ Result<DescriptorHandle> DescriptorHeapManager::AllocateCBV_SRV_UAV() {
     }
 
     if (m_frameActive) {
-        UpdateTransientSegment();
-        m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+        // If transient descriptors have already been allocated this frame, do NOT
+        // reset the ring cursor back to the transient segment start, or we'd risk
+        // overwriting descriptors already referenced by the command list being recorded.
+        if (!transientUsedThisFrame) {
+            UpdateTransientSegment();
+            m_cbvSrvUavHeap.ResetFrom(m_transientSegmentStart);
+        }
     } else {
         // Keep the transient region reserved even outside of a frame so that
         // background loading cannot overwrite descriptors that may be used for

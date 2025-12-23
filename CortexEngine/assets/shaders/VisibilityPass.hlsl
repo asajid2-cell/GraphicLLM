@@ -103,8 +103,17 @@ PSInput VSMain(VSInput input) {
 PSOutput PSMain(PSInput input, uint primitiveID : SV_PrimitiveID) {
     PSOutput output;
 
-    // Output visibility buffer payload (primitiveID within this draw + instanceID).
-    output.visibilityData = uint2(primitiveID, input.instanceID);
+    // Output visibility buffer payload (triangleID within the instance + instanceID).
+    // NOTE: For instanced draws, some backends expose SV_PrimitiveID as a global
+    // primitive counter across all instances. Convert to a per-instance triangle
+    // ID using the instance's indexCount so the resolve pass can safely index.
+    uint triangleID = primitiveID;
+    VBInstanceData instance = g_Instances[input.instanceID];
+    const uint triCount = instance.indexCount / 3u;
+    if (triCount > 0u) {
+        triangleID = primitiveID % triCount;
+    }
+    output.visibilityData = uint2(triangleID, input.instanceID);
 
     return output;
 }
@@ -140,6 +149,11 @@ PSOutput PSMainAlphaTest(PSInput input, uint primitiveID : SV_PrimitiveID) {
     }
 
     clip(alpha - cutoff);
-    output.visibilityData = uint2(primitiveID, input.instanceID);
+    uint triangleID = primitiveID;
+    const uint triCount = instance.indexCount / 3u;
+    if (triCount > 0u) {
+        triangleID = primitiveID % triCount;
+    }
+    output.visibilityData = uint2(triangleID, input.instanceID);
     return output;
 }

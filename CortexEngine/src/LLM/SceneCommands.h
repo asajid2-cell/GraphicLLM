@@ -84,6 +84,12 @@ struct AddEntityCommand : public SceneCommand {
     // and place it exactly at the requested position (clamped to world bounds).
     bool disableCollisionAvoidance = false;
 
+    // When true, treat this entity as an overlay/decal: it will be rendered
+    // after opaque geometry using a depth-tested, depth-write-disabled pass.
+    // This is used internally by helpers (e.g., road/lane markings) and does
+    // not require the JSON command schema to expose it.
+    bool isDecal = false;
+
     AddEntityCommand() { type = CommandType::AddEntity; }
     std::string ToString() const override;
 };

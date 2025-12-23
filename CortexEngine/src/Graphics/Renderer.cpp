@@ -1413,12 +1413,6 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     ProcessGpuJobsPerFrame();
     MarkPassComplete("Render_BeforeBeginFrame");
 
-    // Warm per-material descriptor tables *before* BeginFrame() marks the
-    // descriptor heap as transient-active. This avoids mid-frame persistent
-    // allocations, which can trigger costly GPU flushes or fail once transient
-    // allocations have started.
-    PrewarmMaterialDescriptors(registry);
-
     // Common frame setup (depth/HDR resize, command list reset, constant
     // buffer updates) shared by both the classic raster/RT backend and the
     // experimental voxel renderer.
@@ -1437,6 +1431,13 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     m_vbInstances.clear();
     m_vbMeshDraws.clear();
     MarkPassComplete("BeginFrame_Done");
+
+    // Warm per-material descriptor tables after BeginFrame() has waited for the
+    // current frame's transient descriptor segment to become available. This is
+    // required for correctness when descriptors are sourced from per-frame
+    // transient ranges (avoids overwriting in-flight heap entries).
+    PrewarmMaterialDescriptors(registry);
+
     UpdateFrameConstants(deltaTime, registry);
     MarkPassComplete("UpdateFrameConstants_Done");
 
@@ -1619,8 +1620,8 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
 
         // If VB is disabled or fails to produce a lit HDR frame (e.g. no instances),
         // fall back to the existing opaque render paths for robustness.
-        if (!vbEnabled || !m_vbRenderedThisFrame) {
-            if (vbEnabled && !m_vbRenderedThisFrame) {
+         if (!vbEnabled || !m_vbRenderedThisFrame) {
+             if (vbEnabled && !m_vbRenderedThisFrame) {
                 // Ensure depth is writable for the fallback draw path.
                 if (m_depthBuffer && m_depthState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
                     D3D12_RESOURCE_BARRIER barrier{};
@@ -1652,14 +1653,16 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                 spdlog::info("Taking legacy forward rendering path");
                 WriteBreadcrumb(GpuMarker::OpaqueGeometry);
                 RenderScene(registry);
-                MarkPassComplete("RenderScene_Done");
-            }
-        }
-        // Then blended transparent/glass objects, sorted back-to-front.
-        WriteBreadcrumb(GpuMarker::TransparentGeom);
-        RenderTransparent(registry);
-        MarkPassComplete("RenderTransparent_Done");
-    }
+                 MarkPassComplete("RenderScene_Done");
+             }
+         }
+         // Depth-tested overlay/decal pass (lane markings, UI planes, etc.)
+         RenderOverlays(registry);
+         // Then blended transparent/glass objects, sorted back-to-front.
+         WriteBreadcrumb(GpuMarker::TransparentGeom);
+         RenderTransparent(registry);
+         MarkPassComplete("RenderTransparent_Done");
+     }
 
     // Ray-traced reflections require the current frame's normal/roughness
     // buffer, so dispatch them after the main pass has produced it but before
@@ -4950,6 +4953,7 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) continue;
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
             !renderable.mesh->gpuBuffers->vertexBuffer ||
@@ -5181,15 +5185,83 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     // Track previous-frame world matrices for per-object motion vectors.
     static std::unordered_map<uint32_t, glm::mat4> s_prevWorldByEntity;
 
+    auto ensureMeshBindlessSrvs = [&](const std::shared_ptr<Scene::MeshData>& mesh) {
+        if (!mesh || !mesh->gpuBuffers || !m_descriptorManager || !m_device) {
+            return;
+        }
+        auto& gpu = *mesh->gpuBuffers;
+        if (!gpu.vertexBuffer || !gpu.indexBuffer) {
+            return;
+        }
+        if (gpu.vbRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex &&
+            gpu.ibRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex) {
+            return;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
+        rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
+        rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        rawSrv.Buffer.FirstElement = 0;
+        rawSrv.Buffer.StructureByteStride = 0;
+        rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+        const UINT64 vbBytes = gpu.vertexBuffer->GetDesc().Width;
+        const UINT64 ibBytes = gpu.indexBuffer->GetDesc().Width;
+
+        auto vbSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        auto ibSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (vbSrvResult.IsErr() || ibSrvResult.IsErr()) {
+            spdlog::warn("VB: failed to allocate persistent mesh SRVs (vb={}, ib={})",
+                         vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok",
+                         ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok");
+            return;
+        }
+
+        DescriptorHandle vbSrv = vbSrvResult.Value();
+        DescriptorHandle ibSrv = ibSrvResult.Value();
+
+        rawSrv.Buffer.NumElements = static_cast<UINT>(vbBytes / 4u);
+        m_device->GetDevice()->CreateShaderResourceView(gpu.vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
+
+        rawSrv.Buffer.NumElements = static_cast<UINT>(ibBytes / 4u);
+        m_device->GetDevice()->CreateShaderResourceView(gpu.indexBuffer.Get(), &rawSrv, ibSrv.cpu);
+
+        gpu.vbRawSRVIndex = vbSrv.index;
+        gpu.ibRawSRVIndex = ibSrv.index;
+        gpu.vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
+        gpu.indexFormat = 0u; // R32_UINT
+    };
+
     for (auto entity : stableEntities) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) continue;
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
             !renderable.mesh->gpuBuffers->vertexBuffer ||
-            !renderable.mesh->gpuBuffers->indexBuffer) continue;
+            !renderable.mesh->gpuBuffers->indexBuffer) {
+            if (!renderable.mesh->positions.empty() && !renderable.mesh->indices.empty()) {
+                static std::unordered_set<const Scene::MeshData*> s_autoUploadRequested;
+                if (s_autoUploadRequested.insert(renderable.mesh.get()).second) {
+                    auto enqueue = EnqueueMeshUpload(renderable.mesh, "AutoMeshUpload");
+                    if (enqueue.IsErr()) {
+                        spdlog::warn("CollectInstancesForVisibilityBuffer: auto mesh upload enqueue failed: {}", enqueue.Error());
+                    }
+                }
+            }
+            continue;
+        }
+
+        ensureMeshBindlessSrvs(renderable.mesh);
+        if (renderable.mesh->gpuBuffers &&
+            (renderable.mesh->gpuBuffers->vbRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex ||
+             renderable.mesh->gpuBuffers->ibRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex)) {
+            // VB resolve requires bindless SRV indices for the mesh buffers; skip until available.
+            continue;
+        }
 
         // Find or create mesh draw info
         uint32_t meshDrawIndex = 0;
@@ -5520,6 +5592,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     // via SV_CullDistance, so occluded instances do not rasterize.
     D3D12_GPU_VIRTUAL_ADDRESS vbCullMaskAddress = 0;
     if (m_gpuCullingEnabled && m_gpuCulling) {
+        const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
+        m_gpuCulling->SetForceVisible(forceVisible);
+
         const uint32_t maxInstances = m_gpuCulling->GetMaxInstances();
         if (m_vbInstances.size() > maxInstances) {
             spdlog::warn("VB: instance count {} exceeds GPU culling capacity {}; disabling VB cull mask this frame",
@@ -5618,6 +5693,12 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
             }
         }
         }
+    }
+
+    // Debug/escape hatch: allow disabling the VB cull mask without disabling the
+    // entire GPU culling pipeline (helps diagnose missing-geometry reports).
+    if (vbCullMaskAddress != 0 && std::getenv("CORTEX_DISABLE_VB_CULL_MASK") != nullptr) {
+        vbCullMaskAddress = 0;
     }
 
     // One-time debug log for first frame
@@ -6136,12 +6217,26 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         if (!renderable.visible || !renderable.mesh) {
             continue;
         }
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
+            continue;
+        }
         if (IsTransparentRenderable(renderable)) {
             continue;
         }
         if (!renderable.mesh->gpuBuffers ||
             !renderable.mesh->gpuBuffers->vertexBuffer ||
             !renderable.mesh->gpuBuffers->indexBuffer) {
+            // Mesh exists on CPU but hasn't been uploaded yet; enqueue once so
+            // GPU-driven paths don't silently drop newly spawned primitives.
+            if (!renderable.mesh->positions.empty() && !renderable.mesh->indices.empty()) {
+                static std::unordered_set<const Scene::MeshData*> s_autoUploadRequested;
+                if (s_autoUploadRequested.insert(renderable.mesh.get()).second) {
+                    auto enqueue = EnqueueMeshUpload(renderable.mesh, "AutoMeshUpload");
+                    if (enqueue.IsErr()) {
+                        spdlog::warn("RenderSceneIndirect: auto mesh upload enqueue failed: {}", enqueue.Error());
+                    }
+                }
+            }
             continue;
         }
 
@@ -6560,6 +6655,9 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         if (!renderable.visible || !renderable.mesh) {
             continue;
         }
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
+            continue;
+        }
         // Transparent / glass materials are rendered in a dedicated blended
         // pass after all opaque geometry so depth testing and composition
         // behave correctly. Skip them here.
@@ -6817,6 +6915,161 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     }
 }
 
+void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
+    if (!registry || !m_overlayPipeline || !m_hdrColor || !m_depthBuffer) {
+        return;
+    }
+
+    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+    if (view.begin() == view.end()) {
+        return;
+    }
+
+    const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_frameDataCPU.viewProjectionNoJitter);
+
+    // Ensure HDR is writable.
+    if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_hdrColor.Get();
+        barrier.Transition.StateBefore = m_hdrState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrier);
+        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthStencilView.cpu;
+    m_commandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+
+    D3D12_VIEWPORT viewport{};
+    viewport.Width = static_cast<float>(m_window->GetWidth());
+    viewport.Height = static_cast<float>(m_window->GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    D3D12_RECT scissorRect{};
+    scissorRect.left = 0;
+    scissorRect.top = 0;
+    scissorRect.right = static_cast<LONG>(m_window->GetWidth());
+    scissorRect.bottom = static_cast<LONG>(m_window->GetHeight());
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissorRect);
+
+    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    m_commandList->SetPipelineState(m_overlayPipeline->GetPipelineState());
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+
+    if (m_shadowAndEnvDescriptors[0].IsValid()) {
+        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    for (auto entity : view) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (renderable.renderLayer != Scene::RenderableComponent::RenderLayer::Overlay) {
+            continue;
+        }
+        if (IsTransparentRenderable(renderable)) {
+            continue;
+        }
+
+        // Frustum culling to avoid drawing off-screen decals/markings.
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+        if (renderable.mesh->hasBounds) {
+            glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
+            float radiusWS = 1.0f;
+            centerWS = glm::vec3(transform.worldMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+            radiusWS = renderable.mesh->boundsRadius * GetMaxWorldScale(transform.worldMatrix);
+            if (!SphereIntersectsFrustumCPU(frustum, centerWS, radiusWS)) {
+                continue;
+            }
+        }
+
+        EnsureMaterialTextures(renderable);
+
+        MaterialConstants materialData{};
+        materialData.albedo    = renderable.albedoColor;
+        materialData.metallic  = glm::clamp(renderable.metallic, 0.0f, 1.0f);
+        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+        materialData.ao        = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData._pad0     = 0.0f;
+
+        const auto hasAlbedoMap    = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
+        const auto hasNormalMap    = renderable.textures.normal && renderable.textures.normal != m_placeholderNormal;
+        const auto hasMetallicMap  = renderable.textures.metallic && renderable.textures.metallic != m_placeholderMetallic;
+        const auto hasRoughnessMap = renderable.textures.roughness && renderable.textures.roughness != m_placeholderRoughness;
+        const auto hasOcclusionMap = static_cast<bool>(renderable.textures.occlusion);
+        const auto hasEmissiveMap  = static_cast<bool>(renderable.textures.emissive);
+
+        materialData.mapFlags = glm::uvec4(
+            hasAlbedoMap ? 1u : 0u,
+            hasNormalMap ? 1u : 0u,
+            hasMetallicMap ? 1u : 0u,
+            hasRoughnessMap ? 1u : 0u);
+        materialData.mapFlags2 = glm::uvec4(
+            hasOcclusionMap ? 1u : 0u,
+            hasEmissiveMap ? 1u : 0u,
+            0u,
+            0u);
+
+        materialData.emissiveFactorStrength = glm::vec4(
+            glm::max(renderable.emissiveColor, glm::vec3(0.0f)),
+            std::max(renderable.emissiveStrength, 0.0f));
+        materialData.extraParams = glm::vec4(
+            glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+            std::max(renderable.normalScale, 0.0f),
+            0.0f,
+            0.0f);
+
+        FillMaterialTextureIndices(renderable, materialData);
+
+        ObjectConstants objectData{};
+        objectData.modelMatrix  = transform.GetMatrix();
+        objectData.normalMatrix = transform.GetNormalMatrix();
+
+        D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
+
+        m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+        m_commandList->SetGraphicsRootConstantBufferView(2, materialCB);
+
+        if (!renderable.textures.gpuState ||
+            !renderable.textures.gpuState->descriptors[0].IsValid()) {
+            continue;
+        }
+        m_commandList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+
+        if (renderable.mesh->gpuBuffers &&
+            renderable.mesh->gpuBuffers->vertexBuffer &&
+            renderable.mesh->gpuBuffers->indexBuffer) {
+            D3D12_VERTEX_BUFFER_VIEW vbv{};
+            vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+            vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+            vbv.StrideInBytes = sizeof(Vertex);
+
+            D3D12_INDEX_BUFFER_VIEW ibv{};
+            ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+            ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+            ibv.Format = DXGI_FORMAT_R32_UINT;
+
+            m_commandList->IASetVertexBuffers(0, 1, &vbv);
+            m_commandList->IASetIndexBuffer(&ibv);
+            m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+        }
+    }
+}
+
 void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     if (!registry || !m_transparentPipeline) {
         return;
@@ -6845,6 +7098,9 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         auto& transform  = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
             continue;
         }
         if (!IsTransparentRenderable(renderable)) {
@@ -8836,48 +9092,15 @@ void Renderer::PrewarmMaterialDescriptors(Scene::ECS_Registry* registry) {
     for (auto entity : view) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
 
-        if (!renderable.mesh) {
+        if (!renderable.visible || !renderable.mesh) {
             continue;
         }
 
         EnsureMaterialTextures(renderable);
-
-        bool texturesChanged = false;
-        if (renderable.textures.gpuState) {
-            std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> sources = {
-                renderable.textures.albedo ? renderable.textures.albedo : m_placeholderAlbedo,
-                renderable.textures.normal ? renderable.textures.normal : m_placeholderNormal,
-                renderable.textures.metallic ? renderable.textures.metallic : m_placeholderMetallic,
-                renderable.textures.roughness ? renderable.textures.roughness : m_placeholderRoughness,
-                renderable.textures.occlusion,
-                renderable.textures.emissive,
-                renderable.textures.transmission,
-                renderable.textures.clearcoat,
-                renderable.textures.clearcoatRoughness,
-                renderable.textures.specular,
-                renderable.textures.specularColor
-            };
-
-            for (size_t i = 0; i < sources.size(); ++i) {
-                auto previous = renderable.textures.gpuState->sourceTextures[i].lock();
-                if (previous != sources[i]) {
-                    texturesChanged = true;
-                    break;
-                }
-            }
-        } else {
-            texturesChanged = true;
-        }
-
-        const bool hasDescriptors = renderable.textures.gpuState &&
-                                    renderable.textures.gpuState->descriptors[0].IsValid();
-        const bool needsRefresh = !hasDescriptors ||
-                                  texturesChanged ||
-                                  (renderable.textures.gpuState &&
-                                   !renderable.textures.gpuState->descriptorsReady);
-        if (needsRefresh) {
-            RefreshMaterialDescriptors(renderable);
-        }
+        // Material descriptor tables are built from the per-frame transient
+        // segment, which is reset each BeginFrame(). Rebuild every frame for
+        // any renderable that might be drawn this frame.
+        RefreshMaterialDescriptors(renderable);
     }
 }
 
@@ -8893,17 +9116,15 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         return;
     }
 
-    // Allocate descriptors once per material and reuse them; textures can change,
-    // but we simply overwrite the descriptor contents.
-    if (!state.descriptors[0].IsValid()) {
-        for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
-            auto handleResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                spdlog::error("Failed to allocate material descriptor: {}", handleResult.Error());
-                return;
-            }
-            state.descriptors[i] = handleResult.Value();
-        }
+    auto baseResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(MaterialGPUState::kSlotCount);
+    if (baseResult.IsErr()) {
+        state.descriptorsReady = false;
+        spdlog::warn("Failed to allocate transient material descriptor table: {}", baseResult.Error());
+        return;
+    }
+    const DescriptorHandle base = baseResult.Value();
+    for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
+        state.descriptors[i] = m_descriptorManager->GetCBV_SRV_UAVHandle(base.index + i);
     }
 
     std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> sources = {
@@ -10926,6 +11147,31 @@ Result<void> Renderer::CreateCommandList() {
         }
     } else {
         m_transparentPipeline.reset();
+    }
+
+    // Overlay/decal pipeline: HDR-only, depth-tested, depth writes disabled, with a
+    // small negative depth bias to reduce coplanar z-fighting for markings/decals.
+    if (psTransparentResult.IsOk()) {
+        m_overlayPipeline = std::make_unique<DX12Pipeline>();
+        PipelineDesc overlayDesc = pipelineDesc;
+        overlayDesc.pixelShader = psTransparentResult.Value();
+        overlayDesc.numRenderTargets = 1; // HDR only
+        overlayDesc.blendEnabled = false;
+        overlayDesc.depthWriteEnabled = false;
+        overlayDesc.depthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        overlayDesc.depthBias = -1;
+        overlayDesc.slopeScaledDepthBias = -1.0f;
+
+        auto overlayResult = m_overlayPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            overlayDesc);
+        if (overlayResult.IsErr()) {
+            spdlog::warn("Failed to create overlay pipeline: {}", overlayResult.Error());
+            m_overlayPipeline.reset();
+        }
+    } else {
+        m_overlayPipeline.reset();
     }
 
     // Depth-only pipeline for prepass: reuse the main vertex shader and

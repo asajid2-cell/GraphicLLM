@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -101,6 +102,11 @@ struct MeshData {
 
 // Renderable Component - What to draw
 struct RenderableComponent {
+    enum class RenderLayer : uint8_t {
+        Opaque = 0,
+        Overlay = 1, // Decals / markings rendered after opaque depth
+    };
+
     std::shared_ptr<MeshData> mesh;
     struct MaterialTextures {
         std::shared_ptr<Cortex::Graphics::DX12Texture> albedo;
@@ -161,6 +167,7 @@ struct RenderableComponent {
 
     // Visibility
     bool visible = true;
+    RenderLayer renderLayer = RenderLayer::Opaque;
 };
 
 // Rotation Component - For spinning cube demo

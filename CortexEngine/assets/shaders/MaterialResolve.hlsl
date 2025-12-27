@@ -112,49 +112,98 @@ SamplerState g_Sampler : register(s0);
 
 static const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
 
-float2 ComputeUVGrad(float2 uv0, float2 uv1, float2 uv2,
-                     float2 screen0, float2 screen1, float2 screen2,
-                     bool wantDx)
+// Compute perspective-correct UV gradients for proper mip selection.
+// This is critical for VB renderers - wrong gradients cause texture shimmer.
+//
+// The key insight is that we need gradients of the PERSPECTIVE-CORRECT UVs,
+// not just screen-space gradients. The perspective-correct UV at a pixel is:
+//   UV = (b0*UV0/w0 + b1*UV1/w1 + b2*UV2/w2) / (b0/w0 + b1/w1 + b2/w2)
+// where b0,b1,b2 are screen-space barycentrics and w0,w1,w2 are clip.w values.
+//
+// For stability, we compute gradients using the Jacobian of the screen-to-UV mapping.
+struct UVGradients {
+    float2 ddx;
+    float2 ddy;
+};
+
+UVGradients ComputePerspectiveCorrectUVGradients(
+    float2 uv0, float2 uv1, float2 uv2,
+    float2 screen0, float2 screen1, float2 screen2,
+    float w0, float w1, float w2)
 {
-    // Compute dUV/dx and dUV/dy from triangle UVs and screen-space positions.
-    // screen* are in normalized [0,1]; convert to pixel units for stability.
+    UVGradients result;
+    result.ddx = float2(0.0f, 0.0f);
+    result.ddy = float2(0.0f, 0.0f);
+
+    // Convert screen coords to pixel units for numerical stability
     float2 p0 = screen0 * float2((float)g_Width, (float)g_Height);
     float2 p1 = screen1 * float2((float)g_Width, (float)g_Height);
     float2 p2 = screen2 * float2((float)g_Width, (float)g_Height);
 
-    float2 dp1 = p1 - p0;
-    float2 dp2 = p2 - p0;
-    float2 duv1 = uv1 - uv0;
-    float2 duv2 = uv2 - uv0;
+    // Edge vectors in screen space
+    float2 e01 = p1 - p0;
+    float2 e02 = p2 - p0;
 
-    float det = dp1.x * dp2.y - dp1.y * dp2.x;
-    if (abs(det) < 1e-8f) {
-        return float2(0.0f, 0.0f);
+    // Triangle area (2x) via cross product
+    float area2 = e01.x * e02.y - e01.y * e02.x;
+    if (abs(area2) < 1e-6f) {
+        return result; // Degenerate triangle
     }
-    float invDet = 1.0f / det;
+    float invArea2 = 1.0f / area2;
 
-    float2 dUVdx = (duv1 * dp2.y - duv2 * dp1.y) * invDet;
-    float2 dUVdy = (-duv1 * dp2.x + duv2 * dp1.x) * invDet;
-    return wantDx ? dUVdx : dUVdy;
+    // Compute perspective-correct UV values at vertices (UV/w)
+    float2 uvOverW0 = uv0 / w0;
+    float2 uvOverW1 = uv1 / w1;
+    float2 uvOverW2 = uv2 / w2;
+    float invW0 = 1.0f / w0;
+    float invW1 = 1.0f / w1;
+    float invW2 = 1.0f / w2;
+
+    // Gradient of 1/w across screen space
+    float dInvWdx = (invW1 - invW0) * e02.y * invArea2 - (invW2 - invW0) * e01.y * invArea2;
+    float dInvWdy = -(invW1 - invW0) * e02.x * invArea2 + (invW2 - invW0) * e01.x * invArea2;
+
+    // Gradient of UV/w across screen space
+    float2 dUVOverWdx = (uvOverW1 - uvOverW0) * e02.y * invArea2 - (uvOverW2 - uvOverW0) * e01.y * invArea2;
+    float2 dUVOverWdy = -(uvOverW1 - uvOverW0) * e02.x * invArea2 + (uvOverW2 - uvOverW0) * e01.x * invArea2;
+
+    // Apply quotient rule: d(UV) = d(UV/w) / (1/w) - UV * d(1/w) / (1/w)
+    // Simplified: d(UV) = w * d(UV/w) - UV * w * d(1/w)
+    // At the center of the triangle (approximate), use average values
+    float wAvg = (w0 + w1 + w2) / 3.0f;
+    float2 uvAvg = (uv0 + uv1 + uv2) / 3.0f;
+
+    result.ddx = wAvg * dUVOverWdx - uvAvg * wAvg * dInvWdx;
+    result.ddy = wAvg * dUVOverWdy - uvAvg * wAvg * dInvWdy;
+
+    // Clamp gradients to prevent extreme mip selection (prevents shimmer)
+    const float maxGrad = 4.0f; // Maximum 4 texels per pixel
+    result.ddx = clamp(result.ddx, -maxGrad, maxGrad);
+    result.ddy = clamp(result.ddy, -maxGrad, maxGrad);
+
+    return result;
 }
 
-// Simple global minimum roughness for metallic surfaces.
-// This prevents disco ball effect by ensuring uniform roughness across all triangles.
-//
-// Key insight: Per-triangle varying GSAA actually CAUSES the disco ball effect because
-// adjacent triangles get different roughness values based on their vertex normals,
-// leading to different specular brightness per triangle.
-//
-// Solution: Apply a uniform roughness floor that doesn't vary per-triangle.
-// All triangles on the same material get identical treatment = no disco ball.
+// Global minimum roughness floor to prevent disco ball effect.
+// The disco ball effect on metallic surfaces is caused by the specular lobe being
+// too sharp, making per-triangle normal variations visible as brightness differences.
+// A minimum roughness floor ensures the specular lobe is wide enough to hide these.
+float ApplyRoughnessFloor(float baseRoughness)
+{
+    // Minimum roughness for ALL surfaces.
+    // This ensures specular highlights are spread enough to hide discretization.
+    const float kMinRoughness = 0.08f;  // Small floor for non-metals
+    return max(baseRoughness, kMinRoughness);
+}
+
 float ApplyMetallicRoughnessFloor(float baseRoughness, float metallic)
 {
-    // Minimum roughness floor for metallic surfaces.
-    // Higher metallic = higher floor (mirrors show every imperfection).
-    // 0.15 corresponds to slightly brushed metal - realistic for most real-world metals.
-    const float kMetallicMinRoughness = 0.15f;  // Tunable: 0.10-0.20
+    // Additional roughness floor for metallic surfaces.
+    // Metals have strong specular and no diffuse, so they need more roughness.
+    const float kMetallicMinRoughness = 0.25f;  // Tunable: 0.20-0.35
     float minRoughness = metallic * kMetallicMinRoughness;
-    return max(baseRoughness, minRoughness);
+    float floor = max(kMetallicMinRoughness * 0.3f, minRoughness); // At least 7.5% for any metallic
+    return max(baseRoughness, floor);
 }
 
 // Load a vertex from the per-mesh vertex buffer (raw SRV -> ByteAddressBuffer)
@@ -207,42 +256,40 @@ float3 ReconstructWorldPosition(float2 uv, float depth, float4x4 invViewProj) {
     return worldPos.xyz / worldPos.w;
 }
 
-// Compute barycentric coordinates for a point inside a triangle (2D screen space version)
+// Compute screen-space barycentrics using edge functions.
+// This matches the GPU rasterizer's approach for determining triangle coverage.
+// Edge functions are more numerically stable for thin triangles.
 float3 ComputeScreenSpaceBarycentrics(float2 p, float2 v0, float2 v1, float2 v2) {
-    float2 e0 = v1 - v0;
-    float2 e1 = v2 - v0;
-    float2 e2 = p - v0;
+    // Use edge function (signed area) method - same as GPU rasterizers
+    // Edge function E(p) = (p - v0) x (v1 - v0) where x is 2D cross product
 
-    float d00 = dot(e0, e0);
-    float d01 = dot(e0, e1);
-    float d11 = dot(e1, e1);
-    float d20 = dot(e2, e0);
-    float d21 = dot(e2, e1);
+    // Edge vectors
+    float2 e01 = v1 - v0;  // Edge from v0 to v1
+    float2 e12 = v2 - v1;  // Edge from v1 to v2
+    float2 e20 = v0 - v2;  // Edge from v2 to v0
 
-    float denom = d00 * d11 - d01 * d01;
+    // Vectors from each vertex to point p
+    float2 d0 = p - v0;
+    float2 d1 = p - v1;
+    float2 d2 = p - v2;
+
+    // Edge functions (2D cross products give signed areas)
+    // These are proportional to the barycentric weights
+    float w0 = e12.x * d1.y - e12.y * d1.x;  // Area opposite to v0
+    float w1 = e20.x * d2.y - e20.y * d2.x;  // Area opposite to v1
+    float w2 = e01.x * d0.y - e01.y * d0.x;  // Area opposite to v2
+
+    // Total signed area (for normalization)
+    float area = w0 + w1 + w2;
 
     // Handle degenerate triangles
-    if (abs(denom) < 1e-7) {
-        return float3(0.33, 0.33, 0.34);
+    if (abs(area) < 1e-10f) {
+        return float3(0.333333f, 0.333333f, 0.333334f);
     }
 
-    float v = (d11 * d20 - d01 * d21) / denom;
-    float w = (d00 * d21 - d01 * d20) / denom;
-    float u = 1.0 - v - w;
-
-    return float3(u, v, w);
-}
-
-// Compute screen-space derivatives for texture sampling
-void ComputeScreenSpaceDerivatives(
-    float2 uv0, float2 uv1, float2 uv2,
-    float3 bary,
-    out float2 ddx, out float2 ddy
-) {
-    // Approximate derivatives using barycentric gradients
-    // This is a simplified version - proper implementation would use screen-space gradients
-    ddx = (uv1 - uv0) * g_RcpWidth * 2.0;
-    ddy = (uv2 - uv0) * g_RcpHeight * 2.0;
+    // Normalize to get barycentrics that sum to 1
+    float invArea = 1.0f / area;
+    return float3(w0 * invArea, w1 * invArea, w2 * invArea);
 }
 
 // Compute shader: One thread per pixel
@@ -341,13 +388,8 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         bary = baryPersp / baryPerspSum;
     }
 
-    // Clamp to valid range for safety, then renormalize to ensure sum = 1.0
-    // This prevents interpolation errors at triangle edges due to floating point precision
-    bary = max(bary, 0.0f);
-    float barySum = bary.x + bary.y + bary.z;
-    if (barySum > 1e-7) {
-        bary /= barySum;
-    }
+    // Clamp to valid range for safety (saturate clamps each component to [0,1])
+    bary = saturate(bary);
 
     // Interpolate vertex attributes using barycentric coordinates
     float2 texCoord = v0.texCoord * bary.x + v1.texCoord * bary.y + v2.texCoord * bary.z;
@@ -411,8 +453,14 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             (mat.textureIndices3.w != INVALID_BINDLESS_INDEX) ||
             (mat.textureIndices4.x != INVALID_BINDLESS_INDEX);
         if (wantsGrad) {
-            ddxUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, true);
-            ddyUV = ComputeUVGrad(v0.texCoord, v1.texCoord, v2.texCoord, screen0, screen1, screen2, false);
+            // Use perspective-correct UV gradients for proper mip selection.
+            // This prevents texture shimmer that occurs when gradients ignore perspective.
+            UVGradients uvGrad = ComputePerspectiveCorrectUVGradients(
+                v0.texCoord, v1.texCoord, v2.texCoord,
+                screen0, screen1, screen2,
+                clipPos0.w, clipPos1.w, clipPos2.w);
+            ddxUV = uvGrad.ddx;
+            ddyUV = uvGrad.ddy;
         }
 
         if (mat.textureIndices.x != INVALID_BINDLESS_INDEX) {
@@ -521,13 +569,14 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         specularColor = saturate(specularColor);
     }
 
-    // Apply global minimum roughness floor to prevent disco ball effect on metals.
-    // Key insight: Per-triangle varying roughness CAUSES disco ball, not fixes it.
-    // A uniform floor ensures all triangles have identical specular response.
+    // Apply roughness floors to prevent disco ball effect.
+    // First apply a small floor for all surfaces, then an additional metallic-specific floor.
     {
+        roughness = ApplyRoughnessFloor(roughness);
         roughness = ApplyMetallicRoughnessFloor(roughness, metallic);
 
         if (clearCoatWeight > 0.01f) {
+            clearCoatRoughness = ApplyRoughnessFloor(clearCoatRoughness);
             clearCoatRoughness = ApplyMetallicRoughnessFloor(clearCoatRoughness, metallic);
         }
     }

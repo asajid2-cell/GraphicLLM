@@ -126,28 +126,42 @@ uint3 LoadTriangleIndices(ByteAddressBuffer indexBuffer, uint triangleID, uint f
     return indices;
 }
 
+// Compute screen-space barycentrics using edge functions.
+// This matches the GPU rasterizer's approach for determining triangle coverage.
+// Edge functions are more numerically stable for thin triangles.
 float3 ComputeScreenSpaceBarycentrics(float2 p, float2 v0, float2 v1, float2 v2)
 {
-    float2 e0 = v1 - v0;
-    float2 e1 = v2 - v0;
-    float2 e2 = p - v0;
+    // Use edge function (signed area) method - same as GPU rasterizers
+    // Edge function E(p) = (p - v0) x (v1 - v0) where x is 2D cross product
 
-    float d00 = dot(e0, e0);
-    float d01 = dot(e0, e1);
-    float d11 = dot(e1, e1);
-    float d20 = dot(e2, e0);
-    float d21 = dot(e2, e1);
+    // Edge vectors
+    float2 e01 = v1 - v0;  // Edge from v0 to v1
+    float2 e12 = v2 - v1;  // Edge from v1 to v2
+    float2 e20 = v0 - v2;  // Edge from v2 to v0
 
-    float denom = d00 * d11 - d01 * d01;
-    if (abs(denom) < 1e-7f)
+    // Vectors from each vertex to point p
+    float2 d0 = p - v0;
+    float2 d1 = p - v1;
+    float2 d2 = p - v2;
+
+    // Edge functions (2D cross products give signed areas)
+    // These are proportional to the barycentric weights
+    float w0 = e12.x * d1.y - e12.y * d1.x;  // Area opposite to v0
+    float w1 = e20.x * d2.y - e20.y * d2.x;  // Area opposite to v1
+    float w2 = e01.x * d0.y - e01.y * d0.x;  // Area opposite to v2
+
+    // Total signed area (for normalization)
+    float area = w0 + w1 + w2;
+
+    // Handle degenerate triangles
+    if (abs(area) < 1e-10f)
     {
-        return float3(0.33f, 0.33f, 0.34f);
+        return float3(0.333333f, 0.333333f, 0.333334f);
     }
 
-    float v = (d11 * d20 - d01 * d21) / denom;
-    float w = (d00 * d21 - d01 * d20) / denom;
-    float u = 1.0f - v - w;
-    return float3(u, v, w);
+    // Normalize to get barycentrics that sum to 1
+    float invArea = 1.0f / area;
+    return float3(w0 * invArea, w1 * invArea, w2 * invArea);
 }
 
 [numthreads(8, 8, 1)]

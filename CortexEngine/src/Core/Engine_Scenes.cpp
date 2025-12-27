@@ -59,6 +59,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     if (m_renderer) {
         m_renderer->ResetTemporalHistoryForSceneChange();
         // Procedural terrain currently renders via the classic forward path.
+        // Keep VB disabled for this preset until we revisit terrain integration.
         m_renderer->SetVisibilityBufferEnabled(preset != ScenePreset::ProceduralTerrain);
     }
 
@@ -165,9 +166,19 @@ void Engine::BuildProceduralTerrainScene() {
     m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
 
     auto& cameraTransform = m_registry->AddComponent<TransformComponent>(cameraEntity);
-    cameraTransform.position = glm::vec3(0.0f, 1.6f, 0.0f);
-    cameraTransform.rotation = glm::quatLookAt(glm::vec3(0.0f, 0.0f, 1.0f),
-                                               glm::vec3(0.0f, 1.0f, 0.0f));
+    // Start slightly above the generated ground so traversal feels grounded.
+    Scene::TerrainNoiseParams p;
+    p.seed = m_terrainSeed;
+    p.amplitude = m_terrainAmplitude;
+    p.frequency = m_terrainFrequency;
+    p.octaves = m_terrainOctaves;
+    p.lacunarity = m_terrainLacunarity;
+    p.gain = m_terrainGain;
+    p.warp = m_terrainWarp;
+    const float groundY = Scene::SampleTerrainHeight(0.0, 0.0, p);
+    cameraTransform.position = glm::vec3(0.0f, groundY + 2.0f, -6.0f);
+    cameraTransform.rotation = glm::quatLookAtLH(glm::vec3(0.0f, 0.0f, 1.0f),
+                                                 glm::vec3(0.0f, 1.0f, 0.0f));
 
     auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
     camera.fov = 70.0f;
@@ -176,94 +187,42 @@ void Engine::BuildProceduralTerrainScene() {
     camera.isActive = true;
 
     if (renderer) {
-        renderer->SetSunDirection(glm::normalize(glm::vec3(0.3f, -1.0f, 0.2f)));
+        // Renderer convention: direction points from surface to light (toward the sun).
+        renderer->SetSunDirection(glm::normalize(glm::vec3(0.3f, 1.0f, 0.2f)));
         renderer->SetSunColor(glm::vec3(1.0f));
-        renderer->SetSunIntensity(5.0f);
-        renderer->SetEnvironmentPreset("studio");
-        renderer->SetIBLEnabled(true);
-        renderer->SetFogEnabled(true);
-        renderer->SetFogParams(0.003f, 0.0f, 0.12f);
-        renderer->SetGodRayIntensity(0.7f);
-    }
-
-    // Clipmap meshes (level 0 = full grid; levels 1+ = ring grid with inner hole).
-    auto grid0 = Utils::MeshGenerator::CreateTerrainClipmapGrid(m_terrainGridDim, false, true);
-    auto ring = Utils::MeshGenerator::CreateTerrainClipmapGrid(m_terrainGridDim, true, true);
-
-    if (renderer) {
-        auto r0 = renderer->UploadMesh(grid0);
-        if (r0.IsErr()) {
-            spdlog::warn("Failed to upload terrain grid mesh: {}", r0.Error());
-            grid0.reset();
-        }
-        auto r1 = renderer->UploadMesh(ring);
-        if (r1.IsErr()) {
-            spdlog::warn("Failed to upload terrain ring mesh: {}", r1.Error());
-            ring.reset();
-        }
-        if (renderer->IsDeviceRemoved()) {
-            spdlog::error("DX12 device removed while uploading terrain meshes; aborting terrain scene build.");
-            return;
-        }
-    }
-
-    if (!grid0 || !grid0->gpuBuffers || !ring || !ring->gpuBuffers) {
-        spdlog::warn("Terrain clipmap meshes unavailable; skipping terrain build.");
-        return;
+        renderer->SetSunIntensity(7.5f);
+        // Disable IBL/skybox for this scene; use an explicit ambient term so
+        // the world reads as an outdoor map rather than "floating in IBL".
+        renderer->SetIBLEnabled(false);
+        renderer->SetAmbientLight(glm::vec3(0.35f, 0.45f, 0.55f), 0.55f);
+        renderer->SetExposure(1.15f);
+        renderer->SetFogEnabled(false);
+        renderer->SetGodRayIntensity(0.0f);
     }
 
     m_terrainEnabled = true;
     m_terrainLevelEntities.clear();
+    ClearProceduralTerrainChunks();
 
-    const uint32_t levels = std::max(1u, m_terrainLevels);
-    for (uint32_t level = 0; level < levels; ++level) {
+    // Pre-create a bounded pool of chunk entities so we can stream the world
+    // without unbounded entity growth.
+    const int32_t r = static_cast<int32_t>(std::max(1u, m_terrainChunkRadiusFar));
+    const uint32_t poolCount = static_cast<uint32_t>((2 * r + 1) * (2 * r + 1));
+    m_terrainChunkPool.clear();
+    m_terrainChunkPool.reserve(poolCount);
+
+    for (uint32_t i = 0; i < poolCount; ++i) {
         entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "Terrain_L" + std::to_string(level));
-
+        m_registry->AddComponent<Scene::TagComponent>(e, "TerrainChunkPool");
         auto& t = m_registry->AddComponent<TransformComponent>(e);
         t.position = glm::vec3(0.0f);
-        const float spacing = m_terrainBaseSpacing * static_cast<float>(1u << std::min(level, 30u));
-        t.scale = glm::vec3(spacing, 1.0f, spacing);
-        t.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
-        r.mesh = (level == 0) ? grid0 : ring;
-        r.albedoColor = glm::vec4(0.45f, 0.55f, 0.35f, 1.0f);
-        r.metallic = 0.0f;
-        r.roughness = 0.85f;
-        r.ao = 1.0f;
-        r.presetName = "terrain";
-
-        Scene::TerrainClipmapLevelComponent lvl{};
-        lvl.level = level;
-        lvl.isRing = (level == 0) ? 0u : 1u;
-        m_registry->AddComponent<Scene::TerrainClipmapLevelComponent>(e, lvl);
-
-        m_terrainLevelEntities.push_back(e);
+        auto& rComp = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        rComp.visible = false;
+        m_terrainChunkPool.push_back(e);
     }
 
-    // A few reference primitives for scale and to exercise PBR shading.
-    auto cubeMesh = Utils::MeshGenerator::CreateCube();
-    if (renderer) {
-        auto upload = renderer->UploadMesh(cubeMesh);
-        if (upload.IsErr()) {
-            cubeMesh.reset();
-        }
-    }
-    if (cubeMesh && cubeMesh->gpuBuffers) {
-        entt::entity ref = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(ref, "ReferenceCube");
-        auto& t = m_registry->AddComponent<TransformComponent>(ref);
-        t.position = glm::vec3(0.0f, 1.0f, 4.0f);
-        t.scale = glm::vec3(1.0f);
-        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ref);
-        r.mesh = cubeMesh;
-        r.albedoColor = glm::vec4(0.9f, 0.2f, 0.2f, 1.0f);
-        r.metallic = 0.0f;
-        r.roughness = 0.4f;
-        r.ao = 1.0f;
-        r.presetName = "painted_plastic";
-    }
+    // One-shot build around the starting camera so the scene is immediately tangible.
+    UpdateProceduralTerrainChunks();
 }
 
 void Engine::BuildCornellScene() {
@@ -1912,6 +1871,12 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::RTShowcase) {
         pos = glm::vec3(0.0f, 3.5f, -13.0f);
         target = glm::vec3(0.0f, 1.5f, 0.0f);
+    } else if (m_currentScenePreset == ScenePreset::ProceduralTerrain) {
+        // Start above the ground and slightly back so the clipmap terrain is
+        // immediately visible while still feeling like an outdoors traversal
+        // scene (as opposed to the hero/demo camera defaults).
+        pos = glm::vec3(0.0f, 12.0f, -28.0f);
+        target = glm::vec3(0.0f, 2.0f, 0.0f);
     } else {
         pos = glm::vec3(0.0f, 3.0f, -8.0f);
         target = glm::vec3(0.0f, 1.0f, kHeroPoolZ);
@@ -1924,7 +1889,7 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     }
 
     transform.position = pos;
-    transform.rotation = glm::quatLookAt(forward, up);
+    transform.rotation = glm::quatLookAtLH(forward, up);
 
     forward = glm::normalize(forward);
     m_cameraYaw = std::atan2(forward.x, forward.z);

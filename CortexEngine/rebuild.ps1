@@ -55,6 +55,15 @@ if (-not (Test-Path $buildDir)) {
 
 Push-Location $buildDir
 
+$hasNinja = Test-Path (Join-Path $buildDir "build.ninja")
+$hasVsProjects = Test-Path (Join-Path $buildDir "ALL_BUILD.vcxproj")
+if (-not $hasNinja -and -not $hasVsProjects) {
+    Write-Host "[ERROR] Build folder exists but no generated build files were found (missing build.ninja / ALL_BUILD.vcxproj)." -ForegroundColor Red
+    Write-Host "        Run .\\setup.ps1 (recommended) or re-run CMake configure to generate the build system." -ForegroundColor Yellow
+    Pop-Location
+    exit 1
+}
+
 if ($Clean) {
     Write-Host "Cleaning..." -ForegroundColor Gray
     & cmake --build . --config $Config --target clean | Out-Null

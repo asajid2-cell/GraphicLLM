@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Scene/Components.h"
+#include "Scene/TerrainNoise.h"
 #include <memory>
 
 namespace Cortex::Utils {
@@ -50,6 +51,18 @@ public:
     // - When `ring` is true, a centered hole of size (gridDim+1)/2 is cut out.
     // - Skirt vertices are marked by `texCoord.y = 1` (base grid vertices use 0).
     static std::shared_ptr<Scene::MeshData> CreateTerrainClipmapGrid(uint32_t gridDim, bool ring, bool skirts = true);
+
+    // CPU-generated heightmap terrain chunk for the forward renderer.
+    // The mesh is generated in local space [0..chunkSize] on XZ; the caller
+    // positions it via the entity transform at (chunkX*chunkSize, 0, chunkZ*chunkSize).
+    static std::shared_ptr<Scene::MeshData> CreateTerrainHeightmapChunk(
+        uint32_t gridDim,
+        float chunkSize,
+        int32_t chunkX,
+        int32_t chunkZ,
+        const Scene::TerrainNoiseParams& params,
+        float skirtDepth = 25.0f
+    );
 };
 
 } // namespace Cortex::Utils

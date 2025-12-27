@@ -152,26 +152,58 @@ Write-Step "Initializing git submodules..."
 $projectRoot = $PSScriptRoot
 Push-Location $projectRoot
 
-# FORCE FIX: Re-register submodule if broken
-if (-not (Test-Path "vendor\llama.cpp\.git")) {
-    Write-Info "Submodule not found. Re-registering..."
-    if (-not (Test-Path ".gitmodules")) {
-        Set-Content -Path .gitmodules -Value '[submodule "vendor/llama.cpp"]
-	path = vendor/llama.cpp
-	url = https://github.com/ggerganov/llama.cpp.git'
-    }
-    git submodule sync
-    git submodule update --init --recursive --force
+# llama.cpp is normally a git submodule when CortexEngine is the repo root.
+# In a monorepo/worktree where CortexEngine is a subdirectory, git will ignore
+# CortexEngine/.gitmodules, so we fall back to cloning llama.cpp directly.
+$gitTopLevel = $null
+try {
+    $gitTopLevel = (& git rev-parse --show-toplevel 2>$null).Trim()
+} catch {
+    $gitTopLevel = $null
 }
 
-# CRITICAL: Force update llama.cpp to latest MASTER (Required for Llama 3.2)
-Write-Info "Updating llama.cpp to latest version (fixing Empty Generation bug)..."
-Push-Location vendor/llama.cpp
-git fetch origin
-git checkout master
-git pull origin master
-Pop-Location
-Write-Success "llama.cpp updated to latest master"
+$llamaDir = Join-Path $projectRoot "vendor\\llama.cpp"
+$llamaCMake = Join-Path $llamaDir "CMakeLists.txt"
+
+if (-not (Test-Path $llamaCMake)) {
+    $canUseSubmodules = $false
+    if ($gitTopLevel) {
+        $projectRootFull = (Resolve-Path $projectRoot).Path
+        $gitTopLevelFull = (Resolve-Path $gitTopLevel).Path
+        if ($projectRootFull -eq $gitTopLevelFull) { $canUseSubmodules = $true }
+    }
+
+    if ($canUseSubmodules) {
+        Write-Info "vendor/llama.cpp not initialized; updating submodules..."
+        git submodule sync
+        git submodule update --init --recursive --force
+    } else {
+        Write-Info "vendor/llama.cpp not present; cloning llama.cpp (monorepo/worktree mode)..."
+        if (Test-Path $llamaDir) {
+            try { Remove-Item -Recurse -Force $llamaDir -ErrorAction Stop } catch {}
+        }
+        & git clone --depth 1 https://github.com/ggerganov/llama.cpp.git $llamaDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to clone llama.cpp into $llamaDir"
+            Pop-Location
+            exit 1
+        }
+    }
+}
+
+if (Test-Path $llamaCMake) {
+    Write-Info "Updating llama.cpp to latest master..."
+    Push-Location $llamaDir
+    & git fetch origin
+    & git checkout master
+    & git pull origin master
+    Pop-Location
+    Write-Success "llama.cpp updated"
+} else {
+    Write-Error "llama.cpp is missing (expected $llamaCMake)."
+    Pop-Location
+    exit 1
+}
 
 Pop-Location
 

@@ -3,7 +3,7 @@
 // Output: R32G32_UINT with (primitiveID, instanceID).
 
 // Root signature:
-// b0: View-projection matrix + current mesh index
+// b0: View-projection matrix + per-mesh state + terrain constants
 // t0: Instance data SRV
 // t2: Optional culling mask (ByteAddressBuffer, 1 uint per instance)
 
@@ -14,7 +14,18 @@ cbuffer PerFrameData : register(b0) {
     // When 0, the cull mask is treated as "not bound" and all instances are visible.
     uint g_CullMaskCount;
     uint _pad;
+
+    // Procedural terrain constants (shared with Terrain.hlsl). These are used
+    // only when an instance sets the terrain flag.
+    uint4  g_TerrainSeedAndOctaves; // x=seed, y=octaves
+    float4 g_TerrainParams0;        // x=amplitude, y=frequency, z=lacunarity, w=gain
+    float4 g_TerrainParams1;        // x=warp, y=skirtDepth, z=originHiX, w=originHiZ
+    float4 g_TerrainParams2;        // x=originLoX, y=originLoZ
 };
+
+#include "TerrainNoise.hlsli"
+
+static const uint VB_INSTANCE_FLAG_TERRAIN = 1u;
 
 // Instance data structure (matches VBInstanceData in C++)
 struct VBInstanceData {
@@ -89,9 +100,31 @@ PSInput VSMain(VSInput input) {
     }
     output.cullDist = (visible != 0u) ? 1.0f : -1.0f;
 
-    // Transform to world space then clip space
-    float4 worldPos = mul(instance.worldMatrix, float4(input.position, 1.0));
-    output.position = mul(g_ViewProj, worldPos);
+    // Transform to world space. Procedural terrain instances displace the Y
+    // coordinate using a deterministic height function so the visibility pass
+    // matches the terrain collision/shading path.
+    float3 worldPos = mul(instance.worldMatrix, float4(input.position, 1.0)).xyz;
+    if ((instance.flags & VB_INSTANCE_FLAG_TERRAIN) != 0u) {
+        const uint seed = g_TerrainSeedAndOctaves.x;
+        const int octaves = (int)g_TerrainSeedAndOctaves.y;
+        const float amplitude = g_TerrainParams0.x;
+        const float frequency = g_TerrainParams0.y;
+        const float lacunarity = g_TerrainParams0.z;
+        const float gain = g_TerrainParams0.w;
+        const float warp = g_TerrainParams1.x;
+
+        float2 originHi = float2(g_TerrainParams1.z, g_TerrainParams1.w);
+        float2 originLo = float2(g_TerrainParams2.x, g_TerrainParams2.y);
+        float2 worldXZ = worldPos.xz + originHi + originLo;
+
+        float h = TerrainHeightParams(worldXZ.x, worldXZ.y, seed, octaves, amplitude, frequency, lacunarity, gain, warp);
+        if (input.texCoord.y > 0.5f) {
+            h -= g_TerrainParams1.y; // skirt depth
+        }
+        worldPos.y = h;
+    }
+
+    output.position = mul(g_ViewProj, float4(worldPos, 1.0));
     output.texCoord = input.texCoord;
 
     // Pass through instance ID for pixel shader (no interpolation!)

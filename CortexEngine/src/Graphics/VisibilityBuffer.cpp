@@ -745,7 +745,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     // ========================================================================
     // Visibility Pass Root Signature
     // Matches VisibilityPass.hlsl:
-    //   b0: ViewProjection matrix + mesh index (16 + 4 = 20 dwords)
+    //   b0: ViewProjection matrix + per-mesh state + terrain constants (16 + 4 + 16 = 36 dwords)
     //   t0: Instance data (StructuredBuffer<VBInstanceData>)
     //   t2: Optional culling mask (ByteAddressBuffer)
     // ========================================================================
@@ -756,7 +756,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 20;  // 16 for matrix + 4 for (meshIdx + materialCount + pad2)
+        params[0].Constants.Num32BitValues = 36;  // 16 matrix + 4 per-mesh + 16 terrain constants
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         // t0: Instance buffer SRV (via descriptor)
@@ -796,7 +796,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
     // ========================================================================
     // Alpha-Tested Visibility Pass Root Signature
     // Matches VisibilityPass.hlsl PSMainAlphaTest:
-    //   b0: ViewProjection matrix + mesh index + material count (20 dwords)
+    //   b0: ViewProjection matrix + per-mesh state + terrain constants (36 dwords)
     //   t0: Instance data (StructuredBuffer<VBInstanceData>)
     //   t1: Material constants (StructuredBuffer<VBMaterialConstants>)
     //   t2: Optional culling mask (ByteAddressBuffer)
@@ -808,7 +808,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 20;
+        params[0].Constants.Num32BitValues = 36;
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
@@ -904,11 +904,11 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
 
         D3D12_ROOT_PARAMETER1 params[6] = {};
 
-        // b0: Resolution constants + view-projection matrix + mesh index (4 + 16 + 4 = 24 dwords)
+        // b0: Resolution constants + view-projection matrix + counts + terrain constants (4 + 16 + 4 + 16 = 40 dwords)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 24;  // 4 for resolution + 16 for mat4x4 + 4 for mesh index + padding
+        params[0].Constants.Num32BitValues = 40;
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // t1: Instance data SRV (StructuredBuffer - can use root descriptor)
@@ -2278,12 +2278,14 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
             uint32_t materialCount;
             uint32_t cullMaskCount;
             uint32_t pad;
+            TerrainConstants terrain;
         } perMeshData;
         perMeshData.viewProj = viewProj;
         perMeshData.meshIndex = meshIdx;
         perMeshData.materialCount = m_materialCount;
         perMeshData.cullMaskCount = hasCullMask ? m_instanceCount : 0u;
-        cmdList->SetGraphicsRoot32BitConstants(0, 20, &perMeshData, 0);
+        perMeshData.terrain = m_terrainConstants;
+        cmdList->SetGraphicsRoot32BitConstants(0, 36, &perMeshData, 0);
 
         // Set vertex buffer for this mesh
         D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -2477,6 +2479,7 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         uint32_t materialCount;
         uint32_t meshCount;
         uint32_t pad[2];
+        TerrainConstants terrain;
     } resConsts;
 
     // Param 1 (t1): Instance buffer SRV (root descriptor)
@@ -2659,7 +2662,8 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     resConsts.rcpWidth = 1.0f / static_cast<float>(m_width);
     resConsts.rcpHeight = 1.0f / static_cast<float>(m_height);
     resConsts.viewProj = viewProj;
-    cmdList->SetComputeRoot32BitConstants(0, 24, &resConsts, 0);  // 4 + 16 + 4 = 24 dwords
+    resConsts.terrain = m_terrainConstants;
+    cmdList->SetComputeRoot32BitConstants(0, 40, &resConsts, 0);
 
     // Single fullscreen dispatch; per-pixel mesh selection is driven by instance.meshIndex.
     cmdList->Dispatch(dispatchX, dispatchY, 1);

@@ -112,6 +112,7 @@ public:
 
     // Scene preset controls (used by debug UI / hotkeys)
     void ToggleScenePreset();
+    void ToggleProceduralTerrainPreset();
 
     // Play-in-editor toggle (F5). In play mode the engine runs a grounded FPS
     // controller and captures the mouse; stopping play restores the editor
@@ -273,6 +274,8 @@ private:
     // Play mode (grounded FPS controller)
     // ------------------------------------------------------------
     bool m_playMouseCaptured = false;
+    bool m_editorDroneFlightEnabledBackup = false;
+    bool m_editorCameraControlActiveBackup = false;
     glm::vec3 m_playerVelocity{0.0f};
     bool m_playerGrounded = false;
     float m_playerEyeHeight = 1.6f;
@@ -294,7 +297,7 @@ private:
     void ApplyWorldOriginShift(const glm::dvec3& delta);
 
     // ------------------------------------------------------------
-    // Procedural terrain (clipmap)
+    // Procedural terrain / world streaming
     // ------------------------------------------------------------
     bool m_terrainEnabled = false;
     uint32_t m_terrainSeed = 1337;
@@ -311,6 +314,24 @@ private:
     float m_terrainSkirtDepth = 40.0f; // meters (in world units)
 
     std::vector<entt::entity> m_terrainLevelEntities;
+
+    // CPU-generated heightmap chunks streamed around the active camera.
+    float m_terrainChunkSize = 64.0f; // meters
+    uint32_t m_terrainChunkRadiusFar = 6;  // chunks (square radius)
+    uint32_t m_terrainChunkRadiusMid = 4;
+    uint32_t m_terrainChunkRadiusNear = 2;
+    uint32_t m_terrainChunkGridNear = 65; // 2^n + 1
+    uint32_t m_terrainChunkGridMid  = 33;
+    uint32_t m_terrainChunkGridFar  = 17;
+
+    std::unordered_map<int64_t, entt::entity> m_terrainChunkEntities;
+    std::unordered_map<int64_t, std::vector<entt::entity>> m_terrainChunkChildren;
+    std::shared_ptr<Scene::MeshData> m_procTreeTrunkMesh;
+    std::shared_ptr<Scene::MeshData> m_procTreeCanopyMesh;
+    std::shared_ptr<Scene::MeshData> m_procRockMesh;
+
+    void UpdateProceduralTerrainChunks();
+    void ClearProceduralTerrainChunks();
 
     // Toggle for drawing world-origin debug axes (XYZ tripod). When false,
     // the origin axes are suppressed so the view can be captured cleanly.
@@ -342,6 +363,7 @@ private:
 
     // Current scene preset used when (re)building the ECS layout.
     ScenePreset m_currentScenePreset = ScenePreset::RTShowcase;
+    ScenePreset m_lastNonTerrainPreset = ScenePreset::RTShowcase;
 
     // Startup quality mode used to decide whether curated scenes (RT showcase)
     // should enable their full high-quality settings or stay on the safe

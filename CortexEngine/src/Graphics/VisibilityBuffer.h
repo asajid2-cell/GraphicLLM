@@ -158,6 +158,10 @@ public:
         const std::vector<Light>& localLights
     );
 
+    // Procedural terrain constants used by the VB visibility/material passes
+    // when instances set the terrain flag bit.
+    void SetTerrainConstants(const TerrainConstants& params) { m_terrainConstants = params; }
+
     // Mesh draw info for visibility pass
     struct VBMeshDrawInfo {
         ID3D12Resource* vertexBuffer;
@@ -343,6 +347,9 @@ private:
     uint8_t* m_materialBufferMapped = nullptr;
     uint32_t m_materialCount = 0;
     uint32_t m_maxMaterials = 4096;
+
+    // Cached terrain constants for VB terrain displacement/shading.
+    TerrainConstants m_terrainConstants{};
 
     // Reflection probe table (upload heap, persistently mapped)
     ComPtr<ID3D12Resource> m_reflectionProbeBuffer;

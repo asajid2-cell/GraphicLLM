@@ -237,6 +237,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.03f;
         r.ao = 1.0f;
         r.presetName = "cornell_floor";
+        r.doubleSided = true;
         // Reuse the RT showcase wood floor textures so the Cornell floor
         // participates in the same BC7/BC5 material pipeline.
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_floor_albedo.dds";
@@ -258,6 +259,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_ceiling";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
@@ -277,6 +279,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.03f;
         r.ao = 1.0f;
         r.presetName = "cornell_back";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
@@ -296,6 +299,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_green";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
@@ -315,6 +319,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.035f;
         r.ao = 1.0f;
         r.presetName = "cornell_red";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
@@ -335,6 +340,7 @@ void Engine::BuildCornellScene() {
         r.roughness = 0.025f;
         r.ao = 1.0f;
         r.presetName = "cornell_front_mirror";
+        r.doubleSided = true;
     }
 
     // Mirror panel on the back wall.

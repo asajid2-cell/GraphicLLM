@@ -703,8 +703,8 @@ public:
     };
 
     std::deque<GpuJob> m_gpuJobQueue;
-    uint32_t m_maxMeshJobsPerFrame = 2;
-    uint32_t m_maxBLASJobsPerFrame = 2;
+    uint32_t m_maxMeshJobsPerFrame = 16;  // Increased from 2 to allow faster mesh upload completion
+    uint32_t m_maxBLASJobsPerFrame = 4;
     uint32_t m_pendingMeshJobs = 0;
     uint32_t m_pendingBLASJobs = 0;
 

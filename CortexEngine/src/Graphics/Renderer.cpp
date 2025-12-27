@@ -5323,6 +5323,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     uint32_t countSkippedLayer = 0;
     uint32_t countSkippedTransparent = 0;
     uint32_t countSkippedBuffers = 0;
+    uint32_t countSkippedSRV = 0;
     uint32_t countCollected = 0;
 
     for (auto entity : stableEntities) {
@@ -5338,11 +5339,31 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             !renderable.mesh->gpuBuffers->vertexBuffer ||
             !renderable.mesh->gpuBuffers->indexBuffer) {
             if (!renderable.mesh->positions.empty() && !renderable.mesh->indices.empty()) {
-                static std::unordered_set<const Scene::MeshData*> s_autoUploadRequested;
-                if (s_autoUploadRequested.insert(renderable.mesh.get()).second) {
+                // Use a per-frame upload tracking set instead of a static one to allow retries
+                // on subsequent frames if previous uploads failed or are still pending.
+                static std::unordered_map<const Scene::MeshData*, uint32_t> s_uploadAttempts;
+                static uint32_t s_lastFrameIndex = 0;
+
+                // Reset retry tracking if this is a new frame
+                if (m_frameIndex != s_lastFrameIndex) {
+                    s_lastFrameIndex = m_frameIndex;
+                    // Clear meshes that have been trying for too long (stale entries)
+                    for (auto it = s_uploadAttempts.begin(); it != s_uploadAttempts.end(); ) {
+                        if (m_frameIndex - it->second > 60) { // Allow 60 frames of retry
+                            it = s_uploadAttempts.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
+                }
+
+                auto [it, inserted] = s_uploadAttempts.try_emplace(renderable.mesh.get(), m_frameIndex);
+                if (inserted || (m_frameIndex - it->second) > 5) { // Retry every 5 frames
+                    it->second = m_frameIndex;
                     auto enqueue = EnqueueMeshUpload(renderable.mesh, "AutoMeshUpload");
                     if (enqueue.IsErr()) {
-                        spdlog::warn("CollectInstancesForVisibilityBuffer: auto mesh upload enqueue failed: {}", enqueue.Error());
+                        spdlog::warn("CollectInstancesForVisibilityBuffer: auto mesh upload enqueue failed for mesh at {:p}: {}",
+                            static_cast<const void*>(renderable.mesh.get()), enqueue.Error());
                     }
                 }
             }
@@ -5355,6 +5376,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             (renderable.mesh->gpuBuffers->vbRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex ||
              renderable.mesh->gpuBuffers->ibRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex)) {
             // VB resolve requires bindless SRV indices for the mesh buffers; skip until available.
+            countSkippedSRV++;
             continue;
         }
 
@@ -5679,10 +5701,19 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         spdlog::warn("Failed to update visibility buffer instances: {}", uploadResult.Error());
     }
     
-    if (!s_loggedCounts && countTotal > 0) {
+    // Log collection stats on first frame and whenever scene might have changed (significantly different total)
+    static uint32_t s_lastLoggedTotal = 0;
+    if ((!s_loggedCounts || countTotal != s_lastLoggedTotal) && countTotal > 0) {
         s_loggedCounts = true;
-        spdlog::info("VB Collect Stats: Total={} Skipped[Vis={} Mesh={} Layer={} Transp={} Buf={}] Collected={}", 
-            countTotal, countSkippedVisible, countSkippedMesh, countSkippedLayer, countSkippedTransparent, countSkippedBuffers, m_vbInstances.size());
+        s_lastLoggedTotal = countTotal;
+        spdlog::info("VB Collect Stats: Total={} Skipped[Vis={} Mesh={} Layer={} Transp={} Buf={} SRV={}] Collected={}",
+            countTotal, countSkippedVisible, countSkippedMesh, countSkippedLayer, countSkippedTransparent, countSkippedBuffers, countSkippedSRV, m_vbInstances.size());
+
+        // If objects are being skipped, log a warning so it's obvious
+        if (countSkippedBuffers > 0 || countSkippedSRV > 0) {
+            spdlog::warn("VB: {} objects skipped (Buf={} SRV={}) - some geometry may not render until mesh uploads complete",
+                countSkippedBuffers + countSkippedSRV, countSkippedBuffers, countSkippedSRV);
+        }
     }
 }
 

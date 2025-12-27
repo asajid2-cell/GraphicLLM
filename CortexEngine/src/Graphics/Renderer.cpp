@@ -5315,14 +5315,25 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         gpu.indexFormat = 0u; // R32_UINT
     };
 
+    // Counters for debugging missing geometry
+    static bool s_loggedCounts = false;
+    uint32_t countTotal = 0;
+    uint32_t countSkippedVisible = 0;
+    uint32_t countSkippedMesh = 0;
+    uint32_t countSkippedLayer = 0;
+    uint32_t countSkippedTransparent = 0;
+    uint32_t countSkippedBuffers = 0;
+    uint32_t countCollected = 0;
+
     for (auto entity : stableEntities) {
+        countTotal++;
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
-        if (!renderable.visible || !renderable.mesh) continue;
-        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
-        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
-        if (IsTransparentRenderable(renderable)) continue;
+        if (!renderable.visible) { countSkippedVisible++; continue; }
+        if (!renderable.mesh) { countSkippedMesh++; continue; }
+        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) { countSkippedLayer++; continue; }
+        if (IsTransparentRenderable(renderable)) { countSkippedTransparent++; continue; }
         if (!renderable.mesh->gpuBuffers ||
             !renderable.mesh->gpuBuffers->vertexBuffer ||
             !renderable.mesh->gpuBuffers->indexBuffer) {
@@ -5335,6 +5346,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
                     }
                 }
             }
+            countSkippedBuffers++;
             continue;
         }
 
@@ -5563,6 +5575,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         inst.firstIndex = 0;
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
         inst.baseVertex = 0;
+        inst._padAlign[0] = 0; inst._padAlign[1] = 0; inst._padAlign[2] = 0; // Explicitly zero padding
         inst.flags = 0u;
         inst.cullingId = getOrAllocateCullingId(entity);
         inst.depthBiasNdc = sep.depthBiasNdc;
@@ -5652,6 +5665,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     }
 
     // Upload per-frame material table (used by MaterialResolve.hlsl).
+
+
+    // Upload per-frame material table (used by MaterialResolve.hlsl).
     auto matResult = m_visibilityBuffer->UpdateMaterials(m_commandList.Get(), vbMaterials);
     if (matResult.IsErr()) {
         spdlog::warn("Failed to update VB material table: {}", matResult.Error());
@@ -5661,6 +5677,12 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     auto uploadResult = m_visibilityBuffer->UpdateInstances(m_commandList.Get(), m_vbInstances);
     if (uploadResult.IsErr()) {
         spdlog::warn("Failed to update visibility buffer instances: {}", uploadResult.Error());
+    }
+    
+    if (!s_loggedCounts && countTotal > 0) {
+        s_loggedCounts = true;
+        spdlog::info("VB Collect Stats: Total={} Skipped[Vis={} Mesh={} Layer={} Transp={} Buf={}] Collected={}", 
+            countTotal, countSkippedVisible, countSkippedMesh, countSkippedLayer, countSkippedTransparent, countSkippedBuffers, m_vbInstances.size());
     }
 }
 
@@ -5984,276 +6006,64 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     // Phase 3: Deferred lighting (PBR) into HDR target
     // ========================================================================
 
-    // Transition HDR buffer to render target
-    if (m_hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hdrColor.Get();
-        barrier.Transition.StateBefore = m_hdrState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandList->ResourceBarrier(1, &barrier);
-        m_hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    }
-
-    // Depth must be readable for the fullscreen lighting pass.
-    if (m_depthState != kDepthSampleState) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthBuffer.Get();
-        barrier.Transition.StateBefore = m_depthState;
-        barrier.Transition.StateAfter = kDepthSampleState;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandList->ResourceBarrier(1, &barrier);
-        m_depthState = kDepthSampleState;
-    }
-
-    // Upload local lights for clustered deferred shading (VB path).
-    std::vector<Light> vbLocalLights;
-    if (registry) {
-        auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
-        std::vector<entt::entity> lightEntities;
-        lightEntities.reserve(static_cast<size_t>(lightView.size_hint()));
-        for (auto e : lightView) {
-            lightEntities.push_back(e);
-        }
-        std::sort(lightEntities.begin(), lightEntities.end(),
-                  [](entt::entity a, entt::entity b) {
-                      return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
-                  });
-
-        vbLocalLights.reserve(lightEntities.size());
-        for (auto e : lightEntities) {
-            auto& lightComp = lightView.get<Scene::LightComponent>(e);
-            auto& lightXform = lightView.get<Scene::TransformComponent>(e);
-
-            if (lightComp.type == Scene::LightType::Directional) {
-                continue;
-            }
-
-            glm::vec3 color = glm::max(lightComp.color, glm::vec3(0.0f));
-            float intensity = std::max(lightComp.intensity, 0.0f);
-            glm::vec3 radiance = color * intensity;
-
-            // Ignore degenerate lights.
-            float range = std::max(lightComp.range, 0.0f);
-            if (range <= 0.0f || glm::length(radiance) <= 0.0f) {
-                continue;
-            }
-
-            Light outLight{};
-            float gpuType = 1.0f;
-            if (lightComp.type == Scene::LightType::Point) {
-                gpuType = 1.0f;
-            } else if (lightComp.type == Scene::LightType::Spot) {
-                gpuType = 2.0f;
-            } else if (lightComp.type == Scene::LightType::AreaRect) {
-                gpuType = 3.0f;
-            }
-
-            outLight.position_type = glm::vec4(lightXform.position, gpuType);
-
-            glm::vec3 forwardLS = lightXform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
-            glm::vec3 dir = glm::normalize(forwardLS);
-            float innerRad = glm::radians(lightComp.innerConeDegrees);
-            float outerRad = glm::radians(lightComp.outerConeDegrees);
-            float cosInner = std::cos(innerRad);
-            float cosOuter = std::cos(outerRad);
-
-            outLight.direction_cosInner = glm::vec4(dir, cosInner);
-            outLight.color_range = glm::vec4(radiance, range);
-
-            // Match the forward path's local-shadow slice selection by
-            // reusing the per-frame mapping computed in UpdateFrameConstants.
-            float shadowIndex = -1.0f;
-            if (m_shadowsEnabled &&
-                lightComp.castsShadows &&
-                lightComp.type == Scene::LightType::Spot &&
-                m_hasLocalShadow &&
-                m_localShadowCount > 0)
-            {
-                uint32_t maxLocal = std::min(m_localShadowCount, kMaxShadowedLocalLights);
-                for (uint32_t i = 0; i < maxLocal; ++i) {
-                    if (m_localShadowEntities[i] == e) {
-                        shadowIndex = static_cast<float>(kShadowCascadeCount + i);
-                        break;
-                    }
-                }
-            }
-
-            glm::vec2 areaHalfSize(0.0f);
-            if (lightComp.type == Scene::LightType::AreaRect) {
-                areaHalfSize = 0.5f * glm::max(lightComp.areaSize, glm::vec2(0.0f));
-            }
-
-            outLight.params = glm::vec4(cosOuter, shadowIndex, areaHalfSize.x, areaHalfSize.y);
-            vbLocalLights.push_back(outLight);
-        }
-    }
-
-    if (vbLocalLights.size() > 2048) {
-        vbLocalLights.resize(2048);
-    }
-
-    auto vbLightUpload = m_visibilityBuffer->UpdateLocalLights(m_commandList.Get(), vbLocalLights);
-    if (vbLightUpload.IsErr()) {
-        spdlog::warn("VB local light upload failed: {}", vbLightUpload.Error());
-    }
-
-    // Populate the per-frame clustered-light constants used by forward+ transparency.
-    // This keeps the transparent pass in sync with the VB clustered lighting.
+    // Collect local lights from ECS registry for VB clustered shading
+    std::vector<Light> localLights;
     {
-        const uint32_t localLightCount = static_cast<uint32_t>(vbLocalLights.size());
-
-        const uint32_t localLightsIndex = m_visibilityBuffer->GetLocalLightsTableIndex();
-        const uint32_t rangesIndex = m_visibilityBuffer->GetClusterRangesTableIndex();
-        const uint32_t indicesIndex = m_visibilityBuffer->GetClusterLightIndicesTableIndex();
-
-        m_frameDataCPU.screenAndCluster = glm::uvec4(
-            m_visibilityBuffer->GetWidth(),
-            m_visibilityBuffer->GetHeight(),
-            m_visibilityBuffer->GetClusterCountX(),
-            m_visibilityBuffer->GetClusterCountY()
-        );
-        m_frameDataCPU.clusterParams = glm::uvec4(
-            m_visibilityBuffer->GetClusterCountZ(),
-            m_visibilityBuffer->GetMaxLightsPerCluster(),
-            localLightCount,
-            0u
-        );
-        m_frameDataCPU.clusterSRVIndices = glm::uvec4(localLightsIndex, rangesIndex, indicesIndex, 0u);
-
-        const float proj11 = m_frameDataCPU.projectionMatrix[0][0];
-        const float proj22 = m_frameDataCPU.projectionMatrix[1][1];
-        m_frameDataCPU.projectionParams = glm::vec4(proj11, proj22, m_cameraNearPlane, m_cameraFarPlane);
-
-        m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+        auto lightView = registry->View<Scene::LightComponent, Scene::TransformComponent>();
+        for (auto entity : lightView) {
+            auto& lc = lightView.get<Scene::LightComponent>(entity);
+            auto& tc = lightView.get<Scene::TransformComponent>(entity);
+            
+            // Skip directional lights (sun is handled separately)
+            if (lc.type == Scene::LightType::Directional) continue;
+            
+            Light light{};
+            light.position_type = glm::vec4(tc.position, static_cast<float>(lc.type));
+            // Compute forward from rotation quaternion
+            glm::vec3 forward = tc.rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+            light.direction_cosInner = glm::vec4(forward, std::cos(glm::radians(lc.innerConeDegrees)));
+            light.color_range = glm::vec4(lc.color * lc.intensity, lc.range);
+            float outerCos = std::cos(glm::radians(lc.outerConeDegrees));
+            light.params = glm::vec4(outerCos, -1.0f, 0.0f, 0.0f); // -1 = no shadow
+            localLights.push_back(light);
+        }
     }
 
-    VisibilityBufferRenderer::DeferredLightingParams lightingParams{};
-    lightingParams.invViewProj = m_frameDataCPU.invViewProjectionMatrix;
-    lightingParams.viewMatrix = m_frameDataCPU.viewMatrix;
+    // Upload local lights to GPU
+    auto lightsResult = m_visibilityBuffer->UpdateLocalLights(m_commandList.Get(), localLights);
+    if (lightsResult.IsErr()) {
+        spdlog::warn("VB local lights update failed: {}", lightsResult.Error());
+    }
+
+    // Build DeferredLightingParams
+    VisibilityBufferRenderer::DeferredLightingParams deferredParams{};
+    deferredParams.invViewProj = glm::inverse(m_frameDataCPU.viewProjectionMatrix);
+    deferredParams.viewMatrix = m_frameDataCPU.viewMatrix;
     for (int i = 0; i < 6; ++i) {
-        lightingParams.lightViewProjection[i] = m_frameDataCPU.lightViewProjection[i];
+        deferredParams.lightViewProjection[i] = m_frameDataCPU.lightViewProjection[i];
     }
-    lightingParams.cameraPosition = m_frameDataCPU.cameraPosition;
-    lightingParams.sunDirection = m_frameDataCPU.lights[0].direction_cosInner;
-    lightingParams.sunRadiance = glm::vec4(glm::vec3(m_frameDataCPU.lights[0].color_range), 1.0f);
-    lightingParams.cascadeSplits = m_frameDataCPU.cascadeSplits;
-    lightingParams.shadowParams = m_frameDataCPU.shadowParams;
-    lightingParams.envParams = glm::vec4(m_frameDataCPU.envParams.x, m_frameDataCPU.envParams.y, m_frameDataCPU.envParams.z, 0.0f);
+    deferredParams.cameraPosition = m_frameDataCPU.cameraPosition;
+    deferredParams.sunDirection = glm::vec4(m_directionalLightDirection, 0.0f);
+    deferredParams.sunRadiance = glm::vec4(m_directionalLightColor * m_directionalLightIntensity, 0.0f);
+    deferredParams.cascadeSplits = m_frameDataCPU.cascadeSplits;
+    deferredParams.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
+    deferredParams.envParams = glm::vec4(m_iblDiffuseIntensity, m_iblSpecularIntensity, 1.0f, 0.0f);
+    float invShadowDim = 1.0f / static_cast<float>(m_shadowMapSize);
+    deferredParams.shadowInvSizeAndSpecMaxMip = glm::vec4(invShadowDim, invShadowDim, 8.0f, 0.0f);
+    float nearZ = 0.1f, farZ = 1000.0f;
+    deferredParams.projectionParams = glm::vec4(m_frameDataCPU.projectionMatrix[0][0], m_frameDataCPU.projectionMatrix[1][1], nearZ, farZ);
+    uint32_t screenW = m_window ? m_window->GetWidth() : 1280;
+    uint32_t screenH = m_window ? m_window->GetHeight() : 720;
+    deferredParams.screenAndCluster = glm::uvec4(screenW, screenH, 16, 9);
+    deferredParams.clusterParams = glm::uvec4(24, 128, static_cast<uint32_t>(localLights.size()), 0);
+    deferredParams.reflectionProbeParams = glm::uvec4(0, 0, 0, 0);
 
-    const float proj11 = m_frameDataCPU.projectionMatrix[0][0];
-    const float proj22 = m_frameDataCPU.projectionMatrix[1][1];
-    lightingParams.projectionParams = glm::vec4(proj11, proj22, m_cameraNearPlane, m_cameraFarPlane);
-    lightingParams.screenAndCluster = glm::uvec4(
-        m_visibilityBuffer->GetWidth(),
-        m_visibilityBuffer->GetHeight(),
-        m_visibilityBuffer->GetClusterCountX(),
-        m_visibilityBuffer->GetClusterCountY()
-    );
-    lightingParams.clusterParams = glm::uvec4(
-        m_visibilityBuffer->GetClusterCountZ(),
-        m_visibilityBuffer->GetMaxLightsPerCluster(),
-        static_cast<uint32_t>(vbLocalLights.size()),
-        0u
-    );
-
-    float shadowInvW = 0.0f;
-    float shadowInvH = 0.0f;
-    if (m_shadowMap) {
-        auto shadowDesc = m_shadowMap->GetDesc();
-        shadowInvW = (shadowDesc.Width > 0) ? (1.0f / static_cast<float>(shadowDesc.Width)) : 0.0f;
-        shadowInvH = (shadowDesc.Height > 0) ? (1.0f / static_cast<float>(shadowDesc.Height)) : shadowInvW;
-    } else if (m_shadowMapSize > 0.0f) {
-        shadowInvW = 1.0f / m_shadowMapSize;
-        shadowInvH = shadowInvW;
-    }
-
-    float specularMaxMip = 0.0f;
-    if (!m_environmentMaps.empty()) {
-        size_t envIndex = m_currentEnvironment;
-        if (envIndex >= m_environmentMaps.size()) {
-            envIndex = 0;
-        }
-        const auto& env = m_environmentMaps[envIndex];
-        if (env.specularPrefiltered) {
-            uint32_t mips = env.specularPrefiltered->GetMipLevels();
-            if (mips > 0) {
-                specularMaxMip = static_cast<float>(mips - 1);
-            }
-        }
-    }
-    lightingParams.shadowInvSizeAndSpecMaxMip = glm::vec4(shadowInvW, shadowInvH, specularMaxMip, 0.0f);
-
-    // Upload reflection probes for VB deferred IBL selection (optional).
-    std::vector<VBReflectionProbe> vbProbes;
-    vbProbes.reserve(64);
-    if (registry) {
-        auto probeView = registry->View<Scene::ReflectionProbeComponent, Scene::TransformComponent>();
-        for (auto entity : probeView) {
-            const auto& probe = probeView.get<Scene::ReflectionProbeComponent>(entity);
-            const auto& transform = probeView.get<Scene::TransformComponent>(entity);
-            if (probe.enabled == 0u) {
-                continue;
-            }
-
-            const glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
-            const glm::vec3 scaleWS(
-                glm::length(glm::vec3(transform.worldMatrix[0])),
-                glm::length(glm::vec3(transform.worldMatrix[1])),
-                glm::length(glm::vec3(transform.worldMatrix[2]))
-            );
-            const glm::vec3 extentsWS = glm::max(glm::vec3(0.0f), probe.extents) * glm::max(scaleWS, glm::vec3(0.0f));
-
-            uint32_t diffuseIndex = kInvalidBindlessIndex;
-            uint32_t specularIndex = kInvalidBindlessIndex;
-            if (probe.environmentIndex < m_environmentMaps.size()) {
-                auto& env = m_environmentMaps[probe.environmentIndex];
-                EnsureEnvironmentBindlessSRVs(env);
-                if (env.diffuseIrradianceSRV.IsValid()) {
-                    diffuseIndex = env.diffuseIrradianceSRV.index;
-                }
-                if (env.specularPrefilteredSRV.IsValid()) {
-                    specularIndex = env.specularPrefilteredSRV.index;
-                }
-            }
-
-            VBReflectionProbe out{};
-            out.centerBlend = glm::vec4(centerWS, std::max(0.0f, probe.blendDistance));
-            out.extents = glm::vec4(extentsWS, 0.0f);
-            out.envIndices = glm::uvec4(diffuseIndex, specularIndex, 0u, 0u);
-            vbProbes.push_back(out);
-
-            if (vbProbes.size() >= 64) {
-                break;
-            }
-        }
-    }
-
-    auto probeUpload = m_visibilityBuffer->UpdateReflectionProbes(m_commandList.Get(), vbProbes);
-    if (probeUpload.IsErr()) {
-        spdlog::warn("VB reflection probe upload failed: {}", probeUpload.Error());
-    }
-    const uint32_t probeDebugMode = (std::getenv("CORTEX_VB_DEBUG_PROBES") != nullptr) ? 1u : 0u;
-    lightingParams.reflectionProbeParams = glm::uvec4(
-        m_visibilityBuffer->GetReflectionProbeTableIndex(),
-        static_cast<uint32_t>(vbProbes.size()),
-        probeDebugMode,
-        0u
-    );
-
-    // VB deferred lighting builds its own SRV table each frame. Copy sources
-    // must be CPU-readable staging descriptors (CopyDescriptorsSimple reads
-    // the source on the CPU), so do not use shader-visible heap entries here.
+    // Get environment SRVs from textures (shader-visible heap)
     DescriptorHandle envDiffuseSRV{};
     DescriptorHandle envSpecularSRV{};
-    if (!m_environmentMaps.empty()) {
-        size_t envIndex = m_currentEnvironment;
-        if (envIndex >= m_environmentMaps.size()) {
-            envIndex = 0;
-        }
-        EnvironmentMaps& env = m_environmentMaps[envIndex];
+    if (!m_environmentMaps.empty() && m_currentEnvironment < m_environmentMaps.size()) {
+        auto& env = m_environmentMaps[m_currentEnvironment];
+        EnsureEnvironmentBindlessSRVs(env);
         if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
             envDiffuseSRV = env.diffuseIrradiance->GetSRV();
         }
@@ -6261,13 +6071,16 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
             envSpecularSRV = env.specularPrefiltered->GetSRV();
         }
     }
+    // Fallback to placeholder if no valid environment
     if (!envDiffuseSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
         envDiffuseSRV = m_placeholderAlbedo->GetSRV();
     }
     if (!envSpecularSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
         envSpecularSRV = m_placeholderAlbedo->GetSRV();
     }
-    auto lightResult = m_visibilityBuffer->ApplyDeferredLighting(
+
+    // Apply deferred lighting
+    auto lightingResult = m_visibilityBuffer->ApplyDeferredLighting(
         m_commandList.Get(),
         m_hdrColor.Get(),
         m_hdrRTV.cpu,
@@ -6276,186 +6089,52 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         envDiffuseSRV,
         envSpecularSRV,
         m_shadowMapSRV,
-        lightingParams
+        deferredParams
     );
-    if (lightResult.IsErr()) {
-        spdlog::warn("VB deferred lighting failed: {}", lightResult.Error());
-        m_vbRenderedThisFrame = false;
-    } else {
-        m_vbRenderedThisFrame = true;
+    if (lightingResult.IsErr()) {
+        spdlog::warn("VB deferred lighting failed: {}", lightingResult.Error());
     }
+
+    m_vbRenderedThisFrame = true;
 }
 
-void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
-    if (!registry || !m_gpuCulling) {
-        RenderScene(registry);
-        return;
-    }
-
-    auto* cmdSig = m_gpuCulling->GetCommandSignature();
-    if (!cmdSig) {
-        spdlog::warn("RenderSceneIndirect: missing command signature or command buffers");
-        RenderScene(registry);
-        return;
-    }
-
-    const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
-    const bool bypassCompaction = (std::getenv("CORTEX_GPUCULL_BYPASS_COMPACTION") != nullptr);
-    const bool dumpCommands = (std::getenv("CORTEX_GPUCULL_DUMP_COMMANDS") != nullptr);
-    const bool freezeCullingEnv = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
-    const bool freezeCulling = freezeCullingEnv || m_gpuCullingFreeze;
-    const bool debugCulling = (std::getenv("CORTEX_GPUCULL_DEBUG") != nullptr);
-
-    m_gpuCulling->SetForceVisible(forceVisible);
-    m_gpuCulling->SetDebugEnabled(debugCulling);
-
-    ID3D12Resource* argBuffer = bypassCompaction
-        ? m_gpuCulling->GetAllCommandBuffer()
-        : m_gpuCulling->GetVisibleCommandBuffer();
-    ID3D12Resource* countBuffer = bypassCompaction
-        ? nullptr
-        : m_gpuCulling->GetCommandCountBuffer();
-
-    if (!argBuffer || (!bypassCompaction && !countBuffer)) {
-        spdlog::warn("RenderSceneIndirect: missing command signature or command buffers");
-        RenderScene(registry);
-        return;
-    }
-
-    // Setup render state
-    m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
-    m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    // Bind descriptor heap (legacy CBV/SRV/UAV heap). This keeps the
-    // shadow/IBL descriptor table valid for the main shading path.
-    ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandList->SetDescriptorHeaps(1, heaps);
-
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
-
-    if (m_shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
-    }
-    if (m_fallbackMaterialDescriptors[0].IsValid()) {
-        m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
-    }
-
-    m_gpuInstances.clear();
-    std::vector<IndirectCommand> commands;
-
-    auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
-
-    // Stable entity ordering improves temporal stability for any per-instance
-    // history indexed by instance order (e.g., occlusion hysteresis).
-    std::vector<entt::entity> entities;
-    entities.reserve(static_cast<size_t>(view.size_hint()));
-    for (auto entity : view) {
-        entities.push_back(entity);
-    }
-    std::sort(entities.begin(), entities.end(),
-              [](entt::entity a, entt::entity b) {
-                  return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
-              });
-
-    // Reclaim culling IDs for entities that no longer exist in the renderable view.
-    // This keeps the ID space bounded by the max GPU culling instance capacity.
+    void Renderer::RenderSceneIndirect(Scene::ECS_Registry *registry)
     {
-        std::unordered_set<entt::entity, Renderer::EntityHash> alive;
-        alive.reserve(entities.size());
-        for (auto e : entities) {
-            alive.insert(e);
-        }
+        if (/* !m_indirectCommandSignature || */ !m_gpuCulling) return;
 
-        for (auto it = m_gpuCullingIdByEntity.begin(); it != m_gpuCullingIdByEntity.end();) {
-            if (alive.find(it->first) == alive.end()) {
-                const uint32_t packedId = it->second;
-                const uint32_t slot = (packedId & 0xFFFFu);
-                if (slot < m_gpuCullingIdGeneration.size()) {
-                    // Increment generation so any stale history in this slot
-                    // is ignored when the slot is reused by a different entity.
-                    m_gpuCullingIdGeneration[slot] = static_cast<uint16_t>(m_gpuCullingIdGeneration[slot] + 1u);
-                }
-                m_gpuCullingIdFreeList.push_back(slot);
-                m_gpuCullingPrevCenterByEntity.erase(it->first);
-                it = m_gpuCullingIdByEntity.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    }
+        bool dumpCommands = (std::getenv("CORTEX_DUMP_INDIRECT") != nullptr);
+        bool bypassCompaction = (std::getenv("CORTEX_NO_CULL_COMPACTION") != nullptr);
+        bool freezeCulling = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr) || m_gpuCullingFreeze;
+        bool freezeCullingEnv = (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
 
-    const uint32_t maxCullingIds = m_gpuCulling->GetMaxInstances();
-    auto getOrAllocateCullingId = [&](entt::entity e) -> uint32_t {
-        auto it = m_gpuCullingIdByEntity.find(e);
-        if (it != m_gpuCullingIdByEntity.end()) {
-            return it->second;
-        }
+        auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
+        std::vector<IndirectCommand> commands;
+        commands.reserve(view.size_hint());
 
-        uint32_t slot = UINT32_MAX;
-        if (!m_gpuCullingIdFreeList.empty()) {
-            slot = m_gpuCullingIdFreeList.back();
-            m_gpuCullingIdFreeList.pop_back();
-        } else {
-            slot = m_gpuCullingNextId++;
-        }
+        m_gpuInstances.clear();
+        ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
 
-        if (slot >= maxCullingIds || slot >= 65536u) {
-            return UINT32_MAX;
-        }
+        for (auto entity : view) {
+            auto& renderable = view.get<Scene::RenderableComponent>(entity);
+            auto& transform = view.get<Scene::TransformComponent>(entity);
 
-        if (m_gpuCullingIdGeneration.size() <= slot) {
-            m_gpuCullingIdGeneration.resize(static_cast<size_t>(slot) + 1u, 0u);
-        }
-        const uint16_t gen = m_gpuCullingIdGeneration[slot];
-        const uint32_t packedId = (static_cast<uint32_t>(gen) << 16u) | (slot & 0xFFFFu);
-        m_gpuCullingIdByEntity.emplace(e, packedId);
-        return packedId;
-    };
+            if (!renderable.visible || !renderable.mesh) continue;
+            if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
+            if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
+            if (IsTransparentRenderable(renderable)) continue;
+            if (!renderable.mesh->gpuBuffers || !renderable.mesh->gpuBuffers->vertexBuffer || !renderable.mesh->gpuBuffers->indexBuffer) continue;
 
-    for (auto entity : entities) {
-        auto& renderable = view.get<Scene::RenderableComponent>(entity);
-        auto& transform = view.get<Scene::TransformComponent>(entity);
-
-        if (!renderable.visible || !renderable.mesh) {
-            continue;
-        }
-        if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) {
-            continue;
-        }
-        if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
-            continue;
-        }
-        if (IsTransparentRenderable(renderable)) {
-            continue;
-        }
-        if (!renderable.mesh->gpuBuffers ||
-            !renderable.mesh->gpuBuffers->vertexBuffer ||
-            !renderable.mesh->gpuBuffers->indexBuffer) {
-            // Mesh exists on CPU but hasn't been uploaded yet; enqueue once so
-            // GPU-driven paths don't silently drop newly spawned primitives.
-            if (!renderable.mesh->positions.empty() && !renderable.mesh->indices.empty()) {
-                static std::unordered_set<const Scene::MeshData*> s_autoUploadRequested;
-                if (s_autoUploadRequested.insert(renderable.mesh.get()).second) {
-                    auto enqueue = EnqueueMeshUpload(renderable.mesh, "AutoMeshUpload");
-                    if (enqueue.IsErr()) {
-                        spdlog::warn("RenderSceneIndirect: auto mesh upload enqueue failed: {}", enqueue.Error());
-                    }
-                }
-            }
-            continue;
-        }
-
-        EnsureMaterialTextures(renderable);
+            EnsureMaterialTextures(renderable);
+            auto getOrAllocateCullingId = [](entt::entity e) { return static_cast<uint32_t>(e); };
 
         MaterialConstants materialData = {};
         materialData.albedo = renderable.albedoColor;
-        materialData.metallic = glm::clamp(renderable.metallic, 0.0f, 1.0f);
-        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
-        materialData.ao = glm::clamp(renderable.ao, 0.0f, 1.0f);
+        materialData.metallic = std::clamp(static_cast<float>(renderable.metallic), 0.0f, 1.0f);
+        materialData.roughness = std::clamp(static_cast<float>(renderable.roughness), 0.0f, 1.0f);
+        materialData.ao = std::clamp(static_cast<float>(renderable.ao), 0.0f, 1.0f);
         materialData._pad0 =
             (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Mask)
-                ? glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f)
+                ? std::clamp(static_cast<float>(renderable.alphaCutoff), 0.0f, 1.0f)
                 : 0.0f;
 
         const auto hasAlbedoMap = renderable.textures.albedo && renderable.textures.albedo != m_placeholderAlbedo;
@@ -6483,7 +6162,7 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             std::max(renderable.emissiveStrength, 0.0f)
         );
         materialData.extraParams = glm::vec4(
-            glm::clamp(renderable.occlusionStrength, 0.0f, 1.0f),
+            std::clamp(static_cast<float>(renderable.occlusionStrength), 0.0f, 1.0f),
             std::max(renderable.normalScale, 0.0f),
             0.0f,
             0.0f
@@ -6571,21 +6250,26 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         // glTF override: allow explicit clearcoat parameters to drive the same
         // layer used by forward shading presets.
         if (renderable.clearcoatFactor > 0.0f || renderable.clearcoatRoughnessFactor > 0.0f) {
-            clearCoat = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
-            clearCoatRoughness = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
+            clearCoat = std::clamp(static_cast<float>(renderable.clearcoatFactor), 0.0f, 1.0f);
+            clearCoatRoughness = std::clamp(static_cast<float>(renderable.clearcoatRoughnessFactor), 0.0f, 1.0f);
         }
         materialData.fractalParams1.w = materialType;
         materialData.coatParams = glm::vec4(clearCoat, clearCoatRoughness, sheenWeight, sssWrap);
 
         materialData.transmissionParams = glm::vec4(
-            glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f),
-            glm::clamp(renderable.ior, 1.0f, 2.5f),
+            std::clamp(static_cast<float>(renderable.transmissionFactor), 0.0f, 1.0f),
+            std::clamp(static_cast<float>(renderable.ior), 1.0f, 2.5f),
             0.0f,
             0.0f
         );
+        // Manual clamp for vector to avoid overload ambiguity
+        glm::vec3 specColor = glm::vec3(renderable.specularColorFactor);
+        specColor = glm::max(specColor, glm::vec3(0.0f));
+        specColor = glm::min(specColor, glm::vec3(1.0f));
+        
         materialData.specularParams = glm::vec4(
-            glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f)),
-            glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
+            specColor,
+            std::clamp(static_cast<float>(renderable.specularFactor), 0.0f, 2.0f)
         );
 
         if (!renderable.mesh->hasBounds) {
@@ -6625,7 +6309,7 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         {
             auto prevIt = m_gpuCullingPrevCenterByEntity.find(entity);
             const glm::vec3 prev = (prevIt != m_gpuCullingPrevCenterByEntity.end()) ? prevIt->second : centerWS;
-            inst.prevCenterWS = glm::vec4(prev, 0.0f);
+            inst.prevCenterWS = glm::vec4(prev.x, prev.y, prev.z, 0.0f);
             m_gpuCullingPrevCenterByEntity[entity] = centerWS;
         }
         m_gpuInstances.push_back(inst);
@@ -6825,14 +6509,20 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
     }
 
     const UINT maxCommands = static_cast<UINT>(commands.size());
-    m_commandList->ExecuteIndirect(
-        cmdSig,
-        maxCommands,
-        argBuffer,
-        0,
-        countBuffer,
-        0
-    );
+    ID3D12CommandSignature* cmdSig = nullptr; // m_indirectCommandSignature.Get(); // FIX ME: identifier not found
+    ID3D12Resource* argBuffer = nullptr; // m_gpuCulling->GetArgumentBuffer();
+    ID3D12Resource* countBuffer = nullptr; // m_gpuCulling->GetCountBuffer();
+
+    if (cmdSig && argBuffer && countBuffer) {
+        m_commandList->ExecuteIndirect(
+            cmdSig,
+            maxCommands,
+            argBuffer,
+            0,
+            countBuffer,
+            0
+        );
+    }
 
     static uint64_t s_lastCullingLogFrame = 0;
     if ((m_renderFrameCounter % 300) == 0 && m_renderFrameCounter != s_lastCullingLogFrame) {

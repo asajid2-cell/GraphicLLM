@@ -1189,8 +1189,9 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-    // Match engine-wide convention (DX12Pipeline): meshes are CCW-wound for front faces.
-    psoDesc.RasterizerState.FrontCounterClockwise = TRUE;
+    // Mesh generator creates CW-wound triangles for front faces (when viewed from front).
+    // CW front-facing = FrontCounterClockwise FALSE.
+    psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
     psoDesc.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
     psoDesc.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
     psoDesc.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;

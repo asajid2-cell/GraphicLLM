@@ -47,6 +47,29 @@ float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
     return GeometrySmith(NdotV, NdotL, roughness);
 }
 
+// IBL-specific geometry term: k = r^2 / 2 (different from direct lighting k = (r+1)^2 / 8)
+// This provides better energy conservation for image-based lighting.
+float GeometrySchlickGGX_IBL(float NdotX, float roughness)
+{
+    float k = (roughness * roughness) / 2.0f;
+    return NdotX / max(NdotX * (1.0f - k) + k, 1e-6f);
+}
+
+float GeometrySmith_IBL(float NdotV, float NdotL, float roughness)
+{
+    float ggx2 = GeometrySchlickGGX_IBL(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX_IBL(NdotL, roughness);
+    return ggx1 * ggx2;
+}
+
+// Convenience overload for IBL (accepts N/V/L vectors).
+float GeometrySmith_IBL(float3 N, float3 V, float3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0f);
+    float NdotL = max(dot(N, L), 0.0f);
+    return GeometrySmith_IBL(NdotV, NdotL, roughness);
+}
+
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
     return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);

@@ -322,8 +322,13 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         bary = baryPersp / baryPerspSum;
     }
 
-    // Clamp to valid range for safety
-    bary = saturate(bary);
+    // Clamp to valid range for safety, then renormalize to ensure sum = 1.0
+    // This prevents interpolation errors at triangle edges due to floating point precision
+    bary = max(bary, 0.0f);
+    float barySum = bary.x + bary.y + bary.z;
+    if (barySum > 1e-7) {
+        bary /= barySum;
+    }
 
     // Interpolate vertex attributes using barycentric coordinates
     float2 texCoord = v0.texCoord * bary.x + v1.texCoord * bary.y + v2.texCoord * bary.z;

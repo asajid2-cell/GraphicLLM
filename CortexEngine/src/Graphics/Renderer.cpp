@@ -645,13 +645,17 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
         const bool vbDisabled = (std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr);
         const bool vbEnabledLegacy = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
-        m_visibilityBufferEnabled = !vbDisabled;
+        // Keep the visibility-buffer path opt-in. This avoids surprising render
+        // regressions on systems/scenes where the VB path is still being
+        // hardened; forward rendering remains the default.
+        m_visibilityBufferEnabled = vbEnabledLegacy && !vbDisabled;
         if (vbDisabled) {
             spdlog::info("VisibilityBuffer disabled via CORTEX_DISABLE_VISIBILITY_BUFFER=1 (using forward rendering).");
-        } else if (vbEnabledLegacy) {
-            spdlog::info("VisibilityBuffer explicitly enabled via CORTEX_ENABLE_VISIBILITY_BUFFER=1.");
         } else {
-            spdlog::info("VisibilityBuffer enabled by default (set CORTEX_DISABLE_VISIBILITY_BUFFER=1 to disable).");
+            spdlog::info("VisibilityBuffer disabled by default (set CORTEX_ENABLE_VISIBILITY_BUFFER=1 to enable).");
+        }
+        if (vbEnabledLegacy && !vbDisabled) {
+            spdlog::info("VisibilityBuffer explicitly enabled via CORTEX_ENABLE_VISIBILITY_BUFFER=1.");
         }
     }
 

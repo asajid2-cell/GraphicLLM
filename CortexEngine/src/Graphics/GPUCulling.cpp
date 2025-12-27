@@ -1432,14 +1432,16 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         m_visibleCommandState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     }
 
-    if (m_visibilityMaskBuffer && m_visibilityMaskState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    constexpr D3D12_RESOURCE_STATES kVisibilityMaskSrvState =
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (m_visibilityMaskBuffer && m_visibilityMaskState != kVisibilityMaskSrvState) {
         postBarriers[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
         postBarriers[postCount].Transition.pResource = m_visibilityMaskBuffer.Get();
         postBarriers[postCount].Transition.StateBefore = m_visibilityMaskState;
-        postBarriers[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        postBarriers[postCount].Transition.StateAfter = kVisibilityMaskSrvState;
         postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++postCount;
-        m_visibilityMaskState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_visibilityMaskState = kVisibilityMaskSrvState;
     }
 
     if (postCount > 0) {

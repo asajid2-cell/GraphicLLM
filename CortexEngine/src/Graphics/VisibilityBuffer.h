@@ -27,6 +27,10 @@ struct VisBufferPayload {
 };
 
 // Per-instance data for visibility buffer rendering
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324) // padded due to alignment specifier (intentional for HLSL layout)
+#endif
 struct alignas(16) VBInstanceData {
     glm::mat4 worldMatrix;
     glm::mat4 prevWorldMatrix;
@@ -46,6 +50,9 @@ struct alignas(16) VBInstanceData {
     float depthBiasNdc;
     uint32_t _pad0;
 };
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 // Minimal material constants for visibility-buffer material resolve (milestone: constant-only materials).
 // Keep this small and stable; later we can extend with texture indices and map flags to match ShaderTypes.h.

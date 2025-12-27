@@ -369,6 +369,53 @@ void Renderer::ReportDeviceRemoved(const char* context,
     m_deviceRemoved = true;
 }
 
+void Renderer::LogDiagnostics() const {
+    spdlog::info("---- Renderer Diagnostics ----");
+    const char* lastPass = (m_lastCompletedPass && m_lastCompletedPass[0]) ? m_lastCompletedPass : "Unknown";
+    spdlog::info("Last completed pass: {}", lastPass);
+    spdlog::info("Frame index: {} (in-flight={})", m_frameIndex, kFrameCount);
+    if (m_window) {
+        spdlog::info("Window: {}x{} vsync={}", m_window->GetWidth(), m_window->GetHeight(), m_window->IsVsyncEnabled());
+    }
+    spdlog::info("Render scale: {:.3f}", m_renderScale);
+    spdlog::info("Backbuffer used-as-RT: {}", m_backBufferUsedAsRTThisFrame);
+
+    spdlog::info("VB: enabled={} renderedThisFrame={} instances={} meshes={}",
+                 m_visibilityBufferEnabled,
+                 m_vbRenderedThisFrame,
+                 m_vbInstances.size(),
+                 m_vbMeshDraws.size());
+    spdlog::info("GPU culling: enabled={} totalInstances={} visibleInstances={}",
+                 m_gpuCullingEnabled,
+                 GetGPUTotalInstances(),
+                 GetGPUCulledCount());
+
+    spdlog::info("Features: TAA={} FXAA={} SSR={} SSAO={} Bloom={:.2f} Fog={} Shadows={} IBL={}",
+                 m_taaEnabled,
+                 m_fxaaEnabled,
+                 m_ssrEnabled,
+                 m_ssaoEnabled,
+                 m_bloomIntensity,
+                 m_fogEnabled,
+                 m_shadowsEnabled,
+                 m_iblEnabled);
+    spdlog::info("RT: supported={} enabled={} reflections={} GI={}",
+                 m_rayTracingSupported,
+                 m_rayTracingEnabled,
+                 m_rtReflectionsEnabled,
+                 m_rtGIEnabled);
+
+    spdlog::info("Resource states: depth=0x{:X} hdr=0x{:X} ssr=0x{:X}",
+                 static_cast<uint32_t>(m_depthState),
+                 static_cast<uint32_t>(m_hdrState),
+                 static_cast<uint32_t>(m_ssrState));
+    spdlog::info("Timings (ms): depthPrepass={:.2f} shadow={:.2f} main={:.2f}",
+                 m_lastDepthPrepassMs,
+                 m_lastShadowPassMs,
+                 m_lastMainPassMs);
+    spdlog::info("------------------------------");
+}
+
 // Convenience macro so call sites automatically capture file/line.
 #define CORTEX_REPORT_DEVICE_REMOVED(ctx, hr) \
     ReportDeviceRemoved((ctx), (hr), __FILE__, __LINE__)
@@ -645,17 +692,14 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
         const bool vbDisabled = (std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr);
         const bool vbEnabledLegacy = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
-        // Keep the visibility-buffer path opt-in. This avoids surprising render
-        // regressions on systems/scenes where the VB path is still being
-        // hardened; forward rendering remains the default.
-        m_visibilityBufferEnabled = vbEnabledLegacy && !vbDisabled;
+        // VB is enabled by default; opt out via env var.
+        m_visibilityBufferEnabled = !vbDisabled;
         if (vbDisabled) {
             spdlog::info("VisibilityBuffer disabled via CORTEX_DISABLE_VISIBILITY_BUFFER=1 (using forward rendering).");
-        } else {
-            spdlog::info("VisibilityBuffer disabled by default (set CORTEX_ENABLE_VISIBILITY_BUFFER=1 to enable).");
-        }
-        if (vbEnabledLegacy && !vbDisabled) {
+        } else if (vbEnabledLegacy) {
             spdlog::info("VisibilityBuffer explicitly enabled via CORTEX_ENABLE_VISIBILITY_BUFFER=1.");
+        } else {
+            spdlog::info("VisibilityBuffer enabled by default (set CORTEX_DISABLE_VISIBILITY_BUFFER=1 to disable).");
         }
     }
 
@@ -1384,6 +1428,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     ++m_renderFrameCounter;
     MarkPassComplete("Render_Entry");
     m_vbRenderedThisFrame = false;
+    m_vbDebugOverrideThisFrame = false;
 
     // All passes enabled by default; per-feature runtime flags (m_ssaoEnabled,
     // m_ssrEnabled, etc.) still control whether they actually run.
@@ -1749,16 +1794,21 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                  MarkPassComplete("RenderScene_Done");
              }
          }
-         // Depth-tested overlay/decal pass (lane markings, UI planes, etc.)
-         RenderOverlays(registry);
-         // Water/liquid surfaces are rendered as a dedicated depth-tested,
-         // depth-write-disabled pass after opaque/decals to avoid coplanar
-         // fighting with ground planes.
-         RenderWaterSurfaces(registry);
-         // Then blended transparent/glass objects, sorted back-to-front.
-         WriteBreadcrumb(GpuMarker::TransparentGeom);
-         RenderTransparent(registry);
-         MarkPassComplete("RenderTransparent_Done");
+         // When VB debug visualization is active, keep the frame clean by
+         // skipping subsequent overlay/water/transparent passes that can
+         // obscure the intermediate buffer being inspected.
+         if (!m_vbDebugOverrideThisFrame) {
+             // Depth-tested overlay/decal pass (lane markings, UI planes, etc.)
+             RenderOverlays(registry);
+             // Water/liquid surfaces are rendered as a dedicated depth-tested,
+             // depth-write-disabled pass after opaque/decals to avoid coplanar
+             // fighting with ground planes.
+             RenderWaterSurfaces(registry);
+             // Then blended transparent/glass objects, sorted back-to-front.
+             WriteBreadcrumb(GpuMarker::TransparentGeom);
+             RenderTransparent(registry);
+             MarkPassComplete("RenderTransparent_Done");
+         }
      }
 
     // Ray-traced reflections require the current frame's normal/roughness
@@ -5629,11 +5679,45 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         return;
     }
 
+    // VB debug view modes are driven by the engine's debug view selector (no env vars).
+    // These modes write directly into HDR and skip the rest of the main pass so the
+    // intermediate buffer is not obscured by later overlays/transparent passes.
+    enum class VBDebugView : uint32_t {
+        None = 0,
+        Visibility = 1,
+        Depth = 2,
+        GBufferAlbedo = 3,
+        GBufferNormal = 4,
+        GBufferEmissive = 5,
+        GBufferExt0 = 6,
+        GBufferExt1 = 7,
+    };
+
+    VBDebugView vbDebugView = VBDebugView::None;
+    switch (m_debugViewMode) {
+        case 33u: vbDebugView = VBDebugView::Visibility; break;
+        case 34u: vbDebugView = VBDebugView::Depth; break;
+        case 35u: vbDebugView = VBDebugView::GBufferAlbedo; break;
+        case 36u: vbDebugView = VBDebugView::GBufferNormal; break;
+        case 37u: vbDebugView = VBDebugView::GBufferEmissive; break;
+        case 38u: vbDebugView = VBDebugView::GBufferExt0; break;
+        case 39u: vbDebugView = VBDebugView::GBufferExt1; break;
+        default: break;
+    }
+    const bool vbDebugActive = (vbDebugView != VBDebugView::None);
+    if (vbDebugActive) {
+        m_vbDebugOverrideThisFrame = true;
+    }
+
     // Optional: use the GPU culling pipeline to produce a per-instance
     // visibility mask for the VB path. The visibility pass consumes this mask
     // via SV_CullDistance, so occluded instances do not rasterize.
     D3D12_GPU_VIRTUAL_ADDRESS vbCullMaskAddress = 0;
-    if (m_gpuCullingEnabled && m_gpuCulling) {
+    // For visibility/depth debug, default to disabling the cull mask so you can
+    // verify rasterization and depth writes without occlusion side effects.
+    const bool wantsUnculledDebug =
+        vbDebugActive && (vbDebugView == VBDebugView::Visibility || vbDebugView == VBDebugView::Depth);
+    if (m_gpuCullingEnabled && m_gpuCulling && !wantsUnculledDebug) {
         const bool forceVisible = (std::getenv("CORTEX_GPUCULL_FORCE_VISIBLE") != nullptr);
         m_gpuCulling->SetForceVisible(forceVisible);
 
@@ -5756,6 +5840,27 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         for (const auto& [meshIdx, count] : meshIndexCounts) {
             spdlog::info("  Mesh {} has {} instances", meshIdx, count);
         }
+        // Log per-mesh draw metadata (helps diagnose missing VB geometry).
+        for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(m_vbMeshDraws.size()); ++meshIdx) {
+            const auto& draw = m_vbMeshDraws[meshIdx];
+            const uint64_t vbBytes = draw.vertexBuffer ? draw.vertexBuffer->GetDesc().Width : 0ull;
+            const uint64_t ibBytes = draw.indexBuffer ? draw.indexBuffer->GetDesc().Width : 0ull;
+            spdlog::info("  MeshDraw {}: vtxCount={} idxCount={} stride={} vbBytes={} ibBytes={} opaque={} ds={} alpha={} alphaDs={} start={}/{}/{}/{}",
+                         meshIdx,
+                         draw.vertexCount,
+                         draw.indexCount,
+                         draw.vertexStrideBytes,
+                         vbBytes,
+                         ibBytes,
+                         draw.instanceCount,
+                         draw.instanceCountDoubleSided,
+                         draw.instanceCountAlpha,
+                         draw.instanceCountAlphaDoubleSided,
+                         draw.startInstance,
+                         draw.startInstanceDoubleSided,
+                         draw.startInstanceAlpha,
+                         draw.startInstanceAlphaDoubleSided);
+        }
         firstFrame = false;
     }
 
@@ -5783,6 +5888,35 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
 
     if (visResult.IsErr()) {
         spdlog::error("Visibility pass failed: {}", visResult.Error());
+        return;
+    }
+
+    if (vbDebugActive && vbDebugView == VBDebugView::Visibility) {
+        auto dbg = m_visibilityBuffer->DebugBlitVisibilityToHDR(m_commandList.Get(), m_hdrColor.Get(), m_hdrRTV.cpu);
+        if (dbg.IsErr()) {
+            spdlog::warn("VB debug blit (visibility) failed: {}", dbg.Error());
+        }
+        m_vbRenderedThisFrame = true;
+        return;
+    }
+
+    if (vbDebugActive && vbDebugView == VBDebugView::Depth) {
+        // Depth must be readable for the debug blit.
+        if (m_depthState != kDepthSampleState) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = m_depthBuffer.Get();
+            barrier.Transition.StateBefore = m_depthState;
+            barrier.Transition.StateAfter = kDepthSampleState;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrier);
+            m_depthState = kDepthSampleState;
+        }
+        auto dbg = m_visibilityBuffer->DebugBlitDepthToHDR(m_commandList.Get(), m_hdrColor.Get(), m_hdrRTV.cpu, m_depthBuffer.Get());
+        if (dbg.IsErr()) {
+            spdlog::warn("VB debug blit (depth) failed: {}", dbg.Error());
+        }
+        m_vbRenderedThisFrame = true;
         return;
     }
 
@@ -5817,6 +5951,33 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     if (firstResolve) {
         spdlog::info("VB: Material resolve completed successfully");
         firstResolve = false;
+    }
+
+    if (vbDebugActive &&
+        (vbDebugView == VBDebugView::GBufferAlbedo ||
+         vbDebugView == VBDebugView::GBufferNormal ||
+         vbDebugView == VBDebugView::GBufferEmissive ||
+         vbDebugView == VBDebugView::GBufferExt0 ||
+         vbDebugView == VBDebugView::GBufferExt1)) {
+        VisibilityBufferRenderer::DebugBlitBuffer which = VisibilityBufferRenderer::DebugBlitBuffer::Albedo;
+        if (vbDebugView == VBDebugView::GBufferNormal) {
+            which = VisibilityBufferRenderer::DebugBlitBuffer::NormalRoughness;
+        } else if (vbDebugView == VBDebugView::GBufferEmissive) {
+            which = VisibilityBufferRenderer::DebugBlitBuffer::EmissiveMetallic;
+        } else if (vbDebugView == VBDebugView::GBufferExt0) {
+            which = VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt0;
+        } else if (vbDebugView == VBDebugView::GBufferExt1) {
+            which = VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt1;
+        } else {
+            which = VisibilityBufferRenderer::DebugBlitBuffer::Albedo;
+        }
+
+        auto dbg = m_visibilityBuffer->DebugBlitGBufferToHDR(m_commandList.Get(), m_hdrColor.Get(), m_hdrRTV.cpu, which);
+        if (dbg.IsErr()) {
+            spdlog::warn("VB debug blit (gbuffer) failed: {}", dbg.Error());
+        }
+        m_vbRenderedThisFrame = true;
+        return;
     }
 
     // ========================================================================
@@ -8556,7 +8717,14 @@ void Renderer::CycleDebugViewMode() {
     // 30 = RT reflection history (post-process),
     // 31 = RT reflection delta (current vs history).
     // 32 = HZB mip debug (depth pyramid).
-    m_debugViewMode = (m_debugViewMode + 1) % 33; 
+    // 33 = VB visibility (instance ID)
+    // 34 = VB depth (hardware depth buffer)
+    // 35 = VB G-buffer albedo
+    // 36 = VB G-buffer normal/roughness
+    // 37 = VB G-buffer emissive/metallic
+    // 38 = VB G-buffer material ext0
+    // 39 = VB G-buffer material ext1
+    m_debugViewMode = (m_debugViewMode + 1) % 40; 
     const char* label = nullptr; 
     switch (m_debugViewMode) { 
         case 0: label = "Shaded"; break;
@@ -8592,6 +8760,13 @@ void Renderer::CycleDebugViewMode() {
         case 30: label = "RT_ReflectionHistory"; break; 
         case 31: label = "RT_ReflectionDelta"; break; 
         case 32: label = "HZB_Mip"; break;
+        case 33: label = "VB_Visibility"; break;
+        case 34: label = "VB_Depth"; break;
+        case 35: label = "VB_GBuffer_Albedo"; break;
+        case 36: label = "VB_GBuffer_NormalRoughness"; break;
+        case 37: label = "VB_GBuffer_EmissiveMetallic"; break;
+        case 38: label = "VB_GBuffer_MaterialExt0"; break;
+        case 39: label = "VB_GBuffer_MaterialExt1"; break;
         default: label = "Unknown"; break; 
     } 
     spdlog::info("Debug view mode: {}", label); 

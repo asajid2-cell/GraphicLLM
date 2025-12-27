@@ -61,17 +61,17 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCube() {
         mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f)); // Top-left
     }
 
-    // Indices (2 triangles per face)
+    // Indices (2 triangles per face, CW winding for front faces)
     for (uint32_t face = 0; face < 6; face++) {
         uint32_t baseIndex = face * 4;
-        // Triangle 1
+        // Triangle 1 (CW: swap 1 and 2)
         mesh->indices.push_back(baseIndex + 0);
+        mesh->indices.push_back(baseIndex + 2);
         mesh->indices.push_back(baseIndex + 1);
-        mesh->indices.push_back(baseIndex + 2);
-        // Triangle 2
+        // Triangle 2 (CW: swap 2 and 3)
         mesh->indices.push_back(baseIndex + 0);
-        mesh->indices.push_back(baseIndex + 2);
         mesh->indices.push_back(baseIndex + 3);
+        mesh->indices.push_back(baseIndex + 2);
     }
 
     mesh->UpdateBounds();
@@ -101,8 +101,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePlane(float width, float h
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
 
-    // Indices
-    mesh->indices = { 0, 1, 2, 0, 2, 3 };
+    // Indices (CW winding for front faces)
+    mesh->indices = { 0, 2, 1, 0, 3, 2 };
 
     mesh->UpdateBounds();
     return mesh;
@@ -131,8 +131,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateQuad(float width, float he
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
 
-    // Indices
-    mesh->indices = { 0, 1, 2, 0, 2, 3 };
+    // Indices (CW winding for front faces)
+    mesh->indices = { 0, 2, 1, 0, 3, 2 };
 
     mesh->UpdateBounds();
     return mesh;
@@ -157,7 +157,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint3
         }
     }
 
-    // Generate indices
+    // Generate indices (CW winding for front faces)
     for (uint32_t y = 0; y < segments; y++) {
         for (uint32_t x = 0; x < segments; x++) {
             uint32_t i0 = y * (segments + 1) + x;
@@ -165,12 +165,13 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint3
             uint32_t i2 = i0 + 1;
             uint32_t i3 = i1 + 1;
 
+            // CW winding: swap i1 and i2
             mesh->indices.push_back(i0);
-            mesh->indices.push_back(i1);
             mesh->indices.push_back(i2);
+            mesh->indices.push_back(i1);
 
-            mesh->indices.push_back(i2);
             mesh->indices.push_back(i1);
+            mesh->indices.push_back(i2);
             mesh->indices.push_back(i3);
         }
     }
@@ -201,21 +202,21 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCylinder(float radius, flo
         mesh->texCoords.push_back(glm::vec2(static_cast<float>(i) / static_cast<float>(segments), 0.0f));
     }
 
-    // Generate indices for cylinder sides
+    // Generate indices for cylinder sides (CW winding for front faces)
     for (uint32_t i = 0; i < segments; i++) {
         uint32_t i0 = i * 2;
         uint32_t i1 = i0 + 1;
         uint32_t i2 = (i0 + 2) % ((segments + 1) * 2);
         uint32_t i3 = (i0 + 3) % ((segments + 1) * 2);
 
-        // Triangle 1
+        // Triangle 1 (CW: i0 -> i2 -> i1)
         mesh->indices.push_back(i0);
-        mesh->indices.push_back(i1);
         mesh->indices.push_back(i2);
+        mesh->indices.push_back(i1);
 
-        // Triangle 2
-        mesh->indices.push_back(i2);
+        // Triangle 2 (CW: i1 -> i2 -> i3)
         mesh->indices.push_back(i1);
+        mesh->indices.push_back(i2);
         mesh->indices.push_back(i3);
     }
 
@@ -253,15 +254,15 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCylinder(float radius, flo
     uint32_t bottomCapStart = topCapStart + 1;
 
     for (uint32_t i = 0; i < segments; i++) {
-        // Top cap
+        // Top cap (CW winding when viewed from above)
         mesh->indices.push_back(topCenterIdx);
-        mesh->indices.push_back(topCapStart + i * 2);
         mesh->indices.push_back(topCapStart + ((i + 1) % (segments + 1)) * 2);
+        mesh->indices.push_back(topCapStart + i * 2);
 
-        // Bottom cap (reversed winding)
+        // Bottom cap (CW winding when viewed from below)
         mesh->indices.push_back(bottomCenterIdx);
-        mesh->indices.push_back(bottomCapStart + ((i + 1) % (segments + 1)) * 2);
         mesh->indices.push_back(bottomCapStart + i * 2);
+        mesh->indices.push_back(bottomCapStart + ((i + 1) % (segments + 1)) * 2);
     }
 
     mesh->UpdateBounds();
@@ -324,9 +325,10 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePyramid(float baseSize, fl
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.5f, 1.0f));
+    // Front face side triangle (CW winding)
     mesh->indices.push_back(baseIdx + 0);
-    mesh->indices.push_back(baseIdx + 1);
     mesh->indices.push_back(baseIdx + 2);
+    mesh->indices.push_back(baseIdx + 1);
 
     // Right face (facing +X)
     glm::vec3 rightNormal = calcNormal(mesh->positions[1], mesh->positions[2], mesh->positions[4]);
@@ -341,9 +343,10 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePyramid(float baseSize, fl
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.5f, 1.0f));
+    // Right face side triangle (CW winding)
     mesh->indices.push_back(baseIdx + 0);
-    mesh->indices.push_back(baseIdx + 1);
     mesh->indices.push_back(baseIdx + 2);
+    mesh->indices.push_back(baseIdx + 1);
 
     // Back face (facing -Z)
     glm::vec3 backNormal = calcNormal(mesh->positions[2], mesh->positions[3], mesh->positions[4]);
@@ -358,9 +361,10 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePyramid(float baseSize, fl
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.5f, 1.0f));
+    // Back face side triangle (CW winding)
     mesh->indices.push_back(baseIdx + 0);
-    mesh->indices.push_back(baseIdx + 1);
     mesh->indices.push_back(baseIdx + 2);
+    mesh->indices.push_back(baseIdx + 1);
 
     // Left face (facing -X)
     glm::vec3 leftNormal = calcNormal(mesh->positions[3], mesh->positions[0], mesh->positions[4]);
@@ -375,9 +379,10 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePyramid(float baseSize, fl
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.5f, 1.0f));
+    // Left face side triangle (CW winding)
     mesh->indices.push_back(baseIdx + 0);
-    mesh->indices.push_back(baseIdx + 1);
     mesh->indices.push_back(baseIdx + 2);
+    mesh->indices.push_back(baseIdx + 1);
 
     mesh->UpdateBounds();
     return mesh;
@@ -463,9 +468,10 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCone(float radius, float h
         mesh->normals.push_back(normal);
         mesh->texCoords.push_back(glm::vec2(0.5f, 1.0f));
 
+        // Cone side triangle indices (CW winding: v0 -> apex -> v1)
         mesh->indices.push_back(baseIdx + 0);
-        mesh->indices.push_back(baseIdx + 1);
         mesh->indices.push_back(baseIdx + 2);
+        mesh->indices.push_back(baseIdx + 1);
     }
 
     // Base cap - center vertex
@@ -485,12 +491,12 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCone(float radius, float h
         mesh->texCoords.push_back(glm::vec2(0.5f + x / (2.0f * radius), 0.5f - z / (2.0f * radius)));
     }
 
-    // Base cap indices (reversed winding for downward-facing normal)
+    // Base cap indices (CW winding when viewed from below)
     uint32_t baseCapStart = baseCenterIdx + 1;
     for (uint32_t i = 0; i < segments; i++) {
         mesh->indices.push_back(baseCenterIdx);
-        mesh->indices.push_back(baseCapStart + i + 1);
         mesh->indices.push_back(baseCapStart + i);
+        mesh->indices.push_back(baseCapStart + i + 1);
     }
 
     mesh->UpdateBounds();
@@ -530,7 +536,7 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
         }
     }
 
-    // Generate indices
+    // Generate indices (CW winding for front faces)
     for (uint32_t i = 0; i < majorSegments; i++) {
         for (uint32_t j = 0; j < minorSegments; j++) {
             uint32_t i0 = i * (minorSegments + 1) + j;
@@ -538,14 +544,14 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
             uint32_t i2 = i0 + 1;
             uint32_t i3 = i1 + 1;
 
-            // Triangle 1
+            // Triangle 1 (CW: swap i1 and i2)
             mesh->indices.push_back(i0);
-            mesh->indices.push_back(i1);
             mesh->indices.push_back(i2);
+            mesh->indices.push_back(i1);
 
-            // Triangle 2
-            mesh->indices.push_back(i2);
+            // Triangle 2 (CW)
             mesh->indices.push_back(i1);
+            mesh->indices.push_back(i2);
             mesh->indices.push_back(i3);
         }
     }
@@ -575,11 +581,11 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateDisk(float radius, uint32_
             0.5f - z / (2.0f * radius)));
     }
 
-    // Indices for triangle fan
+    // Indices for triangle fan (CW winding when viewed from above)
     for (uint32_t i = 1; i <= segments; ++i) {
         mesh->indices.push_back(0);
-        mesh->indices.push_back(i);
         mesh->indices.push_back((i % segments) + 1);
+        mesh->indices.push_back(i);
     }
 
     mesh->UpdateBounds();

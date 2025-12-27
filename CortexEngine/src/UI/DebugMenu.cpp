@@ -620,7 +620,7 @@ void DebugMenu::ResetToDefaults() {
         renderer->SetTAAEnabled(false);
         renderer->SetSSREnabled(true);
         renderer->SetSSAOEnabled(true);
-        renderer->SetIBLEnabled(false);
+        renderer->SetIBLEnabled(true);
         renderer->SetFogEnabled(false);
     }
 
@@ -631,7 +631,7 @@ void DebugMenu::ResetToDefaults() {
     g_state.current.taaEnabled = false;
     g_state.current.ssrEnabled = true;
     g_state.current.ssaoEnabled = true;
-    g_state.current.iblEnabled = false;
+    g_state.current.iblEnabled = true;
     g_state.current.fogEnabled = false;
 
     ApplyStateToRenderer(g_state.current);

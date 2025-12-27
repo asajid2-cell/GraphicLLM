@@ -6058,26 +6058,14 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     deferredParams.clusterParams = glm::uvec4(24, 128, static_cast<uint32_t>(localLights.size()), 0);
     deferredParams.reflectionProbeParams = glm::uvec4(0, 0, 0, 0);
 
-    // Get environment SRVs from textures (shader-visible heap)
+
+    // Environment SRVs for VB deferred lighting: pass empty handles so the VB
+    // writes null SRVs. The shader uses envParams.z (IBL enabled) to control
+    // whether IBL is applied. This avoids CopyDescriptorsSimple from shader-
+    // visible heaps which would trigger D3D12 validation errors.
+    // TODO: Pass underlying ID3D12Resource* to allow proper SRV creation.
     DescriptorHandle envDiffuseSRV{};
     DescriptorHandle envSpecularSRV{};
-    if (!m_environmentMaps.empty() && m_currentEnvironment < m_environmentMaps.size()) {
-        auto& env = m_environmentMaps[m_currentEnvironment];
-        EnsureEnvironmentBindlessSRVs(env);
-        if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
-            envDiffuseSRV = env.diffuseIrradiance->GetSRV();
-        }
-        if (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid()) {
-            envSpecularSRV = env.specularPrefiltered->GetSRV();
-        }
-    }
-    // Fallback to placeholder if no valid environment
-    if (!envDiffuseSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        envDiffuseSRV = m_placeholderAlbedo->GetSRV();
-    }
-    if (!envSpecularSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        envSpecularSRV = m_placeholderAlbedo->GetSRV();
-    }
 
     // Apply deferred lighting
     auto lightingResult = m_visibilityBuffer->ApplyDeferredLighting(

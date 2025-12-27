@@ -99,17 +99,28 @@ float GetMaxWorldScale(const glm::mat4& worldMatrix) {
     return glm::max(glm::max(glm::length(col0), glm::length(col1)), glm::length(col2));
 }
 
-glm::vec3 ComputeAutoDepthOffsetForThinSurfaces(const Scene::RenderableComponent& renderable,
-                                                const glm::mat4& modelMatrix,
-                                                uint32_t stableKey) {
+struct AutoDepthSeparation {
+    glm::vec3 worldOffset{0.0f};
+    float depthBiasNdc = 0.0f;
+};
+
+AutoDepthSeparation ComputeAutoDepthSeparationForThinSurfaces(const Scene::RenderableComponent& renderable,
+                                                              const glm::mat4& modelMatrix,
+                                                              uint32_t stableKey) {
+    AutoDepthSeparation sep{};
+
     if (!renderable.mesh || !renderable.mesh->hasBounds) {
-        return glm::vec3(0.0f);
+        return sep;
+    }
+
+    if (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Blend) {
+        return sep;
     }
 
     const glm::vec3 ext = glm::max(renderable.mesh->boundsMax - renderable.mesh->boundsMin, glm::vec3(0.0f));
     const float maxDim = glm::compMax(ext);
     if (!(maxDim > 0.0f)) {
-        return glm::vec3(0.0f);
+        return sep;
     }
     const float minDim = glm::compMin(ext);
 
@@ -117,7 +128,7 @@ glm::vec3 ComputeAutoDepthOffsetForThinSurfaces(const Scene::RenderableComponent
     constexpr float kThinAbs = 5e-4f;
     constexpr float kThinRel = 0.03f; // 3% of the maximum dimension
     if (minDim > glm::max(kThinAbs, maxDim * kThinRel)) {
-        return glm::vec3(0.0f);
+        return sep;
     }
 
     int thinAxis = 0;
@@ -130,14 +141,14 @@ glm::vec3 ComputeAutoDepthOffsetForThinSurfaces(const Scene::RenderableComponent
     glm::vec3 axisWS = glm::vec3(modelMatrix[thinAxis]);
     const float axisLen2 = glm::length2(axisWS);
     if (axisLen2 < 1e-8f) {
-        return glm::vec3(0.0f);
+        return sep;
     }
     axisWS /= std::sqrt(axisLen2);
 
     // Only apply to mostly-horizontal surfaces (thin axis aligned with world up).
     constexpr float kUpDot = 0.92f;
     if (std::abs(glm::dot(axisWS, glm::vec3(0.0f, 1.0f, 0.0f))) < kUpDot) {
-        return glm::vec3(0.0f);
+        return sep;
     }
 
     const float maxScale = GetMaxWorldScale(modelMatrix);
@@ -156,7 +167,18 @@ glm::vec3 ComputeAutoDepthOffsetForThinSurfaces(const Scene::RenderableComponent
 
     const float direction =
         (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) ? 1.0f : -1.0f;
-    return glm::vec3(0.0f, direction * eps * layerScale, 0.0f);
+
+    sep.worldOffset = glm::vec3(0.0f, direction * eps * layerScale, 0.0f);
+
+    // Clip-space depth bias keeps separation stable at very far distances where
+    // world-space offsets can quantize to the same depth value. This is only
+    // applied to non-overlay, non-blended surfaces that participate in the main depth buffer.
+    if (renderable.renderLayer != Scene::RenderableComponent::RenderLayer::Overlay) {
+        constexpr float kNdcBiasBase = 2.5e-5f;
+        sep.depthBiasNdc = glm::clamp(kNdcBiasBase * layerScale, 0.0f, 5e-4f);
+    }
+
+    return sep;
 }
 
 void ApplyAutoDepthOffset(glm::mat4& modelMatrix, const glm::vec3& offset) {
@@ -4963,7 +4985,9 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
         if (!renderable.mesh->hasBounds) {
             renderable.mesh->UpdateBounds();
         }
-        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
         inst.modelMatrix = modelMatrix;
 
         // Compute bounding sphere in object space
@@ -5470,9 +5494,9 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
         glm::mat4 currWorld = transform.GetMatrix();
         const uint32_t entityKey = static_cast<uint32_t>(entity);
-        const glm::vec3 autoDepthOffset =
-            ComputeAutoDepthOffsetForThinSurfaces(renderable, currWorld, entityKey);
-        ApplyAutoDepthOffset(currWorld, autoDepthOffset);
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, currWorld, entityKey);
+        ApplyAutoDepthOffset(currWorld, sep.worldOffset);
         auto prevIt = s_prevWorldByEntity.find(entityKey);
         const glm::mat4 prevWorld = (prevIt != s_prevWorldByEntity.end()) ? prevIt->second : currWorld;
         s_prevWorldByEntity[entityKey] = currWorld;
@@ -5487,6 +5511,8 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         inst.baseVertex = 0;
         inst.flags = 0u;
         inst.cullingId = getOrAllocateCullingId(entity);
+        inst.depthBiasNdc = sep.depthBiasNdc;
+        inst._pad0 = 0u;
 
         // Bounding sphere in object space (used for GPU occlusion culling).
         if (renderable.mesh->hasBounds) {
@@ -6403,11 +6429,14 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
 
         glm::mat4 modelMatrix = transform.GetMatrix();
         const uint32_t stableKey = static_cast<uint32_t>(entity);
-        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
 
         ObjectConstants objectData = {};
         objectData.modelMatrix = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
@@ -6881,14 +6910,17 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         }
 
         glm::mat4 modelMatrix = transform.GetMatrix();
+        AutoDepthSeparation sep{};
         if (!isWater) {
             const uint32_t stableKey = static_cast<uint32_t>(entity);
-            ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+            sep = ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+            ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
         }
 
         ObjectConstants objectData = {};
         objectData.modelMatrix = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
@@ -7114,9 +7146,12 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         if (renderable.mesh && !renderable.mesh->hasBounds) {
             renderable.mesh->UpdateBounds();
         }
-        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
         objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
@@ -7570,9 +7605,12 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         if (renderable.mesh && !renderable.mesh->hasBounds) {
             renderable.mesh->UpdateBounds();
         }
-        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
         objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB =
             m_objectConstantBuffer.AllocateAndWrite(objectData);
@@ -7690,9 +7728,12 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         if (renderable.mesh && !renderable.mesh->hasBounds) {
             renderable.mesh->UpdateBounds();
         }
-        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
         objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB =
             m_objectConstantBuffer.AllocateAndWrite(objectData);
@@ -12858,7 +12899,9 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             if (renderable.mesh && !renderable.mesh->hasBounds) {
                 renderable.mesh->UpdateBounds();
             }
-            ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+            const AutoDepthSeparation sep =
+                ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+            ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
             objectData.modelMatrix = modelMatrix;
             objectData.normalMatrix = transform.GetNormalMatrix();
 
@@ -12980,7 +13023,9 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 if (renderable.mesh && !renderable.mesh->hasBounds) {
                     renderable.mesh->UpdateBounds();
                 }
-                ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+                const AutoDepthSeparation sep =
+                    ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+                ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
                 objectData.modelMatrix = modelMatrix;
                 objectData.normalMatrix = transform.GetNormalMatrix();
 

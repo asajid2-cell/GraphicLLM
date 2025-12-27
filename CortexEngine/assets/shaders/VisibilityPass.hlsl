@@ -30,7 +30,8 @@ struct VBInstanceData {
     float4 prevCenterWS;    // xyz = previous frame center (world space)
     uint cullingId;         // packed gen<<16|slot
     uint flags;
-    uint2 _pad2;
+    float depthBiasNdc;
+    uint _pad2;
 };
 
 StructuredBuffer<VBInstanceData> g_Instances : register(t0);
@@ -92,6 +93,7 @@ PSInput VSMain(VSInput input) {
     // Transform to world space then clip space
     float4 worldPos = mul(instance.worldMatrix, float4(input.position, 1.0));
     output.position = mul(g_ViewProj, worldPos);
+    output.position.z += instance.depthBiasNdc * output.position.w;
     output.texCoord = input.texCoord;
 
     // Pass through instance ID for pixel shader (no interpolation!)

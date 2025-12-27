@@ -8,6 +8,8 @@ cbuffer ObjectConstants : register(b0)
 {
     float4x4 g_ModelMatrix;
     float4x4 g_NormalMatrix;
+    float g_DepthBiasNdc;
+    float3 _pad0;
 };
 
 cbuffer FrameConstants : register(b1)
@@ -226,6 +228,7 @@ PSInput VSMain(VSInput input)
 
     // Transform to clip space
     output.position = mul(g_ViewProjectionMatrix, worldPos);
+    output.position.z += g_DepthBiasNdc * output.position.w;
 
     // Transform normal to world space
     output.normal = normalize(mul(g_NormalMatrix, float4(input.normal, 0.0f)).xyz);

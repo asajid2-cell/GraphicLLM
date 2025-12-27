@@ -43,7 +43,8 @@ struct alignas(16) VBInstanceData {
     // Packed stable occlusion-history ID (gen<<16 | slot).
     uint32_t cullingId;
     uint32_t flags;
-    uint32_t _pad[2];
+    float depthBiasNdc;
+    uint32_t _pad0;
 };
 
 // Minimal material constants for visibility-buffer material resolve (milestone: constant-only materials).

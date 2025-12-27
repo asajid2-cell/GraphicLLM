@@ -34,6 +34,11 @@ struct Vertex {
 struct ObjectConstants {
     glm::mat4 modelMatrix;
     glm::mat4 normalMatrix;  // For lighting calculations
+    // Signed clip-space depth bias (NDC units) applied in the vertex shader:
+    // pos.z += depthBiasNdc * pos.w. Used to stabilize coplanar thin surfaces
+    // at far distances where depth precision collapses.
+    float depthBiasNdc = 0.0f;
+    glm::vec3 _pad0{0.0f};
 };
 
 // Light data for forward lighting

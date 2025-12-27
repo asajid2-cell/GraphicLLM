@@ -42,7 +42,8 @@ struct VBInstanceData {
     float4 prevCenterWS;    // xyz = previous frame center (world space)
     uint cullingId;         // packed gen<<16|slot
     uint flags;
-    uint2 _pad2;
+    float depthBiasNdc;
+    uint _pad2;
 };
 
 // Vertex structure (matches C++ vertex layout: 48 bytes)

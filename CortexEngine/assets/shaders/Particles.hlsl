@@ -6,6 +6,8 @@ cbuffer ObjectConstants : register(b0)
 {
     float4x4 g_ModelMatrix;
     float4x4 g_NormalMatrix;
+    float g_DepthBiasNdc;
+    float3 _pad0;
 };
 
 cbuffer FrameConstants : register(b1)
@@ -78,6 +80,7 @@ PSInput VSMain(VSInput input)
 
     float3 worldPos = input.instancePos + offset;
     float4 clipPos = mul(g_ViewProjectionMatrix, float4(worldPos, 1.0f));
+    clipPos.z += g_DepthBiasNdc * clipPos.w;
 
     output.position = clipPos;
     output.uv = input.uv;

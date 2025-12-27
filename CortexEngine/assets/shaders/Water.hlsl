@@ -6,6 +6,8 @@ cbuffer ObjectConstants : register(b0)
 {
     float4x4 g_ModelMatrix;
     float4x4 g_NormalMatrix;
+    float g_DepthBiasNdc;
+    float3 _pad0;
 };
 
 cbuffer FrameConstants : register(b1)
@@ -142,6 +144,7 @@ PSInput WaterVS(VSInput input)
     output.worldPos = worldPos.xyz;
 
     float4 clipPos = mul(g_ViewProjectionMatrix, worldPos);
+    clipPos.z += g_DepthBiasNdc * clipPos.w;
     output.position = clipPos;
 
     // Approximate normal from analytic height derivatives and cache a simple

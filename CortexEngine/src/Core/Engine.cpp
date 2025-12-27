@@ -11,9 +11,11 @@
 #include "UI/QuickSettingsWindow.h"
 #include "UI/QualitySettingsWindow.h"
 #include "UI/SceneEditorWindow.h"
+#include "UI/HierarchyWindow.h"
 #include "UI/PerformanceWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
+#include "Scene/TerrainNoise.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 #include <glm/gtc/quaternion.hpp>
@@ -28,6 +30,8 @@
 #include <limits>
 #include <vector>
 #include <deque>
+#include <unordered_map>
+#include <utility>
 #include <atomic>
 #include <thread>
 #include <nlohmann/json.hpp>
@@ -364,6 +368,10 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::CornellBox;
         } else if (sceneLower == "rt" || sceneLower == "rtshowcase" || sceneLower == "rt_showcase") {
             m_currentScenePreset = ScenePreset::RTShowcase;
+        } else if (sceneLower == "godrays" || sceneLower == "god_rays") {
+            m_currentScenePreset = ScenePreset::GodRays;
+        } else if (sceneLower == "terrain" || sceneLower == "proc_terrain" || sceneLower == "procedural_terrain") {
+            m_currentScenePreset = ScenePreset::ProceduralTerrain;
         }
         // Unknown strings fall through and keep the engine default.
     }
@@ -571,6 +579,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
         UI::QualitySettingsWindow::Initialize(m_window->GetHWND());
         UI::SceneEditorWindow::Initialize(m_window->GetHWND());
+        UI::HierarchyWindow::Initialize(m_window->GetHWND());
         UI::PerformanceWindow::Initialize(m_window->GetHWND());
     }
 
@@ -615,7 +624,9 @@ void Engine::ShowCameraHelpOverlay() {
         "  Z                   - Toggle temporal AA (TAA) on/off\n"
         "  R                   - Cycle gizmo mode (translate / rotate / resize)\n"
         "  U                   - Open scene editor window\n"
-        "  F5                  - Increase shadow PCF radius\n"
+        "  I                   - Toggle hierarchy window\n"
+        "  F5                  - Toggle play-in-editor (grounded FPS)\n"
+        "  - / =               - Adjust shadow PCF radius\n"
         "  F7 / F8             - Decrease / increase shadow bias\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
         "  F11 / F12           - Adjust near cascade resolution scale\n"
@@ -659,6 +670,8 @@ void Engine::Shutdown() {
     UI::QuickSettingsWindow::Shutdown();
     UI::QualitySettingsWindow::Shutdown();
     UI::SceneEditorWindow::Shutdown();
+    UI::HierarchyWindow::Shutdown();
+    UI::PerformanceWindow::Shutdown();
 
     // Phase 2: Shutdown LLM
     if (m_llmService) {
@@ -688,6 +701,7 @@ void Engine::Shutdown() {
 
 void Engine::SetSelectedEntity(entt::entity entity) {
     m_selectedEntity = entity;
+    UI::HierarchyWindow::OnSelectionChanged();
 
     if (!m_registry || entity == entt::null) {
         return;
@@ -733,11 +747,197 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::DragonOverWater;
         break;
     case ScenePreset::DragonOverWater:
+        next = ScenePreset::ProceduralTerrain;
+        break;
+    case ScenePreset::ProceduralTerrain:
     default:
         next = ScenePreset::RTShowcase;
         break;
     }
     RebuildScene(next);
+}
+
+void Engine::TogglePlayInEditor() {
+    if (m_mode == EngineMode::Play) {
+        ExitPlayMode();
+        spdlog::info("Play-in-editor STOP (F5)");
+    } else {
+        EnterPlayMode();
+        spdlog::info("Play-in-editor START (F5)");
+    }
+}
+
+std::unique_ptr<Scene::ECS_Registry> Engine::CloneRegistry(const Scene::ECS_Registry& src) const {
+    auto dst = std::make_unique<Scene::ECS_Registry>();
+    auto& srcReg = src.GetRegistry();
+    auto& dstReg = dst->GetRegistry();
+
+    std::unordered_map<entt::entity, entt::entity> entityMap;
+    entityMap.reserve(static_cast<size_t>(srcReg.size()));
+
+    srcReg.each([&](entt::entity e) {
+        entt::entity ne = dstReg.create();
+        entityMap.emplace(e, ne);
+    });
+
+    srcReg.each([&](entt::entity e) {
+        const entt::entity ne = entityMap.at(e);
+
+        if (srcReg.all_of<Scene::TagComponent>(e)) {
+            dstReg.emplace<Scene::TagComponent>(ne, srcReg.get<Scene::TagComponent>(e));
+        }
+        if (srcReg.all_of<Scene::TransformComponent>(e)) {
+            Scene::TransformComponent tc = srcReg.get<Scene::TransformComponent>(e);
+            if (tc.parent != entt::null) {
+                auto it = entityMap.find(tc.parent);
+                tc.parent = (it != entityMap.end()) ? it->second : entt::null;
+            }
+            tc.worldMatrix = glm::mat4(1.0f);
+            tc.normalMatrix = glm::mat4(1.0f);
+            tc.inverseWorldMatrix = glm::mat4(1.0f);
+            dstReg.emplace<Scene::TransformComponent>(ne, tc);
+        }
+        if (srcReg.all_of<Scene::RenderableComponent>(e)) {
+            dstReg.emplace<Scene::RenderableComponent>(ne, srcReg.get<Scene::RenderableComponent>(e));
+        }
+        if (srcReg.all_of<Scene::RotationComponent>(e)) {
+            dstReg.emplace<Scene::RotationComponent>(ne, srcReg.get<Scene::RotationComponent>(e));
+        }
+        if (srcReg.all_of<Scene::LightComponent>(e)) {
+            dstReg.emplace<Scene::LightComponent>(ne, srcReg.get<Scene::LightComponent>(e));
+        }
+        if (srcReg.all_of<Scene::CameraComponent>(e)) {
+            dstReg.emplace<Scene::CameraComponent>(ne, srcReg.get<Scene::CameraComponent>(e));
+        }
+        if (srcReg.all_of<Scene::ReflectionProbeComponent>(e)) {
+            dstReg.emplace<Scene::ReflectionProbeComponent>(ne, srcReg.get<Scene::ReflectionProbeComponent>(e));
+        }
+        if (srcReg.all_of<Scene::TerrainClipmapLevelComponent>(e)) {
+            dstReg.emplace<Scene::TerrainClipmapLevelComponent>(ne, srcReg.get<Scene::TerrainClipmapLevelComponent>(e));
+        }
+        if (srcReg.all_of<Scene::WaterSurfaceComponent>(e)) {
+            dstReg.emplace<Scene::WaterSurfaceComponent>(ne, srcReg.get<Scene::WaterSurfaceComponent>(e));
+        }
+        if (srcReg.all_of<Scene::BuoyancyComponent>(e)) {
+            dstReg.emplace<Scene::BuoyancyComponent>(ne, srcReg.get<Scene::BuoyancyComponent>(e));
+        }
+        if (srcReg.all_of<Scene::ParticleEmitterComponent>(e)) {
+            dstReg.emplace<Scene::ParticleEmitterComponent>(ne, srcReg.get<Scene::ParticleEmitterComponent>(e));
+        }
+    });
+
+    dst->UpdateTransforms();
+    return dst;
+}
+
+void Engine::EnterPlayMode() {
+    if (m_mode == EngineMode::Play || !m_registry || !m_window) {
+        return;
+    }
+
+    m_editorRegistryBackup = CloneRegistry(*m_registry);
+    m_editorSelectedEntity = m_selectedEntity;
+    m_editorWorldOriginOffsetBackup = m_worldOriginOffset;
+    m_selectedEntity = entt::null;
+
+    m_showGizmos = false;
+    m_showOriginAxes = false;
+    m_cameraControlActive = false;
+
+    UI::SceneEditorWindow::SetVisible(false);
+    UI::HierarchyWindow::SetVisible(false);
+    UI::DebugMenu::SetVisible(false);
+    UI::QuickSettingsWindow::SetVisible(false);
+    UI::QualitySettingsWindow::SetVisible(false);
+
+    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
+    m_playMouseCaptured = true;
+
+    m_playerVelocity = glm::vec3(0.0f);
+    m_playerGrounded = false;
+    m_playerJumpHeld = false;
+
+    // Snap to the ground height at the current XZ so play starts in a stable state.
+    if (m_activeCameraEntity != entt::null) {
+        auto& reg = m_registry->GetRegistry();
+        if (reg.valid(m_activeCameraEntity) && reg.all_of<Scene::TransformComponent>(m_activeCameraEntity)) {
+            auto& camT = reg.get<Scene::TransformComponent>(m_activeCameraEntity);
+
+            // Initialize yaw/pitch from the current camera orientation so there is no jump.
+            glm::vec3 forward = camT.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+            if (glm::length2(forward) > 1e-6f) {
+                forward = glm::normalize(forward);
+                m_cameraYaw = std::atan2(forward.x, forward.z);
+                m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+            }
+
+            if (m_terrainEnabled) {
+                Scene::TerrainNoiseParams p;
+                p.seed = m_terrainSeed;
+                p.amplitude = m_terrainAmplitude;
+                p.frequency = m_terrainFrequency;
+                p.octaves = m_terrainOctaves;
+                p.lacunarity = m_terrainLacunarity;
+                p.gain = m_terrainGain;
+                p.warp = m_terrainWarp;
+
+                const double wx = m_worldOriginOffset.x + static_cast<double>(camT.position.x);
+                const double wz = m_worldOriginOffset.z + static_cast<double>(camT.position.z);
+                const float groundY = Scene::SampleTerrainHeight(wx, wz, p);
+                camT.position.y = groundY + m_playerEyeHeight;
+                m_playerGrounded = true;
+            }
+        }
+    }
+
+    m_mode = EngineMode::Play;
+}
+
+void Engine::ExitPlayMode() {
+    if (m_mode != EngineMode::Play || !m_window) {
+        return;
+    }
+
+    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
+    m_playMouseCaptured = false;
+
+    if (m_editorRegistryBackup) {
+        m_registry = std::move(m_editorRegistryBackup);
+    }
+    m_worldOriginOffset = m_editorWorldOriginOffsetBackup;
+    m_editorWorldOriginOffsetBackup = glm::dvec3(0.0, 0.0, 0.0);
+
+    m_selectedEntity = m_editorSelectedEntity;
+    m_editorSelectedEntity = entt::null;
+
+    m_showGizmos = true;
+    m_showOriginAxes = true;
+
+    // Re-acquire active camera handle and yaw/pitch from the restored registry.
+    m_activeCameraEntity = entt::null;
+    m_cameraControllerInitialized = false;
+    InitializeCameraController();
+
+    m_mode = EngineMode::Editor;
+}
+
+void Engine::ApplyWorldOriginShift(const glm::dvec3& delta) {
+    if (!m_registry) {
+        return;
+    }
+
+    const glm::vec3 deltaF(static_cast<float>(delta.x),
+                           static_cast<float>(delta.y),
+                           static_cast<float>(delta.z));
+
+    auto view = m_registry->View<Scene::TransformComponent>();
+    for (auto entity : view) {
+        auto& t = view.get<Scene::TransformComponent>(entity);
+        t.position -= deltaF;
+    }
+
+    m_worldOriginOffset += delta;
+    m_registry->UpdateTransforms();
 }
 
 void Engine::ApplyHeroVisualBaseline() {
@@ -1368,6 +1568,11 @@ void Engine::ProcessInput() {
                 // Global keys that should always work, regardless of settings state
                 // -----------------------------------------------------------------
                 if (key == SDLK_ESCAPE) {
+                    if (m_mode == EngineMode::Play) {
+                        ExitPlayMode();
+                        spdlog::info("Play-in-editor STOP (ESC)");
+                        break;
+                    }
                     // Close overlay first, then the settings window, then the
                     // quick settings window; only exit the app if no UI is open.
                     if (overlayVisible) {
@@ -1382,6 +1587,10 @@ void Engine::ProcessInput() {
                     } else {
                         m_running = false;
                     }
+                    break;
+                }
+                if (key == SDLK_F5) {
+                    TogglePlayInEditor();
                     break;
                 }
                   if (key == SDLK_H) {
@@ -1496,6 +1705,12 @@ void Engine::ProcessInput() {
                     // Separate scene editor window for spawning primitives and models.
                     UI::SceneEditorWindow::Toggle();
                     spdlog::info("Scene editor window toggled (U)");
+                    break;
+                }
+                if (key == SDLK_I) {
+                    // Entity hierarchy / outliner window.
+                    UI::HierarchyWindow::Toggle();
+                    spdlog::info("Hierarchy window toggled (I)");
                     break;
                 }
                 if (key == SDLK_M) {
@@ -1716,9 +1931,15 @@ void Engine::ProcessInput() {
                         m_renderer->ToggleTAA();
                     }
                 }
-                else if (key == SDLK_F5) {
+                else if (key == SDLK_EQUALS || key == SDLK_KP_PLUS) {
                     if (m_renderer) {
                         m_renderer->AdjustShadowPCFRadius(0.5f);
+                        SyncDebugMenuFromRenderer();
+                    }
+                }
+                else if (key == SDLK_MINUS || key == SDLK_KP_MINUS) {
+                    if (m_renderer) {
+                        m_renderer->AdjustShadowPCFRadius(-0.5f);
                         SyncDebugMenuFromRenderer();
                     }
                 }
@@ -1811,7 +2032,7 @@ void Engine::ProcessInput() {
                 m_lastMousePos = glm::vec2(static_cast<float>(event.button.x),
                                            static_cast<float>(event.button.y));
 
-                if (event.button.button == SDL_BUTTON_LEFT) {
+                if (m_mode == EngineMode::Editor && event.button.button == SDL_BUTTON_LEFT) {
                     // If a gizmo axis is under the cursor, begin a drag; otherwise pick entity.
                     bool gizmoWasHit = false;
 
@@ -1929,7 +2150,8 @@ void Engine::ProcessInput() {
                         }
                     }
                 }
-                else if (!m_droneFlightEnabled &&
+                else if (m_mode == EngineMode::Editor &&
+                         !m_droneFlightEnabled &&
                          event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = true;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
@@ -1943,7 +2165,8 @@ void Engine::ProcessInput() {
                         m_gizmoActiveAxis = GizmoAxis::None;
                     }
                 }
-                if (!m_droneFlightEnabled &&
+                if (m_mode == EngineMode::Editor &&
+                    !m_droneFlightEnabled &&
                     event.button.button == SDL_BUTTON_RIGHT && m_window) {
                     m_cameraControlActive = false;
                     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
@@ -2001,7 +2224,7 @@ void Engine::ProcessInput() {
                             }
                         }
                     }
-                } else if (m_cameraControlActive) {
+                } else if (m_cameraControlActive || m_mode == EngineMode::Play) {
                     m_pendingMouseDeltaX += static_cast<float>(event.motion.xrel);
                     m_pendingMouseDeltaY += static_cast<float>(event.motion.yrel);
                 }
@@ -2226,9 +2449,36 @@ void Engine::Update(float deltaTime) {
         }
     }
 
-    // Update active camera (fly controls) and optional auto-demo orbit
-    UpdateCameraController(deltaTime);
-    UpdateAutoDemo(deltaTime);
+    // Update camera.
+    if (m_mode == EngineMode::Play) {
+        UpdatePlayMode(deltaTime);
+    } else {
+        UpdateCameraController(deltaTime);
+        UpdateAutoDemo(deltaTime);
+    }
+
+    // Floating origin in editor mode as well, so long traversal and the
+    // procedural terrain stay stable even when flying around without Play mode.
+    if (m_mode == EngineMode::Editor && !m_gizmoDragging &&
+        m_registry && m_activeCameraEntity != entt::null) {
+        auto& reg = m_registry->GetRegistry();
+        if (reg.valid(m_activeCameraEntity) && reg.all_of<Scene::TransformComponent>(m_activeCameraEntity)) {
+            const auto& camT = reg.get<Scene::TransformComponent>(m_activeCameraEntity);
+            const double localX = static_cast<double>(camT.position.x);
+            const double localZ = static_cast<double>(camT.position.z);
+            if (std::abs(localX) > m_worldShiftThreshold || std::abs(localZ) > m_worldShiftThreshold) {
+                auto roundToGrid = [&](double v) -> double {
+                    if (m_worldShiftGrid <= 1e-6) return 0.0;
+                    return std::round(v / m_worldShiftGrid) * m_worldShiftGrid;
+                };
+                const double shiftX = roundToGrid(localX);
+                const double shiftZ = roundToGrid(localZ);
+                if (std::abs(shiftX) > 1e-6 || std::abs(shiftZ) > 1e-6) {
+                    ApplyWorldOriginShift(glm::dvec3(shiftX, 0.0, shiftZ));
+                }
+            }
+        }
+    }
 
     // Update all rotation components (spinning cube)
     auto viewRot = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
@@ -2239,6 +2489,54 @@ void Engine::Update(float deltaTime) {
         float angle = rotation.speed * deltaTime;
         glm::quat rotationDelta = glm::angleAxis(angle, glm::normalize(rotation.axis));
         transform.rotation = rotationDelta * transform.rotation;
+    }
+
+    // Update procedural terrain clipmap transforms so the active ring levels
+    // stay centered around the active camera in local space. This keeps draw
+    // count constant while allowing unlimited traversal with floating origin.
+    if (m_terrainEnabled && !m_terrainLevelEntities.empty() && m_activeCameraEntity != entt::null) {
+        auto& reg = m_registry->GetRegistry();
+        if (reg.valid(m_activeCameraEntity) && reg.all_of<Scene::TransformComponent>(m_activeCameraEntity)) {
+            const auto& camT = reg.get<Scene::TransformComponent>(m_activeCameraEntity);
+            const double step = (m_terrainBaseSpacing > 1e-6f) ? static_cast<double>(m_terrainBaseSpacing) : 1.0;
+            auto roundTo = [&](double v) -> float {
+                const double q = std::round(v / step) * step;
+                return static_cast<float>(q);
+            };
+            const float centerX = roundTo(static_cast<double>(camT.position.x));
+            const float centerZ = roundTo(static_cast<double>(camT.position.z));
+
+            for (entt::entity e : m_terrainLevelEntities) {
+                if (!reg.valid(e) || !reg.all_of<Scene::TransformComponent, Scene::TerrainClipmapLevelComponent>(e)) {
+                    continue;
+                }
+                auto& t = reg.get<Scene::TransformComponent>(e);
+                const auto& lvl = reg.get<Scene::TerrainClipmapLevelComponent>(e);
+                const float spacing = m_terrainBaseSpacing * static_cast<float>(1u << std::min<uint32_t>(lvl.level, 30u));
+                t.position = glm::vec3(centerX, 0.0f, centerZ);
+                t.scale = glm::vec3(spacing, 1.0f, spacing);
+                t.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            }
+        }
+    }
+
+    // Update renderer-side terrain constants (noise params + floating-origin offset).
+    if (m_renderer && m_terrainEnabled) {
+        auto splitHiLo = [](double v) -> std::pair<float, float> {
+            float hi = static_cast<float>(v);
+            float lo = static_cast<float>(v - static_cast<double>(hi));
+            return { hi, lo };
+        };
+
+        const auto [hiX, loX] = splitHiLo(m_worldOriginOffset.x);
+        const auto [hiZ, loZ] = splitHiLo(m_worldOriginOffset.z);
+
+        Graphics::TerrainConstants tc{};
+        tc.seedAndOctaves = glm::uvec4(m_terrainSeed, m_terrainOctaves, 0u, 0u);
+        tc.params0 = glm::vec4(m_terrainAmplitude, m_terrainFrequency, m_terrainLacunarity, m_terrainGain);
+        tc.params1 = glm::vec4(m_terrainWarp, m_terrainSkirtDepth, hiX, hiZ);
+        tc.params2 = glm::vec4(loX, loZ, 0.0f, 0.0f);
+        m_renderer->SetTerrainConstants(tc);
     }
 
     // Update world matrices for all transforms so picking/gizmos and renderer
@@ -2779,6 +3077,7 @@ entt::entity Engine::PickEntityAt(float mouseX, float mouseY) {
         auto& transform = view.get<Scene::TransformComponent>(entity);
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         if (!renderable.visible) continue;
+        if (m_registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) continue;
 
         glm::mat4 world = transform.worldMatrix;
         glm::mat4 invWorld = transform.inverseWorldMatrix;
@@ -3346,6 +3645,164 @@ void Engine::UpdateCameraController(float deltaTime) {
     transform.rotation = glm::quatLookAt(glm::normalize(forward), up);
 }
 
+void Engine::UpdatePlayMode(float deltaTime) {
+    if (!m_registry || m_activeCameraEntity == entt::null) {
+        return;
+    }
+
+    auto& reg = m_registry->GetRegistry();
+    if (!reg.valid(m_activeCameraEntity) ||
+        !reg.all_of<Scene::TransformComponent, Scene::CameraComponent>(m_activeCameraEntity)) {
+        return;
+    }
+
+    auto& transform = reg.get<Scene::TransformComponent>(m_activeCameraEntity);
+
+    // Mouse look (always active in play mode).
+    const float dx = m_pendingMouseDeltaX;
+    const float dy = m_pendingMouseDeltaY;
+    m_pendingMouseDeltaX = 0.0f;
+    m_pendingMouseDeltaY = 0.0f;
+
+    m_cameraYaw += dx * m_mouseSensitivity;
+    m_cameraPitch += dy * m_mouseSensitivity;
+    const float pitchLimit = glm::radians(89.0f);
+    m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+
+    const float cosPitch = std::cos(m_cameraPitch);
+    glm::vec3 forward(
+        std::sin(m_cameraYaw) * cosPitch,
+        std::sin(m_cameraPitch),
+        std::cos(m_cameraYaw) * cosPitch
+    );
+    forward = glm::normalize(forward);
+    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), forward));
+
+    // Keep the camera upright in play mode.
+    transform.rotation = glm::quatLookAt(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // Keyboard movement (grounded).
+    int numKeys = 0;
+    const bool* keys = SDL_GetKeyboardState(&numKeys);
+    auto keyDown = [&](SDL_Scancode scancode) {
+        return keys && scancode < numKeys && keys[scancode];
+    };
+
+    glm::vec3 moveDir(0.0f);
+    glm::vec3 forwardFlat = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
+    glm::vec3 rightFlat = glm::normalize(glm::vec3(right.x, 0.0f, right.z));
+
+    if (keyDown(SDL_SCANCODE_W)) moveDir += forwardFlat;
+    if (keyDown(SDL_SCANCODE_S)) moveDir -= forwardFlat;
+    if (keyDown(SDL_SCANCODE_D)) moveDir += rightFlat;
+    if (keyDown(SDL_SCANCODE_A)) moveDir -= rightFlat;
+
+    const bool sprint = keyDown(SDL_SCANCODE_LSHIFT) || keyDown(SDL_SCANCODE_RSHIFT);
+    const float maxSpeed = sprint ? m_playerMaxSprintSpeed : m_playerMaxWalkSpeed;
+
+    glm::vec3 vel = m_playerVelocity;
+    glm::vec3 velH(vel.x, 0.0f, vel.z);
+
+    const bool hasMove = (glm::length2(moveDir) > 1e-6f);
+    if (hasMove) {
+        moveDir = glm::normalize(moveDir);
+        glm::vec3 desired = moveDir * maxSpeed;
+        glm::vec3 delta = desired - velH;
+        float maxDelta = m_playerAcceleration * deltaTime;
+        float len = glm::length(delta);
+        if (len > maxDelta && len > 1e-6f) {
+            delta *= (maxDelta / len);
+        }
+        velH += delta;
+    } else {
+        // Friction when no input.
+        float damp = std::exp(-m_playerFriction * deltaTime);
+        velH *= damp;
+    }
+
+    // Gravity.
+    vel.y -= m_playerGravity * deltaTime;
+
+    // Jump edge detect.
+    const bool jumpDown = keyDown(SDL_SCANCODE_SPACE);
+    const bool jumpPressed = jumpDown && !m_playerJumpHeld;
+    m_playerJumpHeld = jumpDown;
+
+    if (m_playerGrounded && jumpPressed) {
+        vel.y = m_playerJumpSpeed;
+        m_playerGrounded = false;
+    }
+
+    // Integrate.
+    glm::vec3 pos = transform.position;
+    pos += glm::vec3(velH.x, vel.y, velH.z) * deltaTime;
+
+    // Ground collision (procedural terrain height function).
+    float groundY = 0.0f;
+    bool hasGround = true;
+    glm::vec3 groundNormal(0.0f, 1.0f, 0.0f);
+
+    if (m_terrainEnabled) {
+        Scene::TerrainNoiseParams p;
+        p.seed = m_terrainSeed;
+        p.amplitude = m_terrainAmplitude;
+        p.frequency = m_terrainFrequency;
+        p.octaves = m_terrainOctaves;
+        p.lacunarity = m_terrainLacunarity;
+        p.gain = m_terrainGain;
+        p.warp = m_terrainWarp;
+
+        const double wx = m_worldOriginOffset.x + static_cast<double>(pos.x);
+        const double wz = m_worldOriginOffset.z + static_cast<double>(pos.z);
+
+        groundY = Scene::SampleTerrainHeight(wx, wz, p);
+        hasGround = true;
+
+        // Finite-difference normal in world units for slope limiting.
+        constexpr double eps = 0.5;
+        const float hL = Scene::SampleTerrainHeight(wx - eps, wz, p);
+        const float hR = Scene::SampleTerrainHeight(wx + eps, wz, p);
+        const float hD = Scene::SampleTerrainHeight(wx, wz - eps, p);
+        const float hU = Scene::SampleTerrainHeight(wx, wz + eps, p);
+        glm::vec3 n(-(hR - hL), 2.0f * static_cast<float>(eps), -(hU - hD));
+        if (glm::length2(n) > 1e-6f) {
+            groundNormal = glm::normalize(n);
+        }
+    }
+    const float targetEyeY = groundY + m_playerEyeHeight;
+    const float maxSlopeDeg = 50.0f;
+    const float minUp = std::cos(glm::radians(maxSlopeDeg));
+    const bool slopeOK = (groundNormal.y >= minUp);
+
+    if (hasGround && slopeOK && pos.y <= targetEyeY) {
+        pos.y = targetEyeY;
+        vel.y = 0.0f;
+        m_playerGrounded = true;
+    } else {
+        m_playerGrounded = false;
+    }
+
+    transform.position = pos;
+    m_playerVelocity = glm::vec3(velH.x, vel.y, velH.z);
+
+    // Floating origin shift to keep float transforms stable over long traversal.
+    // Shift only in XZ; Y remains in local space to avoid perturbing vertical
+    // effects (water level, fog base height, etc.).
+    const double localX = static_cast<double>(transform.position.x);
+    const double localZ = static_cast<double>(transform.position.z);
+    if (std::abs(localX) > m_worldShiftThreshold || std::abs(localZ) > m_worldShiftThreshold) {
+        auto roundToGrid = [&](double v) -> double {
+            if (m_worldShiftGrid <= 1e-6) return 0.0;
+            return std::round(v / m_worldShiftGrid) * m_worldShiftGrid;
+        };
+        const double shiftX = roundToGrid(localX);
+        const double shiftZ = roundToGrid(localZ);
+        if (std::abs(shiftX) > 1e-6 || std::abs(shiftZ) > 1e-6) {
+            ApplyWorldOriginShift(glm::dvec3(shiftX, 0.0, shiftZ));
+        }
+    }
+}
+
 void Engine::UpdateAutoDemo(float deltaTime) {
     if (!m_autoDemoEnabled || !m_registry) {
         return;
@@ -3772,6 +4229,8 @@ void Engine::InitializeScene() {
     case ScenePreset::CornellBox:
     case ScenePreset::DragonOverWater:
     case ScenePreset::RTShowcase:
+    case ScenePreset::GodRays:
+    case ScenePreset::ProceduralTerrain:
         break;
     default:
         m_currentScenePreset = ScenePreset::RTShowcase;

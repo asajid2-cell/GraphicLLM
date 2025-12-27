@@ -743,6 +743,11 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create material constant buffer: " + cbResult.Error());
     }
 
+    cbResult = m_terrainConstantBuffer.Initialize(device->GetDevice(), 64);
+    if (cbResult.IsErr()) {
+        return Result<void>::Err("Failed to create terrain constant buffer: " + cbResult.Error());
+    }
+
     // Shadow constants: one slot per cascade so we can safely
     // update them independently while recording the shadow pass.
     cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice(), kShadowCascadeCount);
@@ -4933,6 +4938,14 @@ void Renderer::SetGPUCullingEnabled(bool enabled) {
     }
 }
 
+void Renderer::SetVisibilityBufferEnabled(bool enabled) {
+    // Visibility buffer requires a successfully initialized VB renderer.
+    m_visibilityBufferEnabled = enabled && (m_visibilityBuffer != nullptr);
+    if (!m_visibilityBufferEnabled) {
+        m_vbRenderedThisFrame = false;
+    }
+}
+
 uint32_t Renderer::GetGPUCulledCount() const {
     return m_gpuCulling ? m_gpuCulling->GetVisibleCount() : 0;
 }
@@ -4959,6 +4972,7 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
 
         if (!renderable.visible || !renderable.mesh) continue;
         if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
+        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
@@ -5245,6 +5259,7 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
         if (!renderable.visible || !renderable.mesh) continue;
         if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
+        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
@@ -6145,6 +6160,52 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
         m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
     }
 
+    // Terrain pass (not part of indirect draw path).
+    if (m_terrainPipeline) {
+        auto terrainView = registry->View<Scene::RenderableComponent, Scene::TransformComponent, Scene::TerrainClipmapLevelComponent>();
+        if (terrainView.begin() != terrainView.end()) {
+            m_commandList->SetPipelineState(m_terrainPipeline->GetPipelineState());
+            const D3D12_GPU_VIRTUAL_ADDRESS terrainCB =
+                m_terrainConstantBuffer.AllocateAndWrite(m_terrainParamsCPU);
+            m_commandList->SetGraphicsRootConstantBufferView(2, terrainCB);
+
+            for (auto entity : terrainView) {
+                auto& renderable = terrainView.get<Scene::RenderableComponent>(entity);
+                auto& transform = terrainView.get<Scene::TransformComponent>(entity);
+                if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
+                    continue;
+                }
+
+                ObjectConstants objectData{};
+                objectData.modelMatrix = transform.GetMatrix();
+                objectData.normalMatrix = transform.GetNormalMatrix();
+
+                const D3D12_GPU_VIRTUAL_ADDRESS objectCB =
+                    m_objectConstantBuffer.AllocateAndWrite(objectData);
+                m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                    D3D12_VERTEX_BUFFER_VIEW vbv{};
+                    vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                    vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                    vbv.StrideInBytes = sizeof(Vertex);
+
+                    D3D12_INDEX_BUFFER_VIEW ibv{};
+                    ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                    ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                    ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                    m_commandList->IASetIndexBuffer(&ibv);
+                    m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+                }
+            }
+
+            // Restore base pipeline for indirect geometry.
+            m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+        }
+    }
+
     m_gpuInstances.clear();
     std::vector<IndirectCommand> commands;
 
@@ -6225,6 +6286,9 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             continue;
         }
         if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) {
+            continue;
+        }
+        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) {
             continue;
         }
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
@@ -6651,6 +6715,52 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
 
+    // Terrain pass (procedural clipmap). Rendered before other opaque geometry.
+    if (m_terrainPipeline) {
+        auto terrainView = registry->View<Scene::RenderableComponent, Scene::TransformComponent, Scene::TerrainClipmapLevelComponent>();
+        if (!terrainView.empty()) {
+            m_commandList->SetPipelineState(m_terrainPipeline->GetPipelineState());
+            const D3D12_GPU_VIRTUAL_ADDRESS terrainCB =
+                m_terrainConstantBuffer.AllocateAndWrite(m_terrainParamsCPU);
+            m_commandList->SetGraphicsRootConstantBufferView(2, terrainCB);
+
+            for (auto entity : terrainView) {
+                auto& renderable = terrainView.get<Scene::RenderableComponent>(entity);
+                auto& transform = terrainView.get<Scene::TransformComponent>(entity);
+                if (!renderable.visible || !renderable.mesh || !renderable.mesh->gpuBuffers) {
+                    continue;
+                }
+
+                ObjectConstants objectData{};
+                objectData.modelMatrix = transform.GetMatrix();
+                objectData.normalMatrix = transform.GetNormalMatrix();
+
+                const D3D12_GPU_VIRTUAL_ADDRESS objectCB =
+                    m_objectConstantBuffer.AllocateAndWrite(objectData);
+                m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                    D3D12_VERTEX_BUFFER_VIEW vbv{};
+                    vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                    vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                    vbv.StrideInBytes = sizeof(Vertex);
+
+                    D3D12_INDEX_BUFFER_VIEW ibv{};
+                    ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                    ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                    ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                    m_commandList->IASetIndexBuffer(&ibv);
+                    m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+                }
+            }
+
+            // Restore default pipeline for the rest of the scene.
+            m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
+        }
+    }
+
     // Render all entities with Renderable and Transform components
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
 
@@ -6663,6 +6773,12 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
         if (!renderable.visible || !renderable.mesh) {
+            continue;
+        }
+        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) {
+            continue;
+        }
+        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) {
             continue;
         }
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) {
@@ -11258,6 +11374,34 @@ Result<void> Renderer::CreateCommandList() {
         spdlog::warn("Failed to compile water pixel shader: {}", waterPsResult.Error());
     }
 
+    // Procedural terrain clipmap shaders (forward path).
+    auto terrainVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Terrain.hlsl",
+        "TerrainVS",
+        "vs_5_1"
+    );
+    if (terrainVsResult.IsErr()) {
+        spdlog::warn("Failed to compile terrain vertex shader: {}", terrainVsResult.Error());
+    }
+
+    auto terrainPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Terrain.hlsl",
+        "TerrainPS",
+        "ps_5_1"
+    );
+    if (terrainPsResult.IsErr()) {
+        spdlog::warn("Failed to compile terrain pixel shader: {}", terrainPsResult.Error());
+    }
+
+    auto terrainShadowVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/Terrain.hlsl",
+        "TerrainShadowVS",
+        "vs_5_1"
+    );
+    if (terrainShadowVsResult.IsErr()) {
+        spdlog::warn("Failed to compile terrain shadow vertex shader: {}", terrainShadowVsResult.Error());
+    }
+
     // Store compiled shaders (we'll use them in CreatePipeline)
     // For now, we'll just recreate the root signature and pipeline
 
@@ -11362,6 +11506,56 @@ Result<void> Renderer::CreateCommandList() {
         }
     } else {
         m_overlayPipeline.reset();
+    }
+
+    // Procedural terrain pipeline (forward path). Uses a dedicated shader pair that
+    // displaces a clipmap grid in the vertex shader.
+    if (terrainVsResult.IsOk() && terrainPsResult.IsOk()) {
+        m_terrainPipeline = std::make_unique<DX12Pipeline>();
+        PipelineDesc terrainDesc = pipelineDesc;
+        terrainDesc.vertexShader = terrainVsResult.Value();
+        terrainDesc.pixelShader = terrainPsResult.Value();
+        terrainDesc.numRenderTargets = 2;
+        terrainDesc.depthTestEnabled = true;
+        terrainDesc.depthWriteEnabled = true;
+        terrainDesc.cullMode = D3D12_CULL_MODE_BACK;
+
+        auto terrainPipelineResult = m_terrainPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            terrainDesc);
+        if (terrainPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create terrain pipeline: {}", terrainPipelineResult.Error());
+            m_terrainPipeline.reset();
+        }
+    } else {
+        m_terrainPipeline.reset();
+    }
+
+    // Depth-only terrain pipeline for the cascaded shadow map pass.
+    if (terrainShadowVsResult.IsOk()) {
+        m_terrainShadowPipeline = std::make_unique<DX12Pipeline>();
+        PipelineDesc terrainShadowDesc = {};
+        terrainShadowDesc.vertexShader = terrainShadowVsResult.Value();
+        terrainShadowDesc.pixelShader  = {}; // depth-only
+        terrainShadowDesc.inputLayout  = pipelineDesc.inputLayout;
+        terrainShadowDesc.rtvFormat    = DXGI_FORMAT_UNKNOWN;
+        terrainShadowDesc.dsvFormat    = DXGI_FORMAT_D32_FLOAT;
+        terrainShadowDesc.numRenderTargets = 0;
+        terrainShadowDesc.depthTestEnabled = true;
+        terrainShadowDesc.depthWriteEnabled = true;
+        terrainShadowDesc.cullMode = D3D12_CULL_MODE_BACK;
+
+        auto terrainShadowResult = m_terrainShadowPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            terrainShadowDesc);
+        if (terrainShadowResult.IsErr()) {
+            spdlog::warn("Failed to create terrain shadow pipeline: {}", terrainShadowResult.Error());
+            m_terrainShadowPipeline.reset();
+        }
+    } else {
+        m_terrainShadowPipeline.reset();
     }
 
     if (!waterVsResult.IsOk() || !waterPsResult.IsOk()) {
@@ -12740,6 +12934,10 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         // Bind shadow constants (b3)
         m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
+        // Terrain constants (b2) for any terrain clipmap draws in this cascade.
+        const D3D12_GPU_VIRTUAL_ADDRESS terrainCB =
+            m_terrainConstantBuffer.AllocateAndWrite(m_terrainParamsCPU);
+
         // Bind DSV for this cascade
         D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMapDSVs[cascadeIndex].cpu;
         m_commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
@@ -12760,6 +12958,43 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 continue;
             }
             if (IsTransparentRenderable(renderable)) {
+                continue;
+            }
+
+            const bool isTerrain = registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity);
+            if (isTerrain) {
+                if (!m_terrainShadowPipeline) {
+                    continue;
+                }
+                if (currentPipeline != m_terrainShadowPipeline.get()) {
+                    currentPipeline = m_terrainShadowPipeline.get();
+                    m_commandList->SetPipelineState(currentPipeline->GetPipelineState());
+                }
+
+                // Bind terrain constants (b2) for displacement.
+                m_commandList->SetGraphicsRootConstantBufferView(2, terrainCB);
+
+                ObjectConstants objectData{};
+                objectData.modelMatrix = transform.GetMatrix();
+                objectData.normalMatrix = transform.GetNormalMatrix();
+                D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+                m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                    D3D12_VERTEX_BUFFER_VIEW vbv{};
+                    vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                    vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                    vbv.StrideInBytes = sizeof(Vertex);
+
+                    D3D12_INDEX_BUFFER_VIEW ibv{};
+                    ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                    ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                    ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                    m_commandList->IASetIndexBuffer(&ibv);
+                    m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+                }
                 continue;
             }
 
@@ -12856,6 +13091,9 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             // Bind shadow constants (b3)
             m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
+            const D3D12_GPU_VIRTUAL_ADDRESS terrainCB =
+                m_terrainConstantBuffer.AllocateAndWrite(m_terrainParamsCPU);
+
             // Bind DSV for this local light slice
             D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowMapDSVs[slice].cpu;
             m_commandList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
@@ -12876,6 +13114,43 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                     continue;
                 }
                 if (IsTransparentRenderable(renderable)) {
+                    continue;
+                }
+
+                const bool isTerrain = registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity);
+                if (isTerrain) {
+                    if (!m_terrainShadowPipeline) {
+                        continue;
+                    }
+                    if (currentPipeline != m_terrainShadowPipeline.get()) {
+                        currentPipeline = m_terrainShadowPipeline.get();
+                        m_commandList->SetPipelineState(currentPipeline->GetPipelineState());
+                    }
+
+                    m_commandList->SetGraphicsRootConstantBufferView(2, terrainCB);
+
+                    ObjectConstants objectData{};
+                    objectData.modelMatrix = transform.GetMatrix();
+                    objectData.normalMatrix = transform.GetNormalMatrix();
+
+                    D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
+                    m_commandList->SetGraphicsRootConstantBufferView(0, objectCB);
+
+                    if (renderable.mesh->gpuBuffers->vertexBuffer && renderable.mesh->gpuBuffers->indexBuffer) {
+                        D3D12_VERTEX_BUFFER_VIEW vbv{};
+                        vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
+                        vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
+                        vbv.StrideInBytes = sizeof(Vertex);
+
+                        D3D12_INDEX_BUFFER_VIEW ibv{};
+                        ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
+                        ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
+                        ibv.Format = DXGI_FORMAT_R32_UINT;
+
+                        m_commandList->IASetVertexBuffers(0, 1, &vbv);
+                        m_commandList->IASetIndexBuffer(&ibv);
+                        m_commandList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
+                    }
                     continue;
                 }
 

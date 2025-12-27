@@ -233,6 +233,14 @@ struct WaterSurfaceComponent {
     float priority = 0.0f;
 };
 
+// Marker component for procedural terrain clipmap levels. Terrain is rendered
+// with a dedicated pipeline (displaced in the vertex shader) and provides the
+// ground height function for play-mode traversal.
+struct TerrainClipmapLevelComponent {
+    uint32_t level = 0;   // 0 = finest
+    uint32_t isRing = 0;  // 0 = full grid, 1 = ring (with inner hole)
+};
+
 // Simple buoyancy data for objects that should float on water. Vertical
 // integration and interaction are handled by a dedicated update step.
 struct BuoyancyComponent {

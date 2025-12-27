@@ -41,6 +41,15 @@ public:
     // Generate a thin rectangular prism that can be used as a "line" or
     // segment when oriented and scaled via TransformComponent.
     static std::shared_ptr<Scene::MeshData> CreateLine(float length = 1.0f, float thickness = 0.02f);
+
+    // Terrain clipmap support: generate an XZ grid centered at origin with optional
+    // inner-hole (ring) topology and boundary skirts. Intended for vertex-shader
+    // displacement using an analytic height function.
+    //
+    // - `gridDim` should be 2^n + 1 (e.g., 129) for clean nested LOD alignment.
+    // - When `ring` is true, a centered hole of size (gridDim+1)/2 is cut out.
+    // - Skirt vertices are marked by `texCoord.y = 1` (base grid vertices use 0).
+    static std::shared_ptr<Scene::MeshData> CreateTerrainClipmapGrid(uint32_t gridDim, bool ring, bool skirts = true);
 };
 
 } // namespace Cortex::Utils

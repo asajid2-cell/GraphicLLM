@@ -395,6 +395,14 @@ public:
         m_voxelBackendEnabled = enabled && (m_voxelPipeline != nullptr);
     }
     [[nodiscard]] bool IsVoxelBackendEnabled() const { return m_voxelBackendEnabled; }
+
+    // Visibility buffer path toggle (two-phase deferred). Some render features
+    // can request the classic forward path for correctness.
+    void SetVisibilityBufferEnabled(bool enabled);
+    [[nodiscard]] bool IsVisibilityBufferEnabled() const { return m_visibilityBufferEnabled && m_visibilityBuffer != nullptr; }
+
+    // Procedural terrain parameters consumed by `assets/shaders/Terrain.hlsl`.
+    void SetTerrainConstants(const TerrainConstants& params) { m_terrainParamsCPU = params; }
     // Mark the dense voxel grid as out of date so the next voxel render pass
     // rebuilds it from the current ECS scene. Called on scene rebuilds or
     // when large structural changes occur.
@@ -625,6 +633,8 @@ public:
     std::unique_ptr<DX12Pipeline> m_waterPipeline;
     std::unique_ptr<DX12Pipeline> m_waterOverlayPipeline;
     std::unique_ptr<DX12Pipeline> m_particlePipeline;
+    std::unique_ptr<DX12Pipeline> m_terrainPipeline;
+    std::unique_ptr<DX12Pipeline> m_terrainShadowPipeline;
     // Experimental fullscreen voxel renderer pipeline (SV_VertexID triangle).
     std::unique_ptr<DX12Pipeline> m_voxelPipeline;
 
@@ -642,6 +652,7 @@ public:
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
     ConstantBuffer<ObjectConstants> m_objectConstantBuffer;
     ConstantBuffer<MaterialConstants> m_materialConstantBuffer;
+    ConstantBuffer<TerrainConstants> m_terrainConstantBuffer;
     ConstantBuffer<ShadowConstants> m_shadowConstantBuffer;
 
     // Upload helpers
@@ -1110,6 +1121,7 @@ public:
     float m_totalTime = 0.0f;
     uint64_t m_fenceValues[3] = { 0, 0, 0 };
     FrameConstants m_frameDataCPU{};
+    TerrainConstants m_terrainParamsCPU{};
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     bool m_hyperSceneBuilt = false;
 #endif

@@ -155,12 +155,25 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
                     const float2 radiusNdc = (worldRadius * hzbProjScale) / viewZ;
                     const float2 radiusPx = abs(radiusNdc) * float2(0.5f * (float)hzbWidth, 0.5f * (float)hzbHeight);
                     const float r = max(1.0f, max(radiusPx.x, radiusPx.y));
-                    uint mip = min(hzbMipCount - 1u, (uint)max(0.0f, floor(log2(r))));
 
-                    // Under motion, bias toward more detailed mips to reduce false occlusion
-                    // from coarse min-depth tiles that are temporally misaligned.
-                    if (motion + cameraMotionWS > 0.001f && mip > 0u) {
-                        mip -= 1u;
+                    // Skip occlusion for large objects (>64 pixels radius).
+                    // Large objects are prone to self-occlusion and partial visibility.
+                    if (r > 64.0f) {
+                        occluded = false;
+                    } else {
+                    // Use ceil() for conservative mip selection - round UP to ensure we sample
+                    // at a resolution that fully covers the object's screen footprint.
+                    uint mip = min(hzbMipCount - 1u, (uint)max(0.0f, ceil(log2(r))));
+
+                    // More aggressive mip reduction during motion - use finer mips for accuracy.
+                    // Finer mips have more precise per-pixel depths, reducing errors from
+                    // coarse-tile averaging during camera/object movement.
+                    const float totalMotion = motion + cameraMotionWS;
+                    if (totalMotion > 0.001f) {
+                        uint mipReduction = 1u;
+                        if (totalMotion > 0.5f) mipReduction = 2u;  // Fast motion: -2 mips
+                        if (totalMotion > 2.0f) mipReduction = 3u;  // Very fast: -3 mips
+                        mip = (mip >= mipReduction) ? (mip - mipReduction) : 0u;
                     }
 
                     const uint mipW = max(1u, CeilDivPow2(hzbWidth, mip));
@@ -188,9 +201,15 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
                     hzbViewZ = max(hzbViewZ, g_HZB.Load(int3((int2)coord11, (int)mip)));
                     dbgHzbDepth = hzbViewZ;
 
-                    // Compute the sphere's nearest point to the HZB camera in world space.
-                    float3 toCenter = centerWS - g_HZBCameraPos.xyz;
-                    float distToCenter = length(toCenter);
+                    // Transform sphere center to HZB view-space and compute nearest depth.
+                    // Use simpler approach: centerZ - radius (conservative approximation).
+                    // This avoids complex world-space near-point calculation that can have
+                    // matrix convention issues between GLM (column-major) and HLSL (row-major).
+                    const float4 centerVS4 = mul(g_HZBViewMatrix, float4(centerWS, 1.0f));
+                    const float centerViewZ = centerVS4.z;
+
+                    // Camera inside sphere check using view-space distance
+                    const float distToCenter = length(centerVS4.xyz);
 
                     // CRITICAL: If camera is inside the bounding sphere, NEVER occlude.
                     // This prevents culling objects we're standing inside of.
@@ -198,23 +217,34 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
                         // Camera is inside sphere - object is definitely visible
                         occluded = false;
                     } else {
-                        float3 dir = toCenter / max(distToCenter, 1e-6f);
-                        float3 nearWS = centerWS - dir * worldRadius;
-                        const float3 nearVS = mul(g_HZBViewMatrix, float4(nearWS, 1.0f)).xyz;
-                        const float nearViewZ = nearVS.z;
+                        // Nearest possible depth = center depth - radius (sphere front face)
+                        const float nearViewZ = centerViewZ - worldRadius;
                         dbgNearDepth = nearViewZ;
 
                         // If nearest point is at or behind camera plane, don't occlude.
                         // This catches edge cases where objects are partially behind camera.
                         if (nearViewZ <= 0.0f) {
                             occluded = false;
+                        } else if (hzbViewZ <= 0.0f) {
+                            // HZB sentinel value (0) means "no occluder in this region".
+                            // With MAX pyramid, 0 indicates sky/empty pixels.
+                            occluded = false;
                         } else {
-                            // Distance-scaled epsilon in view-space to keep the test
-                            // stable across near/far/FOV changes.
-                            const float epsilonViewZ = max(hzbEpsilon, 0.01f * nearViewZ);
-                            occluded = (nearViewZ > (hzbViewZ + epsilonViewZ));
+                            // Ratio-based test: only occlude if object is significantly farther
+                            // than HZB depth. This handles:
+                            // 1. Self-occlusion (object's own depth from previous frame)
+                            // 2. Temporal drift from camera/object motion
+                            // 3. Depth precision issues at far distances
+                            // DEBUG: Using very aggressive thresholds to diagnose false positives
+                            const float occlusionRatio = 2.0f;    // 100% safety margin (double the depth)
+                            const float minAbsoluteMargin = 5.0f; // At least 5 meters absolute margin
+                            const float ratioThreshold = hzbViewZ * occlusionRatio;
+                            const float absoluteThreshold = hzbViewZ + minAbsoluteMargin;
+                            const float threshold = max(ratioThreshold, absoluteThreshold);
+                            occluded = (nearViewZ > threshold);
                         }
                     }
+                    } // close else (r <= 64.0f) for large object check
                 }
             }
         }

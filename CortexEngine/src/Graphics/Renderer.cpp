@@ -11827,11 +11827,12 @@ cbuffer FrameConstants : register(b1)
 static float ReconstructViewZ(float2 uv, float depth)
 {
     depth = saturate(depth);
-    // Treat far-plane/background depth as "inf" so it does not become the
-    // min-depth occluder in the pyramid.
+    // For MAX pyramid: treat far-plane/background as 0 so MAX ignores it.
+    // Real geometry has positive view-space Z, so MAX picks actual depths.
+    // Regions with only sky will have HZB=0, indicating "no occluder".
     if (depth >= 1.0f - 1e-4f || depth <= 0.0f)
     {
-        return 1e9f;
+        return 0.0f;
     }
 
     float x = uv.x * 2.0f - 1.0f;
@@ -11881,7 +11882,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
     float d2 = g_InMip.Load(int3(c2, 0));
     float d3 = g_InMip.Load(int3(c3, 0));
 
-    g_OutMip[dispatchThreadId.xy] = min(min(d0, d1), min(d2, d3));
+    // MAX pyramid for conservative occlusion culling.
+    // Stores the FARTHEST depth in each region, so if an object is behind
+    // the max depth, it's guaranteed to be behind ALL pixels in that region.
+    g_OutMip[dispatchThreadId.xy] = max(max(d0, d1), max(d2, d3));
 }
 )";
 

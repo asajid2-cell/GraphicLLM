@@ -1046,11 +1046,15 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     constants.cameraPos[2] = cameraPos.z;
     constants.instanceCount = m_totalInstances;
 
+    // HZB occlusion culling using simplified depth comparison.
+    // Changed from complex world-space near-point to simpler view-space centerZ - radius.
     const uint32_t hzbEnabled =
         (m_hzbEnabled && m_hzbTexture && (m_hzbMipCount > 0) && (m_hzbWidth > 0) && (m_hzbHeight > 0)) ? 1u : 0u;
+
     // Streak threshold: require N consecutive occluded frames before culling.
     // Higher values reduce popping/flickering but delay culling slightly.
-    constexpr uint32_t kOcclusionStreakThreshold = 4u;
+    // At 60fps, 8 frames = 133ms delay before occlusion kicks in.
+    constexpr uint32_t kOcclusionStreakThreshold = 8u;
     constants.occlusionParams0 = glm::uvec4(
         m_forceVisible ? 1u : 0u,
         hzbEnabled,

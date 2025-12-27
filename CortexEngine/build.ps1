@@ -52,6 +52,14 @@ if (-not (Test-Path $buildDir)) {
     exit $LASTEXITCODE
 }
 
+$hasNinja = Test-Path (Join-Path $buildDir "build.ninja")
+$hasVsProjects = Test-Path (Join-Path $buildDir "ALL_BUILD.vcxproj")
+if (-not $hasNinja -and -not $hasVsProjects) {
+    Write-Host "Build directory exists but no generated build files were found. Running full setup..." -ForegroundColor Yellow
+    & "$PSScriptRoot\setup.ps1" -BuildConfig $Config
+    exit $LASTEXITCODE
+}
+
 if ($Clean) {
     Write-Host "Cleaning build..." -ForegroundColor Yellow
     Push-Location $buildDir

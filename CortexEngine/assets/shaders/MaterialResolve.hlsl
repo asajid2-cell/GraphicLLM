@@ -26,7 +26,18 @@ cbuffer ResolutionConstants : register(b0) {
     uint g_MaterialCount;
     uint g_MeshCount;
     uint2 _pad2;
+
+    // Procedural terrain constants (shared with Terrain.hlsl). These are used
+    // only when an instance sets the terrain flag.
+    uint4  g_TerrainSeedAndOctaves; // x=seed, y=octaves
+    float4 g_TerrainParams0;        // x=amplitude, y=frequency, z=lacunarity, w=gain
+    float4 g_TerrainParams1;        // x=warp, y=skirtDepth, z=originHiX, w=originHiZ
+    float4 g_TerrainParams2;        // x=originLoX, y=originLoZ
 };
+
+#include "TerrainNoise.hlsli"
+
+static const uint VB_INSTANCE_FLAG_TERRAIN = 1u;
 
 // Instance data structure (matches VBInstanceData in C++)
 struct VBInstanceData {
@@ -252,6 +263,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
     // Fetch instance data
     VBInstanceData instance = g_Instances[instanceID];
+    const bool isTerrain = ((instance.flags & VB_INSTANCE_FLAG_TERRAIN) != 0u);
 
     if (g_MeshCount == 0 || instance.meshIndex >= g_MeshCount) {
         return;
@@ -284,10 +296,49 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     Vertex v1 = LoadVertex(vertexBuffer, indices.y, mesh.vertexStrideBytes);
     Vertex v2 = LoadVertex(vertexBuffer, indices.z, mesh.vertexStrideBytes);
 
-    // Transform vertices to world space
+    // Transform vertices to world space. Procedural terrain instances displace
+    // the Y coordinate using the same deterministic height function as Terrain.hlsl.
     float3 worldPos0 = mul(instance.worldMatrix, float4(v0.position, 1.0)).xyz;
     float3 worldPos1 = mul(instance.worldMatrix, float4(v1.position, 1.0)).xyz;
     float3 worldPos2 = mul(instance.worldMatrix, float4(v2.position, 1.0)).xyz;
+
+    float3 terrainNormalWS = float3(0.0f, 1.0f, 0.0f);
+    if (isTerrain) {
+        const uint seed = g_TerrainSeedAndOctaves.x;
+        const int octaves = (int)g_TerrainSeedAndOctaves.y;
+        const float amplitude = g_TerrainParams0.x;
+        const float frequency = g_TerrainParams0.y;
+        const float lacunarity = g_TerrainParams0.z;
+        const float gain = g_TerrainParams0.w;
+        const float warp = g_TerrainParams1.x;
+
+        float2 originHi = float2(g_TerrainParams1.z, g_TerrainParams1.w);
+        float2 originLo = float2(g_TerrainParams2.x, g_TerrainParams2.y);
+
+        // Apply terrain displacement to each triangle vertex.
+        float2 worldXZ0 = worldPos0.xz + originHi + originLo;
+        float2 worldXZ1 = worldPos1.xz + originHi + originLo;
+        float2 worldXZ2 = worldPos2.xz + originHi + originLo;
+
+        float h0 = TerrainHeightParams(worldXZ0.x, worldXZ0.y, seed, octaves, amplitude, frequency, lacunarity, gain, warp);
+        float h1 = TerrainHeightParams(worldXZ1.x, worldXZ1.y, seed, octaves, amplitude, frequency, lacunarity, gain, warp);
+        float h2 = TerrainHeightParams(worldXZ2.x, worldXZ2.y, seed, octaves, amplitude, frequency, lacunarity, gain, warp);
+
+        if (v0.texCoord.y > 0.5f) { h0 -= g_TerrainParams1.y; }
+        if (v1.texCoord.y > 0.5f) { h1 -= g_TerrainParams1.y; }
+        if (v2.texCoord.y > 0.5f) { h2 -= g_TerrainParams1.y; }
+
+        worldPos0.y = h0;
+        worldPos1.y = h1;
+        worldPos2.y = h2;
+
+        float3 e1 = worldPos1 - worldPos0;
+        float3 e2 = worldPos2 - worldPos0;
+        float3 n = cross(e1, e2);
+        if (all(isfinite(n)) && dot(n, n) > 1e-12f) {
+            terrainNormalWS = normalize(n);
+        }
+    }
 
     // Read depth for current pixel
     float depth = g_DepthBuffer[pixelCoord];
@@ -336,6 +387,11 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         normalWS = normalize(normalWS);
     }
 
+    // Override normals for terrain using displaced triangle geometry.
+    if (isTerrain) {
+        normalWS = terrainNormalWS;
+    }
+
     float4 tangent = v0.tangent * bary.x + v1.tangent * bary.y + v2.tangent * bary.z;
     tangent.xyz = normalize(mul((float3x3)instance.worldMatrix, tangent.xyz));
 
@@ -356,7 +412,37 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float2 ddxUV = float2(0.0f, 0.0f);
     float2 ddyUV = float2(0.0f, 0.0f);
 
-    if (g_MaterialCount > 0 && instance.materialIndex < g_MaterialCount) {
+    // Terrain shading path: derive albedo/roughness from height + slope bands.
+    // This keeps the procedural terrain fully compatible with the VB pipeline.
+    if (isTerrain) {
+        float3 worldPos = worldPos0 * bary.x + worldPos1 * bary.y + worldPos2 * bary.z;
+        float height = worldPos.y;
+        float slope = saturate(1.0f - normalWS.y);
+
+        float amplitude = g_TerrainParams0.x;
+        float hNorm = saturate(height / max(amplitude, 1.0f));
+        float grassW = saturate(1.0f - smoothstep(0.25f, 0.55f, hNorm) - slope * 1.2f);
+        float rockW  = saturate(smoothstep(0.15f, 0.45f, hNorm) + slope);
+        float snowW  = saturate(smoothstep(0.65f, 0.9f, hNorm) * (1.0f - slope * 0.75f));
+        float wSum = max(grassW + rockW + snowW, 1e-3f);
+        grassW /= wSum; rockW /= wSum; snowW /= wSum;
+
+        float3 grass = float3(0.18f, 0.32f, 0.14f);
+        float3 rock  = float3(0.35f, 0.35f, 0.37f);
+        float3 snow  = float3(0.85f, 0.88f, 0.92f);
+        albedo = grass * grassW + rock * rockW + snow * snowW;
+
+        roughness = lerp(0.75f, 0.98f, rockW) * (1.0f - 0.2f * snowW);
+        metallic = 0.0f;
+        ao = 1.0f;
+        emissive = float3(0.0f, 0.0f, 0.0f);
+        clearCoatWeight = 0.0f;
+        clearCoatRoughness = 1.0f;
+        transmission = 0.0f;
+        ior = 1.5f;
+        specularFactor = 1.0f;
+        specularColor = 1.0f;
+    } else if (g_MaterialCount > 0 && instance.materialIndex < g_MaterialCount) {
         VBMaterialConstants mat = g_Materials[instance.materialIndex];
         albedo = mat.albedo.rgb;
         metallic = mat.metallic;

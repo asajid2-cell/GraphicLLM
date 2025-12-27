@@ -745,4 +745,167 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainClipmapGrid(uint32_
     return mesh;
 }
 
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
+    uint32_t gridDim,
+    float chunkSize,
+    int32_t chunkX,
+    int32_t chunkZ,
+    const Scene::TerrainNoiseParams& params,
+    float skirtDepth
+) {
+    auto mesh = std::make_shared<Scene::MeshData>();
+    mesh->kind = Scene::MeshKind::Procedural;
+
+    if (gridDim < 3u) {
+        gridDim = 3u;
+    }
+    if ((gridDim & 1u) == 0u) {
+        gridDim += 1u;
+    }
+    chunkSize = std::max(chunkSize, 1.0f);
+
+    const uint32_t vertCount = gridDim * gridDim;
+    mesh->positions.resize(vertCount);
+    mesh->normals.resize(vertCount);
+    mesh->texCoords.resize(vertCount);
+
+    const float step = chunkSize / static_cast<float>(gridDim - 1u);
+    const double baseX = static_cast<double>(chunkX) * static_cast<double>(chunkSize);
+    const double baseZ = static_cast<double>(chunkZ) * static_cast<double>(chunkSize);
+
+    auto vIndex = [&](uint32_t x, uint32_t z) -> uint32_t {
+        return z * gridDim + x;
+    };
+
+    // Height samples
+    std::vector<float> heights;
+    heights.resize(vertCount);
+
+    for (uint32_t z = 0; z < gridDim; ++z) {
+        for (uint32_t x = 0; x < gridDim; ++x) {
+            const float lx = static_cast<float>(x) * step;
+            const float lz = static_cast<float>(z) * step;
+            const double wx = baseX + static_cast<double>(lx);
+            const double wz = baseZ + static_cast<double>(lz);
+            const float h = Scene::SampleTerrainHeight(wx, wz, params);
+
+            const uint32_t idx = vIndex(x, z);
+            heights[idx] = h;
+            mesh->positions[idx] = glm::vec3(lx, h, lz);
+            // texCoord.y is a skirt flag (0 = base vertex, 1 = skirt vertex)
+            mesh->texCoords[idx] = glm::vec2(
+                static_cast<float>(wx * 0.01),
+                0.0f
+            );
+        }
+    }
+
+    // Normals via finite differences in local units (step).
+    for (uint32_t z = 0; z < gridDim; ++z) {
+        for (uint32_t x = 0; x < gridDim; ++x) {
+            const uint32_t xm = (x > 0u) ? (x - 1u) : x;
+            const uint32_t xp = (x + 1u < gridDim) ? (x + 1u) : x;
+            const uint32_t zm = (z > 0u) ? (z - 1u) : z;
+            const uint32_t zp = (z + 1u < gridDim) ? (z + 1u) : z;
+
+            const float hL = heights[vIndex(xm, z)];
+            const float hR = heights[vIndex(xp, z)];
+            const float hD = heights[vIndex(x, zm)];
+            const float hU = heights[vIndex(x, zp)];
+
+            const float dx = (hR - hL) / std::max(step * 2.0f, 1e-4f);
+            const float dz = (hU - hD) / std::max(step * 2.0f, 1e-4f);
+
+            glm::vec3 n(-dx, 1.0f, -dz);
+            if (glm::length2(n) < 1e-8f) {
+                n = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                n = glm::normalize(n);
+            }
+            mesh->normals[vIndex(x, z)] = n;
+        }
+    }
+
+    // Indices (two triangles per cell).
+    const uint32_t cellDim = gridDim - 1u;
+    mesh->indices.reserve(static_cast<size_t>(cellDim) * static_cast<size_t>(cellDim) * 6u);
+    for (uint32_t z = 0; z < cellDim; ++z) {
+        for (uint32_t x = 0; x < cellDim; ++x) {
+            const uint32_t v0 = vIndex(x + 0u, z + 0u);
+            const uint32_t v1 = vIndex(x + 1u, z + 0u);
+            const uint32_t v2 = vIndex(x + 1u, z + 1u);
+            const uint32_t v3 = vIndex(x + 0u, z + 1u);
+
+            mesh->indices.push_back(v0);
+            mesh->indices.push_back(v1);
+            mesh->indices.push_back(v2);
+
+            mesh->indices.push_back(v0);
+            mesh->indices.push_back(v2);
+            mesh->indices.push_back(v3);
+        }
+    }
+
+    // Optional skirts to hide cracks between LODs/chunks.
+    if (skirtDepth > 0.0f) {
+        std::unordered_map<uint64_t, uint32_t> edgeCount;
+        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> edgeDir;
+        edgeCount.reserve(mesh->indices.size());
+        edgeDir.reserve(mesh->indices.size());
+
+        auto addEdge = [&](uint32_t a, uint32_t b) {
+            const uint32_t lo = (a < b) ? a : b;
+            const uint32_t hi = (a < b) ? b : a;
+            const uint64_t key = (static_cast<uint64_t>(lo) << 32u) | static_cast<uint64_t>(hi);
+            uint32_t& c = edgeCount[key];
+            c += 1u;
+            if (c == 1u) {
+                edgeDir[key] = { a, b };
+            }
+        };
+
+        for (size_t i = 0; i + 2 < mesh->indices.size(); i += 3) {
+            const uint32_t i0 = mesh->indices[i + 0];
+            const uint32_t i1 = mesh->indices[i + 1];
+            const uint32_t i2 = mesh->indices[i + 2];
+            addEdge(i0, i1);
+            addEdge(i1, i2);
+            addEdge(i2, i0);
+        }
+
+        for (const auto& [key, count] : edgeCount) {
+            if (count != 1u) {
+                continue;
+            }
+            const auto it = edgeDir.find(key);
+            if (it == edgeDir.end()) {
+                continue;
+            }
+            const uint32_t a = it->second.first;
+            const uint32_t b = it->second.second;
+
+            const uint32_t skirtA = static_cast<uint32_t>(mesh->positions.size());
+            mesh->positions.push_back(mesh->positions[a] + glm::vec3(0.0f, -skirtDepth, 0.0f));
+            mesh->normals.push_back(mesh->normals[a]);
+            mesh->texCoords.push_back(glm::vec2(mesh->texCoords[a].x, 1.0f));
+
+            const uint32_t skirtB = static_cast<uint32_t>(mesh->positions.size());
+            mesh->positions.push_back(mesh->positions[b] + glm::vec3(0.0f, -skirtDepth, 0.0f));
+            mesh->normals.push_back(mesh->normals[b]);
+            mesh->texCoords.push_back(glm::vec2(mesh->texCoords[b].x, 1.0f));
+
+            mesh->indices.push_back(a);
+            mesh->indices.push_back(b);
+            mesh->indices.push_back(skirtB);
+
+            mesh->indices.push_back(a);
+            mesh->indices.push_back(skirtB);
+            mesh->indices.push_back(skirtA);
+        }
+    }
+
+    mesh->UpdateBounds();
+    return mesh;
+}
+
 } // namespace Cortex::Utils

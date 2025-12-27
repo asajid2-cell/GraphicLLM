@@ -38,6 +38,19 @@
 
 namespace Cortex {
 
+static int64_t PackChunkKey(int32_t cx, int32_t cz) {
+    return (static_cast<int64_t>(cx) << 32) ^ (static_cast<uint32_t>(cz));
+}
+
+static uint32_t HashChunk(uint32_t x) {
+    x ^= x >> 16;
+    x *= 0x7feb352dU;
+    x ^= x >> 15;
+    x *= 0x846ca68bU;
+    x ^= x >> 16;
+    return x;
+}
+
 Engine::~Engine() {
     Shutdown();
 }
@@ -626,6 +639,8 @@ void Engine::ShowCameraHelpOverlay() {
         "  U                   - Open scene editor window\n"
         "  I                   - Toggle hierarchy window\n"
         "  F5                  - Toggle play-in-editor (grounded FPS)\n"
+        "  N                   - Cycle all scene presets\n"
+        "  J                   - Toggle procedural terrain preset\n"
         "  - / =               - Adjust shadow PCF radius\n"
         "  F7 / F8             - Decrease / increase shadow bias\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
@@ -754,7 +769,28 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::RTShowcase;
         break;
     }
+    if (next == ScenePreset::ProceduralTerrain) {
+        if (m_currentScenePreset != ScenePreset::ProceduralTerrain) {
+            m_lastNonTerrainPreset = m_currentScenePreset;
+        }
+    } else {
+        m_lastNonTerrainPreset = next;
+    }
     RebuildScene(next);
+}
+
+void Engine::ToggleProceduralTerrainPreset() {
+    if (m_currentScenePreset != ScenePreset::ProceduralTerrain) {
+        m_lastNonTerrainPreset = m_currentScenePreset;
+        RebuildScene(ScenePreset::ProceduralTerrain);
+        return;
+    }
+
+    ScenePreset restore = m_lastNonTerrainPreset;
+    if (restore == ScenePreset::ProceduralTerrain) {
+        restore = ScenePreset::RTShowcase;
+    }
+    RebuildScene(restore);
 }
 
 void Engine::TogglePlayInEditor() {
@@ -773,14 +809,15 @@ std::unique_ptr<Scene::ECS_Registry> Engine::CloneRegistry(const Scene::ECS_Regi
     auto& dstReg = dst->GetRegistry();
 
     std::unordered_map<entt::entity, entt::entity> entityMap;
-    entityMap.reserve(static_cast<size_t>(srcReg.size()));
+    const auto* srcEntities = srcReg.storage<entt::entity>();
+    entityMap.reserve(static_cast<size_t>(srcEntities->size()));
 
-    srcReg.each([&](entt::entity e) {
-        entt::entity ne = dstReg.create();
+    for (const auto [e] : srcEntities->each()) {
+        const entt::entity ne = dstReg.create();
         entityMap.emplace(e, ne);
-    });
+    }
 
-    srcReg.each([&](entt::entity e) {
+    for (const auto [e] : srcEntities->each()) {
         const entt::entity ne = entityMap.at(e);
 
         if (srcReg.all_of<Scene::TagComponent>(e)) {
@@ -824,7 +861,7 @@ std::unique_ptr<Scene::ECS_Registry> Engine::CloneRegistry(const Scene::ECS_Regi
         if (srcReg.all_of<Scene::ParticleEmitterComponent>(e)) {
             dstReg.emplace<Scene::ParticleEmitterComponent>(ne, srcReg.get<Scene::ParticleEmitterComponent>(e));
         }
-    });
+    }
 
     dst->UpdateTransforms();
     return dst;
@@ -835,6 +872,13 @@ void Engine::EnterPlayMode() {
         return;
     }
 
+    if (m_renderer) {
+        m_renderer->WaitForAllFrames();
+    }
+
+    m_editorDroneFlightEnabledBackup = m_droneFlightEnabled;
+    m_editorCameraControlActiveBackup = m_cameraControlActive;
+
     m_editorRegistryBackup = CloneRegistry(*m_registry);
     m_editorSelectedEntity = m_selectedEntity;
     m_editorWorldOriginOffsetBackup = m_worldOriginOffset;
@@ -843,6 +887,7 @@ void Engine::EnterPlayMode() {
     m_showGizmos = false;
     m_showOriginAxes = false;
     m_cameraControlActive = false;
+    m_droneFlightEnabled = false;
 
     UI::SceneEditorWindow::SetVisible(false);
     UI::HierarchyWindow::SetVisible(false);
@@ -898,6 +943,10 @@ void Engine::ExitPlayMode() {
         return;
     }
 
+    if (m_renderer) {
+        m_renderer->WaitForAllFrames();
+    }
+
     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
     m_playMouseCaptured = false;
 
@@ -917,6 +966,14 @@ void Engine::ExitPlayMode() {
     m_activeCameraEntity = entt::null;
     m_cameraControllerInitialized = false;
     InitializeCameraController();
+
+    m_droneFlightEnabled = m_editorDroneFlightEnabledBackup;
+    m_cameraControlActive = m_editorCameraControlActiveBackup;
+    m_editorDroneFlightEnabledBackup = false;
+    m_editorCameraControlActiveBackup = false;
+    if (m_window) {
+        SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), m_droneFlightEnabled);
+    }
 
     m_mode = EngineMode::Editor;
 }
@@ -1177,11 +1234,16 @@ void Engine::RenderHUD() {
     drawLine(buffer);
 
     // Scene preset summary and quick hint for switching.
-    const wchar_t* sceneLabel =
-        (m_currentScenePreset == ScenePreset::CornellBox)
-            ? L"Cornell Box"
-            : L"Dragon Over Water Studio";
-    swprintf_s(buffer, L"Scene: %s  (press N to switch)", sceneLabel);
+    const wchar_t* sceneLabel = L"Unknown";
+    switch (m_currentScenePreset) {
+    case ScenePreset::CornellBox:        sceneLabel = L"Cornell Box"; break;
+    case ScenePreset::DragonOverWater:   sceneLabel = L"Dragon Over Water Studio"; break;
+    case ScenePreset::RTShowcase:        sceneLabel = L"RT Showcase Gallery"; break;
+    case ScenePreset::GodRays:           sceneLabel = L"God Rays Atrium"; break;
+    case ScenePreset::ProceduralTerrain: sceneLabel = L"Procedural Terrain"; break;
+    default: break;
+    }
+    swprintf_s(buffer, L"Scene: %s  (N: cycle, J: terrain)", sceneLabel);
     drawLine(buffer);
 
     // Only show detailed renderer/light/command information in debug screen mode
@@ -1641,8 +1703,21 @@ void Engine::ProcessInput() {
                     break;
                 }
                 if (key == SDLK_N) {
-                    // Scene preset toggle: Cornell box <-> Dragon studio.
+                    if (m_mode == EngineMode::Play) {
+                        spdlog::info("Scene switching disabled in play mode (ESC to stop play)");
+                        break;
+                    }
+                    // Cycle all scene presets.
                     ToggleScenePreset();
+                    break;
+                }
+                if (key == SDLK_J) {
+                    if (m_mode == EngineMode::Play) {
+                        spdlog::info("Scene switching disabled in play mode (ESC to stop play)");
+                        break;
+                    }
+                    // Quick toggle: jump to/from the infinite terrain (J).
+                    ToggleProceduralTerrainPreset();
                     break;
                 }
                 if (key == SDLK_1 || key == SDLK_2 || key == SDLK_3) {
@@ -1888,6 +1963,10 @@ void Engine::ProcessInput() {
                     FrameSelectedEntity();
                 }
                 else if (key == SDLK_G) {
+                    if (m_mode == EngineMode::Play) {
+                        // Avoid fighting play-mode mouse capture and camera logic.
+                        break;
+                    }
                     // Toggle drone/free-flight camera mode. When enabled, the camera
                     // can be steered continuously without holding the right mouse
                     // button and the mouse is locked in relative mode.
@@ -2518,6 +2597,13 @@ void Engine::Update(float deltaTime) {
                 t.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
             }
         }
+    }
+
+    // CPU heightmap chunk streaming (forward renderer). Keep a fixed set of
+    // chunks alive around the camera so the procedural scene is a tangible,
+    // traversable world instead of "floating in IBL".
+    if (m_terrainEnabled && m_currentScenePreset == ScenePreset::ProceduralTerrain) {
+        UpdateProceduralTerrainChunks();
     }
 
     // Update renderer-side terrain constants (noise params + floating-origin offset).
@@ -3492,10 +3578,9 @@ void Engine::UpdateCameraController(float deltaTime) {
         m_pendingMouseDeltaY = 0.0f;
 
         m_cameraYaw += dx * m_mouseSensitivity;
-        // Invert Y so that moving the mouse up pitches the camera down and
-        // moving it down pitches up, matching the requested flight-style
-        // controls.
-        m_cameraPitch += dy * m_mouseSensitivity;
+        // Standard FPS mouse look: moving the mouse up looks up.
+        // SDL mouse motion uses +Y for downward motion, so subtract dy.
+        m_cameraPitch -= dy * m_mouseSensitivity;
 
         float pitchLimit = glm::radians(89.0f);
         m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
@@ -3514,8 +3599,9 @@ void Engine::UpdateCameraController(float deltaTime) {
     forward = glm::normalize(forward);
 
     glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
-    glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
-    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+    // Left-handed basis used by CameraComponent::GetViewMatrix: +Z forward, +X right.
+    glm::vec3 right = glm::normalize(glm::cross(worldUp, forward));
+    glm::vec3 up = glm::normalize(glm::cross(forward, right));
 
     // Optional roll for drone-style banking, only in drone mode.
     if (m_droneFlightEnabled) {
@@ -3559,8 +3645,8 @@ void Engine::UpdateCameraController(float deltaTime) {
 
         glm::vec3 moveDir(0.0f);
         // Standard FPS controls: WASD for horizontal/forward movement
-        if (keyDown(SDL_SCANCODE_S)) moveDir += forward;  // W = forward
-        if (keyDown(SDL_SCANCODE_W)) moveDir -= forward;  // S = backward
+        if (keyDown(SDL_SCANCODE_W)) moveDir += forward;  // W = forward
+        if (keyDown(SDL_SCANCODE_S)) moveDir -= forward;  // S = backward
         if (keyDown(SDL_SCANCODE_D)) moveDir += right;    // D = right
         if (keyDown(SDL_SCANCODE_A)) moveDir -= right;    // A = left
 
@@ -3642,7 +3728,7 @@ void Engine::UpdateCameraController(float deltaTime) {
     }
 
     // Update camera rotation from forward/up (including any roll).
-    transform.rotation = glm::quatLookAt(glm::normalize(forward), up);
+    transform.rotation = glm::quatLookAtLH(glm::normalize(forward), up);
 }
 
 void Engine::UpdatePlayMode(float deltaTime) {
@@ -3665,7 +3751,8 @@ void Engine::UpdatePlayMode(float deltaTime) {
     m_pendingMouseDeltaY = 0.0f;
 
     m_cameraYaw += dx * m_mouseSensitivity;
-    m_cameraPitch += dy * m_mouseSensitivity;
+    // Standard FPS mouse look: moving the mouse up looks up.
+    m_cameraPitch -= dy * m_mouseSensitivity;
     const float pitchLimit = glm::radians(89.0f);
     m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
 
@@ -3678,8 +3765,8 @@ void Engine::UpdatePlayMode(float deltaTime) {
     forward = glm::normalize(forward);
     glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), forward));
 
-    // Keep the camera upright in play mode.
-    transform.rotation = glm::quatLookAt(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+    // Keep the camera upright in play mode (left-handed look direction).
+    transform.rotation = glm::quatLookAtLH(forward, glm::vec3(0.0f, 1.0f, 0.0f));
 
     // Keyboard movement (grounded).
     int numKeys = 0;

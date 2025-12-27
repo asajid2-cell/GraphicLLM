@@ -433,6 +433,7 @@ public:
     void SetSunColor(const glm::vec3& color);
     void SetSunIntensity(float intensity);
     [[nodiscard]] float GetSunIntensity() const { return m_directionalLightIntensity; }
+    void SetAmbientLight(const glm::vec3& color, float intensity);
 
     // GPU job queue introspection for incremental loading / diagnostics.
     [[nodiscard]] bool HasPendingGpuJobs() const { return !m_gpuJobQueue.empty(); }
@@ -597,6 +598,11 @@ public:
     uint64_t m_absoluteFrameIndex = 0;  // Monotonically increasing frame counter
     bool m_commandListOpen = false;  // Tracks whether command list is currently recording
     bool m_computeListOpen = false;  // Tracks compute command list state
+
+    // Deferred releases for resources destroyed mid-frame. Items are released
+    // only after the corresponding frame index is fenced, preventing debug-layer
+    // #921 (OBJECT_DELETED_WHILE_STILL_IN_USE / deleted prior to command list close).
+    std::array<std::vector<ComPtr<ID3D12Resource>>, kFrameCount> m_deferredResourceReleases;
 
     // Pipeline state
     std::unique_ptr<DX12RootSignature> m_rootSignature;
@@ -848,6 +854,9 @@ public:
     std::shared_ptr<DX12Texture> m_placeholderNormal;
     std::shared_ptr<DX12Texture> m_placeholderMetallic;
     std::shared_ptr<DX12Texture> m_placeholderRoughness;
+    // Neutral IBL fallback used when no HDR/IBL assets are present.
+    // Keeps the scene from blowing out (white) when environment maps are missing.
+    std::shared_ptr<DX12Texture> m_placeholderEnvironment;
     std::array<DescriptorHandle, 4> m_fallbackMaterialDescriptors = {};
     bool m_visibilityBufferEnabled = false;
 

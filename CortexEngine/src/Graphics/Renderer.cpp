@@ -1271,6 +1271,7 @@ void Renderer::Shutdown() {
     m_placeholderNormal.reset();
     m_placeholderMetallic.reset();
     m_placeholderRoughness.reset();
+    m_placeholderEnvironment.reset();
     m_textureCache.clear();
     m_depthBuffer.Reset();
     m_shadowMap.Reset();
@@ -2059,18 +2060,19 @@ void Renderer::ResetTemporalHistoryForSceneChange() {
 }
 
 void Renderer::WaitForAllFrames() {
-    // Wait for ALL in-flight frames to complete, not just the current one.
-    // With triple buffering, frames N-1 and N-2 might still be executing
-    // and holding references to resources we're about to delete.
-    for (uint32_t i = 0; i < kFrameCount; ++i) {
-        if (m_fenceValues[i] > 0 && m_commandQueue) {
-            m_commandQueue->WaitForFenceValue(m_fenceValues[i]);
-        }
+    // Scene switches and aggressive resource pruning need a hard guarantee
+    // that *all* GPU work is complete before releasing resources. Relying on
+    // the swap-chain frame fences alone can miss mid-frame submissions.
+    //
+    // Flush the graphics queue (direct), plus upload/compute queues when present.
+    if (m_commandQueue) {
+        m_commandQueue->Flush();
     }
-
-    // Also flush any pending upload work
     if (m_uploadQueue) {
         m_uploadQueue->Flush();
+    }
+    if (m_computeQueue) {
+        m_computeQueue->Flush();
     }
 }
 
@@ -2471,6 +2473,9 @@ void Renderer::RebuildAssetRefsFromScene(Scene::ECS_Registry* registry) {
 void Renderer::PruneUnusedMeshes(Scene::ECS_Registry* /*registry*/) {
     // Focus on BLAS/geometry cleanup; texture lifetime is primarily tied to
     // scene entities and will be reclaimed when those are destroyed.
+    // Ensure no in-flight work can reference BLAS/mesh resources we release.
+    WaitForAllFrames();
+
     auto unused = m_assetRegistry.CollectUnusedMeshes();
     if (unused.empty()) {
         return;
@@ -2502,6 +2507,10 @@ void Renderer::PruneUnusedMeshes(Scene::ECS_Registry* /*registry*/) {
         if (meshPtr) {
             m_meshAssetKeys.erase(meshPtr);
         }
+
+        // Drop the mesh entry from the diagnostics registry so it doesn't
+        // accumulate across scene switches.
+        m_assetRegistry.UnregisterMesh(asset.key);
     }
 
     const double mb = static_cast<double>(totalBytes) / (1024.0 * 1024.0);
@@ -2571,6 +2580,11 @@ void Renderer::BeginFrame() {
         m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
     }
 
+    // Release any resources deferred from the previous use of this frame slot.
+    if (m_frameIndex < kFrameCount) {
+        m_deferredResourceReleases[m_frameIndex].clear();
+    }
+
     if (m_gpuCulling) {
         m_gpuCulling->UpdateVisibleCountFromReadback();
     }
@@ -2625,6 +2639,16 @@ void Renderer::BeginFrame() {
             // Treat this as a fatal condition for the current run.
             m_deviceRemoved = true;
             return;
+        }
+
+        // HZB depends on the depth buffer size. Recreate it here so later
+        // passes do not destroy/replace the HZB mid-frame after it may have
+        // already been referenced by occlusion/culling dispatches.
+        if (!m_deviceRemoved) {
+            auto hzbResult = CreateHZBResources();
+            if (hzbResult.IsErr()) {
+                spdlog::warn("BeginFrame: failed to recreate HZB resources after depth resize: {}", hzbResult.Error());
+            }
         }
     }
 
@@ -5259,7 +5283,6 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
         if (!renderable.visible || !renderable.mesh) continue;
         if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
-        if (registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
         if (!renderable.mesh->gpuBuffers ||
@@ -5495,7 +5518,10 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         inst.firstIndex = 0;
         inst.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
         inst.baseVertex = 0;
-        inst.flags = 0u;
+        constexpr uint32_t kVBInstanceFlag_Terrain = 1u;
+        inst.flags = registry->HasComponent<Scene::TerrainClipmapLevelComponent>(entity)
+            ? kVBInstanceFlag_Terrain
+            : 0u;
         inst.cullingId = getOrAllocateCullingId(entity);
 
         // Bounding sphere in object space (used for GPU occlusion culling).
@@ -5599,6 +5625,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         spdlog::warn("VB: Disabled or not initialized");
         return;
     }
+
+    // Keep VB terrain displacement/shading in sync with the renderer's terrain constants.
+    m_visibilityBuffer->SetTerrainConstants(m_terrainParamsCPU);
 
     // Collect and upload instance data + mesh draw info
     CollectInstancesForVisibilityBuffer(registry);
@@ -6080,11 +6109,19 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
             envSpecularSRV = env.specularPrefiltered->GetSRV();
         }
     }
-    if (!envDiffuseSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        envDiffuseSRV = m_placeholderAlbedo->GetSRV();
+    if (!envDiffuseSRV.IsValid()) {
+        if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+            envDiffuseSRV = m_placeholderEnvironment->GetSRV();
+        } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+            envDiffuseSRV = m_placeholderAlbedo->GetSRV();
+        }
     }
-    if (!envSpecularSRV.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        envSpecularSRV = m_placeholderAlbedo->GetSRV();
+    if (!envSpecularSRV.IsValid()) {
+        if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+            envSpecularSRV = m_placeholderEnvironment->GetSRV();
+        } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+            envSpecularSRV = m_placeholderAlbedo->GetSRV();
+        }
     }
     auto lightResult = m_visibilityBuffer->ApplyDeferredLighting(
         m_commandList.Get(),
@@ -6718,7 +6755,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     // Terrain pass (procedural clipmap). Rendered before other opaque geometry.
     if (m_terrainPipeline) {
         auto terrainView = registry->View<Scene::RenderableComponent, Scene::TransformComponent, Scene::TerrainClipmapLevelComponent>();
-        if (!terrainView.empty()) {
+        if (terrainView.begin() != terrainView.end()) {
             m_commandList->SetPipelineState(m_terrainPipeline->GetPipelineState());
             const D3D12_GPU_VIRTUAL_ADDRESS terrainCB =
                 m_terrainConstantBuffer.AllocateAndWrite(m_terrainParamsCPU);
@@ -9174,6 +9211,13 @@ void Renderer::SetSunIntensity(float intensity) {
     spdlog::info("Sun intensity set to {:.2f}", m_directionalLightIntensity);
 }
 
+void Renderer::SetAmbientLight(const glm::vec3& color, float intensity) {
+    m_ambientLightColor = glm::max(color, glm::vec3(0.0f));
+    m_ambientLightIntensity = std::max(intensity, 0.0f);
+    spdlog::info("Ambient light set to color=({:.2f}, {:.2f}, {:.2f}) intensity={:.2f}",
+                 m_ambientLightColor.x, m_ambientLightColor.y, m_ambientLightColor.z, m_ambientLightIntensity);
+}
+
 void Renderer::CycleEnvironmentPreset() {
     if (m_environmentMaps.empty()) {
         spdlog::warn("No environments loaded to cycle through");
@@ -9621,7 +9665,10 @@ Result<void> Renderer::CreateHZBResources() {
         return Result<void>::Ok();
     }
 
-    m_hzbTexture.Reset();
+    if (m_hzbTexture) {
+        m_deferredResourceReleases[m_frameIndex % kFrameCount].push_back(m_hzbTexture);
+        m_hzbTexture.Reset();
+    }
     m_hzbFullSRV = {};
     m_hzbMipSRVStaging.clear();
     m_hzbMipUAVStaging.clear();
@@ -12261,6 +12308,7 @@ Result<void> Renderer::CreatePlaceholderTexture() {
     const float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     const float flatNormal[4] = { 0.5f, 0.5f, 1.0f, 1.0f };
     const float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    const float neutralEnv[4] = { 0.03f, 0.03f, 0.035f, 1.0f };
 
     auto createAndBind = [&](const float color[4], std::shared_ptr<DX12Texture>& out) -> Result<void> {
         auto texResult = DX12Texture::CreatePlaceholder(
@@ -12302,6 +12350,9 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
     auto roughnessResult = createAndBind(white, m_placeholderRoughness);
     if (roughnessResult.IsErr()) return roughnessResult;
+
+    auto envResult = createAndBind(neutralEnv, m_placeholderEnvironment);
+    if (envResult.IsErr()) return envResult;
 
     m_commandQueue->Flush();
 
@@ -12398,22 +12449,38 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     m_environmentMaps.clear();
     m_pendingEnvironments.clear();
 
-    // Scan assets directory for all HDR and EXR files
+    // Scan for environment maps.
+    // Prefer HDR/EXR when available; also support small pre-baked DDS lat-long
+    // environments (tracked in-repo) so a fresh worktree doesn't default to a
+    // white placeholder sky.
     namespace fs = std::filesystem;
     std::vector<fs::path> envFiles;
 
     const fs::path assetsDir = "assets";
+    const std::array<fs::path, 3> searchDirs = {
+        assetsDir,
+        assetsDir / "environments",
+        assetsDir / "ibl"
+    };
 
-    if (fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
-        for (const auto& entry : fs::directory_iterator(assetsDir)) {
-            if (entry.is_regular_file()) {
-                std::string ext = entry.path().extension().string();
-                std::transform(ext.begin(), ext.end(), ext.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
+    for (const auto& dir : searchDirs) {
+        if (!fs::exists(dir) || !fs::is_directory(dir)) {
+            continue;
+        }
 
-                if (ext == ".hdr" || ext == ".exr") {
-                    envFiles.push_back(entry.path());
-                }
+        for (const auto& entry : fs::directory_iterator(dir)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+
+            std::string ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+            // Keep this list conservative: only scan the dedicated env dirs
+            // above so we don't treat regular material DDS textures as skies.
+            if (ext == ".hdr" || ext == ".exr" || ext == ".dds") {
+                envFiles.push_back(entry.path());
             }
         }
     }
@@ -12487,15 +12554,20 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     // If no environments loaded, create a fallback placeholder environment
     if (m_environmentMaps.empty()) {
-        spdlog::warn("No HDR environments loaded; using placeholder");
+        spdlog::warn("No environment maps loaded; using neutral placeholder");
         EnvironmentMaps fallback;
         fallback.name = "Placeholder";
 
         // The engine's IBL shaders treat environment maps as lat-long 2D
         // textures. Use the existing placeholder 2D texture so SRV dimension
         // matches both forward and deferred/VB sampling.
-        fallback.diffuseIrradiance = m_placeholderAlbedo;
-        fallback.specularPrefiltered = m_placeholderAlbedo;
+        std::shared_ptr<DX12Texture> neutral =
+            m_placeholderEnvironment ? m_placeholderEnvironment : m_placeholderMetallic;
+        if (!neutral) {
+            neutral = m_placeholderAlbedo;
+        }
+        fallback.diffuseIrradiance = neutral;
+        fallback.specularPrefiltered = neutral;
 
         m_environmentMaps.push_back(fallback);
     }
@@ -12617,13 +12689,21 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
         }
     }
 
-    // If no environment texture is available, fall back to placeholders when
-    // present; otherwise leave the descriptors as null SRVs.
-    if (!diffuseSrc.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        diffuseSrc = m_placeholderAlbedo->GetSRV();
+    // If no environment texture is available, fall back to a neutral
+    // placeholder (avoid a white sky blowing out the scene).
+    if (!diffuseSrc.IsValid()) {
+        if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+            diffuseSrc = m_placeholderEnvironment->GetSRV();
+        } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+            diffuseSrc = m_placeholderAlbedo->GetSRV();
+        }
     }
-    if (!specularSrc.IsValid() && m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
-        specularSrc = m_placeholderAlbedo->GetSRV();
+    if (!specularSrc.IsValid()) {
+        if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+            specularSrc = m_placeholderEnvironment->GetSRV();
+        } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
+            specularSrc = m_placeholderAlbedo->GetSRV();
+        }
     }
 
     if (diffuseSrc.IsValid()) {
@@ -12700,6 +12780,8 @@ void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {
     DescriptorHandle diffuseSrc;
     if (env.diffuseIrradiance && env.diffuseIrradiance->GetSRV().IsValid()) {
         diffuseSrc = env.diffuseIrradiance->GetSRV();
+    } else if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+        diffuseSrc = m_placeholderEnvironment->GetSRV();
     } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
         diffuseSrc = m_placeholderAlbedo->GetSRV();
     }
@@ -12707,6 +12789,8 @@ void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {
     DescriptorHandle specularSrc;
     if (env.specularPrefiltered && env.specularPrefiltered->GetSRV().IsValid()) {
         specularSrc = env.specularPrefiltered->GetSRV();
+    } else if (m_placeholderEnvironment && m_placeholderEnvironment->GetSRV().IsValid()) {
+        specularSrc = m_placeholderEnvironment->GetSRV();
     } else if (m_placeholderAlbedo && m_placeholderAlbedo->GetSRV().IsValid()) {
         specularSrc = m_placeholderAlbedo->GetSRV();
     }

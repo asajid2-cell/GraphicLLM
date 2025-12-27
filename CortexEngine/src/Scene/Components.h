@@ -241,6 +241,15 @@ struct TerrainClipmapLevelComponent {
     uint32_t isRing = 0;  // 0 = full grid, 1 = ring (with inner hole)
 };
 
+// Procedural terrain chunk metadata for CPU-generated heightmap terrain.
+// Chunks are streamed around the camera for infinite traversal.
+struct TerrainChunkComponent {
+    int32_t chunkX = 0;
+    int32_t chunkZ = 0;
+    uint32_t lod = 0;       // 0 = highest detail
+    float chunkSize = 64.0f;
+};
+
 // Simple buoyancy data for objects that should float on water. Vertical
 // integration and interaction are handled by a dedicated update step.
 struct BuoyancyComponent {

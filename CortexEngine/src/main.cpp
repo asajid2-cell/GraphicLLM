@@ -1,6 +1,8 @@
 #include "Core/Engine.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/ringbuffer_sink.h>
 #include <exception>
 #include <windows.h>
 #include <vector>
@@ -8,10 +10,107 @@
 #include <cstdlib>
 #include <string>
 #include <filesystem>
+#include <fstream>
 
 using namespace Cortex;
 
 namespace {
+
+// Forward declarations (helpers defined later in this TU).
+std::string GetExecutableDirectory();
+
+struct RunLogState {
+    std::filesystem::path logFilePath;
+    std::shared_ptr<spdlog::sinks::ringbuffer_sink_mt> ringSink;
+};
+
+RunLogState& GetRunLogState() {
+    static RunLogState s{};
+    return s;
+}
+
+std::filesystem::path GetLogDirectory() {
+    std::filesystem::path exeDir = GetExecutableDirectory();
+    std::filesystem::path logDir = exeDir / "logs";
+    std::error_code ec;
+    std::filesystem::create_directories(logDir, ec);
+    if (ec) {
+        // Fall back to CWD if exe-relative logs can't be created.
+        logDir = std::filesystem::current_path() / "logs";
+        std::filesystem::create_directories(logDir, ec);
+    }
+    return logDir;
+}
+
+void ConfigureLoggingToFile() {
+    auto& state = GetRunLogState();
+    state.logFilePath = GetLogDirectory() / "cortex_last_run.txt";
+
+    auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(state.logFilePath.string(), true);
+    state.ringSink = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(4096);
+
+    auto logger = std::make_shared<spdlog::logger>(
+        "cortex",
+        spdlog::sinks_init_list{consoleSink, fileSink, state.ringSink}
+    );
+    spdlog::set_default_logger(logger);
+
+    // Default to info-level to avoid per-frame spam; raise if diagnosing issues.
+    spdlog::set_level(spdlog::level::info);
+    spdlog::set_pattern("[%H:%M:%S] [%^%l%$] %v");
+    spdlog::flush_on(spdlog::level::info);
+}
+
+void DumpCurrentStackToLog(const char* header) {
+    if (header && *header) {
+        spdlog::info("{}", header);
+    }
+
+    HANDLE process = GetCurrentProcess();
+    SymInitialize(process, nullptr, TRUE);
+
+    HMODULE exeModule = GetModuleHandle(nullptr);
+    const auto base = reinterpret_cast<uintptr_t>(exeModule);
+
+    void* stack[32]{};
+    USHORT frames = RtlCaptureStackBackTrace(0, 32, stack, nullptr);
+    for (USHORT i = 0; i < frames; ++i) {
+        DWORD64 addr64 = reinterpret_cast<DWORD64>(stack[i]);
+        char buffer[sizeof(SYMBOL_INFO) + 256] = {};
+        PSYMBOL_INFO symbol = reinterpret_cast<PSYMBOL_INFO>(buffer);
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = 255;
+
+        DWORD64 displacement = 0;
+        if (SymFromAddr(process, addr64, &displacement, symbol)) {
+            spdlog::info("  frame {}: {} + 0x{:X}", i, symbol->Name, static_cast<unsigned int>(displacement));
+        } else {
+            spdlog::info("  frame {}: {} (offset 0x{:X})", i, stack[i],
+                         static_cast<unsigned int>(reinterpret_cast<uintptr_t>(stack[i]) - base));
+        }
+    }
+}
+
+void AppendEndOfRunDump(Engine& engine) {
+    spdlog::info("===================================");
+    spdlog::info("End-of-run diagnostics dump");
+    spdlog::info("Log file: {}", GetRunLogState().logFilePath.string());
+    spdlog::info("===================================");
+
+    if (auto* renderer = engine.GetRenderer()) {
+        renderer->LogDiagnostics();
+    } else {
+        spdlog::warn("Renderer diagnostics unavailable (renderer is null)");
+    }
+
+    DumpCurrentStackToLog("Stack trace at clean shutdown:");
+
+    // Ensure file sinks flush before process exit.
+    if (auto logger = spdlog::default_logger()) {
+        logger->flush();
+    }
+}
 
 // Global SEH handler to log crashes instead of silent termination
 LONG WINAPI CortexCrashHandler(EXCEPTION_POINTERS* info) {
@@ -378,13 +477,9 @@ bool ShowLauncher(EngineConfig& config) {
 } // namespace
 
 int main(int argc, char* argv[]) {
-    // Set up logging
-    auto console = spdlog::stdout_color_mt("console");
-    spdlog::set_default_logger(console);
-    // Default to info-level to avoid per-frame spam; raise if diagnosing issues
-    spdlog::set_level(spdlog::level::info);
-    spdlog::set_pattern("[%H:%M:%S] [%^%l%$] %v");
-    spdlog::flush_on(spdlog::level::info);
+    // Set up logging (console + per-run log file).
+    ConfigureLoggingToFile();
+    spdlog::info("Last-run log: {}", GetRunLogState().logFilePath.string());
 
     // Install crash handler to capture SEH faults
     SetUnhandledExceptionFilter(CortexCrashHandler);
@@ -603,6 +698,9 @@ int main(int argc, char* argv[]) {
 
         // Run main loop
         engine.Run();
+
+        // Always dump a useful snapshot before tearing down renderer/device.
+        AppendEndOfRunDump(engine);
 
         // Shutdown
         engine.Shutdown();

@@ -287,12 +287,44 @@ public:
 
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
+    [[nodiscard]] const DescriptorHandle& GetVisibilitySRVHandle() const { return m_visibilitySRV; }
+
+    enum class DebugBlitBuffer : uint32_t {
+        Albedo = 0,
+        NormalRoughness,
+        EmissiveMetallic,
+        MaterialExt0,
+        MaterialExt1,
+    };
 
     // Debug: Blit albedo to HDR buffer for visualization
     Result<void> DebugBlitAlbedoToHDR(
         ID3D12GraphicsCommandList* cmdList,
         ID3D12Resource* hdrTarget,
         D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+    );
+
+    // Debug: Blit a selected VB G-buffer to HDR.
+    Result<void> DebugBlitGBufferToHDR(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+        DebugBlitBuffer buffer
+    );
+
+    // Debug: Visualize the visibility buffer payload (triangleID/instanceID).
+    Result<void> DebugBlitVisibilityToHDR(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+    );
+
+    // Debug: Visualize an external depth buffer (R32_FLOAT SRV expected).
+    Result<void> DebugBlitDepthToHDR(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+        ID3D12Resource* depthBuffer
     );
 
     // Statistics
@@ -409,6 +441,8 @@ private:
     // Debug blit pipeline
     ComPtr<ID3D12RootSignature> m_blitRootSignature;
     ComPtr<ID3D12PipelineState> m_blitPipeline;
+    ComPtr<ID3D12PipelineState> m_blitVisibilityPipeline;
+    ComPtr<ID3D12PipelineState> m_blitDepthPipeline;
     ComPtr<ID3D12DescriptorHeap> m_blitSamplerHeap;
 
     // Deferred lighting pipeline

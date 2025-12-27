@@ -756,7 +756,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
-        params[0].Constants.Num32BitValues = 20;  // 16 for matrix + 4 for (meshIdx + materialCount + pad2)
+        params[0].Constants.Num32BitValues = 20;  // 16 for matrix + 4 for (meshIdx + baseInstance + materialCount + cullMaskCount)
         // Pixel shader reads g_MaterialCount / g_CullMaskCount and may sample instance
         // data for primitive-ID normalization, so these must be visible to ALL stages.
         params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1189,7 +1189,8 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-    psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
+    // Match engine-wide convention (DX12Pipeline): meshes are CCW-wound for front faces.
+    psoDesc.RasterizerState.FrontCounterClockwise = TRUE;
     psoDesc.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
     psoDesc.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
     psoDesc.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
@@ -1692,9 +1693,107 @@ Result<void> VisibilityBufferRenderer::CreatePipelines() {
     if (!blitReady) {
         m_blitPipeline.Reset();
         m_blitRootSignature.Reset();
+        m_blitVisibilityPipeline.Reset();
+        m_blitDepthPipeline.Reset();
         m_blitSamplerHeap.Reset();
     } else {
         spdlog::info("VisibilityBuffer: Debug blit pipeline created");
+
+        // Optional: visibility buffer debug blit (uint2 payload -> color).
+        {
+            auto visVS = ShaderCompiler::CompileFromFile(
+                "assets/shaders/DebugBlitVisibility.hlsl",
+                "VSMain",
+                "vs_6_6"
+            );
+            auto visPS = ShaderCompiler::CompileFromFile(
+                "assets/shaders/DebugBlitVisibility.hlsl",
+                "PSMain",
+                "ps_6_6"
+            );
+            if (visVS.IsOk() && visPS.IsOk()) {
+                D3D12_GRAPHICS_PIPELINE_STATE_DESC pso = {};
+                pso.pRootSignature = m_blitRootSignature.Get();
+                pso.VS = { visVS.Value().data.data(), visVS.Value().data.size() };
+                pso.PS = { visPS.Value().data.data(), visPS.Value().data.size() };
+                pso.BlendState.RenderTarget[0] = {
+                    FALSE, FALSE,
+                    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                    D3D12_LOGIC_OP_NOOP,
+                    D3D12_COLOR_WRITE_ENABLE_ALL
+                };
+                pso.SampleMask = UINT_MAX;
+                pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+                pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+                pso.RasterizerState.FrontCounterClockwise = FALSE;
+                pso.RasterizerState.DepthClipEnable = FALSE;
+                pso.DepthStencilState.DepthEnable = FALSE;
+                pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+                pso.DepthStencilState.StencilEnable = FALSE;
+                pso.InputLayout = { nullptr, 0 };
+                pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+                pso.NumRenderTargets = 1;
+                pso.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                pso.SampleDesc.Count = 1;
+
+                HRESULT hr2 = device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_blitVisibilityPipeline));
+                if (FAILED(hr2)) {
+                    m_blitVisibilityPipeline.Reset();
+                    spdlog::warn("VisibilityBuffer: failed to create visibility debug blit PSO");
+                }
+            } else {
+                spdlog::warn("VisibilityBuffer: failed to compile visibility debug blit shader(s)");
+            }
+        }
+
+        // Optional: depth buffer debug blit (float depth -> grayscale).
+        {
+            auto depthVS = ShaderCompiler::CompileFromFile(
+                "assets/shaders/DebugBlitDepth.hlsl",
+                "VSMain",
+                "vs_6_6"
+            );
+            auto depthPS = ShaderCompiler::CompileFromFile(
+                "assets/shaders/DebugBlitDepth.hlsl",
+                "PSMain",
+                "ps_6_6"
+            );
+            if (depthVS.IsOk() && depthPS.IsOk()) {
+                D3D12_GRAPHICS_PIPELINE_STATE_DESC pso = {};
+                pso.pRootSignature = m_blitRootSignature.Get();
+                pso.VS = { depthVS.Value().data.data(), depthVS.Value().data.size() };
+                pso.PS = { depthPS.Value().data.data(), depthPS.Value().data.size() };
+                pso.BlendState.RenderTarget[0] = {
+                    FALSE, FALSE,
+                    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                    D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                    D3D12_LOGIC_OP_NOOP,
+                    D3D12_COLOR_WRITE_ENABLE_ALL
+                };
+                pso.SampleMask = UINT_MAX;
+                pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+                pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+                pso.RasterizerState.FrontCounterClockwise = FALSE;
+                pso.RasterizerState.DepthClipEnable = FALSE;
+                pso.DepthStencilState.DepthEnable = FALSE;
+                pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+                pso.DepthStencilState.StencilEnable = FALSE;
+                pso.InputLayout = { nullptr, 0 };
+                pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+                pso.NumRenderTargets = 1;
+                pso.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+                pso.SampleDesc.Count = 1;
+
+                HRESULT hr2 = device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_blitDepthPipeline));
+                if (FAILED(hr2)) {
+                    m_blitDepthPipeline.Reset();
+                    spdlog::warn("VisibilityBuffer: failed to create depth debug blit PSO");
+                }
+            } else {
+                spdlog::warn("VisibilityBuffer: failed to compile depth debug blit shader(s)");
+            }
+        }
     }
 
     // ========================================================================
@@ -2281,12 +2380,13 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         struct {
             glm::mat4 viewProj;
             uint32_t meshIndex;
+            uint32_t baseInstance;
             uint32_t materialCount;
             uint32_t cullMaskCount;
-            uint32_t pad;
         } perMeshData;
         perMeshData.viewProj = viewProj;
         perMeshData.meshIndex = meshIdx;
+        perMeshData.baseInstance = startInstance;
         perMeshData.materialCount = m_materialCount;
         perMeshData.cullMaskCount = hasCullMask ? m_instanceCount : 0u;
         cmdList->SetGraphicsRoot32BitConstants(0, 20, &perMeshData, 0);
@@ -2295,9 +2395,22 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         D3D12_VERTEX_BUFFER_VIEW vbv = {};
         vbv.BufferLocation = drawInfo.vertexBuffer->GetGPUVirtualAddress();
         const uint32_t stride = (drawInfo.vertexStrideBytes > 0) ? drawInfo.vertexStrideBytes : static_cast<uint32_t>(sizeof(Vertex));
-        const uint64_t vbBytesNeeded = static_cast<uint64_t>(drawInfo.vertexCount) * static_cast<uint64_t>(stride);
         const uint64_t vbBytesAvail = drawInfo.vertexBuffer->GetDesc().Width;
-        const uint64_t vbBytes = std::min(vbBytesNeeded, vbBytesAvail);
+
+        uint64_t vbBytes = vbBytesAvail;
+        if (drawInfo.vertexCount > 0) {
+            const uint64_t vbBytesNeeded = static_cast<uint64_t>(drawInfo.vertexCount) * static_cast<uint64_t>(stride);
+            vbBytes = std::min(vbBytesNeeded, vbBytesAvail);
+            if (vbBytesNeeded > vbBytesAvail) {
+                static bool s_loggedOnce = false;
+                if (!s_loggedOnce) {
+                    s_loggedOnce = true;
+                    spdlog::warn("VB: vertex buffer smaller than expected (needed={} avail={}); clamping VBV size",
+                                 vbBytesNeeded, vbBytesAvail);
+                }
+            }
+        }
+
         vbv.SizeInBytes = static_cast<UINT>(std::min<uint64_t>(vbBytes, static_cast<uint64_t>(UINT_MAX)));
         vbv.StrideInBytes = stride;
         cmdList->IASetVertexBuffers(0, 1, &vbv);
@@ -2313,12 +2426,16 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
         ibv.Format = (drawInfo.indexFormat == 1u) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         cmdList->IASetIndexBuffer(&ibv);
 
+        // Important: use StartInstanceLocation=0 so SV_InstanceID is stable across
+        // backends/drivers, and apply the draw's base instance explicitly via
+        // root constants (g_BaseInstance). This keeps the visibility buffer's
+        // instance IDs aligned with the packed global instance buffer.
         cmdList->DrawIndexedInstanced(
             drawInfo.indexCount,
             instanceCount,
             drawInfo.firstIndex,
             drawInfo.baseVertex,
-            startInstance
+            0
         );
     };
 
@@ -2782,54 +2899,205 @@ Result<void> VisibilityBufferRenderer::DebugBlitAlbedoToHDR(
     ID3D12Resource* hdrTarget,
     D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
 ) {
+    return DebugBlitGBufferToHDR(cmdList, hdrTarget, hdrRTV, DebugBlitBuffer::Albedo);
+}
+
+Result<void> VisibilityBufferRenderer::DebugBlitGBufferToHDR(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+    DebugBlitBuffer buffer
+) {
     (void)hdrTarget;
 
-    if (!m_blitPipeline) {
-        return Result<void>::Err("Blit pipeline not initialized");
+    if (!cmdList) {
+        return Result<void>::Err("Debug blit requires a valid command list");
+    }
+    if (!m_blitPipeline || !m_blitRootSignature || !m_blitSamplerHeap) {
+        return Result<void>::Err("Debug blit pipeline not initialized");
     }
 
-    // Transition albedo to shader resource
-    if (m_albedoState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        D3D12_RESOURCE_BARRIER barrier = {};
+    constexpr D3D12_RESOURCE_STATES kSrvState =
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+    ID3D12Resource* src = nullptr;
+    D3D12_RESOURCE_STATES* state = nullptr;
+    D3D12_GPU_DESCRIPTOR_HANDLE srv = {};
+
+    switch (buffer) {
+        case DebugBlitBuffer::Albedo:
+            src = m_gbufferAlbedo.Get();
+            state = &m_albedoState;
+            srv = m_albedoSRV.gpu;
+            break;
+        case DebugBlitBuffer::NormalRoughness:
+            src = m_gbufferNormalRoughness.Get();
+            state = &m_normalRoughnessState;
+            srv = m_normalRoughnessSRV.gpu;
+            break;
+        case DebugBlitBuffer::EmissiveMetallic:
+            src = m_gbufferEmissiveMetallic.Get();
+            state = &m_emissiveMetallicState;
+            srv = m_emissiveMetallicSRV.gpu;
+            break;
+        case DebugBlitBuffer::MaterialExt0:
+            src = m_gbufferMaterialExt0.Get();
+            state = &m_materialExt0State;
+            srv = m_materialExt0SRV.gpu;
+            break;
+        case DebugBlitBuffer::MaterialExt1:
+            src = m_gbufferMaterialExt1.Get();
+            state = &m_materialExt1State;
+            srv = m_materialExt1SRV.gpu;
+            break;
+        default:
+            return Result<void>::Err("Unknown debug blit buffer");
+    }
+
+    if (!src || !state || srv.ptr == 0) {
+        return Result<void>::Err("Debug blit source not available");
+    }
+
+    if (*state != kSrvState) {
+        D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_gbufferAlbedo.Get();
-        barrier.Transition.StateBefore = m_albedoState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.pResource = src;
+        barrier.Transition.StateBefore = *state;
+        barrier.Transition.StateAfter = kSrvState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_albedoState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        *state = kSrvState;
     }
 
-    // Set HDR buffer as render target
     cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
 
-    // Set viewport and scissor
     D3D12_VIEWPORT viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
     D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
     cmdList->RSSetViewports(1, &viewport);
     cmdList->RSSetScissorRects(1, &scissor);
 
-    // Set blit pipeline
     cmdList->SetPipelineState(m_blitPipeline.Get());
     cmdList->SetGraphicsRootSignature(m_blitRootSignature.Get());
 
-    // Set descriptor heaps (CBV/SRV/UAV heap for texture, sampler heap for sampler)
     ID3D12DescriptorHeap* heaps[] = {
         m_descriptorManager->GetCBV_SRV_UAV_Heap(),
         m_blitSamplerHeap.Get()
     };
     cmdList->SetDescriptorHeaps(2, heaps);
 
-    // Bind albedo texture (t0)
-    cmdList->SetGraphicsRootDescriptorTable(0, m_albedoSRV.gpu);
-
-    // Bind sampler (s0)
+    cmdList->SetGraphicsRootDescriptorTable(0, srv);
     cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
 
-    // Set primitive topology
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->DrawInstanced(3, 1, 0, 0);
 
-    // Draw fullscreen triangle (3 vertices, no vertex buffer)
+    return Result<void>::Ok();
+}
+
+Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+) {
+    (void)hdrTarget;
+
+    if (!cmdList) {
+        return Result<void>::Err("Visibility debug blit requires a valid command list");
+    }
+    if (!m_blitVisibilityPipeline || !m_blitRootSignature || !m_blitSamplerHeap) {
+        return Result<void>::Err("Visibility debug blit pipeline not initialized");
+    }
+
+    constexpr D3D12_RESOURCE_STATES kSrvState =
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+    if (m_visibilityState != kSrvState) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = m_visibilityBuffer.Get();
+        barrier.Transition.StateBefore = m_visibilityState;
+        barrier.Transition.StateAfter = kSrvState;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &barrier);
+        m_visibilityState = kSrvState;
+    }
+
+    cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetPipelineState(m_blitVisibilityPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_blitRootSignature.Get());
+
+    ID3D12DescriptorHeap* heaps[] = {
+        m_descriptorManager->GetCBV_SRV_UAV_Heap(),
+        m_blitSamplerHeap.Get()
+    };
+    cmdList->SetDescriptorHeaps(2, heaps);
+
+    cmdList->SetGraphicsRootDescriptorTable(0, m_visibilitySRV.gpu);
+    cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    return Result<void>::Ok();
+}
+
+Result<void> VisibilityBufferRenderer::DebugBlitDepthToHDR(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+    ID3D12Resource* depthBuffer
+) {
+    (void)hdrTarget;
+
+    if (!cmdList) {
+        return Result<void>::Err("Depth debug blit requires a valid command list");
+    }
+    if (!depthBuffer) {
+        return Result<void>::Err("Depth debug blit requires a valid depth buffer");
+    }
+    if (!m_blitDepthPipeline || !m_blitRootSignature || !m_blitSamplerHeap) {
+        return Result<void>::Err("Depth debug blit pipeline not initialized");
+    }
+
+    auto srvResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(1);
+    if (srvResult.IsErr()) {
+        return Result<void>::Err("Depth debug blit failed to allocate transient SRV: " + srvResult.Error());
+    }
+    DescriptorHandle srv = srvResult.Value();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc{};
+    depthSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(depthBuffer, &depthSrvDesc, srv.cpu);
+
+    cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetPipelineState(m_blitDepthPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_blitRootSignature.Get());
+
+    ID3D12DescriptorHeap* heaps[] = {
+        m_descriptorManager->GetCBV_SRV_UAV_Heap(),
+        m_blitSamplerHeap.Get()
+    };
+    cmdList->SetDescriptorHeaps(2, heaps);
+
+    cmdList->SetGraphicsRootDescriptorTable(0, srv.gpu);
+    cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->DrawInstanced(3, 1, 0, 0);
 
     return Result<void>::Ok();

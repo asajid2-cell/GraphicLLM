@@ -52,6 +52,7 @@ public:
     [[nodiscard]] uint32_t GetWidth() const { return m_width; }
     [[nodiscard]] uint32_t GetHeight() const { return m_height; }
     [[nodiscard]] float GetAspectRatio() const { return static_cast<float>(m_width) / static_cast<float>(m_height); }
+    [[nodiscard]] bool IsVsyncEnabled() const { return m_vsync; }
     [[nodiscard]] SDL_Window* GetSDLWindow() const { return m_window; }
     [[nodiscard]] IDXGISwapChain3* GetSwapChain() const { return m_swapChain.Get(); }
 

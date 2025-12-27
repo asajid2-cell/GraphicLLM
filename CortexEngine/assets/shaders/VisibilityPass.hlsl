@@ -3,17 +3,19 @@
 // Output: R32G32_UINT with (primitiveID, instanceID).
 
 // Root signature:
-// b0: View-projection matrix + current mesh index
+// b0: View-projection matrix + (mesh index, base instance, counts)
 // t0: Instance data SRV
 // t2: Optional culling mask (ByteAddressBuffer, 1 uint per instance)
 
 cbuffer PerFrameData : register(b0) {
     float4x4 g_ViewProj;
-    uint g_CurrentMeshIndex;  // Current mesh being drawn
+    uint g_CurrentMeshIndex;  // Current mesh being drawn (debug/diagnostics)
+    // D3D SV_InstanceID is 0..(InstanceCount-1) and does NOT include
+    // StartInstanceLocation, so we pass the draw's base instance explicitly.
+    uint g_BaseInstance;
     uint g_MaterialCount;
     // When 0, the cull mask is treated as "not bound" and all instances are visible.
     uint g_CullMaskCount;
-    uint _pad;
 };
 
 // Instance data structure (matches VBInstanceData in C++)
@@ -79,14 +81,16 @@ struct PSOutput {
 PSInput VSMain(VSInput input) {
     PSInput output;
 
+    const uint globalInstanceID = g_BaseInstance + input.instanceID;
+
     // Fetch instance data
-    VBInstanceData instance = g_Instances[input.instanceID];
+    VBInstanceData instance = g_Instances[globalInstanceID];
 
     // Optional per-instance culling: when a valid mask is bound, instances with
     // mask == 0 are culled before rasterization via SV_CullDistance.
     uint visible = 1u;
-    if (g_CullMaskCount != 0u && input.instanceID < g_CullMaskCount) {
-        visible = g_CullMask.Load(input.instanceID * 4u);
+    if (g_CullMaskCount != 0u && globalInstanceID < g_CullMaskCount) {
+        visible = g_CullMask.Load(globalInstanceID * 4u);
     }
     output.cullDist = (visible != 0u) ? 1.0f : -1.0f;
 
@@ -97,7 +101,7 @@ PSInput VSMain(VSInput input) {
     output.texCoord = input.texCoord;
 
     // Pass through instance ID for pixel shader (no interpolation!)
-    output.instanceID = input.instanceID;
+    output.instanceID = globalInstanceID;
 
     return output;
 }

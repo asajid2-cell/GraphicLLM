@@ -154,6 +154,10 @@ public:
     // Main render function
     void Render(Scene::ECS_Registry* registry, float deltaTime);
 
+    // Writes a one-shot renderer state dump to spdlog. Intended to be called
+    // at shutdown (it is also copied into the per-run log file).
+    void LogDiagnostics() const;
+
     // Upload mesh to GPU
     Result<void> UploadMesh(std::shared_ptr<Scene::MeshData> mesh);
     // Enqueue a mesh upload to be processed by the GPU job queue.
@@ -984,6 +988,7 @@ public:
       std::vector<VisibilityBufferRenderer::VBMeshDrawInfo> m_vbMeshDraws;
       bool m_vbPlannedThisFrame = false;
       bool m_vbRenderedThisFrame = false;
+      bool m_vbDebugOverrideThisFrame = false;
       // Sticky flag set when the DX12 device reports "device removed" during
       // resource creation (typically due to GPU memory pressure). Once this
       // is true the renderer will skip further heavy work for the remainder

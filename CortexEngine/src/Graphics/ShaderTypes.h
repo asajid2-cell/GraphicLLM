@@ -53,6 +53,19 @@ struct ShadowConstants {
     glm::uvec4 cascadeIndex;
 };
 
+// Procedural terrain parameters for the clipmap terrain pipeline (Terrain.hlsl).
+// Bound to b2 in the terrain pipelines; other pipelines bind MaterialConstants there.
+struct TerrainConstants {
+    // x = seed, y = octaves, z/w reserved (must be 16-byte aligned).
+    alignas(16) glm::uvec4 seedAndOctaves{1337u, 5u, 0u, 0u};
+    // x = amplitude, y = frequency, z = lacunarity, w = gain
+    alignas(16) glm::vec4 params0{35.0f, 0.0025f, 2.0f, 0.5f};
+    // x = warp strength, y = skirt depth (meters), z = originHiX, w = originHiZ
+    alignas(16) glm::vec4 params1{0.0f, 40.0f, 0.0f, 0.0f};
+    // x = originLoX, y = originLoZ, z/w reserved
+    alignas(16) glm::vec4 params2{0.0f, 0.0f, 0.0f, 0.0f};
+};
+
 // Per-frame constant buffer (changes per frame)
 // Note: lightViewProjection includes 3 cascades for the directional sun and
 // up to 3 additional local shadow-casting lights (total 6 matrices).

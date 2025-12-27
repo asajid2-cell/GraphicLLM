@@ -49,6 +49,8 @@ void Engine::RebuildScene(ScenePreset preset) {
     m_selectedEntity = entt::null;
     m_autoDemoEnabled = false;
     m_cameraControllerInitialized = false;
+    m_terrainEnabled = false;
+    m_terrainLevelEntities.clear();
 
     m_currentScenePreset = preset;
 
@@ -56,6 +58,8 @@ void Engine::RebuildScene(ScenePreset preset) {
     // state (no TAA or RT afterimages from the previous layout).
     if (m_renderer) {
         m_renderer->ResetTemporalHistoryForSceneChange();
+        // Procedural terrain currently renders via the classic forward path.
+        m_renderer->SetVisibilityBufferEnabled(preset != ScenePreset::ProceduralTerrain);
     }
 
     switch (preset) {
@@ -64,6 +68,9 @@ void Engine::RebuildScene(ScenePreset preset) {
         break;
     case ScenePreset::DragonOverWater:
         BuildDragonStudioScene();
+        break;
+    case ScenePreset::ProceduralTerrain:
+        BuildProceduralTerrainScene();
         break;
     case ScenePreset::RTShowcase:
     case ScenePreset::GodRays: // currently shares layout with RTShowcase
@@ -85,6 +92,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DragonOverWater: presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:      presetName = "RT Showcase Gallery"; break;
     case ScenePreset::GodRays:         presetName = "God Rays Atrium"; break;
+    case ScenePreset::ProceduralTerrain: presetName = "Procedural Terrain"; break;
     default:                           presetName = "Unknown"; break;
     }
 
@@ -145,6 +153,117 @@ void Engine::RebuildScene(ScenePreset preset) {
     // estimated GPU memory footprint is close to the adapter limit.
     // DISABLED: Keep all graphics features enabled
     // ApplyVRAMQualityGovernor();
+}
+
+void Engine::BuildProceduralTerrainScene() {
+    spdlog::info("Building scene: Procedural Terrain (clipmap)");
+
+    auto* renderer = m_renderer.get();
+
+    // Camera at human height, looking forward across the terrain.
+    entt::entity cameraEntity = m_registry->CreateEntity();
+    m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
+
+    auto& cameraTransform = m_registry->AddComponent<TransformComponent>(cameraEntity);
+    cameraTransform.position = glm::vec3(0.0f, 1.6f, 0.0f);
+    cameraTransform.rotation = glm::quatLookAt(glm::vec3(0.0f, 0.0f, 1.0f),
+                                               glm::vec3(0.0f, 1.0f, 0.0f));
+
+    auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
+    camera.fov = 70.0f;
+    camera.nearPlane = 0.05f;
+    camera.farPlane = 10000.0f;
+    camera.isActive = true;
+
+    if (renderer) {
+        renderer->SetSunDirection(glm::normalize(glm::vec3(0.3f, -1.0f, 0.2f)));
+        renderer->SetSunColor(glm::vec3(1.0f));
+        renderer->SetSunIntensity(5.0f);
+        renderer->SetEnvironmentPreset("studio");
+        renderer->SetIBLEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.003f, 0.0f, 0.12f);
+        renderer->SetGodRayIntensity(0.7f);
+    }
+
+    // Clipmap meshes (level 0 = full grid; levels 1+ = ring grid with inner hole).
+    auto grid0 = Utils::MeshGenerator::CreateTerrainClipmapGrid(m_terrainGridDim, false, true);
+    auto ring = Utils::MeshGenerator::CreateTerrainClipmapGrid(m_terrainGridDim, true, true);
+
+    if (renderer) {
+        auto r0 = renderer->UploadMesh(grid0);
+        if (r0.IsErr()) {
+            spdlog::warn("Failed to upload terrain grid mesh: {}", r0.Error());
+            grid0.reset();
+        }
+        auto r1 = renderer->UploadMesh(ring);
+        if (r1.IsErr()) {
+            spdlog::warn("Failed to upload terrain ring mesh: {}", r1.Error());
+            ring.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device removed while uploading terrain meshes; aborting terrain scene build.");
+            return;
+        }
+    }
+
+    if (!grid0 || !grid0->gpuBuffers || !ring || !ring->gpuBuffers) {
+        spdlog::warn("Terrain clipmap meshes unavailable; skipping terrain build.");
+        return;
+    }
+
+    m_terrainEnabled = true;
+    m_terrainLevelEntities.clear();
+
+    const uint32_t levels = std::max(1u, m_terrainLevels);
+    for (uint32_t level = 0; level < levels; ++level) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "Terrain_L" + std::to_string(level));
+
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(0.0f);
+        const float spacing = m_terrainBaseSpacing * static_cast<float>(1u << std::min(level, 30u));
+        t.scale = glm::vec3(spacing, 1.0f, spacing);
+        t.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = (level == 0) ? grid0 : ring;
+        r.albedoColor = glm::vec4(0.45f, 0.55f, 0.35f, 1.0f);
+        r.metallic = 0.0f;
+        r.roughness = 0.85f;
+        r.ao = 1.0f;
+        r.presetName = "terrain";
+
+        Scene::TerrainClipmapLevelComponent lvl{};
+        lvl.level = level;
+        lvl.isRing = (level == 0) ? 0u : 1u;
+        m_registry->AddComponent<Scene::TerrainClipmapLevelComponent>(e, lvl);
+
+        m_terrainLevelEntities.push_back(e);
+    }
+
+    // A few reference primitives for scale and to exercise PBR shading.
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    if (renderer) {
+        auto upload = renderer->UploadMesh(cubeMesh);
+        if (upload.IsErr()) {
+            cubeMesh.reset();
+        }
+    }
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        entt::entity ref = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(ref, "ReferenceCube");
+        auto& t = m_registry->AddComponent<TransformComponent>(ref);
+        t.position = glm::vec3(0.0f, 1.0f, 4.0f);
+        t.scale = glm::vec3(1.0f);
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(ref);
+        r.mesh = cubeMesh;
+        r.albedoColor = glm::vec4(0.9f, 0.2f, 0.2f, 1.0f);
+        r.metallic = 0.0f;
+        r.roughness = 0.4f;
+        r.ao = 1.0f;
+        r.presetName = "painted_plastic";
+    }
 }
 
 void Engine::BuildCornellScene() {

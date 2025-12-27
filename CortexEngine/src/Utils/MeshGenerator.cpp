@@ -1,5 +1,6 @@
 #include "MeshGenerator.h"
 #include <cmath>
+#include <unordered_map>
 
 namespace Cortex::Utils {
 
@@ -606,6 +607,141 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateLine(float length, float t
         p.y *= halfT * 2.0f;
         p.z *= halfT * 2.0f;
     }
+    return mesh;
+}
+
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainClipmapGrid(uint32_t gridDim, bool ring, bool skirts) {
+    auto mesh = std::make_shared<Scene::MeshData>();
+    mesh->kind = Scene::MeshKind::Procedural;
+
+    if (gridDim < 3) {
+        gridDim = 3;
+    }
+    if ((gridDim & 1u) == 0u) {
+        // Keep the grid centered (odd dimension). 2^n + 1 recommended.
+        gridDim += 1;
+    }
+
+    const uint32_t halfCells = (gridDim - 1u) / 2u;
+
+    mesh->positions.reserve(static_cast<size_t>(gridDim) * static_cast<size_t>(gridDim));
+    mesh->normals.reserve(mesh->positions.capacity());
+    mesh->texCoords.reserve(mesh->positions.capacity());
+
+    // Base grid vertices on XZ plane, centered at origin.
+    for (uint32_t z = 0; z < gridDim; ++z) {
+        const float fz = static_cast<float>(halfCells) - static_cast<float>(z);
+        for (uint32_t x = 0; x < gridDim; ++x) {
+            const float fx = static_cast<float>(x) - static_cast<float>(halfCells);
+            mesh->positions.emplace_back(fx, 0.0f, fz);
+            mesh->normals.emplace_back(0.0f, 1.0f, 0.0f);
+            // texCoord.y is a skirt flag (0 = base vertex, 1 = skirt vertex).
+            mesh->texCoords.emplace_back(fx / static_cast<float>(gridDim - 1u), 0.0f);
+        }
+    }
+
+    // Indices for the base surface.
+    uint32_t holeVertDim = (gridDim + 1u) / 2u;
+    uint32_t holeStart = (gridDim - holeVertDim) / 2u;
+    uint32_t holeEnd = holeStart + holeVertDim - 1u; // inclusive vertex index
+
+    auto cellInHole = [&](uint32_t x, uint32_t z) {
+        // Cell is defined by [x,x+1] and [z,z+1] vertices. If both axes fall
+        // within the hole range, the cell is excluded.
+        if (!ring) return false;
+        return (x >= holeStart && (x + 1u) <= holeEnd &&
+                z >= holeStart && (z + 1u) <= holeEnd);
+    };
+
+    const uint32_t cellDim = gridDim - 1u;
+    mesh->indices.reserve(static_cast<size_t>(cellDim) * static_cast<size_t>(cellDim) * 6u);
+
+    auto vIndex = [&](uint32_t x, uint32_t z) -> uint32_t {
+        return z * gridDim + x;
+    };
+
+    for (uint32_t z = 0; z < cellDim; ++z) {
+        for (uint32_t x = 0; x < cellDim; ++x) {
+            if (cellInHole(x, z)) {
+                continue;
+            }
+
+            const uint32_t v0 = vIndex(x + 0u, z + 0u);
+            const uint32_t v1 = vIndex(x + 1u, z + 0u);
+            const uint32_t v2 = vIndex(x + 1u, z + 1u);
+            const uint32_t v3 = vIndex(x + 0u, z + 1u);
+
+            // Match the plane winding: (v0,v1,v2) and (v0,v2,v3).
+            mesh->indices.push_back(v0);
+            mesh->indices.push_back(v1);
+            mesh->indices.push_back(v2);
+
+            mesh->indices.push_back(v0);
+            mesh->indices.push_back(v2);
+            mesh->indices.push_back(v3);
+        }
+    }
+
+    if (skirts) {
+        // Build boundary skirts by finding edges referenced by only one triangle.
+        std::unordered_map<uint64_t, uint32_t> edgeCount;
+        std::unordered_map<uint64_t, std::pair<uint32_t, uint32_t>> edgeDir;
+        edgeCount.reserve(mesh->indices.size());
+        edgeDir.reserve(mesh->indices.size());
+
+        auto addEdge = [&](uint32_t a, uint32_t b) {
+            const uint32_t lo = (a < b) ? a : b;
+            const uint32_t hi = (a < b) ? b : a;
+            const uint64_t key = (static_cast<uint64_t>(lo) << 32u) | static_cast<uint64_t>(hi);
+            uint32_t& c = edgeCount[key];
+            c += 1u;
+            if (c == 1u) {
+                edgeDir[key] = { a, b };
+            }
+        };
+
+        for (size_t i = 0; i + 2 < mesh->indices.size(); i += 3) {
+            const uint32_t i0 = mesh->indices[i + 0];
+            const uint32_t i1 = mesh->indices[i + 1];
+            const uint32_t i2 = mesh->indices[i + 2];
+            addEdge(i0, i1);
+            addEdge(i1, i2);
+            addEdge(i2, i0);
+        }
+
+        for (const auto& [key, count] : edgeCount) {
+            if (count != 1u) {
+                continue;
+            }
+            const auto it = edgeDir.find(key);
+            if (it == edgeDir.end()) {
+                continue;
+            }
+            const uint32_t a = it->second.first;
+            const uint32_t b = it->second.second;
+
+            const uint32_t skirtA = static_cast<uint32_t>(mesh->positions.size());
+            mesh->positions.push_back(mesh->positions[a]);
+            mesh->normals.push_back(mesh->normals[a]);
+            mesh->texCoords.push_back(glm::vec2(mesh->texCoords[a].x, 1.0f));
+
+            const uint32_t skirtB = static_cast<uint32_t>(mesh->positions.size());
+            mesh->positions.push_back(mesh->positions[b]);
+            mesh->normals.push_back(mesh->normals[b]);
+            mesh->texCoords.push_back(glm::vec2(mesh->texCoords[b].x, 1.0f));
+
+            // Two triangles connecting the boundary edge to its skirt edge.
+            mesh->indices.push_back(a);
+            mesh->indices.push_back(b);
+            mesh->indices.push_back(skirtB);
+
+            mesh->indices.push_back(a);
+            mesh->indices.push_back(skirtB);
+            mesh->indices.push_back(skirtA);
+        }
+    }
+
+    mesh->UpdateBounds();
     return mesh;
 }
 

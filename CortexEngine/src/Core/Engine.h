@@ -4,6 +4,7 @@
 #include <deque>
 #include <atomic>
 #include <thread>
+#include <vector>
 #include <entt/entt.hpp>
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
@@ -59,7 +60,7 @@ struct EngineConfig {
 
     // Optional initial scene preset. When empty, the engine chooses its
     // default (currently the RT showcase gallery). Accepted values are
-    // "dragon", "rt_showcase", and "cornell".
+    // "dragon", "rt_showcase", "cornell", and "terrain".
     std::string initialScenePreset;
 };
 
@@ -112,13 +113,24 @@ public:
     // Scene preset controls (used by debug UI / hotkeys)
     void ToggleScenePreset();
 
+    // Play-in-editor toggle (F5). In play mode the engine runs a grounded FPS
+    // controller and captures the mouse; stopping play restores the editor
+    // snapshot of the ECS.
+    void TogglePlayInEditor();
+
 private:
+    enum class EngineMode {
+        Editor = 0,
+        Play   = 1,
+    };
+
     // High-level scene presets for easy switching between curated layouts.
     enum class ScenePreset {
         CornellBox      = 0,
         DragonOverWater = 1,
         RTShowcase      = 2,
         GodRays         = 3,
+        ProceduralTerrain = 4,
     };
 
     void ProcessInput();
@@ -133,9 +145,11 @@ private:
     void BuildDragonStudioScene();
     void BuildRTShowcaseScene();
     void BuildGodRaysScene();
+    void BuildProceduralTerrainScene();
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
+    void UpdatePlayMode(float deltaTime);
     void ApplyHeroVisualBaseline();
     void UpdateAutoDemo(float deltaTime);
     void SyncDebugMenuFromRenderer();
@@ -150,6 +164,11 @@ private:
                                    glm::vec3& outDirection);
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
+
+    // Play-in-editor snapshot + mode switch.
+    void EnterPlayMode();
+    void ExitPlayMode();
+    std::unique_ptr<Scene::ECS_Registry> CloneRegistry(const Scene::ECS_Registry& src) const;
 
     // VRAM-aware quality governor to automatically reduce expensive features
     // when the estimated GPU memory footprint exceeds a soft limit.
@@ -238,6 +257,10 @@ private:
     float m_cameraRollDamping = 3.0f;     // how quickly roll recenters when no input
     entt::entity m_activeCameraEntity = entt::null;
 
+    EngineMode m_mode = EngineMode::Editor;
+    std::unique_ptr<Scene::ECS_Registry> m_editorRegistryBackup;
+    entt::entity m_editorSelectedEntity = entt::null;
+
     // Simple auto-demo orbit around the hero scene so the engine can present
     // itself without manual camera input.
     bool  m_autoDemoEnabled = false;
@@ -245,6 +268,49 @@ private:
 
     // Current selection for editor-style interactions (picking & framing).
     entt::entity m_selectedEntity = entt::null;
+
+    // ------------------------------------------------------------
+    // Play mode (grounded FPS controller)
+    // ------------------------------------------------------------
+    bool m_playMouseCaptured = false;
+    glm::vec3 m_playerVelocity{0.0f};
+    bool m_playerGrounded = false;
+    float m_playerEyeHeight = 1.6f;
+    float m_playerCapsuleHeight = 1.8f;
+    float m_playerCapsuleRadius = 0.35f;
+    float m_playerJumpSpeed = 6.0f;
+    float m_playerGravity = 18.0f;
+    float m_playerMaxWalkSpeed = 5.0f;
+    float m_playerMaxSprintSpeed = 9.0f;
+    float m_playerAcceleration = 35.0f;
+    float m_playerFriction = 10.0f;
+    bool m_playerJumpHeld = false;
+
+    // Floating origin (keeps float transforms stable while allowing unlimited traversal).
+    glm::dvec3 m_worldOriginOffset{0.0, 0.0, 0.0};
+    glm::dvec3 m_editorWorldOriginOffsetBackup{0.0, 0.0, 0.0};
+    double m_worldShiftThreshold = 2048.0; // meters (local-space)
+    double m_worldShiftGrid = 512.0;       // meters (shift quantum)
+    void ApplyWorldOriginShift(const glm::dvec3& delta);
+
+    // ------------------------------------------------------------
+    // Procedural terrain (clipmap)
+    // ------------------------------------------------------------
+    bool m_terrainEnabled = false;
+    uint32_t m_terrainSeed = 1337;
+    float m_terrainAmplitude = 35.0f;
+    float m_terrainFrequency = 0.0025f;
+    uint32_t m_terrainOctaves = 5;
+    float m_terrainLacunarity = 2.0f;
+    float m_terrainGain = 0.5f;
+    float m_terrainWarp = 0.0f;
+
+    uint32_t m_terrainGridDim = 129;   // 2^n + 1 recommended
+    uint32_t m_terrainLevels = 8;
+    float m_terrainBaseSpacing = 1.0f; // meters
+    float m_terrainSkirtDepth = 40.0f; // meters (in world units)
+
+    std::vector<entt::entity> m_terrainLevelEntities;
 
     // Toggle for drawing world-origin debug axes (XYZ tripod). When false,
     // the origin axes are suppressed so the view can be captured cleanly.

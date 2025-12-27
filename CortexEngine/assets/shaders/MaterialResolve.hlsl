@@ -138,6 +138,25 @@ float2 ComputeUVGrad(float2 uv0, float2 uv1, float2 uv2,
     return wantDx ? dUVdx : dUVdy;
 }
 
+// Simple global minimum roughness for metallic surfaces.
+// This prevents disco ball effect by ensuring uniform roughness across all triangles.
+//
+// Key insight: Per-triangle varying GSAA actually CAUSES the disco ball effect because
+// adjacent triangles get different roughness values based on their vertex normals,
+// leading to different specular brightness per triangle.
+//
+// Solution: Apply a uniform roughness floor that doesn't vary per-triangle.
+// All triangles on the same material get identical treatment = no disco ball.
+float ApplyMetallicRoughnessFloor(float baseRoughness, float metallic)
+{
+    // Minimum roughness floor for metallic surfaces.
+    // Higher metallic = higher floor (mirrors show every imperfection).
+    // 0.15 corresponds to slightly brushed metal - realistic for most real-world metals.
+    const float kMetallicMinRoughness = 0.15f;  // Tunable: 0.10-0.20
+    float minRoughness = metallic * kMetallicMinRoughness;
+    return max(baseRoughness, minRoughness);
+}
+
 // Load a vertex from the per-mesh vertex buffer (raw SRV -> ByteAddressBuffer)
 Vertex LoadVertex(ByteAddressBuffer vertexBuffer, uint vertexIndex, uint vertexStrideBytes) {
     uint offset = vertexIndex * vertexStrideBytes;
@@ -500,6 +519,17 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         transmission = saturate(transmission);
         specularFactor = saturate(specularFactor);
         specularColor = saturate(specularColor);
+    }
+
+    // Apply global minimum roughness floor to prevent disco ball effect on metals.
+    // Key insight: Per-triangle varying roughness CAUSES disco ball, not fixes it.
+    // A uniform floor ensures all triangles have identical specular response.
+    {
+        roughness = ApplyMetallicRoughnessFloor(roughness, metallic);
+
+        if (clearCoatWeight > 0.01f) {
+            clearCoatRoughness = ApplyMetallicRoughnessFloor(clearCoatRoughness, metallic);
+        }
     }
 
     // Write to G-buffers

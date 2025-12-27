@@ -131,14 +131,8 @@ PSOutput PSMainAlphaTest(PSInput input, uint primitiveID : SV_PrimitiveID) {
 
     VBInstanceData instance = g_Instances[input.instanceID];
 
-    // Apply the same optional occlusion/frustum mask as the opaque path.
-    if (g_CullMaskCount != 0u && input.instanceID < g_CullMaskCount) {
-        uint visible = g_CullMask.Load(input.instanceID * 4u);
-        if (visible == 0u)
-        {
-            clip(-1.0f);
-        }
-    }
+    // Note: Cull mask is already handled by SV_CullDistance in the vertex shader,
+    // so no redundant check is needed here.
 
     float alpha = 1.0f;
     float cutoff = 0.5f;

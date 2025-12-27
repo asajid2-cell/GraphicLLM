@@ -61,18 +61,32 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCube() {
         mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f)); // Top-left
     }
 
-    // Indices (2 triangles per face, CW winding for front faces)
-    for (uint32_t face = 0; face < 6; face++) {
-        uint32_t baseIndex = face * 4;
-        // Triangle 1 (CW: swap 1 and 2)
-        mesh->indices.push_back(baseIndex + 0);
-        mesh->indices.push_back(baseIndex + 2);
-        mesh->indices.push_back(baseIndex + 1);
-        // Triangle 2 (CW: swap 2 and 3)
-        mesh->indices.push_back(baseIndex + 0);
-        mesh->indices.push_back(baseIndex + 3);
-        mesh->indices.push_back(baseIndex + 2);
-    }
+    // Indices (2 triangles per face, CW winding produces outward-facing normals)
+    // For each face, we compute cross((v[1]-v[0]), (v[2]-v[0])) to get the normal.
+
+    // Front face (+Z): vertices 0,1,2,3 -> cross gives (0,0,+1)
+    mesh->indices.push_back(0); mesh->indices.push_back(1); mesh->indices.push_back(2);
+    mesh->indices.push_back(0); mesh->indices.push_back(2); mesh->indices.push_back(3);
+
+    // Back face (-Z): vertices 4,5,6,7 -> cross gives (0,0,-1)
+    mesh->indices.push_back(4); mesh->indices.push_back(5); mesh->indices.push_back(6);
+    mesh->indices.push_back(4); mesh->indices.push_back(6); mesh->indices.push_back(7);
+
+    // Top face (+Y): vertices 8,9,10,11 -> cross gives (0,+1,0)
+    mesh->indices.push_back(8); mesh->indices.push_back(9); mesh->indices.push_back(10);
+    mesh->indices.push_back(8); mesh->indices.push_back(10); mesh->indices.push_back(11);
+
+    // Bottom face (-Y): vertices 12,13,14,15 -> cross gives (0,-1,0)
+    mesh->indices.push_back(12); mesh->indices.push_back(13); mesh->indices.push_back(14);
+    mesh->indices.push_back(12); mesh->indices.push_back(14); mesh->indices.push_back(15);
+
+    // Right face (+X): vertices 16,17,18,19 -> cross gives (+1,0,0)
+    mesh->indices.push_back(16); mesh->indices.push_back(17); mesh->indices.push_back(18);
+    mesh->indices.push_back(16); mesh->indices.push_back(18); mesh->indices.push_back(19);
+
+    // Left face (-X): vertices 20,21,22,23 -> cross gives (-1,0,0)
+    mesh->indices.push_back(20); mesh->indices.push_back(21); mesh->indices.push_back(22);
+    mesh->indices.push_back(20); mesh->indices.push_back(22); mesh->indices.push_back(23);
 
     mesh->UpdateBounds();
     return mesh;
@@ -101,8 +115,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreatePlane(float width, float h
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
 
-    // Indices (CW winding for front faces)
-    mesh->indices = { 0, 2, 1, 0, 3, 2 };
+    // Indices: cross((v1-v0), (v2-v0)) = (0, +1, 0) for +Y normal
+    mesh->indices = { 0, 1, 2, 0, 2, 3 };
 
     mesh->UpdateBounds();
     return mesh;
@@ -131,8 +145,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateQuad(float width, float he
     mesh->texCoords.push_back(glm::vec2(1.0f, 0.0f));
     mesh->texCoords.push_back(glm::vec2(0.0f, 0.0f));
 
-    // Indices (CW winding for front faces)
-    mesh->indices = { 0, 2, 1, 0, 3, 2 };
+    // Indices: cross((v1-v0), (v2-v0)) = (0, 0, +1) for +Z normal
+    mesh->indices = { 0, 1, 2, 0, 2, 3 };
 
     mesh->UpdateBounds();
     return mesh;
@@ -157,7 +171,9 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint3
         }
     }
 
-    // Generate indices (CW winding for front faces)
+    // Generate indices for outward-facing triangles
+    // Vertex layout per quad: i0 (current), i1 (below), i2 (right), i3 (below-right)
+    // cross(i1-i0, i3-i0) and cross(i3-i0, i2-i0) both point outward
     for (uint32_t y = 0; y < segments; y++) {
         for (uint32_t x = 0; x < segments; x++) {
             uint32_t i0 = y * (segments + 1) + x;
@@ -165,14 +181,15 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateSphere(float radius, uint3
             uint32_t i2 = i0 + 1;
             uint32_t i3 = i1 + 1;
 
-            // CW winding: swap i1 and i2
+            // Triangle 1: i0 -> i1 -> i3 (outward normal)
             mesh->indices.push_back(i0);
-            mesh->indices.push_back(i2);
             mesh->indices.push_back(i1);
-
-            mesh->indices.push_back(i1);
-            mesh->indices.push_back(i2);
             mesh->indices.push_back(i3);
+
+            // Triangle 2: i0 -> i3 -> i2 (outward normal)
+            mesh->indices.push_back(i0);
+            mesh->indices.push_back(i3);
+            mesh->indices.push_back(i2);
         }
     }
 
@@ -448,9 +465,9 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateCone(float radius, float h
         glm::vec3 v0(std::cos(angle0) * radius, 0.0f, std::sin(angle0) * radius);
         glm::vec3 v1(std::cos(angle1) * radius, 0.0f, std::sin(angle1) * radius);
 
-        // Calculate face normal
-        glm::vec3 edge1 = v1 - v0;
-        glm::vec3 edge2 = apex - v0;
+        // Calculate face normal (cross order matches triangle winding for outward normal)
+        glm::vec3 edge1 = apex - v0;
+        glm::vec3 edge2 = v1 - v0;
         glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
 
         uint32_t baseIdx = static_cast<uint32_t>(mesh->positions.size());
@@ -536,7 +553,9 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
         }
     }
 
-    // Generate indices (CW winding for front faces)
+    // Generate indices for outward-facing triangles
+    // Vertex layout per quad: i0 (current), i1 (next major ring), i2 (next minor), i3 (both next)
+    // Same pattern as sphere: cross(i1-i0, i3-i0) and cross(i3-i0, i2-i0) point outward
     for (uint32_t i = 0; i < majorSegments; i++) {
         for (uint32_t j = 0; j < minorSegments; j++) {
             uint32_t i0 = i * (minorSegments + 1) + j;
@@ -544,15 +563,15 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTorus(float majorRadius, f
             uint32_t i2 = i0 + 1;
             uint32_t i3 = i1 + 1;
 
-            // Triangle 1 (CW: swap i1 and i2)
+            // Triangle 1: i0 -> i1 -> i3 (outward normal)
             mesh->indices.push_back(i0);
-            mesh->indices.push_back(i2);
             mesh->indices.push_back(i1);
-
-            // Triangle 2 (CW)
-            mesh->indices.push_back(i1);
-            mesh->indices.push_back(i2);
             mesh->indices.push_back(i3);
+
+            // Triangle 2: i0 -> i3 -> i2 (outward normal)
+            mesh->indices.push_back(i0);
+            mesh->indices.push_back(i3);
+            mesh->indices.push_back(i2);
         }
     }
 

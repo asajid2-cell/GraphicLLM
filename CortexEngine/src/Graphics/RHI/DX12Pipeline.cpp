@@ -26,8 +26,8 @@ Result<void> DX12Pipeline::Initialize(
     D3D12_RASTERIZER_DESC rasterizerDesc = {};
     rasterizerDesc.FillMode = desc.wireframe ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
     rasterizerDesc.CullMode = desc.cullMode;
-    // Our meshes use counter-clockwise winding for front faces
-    rasterizerDesc.FrontCounterClockwise = TRUE;
+    // Our meshes use clockwise winding for front faces
+    rasterizerDesc.FrontCounterClockwise = FALSE;
     rasterizerDesc.DepthBias = desc.depthBias;
     rasterizerDesc.DepthBiasClamp = desc.depthBiasClamp;
     rasterizerDesc.SlopeScaledDepthBias = desc.slopeScaledDepthBias;

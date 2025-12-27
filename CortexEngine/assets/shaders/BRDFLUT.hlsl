@@ -49,19 +49,20 @@ float3 ImportanceSampleGGX(float2 Xi, float roughness, float3 N)
     return normalize(tangentX * H.x + tangentY * H.y + N * H.z);
 }
 
-float GeometrySchlickGGX(float NdotV, float roughness)
+// IBL-specific geometry term: k = r^2 / 2 (different from direct lighting k = (r+1)^2 / 8)
+// This provides better energy conservation for image-based lighting.
+float GeometrySchlickGGX_IBL(float NdotV, float roughness)
 {
-    float r = roughness + 1.0f;
-    float k = (r * r) / 8.0f;
+    float k = (roughness * roughness) / 2.0f;
     return NdotV / (NdotV * (1.0f - k) + k);
 }
 
-float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
+float GeometrySmith_IBL(float3 N, float3 V, float3 L, float roughness)
 {
     float NdotV = max(dot(N, V), 0.0f);
     float NdotL = max(dot(N, L), 0.0f);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    float ggx2 = GeometrySchlickGGX_IBL(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX_IBL(NdotL, roughness);
     return ggx1 * ggx2;
 }
 
@@ -91,7 +92,7 @@ float2 IntegrateBRDF(float NdotV, float roughness)
 
         if (NdotL > 0.0f)
         {
-            float G = GeometrySmith(N, V, L, roughness);
+            float G = GeometrySmith_IBL(N, V, L, roughness);
             float G_Vis = (G * VdotH) / max(NdotH * NdotV, 1e-6f);
             float Fc = pow(1.0f - VdotH, 5.0f);
             A += (1.0f - Fc) * G_Vis;

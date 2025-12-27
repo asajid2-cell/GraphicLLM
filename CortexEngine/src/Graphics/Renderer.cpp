@@ -6059,13 +6059,29 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     deferredParams.reflectionProbeParams = glm::uvec4(0, 0, 0, 0);
 
 
-    // Environment SRVs for VB deferred lighting: pass empty handles so the VB
-    // writes null SRVs. The shader uses envParams.z (IBL enabled) to control
-    // whether IBL is applied. This avoids CopyDescriptorsSimple from shader-
-    // visible heaps which would trigger D3D12 validation errors.
-    // TODO: Pass underlying ID3D12Resource* to allow proper SRV creation.
-    DescriptorHandle envDiffuseSRV{};
-    DescriptorHandle envSpecularSRV{};
+    // Get environment resources (ID3D12Resource*) for direct SRV creation in VB.
+    // This avoids copying descriptors from shader-visible heaps.
+    ID3D12Resource* envDiffuseResource = nullptr;
+    ID3D12Resource* envSpecularResource = nullptr;
+    DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    if (!m_environmentMaps.empty() && m_currentEnvironment < m_environmentMaps.size()) {
+        auto& env = m_environmentMaps[m_currentEnvironment];
+        if (env.diffuseIrradiance) {
+            envDiffuseResource = env.diffuseIrradiance->GetResource();
+            envFormat = env.diffuseIrradiance->GetFormat();
+        }
+        if (env.specularPrefiltered) {
+            envSpecularResource = env.specularPrefiltered->GetResource();
+        }
+    }
+    // Fallback to placeholder if no valid environment
+    if (!envDiffuseResource && m_placeholderAlbedo) {
+        envDiffuseResource = m_placeholderAlbedo->GetResource();
+    }
+    if (!envSpecularResource && m_placeholderAlbedo) {
+        envSpecularResource = m_placeholderAlbedo->GetResource();
+    }
 
     // Apply deferred lighting
     auto lightingResult = m_visibilityBuffer->ApplyDeferredLighting(
@@ -6074,8 +6090,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         m_hdrRTV.cpu,
         m_depthBuffer.Get(),
         m_depthSRV,
-        envDiffuseSRV,
-        envSpecularSRV,
+        envDiffuseResource,
+        envSpecularResource,
+        envFormat,
         m_shadowMapSRV,
         deferredParams
     );

@@ -3285,8 +3285,9 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
     ID3D12Resource* depthBuffer,
     const DescriptorHandle& depthSRV,
-    const DescriptorHandle& envDiffuseSRV,
-    const DescriptorHandle& envSpecularSRV,
+    ID3D12Resource* envDiffuseResource,
+    ID3D12Resource* envSpecularResource,
+    DXGI_FORMAT envFormat,
     const DescriptorHandle& shadowMapSRV,
     const DeferredLightingParams& params
 ) {
@@ -3298,8 +3299,9 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     if (!depthBuffer) {
         return Result<void>::Err("Deferred lighting requires a valid depth buffer");
     }
-    if (!envDiffuseSRV.IsValid() || !envSpecularSRV.IsValid() || !shadowMapSRV.IsValid()) {
-        return Result<void>::Err("Deferred lighting requires valid envDiffuse/envSpecular/shadow SRVs");
+    // Only shadow map SRV is required; env diffuse/specular can be empty (null SRVs created below)
+    if (!shadowMapSRV.IsValid()) {
+        return Result<void>::Err("Deferred lighting requires a valid shadow map SRV");
     }
     {
         auto brdfResult = EnsureBRDFLUT(cmdList);
@@ -3520,24 +3522,26 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     D3D12_CPU_DESCRIPTOR_HANDLE brdfDst = envShadowTable.cpu;
     brdfDst.ptr += static_cast<SIZE_T>(descriptorSize2) * 3;
 
-    // Environment/shadow come from the renderer; these must be CPU-readable
-    // staging descriptors (CopyDescriptorsSimple reads the source on the CPU).
-    auto copyOrNull = [&](D3D12_CPU_DESCRIPTOR_HANDLE dst, const DescriptorHandle& src, DXGI_FORMAT fmt) {
-        if (src.IsValid()) {
-            m_device->GetDevice()->CopyDescriptorsSimple(1, dst, src.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            return;
-        }
-        D3D12_SHADER_RESOURCE_VIEW_DESC nullSrv{};
-        nullSrv.Format = fmt;
-        nullSrv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        nullSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        nullSrv.Texture2D.MipLevels = 1;
-        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullSrv, dst);
+    // Create SRVs directly from resources to avoid copying from shader-visible heaps
+    auto createSrvOrNull = [&](D3D12_CPU_DESCRIPTOR_HANDLE dst, ID3D12Resource* resource, DXGI_FORMAT fmt) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = fmt;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = resource ? resource->GetDesc().MipLevels : 1;
+        
+        m_device->GetDevice()->CreateShaderResourceView(resource, &srvDesc, dst);
     };
 
-    copyOrNull(envDst, envDiffuseSRV, DXGI_FORMAT_R8G8B8A8_UNORM);
-    copyOrNull(specDst, envSpecularSRV, DXGI_FORMAT_R8G8B8A8_UNORM);
-    copyOrNull(shadowDst, shadowMapSRV, DXGI_FORMAT_R32_FLOAT);
+    createSrvOrNull(envDst, envDiffuseResource, envFormat);
+    createSrvOrNull(specDst, envSpecularResource, envFormat);
+
+    // Shadow map comes as a descriptor handle (assumed CPU readable), so copy it
+    if (shadowMapSRV.IsValid()) {
+        m_device->GetDevice()->CopyDescriptorsSimple(1, shadowDst, shadowMapSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    } else {
+        createSrvOrNull(shadowDst, nullptr, DXGI_FORMAT_R32_FLOAT);
+    }
 
     // BRDF LUT is owned by the VB system; write directly to avoid copying from shader-visible heaps.
     D3D12_SHADER_RESOURCE_VIEW_DESC brdfSrvDesc{};

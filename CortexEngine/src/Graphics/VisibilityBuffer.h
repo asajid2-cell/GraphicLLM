@@ -248,8 +248,9 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
         ID3D12Resource* depthBuffer,
         const DescriptorHandle& depthSRV,
-        const DescriptorHandle& envDiffuseSRV,
-        const DescriptorHandle& envSpecularSRV,
+        ID3D12Resource* envDiffuseResource, // Can be null
+        ID3D12Resource* envSpecularResource, // Can be null
+        DXGI_FORMAT envFormat, // Format for env maps (e.g., DXGI_FORMAT_R16G16B16A16_FLOAT)
         const DescriptorHandle& shadowMapSRV,
         const DeferredLightingParams& params
     );

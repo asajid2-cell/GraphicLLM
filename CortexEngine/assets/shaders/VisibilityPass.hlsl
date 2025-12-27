@@ -28,12 +28,13 @@ struct VBInstanceData {
     uint firstIndex;
     uint indexCount;
     uint baseVertex;
+    uint _padAlign[3]; // explicit padding to match C++ alignment (16-byte boundary for float4)
     float4 boundingSphere;  // xyz = center (object space), w = radius
     float4 prevCenterWS;    // xyz = previous frame center (world space)
     uint cullingId;         // packed gen<<16|slot
     uint flags;
     float depthBiasNdc;
-    uint _pad2;
+    uint _pad0;
 };
 
 StructuredBuffer<VBInstanceData> g_Instances : register(t0);

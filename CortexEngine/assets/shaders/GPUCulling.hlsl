@@ -190,17 +190,31 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
 
                     // Compute the sphere's nearest point to the HZB camera in world space.
                     float3 toCenter = centerWS - g_HZBCameraPos.xyz;
-                    float lenSq = dot(toCenter, toCenter);
-                    float3 dir = (lenSq > 1e-8f) ? (toCenter * rsqrt(lenSq)) : float3(0.0f, 0.0f, 1.0f);
-                    float3 nearWS = centerWS - dir * worldRadius;
-                    const float3 nearVS = mul(g_HZBViewMatrix, float4(nearWS, 1.0f)).xyz;
-                    const float nearViewZ = nearVS.z;
-                    dbgNearDepth = nearViewZ;
+                    float distToCenter = length(toCenter);
 
-                    // Distance-scaled epsilon in view-space to keep the test
-                    // stable across near/far/FOV changes.
-                    const float epsilonViewZ = max(hzbEpsilon, 0.001f * nearViewZ);
-                    occluded = (nearViewZ > (hzbViewZ + epsilonViewZ));
+                    // CRITICAL: If camera is inside the bounding sphere, NEVER occlude.
+                    // This prevents culling objects we're standing inside of.
+                    if (distToCenter < worldRadius) {
+                        // Camera is inside sphere - object is definitely visible
+                        occluded = false;
+                    } else {
+                        float3 dir = toCenter / max(distToCenter, 1e-6f);
+                        float3 nearWS = centerWS - dir * worldRadius;
+                        const float3 nearVS = mul(g_HZBViewMatrix, float4(nearWS, 1.0f)).xyz;
+                        const float nearViewZ = nearVS.z;
+                        dbgNearDepth = nearViewZ;
+
+                        // If nearest point is at or behind camera plane, don't occlude.
+                        // This catches edge cases where objects are partially behind camera.
+                        if (nearViewZ <= 0.0f) {
+                            occluded = false;
+                        } else {
+                            // Distance-scaled epsilon in view-space to keep the test
+                            // stable across near/far/FOV changes.
+                            const float epsilonViewZ = max(hzbEpsilon, 0.01f * nearViewZ);
+                            occluded = (nearViewZ > (hzbViewZ + epsilonViewZ));
+                        }
+                    }
                 }
             }
         }

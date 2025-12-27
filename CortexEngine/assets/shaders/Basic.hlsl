@@ -1550,8 +1550,30 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
 
     bool hasMetallicMap = (g_TextureIndices.z != INVALID_BINDLESS_INDEX) || g_MapFlags.z;
     bool hasRoughnessMap = (g_TextureIndices.w != INVALID_BINDLESS_INDEX) || g_MapFlags.w;
-    float metallic = hasMetallicMap ? SampleMetallic(input.texCoord).r : g_Metallic;
-    float roughness = hasRoughnessMap ? SampleRoughness(input.texCoord).r : g_Roughness;
+
+    float metallic = g_Metallic;
+    float roughness = g_Roughness;
+
+#ifdef ENABLE_BINDLESS
+    // glTF metallic-roughness convention:
+    // - When metallic + roughness refer to the same texture, treat it as packed:
+    //   roughness = G, metallic = B.
+    const bool packedMR =
+        hasMetallicMap && hasRoughnessMap &&
+        (g_TextureIndices.z != INVALID_BINDLESS_INDEX) &&
+        (g_TextureIndices.z == g_TextureIndices.w);
+    if (packedMR)
+    {
+        float4 mr = SampleBindlessTextureOrDefault(g_TextureIndices.z, input.texCoord, float4(0, 0, 0, 0));
+        roughness = mr.g;
+        metallic  = mr.b;
+    }
+    else
+#endif
+    {
+        if (hasMetallicMap)  metallic  = SampleMetallic(input.texCoord).r;
+        if (hasRoughnessMap) roughness = SampleRoughness(input.texCoord).r;
+    }
     float ao = g_AO;
     float occlusionStrength = saturate(g_ExtraParams.x);
 

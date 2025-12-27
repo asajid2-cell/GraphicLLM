@@ -1048,7 +1048,9 @@ Result<void> GPUCullingPipeline::DispatchCulling(
 
     const uint32_t hzbEnabled =
         (m_hzbEnabled && m_hzbTexture && (m_hzbMipCount > 0) && (m_hzbWidth > 0) && (m_hzbHeight > 0)) ? 1u : 0u;
-    constexpr uint32_t kOcclusionStreakThreshold = 2u;
+    // Streak threshold: require N consecutive occluded frames before culling.
+    // Higher values reduce popping/flickering but delay culling slightly.
+    constexpr uint32_t kOcclusionStreakThreshold = 4u;
     constants.occlusionParams0 = glm::uvec4(
         m_forceVisible ? 1u : 0u,
         hzbEnabled,
@@ -1068,7 +1070,8 @@ Result<void> GPUCullingPipeline::DispatchCulling(
 
     // View-space depth epsilon (meters/units). This is intentionally larger than
     // the old NDC-depth epsilon because HZB now stores view-space Z.
-    constexpr float kHzbEpsilon = 0.02f;
+    // Increased to 5cm to be more conservative and reduce false occlusion.
+    constexpr float kHzbEpsilon = 0.05f;
     const float cameraMotionWS =
         glm::length(glm::vec3(constants.cameraPos[0], constants.cameraPos[1], constants.cameraPos[2]) - m_hzbCameraPosWS);
     constants.occlusionParams3 = glm::vec4(m_hzbNearPlane, m_hzbFarPlane, kHzbEpsilon, cameraMotionWS);

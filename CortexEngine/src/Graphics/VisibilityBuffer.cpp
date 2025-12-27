@@ -423,12 +423,14 @@ Result<void> VisibilityBufferRenderer::CreateVisibilityBuffer() {
     m_visibilityBuffer->SetName(L"VisibilityBuffer");
     m_visibilityState = D3D12_RESOURCE_STATE_COMMON;
 
-    // Create RTV
-    auto rtvResult = m_descriptorManager->AllocateRTV();
-    if (rtvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate visibility RTV");
+    // Create RTV (reuse existing handle on resize to avoid descriptor leak)
+    if (!m_visibilityRTV.IsValid()) {
+        auto rtvResult = m_descriptorManager->AllocateRTV();
+        if (rtvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate visibility RTV");
+        }
+        m_visibilityRTV = rtvResult.Value();
     }
-    m_visibilityRTV = rtvResult.Value();
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
     rtvDesc.Format = DXGI_FORMAT_R32G32_UINT;
@@ -437,12 +439,14 @@ Result<void> VisibilityBufferRenderer::CreateVisibilityBuffer() {
         m_visibilityBuffer.Get(), &rtvDesc, m_visibilityRTV.cpu
     );
 
-    // Create SRV
-    auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-    if (srvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate visibility SRV");
+    // Create SRV (reuse existing handle on resize to avoid descriptor leak)
+    if (!m_visibilitySRV.IsValid()) {
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate visibility SRV");
+        }
+        m_visibilitySRV = srvResult.Value();
     }
-    m_visibilitySRV = srvResult.Value();
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = DXGI_FORMAT_R32G32_UINT;
@@ -453,17 +457,21 @@ Result<void> VisibilityBufferRenderer::CreateVisibilityBuffer() {
         m_visibilityBuffer.Get(), &srvDesc, m_visibilitySRV.cpu
     );
 
-    // Create UAV for compute access
-    auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-    if (uavResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate visibility UAV");
+    // Create UAV for compute access (reuse existing handles on resize to avoid descriptor leak)
+    if (!m_visibilityUAV.IsValid()) {
+        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (uavResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate visibility UAV");
+        }
+        m_visibilityUAV = uavResult.Value();
     }
-    m_visibilityUAV = uavResult.Value();
-    auto uavStagingResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
-    if (uavStagingResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate visibility UAV staging descriptor");
+    if (!m_visibilityUAVStaging.IsValid()) {
+        auto uavStagingResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (uavStagingResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate visibility UAV staging descriptor");
+        }
+        m_visibilityUAVStaging = uavStagingResult.Value();
     }
-    m_visibilityUAVStaging = uavStagingResult.Value();
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = DXGI_FORMAT_R32G32_UINT;
@@ -508,19 +516,23 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_gbufferAlbedo->SetName(L"VB_GBuffer_Albedo");
         m_albedoState = D3D12_RESOURCE_STATE_COMMON;
 
-        // Create RTV
-        auto rtvResult = m_descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate albedo RTV");
-        m_albedoRTV = rtvResult.Value();
+        // Create RTV (reuse existing handle on resize to avoid descriptor leak)
+        if (!m_albedoRTV.IsValid()) {
+            auto rtvResult = m_descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate albedo RTV");
+            m_albedoRTV = rtvResult.Value();
+        }
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
         rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         m_device->GetDevice()->CreateRenderTargetView(m_gbufferAlbedo.Get(), &rtvDesc, m_albedoRTV.cpu);
 
-        // Create SRV
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate albedo SRV");
-        m_albedoSRV = srvResult.Value();
+        // Create SRV (reuse existing handle on resize to avoid descriptor leak)
+        if (!m_albedoSRV.IsValid()) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate albedo SRV");
+            m_albedoSRV = srvResult.Value();
+        }
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // linear
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -528,10 +540,12 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         srvDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(m_gbufferAlbedo.Get(), &srvDesc, m_albedoSRV.cpu);
 
-        // Create UAV
-        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate albedo UAV");
-        m_albedoUAV = uavResult.Value();
+        // Create UAV (reuse existing handle on resize to avoid descriptor leak)
+        if (!m_albedoUAV.IsValid()) {
+            auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate albedo UAV");
+            m_albedoUAV = uavResult.Value();
+        }
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
@@ -564,14 +578,18 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_gbufferNormalRoughness->SetName(L"VB_GBuffer_NormalRoughness");
         m_normalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
 
-        auto rtvResult = m_descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness RTV");
-        m_normalRoughnessRTV = rtvResult.Value();
+        if (!m_normalRoughnessRTV.IsValid()) {
+            auto rtvResult = m_descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness RTV");
+            m_normalRoughnessRTV = rtvResult.Value();
+        }
         m_device->GetDevice()->CreateRenderTargetView(m_gbufferNormalRoughness.Get(), nullptr, m_normalRoughnessRTV.cpu);
 
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness SRV");
-        m_normalRoughnessSRV = srvResult.Value();
+        if (!m_normalRoughnessSRV.IsValid()) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness SRV");
+            m_normalRoughnessSRV = srvResult.Value();
+        }
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -579,9 +597,11 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         srvDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(m_gbufferNormalRoughness.Get(), &srvDesc, m_normalRoughnessSRV.cpu);
 
-        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness UAV");
-        m_normalRoughnessUAV = uavResult.Value();
+        if (!m_normalRoughnessUAV.IsValid()) {
+            auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate normal-roughness UAV");
+            m_normalRoughnessUAV = uavResult.Value();
+        }
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
@@ -614,14 +634,18 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_gbufferEmissiveMetallic->SetName(L"VB_GBuffer_EmissiveMetallic");
         m_emissiveMetallicState = D3D12_RESOURCE_STATE_COMMON;
 
-        auto rtvResult = m_descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic RTV");
-        m_emissiveMetallicRTV = rtvResult.Value();
+        if (!m_emissiveMetallicRTV.IsValid()) {
+            auto rtvResult = m_descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic RTV");
+            m_emissiveMetallicRTV = rtvResult.Value();
+        }
         m_device->GetDevice()->CreateRenderTargetView(m_gbufferEmissiveMetallic.Get(), nullptr, m_emissiveMetallicRTV.cpu);
 
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic SRV");
-        m_emissiveMetallicSRV = srvResult.Value();
+        if (!m_emissiveMetallicSRV.IsValid()) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic SRV");
+            m_emissiveMetallicSRV = srvResult.Value();
+        }
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -629,9 +653,11 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         srvDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(m_gbufferEmissiveMetallic.Get(), &srvDesc, m_emissiveMetallicSRV.cpu);
 
-        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic UAV");
-        m_emissiveMetallicUAV = uavResult.Value();
+        if (!m_emissiveMetallicUAV.IsValid()) {
+            auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate emissive-metallic UAV");
+            m_emissiveMetallicUAV = uavResult.Value();
+        }
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
@@ -664,14 +690,18 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_gbufferMaterialExt0->SetName(L"VB_GBuffer_MaterialExt0");
         m_materialExt0State = D3D12_RESOURCE_STATE_COMMON;
 
-        auto rtvResult = m_descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 RTV");
-        m_materialExt0RTV = rtvResult.Value();
+        if (!m_materialExt0RTV.IsValid()) {
+            auto rtvResult = m_descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 RTV");
+            m_materialExt0RTV = rtvResult.Value();
+        }
         m_device->GetDevice()->CreateRenderTargetView(m_gbufferMaterialExt0.Get(), nullptr, m_materialExt0RTV.cpu);
 
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 SRV");
-        m_materialExt0SRV = srvResult.Value();
+        if (!m_materialExt0SRV.IsValid()) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 SRV");
+            m_materialExt0SRV = srvResult.Value();
+        }
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -679,9 +709,11 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         srvDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt0.Get(), &srvDesc, m_materialExt0SRV.cpu);
 
-        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 UAV");
-        m_materialExt0UAV = uavResult.Value();
+        if (!m_materialExt0UAV.IsValid()) {
+            auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext0 UAV");
+            m_materialExt0UAV = uavResult.Value();
+        }
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
@@ -714,14 +746,18 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         m_gbufferMaterialExt1->SetName(L"VB_GBuffer_MaterialExt1");
         m_materialExt1State = D3D12_RESOURCE_STATE_COMMON;
 
-        auto rtvResult = m_descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 RTV");
-        m_materialExt1RTV = rtvResult.Value();
+        if (!m_materialExt1RTV.IsValid()) {
+            auto rtvResult = m_descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 RTV");
+            m_materialExt1RTV = rtvResult.Value();
+        }
         m_device->GetDevice()->CreateRenderTargetView(m_gbufferMaterialExt1.Get(), nullptr, m_materialExt1RTV.cpu);
 
-        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 SRV");
-        m_materialExt1SRV = srvResult.Value();
+        if (!m_materialExt1SRV.IsValid()) {
+            auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 SRV");
+            m_materialExt1SRV = srvResult.Value();
+        }
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -729,9 +765,11 @@ Result<void> VisibilityBufferRenderer::CreateGBuffers() {
         srvDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt1.Get(), &srvDesc, m_materialExt1SRV.cpu);
 
-        auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-        if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 UAV");
-        m_materialExt1UAV = uavResult.Value();
+        if (!m_materialExt1UAV.IsValid()) {
+            auto uavResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) return Result<void>::Err("Failed to allocate material ext1 UAV");
+            m_materialExt1UAV = uavResult.Value();
+        }
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;

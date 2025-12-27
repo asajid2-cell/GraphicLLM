@@ -813,6 +813,7 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.55f;
         r.ao = 1.0f;
         r.presetName = "wood_floor";
+        r.doubleSided = true;
         // Phase 2: RT showcase floor uses pre-compressed BC7/BC5 textures when
         // available. The loader will fall back to placeholders if these DDS
         // assets are missing.
@@ -835,6 +836,7 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.6f;
         r.ao = 1.0f;
         r.presetName = "backdrop";
+        r.doubleSided = true;
     }
 
     if (wallPlane && wallPlane->gpuBuffers) {
@@ -852,6 +854,7 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.85f;
         r.ao = 1.0f;
         r.presetName = "brick";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_leftwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_leftwall_normal_bc5.dds";
 
@@ -904,6 +907,7 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.7f;
         r.ao = 1.0f;
         r.presetName = "backdrop";
+        r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
@@ -1170,6 +1174,7 @@ void Engine::BuildRTShowcaseScene() {
         r.roughness = 0.8f;
         r.ao = 1.0f;
         r.presetName = "brick";
+        r.doubleSided = true;
     }
 
     if (poolPlane && poolPlane->gpuBuffers) {
@@ -1187,6 +1192,7 @@ void Engine::BuildRTShowcaseScene() {
         rr.roughness = 0.75f;
         rr.ao = 1.0f;
         rr.presetName = "concrete";
+        rr.doubleSided = true;
 
         // Water surface
         entt::entity water = m_registry->CreateEntity();

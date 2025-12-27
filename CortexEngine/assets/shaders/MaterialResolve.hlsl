@@ -419,24 +419,33 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             emissive *= emissiveTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
         }
 
-        // glTF metallic-roughness convention:
-        // - If metallic+roughness are the same texture (or one is missing), treat it as packed:
-        //   roughness = G, metallic = B.
-        // - Otherwise, sample separate scalar maps (assume scalar stored in R).
+        // Metallic/roughness sampling:
+        // - Treat as packed only when BOTH maps are present and refer to the same texture:
+        //   roughness = G, metallic = B (glTF metallic-roughness convention).
+        // - Otherwise treat them as separate scalar maps (scalar stored in R). If one map is
+        //   missing, keep the constant material value for that channel.
         const uint metalIdx = mat.textureIndices.z;
         const uint roughIdx = mat.textureIndices.w;
         if (metalIdx != INVALID_BINDLESS_INDEX || roughIdx != INVALID_BINDLESS_INDEX) {
-            if (metalIdx == roughIdx || metalIdx == INVALID_BINDLESS_INDEX || roughIdx == INVALID_BINDLESS_INDEX) {
-                const uint mrIdx = (roughIdx != INVALID_BINDLESS_INDEX) ? roughIdx : metalIdx;
-                Texture2D mrTex = ResourceDescriptorHeap[mrIdx];
+            const bool packedMR =
+                (metalIdx != INVALID_BINDLESS_INDEX) &&
+                (roughIdx != INVALID_BINDLESS_INDEX) &&
+                (metalIdx == roughIdx);
+
+            if (packedMR) {
+                Texture2D mrTex = ResourceDescriptorHeap[metalIdx];
                 float4 mr = mrTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV);
                 roughness = mr.g;
                 metallic = mr.b;
             } else {
-                Texture2D metalTex = ResourceDescriptorHeap[metalIdx];
-                Texture2D roughTex = ResourceDescriptorHeap[roughIdx];
-                metallic = metalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
-                roughness = roughTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                if (metalIdx != INVALID_BINDLESS_INDEX) {
+                    Texture2D metalTex = ResourceDescriptorHeap[metalIdx];
+                    metallic = metalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                }
+                if (roughIdx != INVALID_BINDLESS_INDEX) {
+                    Texture2D roughTex = ResourceDescriptorHeap[roughIdx];
+                    roughness = roughTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).r;
+                }
             }
         }
 

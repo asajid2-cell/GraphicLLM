@@ -2141,11 +2141,26 @@ void Engine::Update(float deltaTime) {
                     continue;
                 }
 
+                bool useSRGB = true;
+                switch (tex.usage) {
+                    case AI::Vision::TextureUsage::Albedo:
+                        useSRGB = true;
+                        break;
+                    case AI::Vision::TextureUsage::Normal:
+                    case AI::Vision::TextureUsage::Roughness:
+                    case AI::Vision::TextureUsage::Metalness:
+                        useSRGB = false;
+                        break;
+                    default:
+                        useSRGB = true;
+                        break;
+                }
+
                 auto gpuTex = m_renderer->CreateTextureFromRGBA(
                     tex.pixels.data(),
                     tex.width,
                     tex.height,
-                    /*useSRGB=*/true,
+                    useSRGB,
                     "Dreamer_" + tex.targetName);
                 if (gpuTex.IsErr()) {
                     spdlog::error("[Dreamer] Failed to create GPU texture for '{}': {}",

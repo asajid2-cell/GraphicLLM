@@ -99,6 +99,73 @@ float GetMaxWorldScale(const glm::mat4& worldMatrix) {
     return glm::max(glm::max(glm::length(col0), glm::length(col1)), glm::length(col2));
 }
 
+glm::vec3 ComputeAutoDepthOffsetForThinSurfaces(const Scene::RenderableComponent& renderable,
+                                                const glm::mat4& modelMatrix,
+                                                uint32_t stableKey) {
+    if (!renderable.mesh || !renderable.mesh->hasBounds) {
+        return glm::vec3(0.0f);
+    }
+
+    const glm::vec3 ext = glm::max(renderable.mesh->boundsMax - renderable.mesh->boundsMin, glm::vec3(0.0f));
+    const float maxDim = glm::compMax(ext);
+    if (!(maxDim > 0.0f)) {
+        return glm::vec3(0.0f);
+    }
+    const float minDim = glm::compMin(ext);
+
+    // "Thin plate" heuristic: one axis is very small relative to the others.
+    constexpr float kThinAbs = 5e-4f;
+    constexpr float kThinRel = 0.03f; // 3% of the maximum dimension
+    if (minDim > glm::max(kThinAbs, maxDim * kThinRel)) {
+        return glm::vec3(0.0f);
+    }
+
+    int thinAxis = 0;
+    if (ext.y <= ext.x && ext.y <= ext.z) {
+        thinAxis = 1;
+    } else if (ext.z <= ext.x && ext.z <= ext.y) {
+        thinAxis = 2;
+    }
+
+    glm::vec3 axisWS = glm::vec3(modelMatrix[thinAxis]);
+    const float axisLen2 = glm::length2(axisWS);
+    if (axisLen2 < 1e-8f) {
+        return glm::vec3(0.0f);
+    }
+    axisWS /= std::sqrt(axisLen2);
+
+    // Only apply to mostly-horizontal surfaces (thin axis aligned with world up).
+    constexpr float kUpDot = 0.92f;
+    if (std::abs(glm::dot(axisWS, glm::vec3(0.0f, 1.0f, 0.0f))) < kUpDot) {
+        return glm::vec3(0.0f);
+    }
+
+    const float maxScale = GetMaxWorldScale(modelMatrix);
+    const float worldMaxDim = maxDim * maxScale;
+
+    // Small world-space separation tuned to be visually imperceptible but large
+    // enough to eliminate depth quantization flicker on large coplanar surfaces.
+    constexpr float kBiasScale = 4e-4f;
+    float eps = glm::clamp(worldMaxDim * kBiasScale, 1e-4f, 2e-2f);
+
+    // Stable per-entity stratification so multiple coplanar plates don't "fight"
+    // each other; keeps ordering deterministic without per-material hacks.
+    uint32_t h = stableKey * 2654435761u;
+    uint32_t layer = (h >> 29u) & 7u; // 0..7
+    float layerScale = 1.0f + static_cast<float>(layer) * 0.10f;
+
+    const float direction =
+        (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) ? 1.0f : -1.0f;
+    return glm::vec3(0.0f, direction * eps * layerScale, 0.0f);
+}
+
+void ApplyAutoDepthOffset(glm::mat4& modelMatrix, const glm::vec3& offset) {
+    if (offset == glm::vec3(0.0f)) {
+        return;
+    }
+    modelMatrix[3] += glm::vec4(offset, 0.0f);
+}
+
 } // namespace
 
 Renderer::~Renderer() {
@@ -4236,41 +4303,34 @@ void Renderer::RenderSSR() {
     // Frame constants
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Allocate transient descriptors for HDR (t0), depth (t1), normal/roughness (t2)
-    auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (hdrHandleResult.IsErr()) {
-        spdlog::warn("RenderSSR: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+    // Root parameter 3 is a descriptor table sized for t0-t9. Allocate a single
+    // contiguous range so t0/t1/t2 are guaranteed to be adjacent and stable.
+    auto tableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+    if (tableResult.IsErr()) {
+        spdlog::warn("RenderSSR: failed to allocate transient SRV table: {}", tableResult.Error());
         return;
     }
-    DescriptorHandle hdrHandle = hdrHandleResult.Value();
+    const DescriptorHandle tableBase = tableResult.Value();
+
+    auto tableSlot = [&](uint32_t slot) -> DescriptorHandle {
+        return m_descriptorManager->GetCBV_SRV_UAVHandle(tableBase.index + slot);
+    };
+
+    const DescriptorHandle hdrHandle = tableSlot(0);
+    const DescriptorHandle depthHandle = tableSlot(1);
+    const DescriptorHandle gbufHandle = tableSlot(2);
 
     m_device->GetDevice()->CopyDescriptorsSimple(
         1,
         hdrHandle.cpu,
         m_hdrSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (depthHandleResult.IsErr()) {
-        spdlog::warn("RenderSSR: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
-        return;
-    }
-    DescriptorHandle depthHandle = depthHandleResult.Value();
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     m_device->GetDevice()->CopyDescriptorsSimple(
         1,
         depthHandle.cpu,
         m_depthSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
-
-    auto gbufHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (gbufHandleResult.IsErr()) {
-        spdlog::warn("RenderSSR: failed to allocate transient normal/roughness SRV: {}", gbufHandleResult.Error());
-        return;
-    }
-    DescriptorHandle gbufHandle = gbufHandleResult.Value();
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // Avoid CopyDescriptorsSimple from shader-visible heaps (VB path); write the SRV directly.
     ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
@@ -4284,9 +4344,7 @@ void Renderer::RenderSSR() {
     gbufSrvDesc.Texture2D.MipLevels = 1;
     m_device->GetDevice()->CreateShaderResourceView(normalRes, &gbufSrvDesc, gbufHandle.cpu);
 
-    // IMPORTANT: Root parameter 3 is a descriptor table sized for t0-t9.
-    // We must allocate/initialize all 10 descriptors so later transient
-    // allocations don't overwrite descriptors within the bound table.
+    // Fill remaining slots with null SRVs to keep the table well-defined.
     auto writeNullSrv = [&](DescriptorHandle handle, DXGI_FORMAT fmt) {
         D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
         nullDesc.Format = fmt;
@@ -4295,14 +4353,8 @@ void Renderer::RenderSSR() {
         nullDesc.Texture2D.MipLevels = 1;
         m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, handle.cpu);
     };
-    for (int slot = 3; slot < 10; ++slot) {
-        auto dummyResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (dummyResult.IsErr()) {
-            spdlog::warn("RenderSSR: failed to allocate dummy SRV slot {}: {}", slot, dummyResult.Error());
-            return;
-        }
-        // Format is irrelevant for unused slots; keep it consistent with HDR SRVs.
-        writeNullSrv(dummyResult.Value(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    for (uint32_t slot = 3; slot < 10; ++slot) {
+        writeNullSrv(tableSlot(slot), DXGI_FORMAT_R16G16B16A16_FLOAT);
     }
 
     // Bind SRV table at slot 3 (t0-t2)
@@ -4518,85 +4570,66 @@ void Renderer::RenderTAA() {
         UpdateTAAResolveDescriptorTable();
         m_commandList->SetGraphicsRootDescriptorTable(3, m_taaResolveSrvTables[m_frameIndex % kFrameCount][0].gpu);
     } else {
-        auto hdrHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (hdrHandleResult.IsErr()) {
-            spdlog::warn("RenderTAA: failed to allocate transient HDR SRV: {}", hdrHandleResult.Error());
+        auto tableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+        if (tableResult.IsErr()) {
+            spdlog::warn("RenderTAA: failed to allocate transient SRV table: {}", tableResult.Error());
             return;
         }
-        DescriptorHandle hdrHandle = hdrHandleResult.Value();
+        const DescriptorHandle tableBase = tableResult.Value();
+        auto tableSlot = [&](uint32_t slot) -> DescriptorHandle {
+            return m_descriptorManager->GetCBV_SRV_UAVHandle(tableBase.index + slot);
+        };
 
+        D3D12_SHADER_RESOURCE_VIEW_DESC nullHdrDesc{};
+        nullHdrDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        nullHdrDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        nullHdrDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        nullHdrDesc.Texture2D.MipLevels = 1;
+
+        // t0: HDR scene color
         device->CopyDescriptorsSimple(
             1,
-            hdrHandle.cpu,
+            tableSlot(0).cpu,
             m_hdrSRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // t1: bloom (unused)
-        auto bloomAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (bloomAllocResult.IsOk() && m_bloomCombinedSRV.IsValid()) {
-            DescriptorHandle bloomHandle = bloomAllocResult.Value();
+        // t1: bloom (unused here, but keep slot stable)
+        if (m_bloomCombinedSRV.IsValid()) {
             device->CopyDescriptorsSimple(
                 1,
-                bloomHandle.cpu,
+                tableSlot(1).cpu,
                 m_bloomCombinedSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         } else {
-            // Allocate a dummy descriptor to keep layout consistent even if bloom is missing.
-            (void)bloomAllocResult;
+            device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(1).cpu);
         }
 
-        // t2: SSAO (unused in TAA but keep slot)
-        auto ssaoAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (ssaoAllocResult.IsOk() && m_ssaoSRV.IsValid()) {
-            DescriptorHandle ssaoHandle = ssaoAllocResult.Value();
+        // t2: SSAO (unused here, but keep slot stable)
+        if (m_ssaoSRV.IsValid()) {
             device->CopyDescriptorsSimple(
                 1,
-                ssaoHandle.cpu,
+                tableSlot(2).cpu,
                 m_ssaoSRV.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-            );
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
         } else {
-            (void)ssaoAllocResult;
+            device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(2).cpu);
         }
 
         // t3: TAA history
-        auto historyAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (historyAllocResult.IsErr()) {
-            spdlog::warn("RenderTAA: failed to allocate transient history SRV: {}", historyAllocResult.Error());
-            return;
-        }
-        DescriptorHandle historyHandle = historyAllocResult.Value();
         device->CopyDescriptorsSimple(
             1,
-            historyHandle.cpu,
+            tableSlot(3).cpu,
             m_historySRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
         // t4: depth
-        auto depthAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (depthAllocResult.IsErr()) {
-            spdlog::warn("RenderTAA: failed to allocate transient depth SRV: {}", depthAllocResult.Error());
-            return;
-        }
-        DescriptorHandle depthHandle = depthAllocResult.Value();
         device->CopyDescriptorsSimple(
             1,
-            depthHandle.cpu,
+            tableSlot(4).cpu,
             m_depthSRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-        // t5: normal/roughness
-        auto gbufAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (gbufAllocResult.IsErr()) {
-            spdlog::warn("RenderTAA: failed to allocate transient normal/roughness SRV: {}", gbufAllocResult.Error());
-            return;
-        }
-        DescriptorHandle gbufHandle = gbufAllocResult.Value();
-        // Avoid CopyDescriptorsSimple from shader-visible heaps (VB path); write the SRV directly.
+        // t5: normal/roughness (avoid CopyDescriptorsSimple from shader-visible heaps (VB path); write directly)
         ID3D12Resource* normalRes = m_gbufferNormalRoughness.Get();
         if (m_vbRenderedThisFrame && m_visibilityBuffer && m_visibilityBuffer->GetNormalRoughnessBuffer()) {
             normalRes = m_visibilityBuffer->GetNormalRoughnessBuffer();
@@ -4606,78 +4639,45 @@ void Renderer::RenderTAA() {
         normalSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         normalSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         normalSrvDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(normalRes, &normalSrvDesc, gbufHandle.cpu);
+        device->CreateShaderResourceView(normalRes, &normalSrvDesc, tableSlot(5).cpu);
 
-        // t6: SSR (unused)
-        (void)m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+        // t6: SSR (unused in TAA)
+        device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(6).cpu);
 
-        // t7: velocity
-        if (m_velocitySRV.IsValid() && m_velocityBuffer) {
-            auto velAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (velAllocResult.IsOk()) {
-                DescriptorHandle velHandle = velAllocResult.Value();
-                device->CopyDescriptorsSimple(
-                    1,
-                    velHandle.cpu,
-                    m_velocitySRV.cpu,
-                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-                );
-            } else {
-                spdlog::warn("RenderTAA: failed to allocate transient velocity SRV; TAA reprojection will be disabled this frame");
-            }
+        // t7: velocity (optional)
+        if (m_velocitySRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                tableSlot(7).cpu,
+                m_velocitySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(7).cpu);
         }
 
         // t8: RT reflections (optional)
-        {
-            auto rtAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (rtAllocResult.IsErr()) {
-                spdlog::warn("RenderTAA: failed to allocate transient RT reflection SRV slot: {}", rtAllocResult.Error());
-                return;
-            }
-            DescriptorHandle rtHandle = rtAllocResult.Value();
-            if (m_rtReflectionSRV.IsValid()) {
-                device->CopyDescriptorsSimple(
-                    1,
-                    rtHandle.cpu,
-                    m_rtReflectionSRV.cpu,
-                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-                );
-            } else {
-                D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
-                nullDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-                nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                nullDesc.Texture2D.MipLevels = 1;
-                device->CreateShaderResourceView(nullptr, &nullDesc, rtHandle.cpu);
-            }
+        if (m_rtReflectionSRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                tableSlot(8).cpu,
+                m_rtReflectionSRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(8).cpu);
         }
 
         // t9: RT reflection history (optional)
-        {
-            auto rtHistAllocResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (rtHistAllocResult.IsErr()) {
-                spdlog::warn("RenderTAA: failed to allocate transient RT reflection history SRV slot: {}", rtHistAllocResult.Error());
-                return;
-            }
-            DescriptorHandle rtHistHandle = rtHistAllocResult.Value();
-            if (m_rtReflectionHistorySRV.IsValid()) {
-                device->CopyDescriptorsSimple(
-                    1,
-                    rtHistHandle.cpu,
-                    m_rtReflectionHistorySRV.cpu,
-                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-                );
-            } else {
-                D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
-                nullDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-                nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-                nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                nullDesc.Texture2D.MipLevels = 1;
-                device->CreateShaderResourceView(nullptr, &nullDesc, rtHistHandle.cpu);
-            }
+        if (m_rtReflectionHistorySRV.IsValid()) {
+            device->CopyDescriptorsSimple(
+                1,
+                tableSlot(9).cpu,
+                m_rtReflectionHistorySRV.cpu,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        } else {
+            device->CreateShaderResourceView(nullptr, &nullHdrDesc, tableSlot(9).cpu);
         }
 
-        m_commandList->SetGraphicsRootDescriptorTable(3, hdrHandle.gpu);
+        m_commandList->SetGraphicsRootDescriptorTable(3, tableSlot(0).gpu);
     }
 
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
@@ -4872,38 +4872,30 @@ void Renderer::RenderMotionVectors() {
 
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-    if (depthHandleResult.IsErr()) {
-        spdlog::warn("RenderMotionVectors: failed to allocate transient depth SRV: {}", depthHandleResult.Error());
+    auto tableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
+    if (tableResult.IsErr()) {
+        spdlog::warn("RenderMotionVectors: failed to allocate transient SRV table: {}", tableResult.Error());
         return;
     }
-    DescriptorHandle depthHandle = depthHandleResult.Value();
+    const DescriptorHandle tableBase = tableResult.Value();
+    auto tableSlot = [&](uint32_t slot) -> DescriptorHandle {
+        return m_descriptorManager->GetCBV_SRV_UAVHandle(tableBase.index + slot);
+    };
 
+    const DescriptorHandle depthHandle = tableSlot(0);
     m_device->GetDevice()->CopyDescriptorsSimple(
         1,
         depthHandle.cpu,
         m_depthSRV.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-    );
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    // Root parameter 3 is sized for t0-t9; allocate dummy SRVs for the
-    // remaining slots so later transient allocations don't overwrite within
-    // the bound table.
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
-        nullDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        nullDesc.Texture2D.MipLevels = 1;
-
-        for (int slot = 1; slot < 10; ++slot) {
-            auto dummyResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
-            if (dummyResult.IsErr()) {
-                spdlog::warn("RenderMotionVectors: failed to allocate dummy SRV slot {}: {}", slot, dummyResult.Error());
-                return;
-            }
-            m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, dummyResult.Value().cpu);
-        }
+    D3D12_SHADER_RESOURCE_VIEW_DESC nullDesc{};
+    nullDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    nullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    nullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    nullDesc.Texture2D.MipLevels = 1;
+    for (uint32_t slot = 1; slot < 10; ++slot) {
+        m_device->GetDevice()->CreateShaderResourceView(nullptr, &nullDesc, tableSlot(slot).cpu);
     }
 
     m_commandList->SetGraphicsRootDescriptorTable(3, depthHandle.gpu);
@@ -4966,7 +4958,13 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
             !renderable.mesh->gpuBuffers->indexBuffer) continue;
 
         GPUInstanceData inst{};
-        inst.modelMatrix = transform.GetMatrix();
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        const uint32_t stableKey = static_cast<uint32_t>(entity);
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        inst.modelMatrix = modelMatrix;
 
         // Compute bounding sphere in object space
         if (renderable.mesh->hasBounds) {
@@ -5466,8 +5464,15 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
         // Build instance data
         VBInstanceData inst{};
-        const glm::mat4 currWorld = transform.GetMatrix();
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+
+        glm::mat4 currWorld = transform.GetMatrix();
         const uint32_t entityKey = static_cast<uint32_t>(entity);
+        const glm::vec3 autoDepthOffset =
+            ComputeAutoDepthOffsetForThinSurfaces(renderable, currWorld, entityKey);
+        ApplyAutoDepthOffset(currWorld, autoDepthOffset);
         auto prevIt = s_prevWorldByEntity.find(entityKey);
         const glm::mat4 prevWorld = (prevIt != s_prevWorldByEntity.end()) ? prevIt->second : currWorld;
         s_prevWorldByEntity[entityKey] = currWorld;
@@ -6392,22 +6397,30 @@ void Renderer::RenderSceneIndirect(Scene::ECS_Registry* registry) {
             glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
         );
 
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        const uint32_t stableKey = static_cast<uint32_t>(entity);
+        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+
         ObjectConstants objectData = {};
-        objectData.modelMatrix = transform.GetMatrix();
+        objectData.modelMatrix = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_materialConstantBuffer.AllocateAndWrite(materialData);
 
         GPUInstanceData inst{};
-        inst.modelMatrix = transform.GetMatrix();
-        glm::vec3 centerWS = glm::vec3(transform.worldMatrix[3]);
+        inst.modelMatrix = modelMatrix;
+        glm::vec3 centerWS = glm::vec3(modelMatrix[3]);
         if (renderable.mesh->hasBounds) {
             inst.boundingSphere = glm::vec4(
                 renderable.mesh->boundsCenter,
                 renderable.mesh->boundsRadius
             );
-            centerWS = glm::vec3(transform.worldMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+            centerWS = glm::vec3(modelMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
         } else {
             inst.boundingSphere = glm::vec4(0.0f, 0.0f, 0.0f, 10.0f);
         }
@@ -6860,9 +6873,21 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
             glm::clamp(renderable.specularFactor, 0.0f, 2.0f)
         );
 
+        const bool isWater = registry && registry->HasComponent<Scene::WaterSurfaceComponent>(entity);
+
         // Update object constants
+        if (!renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        if (!isWater) {
+            const uint32_t stableKey = static_cast<uint32_t>(entity);
+            ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        }
+
         ObjectConstants objectData = {};
-        objectData.modelMatrix = transform.GetMatrix();
+        objectData.modelMatrix = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
@@ -6876,7 +6901,6 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         // is tagged as a water surface; otherwise use the default PBR pipeline.
         // Re-set topology defensively after pipeline switch to guard against
         // future changes where water might use a different topology.
-        const bool isWater = registry->HasComponent<Scene::WaterSurfaceComponent>(entity);
         if (isWater && m_waterPipeline) {
             m_commandList->SetPipelineState(m_waterPipeline->GetPipelineState());
         } else {
@@ -6993,6 +7017,9 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
     m_commandList->SetDescriptorHeaps(1, heaps);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+    std::vector<entt::entity> overlayEntities;
+    overlayEntities.reserve(static_cast<size_t>(view.size_hint()));
+
     for (auto entity : view) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
@@ -7019,6 +7046,28 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
             if (!SphereIntersectsFrustumCPU(frustum, centerWS, radiusWS)) {
                 continue;
             }
+        }
+
+        overlayEntities.push_back(entity);
+    }
+
+    if (overlayEntities.empty()) {
+        return;
+    }
+
+    // Deterministic ordering: older overlays first so newer entities (higher IDs)
+    // land on top when multiple overlays overlap.
+    std::sort(overlayEntities.begin(), overlayEntities.end(),
+              [](entt::entity a, entt::entity b) {
+                  return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
+              });
+
+    for (auto entity : overlayEntities) {
+        auto& renderable = view.get<Scene::RenderableComponent>(entity);
+        auto& transform = view.get<Scene::TransformComponent>(entity);
+
+        if (!renderable.visible || !renderable.mesh) {
+            continue;
         }
 
         EnsureMaterialTextures(renderable);
@@ -7060,7 +7109,13 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         FillMaterialTextureIndices(renderable, materialData);
 
         ObjectConstants objectData{};
-        objectData.modelMatrix  = transform.GetMatrix();
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        const uint32_t stableKey = static_cast<uint32_t>(entity);
+        if (renderable.mesh && !renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
@@ -7288,8 +7343,13 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
 
     std::sort(drawList.begin(), drawList.end(),
               [](const TransparentDraw& a, const TransparentDraw& b) {
-                  // Draw far-to-near for correct alpha blending.
-                  return a.depth > b.depth;
+                  // Draw far-to-near for correct alpha blending. Tie-break on
+                  // entity ID for determinism to avoid flicker when depths are
+                  // extremely close.
+                  if (a.depth != b.depth) {
+                      return a.depth > b.depth;
+                  }
+                  return static_cast<uint32_t>(a.entity) < static_cast<uint32_t>(b.entity);
               });
 
     // Bind HDR + depth explicitly for the transparent pass. Render HDR only
@@ -7505,7 +7565,13 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         );
 
         ObjectConstants objectData = {};
-        objectData.modelMatrix  = transform.GetMatrix();
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        const uint32_t stableKey = static_cast<uint32_t>(entity);
+        if (renderable.mesh && !renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB =
@@ -7619,7 +7685,13 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         // Object constants (b0); material/texture data are not needed for a
         // pure depth pass so we skip b2 and descriptor tables.
         ObjectConstants objectData = {};
-        objectData.modelMatrix  = transform.GetMatrix();
+        glm::mat4 modelMatrix = transform.GetMatrix();
+        const uint32_t stableKey = static_cast<uint32_t>(entity);
+        if (renderable.mesh && !renderable.mesh->hasBounds) {
+            renderable.mesh->UpdateBounds();
+        }
+        ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+        objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = transform.GetNormalMatrix();
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB =
@@ -12781,7 +12853,13 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             }
 
             ObjectConstants objectData = {};
-            objectData.modelMatrix = transform.GetMatrix();
+            glm::mat4 modelMatrix = transform.GetMatrix();
+            const uint32_t stableKey = static_cast<uint32_t>(entity);
+            if (renderable.mesh && !renderable.mesh->hasBounds) {
+                renderable.mesh->UpdateBounds();
+            }
+            ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+            objectData.modelMatrix = modelMatrix;
             objectData.normalMatrix = transform.GetNormalMatrix();
 
             D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);
@@ -12897,7 +12975,13 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 }
 
                 ObjectConstants objectData = {};
-                objectData.modelMatrix = transform.GetMatrix();
+                glm::mat4 modelMatrix = transform.GetMatrix();
+                const uint32_t stableKey = static_cast<uint32_t>(entity);
+                if (renderable.mesh && !renderable.mesh->hasBounds) {
+                    renderable.mesh->UpdateBounds();
+                }
+                ApplyAutoDepthOffset(modelMatrix, ComputeAutoDepthOffsetForThinSurfaces(renderable, modelMatrix, stableKey));
+                objectData.modelMatrix = modelMatrix;
                 objectData.normalMatrix = transform.GetNormalMatrix();
 
                 D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_objectConstantBuffer.AllocateAndWrite(objectData);

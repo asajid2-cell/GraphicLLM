@@ -69,6 +69,10 @@ struct MeshData {
     // Simple bounding volume used for culling and RT acceleration structure
     // budgeting. Bounds are computed in object space and updated by mesh
     // generators / loaders once vertex positions are populated.
+    // NOTE: boundsMin/Max are used to detect thin plate geometry (e.g., planes)
+    // for automatic depth separation to reduce coplanar z-fighting.
+    glm::vec3 boundsMin{0.0f};
+    glm::vec3 boundsMax{0.0f};
     glm::vec3 boundsCenter{0.0f};
     float     boundsRadius = 0.0f;
     bool      hasBounds = false;
@@ -82,6 +86,8 @@ struct MeshData {
 
     void UpdateBounds() {
         if (positions.empty()) {
+            boundsMin = glm::vec3(0.0f);
+            boundsMax = glm::vec3(0.0f);
             boundsCenter = glm::vec3(0.0f);
             boundsRadius = 0.0f;
             hasBounds = false;
@@ -94,6 +100,8 @@ struct MeshData {
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }
+        boundsMin = minP;
+        boundsMax = maxP;
         boundsCenter = 0.5f * (minP + maxP);
         boundsRadius = glm::length(maxP - boundsCenter);
         hasBounds = true;

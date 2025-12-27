@@ -465,7 +465,8 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
         if (mat.textureIndices.x != INVALID_BINDLESS_INDEX) {
             Texture2D albedoTex = ResourceDescriptorHeap[mat.textureIndices.x];
-            albedo = albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
+            // glTF/PBR: finalAlbedo = baseColorFactor * textureColor
+            albedo *= albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
         }
 
         if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {

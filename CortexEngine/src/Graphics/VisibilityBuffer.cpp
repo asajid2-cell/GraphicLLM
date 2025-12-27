@@ -757,19 +757,21 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[0].Constants.ShaderRegister = 0;
         params[0].Constants.RegisterSpace = 0;
         params[0].Constants.Num32BitValues = 20;  // 16 for matrix + 4 for (meshIdx + materialCount + pad2)
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        // Pixel shader reads g_MaterialCount / g_CullMaskCount and may sample instance
+        // data for primitive-ID normalization, so these must be visible to ALL stages.
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // t0: Instance buffer SRV (via descriptor)
         params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
         params[1].Descriptor.ShaderRegister = 0;
         params[1].Descriptor.RegisterSpace = 0;
-        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         // t2: Optional culling mask SRV (raw buffer)
         params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
         params[2].Descriptor.ShaderRegister = 2;
         params[2].Descriptor.RegisterSpace = 0;
-        params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
         rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -1892,6 +1894,8 @@ Result<void> VisibilityBufferRenderer::UpdateInstances(
     ID3D12GraphicsCommandList* cmdList,
     const std::vector<VBInstanceData>& instances
 ) {
+    (void)cmdList;
+
     if (instances.empty()) {
         m_instanceCount = 0;
         return Result<void>::Ok();
@@ -2191,6 +2195,8 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     const std::vector<VBMeshDrawInfo>& meshDraws,
     D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress
 ) {
+    (void)depthBuffer;
+
     if (meshDraws.empty() || m_instanceCount == 0) {
         return Result<void>::Ok(); // Nothing to draw
     }
@@ -2776,6 +2782,8 @@ Result<void> VisibilityBufferRenderer::DebugBlitAlbedoToHDR(
     ID3D12Resource* hdrTarget,
     D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
 ) {
+    (void)hdrTarget;
+
     if (!m_blitPipeline) {
         return Result<void>::Err("Blit pipeline not initialized");
     }
@@ -3016,6 +3024,7 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     if (!m_deferredLightingPipeline) {
         return Result<void>::Err("Deferred lighting pipeline not initialized");
     }
+    (void)hdrTarget;
     (void)depthSRV; // SRVs are written directly from the resources below.
     if (!depthBuffer) {
         return Result<void>::Err("Deferred lighting requires a valid depth buffer");

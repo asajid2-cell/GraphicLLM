@@ -690,6 +690,10 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         m_visibilityBuffer.reset();
     } else {
         spdlog::info("VisibilityBuffer initialized for two-phase deferred rendering");
+        // Set flush callback so VB resize waits for GPU before destroying resources
+        m_visibilityBuffer->SetFlushCallback([this]() {
+            WaitForGPU();
+        });
         const bool vbDisabled = (std::getenv("CORTEX_DISABLE_VISIBILITY_BUFFER") != nullptr);
         const bool vbEnabledLegacy = (std::getenv("CORTEX_ENABLE_VISIBILITY_BUFFER") != nullptr);
         // VB is enabled by default; opt out via env var.
@@ -5864,11 +5868,28 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
                 m_hzbState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
             }
 
+            // Enable debug stats for culling diagnostics
+            static bool s_debugCullingEnv = (std::getenv("CORTEX_DEBUG_CULLING") != nullptr);
+            m_gpuCulling->SetDebugEnabled(s_debugCullingEnv);
+
             auto cullResult = m_gpuCulling->DispatchCulling(m_commandList.Get(), viewProjForCulling, cameraPosForCulling);
             if (cullResult.IsErr()) {
                 spdlog::warn("VB: GPU culling dispatch failed: {}", cullResult.Error());
             } else if (auto* mask = m_gpuCulling->GetVisibilityMaskBuffer()) {
                 vbCullMaskAddress = mask->GetGPUVirtualAddress();
+            }
+
+            // Log culling stats periodically when debug is enabled
+            if (s_debugCullingEnv) {
+                static uint32_t s_cullLogCounter = 0;
+                if ((s_cullLogCounter++ % 60) == 0) { // Log every ~1 second at 60fps
+                    auto stats = m_gpuCulling->GetDebugStats();
+                    if (stats.valid) {
+                        spdlog::info("GPU Cull Stats: tested={} frustumCulled={} occluded={} visible={} (HZB: near={:.2f} hzb={:.2f} mip={} flags={})",
+                            stats.tested, stats.frustumCulled, stats.occluded, stats.visible,
+                            stats.sampleNearDepth, stats.sampleHzbDepth, stats.sampleMip, stats.sampleFlags);
+                    }
+                }
             }
         }
         }

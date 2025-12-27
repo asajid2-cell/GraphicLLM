@@ -300,8 +300,7 @@ void Engine::BuildCornellScene() {
         r.ao = 1.0f;
         r.presetName = "cornell_green";
         r.doubleSided = true;
-        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
-        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
+        // No albedo texture - use pure base color for classic Cornell Box look
     }
 
     // Right wall (red)
@@ -320,8 +319,7 @@ void Engine::BuildCornellScene() {
         r.ao = 1.0f;
         r.presetName = "cornell_red";
         r.doubleSided = true;
-        r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
-        r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
+        // No albedo texture - use pure base color for classic Cornell Box look
     }
 
     // Front wall (mirror) closing the box toward -Z so that the interior is
@@ -372,6 +370,7 @@ void Engine::BuildCornellScene() {
             r.roughness = 0.02f;
             r.ao = 1.0f;
             r.presetName = "mirror";
+            r.doubleSided = true;
         }
 
         // Interior mirror panel facing the back-wall mirror to create a simple
@@ -392,6 +391,7 @@ void Engine::BuildCornellScene() {
             r.roughness = 0.02f;
             r.ao = 1.0f;
             r.presetName = "infinity_mirror";
+            r.doubleSided = true;
         }
     }
 
@@ -556,6 +556,7 @@ void Engine::BuildCornellScene() {
             r.roughness = 0.03f;
             r.ao = 1.0f;
             r.presetName = "mirror";
+            r.doubleSided = true;
         }
 
         // Small "glass brick" tiles near the side mirror using the same
@@ -575,6 +576,7 @@ void Engine::BuildCornellScene() {
             r.roughness = 0.05f;
             r.ao = 1.0f;
             r.presetName = "glass";
+            r.doubleSided = true;
         }
 
         {
@@ -592,6 +594,7 @@ void Engine::BuildCornellScene() {
             r.roughness = 0.04f;
             r.ao = 1.0f;
             r.presetName = "glass";
+            r.doubleSided = true;
         }
     }
 

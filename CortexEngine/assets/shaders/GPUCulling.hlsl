@@ -81,8 +81,9 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
     float3 scaleY = float3(instance.modelMatrix[0][1], instance.modelMatrix[1][1], instance.modelMatrix[2][1]);
     float3 scaleZ = float3(instance.modelMatrix[0][2], instance.modelMatrix[1][2], instance.modelMatrix[2][2]);
     float maxScale = max(max(length(scaleX), length(scaleY)), length(scaleZ));
-    // Add 20% conservative padding to prevent edge-case frustum culling
-    float worldRadius = radius * maxScale * 1.2f;
+    // Add 50% conservative padding to prevent edge-case frustum culling.
+    // Also enforce a minimum world-space radius for very thin geometry (planes).
+    float worldRadius = max(radius * maxScale * 1.5f, 0.5f);
 
     // Inflate bounds based on object motion to avoid false occlusion/popping
     // when instances move while the HZB is from the previous frame.

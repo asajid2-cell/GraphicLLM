@@ -40,6 +40,9 @@ struct alignas(16) VBInstanceData {
     uint32_t firstIndex;      // Start index in global index buffer
     uint32_t indexCount;      // Number of indices
     uint32_t baseVertex;      // Base vertex offset
+    // Explicit padding to align boundingSphere to 16 bytes (HLSL StructuredBuffer rule).
+    // baseVertex ends at offset 212. boundingSphere (float4) requires 16-byte alignment (offset 224).
+    uint32_t _padAlign[3];
     // Bounding sphere in object space: xyz = center, w = radius.
     glm::vec4 boundingSphere;
     // Previous frame center in world space: xyz = center, w unused.

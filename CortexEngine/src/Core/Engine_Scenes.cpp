@@ -1902,14 +1902,17 @@ void Engine::BuildProceduralTerrainScene() {
         m_activeCameraEntity = camera;
     }
 
-    // Create terrain chunks - larger world
-    const int chunkRadius = 3;  // Reduced for descriptor budget
+    // Create terrain chunks - use same radius as dynamic loading
+    const int32_t chunkRadius = CHUNK_LOAD_RADIUS;
     const uint32_t gridDim = 64;
-    const float chunkSize = 64.0f;
+    const float chunkSize = TERRAIN_CHUNK_SIZE;
     int chunkCount = 0;
 
-    for (int cz = -chunkRadius; cz <= chunkRadius; ++cz) {
-        for (int cx = -chunkRadius; cx <= chunkRadius; ++cx) {
+    // Clear loaded chunks tracking (will be populated below)
+    m_loadedChunks.clear();
+
+    for (int32_t cz = -chunkRadius; cz <= chunkRadius; ++cz) {
+        for (int32_t cx = -chunkRadius; cx <= chunkRadius; ++cx) {
             entt::entity chunk = m_registry->CreateEntity();
 
             char tagName[64];
@@ -1936,6 +1939,9 @@ void Engine::BuildProceduralTerrainScene() {
             terrainComp.chunkZ = cz;
             terrainComp.chunkSize = chunkSize;
             terrainComp.lodLevel = 0;
+
+            // Register chunk in loaded set for dynamic streaming
+            m_loadedChunks.insert({cx, cz});
 
             ++chunkCount;
         }

@@ -1,4 +1,4 @@
-﻿#include "Engine.h"
+#include "Engine.h"
 #include "ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
@@ -14,6 +14,8 @@
 #include "UI/PerformanceWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
+#include "Scene/TerrainNoise.h"
+#include "Game/InteractionSystem.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 #include <glm/gtc/quaternion.hpp>
@@ -724,6 +726,8 @@ void Engine::SetFocusTarget(const std::string& name) {
 }
 
 void Engine::ToggleScenePreset() {
+    // N key cycles through curated IBL scenes only
+    // ProceduralTerrain is accessed via J key as a separate world mode
     ScenePreset next;
     switch (m_currentScenePreset) {
     case ScenePreset::RTShowcase:
@@ -1105,7 +1109,7 @@ void Engine::RenderHUD() {
     if (UI::DebugMenu::IsVisible()) {
         UI::DebugMenuState state = UI::DebugMenu::GetState();
 
-        drawLine(L"[Settings overlay active GÇô M / F2]");
+        drawLine(L"[Settings overlay active G�� M / F2]");
         drawLine(L"Use UP/DOWN to select row, LEFT/RIGHT to tweak, SPACE/ENTER to toggle.");
 
         int panelX = static_cast<int>(m_window->GetWidth()) - 320;
@@ -1431,9 +1435,52 @@ void Engine::ProcessInput() {
                     }
                     break;
                 }
+                if (key == SDLK_F5) {
+                    // Toggle play mode (FPS controls with terrain collision)
+                    if (m_playModeActive) {
+                        ExitPlayMode();
+                    } else {
+                        EnterPlayMode();
+                    }
+                    break;
+                }
+                if (key == SDLK_E && m_playModeActive) {
+                    // Interact with hovered object
+                    m_interactionSystem.OnInteractPressed();
+                    break;
+                }
+                if (key == SDLK_Q && m_playModeActive) {
+                    // Drop held object
+                    m_interactionSystem.OnDropPressed();
+                    break;
+                }
+                if (key == SDLK_G && m_playModeActive) {
+                    // Throw held object
+                    m_interactionSystem.OnThrowPressed();
+                    break;
+                }
                 if (key == SDLK_N) {
-                    // Scene preset toggle: Cornell box <-> Dragon studio.
-                    ToggleScenePreset();
+                    // Scene preset toggle: cycles through curated IBL scenes
+                    if (m_currentScenePreset != ScenePreset::ProceduralTerrain) {
+                        ToggleScenePreset();
+                    } else {
+                        // Exit terrain world, return to RT showcase
+                        RebuildScene(ScenePreset::RTShowcase);
+                    }
+                    break;
+                }
+                if (key == SDLK_J) {
+                    // Toggle terrain world mode (separate from curated scenes)
+                    if (m_currentScenePreset == ScenePreset::ProceduralTerrain) {
+                        // Exit terrain world, return to previous scene type
+                        RebuildScene(ScenePreset::RTShowcase);
+                        spdlog::info("Exited Terrain World (J)");
+                    } else {
+                        // Enter terrain world
+                        RebuildScene(ScenePreset::ProceduralTerrain);
+                        if (!m_playModeActive) { EnterPlayMode(); }
+                        spdlog::info("Entered Terrain World (J) - WASD to move, Space to jump");
+                    }
                     break;
                 }
                 if (key == SDLK_1 || key == SDLK_2 || key == SDLK_3) {
@@ -1499,7 +1546,7 @@ void Engine::ProcessInput() {
                     break;
                 }
                 if (key == SDLK_M) {
-                    // GPU overlay (in-shader menu) toggle GÇô does not affect
+                    // GPU overlay (in-shader menu) toggle G�� does not affect
                     // the native F2 settings window.
                     m_settingsOverlayVisible = !m_settingsOverlayVisible;
                     if (m_settingsOverlayVisible) {
@@ -2244,6 +2291,9 @@ void Engine::Update(float deltaTime) {
     // Update active camera (fly controls) and optional auto-demo orbit
     UpdateCameraController(deltaTime);
     UpdateAutoDemo(deltaTime);
+
+    // Update play mode (terrain collision, interaction) if active
+    UpdatePlayMode(deltaTime);
 
     // Update all rotation components (spinning cube)
     auto viewRot = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
@@ -3996,5 +4046,216 @@ void Engine::EnqueueSceneCommand(std::shared_ptr<LLM::SceneCommand> command) {
     m_commandQueue->Push(std::move(command));
 }
 
-} // namespace Cortex
+// =============================================================================
+// Play Mode and Terrain System (appended - does not modify existing code)
+// =============================================================================
 
+void Engine::EnterPlayMode() {
+    if (m_playModeActive) return;
+
+    m_playModeActive = true;
+    m_engineMode = EngineMode::Play;
+
+    // Initialize interaction system
+    m_interactionSystem.Initialize(m_registry.get());
+    m_interactionSystem.SetTerrainParams(m_terrainParams, m_terrainEnabled);
+
+    // Capture mouse for FPS controls
+    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), true);
+
+    // Initialize player at camera position
+    if (m_activeCameraEntity != entt::null &&
+        m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity)) {
+        auto& camTransform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+        // If terrain is enabled, place player on ground
+        if (m_terrainEnabled) {
+            float groundY = Scene::SampleTerrainHeight(
+                static_cast<double>(camTransform.position.x),
+                static_cast<double>(camTransform.position.z),
+                m_terrainParams);
+            camTransform.position.y = groundY + m_playerEyeHeight;
+        }
+    }
+
+    m_playerVelocity = glm::vec3(0.0f);
+    m_playerGrounded = false;
+
+    spdlog::info("Entered Play Mode (F5)");
+}
+
+void Engine::ExitPlayMode() {
+    if (!m_playModeActive) return;
+
+    m_playModeActive = false;
+    m_engineMode = EngineMode::Editor;
+
+    // Release mouse
+    SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
+
+    spdlog::info("Exited Play Mode (F5)");
+}
+
+void Engine::UpdatePlayMode(float deltaTime) {
+    if (!m_playModeActive || !m_registry) return;
+
+    // Get camera for interaction raycasting
+    glm::vec3 cameraPos(0.0f);
+    glm::vec3 cameraForward(0.0f, 0.0f, 1.0f);
+
+    if (m_activeCameraEntity != entt::null &&
+        m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity)) {
+        auto& camTransform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+        cameraPos = camTransform.position;
+        cameraForward = camTransform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    // Update interaction system
+    m_interactionSystem.Update(cameraPos, cameraForward, deltaTime);
+
+    // FPS movement with terrain collision
+    if (m_terrainEnabled && m_activeCameraEntity != entt::null) {
+        auto& camTransform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+        const float gravity = 20.0f;
+        const float jumpVelocity = 8.0f;
+
+        // Apply gravity
+        if (!m_playerGrounded) {
+            m_playerVelocity.y -= gravity * deltaTime;
+        }
+
+        // Sample terrain height at current position
+        float groundY = Scene::SampleTerrainHeight(
+            static_cast<double>(camTransform.position.x),
+            static_cast<double>(camTransform.position.z),
+            m_terrainParams);
+
+        float targetY = groundY + m_playerEyeHeight;
+
+        // Check if on ground
+        if (camTransform.position.y <= targetY + 0.1f) {
+            m_playerGrounded = true;
+            camTransform.position.y = targetY;
+            if (m_playerVelocity.y < 0.0f) {
+                m_playerVelocity.y = 0.0f;
+            }
+        } else {
+            m_playerGrounded = false;
+        }
+
+        // Apply vertical velocity
+        camTransform.position.y += m_playerVelocity.y * deltaTime;
+
+        // Clamp to ground
+        if (camTransform.position.y < targetY) {
+            camTransform.position.y = targetY;
+            m_playerVelocity.y = 0.0f;
+            m_playerGrounded = true;
+        }
+
+        // Jump input (Space key is handled in ProcessInput)
+        const bool* keyState = SDL_GetKeyboardState(nullptr);
+        if (keyState && m_playerGrounded) {
+            if (keyState[SDL_SCANCODE_SPACE]) {
+                m_playerVelocity.y = jumpVelocity;
+                m_playerGrounded = false;
+            }
+        }
+    }
+}
+
+
+// ============================================================================
+// Dynamic Chunk Loading for Infinite Terrain
+// ============================================================================
+
+void Engine::UpdateDynamicChunkLoading(const glm::vec3& playerPos) {
+    // Calculate which chunk the player is in
+    int32_t playerChunkX = static_cast<int32_t>(std::floor(playerPos.x / TERRAIN_CHUNK_SIZE));
+    int32_t playerChunkZ = static_cast<int32_t>(std::floor(playerPos.z / TERRAIN_CHUNK_SIZE));
+
+    // Determine which chunks should be loaded (all chunks within CHUNK_LOAD_RADIUS)
+    std::unordered_set<ChunkKey, ChunkKeyHash> desiredChunks;
+    for (int32_t dz = -CHUNK_LOAD_RADIUS; dz <= CHUNK_LOAD_RADIUS; ++dz) {
+        for (int32_t dx = -CHUNK_LOAD_RADIUS; dx <= CHUNK_LOAD_RADIUS; ++dx) {
+            desiredChunks.insert({playerChunkX + dx, playerChunkZ + dz});
+        }
+    }
+
+    // NOTE: WaitForGPU is no longer needed here. The DeferredGPUDeletionQueue
+    // pattern ensures GPU resources are kept alive for N frames after destruction,
+    // preventing D3D12 error 921 (OBJECT_DELETED_WHILE_STILL_IN_USE).
+
+    // Unload chunks that are no longer needed
+    std::vector<ChunkKey> chunksToUnload;
+    for (const auto& chunk : m_loadedChunks) {
+        if (desiredChunks.find(chunk) == desiredChunks.end()) {
+            chunksToUnload.push_back(chunk);
+        }
+    }
+    if (!chunksToUnload.empty()) {
+        UnloadChunk(chunksToUnload[0].x, chunksToUnload[0].z);
+    }
+
+    // Load new chunks that are needed
+    for (const auto& chunk : desiredChunks) {
+        if (m_loadedChunks.find(chunk) == m_loadedChunks.end()) {
+            LoadChunk(chunk.x, chunk.z);
+            break;  // Only load one chunk per frame
+        }
+    }
+}
+
+void Engine::LoadChunk(int32_t cx, int32_t cz) {
+    // NOTE: No GPU sync needed - mesh uploads use the renderer's job queue
+    // and deferred deletion handles resource lifetime safely.
+    entt::entity chunk = m_registry->CreateEntity();
+
+    char tagName[64];
+    snprintf(tagName, sizeof(tagName), "TerrainChunk_%d_%d", cx, cz);
+    m_registry->AddComponent<Scene::TagComponent>(chunk, tagName);
+
+    auto& transform = m_registry->AddComponent<Scene::TransformComponent>(chunk);
+    transform.position = glm::vec3(0.0f);
+    transform.scale = glm::vec3(1.0f);
+
+    constexpr uint32_t gridDim = 64;
+    auto mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(
+        gridDim, TERRAIN_CHUNK_SIZE, cx, cz, m_terrainParams);
+
+    auto& renderable = m_registry->AddComponent<Scene::RenderableComponent>(chunk);
+    renderable.mesh = mesh;
+    renderable.presetName = "terrain";
+    renderable.albedoColor = glm::vec4(0.18f, 0.35f, 0.12f, 1.0f);
+    renderable.roughness = 0.95f;
+    renderable.metallic = 0.0f;
+
+    auto& terrainComp = m_registry->AddComponent<Scene::TerrainChunkComponent>(chunk);
+    terrainComp.chunkX = cx;
+    terrainComp.chunkZ = cz;
+    terrainComp.chunkSize = TERRAIN_CHUNK_SIZE;
+    terrainComp.lodLevel = 0;
+
+    m_loadedChunks.insert({cx, cz});
+
+    spdlog::debug("Loaded terrain chunk ({}, {})", cx, cz);
+}
+
+void Engine::UnloadChunk(int32_t cx, int32_t cz) {
+    auto view = m_registry->View<Scene::TerrainChunkComponent>();
+    for (auto entity : view) {
+        auto& comp = view.get<Scene::TerrainChunkComponent>(entity);
+        if (comp.chunkX == cx && comp.chunkZ == cz) {
+            m_registry->DestroyEntity(entity);
+            break;
+        }
+    }
+
+    m_loadedChunks.erase({cx, cz});
+
+    spdlog::debug("Unloaded terrain chunk ({}, {})", cx, cz);
+}
+
+
+} // namespace Cortex

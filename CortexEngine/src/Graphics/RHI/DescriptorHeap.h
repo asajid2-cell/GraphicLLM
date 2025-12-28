@@ -122,7 +122,7 @@ private:
 
     static constexpr uint32_t RTV_HEAP_SIZE = 64;
     static constexpr uint32_t DSV_HEAP_SIZE = 64;
-    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 65536;  // Headroom for bindless resources + per-frame transient tables
+    static constexpr uint32_t CBV_SRV_UAV_HEAP_SIZE = 262144;  // Headroom for bindless resources + per-frame transient tables
     static constexpr uint32_t STAGING_CBV_SRV_UAV_HEAP_SIZE = 32768;  // CPU-only staging heap for persistent SRVs (copied into shader-visible heap as needed)
     static constexpr uint32_t CBV_SRV_UAV_PERSISTENT_RESERVE = 16384;  // Fixed prefix reserved for persistent descriptors; transient regions start after this
 

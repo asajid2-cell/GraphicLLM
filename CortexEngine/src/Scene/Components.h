@@ -7,10 +7,10 @@
 #include <string>
 #include <vector>
 #include <entt/entt.hpp>
+#include "Graphics/MeshBuffers.h"  // For DeferMeshBuffersDeletion
 
 namespace Cortex::Graphics {
     class DX12Texture;
-    struct MeshBuffers;
     struct MaterialGPUState;
 }
 
@@ -80,8 +80,50 @@ struct MeshData {
     // GPU buffer handles (renderer-owned)
     std::shared_ptr<Cortex::Graphics::MeshBuffers> gpuBuffers;
 
+    MeshData() = default;
+
+    // Destructor uses deferred deletion to prevent D3D12 validation errors.
+    // When MeshData is destroyed (e.g., when an entity is deleted), the GPU
+    // buffers are queued for deletion after N frames to ensure they are no
+    // longer referenced by any in-flight command lists.
+    ~MeshData() {
+        if (gpuBuffers) {
+            Cortex::Graphics::DeferMeshBuffersDeletion(gpuBuffers);
+        }
+    }
+
+    // Move constructor and assignment
+    MeshData(MeshData&& other) noexcept = default;
+    MeshData& operator=(MeshData&& other) noexcept {
+        if (this != &other) {
+            // Defer deletion of current buffers before taking new ones
+            if (gpuBuffers) {
+                Cortex::Graphics::DeferMeshBuffersDeletion(gpuBuffers);
+            }
+            kind = other.kind;
+            positions = std::move(other.positions);
+            normals = std::move(other.normals);
+            texCoords = std::move(other.texCoords);
+            indices = std::move(other.indices);
+            boundsMin = other.boundsMin;
+            boundsMax = other.boundsMax;
+            boundsCenter = other.boundsCenter;
+            boundsRadius = other.boundsRadius;
+            hasBounds = other.hasBounds;
+            gpuBuffers = std::move(other.gpuBuffers);
+        }
+        return *this;
+    }
+
+    // Copy is deleted (GPU buffers should not be duplicated)
+    MeshData(const MeshData&) = delete;
+    MeshData& operator=(const MeshData&) = delete;
+
+    // Reset GPU resources using deferred deletion.
+    // This queues the buffers for deletion after N frames to ensure the GPU
+    // is no longer referencing them, preventing D3D12 validation errors.
     void ResetGPUResources() {
-        gpuBuffers.reset();
+        Cortex::Graphics::DeferMeshBuffersDeletion(gpuBuffers);
     }
 
     void UpdateBounds() {
@@ -288,6 +330,52 @@ struct ParticleEmitterComponent {
     // Internal state
     float emissionAccumulator = 0.0f;
     std::vector<Particle> particles;
+};
+
+// Terrain clipmap level component for GPU-displaced terrain rings.
+struct TerrainClipmapLevelComponent {
+    uint32_t ringIndex = 0;       // 0 = innermost (highest detail)
+    float baseScale = 1.0f;       // Base scale for this ring
+    bool isRing = false;          // true = ring topology, false = full grid
+};
+
+// CPU-generated terrain chunk component for VB-integrated terrain.
+struct TerrainChunkComponent {
+    int32_t chunkX = 0;           // Grid coordinate X
+    int32_t chunkZ = 0;           // Grid coordinate Z
+    float chunkSize = 64.0f;      // World-space size of chunk
+    uint32_t lodLevel = 0;        // LOD level (0 = highest detail)
+};
+
+// Interactable object component for pick-up / activate / examine interactions.
+enum class InteractionType : uint32_t {
+    Pickup = 0,
+    Activate = 1,
+    Examine = 2
+};
+
+struct InteractableComponent {
+    InteractionType type = InteractionType::Pickup;
+    glm::vec3 highlightColor = glm::vec3(1.0f, 0.8f, 0.2f);
+    float interactionRadius = 2.0f;
+    bool isHighlighted = false;
+};
+
+// Marks an object as currently held by the player.
+struct HeldObjectComponent {
+    glm::vec3 holdOffset = glm::vec3(0.0f, -0.2f, 0.5f);
+    glm::quat holdRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+};
+
+// Simple rigid body physics for dropped/thrown objects.
+struct PhysicsBodyComponent {
+    glm::vec3 velocity = glm::vec3(0.0f);
+    glm::vec3 angularVelocity = glm::vec3(0.0f);
+    float mass = 1.0f;
+    float restitution = 0.3f;
+    float friction = 0.5f;
+    bool useGravity = true;
+    bool isKinematic = false;
 };
 
 } // namespace Cortex::Scene

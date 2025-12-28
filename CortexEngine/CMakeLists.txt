@@ -88,6 +88,9 @@ set(CORTEX_SOURCES
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
+    src/Scene/TerrainNoise.cpp
+
+    src/Game/InteractionSystem.cpp
 
     src/Utils/FileUtils.cpp
     src/Utils/MeshGenerator.cpp
@@ -144,6 +147,9 @@ set(CORTEX_HEADERS
 
     src/Scene/ECS_Registry.h
     src/Scene/Components.h
+    src/Scene/TerrainNoise.h
+
+    src/Game/InteractionSystem.h
 
     src/Utils/Result.h
     src/Utils/FileUtils.h

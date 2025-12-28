@@ -4,6 +4,7 @@
 #include <deque>
 #include <atomic>
 #include <thread>
+#include <unordered_set>
 #include <entt/entt.hpp>
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
@@ -15,6 +16,8 @@
 #include "AI/Vision/DreamerService.h"
 #include "Utils/Result.h"
 #include <glm/glm.hpp>
+#include "Scene/TerrainNoise.h"
+#include "Game/InteractionSystem.h"
 
 namespace Cortex {
 
@@ -115,10 +118,11 @@ public:
 private:
     // High-level scene presets for easy switching between curated layouts.
     enum class ScenePreset {
-        CornellBox      = 0,
-        DragonOverWater = 1,
-        RTShowcase      = 2,
-        GodRays         = 3,
+        CornellBox        = 0,
+        DragonOverWater   = 1,
+        RTShowcase        = 2,
+        GodRays           = 3,
+        ProceduralTerrain = 4,
     };
 
     void ProcessInput();
@@ -130,6 +134,7 @@ private:
 
     void RebuildScene(ScenePreset preset);
     void BuildCornellScene();
+    void BuildProceduralTerrainScene();
     void BuildDragonStudioScene();
     void BuildRTShowcaseScene();
     void BuildGodRaysScene();
@@ -281,6 +286,47 @@ private:
     // should enable their full high-quality settings or stay on the safe
     // low-VRAM preset.
     EngineConfig::QualityMode m_qualityMode = EngineConfig::QualityMode::Default;
+
+    // =========================================================================
+    // Play Mode and Terrain System (appended - does not modify existing code)
+    // =========================================================================
+
+    // Engine mode: Editor (default) or Play (F5 toggle)
+    enum class EngineMode { Editor = 0, Play = 1 };
+    EngineMode m_engineMode = EngineMode::Editor;
+
+    // Play mode state
+    void EnterPlayMode();
+    void ExitPlayMode();
+    void UpdatePlayMode(float deltaTime);
+    bool m_playModeActive = false;
+    glm::vec3 m_playerVelocity{0.0f};
+    bool m_playerGrounded = false;
+    float m_playerEyeHeight = 1.7f;
+
+    // Terrain system
+    bool m_terrainEnabled = false;
+    Scene::TerrainNoiseParams m_terrainParams;
+
+    // Dynamic chunk loading for infinite terrain
+    struct ChunkKey {
+        int32_t x, z;
+        bool operator==(const ChunkKey& other) const { return x == other.x && z == other.z; }
+    };
+    struct ChunkKeyHash {
+        size_t operator()(const ChunkKey& k) const {
+            return std::hash<int64_t>()((static_cast<int64_t>(k.x) << 32) | static_cast<uint32_t>(k.z));
+        }
+    };
+    std::unordered_set<ChunkKey, ChunkKeyHash> m_loadedChunks;
+    void UpdateDynamicChunkLoading(const glm::vec3& playerPos);
+    void LoadChunk(int32_t cx, int32_t cz);
+    void UnloadChunk(int32_t cx, int32_t cz);
+    static constexpr int32_t CHUNK_LOAD_RADIUS = 4;
+    static constexpr float TERRAIN_CHUNK_SIZE = 64.0f;
+
+    // Object interaction system
+    Game::InteractionSystem m_interactionSystem;
 };
 
 } // namespace Cortex

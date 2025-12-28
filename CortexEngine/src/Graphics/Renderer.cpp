@@ -5,6 +5,7 @@
 #include "Scene/Components.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/MeshBuffers.h"  // For DeferredGPUDeletionQueue
 #include <spdlog/spdlog.h>
 #include <cmath>
 #include <chrono>
@@ -2712,6 +2713,12 @@ void Renderer::BeginFrame() {
 
         m_commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
     }
+
+    // Process deferred GPU resource deletion queue.
+    // This releases resources that were queued for deletion N frames ago,
+    // ensuring they are no longer referenced by any in-flight command lists.
+    // This is the standard D3D12 pattern for safe resource lifetime management.
+    DeferredGPUDeletionQueue::Instance().ProcessFrame();
 
     if (m_gpuCulling) {
         m_gpuCulling->UpdateVisibleCountFromReadback();

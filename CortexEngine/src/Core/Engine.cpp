@@ -4217,7 +4217,8 @@ void Engine::LoadChunk(int32_t cx, int32_t cz) {
     m_registry->AddComponent<Scene::TagComponent>(chunk, tagName);
 
     auto& transform = m_registry->AddComponent<Scene::TransformComponent>(chunk);
-    transform.position = glm::vec3(0.0f);
+    // Position chunk at correct world location - mesh uses local coords
+    transform.position = glm::vec3(cx * TERRAIN_CHUNK_SIZE, 0.0f, cz * TERRAIN_CHUNK_SIZE);
     transform.scale = glm::vec3(1.0f);
 
     constexpr uint32_t gridDim = 64;

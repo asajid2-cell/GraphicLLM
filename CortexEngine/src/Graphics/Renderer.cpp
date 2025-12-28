@@ -7925,6 +7925,14 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
                          ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok");
         }
     }
+
+    // CRITICAL: If mesh already has GPU buffers (e.g., re-upload), defer deletion
+    // of old buffers to prevent D3D12 Error 921 (OBJECT_DELETED_WHILE_STILL_IN_USE).
+    // Simple assignment would immediately release old buffers which may still be
+    // referenced by in-flight GPU commands.
+    if (mesh->gpuBuffers) {
+        DeferMeshBuffersDeletion(mesh->gpuBuffers);
+    }
     mesh->gpuBuffers = gpuBuffers;
 
     // Register approximate geometry footprint in the asset registry so the

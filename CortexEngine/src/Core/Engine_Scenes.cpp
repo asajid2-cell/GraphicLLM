@@ -1917,7 +1917,8 @@ void Engine::BuildProceduralTerrainScene() {
             m_registry->AddComponent<Scene::TagComponent>(chunk, tagName);
 
             auto& transform = m_registry->AddComponent<TransformComponent>(chunk);
-            transform.position = glm::vec3(0.0f);
+            // Position chunk at correct world location - mesh uses local coords
+            transform.position = glm::vec3(cx * chunkSize, 0.0f, cz * chunkSize);
             transform.scale = glm::vec3(1.0f);
 
             auto mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(

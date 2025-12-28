@@ -2295,6 +2295,12 @@ void Engine::Update(float deltaTime) {
     // Update play mode (terrain collision, interaction) if active
     UpdatePlayMode(deltaTime);
 
+    // Dynamic chunk loading for infinite terrain - stream chunks around player
+    if (m_terrainEnabled && m_activeCameraEntity != entt::null) {
+        auto& camTransform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+        UpdateDynamicChunkLoading(camTransform.position);
+    }
+
     // Update all rotation components (spinning cube)
     auto viewRot = m_registry->View<Scene::RotationComponent, Scene::TransformComponent>();
     for (auto entity : viewRot) {

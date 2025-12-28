@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Scene/Components.h"
+#include "Scene/TerrainNoise.h"
 #include <memory>
 
 namespace Cortex::Utils {
@@ -41,6 +42,21 @@ public:
     // Generate a thin rectangular prism that can be used as a "line" or
     // segment when oriented and scaled via TransformComponent.
     static std::shared_ptr<Scene::MeshData> CreateLine(float length = 1.0f, float thickness = 0.02f);
+
+    // Terrain clipmap support: generate an XZ grid centered at origin with optional
+    // inner-hole (ring) topology and boundary skirts. Intended for vertex-shader
+    // displacement using an analytic height function.
+    static std::shared_ptr<Scene::MeshData> CreateTerrainClipmapGrid(uint32_t gridDim, bool ring, bool skirts = true);
+
+    // CPU-generated heightmap terrain chunk for the visibility buffer pipeline.
+    static std::shared_ptr<Scene::MeshData> CreateTerrainHeightmapChunk(
+        uint32_t gridDim,
+        float chunkSize,
+        int32_t chunkX,
+        int32_t chunkZ,
+        const Scene::TerrainNoiseParams& params,
+        float skirtDepth = 25.0f
+    );
 };
 
 } // namespace Cortex::Utils

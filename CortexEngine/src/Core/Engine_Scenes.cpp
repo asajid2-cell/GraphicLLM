@@ -4,6 +4,7 @@
 #include "Engine.h"
 
 #include "Scene/Components.h"
+#include "Scene/TerrainNoise.h"
 #include "Utils/MeshGenerator.h"
 #include "Utils/GLTFLoader.h"
 #include "Graphics/Renderer.h"
@@ -23,13 +24,12 @@ namespace {
 }
 
 void Engine::RebuildScene(ScenePreset preset) {
-    // CRITICAL: Wait for ALL in-flight GPU frames before destroying resources.
-    // With triple buffering, frames N-1 and N-2 might still be executing and
-    // holding references to resources we're about to delete.
+    // CRITICAL: Full GPU synchronization before destroying resources.
+    // WaitForGPU flushes all command queues (main, upload, compute) and waits
+    // for their completion. This is more thorough than WaitForAllFrames which
+    // only waits for existing fence values.
     if (m_renderer) {
-        // WaitForAllFrames waits for all 3 frame fences, not just the current one.
-        // This ensures no in-flight frame is still using resources we'll delete.
-        m_renderer->WaitForAllFrames();
+        m_renderer->WaitForGPU();
 
         // Reset the command list to clear CPU-side references to resources.
         // This closes the current recording, resets the allocator and command list
@@ -43,8 +43,26 @@ void Engine::RebuildScene(ScenePreset preset) {
         m_renderer->ClearBLASCache();
     }
 
-    // Clear all existing entities/components.
+    // Exit play mode if active before rebuilding
+    if (m_playModeActive) {
+        ExitPlayMode();
+    }
+
+    // Disable terrain system (will be re-enabled if switching to terrain scene)
+    m_terrainEnabled = false;
+    m_loadedChunks.clear();
+
+    // Clear all existing entities/components. This destroys RenderableComponents
+    // which may release GPU resources (mesh buffers, etc.).
     m_registry->GetRegistry().clear();
+
+    // CRITICAL: After clearing the registry, force another full GPU sync to ensure
+    // all destructor-triggered resource releases have completed. This prevents
+    // D3D12 validation error 921 (OBJECT_DELETED_WHILE_STILL_IN_USE) when rapidly
+    // rebuilding scenes with many mesh uploads (e.g., terrain chunks).
+    if (m_renderer) {
+        m_renderer->WaitForGPU();
+    }
     m_activeCameraEntity = entt::null;
     m_selectedEntity = entt::null;
     m_autoDemoEnabled = false;
@@ -65,6 +83,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DragonOverWater:
         BuildDragonStudioScene();
         break;
+    case ScenePreset::ProceduralTerrain:
+        BuildProceduralTerrainScene();
+        break;
     case ScenePreset::RTShowcase:
     case ScenePreset::GodRays: // currently shares layout with RTShowcase
     default:
@@ -81,11 +102,12 @@ void Engine::RebuildScene(ScenePreset preset) {
 
     const char* presetName = "Unknown";
     switch (preset) {
-    case ScenePreset::CornellBox:      presetName = "Cornell Box"; break;
-    case ScenePreset::DragonOverWater: presetName = "Dragon Over Water Studio"; break;
-    case ScenePreset::RTShowcase:      presetName = "RT Showcase Gallery"; break;
-    case ScenePreset::GodRays:         presetName = "God Rays Atrium"; break;
-    default:                           presetName = "Unknown"; break;
+    case ScenePreset::CornellBox:        presetName = "Cornell Box"; break;
+    case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
+    case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
+    case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
+    case ScenePreset::ProceduralTerrain: presetName = "Procedural Terrain"; break;
+    default:                             presetName = "Unknown"; break;
     }
 
     spdlog::info("Scene rebuilt as {}", presetName);
@@ -1808,6 +1830,9 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::RTShowcase) {
         pos = glm::vec3(0.0f, 3.5f, -13.0f);
         target = glm::vec3(0.0f, 1.5f, 0.0f);
+    } else if (m_currentScenePreset == ScenePreset::ProceduralTerrain) {
+        pos = glm::vec3(0.0f, 50.0f, -10.0f);
+        target = glm::vec3(0.0f, 30.0f, 50.0f);
     } else {
         pos = glm::vec3(0.0f, 3.0f, -8.0f);
         target = glm::vec3(0.0f, 1.0f, kHeroPoolZ);
@@ -1827,6 +1852,268 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
     float pitchLimit = glm::radians(89.0f);
     m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+}
+
+// =============================================================================
+// Procedural Terrain Scene (appended - does not modify existing code)
+// =============================================================================
+
+void Engine::BuildProceduralTerrainScene() {
+    // ==========================================================================
+    // PROCEDURAL TERRAIN WORLD - Minecraft-style explorable world
+    // ==========================================================================
+
+    // Enable terrain system with varied, interesting terrain
+    m_terrainEnabled = true;
+    m_terrainParams = Scene::TerrainNoiseParams{};
+    m_terrainParams.seed = 42;
+    m_terrainParams.amplitude = 20.0f;      // Taller mountains
+    m_terrainParams.frequency = 0.003f;     // Larger features
+    m_terrainParams.octaves = 6;            // More detail
+    m_terrainParams.lacunarity = 2.0f;
+    m_terrainParams.gain = 0.5f;
+    m_terrainParams.warp = 15.0f;           // Domain warping for natural look
+
+    // Simple hash function for procedural placement
+    auto hash = [](int x, int z, int seed) -> float {
+        uint32_t h = static_cast<uint32_t>(x * 374761393 + z * 668265263 + seed);
+        h = (h ^ (h >> 13)) * 1274126177;
+        return static_cast<float>(h & 0xFFFF) / 65535.0f;
+    };
+
+    // Create camera at a nice starting position
+    {
+        entt::entity camera = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camera, "MainCamera");
+
+        // Start at origin, sample terrain height
+        float startY = Scene::SampleTerrainHeight(0.0, 0.0, m_terrainParams) + 2.0f;
+
+        auto& transform = m_registry->AddComponent<TransformComponent>(camera);
+        transform.position = glm::vec3(0.0f, startY, 0.0f);
+        glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f));
+        transform.rotation = glm::quatLookAt(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camera);
+        cam.fov = 75.0f;  // Wider FOV for exploration
+        cam.nearPlane = 0.1f;
+        cam.farPlane = 1500.0f;
+
+        m_activeCameraEntity = camera;
+    }
+
+    // Create terrain chunks - larger world
+    const int chunkRadius = 3;  // Reduced for descriptor budget
+    const uint32_t gridDim = 64;
+    const float chunkSize = 64.0f;
+    int chunkCount = 0;
+
+    for (int cz = -chunkRadius; cz <= chunkRadius; ++cz) {
+        for (int cx = -chunkRadius; cx <= chunkRadius; ++cx) {
+            entt::entity chunk = m_registry->CreateEntity();
+
+            char tagName[64];
+            snprintf(tagName, sizeof(tagName), "TerrainChunk_%d_%d", cx, cz);
+            m_registry->AddComponent<Scene::TagComponent>(chunk, tagName);
+
+            auto& transform = m_registry->AddComponent<TransformComponent>(chunk);
+            transform.position = glm::vec3(0.0f);
+            transform.scale = glm::vec3(1.0f);
+
+            auto mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(
+                gridDim, chunkSize, cx, cz, m_terrainParams);
+
+            auto& renderable = m_registry->AddComponent<Scene::RenderableComponent>(chunk);
+            renderable.mesh = mesh;
+            renderable.presetName = "terrain";
+            renderable.albedoColor = glm::vec4(0.18f, 0.35f, 0.12f, 1.0f);  // Forest green
+            renderable.roughness = 0.95f;
+            renderable.metallic = 0.0f;
+
+            auto& terrainComp = m_registry->AddComponent<Scene::TerrainChunkComponent>(chunk);
+            terrainComp.chunkX = cx;
+            terrainComp.chunkZ = cz;
+            terrainComp.chunkSize = chunkSize;
+            terrainComp.lodLevel = 0;
+
+            ++chunkCount;
+        }
+    }
+
+    // Directional sun light - warm afternoon sun
+    {
+        entt::entity sun = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(sun, "Sun");
+
+        auto& transform = m_registry->AddComponent<TransformComponent>(sun);
+        transform.position = glm::vec3(500.0f, 800.0f, 300.0f);
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.85f, -0.4f));
+        transform.rotation = glm::quatLookAt(sunDir, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& light = m_registry->AddComponent<Scene::LightComponent>(sun);
+        light.type = Scene::LightType::Directional;
+        light.color = glm::vec3(1.0f, 0.95f, 0.8f);  // Warm sunlight
+        light.intensity = 4.0f;
+        light.castsShadows = true;
+    }
+
+    // Helper: Spawn a tree at position
+    auto spawnTree = [&](float x, float z, int treeId) {
+        float groundY = Scene::SampleTerrainHeight(
+            static_cast<double>(x), static_cast<double>(z), m_terrainParams);
+
+        float trunkHeight = 3.0f + hash(static_cast<int>(x), static_cast<int>(z), 100) * 2.0f;
+        float trunkRadius = 0.15f + hash(static_cast<int>(x), static_cast<int>(z), 200) * 0.1f;
+        float foliageRadius = 1.2f + hash(static_cast<int>(x), static_cast<int>(z), 300) * 0.8f;
+
+        // Trunk
+        {
+            entt::entity trunk = m_registry->CreateEntity();
+            char name[32];
+            snprintf(name, sizeof(name), "TreeTrunk_%d", treeId);
+            m_registry->AddComponent<Scene::TagComponent>(trunk, name);
+
+            auto& t = m_registry->AddComponent<TransformComponent>(trunk);
+            t.position = glm::vec3(x, groundY + trunkHeight * 0.5f, z);
+            t.scale = glm::vec3(trunkRadius * 2.0f, trunkHeight, trunkRadius * 2.0f);
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(trunk);
+            r.mesh = Utils::MeshGenerator::CreateCylinder(0.5f, 1.0f, 8);
+            r.presetName = "wood";
+            r.albedoColor = glm::vec4(0.35f, 0.22f, 0.1f, 1.0f);  // Brown bark
+            r.roughness = 0.9f;
+            r.metallic = 0.0f;
+        }
+
+        // Foliage (cone shape for pine tree look)
+        {
+            entt::entity foliage = m_registry->CreateEntity();
+            char name[32];
+            snprintf(name, sizeof(name), "TreeFoliage_%d", treeId);
+            m_registry->AddComponent<Scene::TagComponent>(foliage, name);
+
+            auto& t = m_registry->AddComponent<TransformComponent>(foliage);
+            t.position = glm::vec3(x, groundY + trunkHeight + foliageRadius * 0.5f, z);
+            t.scale = glm::vec3(foliageRadius * 2.0f, foliageRadius * 2.5f, foliageRadius * 2.0f);
+
+            auto& r = m_registry->AddComponent<Scene::RenderableComponent>(foliage);
+            r.mesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, 8);
+            r.presetName = "leaves";
+            r.albedoColor = glm::vec4(0.1f, 0.4f, 0.15f, 1.0f);  // Dark green
+            r.roughness = 0.8f;
+            r.metallic = 0.0f;
+        }
+    };
+
+    // Helper: Spawn a rock at position
+    auto spawnRock = [&](float x, float z, int rockId) {
+        float groundY = Scene::SampleTerrainHeight(
+            static_cast<double>(x), static_cast<double>(z), m_terrainParams);
+
+        float size = 0.3f + hash(static_cast<int>(x * 10), static_cast<int>(z * 10), 400) * 0.6f;
+
+        entt::entity rock = m_registry->CreateEntity();
+        char name[32];
+        snprintf(name, sizeof(name), "Rock_%d", rockId);
+        m_registry->AddComponent<Scene::TagComponent>(rock, name);
+
+        auto& t = m_registry->AddComponent<TransformComponent>(rock);
+        t.position = glm::vec3(x, groundY + size * 0.3f, z);
+        t.scale = glm::vec3(size, size * 0.6f, size);
+        // Random rotation
+        float yaw = hash(static_cast<int>(x * 7), static_cast<int>(z * 7), 500) * 6.28f;
+        t.rotation = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(rock);
+        r.mesh = Utils::MeshGenerator::CreateSphere(0.5f, 8);
+        r.presetName = "stone";
+        r.albedoColor = glm::vec4(0.4f, 0.4f, 0.42f, 1.0f);  // Gray stone
+        r.roughness = 0.85f;
+        r.metallic = 0.0f;
+    };
+
+    // Procedurally place trees and rocks across the terrain
+    int treeCount = 0;
+    int rockCount = 0;
+    const float worldExtent = chunkRadius * chunkSize;
+
+    for (float x = -worldExtent; x < worldExtent; x += 20.0f) {
+        for (float z = -worldExtent; z < worldExtent; z += 20.0f) {
+            // Add some jitter
+            float jx = x + (hash(static_cast<int>(x), static_cast<int>(z), 1) - 0.5f) * 6.0f;
+            float jz = z + (hash(static_cast<int>(x), static_cast<int>(z), 2) - 0.5f) * 6.0f;
+
+            float h = Scene::SampleTerrainHeight(
+                static_cast<double>(jx), static_cast<double>(jz), m_terrainParams);
+
+            // Trees on mid-height terrain (not too high, not too low)
+            if (h > 4.0f && h < 16.0f && hash(static_cast<int>(jx), static_cast<int>(jz), 3) > 0.7f) {
+                spawnTree(jx, jz, treeCount++);
+            }
+            // Rocks scattered more randomly
+            else if (hash(static_cast<int>(jx * 2), static_cast<int>(jz * 2), 4) > 0.92f) {
+                spawnRock(jx, jz, rockCount++);
+            }
+        }
+    }
+
+    // Spawn interactable objects near spawn
+    auto spawnInteractable = [&](const char* name, float x, float z, float radius,
+                                  const glm::vec4& color) {
+        float groundY = Scene::SampleTerrainHeight(
+            static_cast<double>(x), static_cast<double>(z), m_terrainParams);
+
+        entt::entity obj = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(obj, name);
+
+        auto& t = m_registry->AddComponent<TransformComponent>(obj);
+        t.position = glm::vec3(x, groundY + radius + 0.1f, z);
+        t.scale = glm::vec3(radius * 2.0f);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(obj);
+        r.mesh = Utils::MeshGenerator::CreateSphere(0.5f, 16);
+        r.presetName = "shiny";
+        r.albedoColor = color;
+        r.roughness = 0.2f;
+        r.metallic = 0.8f;
+
+        auto& i = m_registry->AddComponent<Scene::InteractableComponent>(obj);
+        i.type = Scene::InteractionType::Pickup;
+        i.highlightColor = glm::vec3(1.0f, 1.0f, 0.5f);
+        i.interactionRadius = radius * 2.0f;
+        i.isHighlighted = false;
+
+        auto& p = m_registry->AddComponent<Scene::PhysicsBodyComponent>(obj);
+        p.velocity = glm::vec3(0.0f);
+        p.angularVelocity = glm::vec3(0.0f);
+        p.mass = 1.0f;
+        p.restitution = 0.5f;
+        p.friction = 0.4f;
+        p.useGravity = true;
+        p.isKinematic = false;
+    };
+
+    // Place collectible orbs near spawn
+    spawnInteractable("RedOrb", 5.0f, 8.0f, 0.4f, glm::vec4(0.9f, 0.2f, 0.1f, 1.0f));
+    spawnInteractable("BlueOrb", -6.0f, 10.0f, 0.35f, glm::vec4(0.1f, 0.3f, 0.9f, 1.0f));
+    spawnInteractable("GreenOrb", 8.0f, -5.0f, 0.45f, glm::vec4(0.2f, 0.9f, 0.3f, 1.0f));
+    spawnInteractable("GoldOrb", -4.0f, -8.0f, 0.5f, glm::vec4(1.0f, 0.8f, 0.2f, 1.0f));
+    spawnInteractable("PurpleOrb", 12.0f, 3.0f, 0.38f, glm::vec4(0.7f, 0.2f, 0.9f, 1.0f));
+
+    // Configure renderer for outdoor world
+    if (m_renderer) {
+        m_renderer->SetIBLEnabled(false);  // Disable indoor cubemap
+        // IBL disabled - use sun lighting only
+        m_renderer->SetFogEnabled(true);
+        m_renderer->SetExposure(1.0f);
+        m_renderer->SetShadowsEnabled(true);
+    }
+
+    spdlog::info("=== TERRAIN WORLD READY ===");
+    spdlog::info("  {} terrain chunks", chunkCount);
+    spdlog::info("  {} trees, {} rocks", treeCount, rockCount);
+    spdlog::info("  Press F5 for play mode, WASD to move, E to interact");
+    spdlog::info("  Press J to exit terrain world");
 }
 
 } // namespace Cortex

@@ -908,6 +908,29 @@ void DX12RaytracingContext::RebuildBLASForMesh(const std::shared_ptr<Scene::Mesh
     }
 
     const Scene::MeshData* key = mesh.get();
+
+    // CRITICAL: Check if an entry already exists at this key.
+    // Due to memory reuse, a new MeshData may get the same address as a previously
+    // deleted one. If so, the old entry contains stale BLAS/scratch resources that
+    // the GPU may still be referencing. We MUST defer their deletion to prevent
+    // D3D12 error 921 (OBJECT_DELETED_WHILE_STILL_IN_USE).
+    auto existingIt = m_blasCache.find(key);
+    if (existingIt != m_blasCache.end()) {
+        BLASEntry& oldEntry = existingIt->second;
+        if (oldEntry.blas) {
+            // Queue old BLAS for deferred deletion (N frames from now)
+            DeferredGPUDeletionQueue::Instance().QueueResource(std::move(oldEntry.blas));
+            spdlog::debug("DX12RaytracingContext: deferred deletion of stale BLAS at reused address {:p}",
+                          static_cast<const void*>(key));
+        }
+        if (oldEntry.scratch) {
+            // Queue old scratch buffer for deferred deletion
+            DeferredGPUDeletionQueue::Instance().QueueResource(std::move(oldEntry.scratch));
+        }
+        // Clear the entry to prevent any stale state
+        oldEntry = BLASEntry{};
+    }
+
     auto& entry = m_blasCache[key];
 
     D3D12_RAYTRACING_GEOMETRY_DESC geom{};
@@ -978,8 +1001,9 @@ void DX12RaytracingContext::ReleaseBLASForMesh(const Scene::MeshData* meshKey) {
         if (blasBytes > 0 && m_totalBLASBytes >= blasBytes) {
             m_totalBLASBytes -= blasBytes;
         }
-        entry.blas.Reset();
-        spdlog::info("DX12RaytracingContext: released BLAS for mesh {} (kept scratch buffer)",
+        // Use deferred deletion to prevent D3D12 error 921
+        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(entry.blas));
+        spdlog::info("DX12RaytracingContext: deferred BLAS release for mesh {} (kept scratch buffer)",
                      static_cast<const void*>(meshKey));
     }
 
@@ -1001,6 +1025,8 @@ void DX12RaytracingContext::ClearAllBLAS() {
     // Release all BLAS resources and clear the cache.
     // Call this during scene switches to ensure no stale entries remain
     // that could reference freed GPU resources.
+    // Use deferred deletion to prevent D3D12 error 921 in case GPU is still
+    // referencing these resources from in-flight command lists.
     for (auto& kv : m_blasCache) {
         BLASEntry& entry = kv.second;
         if (entry.blas) {
@@ -1008,10 +1034,10 @@ void DX12RaytracingContext::ClearAllBLAS() {
             if (bytes > 0 && m_totalBLASBytes >= bytes) {
                 m_totalBLASBytes -= bytes;
             }
-            entry.blas.Reset();
+            DeferredGPUDeletionQueue::Instance().QueueResource(std::move(entry.blas));
         }
         if (entry.scratch) {
-            entry.scratch.Reset();
+            DeferredGPUDeletionQueue::Instance().QueueResource(std::move(entry.scratch));
         }
     }
     m_blasCache.clear();
@@ -1019,9 +1045,16 @@ void DX12RaytracingContext::ClearAllBLAS() {
     // Also clear TLAS and instance buffer since they contain references to
     // the BLAS entries we just cleared. The next BuildTLAS() call will
     // recreate them from scratch with the new scene's geometry.
-    m_tlas.Reset();
-    m_tlasScratch.Reset();
-    m_instanceBuffer.Reset();
+    // Use deferred deletion for TLAS resources as well.
+    if (m_tlas) {
+        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(m_tlas));
+    }
+    if (m_tlasScratch) {
+        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(m_tlasScratch));
+    }
+    if (m_instanceBuffer) {
+        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(m_instanceBuffer));
+    }
     m_instanceBufferSize = 0;
     m_tlasSize = 0;
     m_tlasScratchSize = 0;
@@ -1031,7 +1064,7 @@ void DX12RaytracingContext::ClearAllBLAS() {
     m_tlasScratchPendingSize = 0;
     m_instanceDescs.clear();
 
-    spdlog::info("DX12RaytracingContext: cleared all BLAS/TLAS for scene switch");
+    spdlog::info("DX12RaytracingContext: cleared all BLAS/TLAS for scene switch (deferred)");
 }
 
 void DX12RaytracingContext::ReleaseScratchBuffers(uint64_t /*completedFrameIndex*/) {

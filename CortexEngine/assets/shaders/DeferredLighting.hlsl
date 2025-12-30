@@ -403,9 +403,52 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     if (depth >= 0.9999) {
         float3 worldFar = ReconstructWorldPosition(input.texCoord, 1.0f);
         float3 viewDir = normalize(worldFar - g_CameraPosition.xyz);
-        float iblSpec = (g_EnvParams.z > 0.5f) ? g_EnvParams.y : 0.0f;
-        float3 sky = SampleEnvSpecular(viewDir, 0.0f, INVALID_BINDLESS_INDEX) * iblSpec;
-        return float4(sky, 1.0f);
+
+        bool iblEnabled = (g_EnvParams.z > 0.5f);
+        if (iblEnabled) {
+            // Use IBL environment map for sky
+            float3 sky = SampleEnvSpecular(viewDir, 0.0f, INVALID_BINDLESS_INDEX) * g_EnvParams.y;
+            return float4(sky, 1.0f);
+        } else {
+            // Procedural sky gradient when IBL is disabled (outdoor/terrain mode)
+            float3 sunDir = normalize(g_SunDirection.xyz);
+            float sunAltitude = sunDir.y;
+
+            // View direction Y component: 1=looking up, -1=looking down
+            float viewY = viewDir.y;
+
+            // Sky gradient: blue zenith, warm horizon
+            float3 skyZenith = float3(0.3f, 0.5f, 0.9f);
+            float3 skyHorizon = float3(0.7f, 0.75f, 0.85f);
+
+            // Sunset/sunrise warm colors when sun is low
+            float sunsetFactor = saturate(1.0f - abs(sunAltitude) * 3.0f);
+            float3 sunsetColor = float3(1.0f, 0.5f, 0.2f);
+            skyHorizon = lerp(skyHorizon, sunsetColor, sunsetFactor * 0.5f);
+
+            // Blend based on view elevation
+            float horizonBlend = saturate(1.0f - abs(viewY));
+            float zenithBlend = saturate(viewY);
+            float3 skyColor = lerp(skyHorizon, skyZenith, zenithBlend);
+
+            // Add sun glow
+            float sunDot = saturate(dot(viewDir, sunDir));
+            float sunGlow = pow(sunDot, 64.0f) * 2.0f; // Tight sun disk
+            float sunHalo = pow(sunDot, 8.0f) * 0.3f;  // Soft halo
+            float3 sunColor = g_SunRadiance.rgb / max(dot(g_SunRadiance.rgb, float3(0.2126f, 0.7152f, 0.0722f)), 0.01f);
+            skyColor += sunColor * (sunGlow + sunHalo);
+
+            // Ground horizon fade (below horizon goes darker)
+            float groundFade = saturate(-viewY * 2.0f);
+            float3 groundColor = float3(0.3f, 0.25f, 0.2f);
+            skyColor = lerp(skyColor, groundColor, groundFade);
+
+            // Apply sun intensity scaling
+            float sunLuminance = dot(g_SunRadiance.rgb, float3(0.2126f, 0.7152f, 0.0722f));
+            skyColor *= min(sunLuminance * 0.15f + 0.3f, 1.2f);
+
+            return float4(skyColor, 1.0f);
+        }
     }
 
     // Reconstruct world position from depth
@@ -565,13 +608,42 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     }
 
     // --- Image-Based Lighting (IBL) ---
-    float3 ambient = float3(0.03, 0.03, 0.03); // Fallback ambient (indirect only)
+    float3 ambient = float3(0.0f, 0.0f, 0.0f);
     const bool iblEnabled = (g_EnvParams.z > 0.5f);
 
     float3 diffuseIBL = 0.0f;
     float3 specularIBL = 0.0f;
     float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
     float3 kD_ibl = (1.0 - metallic) * (1.0 - Fibl);
+
+    // Hemisphere ambient fallback when IBL is disabled (outdoor/terrain lighting).
+    // Uses sky-ground gradient based on normal direction for natural ambient.
+    if (!iblEnabled) {
+        // Derive sky color from sun radiance (approximate atmospheric scattering)
+        float3 sunColor = g_SunRadiance.rgb;
+        float sunLuminance = dot(sunColor, float3(0.2126f, 0.7152f, 0.0722f));
+        float sunAltitude = g_SunDirection.y; // How high the sun is (0=horizon, 1=zenith)
+
+        // Sky color: blue at zenith, warm at horizon/sunset
+        float3 skyZenith = float3(0.2f, 0.4f, 0.8f) * saturate(sunAltitude + 0.3f);
+        float3 skyHorizon = float3(0.6f, 0.5f, 0.4f);
+        float3 skyColor = lerp(skyHorizon, skyZenith, saturate(sunAltitude)) * min(sunLuminance * 0.3f, 1.5f);
+
+        // Ground color: darker, desaturated bounce light
+        float3 groundColor = float3(0.15f, 0.12f, 0.08f) * min(sunLuminance * 0.15f, 0.5f);
+
+        // Hemisphere blend based on world-space normal Y component
+        float hemiBlend = normal.y * 0.5f + 0.5f; // Remap -1..1 to 0..1
+        float3 hemisphereAmbient = lerp(groundColor, skyColor, hemiBlend);
+
+        // Apply to diffuse (metallic surfaces get less diffuse ambient)
+        ambient = hemisphereAmbient * albedoColor * kD_ibl;
+
+        // Add rough specular approximation for non-IBL (sky reflection on shiny surfaces)
+        float3 skyReflect = lerp(groundColor, skyColor, saturate(reflect(-V, normal).y * 0.5f + 0.5f));
+        float roughFade = 1.0f - roughness; // Smooth surfaces get more sky reflection
+        ambient += skyReflect * Fibl * roughFade * 0.3f;
+    }
 
     uint diffuseEnvIndex = INVALID_BINDLESS_INDEX;
     uint specularEnvIndex = INVALID_BINDLESS_INDEX;

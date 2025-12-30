@@ -822,29 +822,34 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
         return skirtBaseIdx + edge * gridDim + i;
     };
 
+    // Bottom edge skirt (z=0) - normal should face -Z (outward)
+    // Reversed winding: (a,b,c) instead of (a,c,b) to flip normal direction
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x, 0), b = idx(x + 1, 0);
         uint32_t c = skirtIdx(0, x), d = skirtIdx(0, x + 1);
-        mesh->indices.push_back(a); mesh->indices.push_back(c); mesh->indices.push_back(b);
-        mesh->indices.push_back(b); mesh->indices.push_back(c); mesh->indices.push_back(d);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
+    // Top edge skirt (z=gridDim-1) - normal should face +Z (outward)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x + 1, gridDim - 1), b = idx(x, gridDim - 1);
         uint32_t c = skirtIdx(1, x + 1), d = skirtIdx(1, x);
-        mesh->indices.push_back(a); mesh->indices.push_back(c); mesh->indices.push_back(b);
-        mesh->indices.push_back(b); mesh->indices.push_back(c); mesh->indices.push_back(d);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
+    // Left edge skirt (x=0) - normal should face -X (outward)
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(0, z + 1), b = idx(0, z);
         uint32_t c = skirtIdx(2, z + 1), d = skirtIdx(2, z);
-        mesh->indices.push_back(a); mesh->indices.push_back(c); mesh->indices.push_back(b);
-        mesh->indices.push_back(b); mesh->indices.push_back(c); mesh->indices.push_back(d);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
+    // Right edge skirt (x=gridDim-1) - normal should face +X (outward)
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(gridDim - 1, z), b = idx(gridDim - 1, z + 1);
         uint32_t c = skirtIdx(3, z), d = skirtIdx(3, z + 1);
-        mesh->indices.push_back(a); mesh->indices.push_back(c); mesh->indices.push_back(b);
-        mesh->indices.push_back(b); mesh->indices.push_back(c); mesh->indices.push_back(d);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
 
     mesh->UpdateBounds();

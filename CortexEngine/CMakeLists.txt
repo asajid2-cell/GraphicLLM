@@ -65,6 +65,7 @@ option(CORTEX_ENABLE_BINDLESS "Enable SM6.6 bindless resources" ON)
 set(CORTEX_SOURCES
     src/Core/Engine.cpp
     src/Core/Engine_Scenes.cpp
+    src/Core/EngineEditorMode.cpp
     src/Core/Window.cpp
     src/Core/ServiceLocator.cpp
 
@@ -90,11 +91,17 @@ set(CORTEX_SOURCES
     src/Scene/Components.cpp
     src/Scene/TerrainNoise.cpp
 
+    # Editor (Engine Editor Mode)
+    src/Editor/EditorWorld.cpp
+    src/Editor/ChunkGenerator.cpp
+    src/Editor/SpatialGrid.cpp
+
     src/Game/InteractionSystem.cpp
 
     src/Utils/FileUtils.cpp
     src/Utils/MeshGenerator.cpp
     src/Utils/GLTFLoader.cpp
+    src/Utils/ConfigLoader.cpp
 
     # Diagnostics
     src/Core/PerfDiagnostics.cpp
@@ -124,6 +131,7 @@ set(CORTEX_SOURCES
 
 set(CORTEX_HEADERS
     src/Core/Engine.h
+    src/Core/EngineEditorMode.h
     src/Core/Window.h
     src/Core/ServiceLocator.h
     src/Core/PerfDiagnostics.h
@@ -148,6 +156,11 @@ set(CORTEX_HEADERS
     src/Scene/ECS_Registry.h
     src/Scene/Components.h
     src/Scene/TerrainNoise.h
+
+    # Editor (Engine Editor Mode)
+    src/Editor/EditorWorld.h
+    src/Editor/ChunkGenerator.h
+    src/Editor/SpatialGrid.h
 
     src/Game/InteractionSystem.h
 

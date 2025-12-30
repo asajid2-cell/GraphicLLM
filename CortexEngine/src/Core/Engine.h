@@ -21,6 +21,9 @@
 
 namespace Cortex {
 
+// Forward declaration
+class EngineEditorMode;
+
 struct EngineConfig {
     WindowConfig window;
     Graphics::DeviceConfig device;
@@ -69,7 +72,7 @@ struct EngineConfig {
 // Main engine class - orchestrates the game loop
 class Engine {
 public:
-    Engine() = default;
+    Engine();
     ~Engine();
 
     Engine(const Engine&) = delete;
@@ -114,6 +117,9 @@ public:
 
     // Scene preset controls (used by debug UI / hotkeys)
     void ToggleScenePreset();
+
+    // Engine Editor Mode - check if launched in parallel engine editor architecture
+    [[nodiscard]] bool IsEngineEditorMode() const { return m_engineEditorMode; }
 
 private:
     // High-level scene presets for easy switching between curated layouts.
@@ -291,9 +297,18 @@ private:
     // Play Mode and Terrain System (appended - does not modify existing code)
     // =========================================================================
 
-    // Engine mode: Editor (default) or Play (F5 toggle)
+    // Engine mode: Editor (default gizmo/selection mode) or Play (FPS terrain exploration)
     enum class EngineMode { Editor = 0, Play = 1 };
     EngineMode m_engineMode = EngineMode::Editor;
+
+    // Engine Editor Mode flag - true when launched via "Engine Editor" button.
+    // This is separate from EngineMode which tracks current operational state.
+    // When m_engineEditorMode is true, the engine uses the parallel clean architecture
+    // and starts directly in terrain world with play mode enabled.
+    bool m_engineEditorMode = false;
+
+    // Engine Editor Mode controller - manages editor state and renderer configuration
+    std::unique_ptr<EngineEditorMode> m_editorModeController;
 
     // Play mode state
     void EnterPlayMode();
@@ -307,6 +322,28 @@ private:
     // Terrain system
     bool m_terrainEnabled = false;
     Scene::TerrainNoiseParams m_terrainParams;
+
+    // =========================================================================
+    // Time-of-Day / World Simulation System
+    // =========================================================================
+    struct WorldState {
+        // Time configuration
+        float timeOfDay = 10.0f;    // 0-24 hours (start at 10am)
+        float timeScale = 60.0f;    // 60.0 = 1 real second = 1 game minute
+        bool timePaused = false;
+
+        // Computed values (updated each frame)
+        float dayProgress = 0.0f;
+        glm::vec3 sunDirection{0.0f, 1.0f, 0.0f};
+        glm::vec3 sunColor{1.0f, 0.95f, 0.9f};
+        float sunIntensity = 8.0f;
+
+        // Methods
+        void Update(float deltaTime);
+        void AdvanceTime(float hours);
+        void SetTime(float hour);
+    };
+    WorldState m_worldState;
 
     // Dynamic chunk loading for infinite terrain
     struct ChunkKey {

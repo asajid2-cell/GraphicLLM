@@ -625,6 +625,7 @@ public:
     std::unique_ptr<DX12Pipeline> m_bloomBlurVPipeline;
     std::unique_ptr<DX12Pipeline> m_bloomCompositePipeline;
     std::unique_ptr<DX12Pipeline> m_skyboxPipeline;
+    std::unique_ptr<DX12Pipeline> m_proceduralSkyPipeline;  // For outdoor terrain (no IBL)
     std::unique_ptr<DX12Pipeline> m_debugLinePipeline;
     std::unique_ptr<DX12Pipeline> m_waterPipeline;
     std::unique_ptr<DX12Pipeline> m_waterOverlayPipeline;

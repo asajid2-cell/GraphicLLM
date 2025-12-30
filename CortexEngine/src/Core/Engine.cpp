@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "EngineEditorMode.h"
 #include "ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
@@ -35,6 +36,8 @@
 #include <nlohmann/json.hpp>
 
 namespace Cortex {
+
+Engine::Engine() = default;
 
 Engine::~Engine() {
     Shutdown();
@@ -366,12 +369,34 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::CornellBox;
         } else if (sceneLower == "rt" || sceneLower == "rtshowcase" || sceneLower == "rt_showcase") {
             m_currentScenePreset = ScenePreset::RTShowcase;
+        } else if (sceneLower == "god_rays" || sceneLower == "godrays") {
+            m_currentScenePreset = ScenePreset::GodRays;
+        } else if (sceneLower == "engine_editor" || sceneLower == "engineeditor") {
+            // Engine Editor Mode - parallel clean architecture
+            m_engineEditorMode = true;
+            m_currentScenePreset = ScenePreset::ProceduralTerrain;
+            spdlog::info("Engine Editor Mode enabled - starting in Terrain World");
         }
         // Unknown strings fall through and keep the engine default.
     }
 
     InitializeScene();
     InitializeCameraController();
+
+    // If Engine Editor mode, enter Play mode for terrain navigation and initialize editor controller
+    if (m_engineEditorMode) {
+        EnterPlayMode();
+        spdlog::info("Entered Play Mode for Engine Editor - WASD to move, Space to jump");
+
+        // Initialize the Engine Editor Mode controller
+        m_editorModeController = std::make_unique<EngineEditorMode>();
+        auto initResult = m_editorModeController->Initialize(this, m_renderer.get(), m_registry.get());
+        if (initResult.IsErr()) {
+            spdlog::error("Failed to initialize EngineEditorMode: {}", initResult.Error());
+            m_editorModeController.reset();
+        }
+    }
+
     ShowCameraHelpOverlay();
     const auto tAfterScene = clock::now();
     spdlog::info("  Scene and camera initialized in {} ms",
@@ -661,6 +686,12 @@ void Engine::Shutdown() {
     UI::QuickSettingsWindow::Shutdown();
     UI::QualitySettingsWindow::Shutdown();
     UI::SceneEditorWindow::Shutdown();
+
+    // Shutdown Engine Editor Mode controller
+    if (m_editorModeController) {
+        m_editorModeController->Shutdown();
+        m_editorModeController.reset();
+    }
 
     // Phase 2: Shutdown LLM
     if (m_llmService) {
@@ -1357,6 +1388,11 @@ void Engine::ProcessInput() {
             continue;  // Don't process other events in text input mode
         }
 
+        // Forward events to Engine Editor Mode controller if active
+        if (m_editorModeController && m_editorModeController->IsInitialized()) {
+            m_editorModeController->ProcessInput(event);
+        }
+
         // Normal event handling
         switch (event.type) {
             case SDL_EVENT_QUIT:
@@ -1601,6 +1637,33 @@ void Engine::ProcessInput() {
                     } else {
                         spdlog::info("[Dreamer] Service not enabled; Y key ignored");
                     }
+                    break;
+                }
+
+                // -----------------------------------------------------------------
+                // Time-of-Day Controls (works in any scene, but most visible in terrain)
+                // -----------------------------------------------------------------
+                if (key == SDLK_PERIOD) {  // '.' = advance time +1 hour
+                    m_worldState.AdvanceTime(1.0f);
+                    m_worldState.Update(0.0f);  // Recalculate sun immediately
+                    spdlog::info("Time: {:.1f}h ({})", m_worldState.timeOfDay,
+                        m_worldState.timeOfDay < 6.0f || m_worldState.timeOfDay >= 18.0f ? "night" :
+                        m_worldState.timeOfDay < 12.0f ? "morning" : "afternoon");
+                    break;
+                }
+                if (key == SDLK_COMMA) {  // ',' = rewind time -1 hour
+                    m_worldState.AdvanceTime(-1.0f);
+                    m_worldState.Update(0.0f);  // Recalculate sun immediately
+                    spdlog::info("Time: {:.1f}h ({})", m_worldState.timeOfDay,
+                        m_worldState.timeOfDay < 6.0f || m_worldState.timeOfDay >= 18.0f ? "night" :
+                        m_worldState.timeOfDay < 12.0f ? "morning" : "afternoon");
+                    break;
+                }
+                if (key == SDLK_L) {  // 'L' = toggle time pause
+                    m_worldState.timePaused = !m_worldState.timePaused;
+                    spdlog::info("Time {} at {:.1f}h",
+                        m_worldState.timePaused ? "PAUSED" : "RUNNING",
+                        m_worldState.timeOfDay);
                     break;
                 }
 
@@ -2070,6 +2133,22 @@ void Engine::ProcessInput() {
 }
 
 void Engine::Update(float deltaTime) {
+    // Update Engine Editor Mode controller if active (handles its own sun state)
+    if (m_editorModeController && m_editorModeController->IsInitialized()) {
+        m_editorModeController->Update(deltaTime);
+        // Editor controller manages sun state, skip world state update
+    } else {
+        // Update world simulation (time-of-day, sun position) for non-editor mode
+        m_worldState.Update(deltaTime);
+
+        // Push sun state to renderer when in terrain mode (procedural sky)
+        if (m_renderer && m_currentScenePreset == ScenePreset::ProceduralTerrain) {
+            m_renderer->SetSunDirection(m_worldState.sunDirection);
+            m_renderer->SetSunColor(m_worldState.sunColor);
+            m_renderer->SetSunIntensity(m_worldState.sunIntensity);
+        }
+    }
+
     // Pump LLM callbacks on the main thread to avoid cross-thread scene mutations
     if (m_llmService) {
         m_llmService->PumpCallbacks();
@@ -2425,6 +2504,11 @@ void Engine::Render(float deltaTime) {
     // Build debug lines (world axes, selection, gizmos) before issuing the
     // main render; the renderer will consume these in its debug overlay pass.
     DebugDrawSceneGraph();
+
+    // Engine Editor Mode: add editor-specific debug visualizations (grid, axes, chunk bounds)
+    if (m_editorModeController && m_editorModeController->IsInitialized()) {
+        m_editorModeController->Render();
+    }
 
     // Let the renderer know whether the GPU settings overlay should be
     // visible, along with the currently highlighted row index. This drives
@@ -4100,6 +4184,60 @@ void Engine::ExitPlayMode() {
     SDL_SetWindowRelativeMouseMode(m_window->GetSDLWindow(), false);
 
     spdlog::info("Exited Play Mode (F5)");
+}
+
+// =============================================================================
+// WorldState Implementation (Time-of-Day System)
+// =============================================================================
+
+void Engine::WorldState::Update(float deltaTime) {
+    if (!timePaused) {
+        // Advance time: timeScale of 60 means 1 real second = 1 game minute
+        timeOfDay += deltaTime * timeScale / 3600.0f;
+        if (timeOfDay >= 24.0f) timeOfDay -= 24.0f;
+        if (timeOfDay < 0.0f) timeOfDay += 24.0f;
+    }
+
+    dayProgress = timeOfDay / 24.0f;
+
+    // Sun angle calculation:
+    // 6h = sunrise (sun at horizon, angle = 0)
+    // 12h = noon (sun at zenith, angle = 90°)
+    // 18h = sunset (sun at horizon, angle = 180°)
+    // 0h/24h = midnight (sun below horizon, angle = -90°)
+    float sunAngle = (timeOfDay - 6.0f) / 12.0f * 3.14159265f;
+    float altitude = glm::sin(sunAngle);
+    float azimuth = glm::cos(sunAngle * 0.5f);
+
+    // Sun direction: rises in east (+X), sets in west (-X), travels through south (+Z)
+    sunDirection = glm::normalize(glm::vec3(
+        azimuth * 0.6f,                    // East-West component
+        glm::max(altitude, -0.2f),         // Altitude (clamped to prevent fully underground)
+        glm::abs(azimuth) * 0.4f           // North-South component (sun travels through south)
+    ));
+
+    // Sun color: warm orange at horizon, white at noon
+    float horizonFactor = 1.0f - glm::abs(altitude);
+    sunColor = glm::mix(
+        glm::vec3(1.0f, 0.95f, 0.9f),      // White noon
+        glm::vec3(1.0f, 0.5f, 0.2f),       // Orange horizon (sunrise/sunset)
+        horizonFactor * horizonFactor       // Squared for more dramatic effect
+    );
+
+    // Sun intensity: peaks at noon (~10), provides moonlight at night (~0.3-0.5)
+    float dayIntensity = glm::max(0.0f, altitude) * 10.0f;
+    float nightIntensity = glm::max(0.0f, -altitude) * 0.3f;  // Moonlight
+    sunIntensity = glm::max(dayIntensity, nightIntensity + 0.2f);  // Minimum ambient
+}
+
+void Engine::WorldState::AdvanceTime(float hours) {
+    timeOfDay += hours;
+    if (timeOfDay >= 24.0f) timeOfDay -= 24.0f;
+    if (timeOfDay < 0.0f) timeOfDay += 24.0f;
+}
+
+void Engine::WorldState::SetTime(float hour) {
+    timeOfDay = glm::clamp(hour, 0.0f, 23.999f);
 }
 
 void Engine::UpdatePlayMode(float deltaTime) {

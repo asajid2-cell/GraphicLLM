@@ -55,7 +55,7 @@ public:
         int32_t chunkX,
         int32_t chunkZ,
         const Scene::TerrainNoiseParams& params,
-        float skirtDepth = 25.0f
+        float skirtDepth = 80.0f
     );
 };
 

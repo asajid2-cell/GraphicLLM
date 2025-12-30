@@ -2107,18 +2107,29 @@ void Engine::BuildProceduralTerrainScene() {
     spawnInteractable("GoldOrb", -4.0f, -8.0f, 0.5f, glm::vec4(1.0f, 0.8f, 0.2f, 1.0f));
     spawnInteractable("PurpleOrb", 12.0f, 3.0f, 0.38f, glm::vec4(0.7f, 0.2f, 0.9f, 1.0f));
 
-    // Configure renderer for outdoor world
+    // Configure renderer for outdoor world - disable all IBL-dependent effects
     if (m_renderer) {
-        m_renderer->SetIBLEnabled(false);  // Disable indoor cubemap
-        // IBL disabled - use sun lighting only
+        m_renderer->SetIBLEnabled(false);  // Disable indoor cubemap skybox
+        m_renderer->SetSSREnabled(false);  // SSR samples IBL for miss rays - disable
+        m_renderer->SetRTReflectionsEnabled(false);  // RT reflections also use IBL fallback
         m_renderer->SetFogEnabled(true);
+        m_renderer->SetFogParams(0.001f, 0.0f, 0.2f);  // Light atmospheric fog (density, height, falloff)
         m_renderer->SetExposure(1.0f);
         m_renderer->SetShadowsEnabled(true);
+        m_renderer->SetSSAOEnabled(true);  // Keep SSAO for ground contact shadows
+
+        // Sun direction/color/intensity now controlled by WorldState (time-of-day system)
+        // Force immediate update so sun is correctly positioned on scene entry
+        m_worldState.Update(0.0f);
+        m_renderer->SetSunDirection(m_worldState.sunDirection);
+        m_renderer->SetSunColor(m_worldState.sunColor);
+        m_renderer->SetSunIntensity(m_worldState.sunIntensity);
     }
 
     spdlog::info("=== TERRAIN WORLD READY ===");
     spdlog::info("  {} terrain chunks", chunkCount);
     spdlog::info("  {} trees, {} rocks", treeCount, rockCount);
+    spdlog::info("  Time: {:.1f}h - Press ./,/L to control time", m_worldState.timeOfDay);
     spdlog::info("  Press F5 for play mode, WASD to move, E to interact");
     spdlog::info("  Press J to exit terrain world");
 }

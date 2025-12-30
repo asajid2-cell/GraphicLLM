@@ -1,0 +1,43 @@
+{
+    "world": {
+        "chunkSize": 64.0,
+        "loadRadius": 8,
+        "maxLoadedChunks": 500,
+        "chunkGeneratorThreads": 2,
+        "maxChunksPerFrame": 4
+    },
+    "lod": {
+        "distance1": 256.0,
+        "distance2": 512.0,
+        "distance3": 1024.0
+    },
+    "camera": {
+        "flySpeed": 20.0,
+        "sprintMultiplier": 3.0,
+        "mouseSensitivity": 0.003,
+        "fov": 60.0,
+        "nearPlane": 0.1,
+        "farPlane": 2000.0
+    },
+    "rendering": {
+        "proceduralSky": true,
+        "shadows": true,
+        "ssao": false,
+        "ssr": false,
+        "fog": true,
+        "fogDensity": 0.01,
+        "fogHeight": 0.0,
+        "fogFalloff": 0.5
+    },
+    "debug": {
+        "showGrid": true,
+        "showChunkBounds": false,
+        "showStats": true,
+        "showGizmos": true
+    },
+    "timeOfDay": {
+        "default": 10.0,
+        "autoAdvance": false,
+        "scale": 60.0
+    }
+}

@@ -210,6 +210,7 @@ struct LauncherState {
     HWND radioRaster = nullptr;
     HWND radioVoxel = nullptr;
     HWND btnLaunch = nullptr;
+    HWND btnEditor = nullptr;
     HWND btnCancel = nullptr;
     EngineConfig* config = nullptr;
     bool accepted = false;
@@ -225,6 +226,7 @@ enum LauncherControlId : int {
     IDC_LAUNCH_VOXEL    = 2007,
     IDC_LAUNCH_OK       = 2010,
     IDC_LAUNCH_CANCEL   = 2011,
+    IDC_LAUNCH_EDITOR   = 2012,
 };
 
 LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -359,10 +361,12 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         // Buttons: place directly below the render backend radios so the
         // layout reads top-to-bottom (scene, quality, features, backend,
         // then actions) instead of anchoring them to the bottom edge.
-        int btnW = 80;
+        int btnW = 100;
         int btnY = y;
-        state->btnLaunch = makeButton(IDC_LAUNCH_OK, L"Launch", width - margin - btnW * 2 - rowGap, btnY, btnW);
-        state->btnCancel = makeButton(IDC_LAUNCH_CANCEL, L"Exit", width - margin - btnW, btnY, btnW);
+        // Three buttons: Launch Demo | Engine Editor | Exit
+        state->btnLaunch = makeButton(IDC_LAUNCH_OK, L"Launch Demo", margin, btnY, btnW);
+        state->btnEditor = makeButton(IDC_LAUNCH_EDITOR, L"Engine Editor", margin + btnW + rowGap, btnY, btnW);
+        state->btnCancel = makeButton(IDC_LAUNCH_CANCEL, L"Exit", width - margin - 60, btnY, 60);
 
         return 0;
     }
@@ -399,6 +403,25 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                     voxel ? EngineConfig::RenderBackend::VoxelExperimental
                           : EngineConfig::RenderBackend::RasterDX12;
 
+                state->accepted = true;
+                PostQuitMessage(0);
+                return 0;
+            }
+            if (id == IDC_LAUNCH_EDITOR && state && state->config) {
+                // Engine Editor mode - launch directly into terrain world
+                state->config->initialScenePreset = "engine_editor";
+                state->config->qualityMode = EngineConfig::QualityMode::Default;
+                // Keep other settings as-is (RT, LLM, etc.)
+                auto isChecked = [](HWND h) {
+                    return SendMessageW(h, BM_GETCHECK, 0, 0) == BST_CHECKED;
+                };
+                state->config->enableRayTracing = isChecked(state->chkRT);
+                state->config->enableLLM        = isChecked(state->chkLLM);
+                state->config->enableDreamer    = isChecked(state->chkDreamer);
+                bool voxel = (SendMessageW(state->radioVoxel, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                state->config->renderBackend =
+                    voxel ? EngineConfig::RenderBackend::VoxelExperimental
+                          : EngineConfig::RenderBackend::RasterDX12;
                 state->accepted = true;
                 PostQuitMessage(0);
                 return 0;

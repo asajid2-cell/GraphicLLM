@@ -4267,22 +4267,31 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
 }
 
 void Renderer::RenderSkybox() {
-    // Only render a skybox when HDR + IBL are active and we have a pipeline.
-    if (!m_skyboxPipeline || !m_hdrColor || !m_iblEnabled) {
+    if (!m_hdrColor) {
         return;
     }
 
-    // Root signature and descriptor heap should already be bound in PrepareMainPass,
-    // but re-binding the pipeline and critical root params keeps this self-contained.
+    // Root signature should already be bound in PrepareMainPass,
+    // but re-binding keeps this self-contained.
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
-    m_commandList->SetPipelineState(m_skyboxPipeline->GetPipelineState());
 
     // Frame constants (b1)
     m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
 
-    // Shadow + environment descriptor table (t4-t6)
-    if (m_shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    if (m_iblEnabled && m_skyboxPipeline) {
+        // IBL skybox rendering (samples environment cubemap)
+        m_commandList->SetPipelineState(m_skyboxPipeline->GetPipelineState());
+
+        // Shadow + environment descriptor table (t4-t6)
+        if (m_shadowAndEnvDescriptors[0].IsValid()) {
+            m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+        }
+    } else if (m_proceduralSkyPipeline) {
+        // Procedural sky rendering (outdoor terrain mode)
+        m_commandList->SetPipelineState(m_proceduralSkyPipeline->GetPipelineState());
+    } else {
+        // No sky pipeline available
+        return;
     }
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -6106,7 +6115,7 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     deferredParams.sunRadiance = glm::vec4(m_directionalLightColor * m_directionalLightIntensity, 0.0f);
     deferredParams.cascadeSplits = m_frameDataCPU.cascadeSplits;
     deferredParams.shadowParams = glm::vec4(m_shadowBias, m_shadowPCFRadius, m_shadowsEnabled ? 1.0f : 0.0f, m_pcssEnabled ? 1.0f : 0.0f);
-    deferredParams.envParams = glm::vec4(m_iblDiffuseIntensity, m_iblSpecularIntensity, 1.0f, 0.0f);
+    deferredParams.envParams = glm::vec4(m_iblDiffuseIntensity, m_iblSpecularIntensity, m_iblEnabled ? 1.0f : 0.0f, 0.0f);
     float invShadowDim = 1.0f / static_cast<float>(m_shadowMapSize);
     deferredParams.shadowInvSizeAndSpecMaxMip = glm::vec4(invShadowDim, invShadowDim, 8.0f, 0.0f);
     float nearZ = 0.1f, farZ = 1000.0f;
@@ -9559,7 +9568,11 @@ Result<void> Renderer::CreateHZBResources() {
         return Result<void>::Ok();
     }
 
-    m_hzbTexture.Reset();
+    // Defer deletion of old HZB texture - it may still be referenced by in-flight command lists.
+    // The DeferredGPUDeletionQueue will hold the resource for kDeferFrames before releasing.
+    if (m_hzbTexture) {
+        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(m_hzbTexture));
+    }
     m_hzbFullSRV = {};
     m_hzbMipSRVStaging.clear();
     m_hzbMipUAVStaging.clear();
@@ -11613,6 +11626,50 @@ Result<void> Renderer::CreateCommandList() {
         }
     } else {
         spdlog::warn("Skybox shaders did not compile; environment will be lighting-only");
+    }
+
+    // Procedural sky pipeline (for outdoor terrain when IBL is disabled)
+    auto proceduralSkyVsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/ProceduralSky.hlsl",
+        "VSMain",
+        "vs_5_1"
+    );
+    auto proceduralSkyPsResult = ShaderCompiler::CompileFromFile(
+        "assets/shaders/ProceduralSky.hlsl",
+        "PSMain",
+        "ps_5_1"
+    );
+
+    if (proceduralSkyVsResult.IsOk() && proceduralSkyPsResult.IsOk()) {
+        m_proceduralSkyPipeline = std::make_unique<DX12Pipeline>();
+
+        PipelineDesc procSkyDesc = {};
+        procSkyDesc.vertexShader = proceduralSkyVsResult.Value();
+        procSkyDesc.pixelShader = proceduralSkyPsResult.Value();
+        procSkyDesc.inputLayout = {};  // SV_VertexID-driven triangle
+        procSkyDesc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        procSkyDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
+        procSkyDesc.numRenderTargets = 1;
+        procSkyDesc.depthTestEnabled = false;
+        procSkyDesc.depthWriteEnabled = false;
+        procSkyDesc.cullMode = D3D12_CULL_MODE_NONE;
+        procSkyDesc.blendEnabled = false;
+
+        auto procSkyPipelineResult = m_proceduralSkyPipeline->Initialize(
+            m_device->GetDevice(),
+            m_rootSignature->GetRootSignature(),
+            procSkyDesc
+        );
+        if (procSkyPipelineResult.IsErr()) {
+            spdlog::warn("Failed to create procedural sky pipeline: {}", procSkyPipelineResult.Error());
+            m_proceduralSkyPipeline.reset();
+        } else {
+            spdlog::info("Procedural sky pipeline created successfully");
+        }
+    } else {
+        spdlog::warn("Procedural sky shaders did not compile");
+        if (proceduralSkyVsResult.IsErr()) spdlog::warn("  VS: {}", proceduralSkyVsResult.Error());
+        if (proceduralSkyPsResult.IsErr()) spdlog::warn("  PS: {}", proceduralSkyPsResult.Error());
     }
 
     // Depth-only pipeline for directional shadow map

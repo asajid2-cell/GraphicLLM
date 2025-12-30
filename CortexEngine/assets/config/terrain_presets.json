@@ -1,0 +1,55 @@
+{
+    "presets": {
+        "default": {
+            "name": "Rolling Hills",
+            "seed": 42,
+            "amplitude": 20.0,
+            "frequency": 0.003,
+            "octaves": 6,
+            "lacunarity": 2.0,
+            "gain": 0.5,
+            "warp": 15.0
+        },
+        "mountains": {
+            "name": "Mountain Range",
+            "seed": 12345,
+            "amplitude": 80.0,
+            "frequency": 0.002,
+            "octaves": 8,
+            "lacunarity": 2.2,
+            "gain": 0.55,
+            "warp": 25.0
+        },
+        "plains": {
+            "name": "Gentle Plains",
+            "seed": 7777,
+            "amplitude": 5.0,
+            "frequency": 0.005,
+            "octaves": 4,
+            "lacunarity": 2.0,
+            "gain": 0.4,
+            "warp": 5.0
+        },
+        "islands": {
+            "name": "Island Archipelago",
+            "seed": 9001,
+            "amplitude": 30.0,
+            "frequency": 0.004,
+            "octaves": 5,
+            "lacunarity": 1.8,
+            "gain": 0.6,
+            "warp": 40.0
+        },
+        "canyon": {
+            "name": "Deep Canyons",
+            "seed": 31415,
+            "amplitude": 50.0,
+            "frequency": 0.001,
+            "octaves": 7,
+            "lacunarity": 2.5,
+            "gain": 0.45,
+            "warp": 30.0
+        }
+    },
+    "defaultPreset": "default"
+}

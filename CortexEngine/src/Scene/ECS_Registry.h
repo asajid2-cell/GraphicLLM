@@ -2,6 +2,8 @@
 
 #include <entt/entt.hpp>
 #include <memory>
+#include <vector>
+#include <unordered_map>
 #include "Components.h"
 
 namespace Cortex::Scene {
@@ -58,10 +60,30 @@ public:
     // Applies parent-child relationships and computes world/normal matrices.
     void UpdateTransforms();
 
+    // Scene graph management (O(1) child lookup)
+    // Sets the parent of a child entity, updating the internal children map
+    void SetParent(entt::entity child, entt::entity parent);
+
+    // Removes the parent relationship for an entity
+    void RemoveParent(entt::entity child);
+
+    // Get all direct children of an entity (O(1) lookup)
+    [[nodiscard]] std::vector<entt::entity> GetChildren(entt::entity parent) const;
+
+    // Get the parent of an entity
+    [[nodiscard]] entt::entity GetParent(entt::entity child) const;
+
+    // Check if entity has children
+    [[nodiscard]] bool HasChildren(entt::entity entity) const;
+
 private:
     void UpdateTransformRecursive(entt::entity entity, const glm::mat4& parentWorld);
 
     entt::registry m_registry;
+
+    // O(1) child lookup map: parent -> list of direct children
+    // This replaces the O(N) scan in UpdateTransformRecursive
+    std::unordered_map<entt::entity, std::vector<entt::entity>> m_childrenOf;
 };
 
 } // namespace Cortex::Scene

@@ -1,5 +1,6 @@
 #include "ECS_Registry.h"
 #include <spdlog/spdlog.h>
+#include <algorithm>
 
 namespace Cortex::Scene {
 
@@ -10,6 +11,15 @@ entt::entity ECS_Registry::CreateEntity() {
 }
 
 void ECS_Registry::DestroyEntity(entt::entity entity) {
+    // First, clean up parent-child relationships
+    if (m_registry.all_of<TransformComponent>(entity)) {
+        // Remove this entity from its parent's children list
+        RemoveParent(entity);
+
+        // Remove all children entries for this entity
+        m_childrenOf.erase(entity);
+    }
+
     m_registry.destroy(entity);
     spdlog::debug("Entity destroyed: {}", static_cast<uint32_t>(entity));
 }
@@ -84,16 +94,90 @@ void ECS_Registry::UpdateTransformRecursive(entt::entity entity, const glm::mat4
     transform.normalMatrix = glm::transpose(invWorld);
     transform.inverseWorldMatrix = invWorld;
 
-    // Propagate to children. For now, perform a simple scan over all transforms;
-    // if performance becomes an issue, this can be replaced with an explicit
-    // parent->children adjacency structure.
-    auto view = m_registry.view<TransformComponent>();
-    for (auto child : view) {
-        auto& childTransform = view.get<TransformComponent>(child);
-        if (childTransform.parent == entity) {
+    // Propagate to children using O(1) lookup instead of O(N) scan
+    auto it = m_childrenOf.find(entity);
+    if (it != m_childrenOf.end()) {
+        for (auto child : it->second) {
             UpdateTransformRecursive(child, transform.worldMatrix);
         }
     }
+}
+
+void ECS_Registry::SetParent(entt::entity child, entt::entity parent) {
+    if (!m_registry.all_of<TransformComponent>(child)) {
+        return;
+    }
+
+    auto& childTransform = m_registry.get<TransformComponent>(child);
+
+    // Remove from old parent's children list
+    if (childTransform.parent != entt::null) {
+        auto it = m_childrenOf.find(childTransform.parent);
+        if (it != m_childrenOf.end()) {
+            auto& children = it->second;
+            children.erase(std::remove(children.begin(), children.end(), child), children.end());
+            // Clean up empty entries
+            if (children.empty()) {
+                m_childrenOf.erase(it);
+            }
+        }
+    }
+
+    // Set new parent in TransformComponent
+    childTransform.parent = parent;
+
+    // Add to new parent's children list
+    if (parent != entt::null) {
+        m_childrenOf[parent].push_back(child);
+    }
+
+    spdlog::debug("Entity {} parent set to {}",
+                  static_cast<uint32_t>(child),
+                  parent == entt::null ? 0xFFFFFFFF : static_cast<uint32_t>(parent));
+}
+
+void ECS_Registry::RemoveParent(entt::entity child) {
+    if (!m_registry.all_of<TransformComponent>(child)) {
+        return;
+    }
+
+    auto& childTransform = m_registry.get<TransformComponent>(child);
+
+    // Remove from old parent's children list
+    if (childTransform.parent != entt::null) {
+        auto it = m_childrenOf.find(childTransform.parent);
+        if (it != m_childrenOf.end()) {
+            auto& children = it->second;
+            children.erase(std::remove(children.begin(), children.end(), child), children.end());
+            // Clean up empty entries
+            if (children.empty()) {
+                m_childrenOf.erase(it);
+            }
+        }
+    }
+
+    // Clear parent in TransformComponent
+    childTransform.parent = entt::null;
+}
+
+std::vector<entt::entity> ECS_Registry::GetChildren(entt::entity parent) const {
+    auto it = m_childrenOf.find(parent);
+    if (it != m_childrenOf.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+entt::entity ECS_Registry::GetParent(entt::entity child) const {
+    if (!m_registry.all_of<TransformComponent>(child)) {
+        return entt::null;
+    }
+    return m_registry.get<TransformComponent>(child).parent;
+}
+
+bool ECS_Registry::HasChildren(entt::entity entity) const {
+    auto it = m_childrenOf.find(entity);
+    return it != m_childrenOf.end() && !it->second.empty();
 }
 
 } // namespace Cortex::Scene

@@ -453,6 +453,31 @@ public:
     void PruneUnusedMeshes(Scene::ECS_Registry* registry);
     void PruneUnusedTextures();
 
+    // === Engine Editor Mode: Selective Renderer Usage ===
+    // These methods allow EngineEditorMode to control the render flow
+    // instead of using the monolithic Render() method.
+
+    // Frame management (call in order: BeginFrame -> ... -> EndFrame)
+    void BeginFrameForEditor();
+    void EndFrameForEditor();
+    void PrepareMainPassForEditor();
+    void UpdateFrameConstantsForEditor(float deltaTime, Scene::ECS_Registry* registry);
+
+    // Individual render passes (call selectively as needed)
+    void RenderSkyboxForEditor();
+    void RenderShadowPassForEditor(Scene::ECS_Registry* registry);
+    void RenderSceneForEditor(Scene::ECS_Registry* registry);
+    void RenderSSAOForEditor();
+    void RenderBloomForEditor();
+    void RenderPostProcessForEditor();
+    void RenderDebugLinesForEditor();
+    void RenderTAAForEditor();
+    void RenderSSRForEditor();
+    void PrewarmMaterialDescriptorsForEditor(Scene::ECS_Registry* registry);
+
+    // Query command list state
+    [[nodiscard]] bool IsCommandListOpen() const { return m_commandListOpen; }
+
 private:
     static constexpr uint32_t kShadowCascadeCount = 3;
     // Total shadow-map array slices: cascades (sun) + local lights.
@@ -758,6 +783,7 @@ public:
     D3D12_VIEWPORT m_shadowViewport{};
     D3D12_RECT m_shadowScissor{};
     D3D12_RESOURCE_STATES m_shadowMapState = D3D12_RESOURCE_STATE_COMMON;
+    bool m_shadowMapInitializedForEditor = false;  // Track if shadow map has been properly transitioned for editor mode
 
     // HDR color target for main pass
     ComPtr<ID3D12Resource> m_hdrColor;

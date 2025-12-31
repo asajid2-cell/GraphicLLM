@@ -90,11 +90,13 @@ set(CORTEX_SOURCES
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
     src/Scene/TerrainNoise.cpp
+    src/Scene/BiomeMap.cpp
 
     # Editor (Engine Editor Mode)
     src/Editor/EditorWorld.cpp
     src/Editor/ChunkGenerator.cpp
     src/Editor/SpatialGrid.cpp
+    src/Editor/EditorCamera.cpp
 
     src/Game/InteractionSystem.cpp
 
@@ -156,6 +158,8 @@ set(CORTEX_HEADERS
     src/Scene/ECS_Registry.h
     src/Scene/Components.h
     src/Scene/TerrainNoise.h
+    src/Scene/BiomeTypes.h
+    src/Scene/BiomeMap.h
 
     # Editor (Engine Editor Mode)
     src/Editor/EditorWorld.h

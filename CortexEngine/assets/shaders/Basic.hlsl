@@ -205,6 +205,7 @@ struct VSInput
     float3 normal : NORMAL;
     float4 tangent : TANGENT;
     float2 texCoord : TEXCOORD;
+    float4 color : COLOR;  // Vertex color (biome blend data for terrain)
 };
 
 // Vertex shader output / Pixel shader input
@@ -215,6 +216,7 @@ struct PSInput
     float3 normal : NORMAL;
     float4 tangent : TANGENT;
     float2 texCoord : TEXCOORD;
+    float4 color : COLOR;  // Vertex color passed through
 };
 
 // Vertex Shader
@@ -235,8 +237,9 @@ PSInput VSMain(VSInput input)
     float3 tangentWS = normalize(mul(g_NormalMatrix, float4(input.tangent.xyz, 0.0f)).xyz);
     output.tangent = float4(tangentWS, input.tangent.w);
 
-    // Pass through texture coordinates
+    // Pass through texture coordinates and vertex color
     output.texCoord = input.texCoord;
+    output.color = input.color;
 
     return output;
 }
@@ -1528,7 +1531,8 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     // Sample albedo texture using bindless sampling (falls back to legacy if no bindless index)
     bool hasAlbedoMap = (g_TextureIndices.x != INVALID_BINDLESS_INDEX) || g_MapFlags.x;
     float4 albedoSample = hasAlbedoMap ? SampleAlbedo(input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
-    float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb);
+    // Apply vertex color tint (used for biome coloring on terrain)
+    float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb * input.color.rgb);
     float  baseOpacity = saturate(albedoSample.a * g_Albedo.a);
 
     // Alpha-masked (cutout) materials use g_MaterialPad0 as the cutoff.

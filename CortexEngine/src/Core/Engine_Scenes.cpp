@@ -84,7 +84,11 @@ void Engine::RebuildScene(ScenePreset preset) {
         BuildDragonStudioScene();
         break;
     case ScenePreset::ProceduralTerrain:
-        BuildProceduralTerrainScene();
+        // Skip old terrain system if Engine Editor Mode is active
+        // (EditorWorld handles terrain generation with its own chunk system)
+        if (!m_engineEditorMode) {
+            BuildProceduralTerrainScene();
+        }
         break;
     case ScenePreset::RTShowcase:
     case ScenePreset::GodRays: // currently shares layout with RTShowcase

@@ -4,6 +4,10 @@
 #include "Scene/TerrainNoise.h"
 #include <memory>
 
+namespace Cortex::Scene {
+    class BiomeMap;  // Forward declaration
+}
+
 namespace Cortex::Utils {
 
 // Procedural mesh generation utilities
@@ -55,6 +59,18 @@ public:
         int32_t chunkX,
         int32_t chunkZ,
         const Scene::TerrainNoiseParams& params,
+        float skirtDepth = 80.0f
+    );
+
+    // CPU-generated heightmap terrain chunk with biome support.
+    // Generates vertex colors encoding biome splatmap data (biome indices + blend weights).
+    static std::shared_ptr<Scene::MeshData> CreateTerrainHeightmapChunkWithBiomes(
+        uint32_t gridDim,
+        float chunkSize,
+        int32_t chunkX,
+        int32_t chunkZ,
+        const Scene::TerrainNoiseParams& params,
+        const Scene::BiomeMap* biomeMap,
         float skirtDepth = 80.0f
     );
 };

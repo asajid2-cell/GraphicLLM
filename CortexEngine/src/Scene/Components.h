@@ -66,6 +66,9 @@ struct MeshData {
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texCoords;
     std::vector<uint32_t> indices;
+    // Vertex colors - used for biome splatmap data on terrain
+    // RGBA channels encode: R=biome0 index, G=biome1 index, B=blend weight, A=flags
+    std::vector<glm::vec4> colors;
     // Simple bounding volume used for culling and RT acceleration structure
     // budgeting. Bounds are computed in object space and updated by mesh
     // generators / loaders once vertex positions are populated.
@@ -105,6 +108,7 @@ struct MeshData {
             normals = std::move(other.normals);
             texCoords = std::move(other.texCoords);
             indices = std::move(other.indices);
+            colors = std::move(other.colors);
             boundsMin = other.boundsMin;
             boundsMax = other.boundsMax;
             boundsCenter = other.boundsCenter;

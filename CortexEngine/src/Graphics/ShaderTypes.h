@@ -24,10 +24,11 @@ struct Vertex {
     glm::vec3 normal;
     glm::vec4 tangent; // xyz = tangent, w = bitangent sign
     glm::vec2 texCoord;
+    glm::vec4 color;   // Vertex color (biome blend data for terrain)
 
-    Vertex() = default;
-    Vertex(glm::vec3 pos, glm::vec3 norm, glm::vec3 tan, glm::vec2 uv)
-        : position(pos), normal(norm), tangent(glm::vec4(tan, 1.0f)), texCoord(uv) {}
+    Vertex() : color(1.0f, 1.0f, 1.0f, 1.0f) {}
+    Vertex(glm::vec3 pos, glm::vec3 norm, glm::vec3 tan, glm::vec2 uv, glm::vec4 col = glm::vec4(1.0f))
+        : position(pos), normal(norm), tangent(glm::vec4(tan, 1.0f)), texCoord(uv), color(col) {}
 };
 
 // Per-object constant buffer (changes per draw call)
@@ -148,12 +149,13 @@ struct FrameConstants {
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer
-// with fixed offsets (0/12/24/40). Fail fast if the CPU vertex layout diverges.
-static_assert(sizeof(Vertex) == 48, "Vertex must be tightly packed (48 bytes) for VB resolve");
+// with fixed offsets. Fail fast if the CPU vertex layout diverges.
+static_assert(sizeof(Vertex) == 64, "Vertex must be tightly packed (64 bytes) for VB resolve");
 static_assert(offsetof(Vertex, position) == 0, "Vertex.position offset must be 0");
 static_assert(offsetof(Vertex, normal) == 12, "Vertex.normal offset must be 12");
 static_assert(offsetof(Vertex, tangent) == 24, "Vertex.tangent offset must be 24");
 static_assert(offsetof(Vertex, texCoord) == 40, "Vertex.texCoord offset must be 40");
+static_assert(offsetof(Vertex, color) == 48, "Vertex.color offset must be 48");
 
 // Material properties
 struct MaterialConstants {

@@ -8,6 +8,7 @@
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
 #include "Scene/TerrainNoise.h"
+#include "Scene/BiomeMap.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cmath>
@@ -64,9 +65,66 @@ Result<void> EditorWorld::Initialize(Graphics::Renderer* renderer,
         m_chunkGenerator->SetTerrainParams(m_config.terrainParams);
     }
 
+    // Initialize biome system if enabled
+    if (m_config.useBiomes) {
+        m_biomeMap = std::make_unique<Scene::BiomeMap>();
+        m_biomeMap->Initialize(m_config.biomeParams);
+
+        // Load biome configurations from JSON
+        if (!m_config.biomesConfigPath.empty()) {
+            if (m_biomeMap->LoadFromJSON(m_config.biomesConfigPath)) {
+                spdlog::info("Loaded biome configurations from '{}'", m_config.biomesConfigPath);
+            } else {
+                spdlog::warn("Failed to load biomes from '{}', using defaults", m_config.biomesConfigPath);
+                // Set up default biome configs
+                std::vector<Scene::BiomeConfig> defaultBiomes;
+                for (uint8_t i = 0; i < static_cast<uint8_t>(Scene::BiomeType::COUNT); ++i) {
+                    Scene::BiomeConfig biome;
+                    biome.type = static_cast<Scene::BiomeType>(i);
+                    biome.name = Scene::BiomeTypeToString(biome.type);
+                    // Default colors vary by biome
+                    switch (biome.type) {
+                        case Scene::BiomeType::Plains:
+                            biome.baseColor = glm::vec4(0.3f, 0.5f, 0.2f, 1.0f);
+                            break;
+                        case Scene::BiomeType::Mountains:
+                            biome.baseColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+                            biome.heightScale = 2.5f;
+                            break;
+                        case Scene::BiomeType::Desert:
+                            biome.baseColor = glm::vec4(0.8f, 0.7f, 0.5f, 1.0f);
+                            break;
+                        case Scene::BiomeType::Forest:
+                            biome.baseColor = glm::vec4(0.15f, 0.35f, 0.1f, 1.0f);
+                            break;
+                        case Scene::BiomeType::Tundra:
+                            biome.baseColor = glm::vec4(0.85f, 0.9f, 0.95f, 1.0f);
+                            break;
+                        case Scene::BiomeType::Swamp:
+                            biome.baseColor = glm::vec4(0.2f, 0.25f, 0.15f, 1.0f);
+                            break;
+                        case Scene::BiomeType::Beach:
+                            biome.baseColor = glm::vec4(0.9f, 0.85f, 0.7f, 1.0f);
+                            break;
+                        default:
+                            biome.baseColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+                            break;
+                    }
+                    defaultBiomes.push_back(biome);
+                }
+                m_biomeMap->SetBiomeConfigs(std::move(defaultBiomes));
+            }
+        }
+
+        // Pass biome map to chunk generator
+        m_chunkGenerator->SetBiomeMap(m_biomeMap.get());
+        spdlog::info("Biome system enabled (cellSize={}, blendRadius={})",
+                     m_config.biomeParams.cellSize, m_config.biomeParams.blendRadius);
+    }
+
     m_initialized = true;
-    spdlog::info("EditorWorld initialized (loadRadius={}, maxChunks={})",
-                 m_config.loadRadius, m_config.maxLoadedChunks);
+    spdlog::info("EditorWorld initialized (loadRadius={}, maxChunks={}, biomes={})",
+                 m_config.loadRadius, m_config.maxLoadedChunks, m_config.useBiomes);
 
     return Result<void>::Ok();
 }
@@ -96,6 +154,9 @@ void EditorWorld::Shutdown() {
         m_spatialGrid->Clear();
         m_spatialGrid.reset();
     }
+
+    // Clear biome map
+    m_biomeMap.reset();
 
     m_renderer = nullptr;
     m_registry = nullptr;
@@ -129,6 +190,35 @@ void EditorWorld::SetTerrainParams(const Scene::TerrainNoiseParams& params) {
     }
 
     // TODO: Optionally regenerate existing chunks with new params
+}
+
+void EditorWorld::SetBiomeParams(const Scene::BiomeMapParams& params) {
+    m_config.biomeParams = params;
+    if (m_biomeMap) {
+        m_biomeMap->Initialize(params);
+    }
+    // TODO: Optionally regenerate existing chunks with new biome params
+}
+
+Scene::BiomeSample EditorWorld::GetBiomeAt(float worldX, float worldZ) const {
+    if (m_biomeMap) {
+        return m_biomeMap->Sample(worldX, worldZ);
+    }
+    // Return default sample (plains)
+    Scene::BiomeSample sample;
+    sample.primary = Scene::BiomeType::Plains;
+    sample.secondary = Scene::BiomeType::Plains;
+    sample.blendWeight = 0.0f;
+    sample.temperature = 0.5f;
+    sample.moisture = 0.5f;
+    return sample;
+}
+
+void EditorWorld::SetBiomesEnabled(bool enabled) {
+    m_config.useBiomes = enabled;
+    if (m_chunkGenerator) {
+        m_chunkGenerator->SetBiomeMap(enabled ? m_biomeMap.get() : nullptr);
+    }
 }
 
 bool EditorWorld::IsChunkLoaded(const ChunkCoord& coord) const {

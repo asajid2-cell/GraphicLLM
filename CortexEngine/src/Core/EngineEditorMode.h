@@ -7,6 +7,8 @@
 
 #include <memory>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <entt/entt.hpp>
 #include "Utils/Result.h"
 
 // Forward declarations
@@ -94,6 +96,9 @@ private:
     // EditorCamera with fly/orbit/focus modes
     std::unique_ptr<EditorCamera> m_camera;
 
+    // Camera entity in ECS (synced with EditorCamera for renderer)
+    entt::entity m_cameraEntity = entt::null;
+
     // Centralized editor state - replaces scattered boolean flags
     struct EditorState {
         // Visual toggles
@@ -126,6 +131,7 @@ private:
 
     // Internal methods
     void UpdateCamera(float deltaTime);
+    void SyncCameraToECS();  // Syncs EditorCamera to ECS CameraComponent
     void UpdateTimeOfDay(float deltaTime);
     void RenderTerrain();
     void RenderSky();

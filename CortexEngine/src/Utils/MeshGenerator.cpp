@@ -1,4 +1,6 @@
 #include "MeshGenerator.h"
+#include "Scene/BiomeMap.h"
+#include "Scene/BiomeTypes.h"
 #include <cmath>
 #include <unordered_map>
 
@@ -824,6 +826,160 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
 
     // Bottom edge skirt (z=0) - normal should face -Z (outward)
     // Reversed winding: (a,b,c) instead of (a,c,b) to flip normal direction
+    for (uint32_t x = 0; x < gridDim - 1; ++x) {
+        uint32_t a = idx(x, 0), b = idx(x + 1, 0);
+        uint32_t c = skirtIdx(0, x), d = skirtIdx(0, x + 1);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
+    }
+    // Top edge skirt (z=gridDim-1) - normal should face +Z (outward)
+    for (uint32_t x = 0; x < gridDim - 1; ++x) {
+        uint32_t a = idx(x + 1, gridDim - 1), b = idx(x, gridDim - 1);
+        uint32_t c = skirtIdx(1, x + 1), d = skirtIdx(1, x);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
+    }
+    // Left edge skirt (x=0) - normal should face -X (outward)
+    for (uint32_t z = 0; z < gridDim - 1; ++z) {
+        uint32_t a = idx(0, z + 1), b = idx(0, z);
+        uint32_t c = skirtIdx(2, z + 1), d = skirtIdx(2, z);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
+    }
+    // Right edge skirt (x=gridDim-1) - normal should face +X (outward)
+    for (uint32_t z = 0; z < gridDim - 1; ++z) {
+        uint32_t a = idx(gridDim - 1, z), b = idx(gridDim - 1, z + 1);
+        uint32_t c = skirtIdx(3, z), d = skirtIdx(3, z + 1);
+        mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
+        mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
+    }
+
+    mesh->UpdateBounds();
+    return mesh;
+}
+
+std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunkWithBiomes(
+    uint32_t gridDim,
+    float chunkSize,
+    int32_t chunkX,
+    int32_t chunkZ,
+    const Scene::TerrainNoiseParams& params,
+    const Scene::BiomeMap* biomeMap,
+    float skirtDepth
+) {
+    auto mesh = std::make_shared<Scene::MeshData>();
+
+    // If no biome map provided, fall back to standard generation
+    if (!biomeMap || !biomeMap->IsInitialized()) {
+        return CreateTerrainHeightmapChunk(gridDim, chunkSize, chunkX, chunkZ, params, skirtDepth);
+    }
+
+    const float cellSize = chunkSize / static_cast<float>(gridDim - 1);
+    const float worldOffsetX = static_cast<float>(chunkX) * chunkSize;
+    const float worldOffsetZ = static_cast<float>(chunkZ) * chunkSize;
+
+    // Generate grid vertices with heights sampled from noise, modified by biome.
+    for (uint32_t z = 0; z < gridDim; ++z) {
+        for (uint32_t x = 0; x < gridDim; ++x) {
+            float localX = static_cast<float>(x) * cellSize;
+            float localZ = static_cast<float>(z) * cellSize;
+            float worldX = worldOffsetX + localX;
+            float worldZ = worldOffsetZ + localZ;
+
+            // Sample base terrain height
+            float baseHeight = Scene::SampleTerrainHeight(worldX, worldZ, params);
+
+            // Get blended height modifiers from biome
+            float heightScale = biomeMap->GetBlendedHeightScale(worldX, worldZ);
+            float heightOffset = biomeMap->GetBlendedHeightOffset(worldX, worldZ);
+
+            // Apply biome height modifiers
+            float finalHeight = baseHeight * heightScale + heightOffset;
+
+            mesh->positions.push_back(glm::vec3(localX, finalHeight, localZ));
+            mesh->texCoords.push_back(glm::vec2(
+                static_cast<float>(x) / static_cast<float>(gridDim - 1),
+                static_cast<float>(z) / static_cast<float>(gridDim - 1)
+            ));
+            mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // Placeholder for vertex color - will be computed after normals
+            mesh->colors.push_back(glm::vec4(1.0f));
+        }
+    }
+
+    // Compute normals from finite differences and update vertex colors with height/slope data.
+    auto idx = [&](uint32_t x, uint32_t z) { return z * gridDim + x; };
+    for (uint32_t z = 0; z < gridDim; ++z) {
+        for (uint32_t x = 0; x < gridDim; ++x) {
+            float hL = (x > 0) ? mesh->positions[idx(x - 1, z)].y : mesh->positions[idx(x, z)].y;
+            float hR = (x < gridDim - 1) ? mesh->positions[idx(x + 1, z)].y : mesh->positions[idx(x, z)].y;
+            float hD = (z > 0) ? mesh->positions[idx(x, z - 1)].y : mesh->positions[idx(x, z)].y;
+            float hU = (z < gridDim - 1) ? mesh->positions[idx(x, z + 1)].y : mesh->positions[idx(x, z)].y;
+
+            float dx = (hR - hL) / (2.0f * cellSize);
+            float dz = (hU - hD) / (2.0f * cellSize);
+
+            glm::vec3 n(-dx, 1.0f, -dz);
+            float len2 = glm::dot(n, n);
+            if (len2 > 1e-8f) n /= std::sqrt(len2);
+            mesh->normals[idx(x, z)] = n;
+
+            // Compute slope from normal (0 = flat, 1 = vertical)
+            float slope = 1.0f - n.y; // n.y = 1 for flat, 0 for vertical
+
+            // Get world position for biome sampling
+            float localX = static_cast<float>(x) * cellSize;
+            float localZ = static_cast<float>(z) * cellSize;
+            float worldX = worldOffsetX + localX;
+            float worldZ = worldOffsetZ + localZ;
+            float height = mesh->positions[idx(x, z)].y;
+
+            // Get height and slope-aware biome color
+            glm::vec3 biomeColor = biomeMap->GetHeightLayeredColor(worldX, worldZ, height, slope);
+            mesh->colors[idx(x, z)] = glm::vec4(biomeColor, 1.0f);
+        }
+    }
+
+    // Generate indices (CW winding for +Y normal, matching other generators).
+    for (uint32_t z = 0; z < gridDim - 1; ++z) {
+        for (uint32_t x = 0; x < gridDim - 1; ++x) {
+            uint32_t i0 = idx(x, z);
+            uint32_t i1 = idx(x + 1, z);
+            uint32_t i2 = idx(x, z + 1);
+            uint32_t i3 = idx(x + 1, z + 1);
+
+            mesh->indices.push_back(i0);
+            mesh->indices.push_back(i2);
+            mesh->indices.push_back(i1);
+
+            mesh->indices.push_back(i1);
+            mesh->indices.push_back(i2);
+            mesh->indices.push_back(i3);
+        }
+    }
+
+    // Add skirt vertices at grid boundaries.
+    uint32_t skirtBaseIdx = static_cast<uint32_t>(mesh->positions.size());
+    auto addSkirtVertex = [&](uint32_t x, uint32_t z) {
+        const glm::vec3& p = mesh->positions[idx(x, z)];
+        mesh->positions.push_back(glm::vec3(p.x, p.y - skirtDepth, p.z));
+        mesh->normals.push_back(mesh->normals[idx(x, z)]);
+        mesh->texCoords.push_back(mesh->texCoords[idx(x, z)]);
+        // Copy biome color to skirt vertex
+        mesh->colors.push_back(mesh->colors[idx(x, z)]);
+    };
+
+    for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, 0);
+    for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, gridDim - 1);
+    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(0, z);
+    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(gridDim - 1, z);
+
+    auto skirtIdx = [&](uint32_t edge, uint32_t i) -> uint32_t {
+        return skirtBaseIdx + edge * gridDim + i;
+    };
+
+    // Bottom edge skirt (z=0) - normal should face -Z (outward)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x, 0), b = idx(x + 1, 0);
         uint32_t c = skirtIdx(0, x), d = skirtIdx(0, x + 1);

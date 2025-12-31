@@ -47,13 +47,14 @@ struct VBInstanceData {
     uint _pad0;
 };
 
-// Vertex structure (matches C++ vertex layout: 48 bytes)
+// Vertex structure (matches C++ vertex layout: 64 bytes)
 struct Vertex {
-    float3 position;    // 12 bytes
-    float3 normal;      // 12 bytes
-    float4 tangent;     // 16 bytes
-    float2 texCoord;    // 8 bytes
-    // Total: 48 bytes
+    float3 position;    // 12 bytes (offset 0)
+    float3 normal;      // 12 bytes (offset 12)
+    float4 tangent;     // 16 bytes (offset 24)
+    float2 texCoord;    // 8 bytes  (offset 40)
+    float4 color;       // 16 bytes (offset 48) - vertex color for biome blending
+    // Total: 64 bytes
 };
 
 // Minimal material constants (matches VBMaterialConstants in C++)
@@ -215,6 +216,7 @@ Vertex LoadVertex(ByteAddressBuffer vertexBuffer, uint vertexIndex, uint vertexS
     v.normal = asfloat(vertexBuffer.Load3(offset + 12));
     v.tangent = asfloat(vertexBuffer.Load4(offset + 24));
     v.texCoord = asfloat(vertexBuffer.Load2(offset + 40));
+    v.color = asfloat(vertexBuffer.Load4(offset + 48));
 
     return v;
 }
@@ -407,6 +409,9 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float4 tangent = v0.tangent * bary.x + v1.tangent * bary.y + v2.tangent * bary.z;
     tangent.xyz = normalize(mul((float3x3)instance.worldMatrix, tangent.xyz));
 
+    // Interpolate vertex color (used for biome tinting on terrain)
+    float4 vertexColor = v0.color * bary.x + v1.color * bary.y + v2.color * bary.z;
+
     // Material evaluation: constants in g_Materials[instance.materialIndex] and optional bindless textures.
     // Default PBR values (mid-roughness, non-metallic)
     float3 albedo = float3(0.5, 0.5, 0.5);
@@ -468,6 +473,9 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             // glTF/PBR: finalAlbedo = baseColorFactor * textureColor
             albedo *= albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
         }
+
+        // Apply vertex color tint (used for biome coloring on terrain)
+        albedo *= vertexColor.rgb;
 
         if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {
             Texture2D normalTex = ResourceDescriptorHeap[mat.textureIndices.y];

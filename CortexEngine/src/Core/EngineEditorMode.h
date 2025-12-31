@@ -16,6 +16,7 @@ namespace Cortex {
 
 class Engine;
 class EditorWorld;
+class EditorCamera;
 
 namespace Graphics {
     class Renderer;
@@ -48,6 +49,7 @@ public:
     // Frame update
     void Update(float deltaTime);
     void Render();
+    void RenderFull(float deltaTime);  // Selective renderer usage (Phase 7)
     void ProcessInput(const SDL_Event& event);
 
     // State queries
@@ -67,9 +69,11 @@ public:
     void AdvanceTimeOfDay(float hours);
 
     // Camera control
-    [[nodiscard]] glm::vec3 GetCameraPosition() const { return m_cameraPosition; }
-    [[nodiscard]] float GetCameraYaw() const { return m_cameraYaw; }
-    [[nodiscard]] float GetCameraPitch() const { return m_cameraPitch; }
+    [[nodiscard]] EditorCamera* GetCamera() { return m_camera.get(); }
+    [[nodiscard]] const EditorCamera* GetCamera() const { return m_camera.get(); }
+    [[nodiscard]] glm::vec3 GetCameraPosition() const;
+    [[nodiscard]] float GetCameraYaw() const;
+    [[nodiscard]] float GetCameraPitch() const;
 
     // Terrain access
     [[nodiscard]] EditorWorld* GetWorld() { return m_world.get(); }
@@ -86,6 +90,9 @@ private:
 
     // EditorWorld manages terrain chunks and entities
     std::unique_ptr<EditorWorld> m_world;
+
+    // EditorCamera with fly/orbit/focus modes
+    std::unique_ptr<EditorCamera> m_camera;
 
     // Centralized editor state - replaces scattered boolean flags
     struct EditorState {
@@ -107,19 +114,15 @@ private:
         // Debug options
         bool showStats = true;
         bool showChunkBounds = false;
+
+        // Edit mode (Phase 8)
+        bool editMode = true;          // vs Play mode
+        bool entityPickingEnabled = true;
+        bool gizmosEnabled = true;
     } m_state;
 
-    // Camera state (separate from terrain player camera)
-    glm::vec3 m_cameraPosition{0.0f, 50.0f, 0.0f};
-    float m_cameraYaw = 0.0f;
-    float m_cameraPitch = -0.3f;       // Slight downward angle
-    float m_cameraSpeed = 20.0f;
-    float m_mouseSensitivity = 0.003f;
-
-    // Input state
+    // Input state for camera control
     bool m_cameraControlActive = false;
-    float m_pendingMouseDeltaX = 0.0f;
-    float m_pendingMouseDeltaY = 0.0f;
 
     // Internal methods
     void UpdateCamera(float deltaTime);

@@ -10,6 +10,7 @@
 #include <functional>
 #include <glm/glm.hpp>
 #include "Scene/TerrainNoise.h"
+#include "Scene/BiomeTypes.h"
 #include "Utils/Result.h"
 
 namespace Cortex {
@@ -21,6 +22,7 @@ namespace Graphics {
 namespace Scene {
     class ECS_Registry;
     struct MeshData;
+    class BiomeMap;
 }
 
 class ChunkGenerator;
@@ -64,6 +66,11 @@ struct EditorWorldConfig {
     // Terrain parameters
     Scene::TerrainNoiseParams terrainParams;
 
+    // Biome parameters
+    Scene::BiomeMapParams biomeParams;
+    bool useBiomes = true;            // Enable biome-based terrain coloring
+    std::string biomesConfigPath = "assets/config/biomes.json";
+
     // Chunk settings
     float chunkSize = 64.0f;
     int32_t loadRadius = 8;           // Chunks to load around camera
@@ -101,6 +108,14 @@ public:
     void SetTerrainParams(const Scene::TerrainNoiseParams& params);
     [[nodiscard]] const Scene::TerrainNoiseParams& GetTerrainParams() const { return m_config.terrainParams; }
     [[nodiscard]] const EditorWorldConfig& GetConfig() const { return m_config; }
+
+    // Biome system
+    void SetBiomeParams(const Scene::BiomeMapParams& params);
+    [[nodiscard]] const Scene::BiomeMapParams& GetBiomeParams() const { return m_config.biomeParams; }
+    [[nodiscard]] Scene::BiomeSample GetBiomeAt(float worldX, float worldZ) const;
+    [[nodiscard]] const Scene::BiomeMap* GetBiomeMap() const { return m_biomeMap.get(); }
+    [[nodiscard]] bool AreBiomesEnabled() const { return m_config.useBiomes && m_biomeMap != nullptr; }
+    void SetBiomesEnabled(bool enabled);
 
     // Chunk queries
     [[nodiscard]] bool IsChunkLoaded(const ChunkCoord& coord) const;
@@ -147,6 +162,7 @@ private:
     // Subsystems
     std::unique_ptr<ChunkGenerator> m_chunkGenerator;
     std::unique_ptr<SpatialGrid> m_spatialGrid;
+    std::unique_ptr<Scene::BiomeMap> m_biomeMap;
 
     // Chunk tracking
     std::unordered_set<ChunkCoord, ChunkCoordHash> m_loadedChunks;

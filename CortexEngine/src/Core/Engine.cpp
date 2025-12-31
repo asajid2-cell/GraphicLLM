@@ -2505,11 +2505,6 @@ void Engine::Render(float deltaTime) {
     // main render; the renderer will consume these in its debug overlay pass.
     DebugDrawSceneGraph();
 
-    // Engine Editor Mode: add editor-specific debug visualizations (grid, axes, chunk bounds)
-    if (m_editorModeController && m_editorModeController->IsInitialized()) {
-        m_editorModeController->Render();
-    }
-
     // Let the renderer know whether the GPU settings overlay should be
     // visible, along with the currently highlighted row index. This drives
     // the in-shader panel in the post-process path (M key).
@@ -2517,7 +2512,20 @@ void Engine::Render(float deltaTime) {
         m_renderer->SetDebugOverlayState(m_settingsOverlayVisible, m_settingsSection);
     }
 
-    m_renderer->Render(m_registry.get(), deltaTime);
+    // === Engine Editor Mode: Selective Renderer Usage (Phase 7) ===
+    // When in editor mode, use RenderFull() which controls individual render
+    // passes based on EditorState. Otherwise, use the monolithic Render().
+    if (m_engineEditorMode && m_editorModeController && m_editorModeController->IsInitialized()) {
+        // Editor controls the full render flow (selective pass usage)
+        m_editorModeController->RenderFull(deltaTime);
+    } else {
+        // Tech Demo mode: use monolithic render
+        // Add editor debug overlays if present (for hybrid mode)
+        if (m_editorModeController && m_editorModeController->IsInitialized()) {
+            m_editorModeController->Render();
+        }
+        m_renderer->Render(m_registry.get(), deltaTime);
+    }
 
     // Render HUD overlay using GDI on top of the swap chain (for FPS/camera
     // text). Even when the user has hidden the normal HUD, keep RenderHUD()

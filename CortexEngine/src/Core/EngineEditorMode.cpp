@@ -7,6 +7,7 @@
 #include "Graphics/Renderer.h"
 #include "Scene/ECS_Registry.h"
 #include "Editor/EditorWorld.h"
+#include "Editor/EditorCamera.h"
 #include "Utils/ConfigLoader.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -70,9 +71,13 @@ Result<void> EngineEditorMode::Initialize(Engine* engine, Graphics::Renderer* re
     m_state.shadows = editorConfig.rendering.shadows;
     m_state.ssao = editorConfig.rendering.ssao;
 
-    // Apply camera settings
-    m_cameraSpeed = editorConfig.camera.flySpeed;
-    m_mouseSensitivity = editorConfig.camera.mouseSensitivity;
+    // Initialize EditorCamera with settings from config
+    m_camera = std::make_unique<EditorCamera>();
+    m_camera->SetFlySpeed(editorConfig.camera.flySpeed);
+    m_camera->SetSprintMultiplier(3.0f);  // Default sprint multiplier
+    m_camera->SetMouseSensitivity(editorConfig.camera.mouseSensitivity);
+    m_camera->SetFOV(editorConfig.camera.fov);
+    m_camera->SetNearFar(editorConfig.camera.nearPlane, editorConfig.camera.farPlane);
 
     // Load terrain presets
     auto presetsResult = Utils::ConfigLoader::LoadTerrainPresets("assets/config");
@@ -111,9 +116,19 @@ Result<void> EngineEditorMode::Initialize(Engine* engine, Graphics::Renderer* re
 
     // Set initial camera position (above terrain center)
     float terrainHeight = m_world->GetTerrainHeight(0.0f, 0.0f);
-    m_cameraPosition = glm::vec3(0.0f, terrainHeight + 50.0f, 0.0f);
-    m_cameraYaw = 0.0f;
-    m_cameraPitch = -0.3f;
+    m_camera->SetPosition(glm::vec3(0.0f, terrainHeight + 50.0f, 0.0f));
+    m_camera->SetYawPitch(0.0f, -0.3f);
+
+    // Set up terrain height callback for camera ground clamping
+    // Use a static lambda with captured world pointer
+    m_camera->SetTerrainHeightCallback(
+        [](float x, float z, void* userData) -> float {
+            auto* world = static_cast<EditorWorld*>(userData);
+            return world->GetTerrainHeight(x, z);
+        },
+        m_world.get()
+    );
+    m_camera->SetMinHeightAboveTerrain(2.0f);
 
     // Configure renderer for editor mode
     // - Disable IBL (use procedural sky for terrain)
@@ -141,6 +156,9 @@ void EngineEditorMode::Shutdown() {
         m_world.reset();
     }
 
+    // Release EditorCamera
+    m_camera.reset();
+
     m_engine = nullptr;
     m_renderer = nullptr;
     m_registry = nullptr;
@@ -163,18 +181,44 @@ void EngineEditorMode::Update(float deltaTime) {
     // Update sun position based on time
     UpdateTimeOfDay(deltaTime);
 
-    // Update camera from input
+    // Update camera movement input from keyboard state
     UpdateCamera(deltaTime);
 
+    // Update EditorCamera (handles movement, transitions, terrain clamping)
+    if (m_camera) {
+        m_camera->Update(deltaTime);
+    }
+
     // Update EditorWorld (chunk streaming based on camera position)
-    if (m_world) {
-        m_world->Update(m_cameraPosition, deltaTime);
+    if (m_world && m_camera) {
+        m_world->Update(m_camera->GetPosition(), deltaTime);
     }
 }
 
 float EngineEditorMode::GetTerrainHeight(float worldX, float worldZ) const {
     if (m_world) {
         return m_world->GetTerrainHeight(worldX, worldZ);
+    }
+    return 0.0f;
+}
+
+glm::vec3 EngineEditorMode::GetCameraPosition() const {
+    if (m_camera) {
+        return m_camera->GetPosition();
+    }
+    return glm::vec3(0.0f);
+}
+
+float EngineEditorMode::GetCameraYaw() const {
+    if (m_camera) {
+        return m_camera->GetYaw();
+    }
+    return 0.0f;
+}
+
+float EngineEditorMode::GetCameraPitch() const {
+    if (m_camera) {
+        return m_camera->GetPitch();
     }
     return 0.0f;
 }
@@ -195,6 +239,71 @@ void EngineEditorMode::Render() {
     if (m_state.showStats) {
         RenderStats();
     }
+}
+
+void EngineEditorMode::RenderFull(float deltaTime) {
+    if (!m_initialized || !m_renderer || !m_registry) {
+        return;
+    }
+
+    // === Phase 7: Selective Renderer Usage ===
+    // Instead of calling the monolithic Renderer::Render(), we control the
+    // render flow by calling individual passes. This allows the Engine Editor
+    // to selectively enable/disable passes based on EditorState.
+
+    // Begin frame (handles swap chain, command list allocation, etc.)
+    m_renderer->BeginFrameForEditor();
+
+    // Update per-frame constants (camera, lights, time, etc.)
+    m_renderer->UpdateFrameConstantsForEditor(deltaTime, m_registry);
+
+    // Prewarm material descriptors for all entities (required for terrain chunks)
+    m_renderer->PrewarmMaterialDescriptorsForEditor(m_registry);
+
+    // Prepare main render target
+    m_renderer->PrepareMainPassForEditor();
+
+    // Render sky (procedural sky since IBL is disabled for terrain)
+    m_renderer->RenderSkyboxForEditor();
+
+    // Render shadows if enabled
+    if (m_state.shadows) {
+        m_renderer->RenderShadowPassForEditor(m_registry);
+    }
+
+    // Render scene geometry (terrain chunks, entities)
+    m_renderer->RenderSceneForEditor(m_registry);
+
+    // Screen-space effects
+    if (m_state.ssao) {
+        m_renderer->RenderSSAOForEditor();
+    }
+
+    // Screen-space reflections (if enabled in future)
+    // m_renderer->RenderSSRForEditor();
+
+    // Temporal anti-aliasing
+    m_renderer->RenderTAAForEditor();
+
+    // Bloom
+    m_renderer->RenderBloomForEditor();
+
+    // Add debug overlays before post-process
+    RenderDebugOverlays();
+
+    // Post-process (tonemapping, color grading, FXAA)
+    m_renderer->RenderPostProcessForEditor();
+
+    // Debug lines (drawn after post for visibility)
+    m_renderer->RenderDebugLinesForEditor();
+
+    // Stats overlay
+    if (m_state.showStats) {
+        RenderStats();
+    }
+
+    // End frame (present swap chain)
+    m_renderer->EndFrameForEditor();
 }
 
 void EngineEditorMode::ProcessInput(const SDL_Event& event) {
@@ -239,13 +348,68 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
                 m_state.showStats = !m_state.showStats;
             }
 
+            // F - Focus on world origin (or selected entity in future)
+            if (key == SDLK_F && !event.key.repeat && m_camera) {
+                // Focus on terrain at current XZ position (smooth camera transition)
+                glm::vec3 pos = m_camera->GetPosition();
+                float terrainY = GetTerrainHeight(pos.x, pos.z);
+                m_camera->FocusOn(glm::vec3(pos.x, terrainY, pos.z), 0.5f);
+                spdlog::info("Camera focusing on terrain");
+            }
+
+            // Tab - Cycle camera mode (Fly -> Orbit -> Fly)
+            if (key == SDLK_TAB && !event.key.repeat && m_camera) {
+                CameraMode currentMode = m_camera->GetMode();
+                if (currentMode == CameraMode::Fly) {
+                    // Set orbit target to point in front of camera
+                    glm::vec3 pos = m_camera->GetPosition();
+                    glm::vec3 forward = m_camera->GetForward();
+                    glm::vec3 orbitTarget = pos + forward * 50.0f;
+                    orbitTarget.y = GetTerrainHeight(orbitTarget.x, orbitTarget.z);
+                    m_camera->SetOrbitTarget(orbitTarget);
+                    m_camera->SetOrbitDistance(glm::length(pos - orbitTarget));
+                    m_camera->SetMode(CameraMode::Orbit);
+                    spdlog::info("Camera mode: Orbit");
+                } else {
+                    m_camera->SetMode(CameraMode::Fly);
+                    spdlog::info("Camera mode: Fly");
+                }
+            }
+
+            // === Phase 8: Entity Manipulation Hotkeys ===
+
+            // H - Toggle gizmos visibility
+            if (key == SDLK_H && !event.key.repeat) {
+                m_state.gizmosEnabled = !m_state.gizmosEnabled;
+                m_state.showGizmos = m_state.gizmosEnabled;
+                spdlog::info("Gizmos: {}", m_state.gizmosEnabled ? "ON" : "OFF");
+            }
+
+            // F5 - Toggle Edit/Play mode
+            if (key == SDLK_F5 && !event.key.repeat) {
+                m_state.editMode = !m_state.editMode;
+                m_state.entityPickingEnabled = m_state.editMode;
+                spdlog::info("Editor mode: {}", m_state.editMode ? "EDIT" : "PLAY");
+            }
+
             break;
         }
 
         case SDL_EVENT_MOUSE_MOTION: {
-            if (m_cameraControlActive) {
-                m_pendingMouseDeltaX += static_cast<float>(event.motion.xrel);
-                m_pendingMouseDeltaY += static_cast<float>(event.motion.yrel);
+            // Forward mouse motion to EditorCamera when camera control is active
+            if (m_cameraControlActive && m_camera) {
+                m_camera->ProcessMouseMove(
+                    static_cast<float>(event.motion.xrel),
+                    static_cast<float>(event.motion.yrel)
+                );
+            }
+            break;
+        }
+
+        case SDL_EVENT_MOUSE_WHEEL: {
+            // Forward scroll to EditorCamera (for orbit zoom or fly speed adjustment)
+            if (m_camera) {
+                m_camera->ProcessMouseScroll(static_cast<float>(event.wheel.y));
             }
             break;
         }
@@ -284,21 +448,29 @@ void EngineEditorMode::AdvanceTimeOfDay(float hours) {
     SetTimeOfDay(m_state.timeOfDay + hours);
 }
 
-void EngineEditorMode::UpdateCamera(float deltaTime) {
-    // Apply mouse look
-    if (m_cameraControlActive) {
-        m_cameraYaw -= m_pendingMouseDeltaX * m_mouseSensitivity;
-        m_cameraPitch -= m_pendingMouseDeltaY * m_mouseSensitivity;
-
-        // Clamp pitch to prevent camera flip
-        m_cameraPitch = std::clamp(m_cameraPitch, -1.5f, 1.5f);
-
-        m_pendingMouseDeltaX = 0.0f;
-        m_pendingMouseDeltaY = 0.0f;
+void EngineEditorMode::UpdateCamera(float /*deltaTime*/) {
+    if (!m_camera) {
+        return;
     }
 
-    // WASD movement is handled by Engine's play mode camera
-    // In future phases, we may add editor-specific fly camera here
+    // Poll keyboard state and pass to EditorCamera for movement
+    // Only process movement when camera control is active (right mouse button held)
+    if (m_cameraControlActive) {
+        const bool* keyState = SDL_GetKeyboardState(nullptr);
+
+        bool forward = keyState[SDL_SCANCODE_W];
+        bool back = keyState[SDL_SCANCODE_S];
+        bool left = keyState[SDL_SCANCODE_A];
+        bool right = keyState[SDL_SCANCODE_D];
+        bool up = keyState[SDL_SCANCODE_E] || keyState[SDL_SCANCODE_SPACE];
+        bool down = keyState[SDL_SCANCODE_Q] || keyState[SDL_SCANCODE_LCTRL];
+        bool sprint = keyState[SDL_SCANCODE_LSHIFT];
+
+        m_camera->SetMovementInput(forward, back, left, right, up, down, sprint);
+    } else {
+        // No movement when not controlling camera
+        m_camera->SetMovementInput(false, false, false, false, false, false, false);
+    }
 }
 
 void EngineEditorMode::UpdateTimeOfDay(float /*deltaTime*/) {
@@ -397,7 +569,7 @@ void EngineEditorMode::RenderDebugOverlays() {
 }
 
 void EngineEditorMode::RenderDebugGrid() {
-    if (!m_renderer) {
+    if (!m_renderer || !m_camera) {
         return;
     }
 
@@ -406,9 +578,11 @@ void EngineEditorMode::RenderDebugGrid() {
     const int gridLines = 17;      // 17 lines = 16 cells = 4x4 chunks visible
     const float gridExtent = gridSize * 8.0f;
 
+    glm::vec3 cameraPos = m_camera->GetPosition();
+
     // Snap grid to chunk boundaries
-    float snapX = std::floor(m_cameraPosition.x / gridSize) * gridSize;
-    float snapZ = std::floor(m_cameraPosition.z / gridSize) * gridSize;
+    float snapX = std::floor(cameraPos.x / gridSize) * gridSize;
+    float snapZ = std::floor(cameraPos.z / gridSize) * gridSize;
 
     // Get terrain height at grid center for Y offset
     float gridY = 0.0f;

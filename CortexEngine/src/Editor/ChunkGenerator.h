@@ -19,6 +19,7 @@ namespace Cortex {
 // Forward declarations
 namespace Scene {
     struct MeshData;
+    class BiomeMap;
 }
 
 // Request for chunk generation
@@ -59,6 +60,7 @@ public:
     // Configure terrain parameters (thread-safe)
     void SetTerrainParams(const Scene::TerrainNoiseParams& params);
     void SetChunkSize(float size);
+    void SetBiomeMap(const Scene::BiomeMap* biomeMap);
 
     // Request chunk generation (thread-safe)
     void RequestChunk(const ChunkCoord& coord, ChunkLOD lod, float priority);
@@ -101,6 +103,7 @@ private:
     // Terrain parameters (read by workers)
     Scene::TerrainNoiseParams m_terrainParams;
     float m_chunkSize = 64.0f;
+    const Scene::BiomeMap* m_biomeMap = nullptr;  // Not owned
     mutable std::mutex m_paramsMutex;
 
     // Active generation tracking

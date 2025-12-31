@@ -68,6 +68,11 @@ void ChunkGenerator::SetChunkSize(float size) {
     m_chunkSize = size;
 }
 
+void ChunkGenerator::SetBiomeMap(const Scene::BiomeMap* biomeMap) {
+    std::lock_guard<std::mutex> lock(m_paramsMutex);
+    m_biomeMap = biomeMap;
+}
+
 void ChunkGenerator::RequestChunk(const ChunkCoord& coord, ChunkLOD lod, float priority) {
     ChunkRequest request;
     request.coord = coord;
@@ -178,23 +183,37 @@ ChunkResult ChunkGenerator::GenerateChunk(const ChunkRequest& request) {
     // Get current terrain parameters
     Scene::TerrainNoiseParams params;
     float chunkSize;
+    const Scene::BiomeMap* biomeMap;
     {
         std::lock_guard<std::mutex> lock(m_paramsMutex);
         params = m_terrainParams;
         chunkSize = m_chunkSize;
+        biomeMap = m_biomeMap;
     }
 
     // Determine grid dimension based on LOD
     uint32_t gridDim = GetGridDimForLOD(request.lod);
 
-    // Generate the mesh
-    auto mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(
-        gridDim,
-        chunkSize,
-        request.coord.x,
-        request.coord.z,
-        params
-    );
+    // Generate the mesh - use biome variant if biome map is available
+    std::shared_ptr<Scene::MeshData> mesh;
+    if (biomeMap) {
+        mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunkWithBiomes(
+            gridDim,
+            chunkSize,
+            request.coord.x,
+            request.coord.z,
+            params,
+            biomeMap
+        );
+    } else {
+        mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(
+            gridDim,
+            chunkSize,
+            request.coord.x,
+            request.coord.z,
+            params
+        );
+    }
 
     auto endTime = std::chrono::high_resolution_clock::now();
     float timeMs = std::chrono::duration<float, std::milli>(endTime - startTime).count();

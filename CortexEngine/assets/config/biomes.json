@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "description": "Biome configuration for procedural terrain generation",
+  "biomeMapParams": {
+    "seed": 1337,
+    "cellSize": 512.0,
+    "blendRadius": 64.0,
+    "temperatureFreq": 0.001,
+    "moistureFreq": 0.0008
+  },
+  "biomes": [
+    {
+      "type": "Plains",
+      "name": "Plains",
+      "heightScale": 0.3,
+      "heightOffset": 0.0,
+      "slopeInfluence": 0.5,
+      "baseColor": [0.35, 0.55, 0.2, 1.0],
+      "slopeColor": [0.4, 0.35, 0.25, 1.0],
+      "roughness": 0.85,
+      "metallic": 0.0,
+      "normalScale": 1.0,
+      "heightLayers": [
+        { "minHeight": -10, "maxHeight": 20, "color": [0.35, 0.55, 0.2, 1.0] },
+        { "minHeight": 20, "maxHeight": 40, "color": [0.4, 0.5, 0.25, 1.0] }
+      ],
+      "vegetationDensity": 0.7,
+      "treeDensity": 0.1,
+      "rockDensity": 0.05,
+      "grassDensity": 0.9,
+      "propTypes": ["oak_tree", "birch_tree", "flower_patch", "grass_tuft"]
+    },
+    {
+      "type": "Mountains",
+      "name": "Mountains",
+      "heightScale": 2.5,
+      "heightOffset": 20.0,
+      "slopeInfluence": 0.8,
+      "baseColor": [0.5, 0.5, 0.5, 1.0],
+      "slopeColor": [0.35, 0.3, 0.28, 1.0],
+      "roughness": 0.95,
+      "metallic": 0.0,
+      "normalScale": 1.5,
+      "heightLayers": [
+        { "minHeight": 0, "maxHeight": 50, "color": [0.35, 0.45, 0.25, 1.0] },
+        { "minHeight": 50, "maxHeight": 100, "color": [0.5, 0.5, 0.5, 1.0] },
+        { "minHeight": 100, "maxHeight": 150, "color": [0.65, 0.65, 0.65, 1.0] },
+        { "minHeight": 150, "maxHeight": 250, "color": [0.92, 0.95, 1.0, 1.0] }
+      ],
+      "vegetationDensity": 0.2,
+      "treeDensity": 0.15,
+      "rockDensity": 0.8,
+      "grassDensity": 0.1,
+      "propTypes": ["boulder", "pine_tree", "dead_tree", "rock_spike"]
+    },
+    {
+      "type": "Desert",
+      "name": "Desert",
+      "heightScale": 0.5,
+      "heightOffset": -5.0,
+      "slopeInfluence": 0.3,
+      "baseColor": [0.85, 0.75, 0.55, 1.0],
+      "slopeColor": [0.7, 0.55, 0.35, 1.0],
+      "roughness": 0.7,
+      "metallic": 0.0,
+      "normalScale": 0.8,
+      "heightLayers": [
+        { "minHeight": -20, "maxHeight": 10, "color": [0.85, 0.75, 0.55, 1.0] },
+        { "minHeight": 10, "maxHeight": 40, "color": [0.8, 0.65, 0.45, 1.0] }
+      ],
+      "vegetationDensity": 0.05,
+      "treeDensity": 0.0,
+      "rockDensity": 0.3,
+      "grassDensity": 0.02,
+      "propTypes": ["cactus", "dead_shrub", "sandstone_rock", "skull"]
+    },
+    {
+      "type": "Forest",
+      "name": "Dense Forest",
+      "heightScale": 0.6,
+      "heightOffset": 0.0,
+      "slopeInfluence": 0.4,
+      "baseColor": [0.15, 0.35, 0.1, 1.0],
+      "slopeColor": [0.25, 0.2, 0.15, 1.0],
+      "roughness": 0.9,
+      "metallic": 0.0,
+      "normalScale": 1.2,
+      "heightLayers": [
+        { "minHeight": -10, "maxHeight": 30, "color": [0.15, 0.35, 0.1, 1.0] },
+        { "minHeight": 30, "maxHeight": 60, "color": [0.2, 0.3, 0.12, 1.0] },
+        { "minHeight": 60, "maxHeight": 100, "color": [0.3, 0.35, 0.2, 1.0] }
+      ],
+      "vegetationDensity": 0.95,
+      "treeDensity": 0.8,
+      "rockDensity": 0.2,
+      "grassDensity": 0.6,
+      "propTypes": ["oak_tree", "pine_tree", "fern", "mushroom", "fallen_log", "bush"]
+    },
+    {
+      "type": "Tundra",
+      "name": "Frozen Tundra",
+      "heightScale": 0.4,
+      "heightOffset": 5.0,
+      "slopeInfluence": 0.6,
+      "baseColor": [0.85, 0.9, 0.95, 1.0],
+      "slopeColor": [0.7, 0.75, 0.82, 1.0],
+      "roughness": 0.6,
+      "metallic": 0.1,
+      "normalScale": 0.7,
+      "heightLayers": [
+        { "minHeight": -20, "maxHeight": 10, "color": [0.75, 0.8, 0.85, 1.0] },
+        { "minHeight": 10, "maxHeight": 50, "color": [0.85, 0.9, 0.95, 1.0] },
+        { "minHeight": 50, "maxHeight": 100, "color": [0.95, 0.97, 1.0, 1.0] }
+      ],
+      "vegetationDensity": 0.1,
+      "treeDensity": 0.02,
+      "rockDensity": 0.4,
+      "grassDensity": 0.05,
+      "propTypes": ["snow_rock", "dead_tree", "ice_spike", "frozen_bush"]
+    },
+    {
+      "type": "Swamp",
+      "name": "Murky Swamp",
+      "heightScale": 0.2,
+      "heightOffset": -10.0,
+      "slopeInfluence": 0.2,
+      "baseColor": [0.2, 0.28, 0.15, 1.0],
+      "slopeColor": [0.15, 0.2, 0.12, 1.0],
+      "roughness": 0.95,
+      "metallic": 0.0,
+      "normalScale": 1.0,
+      "heightLayers": [
+        { "minHeight": -30, "maxHeight": -5, "color": [0.12, 0.18, 0.1, 1.0] },
+        { "minHeight": -5, "maxHeight": 10, "color": [0.2, 0.28, 0.15, 1.0] },
+        { "minHeight": 10, "maxHeight": 30, "color": [0.25, 0.32, 0.18, 1.0] }
+      ],
+      "vegetationDensity": 0.8,
+      "treeDensity": 0.4,
+      "rockDensity": 0.15,
+      "grassDensity": 0.3,
+      "propTypes": ["willow_tree", "cypress", "lily_pad", "mushroom", "dead_log", "cattail"]
+    },
+    {
+      "type": "Beach",
+      "name": "Sandy Beach",
+      "heightScale": 0.15,
+      "heightOffset": -2.0,
+      "slopeInfluence": 0.2,
+      "baseColor": [0.92, 0.88, 0.72, 1.0],
+      "slopeColor": [0.85, 0.78, 0.6, 1.0],
+      "roughness": 0.5,
+      "metallic": 0.0,
+      "normalScale": 0.5,
+      "heightLayers": [
+        { "minHeight": -10, "maxHeight": 2, "color": [0.88, 0.82, 0.65, 1.0] },
+        { "minHeight": 2, "maxHeight": 10, "color": [0.92, 0.88, 0.72, 1.0] },
+        { "minHeight": 10, "maxHeight": 25, "color": [0.95, 0.92, 0.78, 1.0] }
+      ],
+      "vegetationDensity": 0.15,
+      "treeDensity": 0.05,
+      "rockDensity": 0.1,
+      "grassDensity": 0.08,
+      "propTypes": ["palm_tree", "driftwood", "shell_cluster", "beach_grass", "coconut"]
+    },
+    {
+      "type": "Volcanic",
+      "name": "Volcanic Wasteland",
+      "heightScale": 1.8,
+      "heightOffset": 15.0,
+      "slopeInfluence": 0.7,
+      "baseColor": [0.25, 0.2, 0.18, 1.0],
+      "slopeColor": [0.15, 0.12, 0.1, 1.0],
+      "roughness": 0.98,
+      "metallic": 0.0,
+      "normalScale": 1.8,
+      "heightLayers": [
+        { "minHeight": -10, "maxHeight": 30, "color": [0.25, 0.2, 0.18, 1.0] },
+        { "minHeight": 30, "maxHeight": 60, "color": [0.35, 0.25, 0.2, 1.0] },
+        { "minHeight": 60, "maxHeight": 100, "color": [0.45, 0.3, 0.2, 1.0] },
+        { "minHeight": 100, "maxHeight": 200, "color": [0.2, 0.15, 0.12, 1.0] }
+      ],
+      "vegetationDensity": 0.02,
+      "treeDensity": 0.0,
+      "rockDensity": 0.7,
+      "grassDensity": 0.0,
+      "propTypes": ["lava_rock", "obsidian_spike", "ash_pile", "dead_tree_charred"]
+    },
+    {
+      "type": "Ocean",
+      "name": "Deep Ocean",
+      "heightScale": 0.1,
+      "heightOffset": -50.0,
+      "slopeInfluence": 0.1,
+      "baseColor": [0.1, 0.25, 0.4, 1.0],
+      "slopeColor": [0.08, 0.2, 0.35, 1.0],
+      "roughness": 0.3,
+      "metallic": 0.0,
+      "normalScale": 0.3,
+      "heightLayers": [
+        { "minHeight": -100, "maxHeight": -30, "color": [0.05, 0.15, 0.3, 1.0] },
+        { "minHeight": -30, "maxHeight": -10, "color": [0.1, 0.25, 0.4, 1.0] },
+        { "minHeight": -10, "maxHeight": 0, "color": [0.15, 0.35, 0.5, 1.0] }
+      ],
+      "vegetationDensity": 0.0,
+      "treeDensity": 0.0,
+      "rockDensity": 0.1,
+      "grassDensity": 0.0,
+      "propTypes": ["seaweed", "coral", "rock_underwater"]
+    }
+  ]
+}

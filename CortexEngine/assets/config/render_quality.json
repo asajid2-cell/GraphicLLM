@@ -1,0 +1,57 @@
+{
+    "presets": {
+        "low": {
+            "name": "Low",
+            "description": "Best performance, reduced visual quality",
+            "shadows": false,
+            "shadowMapSize": 512,
+            "ssao": false,
+            "ssr": false,
+            "rayTracing": false,
+            "volumetricLighting": false,
+            "lodBias": 2.0,
+            "drawDistance": 512.0,
+            "terrainDetail": 0.5
+        },
+        "medium": {
+            "name": "Medium",
+            "description": "Balanced performance and quality",
+            "shadows": true,
+            "shadowMapSize": 1024,
+            "ssao": false,
+            "ssr": false,
+            "rayTracing": false,
+            "volumetricLighting": false,
+            "lodBias": 1.0,
+            "drawDistance": 1024.0,
+            "terrainDetail": 0.75
+        },
+        "high": {
+            "name": "High",
+            "description": "High quality with good performance",
+            "shadows": true,
+            "shadowMapSize": 2048,
+            "ssao": true,
+            "ssr": false,
+            "rayTracing": false,
+            "volumetricLighting": true,
+            "lodBias": 0.5,
+            "drawDistance": 1536.0,
+            "terrainDetail": 1.0
+        },
+        "ultra": {
+            "name": "Ultra",
+            "description": "Maximum quality, requires powerful GPU",
+            "shadows": true,
+            "shadowMapSize": 4096,
+            "ssao": true,
+            "ssr": true,
+            "rayTracing": true,
+            "volumetricLighting": true,
+            "lodBias": 0.0,
+            "drawDistance": 2048.0,
+            "terrainDetail": 1.0
+        }
+    },
+    "default": "medium"
+}

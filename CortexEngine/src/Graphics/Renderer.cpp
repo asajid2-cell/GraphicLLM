@@ -7766,6 +7766,7 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         }
         v.tangent = glm::vec4(tangent, sign);
         v.texCoord = i < mesh->texCoords.size() ? mesh->texCoords[i] : glm::vec2(0, 0);
+        v.color = i < mesh->colors.size() ? mesh->colors[i] : glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
         vertices.push_back(v);
     }
 
@@ -11360,12 +11361,13 @@ Result<void> Renderer::CreateCommandList() {
     pipelineDesc.dsvFormat = DXGI_FORMAT_D32_FLOAT;
     pipelineDesc.numRenderTargets = 2;
 
-    // Define input layout
+    // Define input layout (must match Vertex struct in ShaderTypes.h)
     pipelineDesc.inputLayout = {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
     auto pipelineResult = m_pipeline->Initialize(
@@ -12811,8 +12813,15 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Transition shadow map to depth write
+    // Transition shadow map to depth write.
+    // The shadow map is a texture array with kShadowArraySize slices (cascades + local
+    // lights). We must ensure ALL subresources are in DEPTH_WRITE state before any
+    // depth clears or writes occur.
     if (!m_shadowPassSkipTransitions) {
+        // If the tracked state indicates we need a transition, issue it.
+        // Also check m_shadowMapInitializedForEditor to handle the first frame after
+        // switching to editor mode - the RenderGraph path may have left the shadow
+        // map in a different state than our tracking indicates.
         if (m_shadowMapState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
             D3D12_RESOURCE_BARRIER barrier = {};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -12823,6 +12832,9 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             m_commandList->ResourceBarrier(1, &barrier);
             m_shadowMapState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         }
+
+        // Mark that we've successfully initialized for editor mode
+        m_shadowMapInitializedForEditor = true;
     }
 
     auto view = registry->View<Scene::RenderableComponent, Scene::TransformComponent>();
@@ -13940,4 +13952,67 @@ Result<void> Renderer::UploadVoxelGridToGPU() {
 
     return Result<void>::Ok();
 }
+
+// =============================================================================
+// Engine Editor Mode: Selective Renderer Usage
+// These public wrappers delegate to the private implementation methods,
+// allowing EngineEditorMode to control the render flow.
+// =============================================================================
+
+void Renderer::BeginFrameForEditor() {
+    BeginFrame();
+}
+
+void Renderer::EndFrameForEditor() {
+    EndFrame();
+}
+
+void Renderer::PrepareMainPassForEditor() {
+    PrepareMainPass();
+}
+
+void Renderer::UpdateFrameConstantsForEditor(float deltaTime, Scene::ECS_Registry* registry) {
+    UpdateFrameConstants(deltaTime, registry);
+}
+
+void Renderer::RenderSkyboxForEditor() {
+    RenderSkybox();
+}
+
+void Renderer::RenderShadowPassForEditor(Scene::ECS_Registry* registry) {
+    RenderShadowPass(registry);
+}
+
+void Renderer::RenderSceneForEditor(Scene::ECS_Registry* registry) {
+    RenderScene(registry);
+}
+
+void Renderer::RenderSSAOForEditor() {
+    RenderSSAO();
+}
+
+void Renderer::RenderBloomForEditor() {
+    RenderBloom();
+}
+
+void Renderer::RenderPostProcessForEditor() {
+    RenderPostProcess();
+}
+
+void Renderer::RenderDebugLinesForEditor() {
+    RenderDebugLines();
+}
+
+void Renderer::RenderTAAForEditor() {
+    RenderTAA();
+}
+
+void Renderer::RenderSSRForEditor() {
+    RenderSSR();
+}
+
+void Renderer::PrewarmMaterialDescriptorsForEditor(Scene::ECS_Registry* registry) {
+    PrewarmMaterialDescriptors(registry);
+}
+
 } // namespace Cortex::Graphics

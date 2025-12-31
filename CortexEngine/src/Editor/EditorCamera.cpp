@@ -120,7 +120,11 @@ void EditorCamera::Update(float deltaTime) {
 
 void EditorCamera::UpdateFlyMode(float deltaTime) {
     // Apply mouse look
-    m_yaw -= m_pendingMouseX * m_mouseSensitivity;
+    // Positive mouseX (move right) should increase yaw (turn right)
+    // With GetForward() = (cos(pitch)*sin(yaw), ...), increasing yaw rotates towards +X
+    m_yaw += m_pendingMouseX * m_mouseSensitivity;
+    // Positive mouseY (move down) should decrease pitch (look down)
+    // With GetForward() Y = sin(pitch), decreasing pitch looks down (natural mouse)
     m_pitch -= m_pendingMouseY * m_mouseSensitivity;
     m_pitch = std::clamp(m_pitch, -1.5f, 1.5f);
 
@@ -131,8 +135,22 @@ void EditorCamera::UpdateFlyMode(float deltaTime) {
     glm::vec3 forward = GetForward();
     glm::vec3 right = GetRight();
 
-    if (m_moveForward) velocity += forward;
-    if (m_moveBack) velocity -= forward;
+    // Use horizontal-only forward/back when terrain callback exists
+    // This prevents diving into terrain when looking down
+    glm::vec3 moveForward = forward;
+    if (m_heightFunc) {
+        glm::vec3 horizontalForward = glm::vec3(forward.x, 0.0f, forward.z);
+        float horizontalLen = glm::length(horizontalForward);
+        if (horizontalLen > 0.001f) {
+            moveForward = horizontalForward / horizontalLen;
+        } else {
+            // Looking straight up/down - use yaw-based forward
+            moveForward = glm::vec3(std::sin(m_yaw), 0.0f, std::cos(m_yaw));
+        }
+    }
+
+    if (m_moveForward) velocity += moveForward;
+    if (m_moveBack) velocity -= moveForward;
     if (m_moveRight) velocity += right;
     if (m_moveLeft) velocity -= right;
     if (m_moveUp) velocity.y += 1.0f;
@@ -148,8 +166,8 @@ void EditorCamera::UpdateFlyMode(float deltaTime) {
 }
 
 void EditorCamera::UpdateOrbitMode(float deltaTime) {
-    // Apply mouse to orbit angles
-    m_orbitYaw -= m_pendingMouseX * m_mouseSensitivity;
+    // Apply mouse to orbit angles (same convention as fly mode)
+    m_orbitYaw += m_pendingMouseX * m_mouseSensitivity;
     m_orbitPitch -= m_pendingMouseY * m_mouseSensitivity;
     m_orbitPitch = std::clamp(m_orbitPitch, -1.4f, 1.4f);
 
@@ -236,6 +254,7 @@ void EditorCamera::ClampToTerrain() {
     float terrainHeight = m_heightFunc(m_position.x, m_position.z, m_heightUserData);
     float minHeight = terrainHeight + m_minHeightAboveTerrain;
 
+    // Hard clamp - never allow camera below minimum height
     if (m_position.y < minHeight) {
         m_position.y = minHeight;
     }

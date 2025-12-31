@@ -6907,6 +6907,12 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         spdlog::warn("RenderScene: Found {} entities but drew 0!", entityCount);
         m_zeroDrawWarningLogged = true;
     }
+
+    // Debug: periodic render statistics
+    static uint32_t s_renderLogCounter = 0;
+    if (++s_renderLogCounter % 120 == 0) {  // Log every ~2 seconds at 60fps
+        spdlog::info("RenderScene: entities={} drawn={}", entityCount, drawnCount);
+    }
 }
 
 void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
@@ -9101,7 +9107,8 @@ void Renderer::SetSunDirection(const glm::vec3& dir) {
         return;
     }
     m_directionalLightDirection = glm::normalize(d);
-    spdlog::info("Sun direction set to ({:.2f}, {:.2f}, {:.2f})",
+    // Debug level to avoid log spam when called every frame
+    spdlog::debug("Sun direction set to ({:.2f}, {:.2f}, {:.2f})",
                  m_directionalLightDirection.x,
                  m_directionalLightDirection.y,
                  m_directionalLightDirection.z);
@@ -9110,7 +9117,8 @@ void Renderer::SetSunDirection(const glm::vec3& dir) {
 void Renderer::SetSunColor(const glm::vec3& color) {
     glm::vec3 c = glm::max(color, glm::vec3(0.0f));
     m_directionalLightColor = c;
-    spdlog::info("Sun color set to ({:.2f}, {:.2f}, {:.2f})",
+    // Debug level to avoid log spam when called every frame
+    spdlog::debug("Sun color set to ({:.2f}, {:.2f}, {:.2f})",
                  m_directionalLightColor.x,
                  m_directionalLightColor.y,
                  m_directionalLightColor.z);
@@ -9119,7 +9127,8 @@ void Renderer::SetSunColor(const glm::vec3& color) {
 void Renderer::SetSunIntensity(float intensity) {
     float v = std::max(intensity, 0.0f);
     m_directionalLightIntensity = v;
-    spdlog::info("Sun intensity set to {:.2f}", m_directionalLightIntensity);
+    // Debug level to avoid log spam when called every frame
+    spdlog::debug("Sun intensity set to {:.2f}", m_directionalLightIntensity);
 }
 
 void Renderer::CycleEnvironmentPreset() {

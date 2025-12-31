@@ -6,6 +6,7 @@
 #include "Window.h"
 #include "Graphics/Renderer.h"
 #include "Scene/ECS_Registry.h"
+#include "Scene/Components.h"
 #include "Editor/EditorWorld.h"
 #include "Editor/EditorCamera.h"
 #include "Utils/ConfigLoader.h"
@@ -128,7 +129,29 @@ Result<void> EngineEditorMode::Initialize(Engine* engine, Graphics::Renderer* re
         },
         m_world.get()
     );
-    m_camera->SetMinHeightAboveTerrain(2.0f);
+    m_camera->SetMinHeightAboveTerrain(5.0f);  // Higher buffer for stability
+
+    // Create a camera entity in ECS for the renderer to use
+    // The EditorCamera is synced to this entity each frame
+    m_cameraEntity = m_registry->CreateEntity();
+    Scene::CameraComponent cam;
+    cam.fov = m_camera->GetFOV();
+    cam.nearPlane = 0.1f;
+    cam.farPlane = 2000.0f;
+    cam.isActive = true;
+    m_registry->GetRegistry().emplace<Scene::CameraComponent>(m_cameraEntity, cam);
+
+    Scene::TransformComponent camTransform;
+    camTransform.position = m_camera->GetPosition();
+    // Calculate rotation quaternion from yaw/pitch (negate pitch for correct direction)
+    float yaw = m_camera->GetYaw();
+    float pitch = m_camera->GetPitch();
+    glm::quat yawQuat = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::quat pitchQuat = glm::angleAxis(-pitch, glm::vec3(1.0f, 0.0f, 0.0f));  // Negated pitch
+    camTransform.rotation = yawQuat * pitchQuat;
+    camTransform.scale = glm::vec3(1.0f);
+    camTransform.worldMatrix = camTransform.GetLocalMatrix();  // Compute world matrix
+    m_registry->GetRegistry().emplace<Scene::TransformComponent>(m_cameraEntity, camTransform);
 
     // Configure renderer for editor mode
     // - Disable IBL (use procedural sky for terrain)
@@ -158,6 +181,12 @@ void EngineEditorMode::Shutdown() {
 
     // Release EditorCamera
     m_camera.reset();
+
+    // Destroy camera entity
+    if (m_registry && m_cameraEntity != entt::null) {
+        m_registry->DestroyEntity(m_cameraEntity);
+        m_cameraEntity = entt::null;
+    }
 
     m_engine = nullptr;
     m_renderer = nullptr;
@@ -254,22 +283,29 @@ void EngineEditorMode::RenderFull(float deltaTime) {
     // Begin frame (handles swap chain, command list allocation, etc.)
     m_renderer->BeginFrameForEditor();
 
+    // Sync EditorCamera position/rotation to ECS camera entity
+    // This must happen before UpdateFrameConstants so renderer uses current camera
+    SyncCameraToECS();
+
     // Update per-frame constants (camera, lights, time, etc.)
     m_renderer->UpdateFrameConstantsForEditor(deltaTime, m_registry);
 
     // Prewarm material descriptors for all entities (required for terrain chunks)
     m_renderer->PrewarmMaterialDescriptorsForEditor(m_registry);
 
-    // Prepare main render target
+    // Render shadows BEFORE PrepareMainPass - shadow pass changes the DSV binding
+    // and transitions the shadow map. We must complete shadow rendering before
+    // setting up the main pass render targets to avoid DSV binding conflicts.
+    if (m_state.shadows) {
+        m_renderer->RenderShadowPassForEditor(m_registry);
+    }
+
+    // Prepare main render target (binds HDR RTV + main depth DSV)
+    // This must happen AFTER shadow pass to ensure correct DSV binding.
     m_renderer->PrepareMainPassForEditor();
 
     // Render sky (procedural sky since IBL is disabled for terrain)
     m_renderer->RenderSkyboxForEditor();
-
-    // Render shadows if enabled
-    if (m_state.shadows) {
-        m_renderer->RenderShadowPassForEditor(m_registry);
-    }
 
     // Render scene geometry (terrain chunks, entities)
     m_renderer->RenderSceneForEditor(m_registry);
@@ -471,6 +507,30 @@ void EngineEditorMode::UpdateCamera(float /*deltaTime*/) {
         // No movement when not controlling camera
         m_camera->SetMovementInput(false, false, false, false, false, false, false);
     }
+}
+
+void EngineEditorMode::SyncCameraToECS() {
+    if (!m_camera || !m_registry || m_cameraEntity == entt::null) {
+        return;
+    }
+
+    // Update the ECS camera entity's transform to match EditorCamera
+    auto& transform = m_registry->GetRegistry().get<Scene::TransformComponent>(m_cameraEntity);
+    transform.position = m_camera->GetPosition();
+
+    // Calculate rotation quaternion from yaw/pitch
+    // EditorCamera::GetForward() = (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw))
+    // CameraComponent expects: rotation * (0,0,1) to give forward direction
+    // angleAxis(pitch, X) * (0,0,1) = (0, -sin(pitch), cos(pitch))
+    // So we need to negate pitch to get (0, sin(pitch), cos(pitch)) after rotation
+    float yaw = m_camera->GetYaw();
+    float pitch = m_camera->GetPitch();
+    glm::quat yawQuat = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::quat pitchQuat = glm::angleAxis(-pitch, glm::vec3(1.0f, 0.0f, 0.0f));  // Negated pitch
+    transform.rotation = yawQuat * pitchQuat;
+
+    // Update world matrix from position/rotation/scale
+    transform.worldMatrix = transform.GetLocalMatrix();
 }
 
 void EngineEditorMode::UpdateTimeOfDay(float /*deltaTime*/) {

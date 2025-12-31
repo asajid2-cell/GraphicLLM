@@ -181,6 +181,14 @@ void EditorWorld::Update(const glm::vec3& cameraPosition, float /*deltaTime*/) {
     // Update stats
     m_stats.loadedChunks = m_loadedChunks.size();
     m_stats.pendingChunks = m_pendingChunks.size();
+
+    // Debug: log chunk activity when there are changes
+    if (m_stats.chunksLoadedThisFrame > 0 || m_stats.chunksUnloadedThisFrame > 0) {
+        spdlog::info("Chunks: loaded={} pending={} +{}/-{} cam=({:.0f},{:.0f},{:.0f})",
+            m_stats.loadedChunks, m_stats.pendingChunks,
+            m_stats.chunksLoadedThisFrame, m_stats.chunksUnloadedThisFrame,
+            cameraPosition.x, cameraPosition.y, cameraPosition.z);
+    }
 }
 
 void EditorWorld::SetTerrainParams(const Scene::TerrainNoiseParams& params) {
@@ -305,8 +313,18 @@ void EditorWorld::ProcessCompletedChunks() {
         return;
     }
 
-    // Get completed chunks (limited per frame for smooth loading)
-    auto completed = m_chunkGenerator->GetCompletedChunks(m_config.maxChunksPerFrame);
+    // Don't fetch completed chunks if we're at capacity - let them queue up
+    // until distant chunks are unloaded. This prevents losing generated chunks.
+    if (m_loadedChunks.size() >= static_cast<size_t>(m_config.maxLoadedChunks)) {
+        return;
+    }
+
+    // Calculate how many we can load this frame
+    size_t roomAvailable = static_cast<size_t>(m_config.maxLoadedChunks) - m_loadedChunks.size();
+    size_t maxToProcess = std::min(roomAvailable, static_cast<size_t>(m_config.maxChunksPerFrame));
+
+    // Get completed chunks (limited by both frame budget and available capacity)
+    auto completed = m_chunkGenerator->GetCompletedChunks(maxToProcess);
 
     float totalGenTime = 0.0f;
 
@@ -319,39 +337,39 @@ void EditorWorld::ProcessCompletedChunks() {
         // Remove from pending
         m_pendingChunks.erase(result.coord);
 
-        // Check if we're at capacity
-        if (m_loadedChunks.size() >= static_cast<size_t>(m_config.maxLoadedChunks)) {
-            // Skip this chunk - we're at capacity
-            continue;
-        }
-
         // Upload mesh to GPU
+        bool uploadSuccess = true;
         if (result.mesh && m_renderer) {
             auto uploadResult = m_renderer->UploadMesh(result.mesh);
             if (uploadResult.IsErr()) {
                 spdlog::warn("Failed to upload chunk ({}, {}): {}",
                             result.coord.x, result.coord.z, uploadResult.Error());
-                continue;
+                uploadSuccess = false;
             }
         }
 
-        // Create entity
-        CreateChunkEntity(result.coord, result.mesh, result.lod);
+        // Create entity only if upload succeeded
+        if (uploadSuccess && result.mesh) {
+            CreateChunkEntity(result.coord, result.mesh, result.lod);
+            m_stats.chunksLoadedThisFrame++;
+            totalGenTime += result.generationTimeMs;
+        }
 
-        // Track in loaded chunks and spatial grid
+        // Always add to loaded chunks to prevent re-requesting
+        // (even if upload failed - chunk simply won't render)
         m_loadedChunks.insert(result.coord);
         m_spatialGrid->RegisterChunk(result.coord);
-
-        m_stats.chunksLoadedThisFrame++;
-        totalGenTime += result.generationTimeMs;
     }
 
     m_stats.chunkGenerationTimeMs = totalGenTime;
 }
 
 void EditorWorld::UnloadDistantChunks(const glm::vec3& cameraPos) {
-    // Calculate unload distance (slightly larger than load radius to prevent thrashing)
-    float unloadRadius = (m_config.loadRadius + 2) * m_config.chunkSize;
+    // Calculate unload distance - must account for square load pattern's diagonal
+    // Load pattern is a square with side 2*loadRadius, so diagonal is loadRadius*sqrt(2)
+    // Add buffer of 2 chunks beyond the diagonal to prevent thrashing at corners
+    // Formula: (loadRadius * 1.42 + 2) * chunkSize
+    float unloadRadius = (m_config.loadRadius * 1.42f + 2.0f) * m_config.chunkSize;
     float unloadRadiusSq = unloadRadius * unloadRadius;
 
     std::vector<ChunkCoord> chunksToUnload;
@@ -411,6 +429,8 @@ void EditorWorld::CreateChunkEntity(const ChunkCoord& coord,
     );
     transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     transform.scale = glm::vec3(1.0f);
+    // Compute worldMatrix for frustum culling (uses worldMatrix to transform bounds)
+    transform.worldMatrix = transform.GetLocalMatrix();
     m_registry->GetRegistry().emplace<Scene::TransformComponent>(entity, transform);
 
     // Renderable component

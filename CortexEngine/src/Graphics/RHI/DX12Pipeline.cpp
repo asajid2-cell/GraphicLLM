@@ -100,11 +100,11 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     }
 
     // Define root parameters
-    // We need: 4 CBVs (b0, b1, b2, b3) +
+    // We need: 5 CBVs (b0, b1, b2, b3, b4) +
     //          descriptor table for material textures (t0-t3) +
     //          descriptor table for shadow/IBL/RT textures (space1) +
     //          descriptor table for UAVs (u0-u3) for async compute
-    D3D12_ROOT_PARAMETER rootParameters[7] = {};
+    D3D12_ROOT_PARAMETER rootParameters[8] = {};
 
     // Parameter 0: Object constants (b0)
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -175,6 +175,12 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[6].DescriptorTable.NumDescriptorRanges = 1;
     rootParameters[6].DescriptorTable.pDescriptorRanges = &uavRange;
     rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;  // Both pixel and compute
+
+    // Parameter 7: Biome materials constants (b4)
+    rootParameters[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[7].Descriptor.ShaderRegister = 4;  // b4
+    rootParameters[7].Descriptor.RegisterSpace = 0;
+    rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     // Static sampler (s0)
     D3D12_STATIC_SAMPLER_DESC samplerDesc = {};

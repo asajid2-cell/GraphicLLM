@@ -355,10 +355,15 @@ void EditorWorld::ProcessCompletedChunks() {
             totalGenTime += result.generationTimeMs;
         }
 
-        // Always add to loaded chunks to prevent re-requesting
-        // (even if upload failed - chunk simply won't render)
-        m_loadedChunks.insert(result.coord);
-        m_spatialGrid->RegisterChunk(result.coord);
+        // Only mark as loaded if upload succeeded or mesh was null (nothing to upload)
+        // On upload failure, allow retry on next frame
+        if (uploadSuccess || !result.mesh) {
+            m_loadedChunks.insert(result.coord);
+            m_spatialGrid->RegisterChunk(result.coord);
+        } else {
+            spdlog::warn("Chunk ({}, {}) will be retried next frame",
+                         result.coord.x, result.coord.z);
+        }
     }
 
     m_stats.chunkGenerationTimeMs = totalGenTime;

@@ -473,4 +473,216 @@ float BiomeMap::Smoothstep(float edge0, float edge1, float x) {
     return t * t * (3.0f - 2.0f * t);
 }
 
+// ============================================================================
+// 4-WAY BLENDING IMPLEMENTATION
+// ============================================================================
+
+BiomeSample4 BiomeMap::Sample4(float worldX, float worldZ) const {
+    BiomeSample4 sample;
+
+    // Sample climate values
+    sample.temperature = SampleTemperature(worldX, worldZ);
+    sample.moisture = SampleMoisture(worldX, worldZ);
+
+    // Find up to 4 nearest biomes and their weights
+    FindNearestBiomes(worldX, worldZ, sample.biomes, sample.weights, sample.activeCount);
+    sample.NormalizeWeights();
+
+    return sample;
+}
+
+BiomeSample4 BiomeMap::Sample4WithNoise(float worldX, float worldZ, float noiseScale, float noiseStrength) const {
+    BiomeSample4 sample = Sample4(worldX, worldZ);
+
+    // Apply noise modulation to blend weights for natural transitions
+    ApplyNoiseToWeights(worldX, worldZ, sample.weights, noiseScale, noiseStrength);
+    sample.NormalizeWeights();
+
+    return sample;
+}
+
+BiomeSample4 BiomeMap::Sample4WithHeightOverride(float worldX, float worldZ, float height) const {
+    BiomeSample4 sample = Sample4WithNoise(worldX, worldZ, 0.1f, 0.15f);
+
+    // Apply height-based biome override (snowline)
+    ApplyHeightOverride(height, worldX, worldZ, sample.biomes, sample.weights, sample.activeCount);
+    sample.NormalizeWeights();
+
+    return sample;
+}
+
+void BiomeMap::FindNearestBiomes(float worldX, float worldZ,
+                                  BiomeType outBiomes[4], float outWeights[4], int& outCount) const {
+    // Scale to cell coordinates
+    float scaledX = worldX / m_params.cellSize;
+    float scaledZ = worldZ / m_params.cellSize;
+
+    // Integer cell coordinates
+    int cellIntX = static_cast<int>(std::floor(scaledX));
+    int cellIntZ = static_cast<int>(std::floor(scaledZ));
+
+    // Store candidates: distance, cellX, cellZ, biome
+    struct BiomeCandidate {
+        float distance;
+        BiomeType biome;
+    };
+    std::vector<BiomeCandidate> candidates;
+    candidates.reserve(9);
+
+    // Check 3x3 neighborhood
+    for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            int cx = cellIntX + dx;
+            int cz = cellIntZ + dz;
+
+            // Random offset within cell (jittered grid)
+            float jitterX = Hash2D(static_cast<float>(cx + m_params.seed), static_cast<float>(cz)) * 0.8f + 0.1f;
+            float jitterZ = Hash2D(static_cast<float>(cx), static_cast<float>(cz + m_params.seed)) * 0.8f + 0.1f;
+
+            float pointX = (cx + jitterX) * m_params.cellSize;
+            float pointZ = (cz + jitterZ) * m_params.cellSize;
+
+            float dist = std::sqrt((worldX - pointX) * (worldX - pointX) +
+                                   (worldZ - pointZ) * (worldZ - pointZ));
+
+            // Get biome at cell center
+            float cellTemp = SampleTemperature(pointX, pointZ);
+            float cellMoist = SampleMoisture(pointX, pointZ);
+            BiomeType biome = SelectBiomeFromClimate(cellTemp, cellMoist);
+
+            candidates.push_back({ dist, biome });
+        }
+    }
+
+    // Sort by distance
+    std::sort(candidates.begin(), candidates.end(),
+              [](const BiomeCandidate& a, const BiomeCandidate& b) {
+                  return a.distance < b.distance;
+              });
+
+    // Take up to 4 unique biomes, weighted by inverse distance
+    outCount = 0;
+    float totalWeight = 0.0f;
+
+    for (size_t i = 0; i < candidates.size() && outCount < 4; ++i) {
+        const auto& candidate = candidates[i];
+
+        // Check if we already have this biome
+        bool duplicate = false;
+        for (int j = 0; j < outCount; ++j) {
+            if (outBiomes[j] == candidate.biome) {
+                duplicate = true;
+                break;
+            }
+        }
+
+        if (!duplicate) {
+            outBiomes[outCount] = candidate.biome;
+
+            // Weight by inverse distance with blend radius consideration
+            float normalizedDist = candidate.distance / m_params.blendRadius;
+            float weight = std::max(0.0f, 1.0f - normalizedDist);
+            weight = weight * weight;  // Quadratic falloff
+
+            outWeights[outCount] = weight;
+            totalWeight += weight;
+            ++outCount;
+        }
+    }
+
+    // Fill remaining slots with primary biome
+    for (int i = outCount; i < 4; ++i) {
+        outBiomes[i] = outBiomes[0];
+        outWeights[i] = 0.0f;
+    }
+
+    // Normalize weights
+    if (totalWeight > 0.001f) {
+        for (int i = 0; i < 4; ++i) {
+            outWeights[i] /= totalWeight;
+        }
+    } else {
+        outWeights[0] = 1.0f;
+        for (int i = 1; i < 4; ++i) {
+            outWeights[i] = 0.0f;
+        }
+    }
+}
+
+void BiomeMap::ApplyNoiseToWeights(float worldX, float worldZ, float weights[4],
+                                    float noiseScale, float noiseStrength) const {
+    // Apply FBM noise modulation to each weight
+    for (int i = 0; i < 4; ++i) {
+        if (weights[i] < 0.01f) continue;
+
+        // Use different noise offsets for each biome layer
+        float noiseX = worldX * noiseScale + i * 17.3f;
+        float noiseZ = worldZ * noiseScale + i * 23.7f;
+
+        float noise = FBMNoise(noiseX, noiseZ, 1.0f, 4, 2.0f, 0.5f);
+        noise = noise * noiseStrength;  // noise is already in [-1, 1] range
+
+        weights[i] = std::clamp(weights[i] + noise, 0.0f, 1.0f);
+    }
+
+    // Re-normalize after noise application
+    float sum = weights[0] + weights[1] + weights[2] + weights[3];
+    if (sum > 0.001f) {
+        for (int i = 0; i < 4; ++i) {
+            weights[i] /= sum;
+        }
+    }
+}
+
+void BiomeMap::ApplyHeightOverride(float height, float worldX, float worldZ,
+                                    BiomeType biomes[4], float weights[4], int& activeCount) const {
+    // Calculate snowline blend factor
+    float snowBlend = Smoothstep(SNOWLINE_START, SNOWLINE_FULL, height);
+
+    if (snowBlend < 0.01f) return;  // Below snowline, no override
+
+    // Add noise variation to snowline for natural look
+    float noiseOffset = FBMNoise(worldX * 0.05f, worldZ * 0.05f, 1.0f, 3, 2.0f, 0.5f) * 20.0f;
+    snowBlend = Smoothstep(SNOWLINE_START, SNOWLINE_FULL, height - noiseOffset);
+
+    if (snowBlend < 0.01f) return;
+
+    // Find the slot with lowest weight to replace with snow biome
+    int minSlot = 0;
+    float minWeight = weights[0];
+    for (int i = 1; i < 4; ++i) {
+        if (weights[i] < minWeight) {
+            minWeight = weights[i];
+            minSlot = i;
+        }
+    }
+
+    // Check if snow biome is already present
+    for (int i = 0; i < 4; ++i) {
+        if (biomes[i] == SNOW_BIOME) {
+            // Boost its weight instead
+            weights[i] = std::max(weights[i], snowBlend);
+            return;
+        }
+    }
+
+    // Inject snow biome
+    biomes[minSlot] = SNOW_BIOME;
+    weights[minSlot] = snowBlend;
+
+    // Re-normalize
+    float sum = weights[0] + weights[1] + weights[2] + weights[3];
+    if (sum > 0.001f) {
+        for (int i = 0; i < 4; ++i) {
+            weights[i] /= sum;
+        }
+    }
+
+    // Update active count if needed
+    activeCount = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (weights[i] > 0.01f) ++activeCount;
+    }
+}
+
 } // namespace Cortex::Scene

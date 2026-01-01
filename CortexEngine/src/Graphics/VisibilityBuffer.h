@@ -212,7 +212,8 @@ public:
         ID3D12Resource* depthBuffer,
         D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
         const std::vector<VBMeshDrawInfo>& meshDraws,
-        const glm::mat4& viewProj
+        const glm::mat4& viewProj,
+        D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress = 0
     );
 
     // Optional: compute per-pixel motion vectors from the visibility buffer.

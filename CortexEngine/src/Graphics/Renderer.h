@@ -26,6 +26,8 @@
 #include "ShaderTypes.h"
 #include "Utils/Result.h"
 #include "../Scene/Components.h"
+#include "../Scene/BiomeTypes.h"
+#include "../Scene/VegetationTypes.h"
 #include "MeshBuffers.h"
 #include "Graphics/AssetRegistry.h"
 
@@ -386,6 +388,12 @@ public:
     [[nodiscard]] uint32_t GetGPUTotalInstances() const;
     [[nodiscard]] GPUCullingPipeline::DebugStats GetGPUCullingDebugStats() const;
 
+    // Biome materials buffer access (for VisibilityBuffer binding)
+    [[nodiscard]] bool IsBiomeMaterialsValid() const { return m_biomeMaterialsValid; }
+    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetBiomeMaterialsGPUAddress() const {
+        return m_biomeMaterialsBuffer.gpuAddress;
+    }
+
     // Experimental voxel backend toggle. When enabled, the main Render path
     // skips the traditional raster + RT pipeline and instead runs a
     // fullscreen voxel raymarch pass that visualizes the scene using a
@@ -429,6 +437,26 @@ public:
     void SetSunColor(const glm::vec3& color);
     void SetSunIntensity(float intensity);
     [[nodiscard]] float GetSunIntensity() const { return m_directionalLightIntensity; }
+
+    // Biome materials upload for terrain rendering
+    void UpdateBiomeMaterialsBuffer(const std::vector<Scene::BiomeConfig>& configs);
+    [[nodiscard]] bool AreBiomeMaterialsValid() const { return m_biomeMaterialsValid; }
+
+    // Vegetation rendering system
+    void SetVegetationEnabled(bool enabled) { m_vegetationEnabled = enabled; }
+    [[nodiscard]] bool IsVegetationEnabled() const { return m_vegetationEnabled; }
+    void UpdateVegetationInstances(const std::vector<Scene::VegetationInstance>& instances,
+                                   const std::vector<Scene::VegetationPrototype>& prototypes,
+                                   const glm::vec3& cameraPos);
+    void UpdateBillboardInstances(const std::vector<Scene::VegetationInstance>& instances,
+                                  const std::vector<Scene::VegetationPrototype>& prototypes);
+    void UpdateGrassInstances(const std::vector<Scene::VegetationInstance>& instances);
+    void SetWindParams(const Scene::WindParams& params) { m_windParams = params; }
+    [[nodiscard]] const Scene::WindParams& GetWindParams() const { return m_windParams; }
+    [[nodiscard]] const Scene::VegetationStats& GetVegetationStats() const { return m_vegetationStats; }
+    Result<void> LoadVegetationAtlas(const std::string& path);
+    void RenderVegetation(Scene::ECS_Registry* registry);
+    void RenderVegetationShadows(Scene::ECS_Registry* registry);
 
     // GPU job queue introspection for incremental loading / diagnostics.
     [[nodiscard]] bool HasPendingGpuJobs() const { return !m_gpuJobQueue.empty(); }
@@ -547,6 +575,18 @@ private:
     void RenderRayTracing(Scene::ECS_Registry* registry);
     void RenderRayTracedReflections();
     void RenderParticles(Scene::ECS_Registry* registry);
+
+    // Vegetation rendering helpers
+    Result<void> CreateVegetationPipelines();
+    Result<void> CreateVegetationInstanceBuffer(UINT capacity);
+    Result<void> CreateBillboardInstanceBuffer(UINT capacity);
+    Result<void> CreateGrassInstanceBuffer(UINT capacity);
+    void UpdateVegetationConstantBuffer(const glm::mat4& viewProj, const glm::mat4& view,
+                                        const glm::vec3& cameraPos, const glm::vec3& cameraRight,
+                                        const glm::vec3& cameraUp);
+    void RenderVegetationMeshes();
+    void RenderVegetationBillboards();
+    void RenderGrassCards();
 
     // GPU-driven rendering (Phase 1)
     void CollectInstancesForGPUCulling(Scene::ECS_Registry* registry);
@@ -673,6 +713,8 @@ public:
     ConstantBuffer<ObjectConstants> m_objectConstantBuffer;
     ConstantBuffer<MaterialConstants> m_materialConstantBuffer;
     ConstantBuffer<ShadowConstants> m_shadowConstantBuffer;
+    ConstantBuffer<Scene::BiomeMaterialsCBuffer> m_biomeMaterialsBuffer;
+    bool m_biomeMaterialsValid = false;  // Track if biome materials have been uploaded
 
     // Upload helpers
     static constexpr uint32_t kUploadPoolSize = 4;
@@ -1137,6 +1179,29 @@ public:
     ComPtr<ID3D12Resource> m_particleInstanceBuffer;
     UINT                   m_particleInstanceCapacity = 0;
     ComPtr<ID3D12Resource> m_particleQuadVertexBuffer;
+
+    // Vegetation rendering system
+    std::unique_ptr<DX12Pipeline> m_vegetationMeshPipeline;        // Instanced 3D vegetation
+    std::unique_ptr<DX12Pipeline> m_vegetationMeshShadowPipeline;  // Shadow pass for vegetation
+    std::unique_ptr<DX12Pipeline> m_vegetationBillboardPipeline;   // Billboard/impostor rendering
+    std::unique_ptr<DX12Pipeline> m_grassCardPipeline;             // Cross-card grass
+    ConstantBuffer<VegetationConstants> m_vegetationConstantBuffer;
+    ComPtr<ID3D12Resource> m_vegetationInstanceBuffer;             // VegetationInstanceGPU[]
+    DescriptorHandle m_vegetationInstanceSRV;
+    UINT m_vegetationInstanceCapacity = 0;
+    UINT m_vegetationInstanceCount = 0;
+    ComPtr<ID3D12Resource> m_billboardInstanceBuffer;              // BillboardInstanceGPU[]
+    DescriptorHandle m_billboardInstanceSRV;
+    UINT m_billboardInstanceCapacity = 0;
+    UINT m_billboardInstanceCount = 0;
+    ComPtr<ID3D12Resource> m_grassInstanceBuffer;                  // GrassInstanceGPU[]
+    DescriptorHandle m_grassInstanceSRV;
+    UINT m_grassInstanceCapacity = 0;
+    UINT m_grassInstanceCount = 0;
+    std::shared_ptr<DX12Texture> m_vegetationAtlas;                // Billboard atlas texture
+    bool m_vegetationEnabled = true;
+    Scene::WindParams m_windParams;
+    Scene::VegetationStats m_vegetationStats;
 
     // Frame state
     float m_totalTime = 0.0f;

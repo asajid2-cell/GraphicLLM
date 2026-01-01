@@ -9,6 +9,7 @@
 #include "Scene/Components.h"
 #include "Editor/EditorWorld.h"
 #include "Editor/EditorCamera.h"
+#include "Scene/BiomeMap.h"
 #include "Utils/ConfigLoader.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -113,6 +114,12 @@ Result<void> EngineEditorMode::Initialize(Engine* engine, Graphics::Renderer* re
     auto worldResult = m_world->Initialize(renderer, registry, worldConfig);
     if (worldResult.IsErr()) {
         return Result<void>::Err("Failed to initialize EditorWorld: " + worldResult.Error());
+    }
+
+    // Upload biome materials to GPU for terrain shading
+    if (m_world->GetBiomeMap() && m_world->GetBiomeMap()->IsInitialized()) {
+        m_renderer->UpdateBiomeMaterialsBuffer(m_world->GetBiomeMap()->GetAllConfigs());
+        spdlog::info("Uploaded {} biome materials to GPU", m_world->GetBiomeMap()->GetAllConfigs().size());
     }
 
     // Set initial camera position (above terrain center)

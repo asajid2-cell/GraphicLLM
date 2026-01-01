@@ -892,6 +892,13 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
 
+    // Biome materials constant buffer for GPU-side material lookups.
+    // Single slot since biome configs are static per-frame.
+    cbResult = m_biomeMaterialsBuffer.Initialize(device->GetDevice(), 1);
+    if (cbResult.IsErr()) {
+        return Result<void>::Err("Failed to create biome materials constant buffer: " + cbResult.Error());
+    }
+
     // Initialize GPU breadcrumb buffer for device-removed diagnostics.
     auto breadcrumbResult = CreateBreadcrumbBuffer();
     if (breadcrumbResult.IsErr()) {
@@ -3158,6 +3165,519 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
 
     m_commandList->DrawInstanced(4, instanceCount, 0, 0);
 }
+
+// ============================================================================
+// Vegetation Rendering System
+// ============================================================================
+
+Result<void> Renderer::CreateVegetationPipelines() {
+    // Vegetation pipelines will be created when needed
+    // The shaders are: VegetationMesh.hlsl and VegetationBillboard.hlsl
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateVegetationInstanceBuffer(UINT capacity) {
+    if (m_deviceRemoved || !m_device) {
+        return Result<void>::Err("Device not available");
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("D3D12 device is null");
+    }
+
+    // Wait for GPU if replacing existing buffer
+    if (m_vegetationInstanceBuffer) {
+        WaitForGPU();
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = static_cast<UINT64>(capacity) * sizeof(VegetationInstanceGPU);
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_vegetationInstanceBuffer));
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create vegetation instance buffer");
+    }
+
+    m_vegetationInstanceCapacity = capacity;
+
+    // Create SRV for structured buffer access
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Buffer.FirstElement = 0;
+    srvDesc.Buffer.NumElements = capacity;
+    srvDesc.Buffer.StructureByteStride = sizeof(VegetationInstanceGPU);
+    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+    if (m_descriptorManager) {
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsOk()) {
+            m_vegetationInstanceSRV = srvResult.Value();
+            device->CreateShaderResourceView(m_vegetationInstanceBuffer.Get(), &srvDesc,
+                                             m_vegetationInstanceSRV.cpu);
+        }
+    }
+
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateBillboardInstanceBuffer(UINT capacity) {
+    if (m_deviceRemoved || !m_device) {
+        return Result<void>::Err("Device not available");
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("D3D12 device is null");
+    }
+
+    if (m_billboardInstanceBuffer) {
+        WaitForGPU();
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = static_cast<UINT64>(capacity) * sizeof(BillboardInstanceGPU);
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_billboardInstanceBuffer));
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create billboard instance buffer");
+    }
+
+    m_billboardInstanceCapacity = capacity;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Buffer.FirstElement = 0;
+    srvDesc.Buffer.NumElements = capacity;
+    srvDesc.Buffer.StructureByteStride = sizeof(BillboardInstanceGPU);
+    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+    if (m_descriptorManager) {
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsOk()) {
+            m_billboardInstanceSRV = srvResult.Value();
+            device->CreateShaderResourceView(m_billboardInstanceBuffer.Get(), &srvDesc,
+                                             m_billboardInstanceSRV.cpu);
+        }
+    }
+
+    return Result<void>::Ok();
+}
+
+Result<void> Renderer::CreateGrassInstanceBuffer(UINT capacity) {
+    if (m_deviceRemoved || !m_device) {
+        return Result<void>::Err("Device not available");
+    }
+
+    ID3D12Device* device = m_device->GetDevice();
+    if (!device) {
+        return Result<void>::Err("D3D12 device is null");
+    }
+
+    if (m_grassInstanceBuffer) {
+        WaitForGPU();
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = static_cast<UINT64>(capacity) * sizeof(GrassInstanceGPU);
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_grassInstanceBuffer));
+
+    if (FAILED(hr)) {
+        return Result<void>::Err("Failed to create grass instance buffer");
+    }
+
+    m_grassInstanceCapacity = capacity;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Buffer.FirstElement = 0;
+    srvDesc.Buffer.NumElements = capacity;
+    srvDesc.Buffer.StructureByteStride = sizeof(GrassInstanceGPU);
+    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+    if (m_descriptorManager) {
+        auto srvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (srvResult.IsOk()) {
+            m_grassInstanceSRV = srvResult.Value();
+            device->CreateShaderResourceView(m_grassInstanceBuffer.Get(), &srvDesc,
+                                             m_grassInstanceSRV.cpu);
+        }
+    }
+
+    return Result<void>::Ok();
+}
+
+void Renderer::UpdateVegetationConstantBuffer(const glm::mat4& viewProj, const glm::mat4& view,
+                                               const glm::vec3& cameraPos, const glm::vec3& cameraRight,
+                                               const glm::vec3& cameraUp) {
+    VegetationConstants constants{};
+    constants.viewProj = viewProj;
+    constants.view = view;
+    constants.cameraPosition = glm::vec4(cameraPos, m_totalTime);
+    constants.cameraRight = glm::vec4(cameraRight, 0.0f);
+    constants.cameraUp = glm::vec4(cameraUp, 0.0f);
+    constants.windDirection = glm::vec4(m_windParams.direction, m_windParams.speed, m_windParams.time);
+    constants.windParams = glm::vec4(m_windParams.gustStrength, m_windParams.gustFrequency,
+                                     m_windParams.turbulence, 0.0f);
+    constants.lodDistances = glm::vec4(50.0f, 100.0f, 200.0f, 500.0f);  // Default LOD distances
+    constants.fadeParams = glm::vec4(5.0f, 1.0f, 0.0005f, 0.0f);  // crossfade, dither, shadow bias
+
+    m_vegetationConstantBuffer.UpdateData(constants);
+}
+
+void Renderer::UpdateVegetationInstances(const std::vector<Scene::VegetationInstance>& instances,
+                                          const std::vector<Scene::VegetationPrototype>& prototypes,
+                                          const glm::vec3& cameraPos) {
+    if (instances.empty()) {
+        m_vegetationInstanceCount = 0;
+        return;
+    }
+
+    const UINT instanceCount = static_cast<UINT>(instances.size());
+    const UINT minCapacity = 1024;
+    const UINT requiredCapacity = std::max(instanceCount, minCapacity);
+
+    // Resize buffer if needed
+    if (!m_vegetationInstanceBuffer || m_vegetationInstanceCapacity < requiredCapacity) {
+        auto result = CreateVegetationInstanceBuffer(requiredCapacity);
+        if (!result.IsOk()) {
+            spdlog::warn("Failed to create vegetation instance buffer: {}", result.Error());
+            return;
+        }
+    }
+
+    // Build GPU instance data
+    std::vector<VegetationInstanceGPU> gpuInstances;
+    gpuInstances.reserve(instanceCount);
+
+    for (const auto& inst : instances) {
+        if (!inst.IsVisible()) continue;
+
+        VegetationInstanceGPU gpuInst{};
+
+        // Build world matrix from position, rotation, scale
+        glm::mat4 translation = glm::translate(glm::mat4(1.0f), inst.position);
+        glm::mat4 rotation = glm::mat4_cast(inst.rotation);
+        glm::mat4 scale = glm::scale(glm::mat4(1.0f), inst.scale);
+        gpuInst.worldMatrix = translation * rotation * scale;
+
+        // Color tint (use default white if no variation)
+        gpuInst.colorTint = glm::vec4(1.0f);
+
+        // Wind parameters - use distance to camera to vary phase
+        float phase = glm::dot(inst.position, glm::vec3(0.1f, 0.0f, 0.1f));
+        float windStrength = inst.IsWindAffected() ? 1.0f : 0.0f;
+
+        // Calculate fade alpha based on LOD distance
+        float lodFade = 1.0f;
+        if (inst.prototypeIndex < prototypes.size()) {
+            const auto& proto = prototypes[inst.prototypeIndex];
+            float dist = inst.distanceToCamera;
+
+            // Calculate fade based on current LOD transition
+            if (inst.currentLOD == Scene::VegetationLOD::Full && dist > proto.lodDistance0 - proto.crossfadeRange) {
+                lodFade = 1.0f - (dist - (proto.lodDistance0 - proto.crossfadeRange)) / proto.crossfadeRange;
+            } else if (inst.currentLOD == Scene::VegetationLOD::Medium && dist > proto.lodDistance1 - proto.crossfadeRange) {
+                lodFade = 1.0f - (dist - (proto.lodDistance1 - proto.crossfadeRange)) / proto.crossfadeRange;
+            } else if (inst.currentLOD == Scene::VegetationLOD::Low && dist > proto.lodDistance2 - proto.crossfadeRange) {
+                lodFade = 1.0f - (dist - (proto.lodDistance2 - proto.crossfadeRange)) / proto.crossfadeRange;
+            }
+        }
+
+        gpuInst.windParams = glm::vec4(phase, windStrength, 1.0f, lodFade);
+        gpuInst.prototypeIndex = inst.prototypeIndex;
+        gpuInst.lodLevel = static_cast<uint32_t>(inst.currentLOD);
+        gpuInst.fadeAlpha = glm::clamp(lodFade, 0.0f, 1.0f);
+        gpuInst.padding = 0.0f;
+
+        gpuInstances.push_back(gpuInst);
+    }
+
+    m_vegetationInstanceCount = static_cast<UINT>(gpuInstances.size());
+
+    if (m_vegetationInstanceCount == 0) {
+        return;
+    }
+
+    // Upload to GPU
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{0, 0};
+    HRESULT hr = m_vegetationInstanceBuffer->Map(0, &readRange, &mapped);
+    if (SUCCEEDED(hr)) {
+        memcpy(mapped, gpuInstances.data(), gpuInstances.size() * sizeof(VegetationInstanceGPU));
+        m_vegetationInstanceBuffer->Unmap(0, nullptr);
+    } else {
+        spdlog::warn("Failed to map vegetation instance buffer");
+    }
+
+    // Update stats
+    m_vegetationStats.totalInstances = static_cast<uint32_t>(instances.size());
+    m_vegetationStats.visibleInstances = m_vegetationInstanceCount;
+}
+
+void Renderer::UpdateBillboardInstances(const std::vector<Scene::VegetationInstance>& instances,
+                                         const std::vector<Scene::VegetationPrototype>& prototypes) {
+    // Filter to only billboard LOD instances
+    std::vector<BillboardInstanceGPU> gpuInstances;
+
+    for (const auto& inst : instances) {
+        if (!inst.IsVisible() || inst.currentLOD != Scene::VegetationLOD::Billboard) {
+            continue;
+        }
+
+        BillboardInstanceGPU gpuInst{};
+        gpuInst.position = inst.position;
+        gpuInst.padding0 = 0.0f;
+
+        // Get size from prototype or use default
+        float width = 2.0f;
+        float height = 4.0f;
+        if (inst.prototypeIndex < prototypes.size()) {
+            // Use average scale as size multiplier
+            float avgScale = (inst.scale.x + inst.scale.y + inst.scale.z) / 3.0f;
+            width *= avgScale;
+            height *= avgScale;
+        }
+        gpuInst.size = glm::vec2(width, height);
+        gpuInst.padding1 = glm::vec2(0.0f);
+
+        // Default UV bounds (full atlas region)
+        gpuInst.uvBounds = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+        gpuInst.colorTint = glm::vec4(1.0f);
+
+        // Random rotation based on position
+        gpuInst.rotation = glm::fract(inst.position.x * 0.1f + inst.position.z * 0.1f) * 6.28318f;
+        gpuInst.windPhase = glm::dot(inst.position, glm::vec3(0.1f, 0.0f, 0.1f));
+        gpuInst.windStrength = inst.IsWindAffected() ? 0.5f : 0.0f;
+        gpuInst.padding2 = 0.0f;
+
+        gpuInstances.push_back(gpuInst);
+    }
+
+    const UINT instanceCount = static_cast<UINT>(gpuInstances.size());
+    if (instanceCount == 0) {
+        m_billboardInstanceCount = 0;
+        return;
+    }
+
+    const UINT requiredCapacity = std::max(instanceCount, 1024u);
+    if (!m_billboardInstanceBuffer || m_billboardInstanceCapacity < requiredCapacity) {
+        auto result = CreateBillboardInstanceBuffer(requiredCapacity);
+        if (!result.IsOk()) {
+            spdlog::warn("Failed to create billboard instance buffer");
+            return;
+        }
+    }
+
+    m_billboardInstanceCount = instanceCount;
+
+    // Upload to GPU
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{0, 0};
+    HRESULT hr = m_billboardInstanceBuffer->Map(0, &readRange, &mapped);
+    if (SUCCEEDED(hr)) {
+        memcpy(mapped, gpuInstances.data(), gpuInstances.size() * sizeof(BillboardInstanceGPU));
+        m_billboardInstanceBuffer->Unmap(0, nullptr);
+    }
+
+    m_vegetationStats.billboardCount = instanceCount;
+}
+
+void Renderer::UpdateGrassInstances(const std::vector<Scene::VegetationInstance>& instances) {
+    std::vector<GrassInstanceGPU> gpuInstances;
+
+    for (const auto& inst : instances) {
+        if (!inst.IsVisible()) continue;
+
+        GrassInstanceGPU gpuInst{};
+        glm::mat4 translation = glm::translate(glm::mat4(1.0f), inst.position);
+        glm::mat4 rotation = glm::mat4_cast(inst.rotation);
+        glm::mat4 scale = glm::scale(glm::mat4(1.0f), inst.scale);
+        gpuInst.worldMatrix = translation * rotation * scale;
+        gpuInst.colorTint = glm::vec4(0.3f, 0.6f, 0.2f, 1.0f);  // Grass green
+        gpuInst.windPhase = glm::dot(inst.position, glm::vec3(0.1f, 0.0f, 0.1f));
+        gpuInst.windStrength = inst.IsWindAffected() ? 1.0f : 0.0f;
+        gpuInst.height = inst.scale.y;
+        gpuInst.bend = 0.1f;
+
+        gpuInstances.push_back(gpuInst);
+    }
+
+    const UINT instanceCount = static_cast<UINT>(gpuInstances.size());
+    if (instanceCount == 0) {
+        m_grassInstanceCount = 0;
+        return;
+    }
+
+    const UINT requiredCapacity = std::max(instanceCount, 4096u);
+    if (!m_grassInstanceBuffer || m_grassInstanceCapacity < requiredCapacity) {
+        auto result = CreateGrassInstanceBuffer(requiredCapacity);
+        if (!result.IsOk()) {
+            spdlog::warn("Failed to create grass instance buffer");
+            return;
+        }
+    }
+
+    m_grassInstanceCount = instanceCount;
+
+    void* mapped = nullptr;
+    D3D12_RANGE readRange{0, 0};
+    HRESULT hr = m_grassInstanceBuffer->Map(0, &readRange, &mapped);
+    if (SUCCEEDED(hr)) {
+        memcpy(mapped, gpuInstances.data(), gpuInstances.size() * sizeof(GrassInstanceGPU));
+        m_grassInstanceBuffer->Unmap(0, nullptr);
+    }
+}
+
+Result<void> Renderer::LoadVegetationAtlas(const std::string& path) {
+    auto result = LoadTextureFromFile(path, true, AssetRegistry::TextureKind::Generic);
+    if (!result.IsOk()) {
+        return Result<void>::Err(result.Error());
+    }
+    m_vegetationAtlas = result.Value();
+    return Result<void>::Ok();
+}
+
+void Renderer::RenderVegetation(Scene::ECS_Registry* registry) {
+    if (!m_vegetationEnabled || m_deviceRemoved) {
+        return;
+    }
+
+    // Update wind time
+    m_windParams.time += 0.016f;  // Approximate delta time
+
+    // Render instanced vegetation meshes
+    RenderVegetationMeshes();
+
+    // Render billboards
+    RenderVegetationBillboards();
+
+    // Render grass cards
+    RenderGrassCards();
+}
+
+void Renderer::RenderVegetationMeshes() {
+    if (m_vegetationInstanceCount == 0 || !m_vegetationMeshPipeline) {
+        return;
+    }
+
+    // TODO: When vegetation mesh pipeline is fully implemented:
+    // 1. Set pipeline state
+    // 2. Bind instance buffer as SRV
+    // 3. Draw instanced for each prototype/LOD batch
+
+    // For now, this is a placeholder that will be filled in when
+    // the full vegetation mesh rendering is integrated
+}
+
+void Renderer::RenderVegetationBillboards() {
+    if (m_billboardInstanceCount == 0 || !m_vegetationBillboardPipeline) {
+        return;
+    }
+
+    // TODO: When billboard pipeline is fully implemented:
+    // 1. Set billboard pipeline state
+    // 2. Bind billboard instance buffer
+    // 3. Bind vegetation atlas
+    // 4. Draw using vertex shader expansion (4 vertices per billboard)
+}
+
+void Renderer::RenderGrassCards() {
+    if (m_grassInstanceCount == 0 || !m_grassCardPipeline) {
+        return;
+    }
+
+    // TODO: When grass card pipeline is fully implemented:
+    // 1. Set grass pipeline state
+    // 2. Bind grass instance buffer
+    // 3. Draw instanced grass cards with wind animation
+}
+
+void Renderer::RenderVegetationShadows(Scene::ECS_Registry* registry) {
+    if (!m_vegetationEnabled || m_deviceRemoved || !m_vegetationMeshShadowPipeline) {
+        return;
+    }
+
+    // Shadow pass for vegetation - similar to mesh shadow rendering
+    // but with instanced vegetation data
+
+    // TODO: Implement shadow rendering for vegetation when shadow
+    // pipeline is fully integrated
+}
+
+// ============================================================================
 
 void Renderer::PrepareMainPass() {
     // Main pass renders into HDR + normal/roughness G-buffer when available,
@@ -6028,7 +6548,8 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
         m_depthBuffer.Get(),
         m_depthSRV.cpu,
         m_vbMeshDraws,
-        m_frameDataCPU.viewProjectionMatrix
+        m_frameDataCPU.viewProjectionMatrix,
+        m_biomeMaterialsValid ? m_biomeMaterialsBuffer.gpuAddress : 0
     );
 
     if (resolveResult.IsErr()) {
@@ -6580,6 +7101,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     if (m_fallbackMaterialDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(3, m_fallbackMaterialDescriptors[0].gpu);
     }
+    if (m_biomeMaterialsValid) {
+        m_commandList->SetGraphicsRootConstantBufferView(7, m_biomeMaterialsBuffer.gpuAddress);
+    }
 
     const UINT maxCommands = static_cast<UINT>(commands.size());
     ID3D12CommandSignature* cmdSig = nullptr; // m_indirectCommandSignature.Get(); // FIX ME: identifier not found
@@ -6619,6 +7143,11 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     // Bind shadow map + environment descriptor table if available (t4-t6)
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
+    }
+
+    // Bind biome materials buffer (b4) if valid
+    if (m_biomeMaterialsValid) {
+        m_commandList->SetGraphicsRootConstantBufferView(7, m_biomeMaterialsBuffer.gpuAddress);
     }
 
     // Render all entities with Renderable and Transform components
@@ -14022,6 +14551,51 @@ void Renderer::RenderSSRForEditor() {
 
 void Renderer::PrewarmMaterialDescriptorsForEditor(Scene::ECS_Registry* registry) {
     PrewarmMaterialDescriptors(registry);
+}
+
+void Renderer::UpdateBiomeMaterialsBuffer(const std::vector<Scene::BiomeConfig>& configs) {
+    if (configs.empty()) {
+        m_biomeMaterialsValid = false;
+        return;
+    }
+
+    Scene::BiomeMaterialsCBuffer cbData = {};
+    cbData.biomeCount = static_cast<uint32_t>(std::min(configs.size(), size_t(16)));
+
+    for (size_t i = 0; i < cbData.biomeCount; ++i) {
+        const auto& cfg = configs[i];
+        auto& gpu = cbData.biomes[i];
+
+        gpu.baseColor = cfg.baseColor;
+        gpu.slopeColor = cfg.slopeColor;
+        gpu.roughness = cfg.roughness;
+        gpu.metallic = cfg.metallic;
+
+        // Initialize height layer arrays to safe defaults
+        for (int j = 0; j < 4; ++j) {
+            gpu.heightLayerMin[j] = -1000.0f;
+            gpu.heightLayerMax[j] = 1000.0f;
+            gpu.heightLayerColor[j] = cfg.baseColor;
+        }
+
+        // Copy height layers from config (up to 4)
+        size_t layerCount = std::min(cfg.heightLayers.size(), size_t(4));
+        for (size_t j = 0; j < layerCount; ++j) {
+            const auto& layer = cfg.heightLayers[j];
+            gpu.heightLayerMin[j] = layer.minHeight;
+            gpu.heightLayerMax[j] = layer.maxHeight;
+            gpu.heightLayerColor[j] = layer.color;
+        }
+
+        gpu.padding[0] = 0.0f;
+        gpu.padding[1] = 0.0f;
+    }
+
+    // Upload to GPU
+    m_biomeMaterialsBuffer.UpdateData(cbData);
+    m_biomeMaterialsValid = true;
+
+    spdlog::info("Renderer: Updated biome materials buffer with {} biomes", cbData.biomeCount);
 }
 
 } // namespace Cortex::Graphics

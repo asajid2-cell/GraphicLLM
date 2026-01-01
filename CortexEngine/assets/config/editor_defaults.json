@@ -1,10 +1,10 @@
 {
     "world": {
         "chunkSize": 64.0,
-        "loadRadius": 8,
-        "maxLoadedChunks": 400,
-        "chunkGeneratorThreads": 2,
-        "maxChunksPerFrame": 2
+        "loadRadius": 6,
+        "maxLoadedChunks": 200,
+        "chunkGeneratorThreads": 4,
+        "maxChunksPerFrame": 8
     },
     "lod": {
         "distance1": 256.0,

@@ -290,15 +290,16 @@ struct BiomeVertexData4 {
 
 // GPU-side biome material data (matches HLSL cbuffer layout)
 // This is uploaded as a constant buffer for the terrain shader
+// CRITICAL: Layout must exactly match BiomeMaterial in BiomeMaterials.hlsli!
 struct alignas(16) BiomeMaterialGPU {
-    glm::vec4 baseColor;           // 16 bytes
-    glm::vec4 slopeColor;          // 16 bytes
-    float roughness;               // 4 bytes
-    float metallic;                // 4 bytes
-    float heightLayerMin[4];       // 16 bytes (padded)
-    float heightLayerMax[4];       // 16 bytes
-    glm::vec4 heightLayerColor[4]; // 64 bytes
-    float padding[2];              // 8 bytes for alignment
+    glm::vec4 baseColor;           // 16 bytes @ offset 0
+    glm::vec4 slopeColor;          // 16 bytes @ offset 16
+    float roughness;               // 4 bytes @ offset 32
+    float metallic;                // 4 bytes @ offset 36
+    float _pad0[2];                // 8 bytes @ offset 40 (matches HLSL float2 _pad0)
+    float heightLayerMin[4];       // 16 bytes @ offset 48 (16-byte aligned for HLSL float4)
+    float heightLayerMax[4];       // 16 bytes @ offset 64
+    glm::vec4 heightLayerColor[4]; // 64 bytes @ offset 80
     // Total: 144 bytes per biome
 };
 

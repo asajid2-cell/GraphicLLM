@@ -870,10 +870,22 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     }
 
     // Create constant buffers
-    auto cbResult = m_frameConstantBuffer.Initialize(device->GetDevice());
+    // Use kFrameCount slots to avoid race conditions with triple buffering
+    auto cbResult = m_frameConstantBuffer.Initialize(device->GetDevice(), kFrameCount);
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create frame constant buffer: " + cbResult.Error());
     }
+    // Initialize all frame constant slots with default data to prevent reading garbage on first frames
+    // This ensures m_currentFrameConstantsGPU is valid before any render pass tries to use it
+    FrameConstants defaultFrameData = {};
+    defaultFrameData.viewMatrix = glm::mat4(1.0f);
+    defaultFrameData.projectionMatrix = glm::mat4(1.0f);
+    defaultFrameData.viewProjectionMatrix = glm::mat4(1.0f);
+    defaultFrameData.invProjectionMatrix = glm::mat4(1.0f);
+    for (uint32_t i = 0; i < kFrameCount; ++i) {
+        m_frameConstantBuffer.WriteToSlot(defaultFrameData, i);
+    }
+    m_currentFrameConstantsGPU = m_frameConstantBuffer.WriteToSlot(defaultFrameData, 0);
 
     cbResult = m_objectConstantBuffer.Initialize(device->GetDevice(), 1024); // enough for typical scenes per frame
     if (cbResult.IsErr()) {
@@ -885,9 +897,9 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
         return Result<void>::Err("Failed to create material constant buffer: " + cbResult.Error());
     }
 
-    // Shadow constants: one slot per cascade so we can safely
-    // update them independently while recording the shadow pass.
-    cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice(), kShadowCascadeCount);
+    // Shadow constants: need slots for all cascades + local lights per frame.
+    // Multiply by kFrameCount to avoid race conditions with triple buffering.
+    cbResult = m_shadowConstantBuffer.Initialize(device->GetDevice(), kShadowArraySize * kFrameCount);
     if (cbResult.IsErr()) {
         return Result<void>::Err("Failed to create shadow constant buffer: " + cbResult.Error());
     }
@@ -2335,7 +2347,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 rtCmdList.Get(),
                 m_depthSRV,
                 m_rtShadowMaskUAV,
-                m_frameConstantBuffer.gpuAddress,
+                m_currentFrameConstantsGPU,
                 envTable);
     }
 
@@ -2369,7 +2381,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 rtCmdList.Get(),
                 m_depthSRV,
                 m_rtGIUAV,
-                m_frameConstantBuffer.gpuAddress,
+                m_currentFrameConstantsGPU,
                 envTable,
                 giW,
                 giH);
@@ -2558,7 +2570,7 @@ void Renderer::RenderRayTracedReflections() {
             rtCmdList.Get(), 
             m_depthSRV, 
             m_rtReflectionUAV, 
-            m_frameConstantBuffer.gpuAddress, 
+            m_currentFrameConstantsGPU, 
             envTable, 
             normalSrv, 
             reflW, 
@@ -2709,6 +2721,17 @@ void Renderer::BeginFrame() {
 
     // Wait for this frame's command allocator/descriptor segment to be available
     m_frameIndex = m_window->GetCurrentBackBufferIndex();
+
+    // Notify visibility buffer of current frame index for triple-buffered resources
+    if (m_visibilityBuffer) {
+        m_visibilityBuffer->SetFrameIndex(m_frameIndex);
+    }
+
+    // Notify GPU culling of current frame index for triple-buffered visibility mask
+    if (m_gpuCulling) {
+        m_gpuCulling->SetFrameIndex(m_frameIndex);
+    }
+
     if (m_fenceValues[m_frameIndex] != 0) {
         uint64_t completedValue = m_commandQueue->GetLastCompletedFenceValue();
         uint64_t expectedValue = m_fenceValues[m_frameIndex];
@@ -2841,6 +2864,7 @@ void Renderer::BeginFrame() {
     // Reset dynamic constant buffer offsets (safe because we fence each frame)
     m_objectConstantBuffer.ResetOffset();
     m_materialConstantBuffer.ResetOffset();
+    m_shadowConstantBuffer.ResetOffset();
 
     // Ensure outstanding uploads are complete before reusing upload allocator
     if (m_uploadQueue) {
@@ -4161,6 +4185,22 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
         m_rayTracingContext->SetCameraParams(cameraPos, cameraForward, camNear, camFar);
     }
 
+    // Detect camera movement BEFORE jitter decision to avoid 1-frame lag.
+    // This ensures m_cameraIsMoving reflects the CURRENT frame's state when
+    // we decide whether to apply TAA jitter, preventing flickering at standstill.
+    if (m_hasPrevCamera) {
+        float posDelta = glm::length(cameraPos - m_prevCameraPos);
+        float fwdDot = glm::clamp(
+            glm::dot(glm::normalize(cameraForward), glm::normalize(m_prevCameraForward)),
+            -1.0f, 1.0f);
+        float angleDelta = std::acos(fwdDot);
+        const float softPosThreshold   = 0.1f;
+        const float softAngleThreshold = glm::radians(3.0f);
+        m_cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
+    } else {
+        m_cameraIsMoving = true;
+    }
+
     // Temporal AA jitter (in pixels) and corresponding UV delta for history
     // sampling. When an internal supersampling scale is active, base these
     // values on the HDR render target size rather than the window size so
@@ -4742,48 +4782,36 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     m_hasPrevViewProj = true;
 
     // Reset RT temporal history when the camera moves significantly to
-    // avoid smearing old GI/shadow data across new viewpoints. We also track
-    // a softer motion flag used for TAA jitter/blend tuning.
+    // avoid smearing old GI/shadow data across new viewpoints.
+    // NOTE: m_cameraIsMoving is now computed earlier (before jitter decision)
+    // to avoid 1-frame lag that caused flickering at standstill.
     if (m_hasPrevCamera) {
         float posDelta = glm::length(cameraPos - m_prevCameraPos);
         float fwdDot = glm::clamp(
             glm::dot(glm::normalize(cameraForward), glm::normalize(m_prevCameraForward)),
-            -1.0f,
-            1.0f);
+            -1.0f, 1.0f);
         float angleDelta = std::acos(fwdDot);
 
         // Hard thresholds for RT history invalidation. These should only fire
         // during significant camera jumps (teleports, cut scenes) to avoid
         // constantly resetting temporal accumulation during normal navigation.
-        // The per-pixel rejection in RT shaders handles edge cases like
-        // shadow boundaries and moving objects more gracefully.
         const float posThreshold   = 5.0f;
         const float angleThreshold = glm::radians(45.0f);
-
-        // Soft thresholds for "camera is moving" used to gate jitter and TAA
-        // blend strength. These fire during normal navigation to keep edges
-        // sharp and reduce temporal lag.
-        const float softPosThreshold   = 0.1f;
-        const float softAngleThreshold = glm::radians(3.0f);
-        m_cameraIsMoving = (posDelta > softPosThreshold || angleDelta > softAngleThreshold);
 
         if (posDelta > posThreshold || angleDelta > angleThreshold) {
             m_rtHasHistory      = false;
             m_rtGIHasHistory    = false;
             m_rtReflHasHistory  = false;
-            // Let TAA resolve handle large changes via per-pixel color and
-            // depth checks rather than nuking history globally; this avoids
-            // sudden full-scene flicker when orbiting the camera.
         }
-    } else {
-        m_cameraIsMoving = true;
     }
     m_prevCameraPos     = cameraPos;
     m_prevCameraForward = cameraForward;
     m_hasPrevCamera     = true;
 
     m_frameDataCPU = frameData;
-    m_frameConstantBuffer.UpdateData(m_frameDataCPU);
+    // Use frame-indexed slot to ensure each frame writes to its own slot
+    // This prevents race conditions where GPU reads frame N while CPU writes frame N+1
+    m_currentFrameConstantsGPU = m_frameConstantBuffer.WriteToSlot(m_frameDataCPU, m_frameIndex);
 }
 
 void Renderer::RenderSkybox() {
@@ -4796,7 +4824,7 @@ void Renderer::RenderSkybox() {
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
 
     // Frame constants (b1)
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     if (m_iblEnabled && m_skyboxPipeline) {
         // IBL skybox rendering (samples environment cubemap)
@@ -4917,7 +4945,7 @@ void Renderer::RenderSSR() {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Frame constants
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Root parameter 3 is a descriptor table sized for t0-t9. Allocate a single
     // contiguous range so t0/t1/t2 are guaranteed to be adjacent and stable.
@@ -5175,7 +5203,7 @@ void Renderer::RenderTAA() {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Frame constants
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Allocate transient descriptors mirroring the layout used in the
     // post-process pass so bindings remain consistent:
@@ -5414,7 +5442,7 @@ void Renderer::RenderMotionVectors() {
             m_commandList.Get(),
             m_velocityBuffer.Get(),
             m_vbMeshDraws,
-            m_frameConstantBuffer.gpuAddress
+            m_currentFrameConstantsGPU
         );
         if (mvResult.IsErr()) {
             spdlog::warn("VB motion vectors failed; falling back to camera-only: {}", mvResult.Error());
@@ -5486,7 +5514,7 @@ void Renderer::RenderMotionVectors() {
     ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
     m_commandList->SetDescriptorHeaps(1, heaps);
 
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     auto tableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(10);
     if (tableResult.IsErr()) {
@@ -5661,6 +5689,11 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
 
     // Stable entity order so per-instance/material indices don't thrash frame-to-frame.
     std::vector<entt::entity> stableEntities;
+
+    // FIX: Collect unique valid meshes and sort by pointer for stable mesh index assignment.
+    // This prevents mesh indices from changing when entity iteration order changes due to
+    // chunk loading/unloading, which was causing "random terrain" glitching.
+    std::vector<std::shared_ptr<Scene::MeshData>> uniqueValidMeshes;
     stableEntities.reserve(static_cast<size_t>(view.size_hint()));
     for (auto entity : view) {
         stableEntities.push_back(entity);
@@ -5669,6 +5702,74 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
               [](entt::entity a, entt::entity b) {
                   return static_cast<uint32_t>(a) < static_cast<uint32_t>(b);
               });
+
+    // ========================================================================
+    // PRE-PASS: Collect unique valid meshes and sort by pointer address.
+    // This ensures mesh indices are STABLE regardless of entity iteration order,
+    // preventing "random terrain" glitching when chunks load/unload.
+    // ========================================================================
+    {
+        std::unordered_set<const Scene::MeshData*> seenMeshes;
+        for (auto entity : stableEntities) {
+            auto& renderable = view.get<Scene::RenderableComponent>(entity);
+            if (!renderable.visible) continue;
+            if (!renderable.mesh) continue;
+            if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
+            if (IsTransparentRenderable(renderable)) continue;
+            if (!renderable.mesh->gpuBuffers ||
+                !renderable.mesh->gpuBuffers->vertexBuffer ||
+                !renderable.mesh->gpuBuffers->indexBuffer) continue;
+            // Also check for valid SRV indices (same criteria as main loop)
+            if (renderable.mesh->gpuBuffers->vbRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex ||
+                renderable.mesh->gpuBuffers->ibRawSRVIndex == MeshBuffers::kInvalidDescriptorIndex) continue;
+
+            // Only add meshes we haven't seen yet
+            if (seenMeshes.insert(renderable.mesh.get()).second) {
+                uniqueValidMeshes.push_back(renderable.mesh);
+            }
+        }
+
+        // Sort meshes by pointer address for stable ordering
+        std::sort(uniqueValidMeshes.begin(), uniqueValidMeshes.end(),
+                  [](const std::shared_ptr<Scene::MeshData>& a, const std::shared_ptr<Scene::MeshData>& b) {
+                      return reinterpret_cast<uintptr_t>(a.get()) < reinterpret_cast<uintptr_t>(b.get());
+                  });
+
+        // Pre-build meshToDrawIndex and m_vbMeshDraws in sorted order
+        for (size_t i = 0; i < uniqueValidMeshes.size(); ++i) {
+            const auto& mesh = uniqueValidMeshes[i];
+            meshToDrawIndex[mesh.get()] = static_cast<uint32_t>(i);
+
+            VisibilityBufferRenderer::VBMeshDrawInfo drawInfo{};
+            drawInfo.vertexBuffer = mesh->gpuBuffers->vertexBuffer.Get();
+            drawInfo.indexBuffer = mesh->gpuBuffers->indexBuffer.Get();
+            drawInfo.vertexCount = static_cast<uint32_t>(mesh->positions.size());
+            drawInfo.indexCount = static_cast<uint32_t>(mesh->indices.size());
+            drawInfo.firstIndex = 0;
+            drawInfo.baseVertex = 0;
+            drawInfo.startInstance = 0;
+            drawInfo.instanceCount = 0;
+            drawInfo.startInstanceDoubleSided = 0;
+            drawInfo.instanceCountDoubleSided = 0;
+            drawInfo.startInstanceAlpha = 0;
+            drawInfo.instanceCountAlpha = 0;
+            drawInfo.startInstanceAlphaDoubleSided = 0;
+            drawInfo.instanceCountAlphaDoubleSided = 0;
+            drawInfo.vertexBufferIndex = mesh->gpuBuffers->vbRawSRVIndex;
+            drawInfo.indexBufferIndex = mesh->gpuBuffers->ibRawSRVIndex;
+            drawInfo.vertexStrideBytes = mesh->gpuBuffers->vertexStrideBytes;
+            drawInfo.indexFormat = mesh->gpuBuffers->indexFormat;
+
+            m_vbMeshDraws.push_back(drawInfo);
+        }
+
+        // Pre-size instance buckets to match mesh count
+        opaqueInstancesPerMesh.resize(uniqueValidMeshes.size());
+        opaqueDoubleSidedInstancesPerMesh.resize(uniqueValidMeshes.size());
+        alphaMaskedInstancesPerMesh.resize(uniqueValidMeshes.size());
+        alphaMaskedDoubleSidedInstancesPerMesh.resize(uniqueValidMeshes.size());
+    }
+    // ========================================================================
 
     // Maintain stable packed culling IDs for occlusion history indexing.
     // IDs are packed as (generation << 16) | slot, where generation increments
@@ -5920,42 +6021,13 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             continue;
         }
 
-        // Find or create mesh draw info
-        uint32_t meshDrawIndex = 0;
+        // Lookup pre-built mesh draw index (built in sorted pre-pass for stability)
         auto it = meshToDrawIndex.find(renderable.mesh.get());
         if (it == meshToDrawIndex.end()) {
-            // First time seeing this mesh - create draw info
-            meshDrawIndex = static_cast<uint32_t>(m_vbMeshDraws.size());
-            meshToDrawIndex[renderable.mesh.get()] = meshDrawIndex;
-
-            VisibilityBufferRenderer::VBMeshDrawInfo drawInfo{};
-            drawInfo.vertexBuffer = renderable.mesh->gpuBuffers->vertexBuffer.Get();
-            drawInfo.indexBuffer = renderable.mesh->gpuBuffers->indexBuffer.Get();
-            drawInfo.vertexCount = static_cast<uint32_t>(renderable.mesh->positions.size());
-            drawInfo.indexCount = static_cast<uint32_t>(renderable.mesh->indices.size());
-            drawInfo.firstIndex = 0;
-            drawInfo.baseVertex = 0;
-            drawInfo.startInstance = 0;
-            drawInfo.instanceCount = 0;
-            drawInfo.startInstanceDoubleSided = 0;
-            drawInfo.instanceCountDoubleSided = 0;
-            drawInfo.startInstanceAlpha = 0;
-            drawInfo.instanceCountAlpha = 0;
-            drawInfo.startInstanceAlphaDoubleSided = 0;
-            drawInfo.instanceCountAlphaDoubleSided = 0;
-            drawInfo.vertexBufferIndex = renderable.mesh->gpuBuffers->vbRawSRVIndex;
-            drawInfo.indexBufferIndex = renderable.mesh->gpuBuffers->ibRawSRVIndex;
-            drawInfo.vertexStrideBytes = renderable.mesh->gpuBuffers->vertexStrideBytes;
-            drawInfo.indexFormat = renderable.mesh->gpuBuffers->indexFormat;
-
-            m_vbMeshDraws.push_back(drawInfo);
-            opaqueInstancesPerMesh.emplace_back();
-            opaqueDoubleSidedInstancesPerMesh.emplace_back();
-            alphaMaskedInstancesPerMesh.emplace_back();
-            alphaMaskedDoubleSidedInstancesPerMesh.emplace_back();
-        } else {
-            meshDrawIndex = it->second;
+            // Mesh wasn't in pre-pass (shouldn't happen, same criteria used)
+            continue;
         }
+        const uint32_t meshDrawIndex = it->second;
 
         // Ensure textures are queued/loaded. Descriptor tables are warmed via
         // PrewarmMaterialDescriptors() early in the frame to avoid mid-frame
@@ -7094,7 +7166,7 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
     m_commandList->SetPipelineState(m_pipeline->GetPipelineState());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->SetDescriptorHeaps(1, heaps);
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
     }
@@ -7138,7 +7210,7 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Bind frame constants
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Bind shadow map + environment descriptor table if available (t4-t6)
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
@@ -7502,7 +7574,7 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetPipelineState(m_overlayPipeline->GetPipelineState());
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
@@ -7704,7 +7776,7 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetPipelineState(m_waterOverlayPipeline->GetPipelineState());
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
@@ -7905,7 +7977,7 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     // transparent pipeline and frame constants to be explicit.
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetPipelineState(m_transparentPipeline->GetPipelineState());
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     if (m_shadowAndEnvDescriptors[0].IsValid()) {
         m_commandList->SetGraphicsRootDescriptorTable(4, m_shadowAndEnvDescriptors[0].gpu);
@@ -8163,7 +8235,7 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
     m_commandList->SetPipelineState(m_depthOnlyPipeline->GetPipelineState());
 
     // Frame constants (b1)
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -10285,7 +10357,7 @@ void Renderer::BuildHZBFromDepth() {
     m_commandList->SetComputeRootSignature(m_computeRootSignature->GetRootSignature());
     ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
     m_commandList->SetDescriptorHeaps(1, heaps);
-    m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetComputeRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     const UINT descriptorInc =
         m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -10444,7 +10516,7 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
             ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
             cmdList->SetDescriptorHeaps(1, heaps);
 
-            cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+            cmdList->SetComputeRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
             const UINT descriptorInc =
                 m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -10539,7 +10611,7 @@ void Renderer::AddHZBFromDepthPasses_RG(RenderGraph& graph, RGResourceHandle dep
                 ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
                 cmdList->SetDescriptorHeaps(1, heaps);
 
-                cmdList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+                cmdList->SetComputeRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
                 const UINT descriptorInc =
                     m_device->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -13401,7 +13473,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_shadowConstantBuffer.AllocateAndWrite(shadowData);
 
         // Bind frame constants
-        m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+        m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
         // Bind shadow constants (b3)
         m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
@@ -13525,7 +13597,7 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_shadowConstantBuffer.AllocateAndWrite(shadowData);
 
             // Bind frame constants
-            m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+            m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
             // Bind shadow constants (b3)
             m_commandList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
@@ -13882,7 +13954,7 @@ void Renderer::RenderPostProcess() {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Bind frame constants
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Bind a stable SRV table for the post-process shader (t0..t9). The shader
     // samples many slots unconditionally (e.g., RT reflections), so the table
@@ -14168,7 +14240,7 @@ void Renderer::RenderVoxel(Scene::ECS_Registry* registry) {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Frame constants (b1)
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Voxel grid SRV table (t0). If the grid failed to build or upload we
     // still render a gradient background; the shader simply finds no hits.
@@ -14560,11 +14632,22 @@ void Renderer::UpdateBiomeMaterialsBuffer(const std::vector<Scene::BiomeConfig>&
     }
 
     Scene::BiomeMaterialsCBuffer cbData = {};
-    cbData.biomeCount = static_cast<uint32_t>(std::min(configs.size(), size_t(16)));
+    // Find the maximum biome type index to set biomeCount correctly
+    uint32_t maxBiomeIndex = 0;
+    for (const auto& cfg : configs) {
+        uint32_t biomeIdx = static_cast<uint32_t>(cfg.type);
+        if (biomeIdx < 16) {
+            maxBiomeIndex = std::max(maxBiomeIndex, biomeIdx + 1);
+        }
+    }
+    cbData.biomeCount = maxBiomeIndex;
 
-    for (size_t i = 0; i < cbData.biomeCount; ++i) {
-        const auto& cfg = configs[i];
-        auto& gpu = cbData.biomes[i];
+    // Use BiomeType enum value as the GPU buffer index
+    // This ensures CPU-encoded biome indices match GPU array positions
+    for (const auto& cfg : configs) {
+        uint32_t biomeIdx = static_cast<uint32_t>(cfg.type);
+        if (biomeIdx >= 16) continue;  // Skip invalid biome types
+        auto& gpu = cbData.biomes[biomeIdx];
 
         gpu.baseColor = cfg.baseColor;
         gpu.slopeColor = cfg.slopeColor;
@@ -14587,8 +14670,9 @@ void Renderer::UpdateBiomeMaterialsBuffer(const std::vector<Scene::BiomeConfig>&
             gpu.heightLayerColor[j] = layer.color;
         }
 
-        gpu.padding[0] = 0.0f;
-        gpu.padding[1] = 0.0f;
+        // Initialize alignment padding (after metallic, before heightLayerMin)
+        gpu._pad0[0] = 0.0f;
+        gpu._pad0[1] = 0.0f;
     }
 
     // Upload to GPU

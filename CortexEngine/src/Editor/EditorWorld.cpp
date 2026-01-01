@@ -12,6 +12,7 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 namespace Cortex {
 
@@ -67,7 +68,7 @@ Result<void> EditorWorld::Initialize(Graphics::Renderer* renderer,
 
     // Initialize biome system if enabled
     if (m_config.useBiomes) {
-        m_biomeMap = std::make_unique<Scene::BiomeMap>();
+        m_biomeMap = std::make_shared<Scene::BiomeMap>();
         m_biomeMap->Initialize(m_config.biomeParams);
 
         // Load biome configurations from JSON
@@ -116,8 +117,8 @@ Result<void> EditorWorld::Initialize(Graphics::Renderer* renderer,
             }
         }
 
-        // Pass biome map to chunk generator
-        m_chunkGenerator->SetBiomeMap(m_biomeMap.get());
+        // Pass biome map to chunk generator (shared_ptr ensures thread-safe lifetime)
+        m_chunkGenerator->SetBiomeMap(m_biomeMap);
         spdlog::info("Biome system enabled (cellSize={}, blendRadius={})",
                      m_config.biomeParams.cellSize, m_config.biomeParams.blendRadius);
     }
@@ -225,7 +226,7 @@ Scene::BiomeSample EditorWorld::GetBiomeAt(float worldX, float worldZ) const {
 void EditorWorld::SetBiomesEnabled(bool enabled) {
     m_config.useBiomes = enabled;
     if (m_chunkGenerator) {
-        m_chunkGenerator->SetBiomeMap(enabled ? m_biomeMap.get() : nullptr);
+        m_chunkGenerator->SetBiomeMap(enabled ? m_biomeMap : nullptr);
     }
 }
 
@@ -319,6 +320,11 @@ void EditorWorld::ProcessCompletedChunks() {
         return;
     }
 
+    // Time budget to prevent frame stalls - bail out after 16ms of upload work
+    // (allows more chunks per frame for faster initial terrain load)
+    constexpr auto timeBudget = std::chrono::milliseconds(16);
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     // Calculate how many we can load this frame
     size_t roomAvailable = static_cast<size_t>(m_config.maxLoadedChunks) - m_loadedChunks.size();
     size_t maxToProcess = std::min(roomAvailable, static_cast<size_t>(m_config.maxChunksPerFrame));
@@ -327,6 +333,7 @@ void EditorWorld::ProcessCompletedChunks() {
     auto completed = m_chunkGenerator->GetCompletedChunks(maxToProcess);
 
     float totalGenTime = 0.0f;
+    size_t processedCount = 0;
 
     for (auto& result : completed) {
         // Skip if no longer desired (may have been cancelled)
@@ -337,7 +344,7 @@ void EditorWorld::ProcessCompletedChunks() {
         // Remove from pending
         m_pendingChunks.erase(result.coord);
 
-        // Upload mesh to GPU
+        // Upload mesh to GPU - this is the expensive blocking operation
         bool uploadSuccess = true;
         if (result.mesh && m_renderer) {
             auto uploadResult = m_renderer->UploadMesh(result.mesh);
@@ -353,16 +360,23 @@ void EditorWorld::ProcessCompletedChunks() {
             CreateChunkEntity(result.coord, result.mesh, result.lod);
             m_stats.chunksLoadedThisFrame++;
             totalGenTime += result.generationTimeMs;
+            processedCount++;
         }
 
         // Only mark as loaded if upload succeeded or mesh was null (nothing to upload)
-        // On upload failure, allow retry on next frame
         if (uploadSuccess || !result.mesh) {
             m_loadedChunks.insert(result.coord);
             m_spatialGrid->RegisterChunk(result.coord);
         } else {
             spdlog::warn("Chunk ({}, {}) will be retried next frame",
                          result.coord.x, result.coord.z);
+        }
+
+        // Check time budget AFTER upload - if exceeded, stop processing more chunks
+        // This prevents multiple expensive uploads from accumulating in one frame
+        auto elapsed = std::chrono::high_resolution_clock::now() - startTime;
+        if (elapsed > timeBudget) {
+            break;
         }
     }
 

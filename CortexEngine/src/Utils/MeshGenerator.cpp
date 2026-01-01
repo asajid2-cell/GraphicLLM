@@ -769,14 +769,44 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
         }
     }
 
-    // Compute normals from finite differences.
+    // Compute normals from finite differences using mirror sampling at boundaries.
+    // Mirror sampling extrapolates beyond edges to maintain slope continuity,
+    // preventing black seams at chunk boundaries.
     auto idx = [&](uint32_t x, uint32_t z) { return z * gridDim + x; };
     for (uint32_t z = 0; z < gridDim; ++z) {
         for (uint32_t x = 0; x < gridDim; ++x) {
-            float hL = (x > 0) ? mesh->positions[idx(x - 1, z)].y : mesh->positions[idx(x, z)].y;
-            float hR = (x < gridDim - 1) ? mesh->positions[idx(x + 1, z)].y : mesh->positions[idx(x, z)].y;
-            float hD = (z > 0) ? mesh->positions[idx(x, z - 1)].y : mesh->positions[idx(x, z)].y;
-            float hU = (z < gridDim - 1) ? mesh->positions[idx(x, z + 1)].y : mesh->positions[idx(x, z)].y;
+            float hC = mesh->positions[idx(x, z)].y;  // Center height
+            float hL, hR, hD, hU;
+
+            // Mirror sampling: at boundaries, extrapolate using reflection
+            // This maintains consistent slope direction across chunk edges
+            if (x > 0) {
+                hL = mesh->positions[idx(x - 1, z)].y;
+            } else {
+                // At left edge: extrapolate left = 2*center - right
+                hL = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x + 1, z)].y : hC;
+            }
+
+            if (x < gridDim - 1) {
+                hR = mesh->positions[idx(x + 1, z)].y;
+            } else {
+                // At right edge: extrapolate right = 2*center - left
+                hR = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x - 1, z)].y : hC;
+            }
+
+            if (z > 0) {
+                hD = mesh->positions[idx(x, z - 1)].y;
+            } else {
+                // At bottom edge: extrapolate down = 2*center - up
+                hD = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x, z + 1)].y : hC;
+            }
+
+            if (z < gridDim - 1) {
+                hU = mesh->positions[idx(x, z + 1)].y;
+            } else {
+                // At top edge: extrapolate up = 2*center - down
+                hU = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x, z - 1)].y : hC;
+            }
 
             float dx = (hR - hL) / (2.0f * cellSize);
             float dz = (hU - hD) / (2.0f * cellSize);
@@ -807,6 +837,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
     }
 
     // Add skirt vertices at grid boundaries.
+    // Layout: Bottom edge (all), Top edge (all), Left edge (exclude corners), Right edge (exclude corners)
+    // This avoids duplicating corner vertices which would corrupt skirtIdx indexing.
     uint32_t skirtBaseIdx = static_cast<uint32_t>(mesh->positions.size());
     auto addSkirtVertex = [&](uint32_t x, uint32_t z) {
         const glm::vec3& p = mesh->positions[idx(x, z)];
@@ -815,41 +847,67 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunk(
         mesh->texCoords.push_back(mesh->texCoords[idx(x, z)]);
     };
 
+    // Bottom edge: gridDim vertices (x=0..gridDim-1, z=0)
     for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, 0);
+    // Top edge: gridDim vertices (x=0..gridDim-1, z=gridDim-1)
     for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, gridDim - 1);
-    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(0, z);
-    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(gridDim - 1, z);
+    // Left edge: gridDim-2 vertices (x=0, z=1..gridDim-2) - corners already in bottom/top
+    for (uint32_t z = 1; z < gridDim - 1; ++z) addSkirtVertex(0, z);
+    // Right edge: gridDim-2 vertices (x=gridDim-1, z=1..gridDim-2) - corners already in bottom/top
+    for (uint32_t z = 1; z < gridDim - 1; ++z) addSkirtVertex(gridDim - 1, z);
 
+    // Indexing helper that accounts for different edge sizes
     auto skirtIdx = [&](uint32_t edge, uint32_t i) -> uint32_t {
-        return skirtBaseIdx + edge * gridDim + i;
+        switch (edge) {
+            case 0: return skirtBaseIdx + i;                                    // Bottom: 0..gridDim-1
+            case 1: return skirtBaseIdx + gridDim + i;                          // Top: gridDim..2*gridDim-1
+            case 2: return skirtBaseIdx + 2 * gridDim + (i - 1);                // Left: z-1 offset (z=1 -> index 0)
+            case 3: return skirtBaseIdx + 2 * gridDim + (gridDim - 2) + (i - 1);// Right: after left edge
+            default: return 0;
+        }
     };
 
-    // Bottom edge skirt (z=0) - normal should face -Z (outward)
-    // Reversed winding: (a,b,c) instead of (a,c,b) to flip normal direction
+    // Helper to get corner skirt vertices from bottom/top edges
+    auto bottomSkirtIdx = [&](uint32_t x) { return skirtBaseIdx + x; };
+    auto topSkirtIdx = [&](uint32_t x) { return skirtBaseIdx + gridDim + x; };
+
+    // Bottom edge skirt (z=0)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x, 0), b = idx(x + 1, 0);
-        uint32_t c = skirtIdx(0, x), d = skirtIdx(0, x + 1);
+        uint32_t c = bottomSkirtIdx(x), d = bottomSkirtIdx(x + 1);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Top edge skirt (z=gridDim-1) - normal should face +Z (outward)
+    // Top edge skirt (z=gridDim-1)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x + 1, gridDim - 1), b = idx(x, gridDim - 1);
-        uint32_t c = skirtIdx(1, x + 1), d = skirtIdx(1, x);
+        uint32_t c = topSkirtIdx(x + 1), d = topSkirtIdx(x);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Left edge skirt (x=0) - normal should face -X (outward)
+    // Left edge skirt (x=0) - use bottom/top corners for z=0 and z=gridDim-1
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(0, z + 1), b = idx(0, z);
-        uint32_t c = skirtIdx(2, z + 1), d = skirtIdx(2, z);
+        uint32_t c, d;
+        // For corner z+1: use top skirt corner or left skirt
+        if (z + 1 == gridDim - 1) c = topSkirtIdx(0);
+        else c = skirtIdx(2, z + 1);
+        // For corner z: use bottom/top skirt or left skirt
+        if (z == 0) d = bottomSkirtIdx(0);
+        else d = skirtIdx(2, z);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Right edge skirt (x=gridDim-1) - normal should face +X (outward)
+    // Right edge skirt (x=gridDim-1) - use bottom/top corners for z=0 and z=gridDim-1
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(gridDim - 1, z), b = idx(gridDim - 1, z + 1);
-        uint32_t c = skirtIdx(3, z), d = skirtIdx(3, z + 1);
+        uint32_t c, d;
+        // For corner z: use bottom/top skirt or right skirt
+        if (z == 0) c = bottomSkirtIdx(gridDim - 1);
+        else c = skirtIdx(3, z);
+        // For corner z+1: use top skirt corner or right skirt
+        if (z + 1 == gridDim - 1) d = topSkirtIdx(gridDim - 1);
+        else d = skirtIdx(3, z + 1);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
@@ -908,14 +966,39 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunkWithB
         }
     }
 
-    // Compute normals from finite differences and update vertex colors with height/slope data.
+    // Compute normals from finite differences using mirror sampling at boundaries.
+    // Mirror sampling extrapolates beyond edges to maintain slope continuity,
+    // preventing black seams at chunk boundaries.
     auto idx = [&](uint32_t x, uint32_t z) { return z * gridDim + x; };
     for (uint32_t z = 0; z < gridDim; ++z) {
         for (uint32_t x = 0; x < gridDim; ++x) {
-            float hL = (x > 0) ? mesh->positions[idx(x - 1, z)].y : mesh->positions[idx(x, z)].y;
-            float hR = (x < gridDim - 1) ? mesh->positions[idx(x + 1, z)].y : mesh->positions[idx(x, z)].y;
-            float hD = (z > 0) ? mesh->positions[idx(x, z - 1)].y : mesh->positions[idx(x, z)].y;
-            float hU = (z < gridDim - 1) ? mesh->positions[idx(x, z + 1)].y : mesh->positions[idx(x, z)].y;
+            float hC = mesh->positions[idx(x, z)].y;  // Center height
+            float hL, hR, hD, hU;
+
+            // Mirror sampling: at boundaries, extrapolate using reflection
+            if (x > 0) {
+                hL = mesh->positions[idx(x - 1, z)].y;
+            } else {
+                hL = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x + 1, z)].y : hC;
+            }
+
+            if (x < gridDim - 1) {
+                hR = mesh->positions[idx(x + 1, z)].y;
+            } else {
+                hR = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x - 1, z)].y : hC;
+            }
+
+            if (z > 0) {
+                hD = mesh->positions[idx(x, z - 1)].y;
+            } else {
+                hD = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x, z + 1)].y : hC;
+            }
+
+            if (z < gridDim - 1) {
+                hU = mesh->positions[idx(x, z + 1)].y;
+            } else {
+                hU = (gridDim > 1) ? 2.0f * hC - mesh->positions[idx(x, z - 1)].y : hC;
+            }
 
             float dx = (hR - hL) / (2.0f * cellSize);
             float dz = (hU - hD) / (2.0f * cellSize);
@@ -963,6 +1046,8 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunkWithB
     }
 
     // Add skirt vertices at grid boundaries.
+    // Layout: Bottom edge (all), Top edge (all), Left edge (exclude corners), Right edge (exclude corners)
+    // This avoids duplicating corner vertices which would corrupt skirtIdx indexing.
     uint32_t skirtBaseIdx = static_cast<uint32_t>(mesh->positions.size());
     auto addSkirtVertex = [&](uint32_t x, uint32_t z) {
         const glm::vec3& p = mesh->positions[idx(x, z)];
@@ -973,40 +1058,63 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunkWithB
         mesh->colors.push_back(mesh->colors[idx(x, z)]);
     };
 
+    // Bottom edge: gridDim vertices (x=0..gridDim-1, z=0)
     for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, 0);
+    // Top edge: gridDim vertices (x=0..gridDim-1, z=gridDim-1)
     for (uint32_t x = 0; x < gridDim; ++x) addSkirtVertex(x, gridDim - 1);
-    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(0, z);
-    for (uint32_t z = 0; z < gridDim; ++z) addSkirtVertex(gridDim - 1, z);
+    // Left edge: gridDim-2 vertices (x=0, z=1..gridDim-2) - corners already in bottom/top
+    for (uint32_t z = 1; z < gridDim - 1; ++z) addSkirtVertex(0, z);
+    // Right edge: gridDim-2 vertices (x=gridDim-1, z=1..gridDim-2) - corners already in bottom/top
+    for (uint32_t z = 1; z < gridDim - 1; ++z) addSkirtVertex(gridDim - 1, z);
 
+    // Indexing helper that accounts for different edge sizes
     auto skirtIdx = [&](uint32_t edge, uint32_t i) -> uint32_t {
-        return skirtBaseIdx + edge * gridDim + i;
+        switch (edge) {
+            case 0: return skirtBaseIdx + i;                                    // Bottom: 0..gridDim-1
+            case 1: return skirtBaseIdx + gridDim + i;                          // Top: gridDim..2*gridDim-1
+            case 2: return skirtBaseIdx + 2 * gridDim + (i - 1);                // Left: z-1 offset (z=1 -> index 0)
+            case 3: return skirtBaseIdx + 2 * gridDim + (gridDim - 2) + (i - 1);// Right: after left edge
+            default: return 0;
+        }
     };
 
-    // Bottom edge skirt (z=0) - normal should face -Z (outward)
+    // Helper to get corner skirt vertices from bottom/top edges
+    auto bottomSkirtIdx = [&](uint32_t x) { return skirtBaseIdx + x; };
+    auto topSkirtIdx = [&](uint32_t x) { return skirtBaseIdx + gridDim + x; };
+
+    // Bottom edge skirt (z=0)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x, 0), b = idx(x + 1, 0);
-        uint32_t c = skirtIdx(0, x), d = skirtIdx(0, x + 1);
+        uint32_t c = bottomSkirtIdx(x), d = bottomSkirtIdx(x + 1);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Top edge skirt (z=gridDim-1) - normal should face +Z (outward)
+    // Top edge skirt (z=gridDim-1)
     for (uint32_t x = 0; x < gridDim - 1; ++x) {
         uint32_t a = idx(x + 1, gridDim - 1), b = idx(x, gridDim - 1);
-        uint32_t c = skirtIdx(1, x + 1), d = skirtIdx(1, x);
+        uint32_t c = topSkirtIdx(x + 1), d = topSkirtIdx(x);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Left edge skirt (x=0) - normal should face -X (outward)
+    // Left edge skirt (x=0) - use bottom/top corners for z=0 and z=gridDim-1
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(0, z + 1), b = idx(0, z);
-        uint32_t c = skirtIdx(2, z + 1), d = skirtIdx(2, z);
+        uint32_t c, d;
+        if (z + 1 == gridDim - 1) c = topSkirtIdx(0);
+        else c = skirtIdx(2, z + 1);
+        if (z == 0) d = bottomSkirtIdx(0);
+        else d = skirtIdx(2, z);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }
-    // Right edge skirt (x=gridDim-1) - normal should face +X (outward)
+    // Right edge skirt (x=gridDim-1) - use bottom/top corners for z=0 and z=gridDim-1
     for (uint32_t z = 0; z < gridDim - 1; ++z) {
         uint32_t a = idx(gridDim - 1, z), b = idx(gridDim - 1, z + 1);
-        uint32_t c = skirtIdx(3, z), d = skirtIdx(3, z + 1);
+        uint32_t c, d;
+        if (z == 0) c = bottomSkirtIdx(gridDim - 1);
+        else c = skirtIdx(3, z);
+        if (z + 1 == gridDim - 1) d = topSkirtIdx(gridDim - 1);
+        else d = skirtIdx(3, z + 1);
         mesh->indices.push_back(a); mesh->indices.push_back(b); mesh->indices.push_back(c);
         mesh->indices.push_back(b); mesh->indices.push_back(d); mesh->indices.push_back(c);
     }

@@ -90,18 +90,22 @@ void GPUCullingPipeline::Shutdown() {
     m_cullPipeline.Reset();
     m_rootSignature.Reset();
     m_commandSignature.Reset();
-    m_instanceBuffer.Reset();
-    m_instanceUploadBuffer.Reset();
-    m_allCommandBuffer.Reset();
-    m_allCommandUploadBuffer.Reset();
-    m_visibleCommandBuffer.Reset();
-    m_commandCountBuffer.Reset();
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        m_instanceBuffer[i].Reset();
+        m_instanceUploadBuffer[i].Reset();
+        m_allCommandBuffer[i].Reset();
+        m_allCommandUploadBuffer[i].Reset();
+        m_visibleCommandBuffer[i].Reset();
+        m_commandCountBuffer[i].Reset();
+    }
     m_commandCountReadback.Reset();
     m_visibleCommandReadback.Reset();
     m_cullConstantBuffer.Reset();
     m_occlusionHistoryA.Reset();
     m_occlusionHistoryB.Reset();
-    m_visibilityMaskBuffer.Reset();
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        m_visibilityMaskBuffer[i].Reset();
+    }
     m_dummyHzbTexture.Reset();
 
     spdlog::info("GPU Culling Pipeline shutdown");
@@ -321,6 +325,7 @@ Result<void> GPUCullingPipeline::CreateComputePipeline() {
 
 Result<void> GPUCullingPipeline::CreateBuffers() {
     ID3D12Device* device = m_device->GetDevice();
+    HRESULT hr = S_OK;
 
     const size_t instanceBufferSize = m_maxInstances * sizeof(GPUInstanceData);
     const size_t commandBufferSize = m_maxInstances * sizeof(IndirectCommand);
@@ -340,83 +345,109 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
     bufferDesc.SampleDesc.Count = 1;
     bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    // Instance buffer (default heap) + upload staging
-    HRESULT hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&m_instanceBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create instance buffer");
-    }
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&m_instanceUploadBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create instance upload buffer");
+    // Instance buffers (triple-buffered: default heap + upload staging)
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        hr = device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&m_instanceBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create instance buffer");
+        }
+        std::wstring instName = L"GPUCulling_InstanceBuffer_" + std::to_wstring(i);
+        m_instanceBuffer[i]->SetName(instName.c_str());
+        m_instanceState[i] = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        hr = device->CreateCommittedResource(
+            &uploadHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_instanceUploadBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create instance upload buffer");
+        }
+        std::wstring uploadName = L"GPUCulling_InstanceUpload_" + std::to_wstring(i);
+        m_instanceUploadBuffer[i]->SetName(uploadName.c_str());
     }
 
-    // All-commands buffer (default heap) + upload staging
+    // All-commands buffers (triple-buffered: default heap + upload staging)
     bufferDesc.Width = commandBufferSize;
-    hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&m_allCommandBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create all-commands buffer");
-    }
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&m_allCommandUploadBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create all-commands upload buffer");
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        hr = device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&m_allCommandBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create all-commands buffer");
+        }
+        std::wstring cmdName = L"GPUCulling_AllCommandBuffer_" + std::to_wstring(i);
+        m_allCommandBuffer[i]->SetName(cmdName.c_str());
+        m_allCommandState[i] = D3D12_RESOURCE_STATE_COPY_DEST;
+
+        hr = device->CreateCommittedResource(
+            &uploadHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_allCommandUploadBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create all-commands upload buffer");
+        }
+        std::wstring cmdUploadName = L"GPUCulling_AllCommandUpload_" + std::to_wstring(i);
+        m_allCommandUploadBuffer[i]->SetName(cmdUploadName.c_str());
     }
 
-    // Visible command buffer (default heap, UAV)
+    // Visible command buffer (default heap, UAV) - triple-buffered
     bufferDesc.Width = commandBufferSize;
     bufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-    hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        nullptr,
-        IID_PPV_ARGS(&m_visibleCommandBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create visible command buffer");
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        hr = device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            IID_PPV_ARGS(&m_visibleCommandBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create visible command buffer " + std::to_string(i));
+        }
+        std::wstring visibleName = L"GPUCulling_VisibleCommand_" + std::to_wstring(i);
+        m_visibleCommandBuffer[i]->SetName(visibleName.c_str());
+        m_visibleCommandState[i] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    // Command count buffer (4 bytes for atomic counter)
+    // Command count buffer (4 bytes for atomic counter) - triple-buffered
     bufferDesc.Width = sizeof(uint32_t);
-    hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        nullptr,
-        IID_PPV_ARGS(&m_commandCountBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create command count buffer");
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        hr = device->CreateCommittedResource(
+            &defaultHeap,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            IID_PPV_ARGS(&m_commandCountBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create command count buffer " + std::to_string(i));
+        }
+        std::wstring countName = L"GPUCulling_CommandCount_" + std::to_wstring(i);
+        m_commandCountBuffer[i]->SetName(countName.c_str());
+        m_commandCountState[i] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     // Command count readback buffer
@@ -438,24 +469,28 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
 
     // Visibility mask buffer (one uint32 per instance). Consumers can bind this
     // as a ByteAddressBuffer SRV to skip drawing occluded instances.
+    // Triple-buffered to prevent race conditions between GPU culling write and visibility pass read.
     {
         D3D12_RESOURCE_DESC maskDesc = bufferDesc;
         maskDesc.Width = static_cast<UINT64>(m_maxInstances) * sizeof(uint32_t);
         maskDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-        hr = device->CreateCommittedResource(
-            &defaultHeap,
-            D3D12_HEAP_FLAG_NONE,
-            &maskDesc,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr,
-            IID_PPV_ARGS(&m_visibilityMaskBuffer)
-        );
-        if (FAILED(hr)) {
-            return Result<void>::Err("Failed to create visibility mask buffer");
+        for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+            hr = device->CreateCommittedResource(
+                &defaultHeap,
+                D3D12_HEAP_FLAG_NONE,
+                &maskDesc,
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                nullptr,
+                IID_PPV_ARGS(&m_visibilityMaskBuffer[i])
+            );
+            if (FAILED(hr)) {
+                return Result<void>::Err("Failed to create visibility mask buffer " + std::to_string(i));
+            }
+            std::wstring maskName = L"GPUCullingVisibilityMask_" + std::to_wstring(i);
+            m_visibilityMaskBuffer[i]->SetName(maskName.c_str());
+            m_visibilityMaskState[i] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
-        m_visibilityMaskBuffer->SetName(L"GPUCullingVisibilityMask");
-        m_visibilityMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     // Debug buffer (counters + sample). Writes are gated by constants, but the
@@ -519,19 +554,7 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
         m_debugState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    // Allocate descriptors for counter buffer UAV (needed for ClearUnorderedAccessViewUint)
-    auto counterUAVResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-    if (counterUAVResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate command count UAV descriptor");
-    }
-    m_counterUAV = counterUAVResult.Value();
-
-    auto counterStagingResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
-    if (counterStagingResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate command count UAV staging descriptor");
-    }
-    m_counterUAVStaging = counterStagingResult.Value();
-
+    // Allocate descriptors for counter buffer UAV (needed for ClearUnorderedAccessViewUint) - triple-buffered
     // Create UAV for command count buffer (raw buffer, 1 uint32)
     D3D12_UNORDERED_ACCESS_VIEW_DESC counterUAVDesc = {};
     counterUAVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -540,11 +563,22 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
     counterUAVDesc.Buffer.NumElements = 1;
     counterUAVDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
 
-    device->CreateUnorderedAccessView(m_commandCountBuffer.Get(), nullptr, &counterUAVDesc, m_counterUAV.cpu);
-    device->CreateUnorderedAccessView(m_commandCountBuffer.Get(), nullptr, &counterUAVDesc, m_counterUAVStaging.cpu);
+    for (uint32_t i = 0; i < kGPUCullingFrameCount; ++i) {
+        auto counterUAVResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (counterUAVResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate command count UAV descriptor " + std::to_string(i));
+        }
+        m_counterUAV[i] = counterUAVResult.Value();
 
-    m_visibleCommandState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        auto counterStagingResult = m_descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (counterStagingResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate command count UAV staging descriptor " + std::to_string(i));
+        }
+        m_counterUAVStaging[i] = counterStagingResult.Value();
+
+        device->CreateUnorderedAccessView(m_commandCountBuffer[i].Get(), nullptr, &counterUAVDesc, m_counterUAV[i].cpu);
+        device->CreateUnorderedAccessView(m_commandCountBuffer[i].Get(), nullptr, &counterUAVDesc, m_counterUAVStaging[i].cpu);
+    }
 
     // Occlusion history buffers (ping-pong), one uint32 per instance.
     bufferDesc.Width = static_cast<UINT64>(m_maxInstances) * sizeof(uint32_t);
@@ -693,8 +727,7 @@ Result<void> GPUCullingPipeline::CreateBuffers() {
         return Result<void>::Err("Failed to create culling constant buffer");
     }
 
-    m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
-    m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
+    // Note: m_instanceState and m_allCommandState are already initialized per-frame in the buffer creation loops
     return Result<void>::Ok();
 }
 
@@ -747,19 +780,19 @@ Result<void> GPUCullingPipeline::PrepareAllCommandsForExecuteIndirect(ID3D12Grap
     if (!cmdList) {
         return Result<void>::Err("PrepareAllCommandsForExecuteIndirect requires a valid command list");
     }
-    if (!m_allCommandBuffer) {
+    if (!m_allCommandBuffer[m_frameIndex]) {
         return Result<void>::Err("All-commands buffer not initialized");
     }
 
-    if (m_allCommandState != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
+    if (m_allCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_allCommandBuffer.Get();
-        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.pResource = m_allCommandBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_allCommandState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_allCommandState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+        m_allCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     }
 
     return Result<void>::Ok();
@@ -846,7 +879,7 @@ Result<void> GPUCullingPipeline::UpdateInstances(
     if (!cmdList) {
         return Result<void>::Err("UpdateInstances requires a valid command list");
     }
-    if (!m_instanceBuffer || !m_instanceUploadBuffer) {
+    if (!m_instanceBuffer[m_frameIndex] || !m_instanceUploadBuffer[m_frameIndex]) {
         return Result<void>::Err("Instance buffer not initialized");
     }
 
@@ -857,44 +890,44 @@ Result<void> GPUCullingPipeline::UpdateInstances(
 
     m_totalInstances = static_cast<uint32_t>(std::min(instances.size(), static_cast<size_t>(m_maxInstances)));
 
-    // Map and upload instance data
+    // Map and upload instance data to frame-indexed buffer
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
-    HRESULT hr = m_instanceUploadBuffer->Map(0, &readRange, &mappedData);
+    HRESULT hr = m_instanceUploadBuffer[m_frameIndex]->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to map instance upload buffer");
     }
 
     memcpy(mappedData, instances.data(), m_totalInstances * sizeof(GPUInstanceData));
-    m_instanceUploadBuffer->Unmap(0, nullptr);
+    m_instanceUploadBuffer[m_frameIndex]->Unmap(0, nullptr);
 
     const UINT64 copyBytes = m_totalInstances * sizeof(GPUInstanceData);
     if (copyBytes == 0) {
         return Result<void>::Ok();
     }
 
-    if (m_instanceState != D3D12_RESOURCE_STATE_COPY_DEST) {
+    if (m_instanceState[m_frameIndex] != D3D12_RESOURCE_STATE_COPY_DEST) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_instanceBuffer.Get();
-        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.pResource = m_instanceBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_instanceState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
+        m_instanceState[m_frameIndex] = D3D12_RESOURCE_STATE_COPY_DEST;
     }
 
-    cmdList->CopyBufferRegion(m_instanceBuffer.Get(), 0, m_instanceUploadBuffer.Get(), 0, copyBytes);
+    cmdList->CopyBufferRegion(m_instanceBuffer[m_frameIndex].Get(), 0, m_instanceUploadBuffer[m_frameIndex].Get(), 0, copyBytes);
 
-    if (m_instanceState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    if (m_instanceState[m_frameIndex] != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_instanceBuffer.Get();
-        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.pResource = m_instanceBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_instanceState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_instanceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_instanceState[m_frameIndex] = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     return Result<void>::Ok();
@@ -907,7 +940,7 @@ Result<void> GPUCullingPipeline::UpdateIndirectCommands(
     if (!cmdList) {
         return Result<void>::Err("UpdateIndirectCommands requires a valid command list");
     }
-    if (!m_allCommandBuffer || !m_allCommandUploadBuffer) {
+    if (!m_allCommandBuffer[m_frameIndex] || !m_allCommandUploadBuffer[m_frameIndex]) {
         return Result<void>::Err("Indirect command buffer not initialized");
     }
     if (commands.empty()) {
@@ -923,38 +956,38 @@ Result<void> GPUCullingPipeline::UpdateIndirectCommands(
 
     void* mappedData = nullptr;
     D3D12_RANGE readRange = { 0, 0 };
-    HRESULT hr = m_allCommandUploadBuffer->Map(0, &readRange, &mappedData);
+    HRESULT hr = m_allCommandUploadBuffer[m_frameIndex]->Map(0, &readRange, &mappedData);
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to map indirect command upload buffer");
     }
 
     memcpy(mappedData, commands.data(), commandCount * sizeof(IndirectCommand));
-    m_allCommandUploadBuffer->Unmap(0, nullptr);
+    m_allCommandUploadBuffer[m_frameIndex]->Unmap(0, nullptr);
 
     const UINT64 copyBytes = commandCount * sizeof(IndirectCommand);
     if (copyBytes > 0) {
-        if (m_allCommandState != D3D12_RESOURCE_STATE_COPY_DEST) {
+        if (m_allCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_COPY_DEST) {
             D3D12_RESOURCE_BARRIER barrier = {};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_allCommandBuffer.Get();
-            barrier.Transition.StateBefore = m_allCommandState;
+            barrier.Transition.pResource = m_allCommandBuffer[m_frameIndex].Get();
+            barrier.Transition.StateBefore = m_allCommandState[m_frameIndex];
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             cmdList->ResourceBarrier(1, &barrier);
-            m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
+            m_allCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_COPY_DEST;
         }
 
-        cmdList->CopyBufferRegion(m_allCommandBuffer.Get(), 0, m_allCommandUploadBuffer.Get(), 0, copyBytes);
+        cmdList->CopyBufferRegion(m_allCommandBuffer[m_frameIndex].Get(), 0, m_allCommandUploadBuffer[m_frameIndex].Get(), 0, copyBytes);
 
-        if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+        if (m_allCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
             D3D12_RESOURCE_BARRIER barrier = {};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_allCommandBuffer.Get();
-            barrier.Transition.StateBefore = m_allCommandState;
+            barrier.Transition.pResource = m_allCommandBuffer[m_frameIndex].Get();
+            barrier.Transition.StateBefore = m_allCommandState[m_frameIndex];
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             cmdList->ResourceBarrier(1, &barrier);
-            m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            m_allCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         }
     }
 
@@ -1034,7 +1067,7 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         m_visibleCount = 0;
         return Result<void>::Ok();
     }
-    if (!m_visibleCommandBuffer || !m_allCommandBuffer || !m_commandCountBuffer) {
+    if (!m_visibleCommandBuffer[m_frameIndex] || !m_allCommandBuffer[m_frameIndex] || !m_commandCountBuffer[m_frameIndex]) {
         return Result<void>::Err("GPU culling buffers are not initialized");
     }
 
@@ -1100,48 +1133,48 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     m_cullConstantBuffer->Unmap(0, nullptr);
 
     // Ensure UAV resources are in the correct state before clearing/dispatch.
-    if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    if (m_allCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_allCommandBuffer.Get();
-        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.pResource = m_allCommandBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_allCommandState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_allCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_visibleCommandState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+    if (m_visibleCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_visibleCommandBuffer.Get();
-        barrier.Transition.StateBefore = m_visibleCommandState;
+        barrier.Transition.pResource = m_visibleCommandBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_visibleCommandState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_visibleCommandState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        m_visibleCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    if (m_commandCountState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+    if (m_commandCountState[m_frameIndex] != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_commandCountBuffer.Get();
-        barrier.Transition.StateBefore = m_commandCountState;
+        barrier.Transition.pResource = m_commandCountBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_commandCountState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        m_commandCountState[m_frameIndex] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    if (m_visibilityMaskBuffer && m_visibilityMaskState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+    if (m_visibilityMaskBuffer[m_frameIndex] && m_visibilityMaskState[m_frameIndex] != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_visibilityMaskBuffer.Get();
-        barrier.Transition.StateBefore = m_visibilityMaskState;
+        barrier.Transition.pResource = m_visibilityMaskBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_visibilityMaskState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_visibilityMaskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        m_visibilityMaskState[m_frameIndex] = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
     // Keep the debug UAV in a valid state for dispatch even when debug writes are disabled.
@@ -1156,26 +1189,26 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         m_debugState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     }
 
-    if (m_instanceState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    if (m_instanceState[m_frameIndex] != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_instanceBuffer.Get();
-        barrier.Transition.StateBefore = m_instanceState;
+        barrier.Transition.pResource = m_instanceBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_instanceState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_instanceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_instanceState[m_frameIndex] = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_allCommandState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    if (m_allCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_allCommandBuffer.Get();
-        barrier.Transition.StateBefore = m_allCommandState;
+        barrier.Transition.pResource = m_allCommandBuffer[m_frameIndex].Get();
+        barrier.Transition.StateBefore = m_allCommandState[m_frameIndex];
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &barrier);
-        m_allCommandState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_allCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     // Ensure descriptor heap is bound (ClearUAV + HZB SRV table use it).
@@ -1184,12 +1217,12 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         cmdList->SetDescriptorHeaps(1, heaps);
     }
 
-    // Clear the command count buffer to 0 using ClearUnorderedAccessViewUint
+    // Clear the command count buffer to 0 using ClearUnorderedAccessViewUint (frame-indexed)
     const UINT clearValues[4] = { 0, 0, 0, 0 };
     cmdList->ClearUnorderedAccessViewUint(
-        m_counterUAV.gpu,
-        m_counterUAVStaging.cpu,
-        m_commandCountBuffer.Get(),
+        m_counterUAV[m_frameIndex].gpu,
+        m_counterUAVStaging[m_frameIndex].cpu,
+        m_commandCountBuffer[m_frameIndex].Get(),
         clearValues,
         0,
         nullptr
@@ -1222,7 +1255,7 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     D3D12_RESOURCE_BARRIER clearBarriers[4] = {};
     uint32_t barrierCount = 0;
     clearBarriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    clearBarriers[barrierCount].UAV.pResource = m_commandCountBuffer.Get();
+    clearBarriers[barrierCount].UAV.pResource = m_commandCountBuffer[m_frameIndex].Get();
     ++barrierCount;
     if (m_historyInitialized) {
         clearBarriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
@@ -1272,16 +1305,16 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     cmdList->SetComputeRootSignature(m_rootSignature.Get());
     cmdList->SetPipelineState(m_cullPipeline.Get());
 
-    // Bind resources
+    // Bind resources (use frame-indexed buffers to avoid race conditions)
     cmdList->SetComputeRootConstantBufferView(0, m_cullConstantBuffer->GetGPUVirtualAddress());
-    cmdList->SetComputeRootShaderResourceView(1, m_instanceBuffer->GetGPUVirtualAddress());
-    cmdList->SetComputeRootShaderResourceView(2, m_allCommandBuffer->GetGPUVirtualAddress());
+    cmdList->SetComputeRootShaderResourceView(1, m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress());
+    cmdList->SetComputeRootShaderResourceView(2, m_allCommandBuffer[m_frameIndex]->GetGPUVirtualAddress());
     cmdList->SetComputeRootShaderResourceView(3, historyIn ? historyIn->GetGPUVirtualAddress() : 0);
-    cmdList->SetComputeRootUnorderedAccessView(4, m_visibleCommandBuffer->GetGPUVirtualAddress());
-    cmdList->SetComputeRootUnorderedAccessView(5, m_commandCountBuffer->GetGPUVirtualAddress());
+    cmdList->SetComputeRootUnorderedAccessView(4, m_visibleCommandBuffer[m_frameIndex]->GetGPUVirtualAddress());
+    cmdList->SetComputeRootUnorderedAccessView(5, m_commandCountBuffer[m_frameIndex]->GetGPUVirtualAddress());
     cmdList->SetComputeRootUnorderedAccessView(6, historyOut ? historyOut->GetGPUVirtualAddress() : 0);
     cmdList->SetComputeRootUnorderedAccessView(7, m_debugBuffer ? m_debugBuffer->GetGPUVirtualAddress() : 0);
-    cmdList->SetComputeRootUnorderedAccessView(8, m_visibilityMaskBuffer ? m_visibilityMaskBuffer->GetGPUVirtualAddress() : 0);
+    cmdList->SetComputeRootUnorderedAccessView(8, m_visibilityMaskBuffer[m_frameIndex] ? m_visibilityMaskBuffer[m_frameIndex]->GetGPUVirtualAddress() : 0);
 
     // Bind HZB SRV via a per-frame transient slot to avoid rewriting a shader-visible
     // descriptor that may still be referenced by an in-flight command list.
@@ -1303,18 +1336,18 @@ Result<void> GPUCullingPipeline::DispatchCulling(
     uint32_t numGroups = (m_totalInstances + 63) / 64;
     cmdList->Dispatch(numGroups, 1, 1);
 
-    // Barrier to ensure compute writes are visible
+    // Barrier to ensure compute writes are visible (frame-indexed)
     D3D12_RESOURCE_BARRIER uavBarriers[5] = {};
     uavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarriers[0].UAV.pResource = m_visibleCommandBuffer.Get();
+    uavBarriers[0].UAV.pResource = m_visibleCommandBuffer[m_frameIndex].Get();
     uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarriers[1].UAV.pResource = m_commandCountBuffer.Get();
+    uavBarriers[1].UAV.pResource = m_commandCountBuffer[m_frameIndex].Get();
     uavBarriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
     uavBarriers[2].UAV.pResource = historyOut;
     uint32_t uavBarrierCount = historyOut ? 3u : 2u;
-    if (m_visibilityMaskBuffer) {
+    if (m_visibilityMaskBuffer[m_frameIndex]) {
         uavBarriers[uavBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        uavBarriers[uavBarrierCount].UAV.pResource = m_visibilityMaskBuffer.Get();
+        uavBarriers[uavBarrierCount].UAV.pResource = m_visibilityMaskBuffer[m_frameIndex].Get();
         ++uavBarrierCount;
     }
     if (m_debugEnabled && m_debugBuffer) {
@@ -1360,21 +1393,21 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         }
 
         if (m_visibleCommandReadback) {
-            if (m_visibleCommandState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
+            if (m_visibleCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_COPY_SOURCE) {
                 D3D12_RESOURCE_BARRIER toCopy = {};
                 toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toCopy.Transition.pResource = m_visibleCommandBuffer.Get();
-                toCopy.Transition.StateBefore = m_visibleCommandState;
+                toCopy.Transition.pResource = m_visibleCommandBuffer[m_frameIndex].Get();
+                toCopy.Transition.StateBefore = m_visibleCommandState[m_frameIndex];
                 toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
                 toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
                 cmdList->ResourceBarrier(1, &toCopy);
-                m_visibleCommandState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                m_visibleCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_COPY_SOURCE;
             }
 
             cmdList->CopyBufferRegion(
                 m_visibleCommandReadback.Get(),
                 0,
-                m_visibleCommandBuffer.Get(),
+                m_visibleCommandBuffer[m_frameIndex].Get(),
                 0,
                 readbackBytes);
 
@@ -1386,18 +1419,18 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         }
     }
 
-    // Copy command count to readback for CPU stats.
+    // Copy command count to readback for CPU stats (frame-indexed).
     if (m_commandCountReadback) {
         D3D12_RESOURCE_BARRIER toCopy = {};
         toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        toCopy.Transition.pResource = m_commandCountBuffer.Get();
-        toCopy.Transition.StateBefore = m_commandCountState;
+        toCopy.Transition.pResource = m_commandCountBuffer[m_frameIndex].Get();
+        toCopy.Transition.StateBefore = m_commandCountState[m_frameIndex];
         toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
         toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         cmdList->ResourceBarrier(1, &toCopy);
-        m_commandCountState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        m_commandCountState[m_frameIndex] = D3D12_RESOURCE_STATE_COPY_SOURCE;
 
-        cmdList->CopyResource(m_commandCountReadback.Get(), m_commandCountBuffer.Get());
+        cmdList->CopyResource(m_commandCountReadback.Get(), m_commandCountBuffer[m_frameIndex].Get());
     }
 
     // Copy debug counters/sample to readback (optional).
@@ -1415,40 +1448,40 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         m_debugReadbackPending = true;
     }
 
-    // Transition buffers for ExecuteIndirect.
+    // Transition buffers for ExecuteIndirect (frame-indexed).
     D3D12_RESOURCE_BARRIER postBarriers[3] = {};
     UINT postCount = 0;
 
-    if (m_commandCountState != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
+    if (m_commandCountState[m_frameIndex] != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
         postBarriers[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        postBarriers[postCount].Transition.pResource = m_commandCountBuffer.Get();
-        postBarriers[postCount].Transition.StateBefore = m_commandCountState;
+        postBarriers[postCount].Transition.pResource = m_commandCountBuffer[m_frameIndex].Get();
+        postBarriers[postCount].Transition.StateBefore = m_commandCountState[m_frameIndex];
         postBarriers[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
         postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++postCount;
-        m_commandCountState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+        m_commandCountState[m_frameIndex] = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     }
 
-    if (m_visibleCommandState != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
+    if (m_visibleCommandState[m_frameIndex] != D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT) {
         postBarriers[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        postBarriers[postCount].Transition.pResource = m_visibleCommandBuffer.Get();
-        postBarriers[postCount].Transition.StateBefore = m_visibleCommandState;
+        postBarriers[postCount].Transition.pResource = m_visibleCommandBuffer[m_frameIndex].Get();
+        postBarriers[postCount].Transition.StateBefore = m_visibleCommandState[m_frameIndex];
         postBarriers[postCount].Transition.StateAfter = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
         postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++postCount;
-        m_visibleCommandState = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+        m_visibleCommandState[m_frameIndex] = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     }
 
     constexpr D3D12_RESOURCE_STATES kVisibilityMaskSrvState =
         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (m_visibilityMaskBuffer && m_visibilityMaskState != kVisibilityMaskSrvState) {
+    if (m_visibilityMaskBuffer[m_frameIndex] && m_visibilityMaskState[m_frameIndex] != kVisibilityMaskSrvState) {
         postBarriers[postCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        postBarriers[postCount].Transition.pResource = m_visibilityMaskBuffer.Get();
-        postBarriers[postCount].Transition.StateBefore = m_visibilityMaskState;
+        postBarriers[postCount].Transition.pResource = m_visibilityMaskBuffer[m_frameIndex].Get();
+        postBarriers[postCount].Transition.StateBefore = m_visibilityMaskState[m_frameIndex];
         postBarriers[postCount].Transition.StateAfter = kVisibilityMaskSrvState;
         postBarriers[postCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++postCount;
-        m_visibilityMaskState = kVisibilityMaskSrvState;
+        m_visibilityMaskState[m_frameIndex] = kVisibilityMaskSrvState;
     }
 
     if (postCount > 0) {

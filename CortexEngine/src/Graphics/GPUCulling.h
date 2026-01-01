@@ -13,6 +13,9 @@ using Microsoft::WRL::ComPtr;
 
 namespace Cortex::Graphics {
 
+// Triple-buffering frame count (must match Renderer.h kFrameCount)
+static constexpr uint32_t kGPUCullingFrameCount = 3;
+
 class DX12Device;
 class DX12CommandQueue;
 class DescriptorHeapManager;
@@ -98,6 +101,9 @@ public:
     // Shutdown and release resources
     void Shutdown();
 
+    // Set current frame index for triple-buffered resources (call at start of frame)
+    void SetFrameIndex(uint32_t frameIndex) { m_frameIndex = frameIndex % kGPUCullingFrameCount; }
+
     // Upload instance data for the current frame
     Result<void> UpdateInstances(
         ID3D12GraphicsCommandList* cmdList,
@@ -133,11 +139,11 @@ public:
         float cameraFarPlane,
         bool enabled);
 
-    // Get the visible command buffer for ExecuteIndirect
-    [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer.Get(); }
-    [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer.Get(); }
-    [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const { return m_allCommandBuffer.Get(); }
-    [[nodiscard]] ID3D12Resource* GetVisibilityMaskBuffer() const { return m_visibilityMaskBuffer.Get(); }
+    // Get the visible command buffer for ExecuteIndirect (triple-buffered)
+    [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer[m_frameIndex].Get(); }
+    [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer[m_frameIndex].Get(); }
+    [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const { return m_allCommandBuffer[m_frameIndex].Get(); }
+    [[nodiscard]] ID3D12Resource* GetVisibilityMaskBuffer() const { return m_visibilityMaskBuffer[m_frameIndex].Get(); }
 
     // Get the command signature for ExecuteIndirect
     [[nodiscard]] ID3D12CommandSignature* GetCommandSignature() const { return m_commandSignature.Get(); }
@@ -187,22 +193,23 @@ private:
     // Command signature for ExecuteIndirect
     ComPtr<ID3D12CommandSignature> m_commandSignature;
 
-    // Buffers
-    ComPtr<ID3D12Resource> m_instanceBuffer;           // All instances (default heap)
-    ComPtr<ID3D12Resource> m_instanceUploadBuffer;     // Upload staging for instances
-    ComPtr<ID3D12Resource> m_allCommandBuffer;         // All indirect commands (default heap)
-    ComPtr<ID3D12Resource> m_allCommandUploadBuffer;   // Upload staging for commands
-    ComPtr<ID3D12Resource> m_visibleCommandBuffer;     // Compacted visible commands (UAV)
-    ComPtr<ID3D12Resource> m_commandCountBuffer;       // Atomic counter for visible commands (UAV)
+    // Buffers - triple-buffered to prevent CPU/GPU race conditions
+    ComPtr<ID3D12Resource> m_instanceBuffer[kGPUCullingFrameCount];           // All instances (default heap)
+    ComPtr<ID3D12Resource> m_instanceUploadBuffer[kGPUCullingFrameCount];     // Upload staging for instances
+    ComPtr<ID3D12Resource> m_allCommandBuffer[kGPUCullingFrameCount];         // All indirect commands (default heap)
+    ComPtr<ID3D12Resource> m_allCommandUploadBuffer[kGPUCullingFrameCount];   // Upload staging for commands
+    ComPtr<ID3D12Resource> m_visibleCommandBuffer[kGPUCullingFrameCount];  // Compacted visible commands (UAV) - triple-buffered
+    ComPtr<ID3D12Resource> m_commandCountBuffer[kGPUCullingFrameCount];    // Atomic counter for visible commands (UAV) - triple-buffered
     ComPtr<ID3D12Resource> m_commandCountReadback;     // CPU-readable counter
     ComPtr<ID3D12Resource> m_visibleCommandReadback;   // CPU-readable command snapshot
     ComPtr<ID3D12Resource> m_debugBuffer;              // Debug counters/sample (UAV)
     ComPtr<ID3D12Resource> m_debugReadback;            // CPU-readable debug snapshot
-    ComPtr<ID3D12Resource> m_visibilityMaskBuffer;     // Per-instance visibility mask bits (UAV/SRV)
+    // Triple-buffered visibility mask to prevent race conditions between GPU culling write and visibility pass read
+    ComPtr<ID3D12Resource> m_visibilityMaskBuffer[kGPUCullingFrameCount];     // Per-instance visibility mask bits (UAV/SRV)
 
-    // Descriptors (shader-visible for ClearUnorderedAccessViewUint)
-    DescriptorHandle m_counterUAV;           // GPU descriptor for counter buffer
-    DescriptorHandle m_counterUAVStaging;    // CPU-only descriptor for ClearUAV
+    // Descriptors (shader-visible for ClearUnorderedAccessViewUint) - triple-buffered
+    DescriptorHandle m_counterUAV[kGPUCullingFrameCount];           // GPU descriptor for counter buffer
+    DescriptorHandle m_counterUAVStaging[kGPUCullingFrameCount];    // CPU-only descriptor for ClearUAV
     DescriptorHandle m_historyAUAV;
     DescriptorHandle m_historyAUAVStaging;
     DescriptorHandle m_historyBUAV;
@@ -221,16 +228,19 @@ private:
     uint32_t m_maxInstances = 65536;
     uint32_t m_totalInstances = 0;
     uint32_t m_visibleCount = 0;
-    D3D12_RESOURCE_STATES m_visibleCommandState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    D3D12_RESOURCE_STATES m_commandCountState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    D3D12_RESOURCE_STATES m_instanceState = D3D12_RESOURCE_STATE_COPY_DEST;
-    D3D12_RESOURCE_STATES m_allCommandState = D3D12_RESOURCE_STATE_COPY_DEST;
+    D3D12_RESOURCE_STATES m_visibleCommandState[kGPUCullingFrameCount] = {D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS};
+    D3D12_RESOURCE_STATES m_commandCountState[kGPUCullingFrameCount] = {D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS};
+    D3D12_RESOURCE_STATES m_instanceState[kGPUCullingFrameCount] = {D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_DEST};
+    D3D12_RESOURCE_STATES m_allCommandState[kGPUCullingFrameCount] = {D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_DEST};
     D3D12_RESOURCE_STATES m_historyAState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_historyBState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_debugState = D3D12_RESOURCE_STATE_COMMON;
-    D3D12_RESOURCE_STATES m_visibilityMaskState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_visibilityMaskState[kGPUCullingFrameCount] = {D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COMMON};
 
     FlushCallback m_flushCallback;
+
+    // Frame index for triple-buffered resources
+    uint32_t m_frameIndex = 0;
 
     bool m_forceVisible = false;
     bool m_debugEnabled = false;

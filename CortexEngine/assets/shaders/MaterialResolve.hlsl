@@ -3,6 +3,9 @@
 // Input: Visibility buffer (triangle/instance IDs)
 // Output: G-buffer textures (albedo, normal+roughness, emissive+metallic)
 
+// Include biome materials for terrain rendering
+#include "BiomeMaterials.hlsli"
+
 // Root signature:
 // b0: Resolution constants
 // t0: Visibility buffer SRV
@@ -409,8 +412,11 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float4 tangent = v0.tangent * bary.x + v1.tangent * bary.y + v2.tangent * bary.z;
     tangent.xyz = normalize(mul((float3x3)instance.worldMatrix, tangent.xyz));
 
-    // Interpolate vertex color (used for biome tinting on terrain)
+    // Interpolate vertex color (used for biome data on terrain)
     float4 vertexColor = v0.color * bary.x + v1.color * bary.y + v2.color * bary.z;
+
+    // Interpolate world position for biome sampling
+    float3 worldPos = worldPos0 * bary.x + worldPos1 * bary.y + worldPos2 * bary.z;
 
     // Material evaluation: constants in g_Materials[instance.materialIndex] and optional bindless textures.
     // Default PBR values (mid-roughness, non-metallic)
@@ -474,8 +480,20 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
             albedo *= albedoTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).rgb;
         }
 
-        // Apply vertex color tint (used for biome coloring on terrain)
-        albedo *= vertexColor.rgb;
+        // Biome terrain handling: vertex color encodes biome indices and blend weights
+        // For terrain meshes, use the biome material system for proper PBR properties
+        if (IsBiomeTerrain(vertexColor) && g_BiomeCount > 0) {
+            // Sample biome material using world position and normal
+            BiomeSurfaceData biomeSurface = SampleBiomeMaterial(worldPos, normalWS, vertexColor);
+            // Override albedo with biome-computed color (includes height layers, slope blending)
+            albedo = biomeSurface.albedo.rgb;
+            // Use biome roughness/metallic (these will be overwritten below by texture sampling if present)
+            roughness = biomeSurface.roughness;
+            metallic = biomeSurface.metallic;
+        } else {
+            // Non-terrain: apply vertex color as a simple tint multiplier
+            albedo *= vertexColor.rgb;
+        }
 
         if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {
             Texture2D normalTex = ResourceDescriptorHeap[mat.textureIndices.y];

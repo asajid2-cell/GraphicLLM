@@ -942,7 +942,7 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
         uavRange.OffsetInDescriptorsFromTableStart = 0;
 
-        D3D12_ROOT_PARAMETER1 params[6] = {};
+        D3D12_ROOT_PARAMETER1 params[7] = {};
 
         // b0: Resolution constants + view-projection matrix + mesh index (4 + 16 + 4 = 24 dwords)
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -981,9 +981,15 @@ Result<void> VisibilityBufferRenderer::CreateRootSignatures() {
         params[5].Descriptor.RegisterSpace = 0;
         params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+        // b4: Biome materials constants (CBV - root descriptor)
+        params[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+        params[6].Descriptor.ShaderRegister = 4;  // b4
+        params[6].Descriptor.RegisterSpace = 0;
+        params[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = {};
         rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        rootDesc.Desc_1_1.NumParameters = 6;
+        rootDesc.Desc_1_1.NumParameters = 7;
         rootDesc.Desc_1_1.pParameters = params;
 
         D3D12_STATIC_SAMPLER_DESC sampler{};
@@ -2542,7 +2548,8 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     ID3D12Resource* depthBuffer,
     D3D12_CPU_DESCRIPTOR_HANDLE depthSRV,
     const std::vector<VBMeshDrawInfo>& meshDraws,
-    const glm::mat4& viewProj
+    const glm::mat4& viewProj,
+    D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress
 ) {
     if (meshDraws.empty()) {
         return Result<void>::Err("No meshes provided for material resolve");
@@ -2654,6 +2661,11 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         materialBufferAddress = m_materialBuffer->GetGPUVirtualAddress();
     }
     cmdList->SetComputeRootShaderResourceView(5, materialBufferAddress);
+
+    // Param 6 (b4): Biome materials constants (CBV - root descriptor)
+    if (biomeMaterialsAddress != 0) {
+        cmdList->SetComputeRootConstantBufferView(6, biomeMaterialsAddress);
+    }
 
     // Upload mesh table for this frame (bindless indices are persistent per mesh).
     if (resConsts.meshCount > 0) {

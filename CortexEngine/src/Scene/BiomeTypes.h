@@ -93,6 +93,9 @@ struct BiomeConfig {
     std::vector<std::string> propTypes;
 };
 
+// Maximum biomes that can blend at a single vertex
+constexpr int MAX_BLEND_BIOMES = 4;
+
 // Biome map sample result at a world position
 struct BiomeSample {
     BiomeType primary = BiomeType::Plains;     // Dominant biome at this location
@@ -109,6 +112,54 @@ struct BiomeSample {
     // Get interpolated height offset based on blend
     float GetBlendedHeightOffset(const BiomeConfig& primaryCfg, const BiomeConfig& secondaryCfg) const {
         return glm::mix(primaryCfg.heightOffset, secondaryCfg.heightOffset, blendWeight);
+    }
+};
+
+// Extended biome sample with 4-way blending support
+struct BiomeSample4 {
+    BiomeType biomes[MAX_BLEND_BIOMES] = { BiomeType::Plains, BiomeType::Plains, BiomeType::Plains, BiomeType::Plains };
+    float weights[MAX_BLEND_BIOMES] = { 1.0f, 0.0f, 0.0f, 0.0f };  // Sum to 1.0
+    int activeCount = 1;               // Number of active biomes (1-4)
+    float temperature = 0.5f;
+    float moisture = 0.5f;
+
+    // Get primary biome (highest weight)
+    BiomeType GetPrimary() const { return biomes[0]; }
+
+    // Normalize weights to sum to 1.0
+    void NormalizeWeights() {
+        float sum = weights[0] + weights[1] + weights[2] + weights[3];
+        if (sum > 0.001f) {
+            for (int i = 0; i < MAX_BLEND_BIOMES; ++i) {
+                weights[i] /= sum;
+            }
+        }
+    }
+
+    // Convert to legacy 2-way sample
+    BiomeSample ToLegacy() const {
+        BiomeSample legacy;
+        legacy.primary = biomes[0];
+        legacy.secondary = (activeCount > 1) ? biomes[1] : biomes[0];
+        legacy.blendWeight = (activeCount > 1) ? weights[1] : 0.0f;
+        legacy.temperature = temperature;
+        legacy.moisture = moisture;
+        return legacy;
+    }
+
+    // Create from legacy 2-way sample
+    static BiomeSample4 FromLegacy(const BiomeSample& legacy) {
+        BiomeSample4 sample4;
+        sample4.biomes[0] = legacy.primary;
+        sample4.biomes[1] = legacy.secondary;
+        sample4.weights[0] = 1.0f - legacy.blendWeight;
+        sample4.weights[1] = legacy.blendWeight;
+        sample4.weights[2] = 0.0f;
+        sample4.weights[3] = 0.0f;
+        sample4.activeCount = (legacy.blendWeight > 0.01f) ? 2 : 1;
+        sample4.temperature = legacy.temperature;
+        sample4.moisture = legacy.moisture;
+        return sample4;
     }
 };
 
@@ -132,7 +183,7 @@ struct BiomeMapParams {
     float climateGain = 0.5f;
 };
 
-// Per-vertex biome data packed for GPU upload
+// Per-vertex biome data packed for GPU upload (legacy 2-way format)
 // Stored in vertex color channels for splatmap approach
 struct BiomeVertexData {
     uint8_t biome0 = 0;        // Primary biome index
@@ -176,6 +227,64 @@ struct BiomeVertexData {
         data.blendWeight = static_cast<uint8_t>(sample.blendWeight * 255.0f);
         data.flags = 0;
         return data;
+    }
+};
+
+// Extended 4-way biome vertex data for advanced blending
+// Uses two vertex color attributes: weights (COLOR0) and indices (COLOR1)
+struct BiomeVertexData4 {
+    uint8_t biomeIndices[4] = { 0, 0, 0, 0 };  // Biome indices (0-15)
+    uint8_t weights[4] = { 255, 0, 0, 0 };     // Blend weights (0-255, sum to 255)
+
+    // Convert weights to float4 for COLOR0 (normalized)
+    glm::vec4 GetWeightsVec4() const {
+        return glm::vec4(
+            static_cast<float>(weights[0]) / 255.0f,
+            static_cast<float>(weights[1]) / 255.0f,
+            static_cast<float>(weights[2]) / 255.0f,
+            static_cast<float>(weights[3]) / 255.0f
+        );
+    }
+
+    // Convert indices to float4 for COLOR1 (packed as 0-1, decode as 0-15)
+    glm::vec4 GetIndicesVec4() const {
+        return glm::vec4(
+            static_cast<float>(biomeIndices[0]) / 15.0f,
+            static_cast<float>(biomeIndices[1]) / 15.0f,
+            static_cast<float>(biomeIndices[2]) / 15.0f,
+            static_cast<float>(biomeIndices[3]) / 15.0f
+        );
+    }
+
+    // Get active biome count (non-zero weights)
+    int GetActiveCount() const {
+        int count = 0;
+        for (int i = 0; i < 4; ++i) {
+            if (weights[i] > 2) ++count;  // Threshold to ignore near-zero
+        }
+        return count > 0 ? count : 1;
+    }
+
+    // Create from BiomeSample4
+    static BiomeVertexData4 FromSample4(const BiomeSample4& sample) {
+        BiomeVertexData4 data;
+        for (int i = 0; i < MAX_BLEND_BIOMES; ++i) {
+            data.biomeIndices[i] = static_cast<uint8_t>(sample.biomes[i]);
+            data.weights[i] = static_cast<uint8_t>(sample.weights[i] * 255.0f);
+        }
+        return data;
+    }
+
+    // Convert to legacy 2-way format (uses top 2 weights)
+    BiomeVertexData ToLegacy() const {
+        BiomeVertexData legacy;
+        legacy.biome0 = biomeIndices[0];
+        legacy.biome1 = biomeIndices[1];
+        // Blend weight is the ratio of weight1 to (weight0 + weight1)
+        int sum01 = weights[0] + weights[1];
+        legacy.blendWeight = (sum01 > 0) ? static_cast<uint8_t>((weights[1] * 255) / sum01) : 0;
+        legacy.flags = 0;
+        return legacy;
     }
 };
 

@@ -382,4 +382,86 @@ struct PhysicsBodyComponent {
     bool isKinematic = false;
 };
 
+// Decal blend modes for surface marking
+enum class DecalBlendMode : uint8_t {
+    Replace = 0,
+    Multiply = 1,
+    Additive = 2,
+    AlphaBlend = 3,
+    Overlay = 4
+};
+
+// Decal render channels
+enum class DecalChannels : uint8_t {
+    None = 0,
+    Albedo = 1 << 0,
+    Normal = 1 << 1,
+    Roughness = 1 << 2,
+    Metallic = 1 << 3,
+    Emissive = 1 << 4,
+    All = Albedo | Normal | Roughness | Metallic | Emissive
+};
+
+inline DecalChannels operator|(DecalChannels a, DecalChannels b) {
+    return static_cast<DecalChannels>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+
+inline DecalChannels operator&(DecalChannels a, DecalChannels b) {
+    return static_cast<DecalChannels>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+
+// Decal component for deferred decal projections
+struct DecalComponent {
+    // Size of decal box (width, height, projection depth)
+    glm::vec3 size = glm::vec3(1.0f);
+
+    // Texture indices
+    uint32_t albedoTexIndex = 0;
+    uint32_t normalTexIndex = 0;
+    uint32_t maskTexIndex = 0;
+
+    // Visual properties
+    glm::vec4 color = glm::vec4(1.0f);
+    float normalStrength = 1.0f;
+    float roughnessModifier = 0.0f;
+    float metallicModifier = 0.0f;
+
+    // Blending
+    DecalBlendMode blendMode = DecalBlendMode::AlphaBlend;
+    DecalChannels channels = DecalChannels::All;
+
+    // Fade parameters
+    float fadeDistance = 50.0f;
+    float angleFade = 0.7f;
+
+    // Lifetime (-1 = permanent)
+    float lifetime = -1.0f;
+    float age = 0.0f;
+    float fadeInTime = 0.1f;
+    float fadeOutTime = 0.5f;
+
+    // State
+    bool enabled = true;
+    uint8_t priority = 2;  // 0=VeryLow, 1=Low, 2=Normal, 3=High, 4=VeryHigh
+};
+
+// Audio source component for 3D spatial audio
+struct AudioSourceComponent {
+    std::string soundName;
+    float volume = 1.0f;
+    float pitch = 1.0f;
+    float minDistance = 1.0f;
+    float maxDistance = 100.0f;
+    bool loop = false;
+    bool spatial = true;
+    bool playOnStart = false;
+    bool isPlaying = false;
+    uint32_t audioHandle = 0;
+};
+
+// Audio listener component (typically attached to camera)
+struct AudioListenerComponent {
+    bool isActive = true;
+};
+
 } // namespace Cortex::Scene

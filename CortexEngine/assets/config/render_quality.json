@@ -11,7 +11,41 @@
             "volumetricLighting": false,
             "lodBias": 2.0,
             "drawDistance": 512.0,
-            "terrainDetail": 0.5
+            "terrainDetail": 0.5,
+            "tessellation": {
+                "enabled": false,
+                "maxFactor": 1.0,
+                "minFactor": 1.0,
+                "targetEdgeLength": 64.0,
+                "startDistance": 50.0,
+                "endDistance": 200.0,
+                "geomorphStrength": 0.0
+            },
+            "erosion": {
+                "enabled": false,
+                "hydraulic": false,
+                "thermal": false,
+                "dropletsPerIteration": 0,
+                "thermalIterations": 0,
+                "blendFactor": 0.0
+            },
+            "biomeBlendQuality": 0,
+            "water": {
+                "reflections": false,
+                "refractions": false,
+                "flowAnimation": true,
+                "foam": false,
+                "waveDetail": 1,
+                "normalMapLayers": 1
+            },
+            "vegetation": {
+                "enabled": true,
+                "lod0Distance": 25.0,
+                "lod1Distance": 50.0,
+                "lod2Distance": 100.0,
+                "billboardDistance": 200.0,
+                "densityMultiplier": 0.5
+            }
         },
         "medium": {
             "name": "Medium",
@@ -24,7 +58,41 @@
             "volumetricLighting": false,
             "lodBias": 1.0,
             "drawDistance": 1024.0,
-            "terrainDetail": 0.75
+            "terrainDetail": 0.75,
+            "tessellation": {
+                "enabled": true,
+                "maxFactor": 8.0,
+                "minFactor": 1.0,
+                "targetEdgeLength": 32.0,
+                "startDistance": 100.0,
+                "endDistance": 400.0,
+                "geomorphStrength": 0.5
+            },
+            "erosion": {
+                "enabled": true,
+                "hydraulic": true,
+                "thermal": false,
+                "dropletsPerIteration": 100,
+                "thermalIterations": 0,
+                "blendFactor": 0.5
+            },
+            "biomeBlendQuality": 1,
+            "water": {
+                "reflections": true,
+                "refractions": false,
+                "flowAnimation": true,
+                "foam": true,
+                "waveDetail": 2,
+                "normalMapLayers": 1
+            },
+            "vegetation": {
+                "enabled": true,
+                "lod0Distance": 50.0,
+                "lod1Distance": 100.0,
+                "lod2Distance": 200.0,
+                "billboardDistance": 400.0,
+                "densityMultiplier": 0.75
+            }
         },
         "high": {
             "name": "High",
@@ -37,7 +105,41 @@
             "volumetricLighting": true,
             "lodBias": 0.5,
             "drawDistance": 1536.0,
-            "terrainDetail": 1.0
+            "terrainDetail": 1.0,
+            "tessellation": {
+                "enabled": true,
+                "maxFactor": 16.0,
+                "minFactor": 1.0,
+                "targetEdgeLength": 16.0,
+                "startDistance": 150.0,
+                "endDistance": 600.0,
+                "geomorphStrength": 0.75
+            },
+            "erosion": {
+                "enabled": true,
+                "hydraulic": true,
+                "thermal": true,
+                "dropletsPerIteration": 500,
+                "thermalIterations": 25,
+                "blendFactor": 0.75
+            },
+            "biomeBlendQuality": 2,
+            "water": {
+                "reflections": true,
+                "refractions": true,
+                "flowAnimation": true,
+                "foam": true,
+                "waveDetail": 3,
+                "normalMapLayers": 2
+            },
+            "vegetation": {
+                "enabled": true,
+                "lod0Distance": 100.0,
+                "lod1Distance": 200.0,
+                "lod2Distance": 400.0,
+                "billboardDistance": 800.0,
+                "densityMultiplier": 1.0
+            }
         },
         "ultra": {
             "name": "Ultra",
@@ -50,7 +152,45 @@
             "volumetricLighting": true,
             "lodBias": 0.0,
             "drawDistance": 2048.0,
-            "terrainDetail": 1.0
+            "terrainDetail": 1.0,
+            "tessellation": {
+                "enabled": true,
+                "maxFactor": 32.0,
+                "minFactor": 1.0,
+                "targetEdgeLength": 8.0,
+                "startDistance": 200.0,
+                "endDistance": 800.0,
+                "geomorphStrength": 1.0
+            },
+            "erosion": {
+                "enabled": true,
+                "hydraulic": true,
+                "thermal": true,
+                "dropletsPerIteration": 2000,
+                "thermalIterations": 50,
+                "blendFactor": 1.0
+            },
+            "biomeBlendQuality": 3,
+            "water": {
+                "reflections": true,
+                "refractions": true,
+                "flowAnimation": true,
+                "foam": true,
+                "waveDetail": 4,
+                "normalMapLayers": 3,
+                "caustics": true,
+                "underwater": true
+            },
+            "vegetation": {
+                "enabled": true,
+                "lod0Distance": 200.0,
+                "lod1Distance": 400.0,
+                "lod2Distance": 800.0,
+                "billboardDistance": 1500.0,
+                "densityMultiplier": 1.0,
+                "windDetail": "high",
+                "shadowsEnabled": true
+            }
         }
     },
     "default": "medium"

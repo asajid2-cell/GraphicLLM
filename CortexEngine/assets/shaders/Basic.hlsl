@@ -2,6 +2,7 @@
 // Implements forward rendering with texture support
 
 #include "PBR_Lighting.hlsli"
+#include "BiomeMaterials.hlsli"
 
 // Constant buffers - must match ShaderTypes.h
 cbuffer ObjectConstants : register(b0)
@@ -1531,8 +1532,25 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     // Sample albedo texture using bindless sampling (falls back to legacy if no bindless index)
     bool hasAlbedoMap = (g_TextureIndices.x != INVALID_BINDLESS_INDEX) || g_MapFlags.x;
     float4 albedoSample = hasAlbedoMap ? SampleAlbedo(input.texCoord) : float4(1.0f, 1.0f, 1.0f, 1.0f);
-    // Apply vertex color tint (used for biome coloring on terrain)
-    float3 albedo = saturate(albedoSample.rgb * g_Albedo.rgb * input.color.rgb);
+
+    // Biome terrain handling: vertex color encodes biome indices and blend weights
+    float3 albedo;
+    float biomeRoughness = 0.0f;
+    float biomeMetallic = 0.0f;
+    bool isBiomeTerrain = IsBiomeTerrain(input.color) && g_BiomeCount > 0;
+
+    if (isBiomeTerrain) {
+        // Sample biome material using world position and normal
+        BiomeSurfaceData biomeSurface = SampleBiomeMaterial(input.worldPos, input.normal, input.color);
+        // Use biome-computed color (includes height layers, slope blending)
+        albedo = saturate(albedoSample.rgb * g_Albedo.rgb * biomeSurface.albedo.rgb);
+        biomeRoughness = biomeSurface.roughness;
+        biomeMetallic = biomeSurface.metallic;
+    } else {
+        // Non-terrain: apply vertex color as a simple tint multiplier
+        albedo = saturate(albedoSample.rgb * g_Albedo.rgb * input.color.rgb);
+    }
+
     float  baseOpacity = saturate(albedoSample.a * g_Albedo.a);
 
     // Alpha-masked (cutout) materials use g_MaterialPad0 as the cutoff.
@@ -1581,6 +1599,14 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         if (hasMetallicMap)  metallic  = SampleMetallic(input.texCoord).r;
         if (hasRoughnessMap) roughness = SampleRoughness(input.texCoord).r;
     }
+
+    // Apply biome material overrides for terrain (when no texture maps override)
+    if (isBiomeTerrain) {
+        // Only apply biome values if no explicit texture maps are provided
+        if (!hasMetallicMap) metallic = biomeMetallic;
+        if (!hasRoughnessMap) roughness = biomeRoughness;
+    }
+
     float ao = g_AO;
     float occlusionStrength = saturate(g_ExtraParams.x);
 

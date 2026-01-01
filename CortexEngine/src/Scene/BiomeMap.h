@@ -32,6 +32,15 @@ public:
     // Sample biome at world position (thread-safe, no mutation)
     [[nodiscard]] BiomeSample Sample(float worldX, float worldZ) const;
 
+    // Sample biome with 4-way blending support
+    [[nodiscard]] BiomeSample4 Sample4(float worldX, float worldZ) const;
+
+    // Sample with noise-modulated blending at boundaries
+    [[nodiscard]] BiomeSample4 Sample4WithNoise(float worldX, float worldZ, float noiseScale = 0.1f, float noiseStrength = 0.15f) const;
+
+    // Sample with height-based biome override (snowline)
+    [[nodiscard]] BiomeSample4 Sample4WithHeightOverride(float worldX, float worldZ, float height) const;
+
     // Sample biome with full detail (includes height/offset calculations)
     [[nodiscard]] BiomeSample SampleDetailed(float worldX, float worldZ, float baseHeight) const;
 
@@ -107,6 +116,23 @@ private:
 
     // Sample height layer color for a single biome (with interpolation between layers)
     [[nodiscard]] glm::vec3 SampleHeightLayerColor(const BiomeConfig& config, float height, float slope) const;
+
+    // Find up to 4 nearest biomes and their weights at a position
+    void FindNearestBiomes(float worldX, float worldZ,
+                           BiomeType outBiomes[4], float outWeights[4], int& outCount) const;
+
+    // Apply noise modulation to blend weights
+    void ApplyNoiseToWeights(float worldX, float worldZ, float weights[4],
+                             float noiseScale, float noiseStrength) const;
+
+    // Apply height-based biome override (snowline effect)
+    void ApplyHeightOverride(float height, float worldX, float worldZ,
+                             BiomeType biomes[4], float weights[4], int& activeCount) const;
+
+    // Snowline parameters (could be moved to config)
+    static constexpr float SNOWLINE_START = 120.0f;
+    static constexpr float SNOWLINE_FULL = 160.0f;
+    static constexpr BiomeType SNOW_BIOME = BiomeType::Tundra;
 };
 
 } // namespace Cortex::Scene

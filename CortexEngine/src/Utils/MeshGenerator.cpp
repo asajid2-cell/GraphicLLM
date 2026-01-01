@@ -925,19 +925,22 @@ std::shared_ptr<Scene::MeshData> MeshGenerator::CreateTerrainHeightmapChunkWithB
             if (len2 > 1e-8f) n /= std::sqrt(len2);
             mesh->normals[idx(x, z)] = n;
 
-            // Compute slope from normal (0 = flat, 1 = vertical)
-            float slope = 1.0f - n.y; // n.y = 1 for flat, 0 for vertical
-
             // Get world position for biome sampling
             float localX = static_cast<float>(x) * cellSize;
             float localZ = static_cast<float>(z) * cellSize;
             float worldX = worldOffsetX + localX;
             float worldZ = worldOffsetZ + localZ;
-            float height = mesh->positions[idx(x, z)].y;
 
-            // Get height and slope-aware biome color
-            glm::vec3 biomeColor = biomeMap->GetHeightLayeredColor(worldX, worldZ, height, slope);
-            mesh->colors[idx(x, z)] = glm::vec4(biomeColor, 1.0f);
+            // Encode biome indices and blend weight for GPU shader
+            // Format: R = biome0 index / 255, G = biome1 index / 255, B = blend weight, A = flags
+            // This matches the DecodeBlendData() function in BiomeMaterials.hlsli
+            Scene::BiomeSample sample = biomeMap->Sample(worldX, worldZ);
+            float biome0Encoded = static_cast<float>(static_cast<uint8_t>(sample.primary)) / 255.0f;
+            float biome1Encoded = static_cast<float>(static_cast<uint8_t>(sample.secondary)) / 255.0f;
+            float blendWeight = sample.blendWeight;
+            // Flag 0x01 = biome terrain (so IsBiomeTerrain() returns true in shader)
+            float flags = 1.0f / 255.0f;  // Set flag bit 0 to indicate biome terrain
+            mesh->colors[idx(x, z)] = glm::vec4(biome0Encoded, biome1Encoded, blendWeight, flags);
         }
     }
 

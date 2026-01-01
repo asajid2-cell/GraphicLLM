@@ -157,6 +157,15 @@ static_assert(offsetof(Vertex, tangent) == 24, "Vertex.tangent offset must be 24
 static_assert(offsetof(Vertex, texCoord) == 40, "Vertex.texCoord offset must be 40");
 static_assert(offsetof(Vertex, color) == 48, "Vertex.color offset must be 48");
 
+// Tessellation constants for terrain LOD (register b5)
+struct TessellationConstants {
+    glm::mat4 viewProj;              // View-projection matrix for screen-space calculations
+    glm::vec4 cameraPosition;        // xyz = camera world pos, w = unused
+    glm::vec4 tessParams;            // x = maxTessFactor, y = minTessFactor, z = targetEdgeLength (pixels), w = distanceFalloff
+    glm::vec4 screenParams;          // x = width, y = height, z = 1/width, w = 1/height
+    glm::vec4 lodParams;             // x = tessStartDist, y = tessEndDist, z = heightScale, w = geomorphStrength
+};
+
 // Material properties
 struct MaterialConstants {
     glm::vec4 albedo;
@@ -193,5 +202,56 @@ struct MaterialConstants {
 
 // Invalid bindless index sentinel - shaders check for this to use fallback.
 // kInvalidBindlessIndex is defined in RHI/BindlessConstants.h
+
+// Vegetation rendering constants (register b6)
+struct VegetationConstants {
+    glm::mat4 viewProj;              // View-projection matrix
+    glm::mat4 view;                  // View matrix (for billboard facing)
+    glm::vec4 cameraPosition;        // xyz = camera position, w = time
+    glm::vec4 cameraRight;           // xyz = camera right vector, w = unused
+    glm::vec4 cameraUp;              // xyz = camera up vector, w = unused
+    glm::vec4 windDirection;         // xy = direction, z = speed, w = accumulated time
+    glm::vec4 windParams;            // x = gustStrength, y = gustFreq, z = turbulence, w = unused
+    glm::vec4 lodDistances;          // x = lod0, y = lod1, z = lod2, w = cullDistance
+    glm::vec4 fadeParams;            // x = crossfadeRange, y = ditherScale, z = shadowBias, w = unused
+};
+
+// GPU-friendly vegetation instance for structured buffer (StructuredBuffer<VegetationInstanceGPU>)
+struct VegetationInstanceGPU {
+    glm::mat4 worldMatrix;           // 64 bytes - full transform
+    glm::vec4 colorTint;             // 16 bytes - per-instance color variation
+    glm::vec4 windParams;            // 16 bytes - x=phase, y=strength, z=frequency, w=lodFade
+    uint32_t prototypeIndex;         // 4 bytes
+    uint32_t lodLevel;               // 4 bytes
+    float fadeAlpha;                 // 4 bytes - for LOD crossfade
+    float padding;                   // 4 bytes
+    // Total: 112 bytes per instance
+};
+
+// Billboard instance data for StructuredBuffer<BillboardInstance>
+struct BillboardInstanceGPU {
+    glm::vec3 position;              // World center position
+    float padding0;
+    glm::vec2 size;                  // Width, height
+    glm::vec2 padding1;
+    glm::vec4 uvBounds;              // xy = min, zw = max (atlas region)
+    glm::vec4 colorTint;             // Per-instance color
+    float rotation;                  // Rotation around view axis
+    float windPhase;                 // Wind animation phase
+    float windStrength;              // Wind strength multiplier
+    float padding2;
+    // Total: 80 bytes per instance
+};
+
+// Grass instance for cross-card grass rendering
+struct GrassInstanceGPU {
+    glm::mat4 worldMatrix;           // Transform
+    glm::vec4 colorTint;             // Color variation
+    float windPhase;                 // Wind phase offset
+    float windStrength;              // Wind intensity
+    float height;                    // Grass blade height
+    float bend;                      // Initial bend amount
+    // Total: 88 bytes per instance (padded to 96)
+};
 
 } // namespace Cortex::Graphics

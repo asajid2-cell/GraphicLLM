@@ -1,0 +1,390 @@
+{
+  "gameplay": {
+    "MoveForward": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "W" },
+        { "type": "gamepad_axis", "axis": "LeftY", "scale": -1.0, "invert": false }
+      ],
+      "deadzone": 0.15
+    },
+    "MoveBackward": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "S" },
+        { "type": "gamepad_axis", "axis": "LeftY", "scale": 1.0, "invert": false }
+      ],
+      "deadzone": 0.15
+    },
+    "MoveLeft": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "A" },
+        { "type": "gamepad_axis", "axis": "LeftX", "scale": -1.0, "invert": false }
+      ],
+      "deadzone": 0.15
+    },
+    "MoveRight": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "D" },
+        { "type": "gamepad_axis", "axis": "LeftX", "scale": 1.0, "invert": false }
+      ],
+      "deadzone": 0.15
+    },
+    "LookX": {
+      "type": "axis",
+      "bindings": [
+        { "type": "mouse_axis", "axis": 0, "scale": 0.1 },
+        { "type": "gamepad_axis", "axis": "RightX", "scale": 3.0 }
+      ],
+      "sensitivity": 1.0
+    },
+    "LookY": {
+      "type": "axis",
+      "bindings": [
+        { "type": "mouse_axis", "axis": 1, "scale": 0.1 },
+        { "type": "gamepad_axis", "axis": "RightY", "scale": 3.0 }
+      ],
+      "sensitivity": 1.0
+    },
+    "Jump": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Space" },
+        { "type": "gamepad_button", "button": "A" }
+      ]
+    },
+    "Sprint": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "LeftShift" },
+        { "type": "gamepad_button", "button": "LS" }
+      ]
+    },
+    "Crouch": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "LeftCtrl" },
+        { "type": "gamepad_button", "button": "B" }
+      ]
+    },
+    "Fire": {
+      "type": "button",
+      "bindings": [
+        { "type": "mouse_button", "button": "Left" },
+        { "type": "gamepad_axis", "axis": "RT", "scale": 1.0 }
+      ],
+      "deadzone": 0.1
+    },
+    "Aim": {
+      "type": "button",
+      "bindings": [
+        { "type": "mouse_button", "button": "Right" },
+        { "type": "gamepad_axis", "axis": "LT", "scale": 1.0 }
+      ],
+      "deadzone": 0.1
+    },
+    "Reload": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "R" },
+        { "type": "gamepad_button", "button": "X" }
+      ]
+    },
+    "Interact": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "E" },
+        { "type": "gamepad_button", "button": "Y" }
+      ]
+    },
+    "Inventory": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "I" },
+        { "type": "key", "key": "Tab" },
+        { "type": "gamepad_button", "button": "Back" }
+      ]
+    },
+    "Pause": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Escape" },
+        { "type": "gamepad_button", "button": "Start" }
+      ]
+    }
+  },
+  "menu": {
+    "NavigateUp": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "W" },
+        { "type": "key", "key": "Up" },
+        { "type": "gamepad_button", "button": "DPadUp" },
+        { "type": "gamepad_axis", "axis": "LeftY", "scale": -1.0 }
+      ],
+      "deadzone": 0.5
+    },
+    "NavigateDown": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "S" },
+        { "type": "key", "key": "Down" },
+        { "type": "gamepad_button", "button": "DPadDown" },
+        { "type": "gamepad_axis", "axis": "LeftY", "scale": 1.0 }
+      ],
+      "deadzone": 0.5
+    },
+    "NavigateLeft": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "A" },
+        { "type": "key", "key": "Left" },
+        { "type": "gamepad_button", "button": "DPadLeft" },
+        { "type": "gamepad_axis", "axis": "LeftX", "scale": -1.0 }
+      ],
+      "deadzone": 0.5
+    },
+    "NavigateRight": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "D" },
+        { "type": "key", "key": "Right" },
+        { "type": "gamepad_button", "button": "DPadRight" },
+        { "type": "gamepad_axis", "axis": "LeftX", "scale": 1.0 }
+      ],
+      "deadzone": 0.5
+    },
+    "Select": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Enter" },
+        { "type": "key", "key": "Space" },
+        { "type": "gamepad_button", "button": "A" }
+      ]
+    },
+    "Back": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Escape" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "gamepad_button", "button": "B" }
+      ]
+    },
+    "TabLeft": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Q" },
+        { "type": "gamepad_button", "button": "LB" }
+      ]
+    },
+    "TabRight": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "E" },
+        { "type": "gamepad_button", "button": "RB" }
+      ]
+    }
+  },
+  "vehicle": {
+    "Accelerate": {
+      "type": "axis",
+      "bindings": [
+        { "type": "key", "key": "W" },
+        { "type": "gamepad_axis", "axis": "RT", "scale": 1.0 }
+      ],
+      "deadzone": 0.05
+    },
+    "Brake": {
+      "type": "axis",
+      "bindings": [
+        { "type": "key", "key": "S" },
+        { "type": "gamepad_axis", "axis": "LT", "scale": 1.0 }
+      ],
+      "deadzone": 0.05
+    },
+    "SteerLeft": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "A" }
+      ]
+    },
+    "SteerRight": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "D" }
+      ]
+    },
+    "Steer": {
+      "type": "axis",
+      "bindings": [
+        { "type": "gamepad_axis", "axis": "LeftX", "scale": 1.0 }
+      ],
+      "deadzone": 0.1
+    },
+    "Handbrake": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Space" },
+        { "type": "gamepad_button", "button": "A" }
+      ]
+    },
+    "Horn": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "H" },
+        { "type": "gamepad_button", "button": "LS" }
+      ]
+    },
+    "ExitVehicle": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "F" },
+        { "type": "gamepad_button", "button": "Y" }
+      ]
+    },
+    "CameraLookBehind": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "C" },
+        { "type": "gamepad_button", "button": "RS" }
+      ]
+    }
+  },
+  "editor": {
+    "CameraForward": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "W" }
+      ]
+    },
+    "CameraBackward": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "S" }
+      ]
+    },
+    "CameraLeft": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "A" }
+      ]
+    },
+    "CameraRight": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "D" }
+      ]
+    },
+    "CameraUp": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "E" }
+      ]
+    },
+    "CameraDown": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Q" }
+      ]
+    },
+    "CameraFast": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "LeftShift" }
+      ]
+    },
+    "CameraSlow": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "LeftCtrl" }
+      ]
+    },
+    "CameraOrbit": {
+      "type": "button",
+      "bindings": [
+        { "type": "mouse_button", "button": "Right" }
+      ]
+    },
+    "CameraPan": {
+      "type": "button",
+      "bindings": [
+        { "type": "mouse_button", "button": "Middle" }
+      ]
+    },
+    "Select": {
+      "type": "button",
+      "bindings": [
+        { "type": "mouse_button", "button": "Left" }
+      ]
+    },
+    "MultiSelect": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "LeftCtrl", "shift": false, "ctrl": true, "alt": false }
+      ]
+    },
+    "Delete": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Delete" }
+      ]
+    },
+    "Duplicate": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "D", "shift": false, "ctrl": true, "alt": false }
+      ]
+    },
+    "Undo": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Z", "shift": false, "ctrl": true, "alt": false }
+      ]
+    },
+    "Redo": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "Y", "shift": false, "ctrl": true, "alt": false },
+        { "type": "key", "key": "Z", "shift": true, "ctrl": true, "alt": false }
+      ]
+    },
+    "ToolTranslate": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "W" }
+      ]
+    },
+    "ToolRotate": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "E" }
+      ]
+    },
+    "ToolScale": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "R" }
+      ]
+    },
+    "FocusSelected": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "F" }
+      ]
+    },
+    "ToggleGrid": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "G" }
+      ]
+    },
+    "ToggleSnap": {
+      "type": "button",
+      "bindings": [
+        { "type": "key", "key": "X" }
+      ]
+    }
+  }
+}

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <deque>
 #include <type_traits>
+#include <atomic>
 #include <spdlog/spdlog.h>
 #include "Core/Window.h"
 #include "RHI/DX12Device.h"
@@ -110,6 +111,7 @@ struct ConstantBuffer {
     void ResetOffset() { offset = 0; }
 
     // Write data into the next slice of the buffer and return the GPU address
+    // WARNING: This uses naive offset cycling - prefer WriteToSlot for frame constants
     D3D12_GPU_VIRTUAL_ADDRESS AllocateAndWrite(const T& data) {
         if (!mappedBytes || alignedSize == 0) {
             return gpuAddress;
@@ -121,6 +123,17 @@ struct ConstantBuffer {
         D3D12_GPU_VIRTUAL_ADDRESS addr = gpuAddress + offset;
         offset += alignedSize;
         return addr;
+    }
+
+    // Write data to a specific slot (frame-indexed) - use this for frame constants
+    // The slotIndex should be m_frameIndex to ensure proper synchronization with GPU
+    D3D12_GPU_VIRTUAL_ADDRESS WriteToSlot(const T& data, uint32_t slotIndex) {
+        if (!mappedBytes || alignedSize == 0) {
+            return gpuAddress;
+        }
+        size_t slotOffset = (slotIndex % (bufferSize / alignedSize)) * alignedSize;
+        memcpy(mappedBytes + slotOffset, &data, sizeof(T));
+        return gpuAddress + slotOffset;
     }
 
     // Convenience for single-slot buffers (frame constants)
@@ -710,11 +723,12 @@ public:
 
     // Constant buffers
     ConstantBuffer<FrameConstants> m_frameConstantBuffer;
+    D3D12_GPU_VIRTUAL_ADDRESS m_currentFrameConstantsGPU = 0;  // Per-frame address from ring buffer
     ConstantBuffer<ObjectConstants> m_objectConstantBuffer;
     ConstantBuffer<MaterialConstants> m_materialConstantBuffer;
     ConstantBuffer<ShadowConstants> m_shadowConstantBuffer;
     ConstantBuffer<Scene::BiomeMaterialsCBuffer> m_biomeMaterialsBuffer;
-    bool m_biomeMaterialsValid = false;  // Track if biome materials have been uploaded
+    std::atomic<bool> m_biomeMaterialsValid{false};  // Track if biome materials have been uploaded (atomic for thread safety)
 
     // Upload helpers
     static constexpr uint32_t kUploadPoolSize = 4;

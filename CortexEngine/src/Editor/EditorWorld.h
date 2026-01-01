@@ -114,6 +114,7 @@ public:
     [[nodiscard]] const Scene::BiomeMapParams& GetBiomeParams() const { return m_config.biomeParams; }
     [[nodiscard]] Scene::BiomeSample GetBiomeAt(float worldX, float worldZ) const;
     [[nodiscard]] const Scene::BiomeMap* GetBiomeMap() const { return m_biomeMap.get(); }
+    [[nodiscard]] std::shared_ptr<const Scene::BiomeMap> GetBiomeMapShared() const { return m_biomeMap; }
     [[nodiscard]] bool AreBiomesEnabled() const { return m_config.useBiomes && m_biomeMap != nullptr; }
     void SetBiomesEnabled(bool enabled);
 
@@ -162,7 +163,7 @@ private:
     // Subsystems
     std::unique_ptr<ChunkGenerator> m_chunkGenerator;
     std::unique_ptr<SpatialGrid> m_spatialGrid;
-    std::unique_ptr<Scene::BiomeMap> m_biomeMap;
+    std::shared_ptr<Scene::BiomeMap> m_biomeMap;
 
     // Chunk tracking
     std::unordered_set<ChunkCoord, ChunkCoordHash> m_loadedChunks;

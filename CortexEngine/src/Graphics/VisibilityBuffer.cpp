@@ -38,7 +38,8 @@ Result<void> VisibilityBufferRenderer::Initialize(
         return gbResult;
     }
 
-    // Create instance buffer
+    // Create triple-buffered instance buffers (one per frame in flight)
+    // This prevents race conditions where CPU writes frame N+1 while GPU reads frame N
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
@@ -52,45 +53,49 @@ Result<void> VisibilityBufferRenderer::Initialize(
     bufferDesc.SampleDesc.Count = 1;
     bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&m_instanceBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create visibility buffer instance buffer");
+    for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_instanceBuffer[i])
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create visibility buffer instance buffer " + std::to_string(i));
+        }
+        std::wstring bufferName = L"VB_InstanceBuffer_" + std::to_wstring(i);
+        m_instanceBuffer[i]->SetName(bufferName.c_str());
+
+        // Persistently map the instance buffer (upload heap allows this)
+        D3D12_RANGE readRange = {0, 0}; // We won't read from this buffer on CPU
+        hr = m_instanceBuffer[i]->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferMapped[i]));
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to persistently map instance buffer " + std::to_string(i));
+        }
+
+        // Create instance buffer SRV for this frame
+        auto instanceSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
+        if (instanceSrvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate instance SRV " + std::to_string(i) + ": " + instanceSrvResult.Error());
+        }
+        m_instanceSRV[i] = instanceSrvResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = m_maxInstances;
+        srvDesc.Buffer.StructureByteStride = sizeof(VBInstanceData);
+        m_device->GetDevice()->CreateShaderResourceView(
+            m_instanceBuffer[i].Get(), &srvDesc, m_instanceSRV[i].cpu
+        );
     }
-    m_instanceBuffer->SetName(L"VB_InstanceBuffer");
+    spdlog::info("Created {} triple-buffered VB instance buffers", kVBFrameCount);
 
-    // Persistently map the instance buffer (upload heap allows this)
-    D3D12_RANGE readRange = {0, 0}; // We won't read from this buffer on CPU
-    hr = m_instanceBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferMapped));
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to persistently map instance buffer");
-    }
-
-    // Create instance buffer SRV
-    auto instanceSrvResult = m_descriptorManager->AllocateCBV_SRV_UAV();
-    if (instanceSrvResult.IsErr()) {
-        return Result<void>::Err("Failed to allocate instance SRV: " + instanceSrvResult.Error());
-    }
-    m_instanceSRV = instanceSrvResult.Value();
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Buffer.FirstElement = 0;
-    srvDesc.Buffer.NumElements = m_maxInstances;
-    srvDesc.Buffer.StructureByteStride = sizeof(VBInstanceData);
-    m_device->GetDevice()->CreateShaderResourceView(
-        m_instanceBuffer.Get(), &srvDesc, m_instanceSRV.cpu
-    );
-
-    // Create a default-sized material buffer (upload heap, persistently mapped).
+    // Create triple-buffered material buffers (upload heap, persistently mapped).
     // This is populated per-frame by the renderer and consumed by the material resolve compute shader.
     {
         D3D12_HEAP_PROPERTIES matHeapProps{};
@@ -106,25 +111,29 @@ Result<void> VisibilityBufferRenderer::Initialize(
         matDesc.SampleDesc.Count = 1;
         matDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-        HRESULT hrMat = m_device->GetDevice()->CreateCommittedResource(
-            &matHeapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &matDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_materialBuffer)
-        );
-        if (FAILED(hrMat)) {
-            return Result<void>::Err("Failed to create VB material constants buffer");
-        }
-        m_materialBuffer->SetName(L"VB_MaterialBuffer");
+        for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+            HRESULT hrMat = m_device->GetDevice()->CreateCommittedResource(
+                &matHeapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &matDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&m_materialBuffer[i])
+            );
+            if (FAILED(hrMat)) {
+                return Result<void>::Err("Failed to create VB material constants buffer " + std::to_string(i));
+            }
+            std::wstring bufferName = L"VB_MaterialBuffer_" + std::to_wstring(i);
+            m_materialBuffer[i]->SetName(bufferName.c_str());
 
-        D3D12_RANGE readRangeMat{0, 0};
-        hrMat = m_materialBuffer->Map(0, &readRangeMat, reinterpret_cast<void**>(&m_materialBufferMapped));
-        if (FAILED(hrMat)) {
-            return Result<void>::Err("Failed to persistently map VB material constants buffer");
+            D3D12_RANGE readRangeMat{0, 0};
+            hrMat = m_materialBuffer[i]->Map(0, &readRangeMat, reinterpret_cast<void**>(&m_materialBufferMapped[i]));
+            if (FAILED(hrMat)) {
+                return Result<void>::Err("Failed to persistently map VB material constants buffer " + std::to_string(i));
+            }
         }
         m_materialCount = 0;
+        spdlog::info("Created {} triple-buffered VB material buffers", kVBFrameCount);
     }
 
     // Create a reflection probe table buffer (upload heap, persistently mapped).
@@ -184,8 +193,9 @@ Result<void> VisibilityBufferRenderer::Initialize(
         m_reflectionProbeCount = 0;
     }
 
-    // Create a default-sized mesh table buffer (upload heap, persistently mapped).
+    // Create triple-buffered mesh table buffers (upload heap, persistently mapped).
     // This is populated per-frame by ResolveMaterials and consumed by compute shaders.
+    // Triple-buffering prevents GPU race conditions when CPU updates mesh table.
     {
         D3D12_HEAP_PROPERTIES meshHeapProps{};
         meshHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -200,23 +210,26 @@ Result<void> VisibilityBufferRenderer::Initialize(
         meshDesc.SampleDesc.Count = 1;
         meshDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-        HRESULT hrMesh = m_device->GetDevice()->CreateCommittedResource(
-            &meshHeapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &meshDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_meshTableBuffer)
-        );
-        if (FAILED(hrMesh)) {
-            return Result<void>::Err("Failed to create VB mesh table buffer");
-        }
-        m_meshTableBuffer->SetName(L"VB_MeshTableBuffer");
+        for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+            HRESULT hrMesh = m_device->GetDevice()->CreateCommittedResource(
+                &meshHeapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &meshDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&m_meshTableBuffer[i])
+            );
+            if (FAILED(hrMesh)) {
+                return Result<void>::Err("Failed to create VB mesh table buffer " + std::to_string(i));
+            }
+            std::wstring meshName = L"VB_MeshTableBuffer_" + std::to_wstring(i);
+            m_meshTableBuffer[i]->SetName(meshName.c_str());
 
-        D3D12_RANGE readRangeMesh{0, 0};
-        hrMesh = m_meshTableBuffer->Map(0, &readRangeMesh, reinterpret_cast<void**>(&m_meshTableBufferMapped));
-        if (FAILED(hrMesh)) {
-            return Result<void>::Err("Failed to persistently map VB mesh table buffer");
+            D3D12_RANGE readRangeMesh{0, 0};
+            hrMesh = m_meshTableBuffer[i]->Map(0, &readRangeMesh, reinterpret_cast<void**>(&m_meshTableBufferMapped[i]));
+            if (FAILED(hrMesh)) {
+                return Result<void>::Err("Failed to persistently map VB mesh table buffer " + std::to_string(i));
+            }
         }
         m_meshCount = 0;
     }
@@ -308,18 +321,29 @@ Result<void> VisibilityBufferRenderer::Initialize(
 }
 
 void VisibilityBufferRenderer::Shutdown() {
-    // Unmap instance buffer before releasing it
-    if (m_instanceBuffer && m_instanceBufferMapped) {
-        m_instanceBuffer->Unmap(0, nullptr);
-        m_instanceBufferMapped = nullptr;
+    // Unmap and release all triple-buffered instance buffers
+    for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+        if (m_instanceBuffer[i] && m_instanceBufferMapped[i]) {
+            m_instanceBuffer[i]->Unmap(0, nullptr);
+            m_instanceBufferMapped[i] = nullptr;
+        }
+        m_instanceBuffer[i].Reset();
     }
-    if (m_materialBuffer && m_materialBufferMapped) {
-        m_materialBuffer->Unmap(0, nullptr);
-        m_materialBufferMapped = nullptr;
+    // Unmap and release all triple-buffered material buffers
+    for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+        if (m_materialBuffer[i] && m_materialBufferMapped[i]) {
+            m_materialBuffer[i]->Unmap(0, nullptr);
+            m_materialBufferMapped[i] = nullptr;
+        }
+        m_materialBuffer[i].Reset();
     }
-    if (m_meshTableBuffer && m_meshTableBufferMapped) {
-        m_meshTableBuffer->Unmap(0, nullptr);
-        m_meshTableBufferMapped = nullptr;
+    // Unmap and release all triple-buffered mesh table buffers
+    for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+        if (m_meshTableBuffer[i] && m_meshTableBufferMapped[i]) {
+            m_meshTableBuffer[i]->Unmap(0, nullptr);
+            m_meshTableBufferMapped[i] = nullptr;
+        }
+        m_meshTableBuffer[i].Reset();
     }
     if (m_reflectionProbeBuffer && m_reflectionProbeBufferMapped) {
         m_reflectionProbeBuffer->Unmap(0, nullptr);
@@ -332,9 +356,6 @@ void VisibilityBufferRenderer::Shutdown() {
     m_gbufferEmissiveMetallic.Reset();
     m_gbufferMaterialExt0.Reset();
     m_gbufferMaterialExt1.Reset();
-    m_instanceBuffer.Reset();
-    m_materialBuffer.Reset();
-    m_meshTableBuffer.Reset();
     m_reflectionProbeBuffer.Reset();
     m_dummyCullMaskBuffer.Reset();
     m_visibilityPipeline.Reset();
@@ -2050,12 +2071,14 @@ Result<void> VisibilityBufferRenderer::UpdateInstances(
         return Result<void>::Err("Too many instances for visibility buffer");
     }
 
-    if (!m_instanceBufferMapped) {
-        return Result<void>::Err("Instance buffer not mapped");
+    // Use frame-indexed buffer to prevent race conditions with GPU
+    uint32_t frameIdx = m_frameIndex;
+    if (!m_instanceBufferMapped[frameIdx]) {
+        return Result<void>::Err("Instance buffer " + std::to_string(frameIdx) + " not mapped");
     }
 
-    // Write to persistently mapped buffer
-    memcpy(m_instanceBufferMapped, instances.data(), instances.size() * sizeof(VBInstanceData));
+    // Write to the current frame's buffer (GPU reads from previous frame's buffer)
+    memcpy(m_instanceBufferMapped[frameIdx], instances.data(), instances.size() * sizeof(VBInstanceData));
 
     m_instanceCount = static_cast<uint32_t>(instances.size());
     return Result<void>::Ok();
@@ -2072,6 +2095,9 @@ Result<void> VisibilityBufferRenderer::UpdateMaterials(
         return Result<void>::Ok();
     }
 
+    // Use frame-indexed buffer to prevent race conditions
+    uint32_t frameIdx = m_frameIndex;
+
     if (materials.size() > m_maxMaterials) {
         if (m_flushCallback) {
             m_flushCallback();
@@ -2084,49 +2110,53 @@ Result<void> VisibilityBufferRenderer::UpdateMaterials(
         }
         m_maxMaterials = newCap;
 
-        if (m_materialBuffer && m_materialBufferMapped) {
-            m_materialBuffer->Unmap(0, nullptr);
-            m_materialBufferMapped = nullptr;
-        }
-        m_materialBuffer.Reset();
+        // Resize all triple-buffered material buffers
+        for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+            if (m_materialBuffer[i] && m_materialBufferMapped[i]) {
+                m_materialBuffer[i]->Unmap(0, nullptr);
+                m_materialBufferMapped[i] = nullptr;
+            }
+            m_materialBuffer[i].Reset();
 
-        D3D12_HEAP_PROPERTIES heapProps{};
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+            D3D12_HEAP_PROPERTIES heapProps{};
+            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-        D3D12_RESOURCE_DESC bufferDesc{};
-        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        bufferDesc.Width = static_cast<UINT64>(m_maxMaterials) * sizeof(VBMaterialConstants);
-        bufferDesc.Height = 1;
-        bufferDesc.DepthOrArraySize = 1;
-        bufferDesc.MipLevels = 1;
-        bufferDesc.SampleDesc.Count = 1;
-        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            D3D12_RESOURCE_DESC bufferDesc{};
+            bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            bufferDesc.Width = static_cast<UINT64>(m_maxMaterials) * sizeof(VBMaterialConstants);
+            bufferDesc.Height = 1;
+            bufferDesc.DepthOrArraySize = 1;
+            bufferDesc.MipLevels = 1;
+            bufferDesc.SampleDesc.Count = 1;
+            bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &bufferDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_materialBuffer)
-        );
-        if (FAILED(hr)) {
-            return Result<void>::Err("Failed to resize VB material constants buffer");
-        }
-        m_materialBuffer->SetName(L"VB_MaterialBuffer");
+            HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &bufferDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&m_materialBuffer[i])
+            );
+            if (FAILED(hr)) {
+                return Result<void>::Err("Failed to resize VB material constants buffer " + std::to_string(i));
+            }
+            std::wstring bufferName = L"VB_MaterialBuffer_" + std::to_wstring(i);
+            m_materialBuffer[i]->SetName(bufferName.c_str());
 
-        D3D12_RANGE readRange{0, 0};
-        hr = m_materialBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_materialBufferMapped));
-        if (FAILED(hr) || !m_materialBufferMapped) {
-            return Result<void>::Err("Failed to map resized VB material constants buffer");
+            D3D12_RANGE readRange{0, 0};
+            hr = m_materialBuffer[i]->Map(0, &readRange, reinterpret_cast<void**>(&m_materialBufferMapped[i]));
+            if (FAILED(hr) || !m_materialBufferMapped[i]) {
+                return Result<void>::Err("Failed to map resized VB material constants buffer " + std::to_string(i));
+            }
         }
     }
 
-    if (!m_materialBufferMapped) {
-        return Result<void>::Err("VB material constants buffer not mapped");
+    if (!m_materialBufferMapped[frameIdx]) {
+        return Result<void>::Err("VB material constants buffer " + std::to_string(frameIdx) + " not mapped");
     }
 
-    memcpy(m_materialBufferMapped, materials.data(), materials.size() * sizeof(VBMaterialConstants));
+    memcpy(m_materialBufferMapped[frameIdx], materials.data(), materials.size() * sizeof(VBMaterialConstants));
     return Result<void>::Ok();
 }
 
@@ -2399,7 +2429,8 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
     cmdList->SetGraphicsRootSignature(m_visibilityRootSignature.Get());
 
     // Set instance buffer (root descriptor t0) - only needs to be set once
-    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
+    // Use frame-indexed buffer to match what was written by UpdateInstances()
+    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress();
     cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
 
     // Optional per-instance culling mask (root descriptor t2). Root SRVs must
@@ -2517,7 +2548,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
             cmdList->SetGraphicsRootSignature(m_visibilityAlphaRootSignature.Get());
 
             cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
-            cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer[m_frameIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootShaderResourceView(3, cullMaskAddress);
 
             for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
@@ -2530,7 +2561,7 @@ Result<void> VisibilityBufferRenderer::RenderVisibilityPass(
                 cmdList->SetPipelineState(m_visibilityAlphaPipelineDoubleSided.Get());
                 cmdList->SetGraphicsRootSignature(m_visibilityAlphaRootSignature.Get());
                 cmdList->SetGraphicsRootShaderResourceView(1, instanceBufferAddress);
-                cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootShaderResourceView(2, m_materialBuffer[m_frameIndex]->GetGPUVirtualAddress());
                 cmdList->SetGraphicsRootShaderResourceView(3, cullMaskAddress);
             }
             for (uint32_t meshIdx = 0; meshIdx < static_cast<uint32_t>(meshDraws.size()); ++meshIdx) {
@@ -2646,19 +2677,23 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
         glm::mat4 viewProj;  // 16 floats
         uint32_t materialCount;
         uint32_t meshCount;
-        uint32_t pad[2];
-    } resConsts;
+        uint32_t instanceCount;  // For bounds checking in shader
+        uint32_t pad;
+    } resConsts = {};
 
     // Param 1 (t1): Instance buffer SRV (root descriptor)
-    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer->GetGPUVirtualAddress();
+    // Use frame-indexed buffer to match what was written by UpdateInstances()
+    D3D12_GPU_VIRTUAL_ADDRESS instanceBufferAddress = m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress();
     cmdList->SetComputeRootShaderResourceView(1, instanceBufferAddress);
 
     // Param 5 (t5): Material constants buffer SRV (root descriptor)
+    // Use frame-indexed buffer to match what was written by UpdateMaterials()
     resConsts.materialCount = m_materialCount;
     resConsts.meshCount = static_cast<uint32_t>(meshDraws.size());
+    resConsts.instanceCount = m_instanceCount;  // For bounds checking in shader
     D3D12_GPU_VIRTUAL_ADDRESS materialBufferAddress = 0;
-    if (m_materialBuffer) {
-        materialBufferAddress = m_materialBuffer->GetGPUVirtualAddress();
+    if (m_materialBuffer[m_frameIndex]) {
+        materialBufferAddress = m_materialBuffer[m_frameIndex]->GetGPUVirtualAddress();
     }
     cmdList->SetComputeRootShaderResourceView(5, materialBufferAddress);
 
@@ -2668,6 +2703,8 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
     }
 
     // Upload mesh table for this frame (bindless indices are persistent per mesh).
+    // Uses triple-buffered mesh table to prevent GPU race conditions.
+    uint32_t frameIdx = m_frameIndex;
     if (resConsts.meshCount > 0) {
         if (resConsts.meshCount > m_maxMeshes) {
             if (m_flushCallback) {
@@ -2680,41 +2717,45 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
             }
             m_maxMeshes = newCap;
 
-            if (m_meshTableBuffer && m_meshTableBufferMapped) {
-                m_meshTableBuffer->Unmap(0, nullptr);
-                m_meshTableBufferMapped = nullptr;
-            }
-            m_meshTableBuffer.Reset();
+            // Resize all triple-buffered mesh table buffers
+            for (uint32_t i = 0; i < kVBFrameCount; ++i) {
+                if (m_meshTableBuffer[i] && m_meshTableBufferMapped[i]) {
+                    m_meshTableBuffer[i]->Unmap(0, nullptr);
+                    m_meshTableBufferMapped[i] = nullptr;
+                }
+                m_meshTableBuffer[i].Reset();
 
-            D3D12_HEAP_PROPERTIES heapProps{};
-            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+                D3D12_HEAP_PROPERTIES heapProps{};
+                heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-            D3D12_RESOURCE_DESC bufferDesc{};
-            bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            bufferDesc.Width = static_cast<UINT64>(m_maxMeshes) * sizeof(VBMeshTableEntry);
-            bufferDesc.Height = 1;
-            bufferDesc.DepthOrArraySize = 1;
-            bufferDesc.MipLevels = 1;
-            bufferDesc.SampleDesc.Count = 1;
-            bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+                D3D12_RESOURCE_DESC bufferDesc{};
+                bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+                bufferDesc.Width = static_cast<UINT64>(m_maxMeshes) * sizeof(VBMeshTableEntry);
+                bufferDesc.Height = 1;
+                bufferDesc.DepthOrArraySize = 1;
+                bufferDesc.MipLevels = 1;
+                bufferDesc.SampleDesc.Count = 1;
+                bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-            HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &bufferDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_meshTableBuffer)
-            );
-            if (FAILED(hr)) {
-                return Result<void>::Err("Failed to resize VB mesh table buffer");
-            }
-            m_meshTableBuffer->SetName(L"VB_MeshTableBuffer");
+                HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+                    &heapProps,
+                    D3D12_HEAP_FLAG_NONE,
+                    &bufferDesc,
+                    D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr,
+                    IID_PPV_ARGS(&m_meshTableBuffer[i])
+                );
+                if (FAILED(hr)) {
+                    return Result<void>::Err("Failed to resize VB mesh table buffer " + std::to_string(i));
+                }
+                std::wstring meshName = L"VB_MeshTableBuffer_" + std::to_wstring(i);
+                m_meshTableBuffer[i]->SetName(meshName.c_str());
 
-            D3D12_RANGE readRange{0, 0};
-            hr = m_meshTableBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_meshTableBufferMapped));
-            if (FAILED(hr) || !m_meshTableBufferMapped) {
-                return Result<void>::Err("Failed to map resized VB mesh table buffer");
+                D3D12_RANGE readRange{0, 0};
+                hr = m_meshTableBuffer[i]->Map(0, &readRange, reinterpret_cast<void**>(&m_meshTableBufferMapped[i]));
+                if (FAILED(hr) || !m_meshTableBufferMapped[i]) {
+                    return Result<void>::Err("Failed to map resized VB mesh table buffer " + std::to_string(i));
+                }
             }
         }
 
@@ -2737,13 +2778,13 @@ Result<void> VisibilityBufferRenderer::ResolveMaterials(
             meshEntries[meshIdx] = entry;
         }
 
-        if (!m_meshTableBufferMapped || !m_meshTableBuffer) {
-            return Result<void>::Err("VB mesh table buffer not mapped");
+        if (!m_meshTableBufferMapped[frameIdx] || !m_meshTableBuffer[frameIdx]) {
+            return Result<void>::Err("VB mesh table buffer " + std::to_string(frameIdx) + " not mapped");
         }
-        memcpy(m_meshTableBufferMapped, meshEntries.data(), meshEntries.size() * sizeof(VBMeshTableEntry));
+        memcpy(m_meshTableBufferMapped[frameIdx], meshEntries.data(), meshEntries.size() * sizeof(VBMeshTableEntry));
         m_meshCount = resConsts.meshCount;
 
-        cmdList->SetComputeRootShaderResourceView(4, m_meshTableBuffer->GetGPUVirtualAddress());
+        cmdList->SetComputeRootShaderResourceView(4, m_meshTableBuffer[frameIdx]->GetGPUVirtualAddress());
     } else {
         m_meshCount = 0;
         cmdList->SetComputeRootShaderResourceView(4, 0);
@@ -2854,13 +2895,13 @@ Result<void> VisibilityBufferRenderer::ComputeMotionVectors(
     if (!m_motionVectorsPipeline || !m_motionVectorsRootSignature) {
         return Result<void>::Err("VB motion vectors pipeline not initialized");
     }
-    if (!m_instanceBuffer || m_instanceCount == 0) {
+    if (!m_instanceBuffer[m_frameIndex] || m_instanceCount == 0) {
         return Result<void>::Ok();
     }
     if (!m_visibilitySRV.IsValid()) {
         return Result<void>::Err("VB motion vectors requires valid visibility SRV");
     }
-    if (!m_meshTableBuffer || !m_meshTableBufferMapped) {
+    if (!m_meshTableBuffer[m_frameIndex] || !m_meshTableBufferMapped[m_frameIndex]) {
         return Result<void>::Err("VB motion vectors requires mesh table buffer (run ResolveMaterials first)");
     }
     if (!meshDraws.empty() && m_meshCount != static_cast<uint32_t>(meshDraws.size())) {
@@ -2894,8 +2935,8 @@ Result<void> VisibilityBufferRenderer::ComputeMotionVectors(
 
     cmdList->SetComputeRootConstantBufferView(1, frameConstantsAddress);
 
-    cmdList->SetComputeRootShaderResourceView(2, m_instanceBuffer->GetGPUVirtualAddress());
-    cmdList->SetComputeRootShaderResourceView(3, m_meshTableBuffer->GetGPUVirtualAddress());
+    cmdList->SetComputeRootShaderResourceView(2, m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress());
+    cmdList->SetComputeRootShaderResourceView(3, m_meshTableBuffer[m_frameIndex]->GetGPUVirtualAddress());
 
     // t0: visibility SRV table (copy to transient to avoid adjacency assumptions)
     auto visTableResult = m_descriptorManager->AllocateTransientCBV_SRV_UAVRange(1);

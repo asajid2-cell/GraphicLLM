@@ -112,6 +112,9 @@ struct VBMaterialOutput {
     glm::vec4 emissiveMetal;    // rgb = emissive, a = metallic
 };
 
+// Triple buffering constant (must match Renderer.h kFrameCount)
+static constexpr uint32_t kVBFrameCount = 3;
+
 // Visibility Buffer Renderer
 // Two-phase deferred rendering:
 // 1. Visibility Pass: Rasterize triangle IDs to visibility buffer (R32G32_UINT)
@@ -129,6 +132,9 @@ public:
 
     VisibilityBufferRenderer(const VisibilityBufferRenderer&) = delete;
     VisibilityBufferRenderer& operator=(const VisibilityBufferRenderer&) = delete;
+
+    // Set current frame index for triple-buffered resources (call at start of frame)
+    void SetFrameIndex(uint32_t frameIndex) { m_frameIndex = frameIndex % kVBFrameCount; }
 
     // Initialize visibility buffer system
     Result<void> Initialize(
@@ -376,16 +382,18 @@ private:
     DescriptorHandle m_materialExt0RTV, m_materialExt0SRV, m_materialExt0UAV;
     DescriptorHandle m_materialExt1RTV, m_materialExt1SRV, m_materialExt1UAV;
 
-    // Instance data buffer
-    ComPtr<ID3D12Resource> m_instanceBuffer;
-    DescriptorHandle m_instanceSRV;
-    uint8_t* m_instanceBufferMapped = nullptr;  // Persistent mapping
+    // Triple-buffered instance data buffers (one per frame in flight)
+    // This prevents race conditions where CPU writes while GPU reads
+    ComPtr<ID3D12Resource> m_instanceBuffer[kVBFrameCount];
+    DescriptorHandle m_instanceSRV[kVBFrameCount];
+    uint8_t* m_instanceBufferMapped[kVBFrameCount] = {nullptr, nullptr, nullptr};
     uint32_t m_instanceCount = 0;
     uint32_t m_maxInstances = 65536;
+    uint32_t m_frameIndex = 0;  // Current frame index for buffer selection
 
-    // Material constants buffer (upload heap, persistently mapped)
-    ComPtr<ID3D12Resource> m_materialBuffer;
-    uint8_t* m_materialBufferMapped = nullptr;
+    // Triple-buffered material constants buffers (upload heap, persistently mapped)
+    ComPtr<ID3D12Resource> m_materialBuffer[kVBFrameCount];
+    uint8_t* m_materialBufferMapped[kVBFrameCount] = {nullptr, nullptr, nullptr};
     uint32_t m_materialCount = 0;
     uint32_t m_maxMaterials = 4096;
 
@@ -400,9 +408,10 @@ private:
     // guard against out-of-range reads so a single uint32 is sufficient.
     ComPtr<ID3D12Resource> m_dummyCullMaskBuffer;
 
-    // Mesh table buffer (upload heap, persistently mapped)
-    ComPtr<ID3D12Resource> m_meshTableBuffer;
-    uint8_t* m_meshTableBufferMapped = nullptr;
+    // Mesh table buffer (upload heap, persistently mapped) - TRIPLE-BUFFERED
+    // Each frame writes to its own buffer to prevent GPU race conditions
+    ComPtr<ID3D12Resource> m_meshTableBuffer[kVBFrameCount];
+    uint8_t* m_meshTableBufferMapped[kVBFrameCount] = {nullptr, nullptr, nullptr};
     uint32_t m_meshCount = 0;
     uint32_t m_maxMeshes = 4096;
 

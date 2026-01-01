@@ -154,7 +154,7 @@ void Renderer::RenderBloom() {
     ID3D12DescriptorHeap* heaps[] = { m_descriptorManager->GetCBV_SRV_UAV_Heap() };
     m_commandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
     m_commandList->SetDescriptorHeaps(1, heaps);
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };

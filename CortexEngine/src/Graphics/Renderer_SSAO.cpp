@@ -198,7 +198,7 @@ void Renderer::RenderSSAO() {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Frame constants
-    m_commandList->SetGraphicsRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetGraphicsRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Depth SRV as t0 via transient descriptor
     auto depthHandleResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
@@ -287,7 +287,7 @@ void Renderer::RenderSSAOAsync() {
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     // Bind frame constants (b1)
-    m_commandList->SetComputeRootConstantBufferView(1, m_frameConstantBuffer.gpuAddress);
+    m_commandList->SetComputeRootConstantBufferView(1, m_currentFrameConstantsGPU);
 
     // Root signature expects fixed-width descriptor tables:
     //   Param 3: t0-t9 (10 SRVs)

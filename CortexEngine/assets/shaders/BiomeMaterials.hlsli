@@ -25,7 +25,7 @@
 // Snowline parameters (world-space heights)
 #define SNOWLINE_START 120.0
 #define SNOWLINE_FULL 160.0
-#define TUNDRA_BIOME_INDEX 8  // Index for Tundra in biome array
+#define TUNDRA_BIOME_INDEX 4  // Index for Tundra in biome array (matches BiomeType::Tundra = 4)
 
 // Per-biome material data (matches BiomeMaterialGPU in C++)
 struct BiomeMaterial {
@@ -89,7 +89,8 @@ float FBM(float2 p, int octaves) {
         frequency *= 2.0;
     }
 
-    return value / totalAmplitude;
+    // Guard against division by zero (octaves = 0)
+    return (totalAmplitude > 0.0001) ? (value / totalAmplitude) : 0.5;
 }
 
 // Noise-modulated blend weight for natural transitions
@@ -128,11 +129,13 @@ struct BiomeVertexData4 {
 };
 
 BiomeVertexData DecodeBlendData(float4 vertexColor) {
+    // Clamp vertex color to valid range to prevent decode issues from interpolation edge cases
+    float4 safeColor = saturate(vertexColor);
     BiomeVertexData data;
-    data.biome0 = uint(vertexColor.r * 255.0 + 0.5) % MAX_BIOMES;
-    data.biome1 = uint(vertexColor.g * 255.0 + 0.5) % MAX_BIOMES;
-    data.blendWeight = vertexColor.b;
-    data.flags = uint(vertexColor.a * 255.0 + 0.5);
+    data.biome0 = uint(safeColor.r * 255.0 + 0.5) % MAX_BIOMES;
+    data.biome1 = uint(safeColor.g * 255.0 + 0.5) % MAX_BIOMES;
+    data.blendWeight = safeColor.b;
+    data.flags = uint(safeColor.a * 255.0 + 0.5);
     return data;
 }
 
@@ -140,19 +143,22 @@ BiomeVertexData DecodeBlendData(float4 vertexColor) {
 // color0: RGBA = weights for biomes 0-3 (normalized)
 // color1: RGBA = biome indices (packed as 0-15 values)
 BiomeVertexData4 DecodeBlendData4(float4 weights, float4 indices) {
+    // Clamp inputs to valid range for safety
+    float4 safeWeights = saturate(weights);
+    float4 safeIndices = saturate(indices);
     BiomeVertexData4 data;
 
     // Extract biome indices from color1
-    data.biomeIndices[0] = uint(indices.r * 15.0 + 0.5) % MAX_BIOMES;
-    data.biomeIndices[1] = uint(indices.g * 15.0 + 0.5) % MAX_BIOMES;
-    data.biomeIndices[2] = uint(indices.b * 15.0 + 0.5) % MAX_BIOMES;
-    data.biomeIndices[3] = uint(indices.a * 15.0 + 0.5) % MAX_BIOMES;
+    data.biomeIndices[0] = uint(safeIndices.r * 15.0 + 0.5) % MAX_BIOMES;
+    data.biomeIndices[1] = uint(safeIndices.g * 15.0 + 0.5) % MAX_BIOMES;
+    data.biomeIndices[2] = uint(safeIndices.b * 15.0 + 0.5) % MAX_BIOMES;
+    data.biomeIndices[3] = uint(safeIndices.a * 15.0 + 0.5) % MAX_BIOMES;
 
     // Extract weights from color0
-    data.weights[0] = weights.r;
-    data.weights[1] = weights.g;
-    data.weights[2] = weights.b;
-    data.weights[3] = weights.a;
+    data.weights[0] = safeWeights.r;
+    data.weights[1] = safeWeights.g;
+    data.weights[2] = safeWeights.b;
+    data.weights[3] = safeWeights.a;
 
     // Normalize weights
     float totalWeight = data.weights[0] + data.weights[1] + data.weights[2] + data.weights[3];

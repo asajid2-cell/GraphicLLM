@@ -28,7 +28,8 @@ cbuffer ResolutionConstants : register(b0) {
     float4x4 g_ViewProj;  // View-projection matrix for computing clip-space barycentrics
     uint g_MaterialCount;
     uint g_MeshCount;
-    uint2 _pad2;
+    uint g_InstanceCount;  // For bounds checking
+    uint _pad2;
 };
 
 // Instance data structure (matches VBInstanceData in C++)
@@ -317,6 +318,18 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         // Write black/default values for background
         g_AlbedoOut[pixelCoord] = float4(0, 0, 0, 1);
         g_NormalRoughnessOut[pixelCoord] = float4(0.5, 0.5, 1.0, 1.0);  // Encoded +Z normal + max roughness
+        g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
+        g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
+        g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
+        return;
+    }
+
+    // CRITICAL: Bounds check instanceID before accessing g_Instances buffer
+    // Without this, out-of-bounds instanceID values (from visibility buffer corruption
+    // or race conditions) cause random garbage reads, leading to "random terrain" glitching.
+    if (g_InstanceCount == 0 || instanceID >= g_InstanceCount) {
+        g_AlbedoOut[pixelCoord] = float4(0, 0, 0, 1);
+        g_NormalRoughnessOut[pixelCoord] = float4(0.5, 0.5, 1.0, 1.0);
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
         g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
         g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);

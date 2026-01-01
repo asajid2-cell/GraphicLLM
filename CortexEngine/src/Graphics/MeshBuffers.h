@@ -123,7 +123,7 @@ struct MeshBuffers {
     static constexpr uint32_t kInvalidDescriptorIndex = 0xFFFFFFFFu;
     uint32_t vbRawSRVIndex = kInvalidDescriptorIndex;
     uint32_t ibRawSRVIndex = kInvalidDescriptorIndex;
-    uint32_t vertexStrideBytes = 48u; // sizeof(Vertex)
+    uint32_t vertexStrideBytes = 64u; // sizeof(Vertex) - must match ShaderTypes.h
     uint32_t indexFormat = 0u;        // 0 = R32_UINT, 1 = R16_UINT
 };
 

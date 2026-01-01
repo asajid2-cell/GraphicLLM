@@ -3,10 +3,10 @@
   "description": "Biome configuration for procedural terrain generation",
   "biomeMapParams": {
     "seed": 1337,
-    "cellSize": 512.0,
-    "blendRadius": 64.0,
-    "temperatureFreq": 0.001,
-    "moistureFreq": 0.0008
+    "cellSize": 128.0,
+    "blendRadius": 32.0,
+    "temperatureFreq": 0.008,
+    "moistureFreq": 0.006
   },
   "biomes": [
     {

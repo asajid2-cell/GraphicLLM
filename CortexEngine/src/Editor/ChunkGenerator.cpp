@@ -68,9 +68,9 @@ void ChunkGenerator::SetChunkSize(float size) {
     m_chunkSize = size;
 }
 
-void ChunkGenerator::SetBiomeMap(const Scene::BiomeMap* biomeMap) {
+void ChunkGenerator::SetBiomeMap(std::shared_ptr<const Scene::BiomeMap> biomeMap) {
     std::lock_guard<std::mutex> lock(m_paramsMutex);
-    m_biomeMap = biomeMap;
+    m_biomeMap = std::move(biomeMap);
 }
 
 void ChunkGenerator::RequestChunk(const ChunkCoord& coord, ChunkLOD lod, float priority) {
@@ -180,15 +180,15 @@ void ChunkGenerator::WorkerThread() {
 ChunkResult ChunkGenerator::GenerateChunk(const ChunkRequest& request) {
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // Get current terrain parameters
+    // Get current terrain parameters (copy shared_ptr to keep BiomeMap alive during generation)
     Scene::TerrainNoiseParams params;
     float chunkSize;
-    const Scene::BiomeMap* biomeMap;
+    std::shared_ptr<const Scene::BiomeMap> biomeMap;
     {
         std::lock_guard<std::mutex> lock(m_paramsMutex);
         params = m_terrainParams;
         chunkSize = m_chunkSize;
-        biomeMap = m_biomeMap;
+        biomeMap = m_biomeMap;  // Increments refcount, keeps BiomeMap alive
     }
 
     // Determine grid dimension based on LOD
@@ -203,7 +203,7 @@ ChunkResult ChunkGenerator::GenerateChunk(const ChunkRequest& request) {
             request.coord.x,
             request.coord.z,
             params,
-            biomeMap
+            biomeMap.get()  // Pass raw pointer, shared_ptr keeps BiomeMap alive
         );
     } else {
         mesh = Utils::MeshGenerator::CreateTerrainHeightmapChunk(
@@ -228,12 +228,16 @@ ChunkResult ChunkGenerator::GenerateChunk(const ChunkRequest& request) {
 }
 
 uint32_t ChunkGenerator::GetGridDimForLOD(ChunkLOD lod) {
+    // Use (2^n + 1) grid dimensions for perfect hierarchical vertex alignment.
+    // With these values, every vertex in a lower LOD aligns exactly with
+    // an even-indexed vertex in the higher LOD, preventing cracks at LOD boundaries.
+    // Example: Half(33) vertex at j/32 = Full(65) vertex at 2j/64
     switch (lod) {
-        case ChunkLOD::Full:    return 64;
-        case ChunkLOD::Half:    return 32;
-        case ChunkLOD::Quarter: return 16;
-        case ChunkLOD::Eighth:  return 8;
-        default:                return 64;
+        case ChunkLOD::Full:    return 65;  // 64 subdivisions (2^6)
+        case ChunkLOD::Half:    return 33;  // 32 subdivisions (2^5)
+        case ChunkLOD::Quarter: return 17;  // 16 subdivisions (2^4)
+        case ChunkLOD::Eighth:  return 9;   // 8 subdivisions (2^3)
+        default:                return 65;
     }
 }
 

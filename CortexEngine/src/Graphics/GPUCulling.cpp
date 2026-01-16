@@ -1122,6 +1122,14 @@ Result<void> GPUCullingPipeline::DispatchCulling(
         constants.frustumPlanes[i] = frustum.planes[i];
     }
 
+    // DEBUG: Log GPU culling dispatch every 60 frames
+    static uint32_t s_dispatchLogCounter = 0;
+    if (s_dispatchLogCounter++ % 60 == 0) {
+        spdlog::info("[FLICKERING DEBUG] GPU Culling Dispatch: InstanceCount={}, WriteIndex={}, ReadIndex={}, HZB Enabled={}, HZB Cam Motion={}m",
+                     m_totalInstances, m_frameIndex, (m_frameIndex + 2) % kGPUCullingFrameCount,
+                     (m_hzbTexture != nullptr), cameraMotionWS);
+    }
+
     // Map and upload constants
     void* mappedCB = nullptr;
     D3D12_RANGE readRange = { 0, 0 };

@@ -140,10 +140,25 @@ public:
         bool enabled);
 
     // Get the visible command buffer for ExecuteIndirect (triple-buffered)
-    [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const { return m_visibleCommandBuffer[m_frameIndex].Get(); }
-    [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const { return m_commandCountBuffer[m_frameIndex].Get(); }
-    [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const { return m_allCommandBuffer[m_frameIndex].Get(); }
-    [[nodiscard]] ID3D12Resource* GetVisibilityMaskBuffer() const { return m_visibilityMaskBuffer[m_frameIndex].Get(); }
+    // CRITICAL FIX: Read from PREVIOUS frame's buffer to prevent GPU-GPU race condition.
+    // The compute shader writes to m_frameIndex, graphics pipeline reads from (m_frameIndex+2)%3.
+    // This implements the standard triple-buffered producer-consumer pattern.
+    [[nodiscard]] ID3D12Resource* GetVisibleCommandBuffer() const {
+        uint32_t readIndex = (m_frameIndex + 2) % kGPUCullingFrameCount;
+        return m_visibleCommandBuffer[readIndex].Get();
+    }
+    [[nodiscard]] ID3D12Resource* GetCommandCountBuffer() const {
+        uint32_t readIndex = (m_frameIndex + 2) % kGPUCullingFrameCount;
+        return m_commandCountBuffer[readIndex].Get();
+    }
+    [[nodiscard]] ID3D12Resource* GetAllCommandBuffer() const {
+        uint32_t readIndex = (m_frameIndex + 2) % kGPUCullingFrameCount;
+        return m_allCommandBuffer[readIndex].Get();
+    }
+    [[nodiscard]] ID3D12Resource* GetVisibilityMaskBuffer() const {
+        uint32_t readIndex = (m_frameIndex + 2) % kGPUCullingFrameCount;
+        return m_visibilityMaskBuffer[readIndex].Get();
+    }
 
     // Get the command signature for ExecuteIndirect
     [[nodiscard]] ID3D12CommandSignature* GetCommandSignature() const { return m_commandSignature.Get(); }

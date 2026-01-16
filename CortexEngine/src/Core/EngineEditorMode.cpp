@@ -496,12 +496,23 @@ void EngineEditorMode::UpdateCamera(float /*deltaTime*/) {
         return;
     }
 
+    // Check for automated camera movement mode (for testing)
+    static bool s_autoCameraMovement = []() {
+        const char* envVal = std::getenv("CORTEX_AUTO_CAMERA");
+        if (envVal && envVal[0] != '\0' && envVal[0] != '0') {
+            spdlog::info("Automated camera movement enabled for testing");
+            return true;
+        }
+        return false;
+    }();
+
     // Poll keyboard state and pass to EditorCamera for movement
     // Only process movement when camera control is active (right mouse button held)
-    if (m_cameraControlActive) {
+    // OR when automated camera movement is enabled for testing
+    if (m_cameraControlActive || s_autoCameraMovement) {
         const bool* keyState = SDL_GetKeyboardState(nullptr);
 
-        bool forward = keyState[SDL_SCANCODE_W];
+        bool forward = keyState[SDL_SCANCODE_W] || s_autoCameraMovement;
         bool back = keyState[SDL_SCANCODE_S];
         bool left = keyState[SDL_SCANCODE_A];
         bool right = keyState[SDL_SCANCODE_D];

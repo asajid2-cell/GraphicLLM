@@ -313,7 +313,12 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         std::chrono::duration_cast<std::chrono::milliseconds>(tAfterRenderer - tAfterWindow).count());
 
     // Enable GPU culling for GPU-driven rendering (Phase 1 feature)
-    m_renderer->SetGPUCullingEnabled(true);
+    // Can be disabled via CORTEX_DISABLE_GPU_CULLING environment variable for debugging
+    const bool gpuCullingEnabled = (std::getenv("CORTEX_DISABLE_GPU_CULLING") == nullptr);
+    m_renderer->SetGPUCullingEnabled(gpuCullingEnabled);
+    if (!gpuCullingEnabled) {
+        spdlog::warn("GPU culling DISABLED via CORTEX_DISABLE_GPU_CULLING environment variable");
+    }
 
     // Create ECS registry
     m_registry = std::make_unique<Scene::ECS_Registry>();
@@ -619,6 +624,16 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 void Engine::ShowCameraHelpOverlay() {
     if (m_cameraHelpShown || !m_window) {
         return;
+    }
+
+    // Skip help dialog if environment variable is set (for automated testing)
+    if (const char* envNoHelp = std::getenv("CORTEX_NO_HELP")) {
+        std::string value = envNoHelp;
+        if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+            m_cameraHelpShown = true;
+            spdlog::info("Camera help dialog skipped via CORTEX_NO_HELP environment variable");
+            return;
+        }
     }
 
     const char* message =

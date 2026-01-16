@@ -1594,6 +1594,39 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     m_vbMeshDraws.clear();
     MarkPassComplete("BeginFrame_Done");
 
+    // DEBUG: Log GPU culling state every frame to verify it's active
+    static int s_debugFrameCounter = 0;
+    if (s_debugFrameCounter++ % 60 == 0) {  // Log every 60 frames (once per second at 60fps)
+        spdlog::info("[FLICKERING DEBUG] Frame {}: GPU Culling Enabled={}, Bindless={}",
+                     m_renderFrameCounter, m_gpuCullingEnabled,
+                     #ifdef ENABLE_BINDLESS
+                     true
+                     #else
+                     false
+                     #endif
+                     );
+    }
+
+    // CRITICAL FIX: Check HZB environment variables and build HZB from previous frame's depth
+    // BEFORE updating camera matrices. This ensures HZB and culling camera are temporally synchronized.
+    // The depth buffer from frame N-1 is still available in GPU memory at this point.
+    static bool s_checkedHzbEnv_early = false;
+    static bool s_enableHzb_early = false;
+    static bool s_useRgHzb_early = false;
+    if (!s_checkedHzbEnv_early) {
+        s_checkedHzbEnv_early = true;
+        s_enableHzb_early = (std::getenv("CORTEX_DISABLE_HZB") == nullptr);
+        s_useRgHzb_early = (std::getenv("CORTEX_DISABLE_RG_HZB") == nullptr);
+        if (s_enableHzb_early) {
+            spdlog::info("HZB early build enabled (RenderGraph builder: {})", s_useRgHzb_early ? "yes" : "no");
+        } else {
+            spdlog::info("HZB early build disabled (CORTEX_DISABLE_HZB=1)");
+        }
+    }
+    if (s_enableHzb_early && !s_useRgHzb_early) {
+        BuildHZBFromDepth();
+    }
+
     // Warm per-material descriptor tables after BeginFrame() has waited for the
     // current frame's transient descriptor segment to become available. This is
     // required for correctness when descriptors are sourced from per-frame
@@ -1866,6 +1899,8 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
             spdlog::info("HZB disabled (CORTEX_DISABLE_HZB=1)");
         }
     }
+    // CRITICAL FIX: HZB is now built EARLY (before UpdateFrameConstants) to fix temporal desynchronization.
+    // This late HZB build code is disabled to prevent building twice per frame.
     // HZB is enabled by default. If it is explicitly disabled via env var,
     // do not override that choice for debug views.
     if (s_enableHzb) {
@@ -1888,7 +1923,8 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
                 rgHasPendingHzb = true;
             }
         } else {
-            BuildHZBFromDepth();
+            // DISABLED: HZB is now built early before UpdateFrameConstants (line ~1627)
+            // BuildHZBFromDepth();
         }
     }
 
@@ -5593,7 +5629,9 @@ void Renderer::CollectInstancesForGPUCulling(Scene::ECS_Registry* registry) {
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
-        if (!renderable.visible || !renderable.mesh) continue;
+        // CRITICAL FIX: Don't check visible flag - GPU will handle culling
+        // if (!renderable.visible || !renderable.mesh) continue;
+        if (!renderable.mesh) continue;
         if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
         if (IsTransparentRenderable(renderable)) continue;
@@ -5712,7 +5750,10 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         std::unordered_set<const Scene::MeshData*> seenMeshes;
         for (auto entity : stableEntities) {
             auto& renderable = view.get<Scene::RenderableComponent>(entity);
-            if (!renderable.visible) continue;
+            // CRITICAL FIX: Don't skip based on visible flag during dynamic chunk loading.
+            // The CPU visible flag can be temporarily stale when entities are created/destroyed.
+            // GPU culling will handle actual visibility determination.
+            // if (!renderable.visible) continue;  // DISABLED - causes flickering with dynamic chunks
             if (!renderable.mesh) continue;
             if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
             if (IsTransparentRenderable(renderable)) continue;
@@ -5972,7 +6013,8 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
         auto& renderable = view.get<Scene::RenderableComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
 
-        if (!renderable.visible) { countSkippedVisible++; continue; }
+        // CRITICAL FIX: Don't skip based on visible flag - causes flickering with dynamic chunks
+        // if (!renderable.visible) { countSkippedVisible++; continue; }
         if (!renderable.mesh) { countSkippedMesh++; continue; }
         if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) { countSkippedLayer++; continue; }
         if (IsTransparentRenderable(renderable)) { countSkippedTransparent++; continue; }
@@ -6314,11 +6356,14 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     }
     
     // Log collection stats on first frame and whenever scene might have changed (significantly different total)
+    // DEBUG: Log every 60 frames to track flickering issues
     static uint32_t s_lastLoggedTotal = 0;
-    if ((!s_loggedCounts || countTotal != s_lastLoggedTotal) && countTotal > 0) {
+    static uint32_t s_vbLogFrameCounter = 0;
+    bool shouldLog = (!s_loggedCounts || countTotal != s_lastLoggedTotal || (++s_vbLogFrameCounter % 60 == 0)) && countTotal > 0;
+    if (shouldLog) {
         s_loggedCounts = true;
         s_lastLoggedTotal = countTotal;
-        spdlog::info("VB Collect Stats: Total={} Skipped[Vis={} Mesh={} Layer={} Transp={} Buf={} SRV={}] Collected={}",
+        spdlog::info("[FLICKERING DEBUG] VB Collect Stats: Total={} Skipped[Vis={} Mesh={} Layer={} Transp={} Buf={} SRV={}] Collected={}",
             countTotal, countSkippedVisible, countSkippedMesh, countSkippedLayer, countSkippedTransparent, countSkippedBuffers, countSkippedSRV, m_vbInstances.size());
 
         // If objects are being skipped, log a warning so it's obvious
@@ -6784,7 +6829,9 @@ void Renderer::RenderVisibilityBufferPath(Scene::ECS_Registry* registry) {
             auto& renderable = view.get<Scene::RenderableComponent>(entity);
             auto& transform = view.get<Scene::TransformComponent>(entity);
 
-            if (!renderable.visible || !renderable.mesh) continue;
+            // CRITICAL FIX: Don't check visible flag - GPU handles culling
+            // if (!renderable.visible || !renderable.mesh) continue;
+            if (!renderable.mesh) continue;
             if (registry->HasComponent<Scene::WaterSurfaceComponent>(entity)) continue;
             if (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) continue;
             if (IsTransparentRenderable(renderable)) continue;

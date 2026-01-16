@@ -103,6 +103,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
     const float2 hzbProjScale = g_OcclusionParams2.zw;
     const float hzbEpsilon = max(g_OcclusionParams3.z, 0.0f);
 
+    // Frustum culling: test the bounding sphere against 6 frustum planes.
     bool visible = (forceVisible != 0);
     if (!visible) {
         visible = true;
@@ -136,6 +137,8 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
         prevStreak = (storedGen == historyGen) ? storedStreak : 0u;
     }
 
+    // Occlusion culling against the previous frame's HZB (optional).
+    // Uses a small streak-based hysteresis to reduce popping and false positives.
     bool occluded = false;
     float dbgNearDepth = 0.0f;
     float dbgHzbDepth = 0.0f;
@@ -250,7 +253,8 @@ void CSMain(uint3 DTid : SV_DispatchThreadID) {
         }
     }
 
-    // Hysteresis: require N consecutive occluded frames before rejecting.
+    // Hysteresis: track consecutive occlusion frames. Only hide if occluded
+    // for at least streakThreshold frames. This prevents single-frame pops.
     if (hzbEnabled != 0 && historyValid) {
         if (visible && occluded) {
             newStreak = min(prevStreak + 1u, 255u);

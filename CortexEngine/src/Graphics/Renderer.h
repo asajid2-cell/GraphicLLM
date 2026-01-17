@@ -45,7 +45,7 @@ namespace Cortex::Graphics {
 // Number of frames in flight (triple buffering)
 static constexpr uint32_t kFrameCount = 3;
 
-// Constant buffer wrapper
+// Constant buffer wrapper with triple-buffering support
 template<typename T>
 struct ConstantBuffer {
     ComPtr<ID3D12Resource> buffer;
@@ -54,6 +54,11 @@ struct ConstantBuffer {
     size_t bufferSize = 0;
     size_t alignedSize = 0;
     size_t offset = 0;
+    // Triple-buffering: each frame index gets its own region to avoid overwriting
+    // data that the GPU is still reading from previous frames
+    size_t perFrameSize = 0;
+    size_t frameRegionStart = 0;
+    size_t frameRegionEnd = 0;
 
     static constexpr size_t Align256(size_t value) {
         return (value + 255) & ~static_cast<size_t>(255);
@@ -61,8 +66,10 @@ struct ConstantBuffer {
 
     Result<void> Initialize(ID3D12Device* device, size_t elementCount = 1) {
         // Create upload heap buffer sized for the requested element count
+        // Multiply by kFrameCount for triple-buffering so each frame has its own region
         alignedSize = Align256(sizeof(T));
-        bufferSize = Align256(alignedSize * elementCount);
+        perFrameSize = Align256(alignedSize * elementCount);
+        bufferSize = Align256(perFrameSize * kFrameCount);
 
         D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -105,19 +112,27 @@ struct ConstantBuffer {
         }
 
         offset = 0;
+        frameRegionStart = 0;
+        frameRegionEnd = perFrameSize;
         return Result<void>::Ok();
     }
 
-    void ResetOffset() { offset = 0; }
+    // Reset offset to the start of the given frame's region (for triple-buffering)
+    void ResetOffset(uint32_t frameIndex = 0) {
+        frameRegionStart = (frameIndex % kFrameCount) * perFrameSize;
+        frameRegionEnd = frameRegionStart + perFrameSize;
+        offset = frameRegionStart;
+    }
 
-    // Write data into the next slice of the buffer and return the GPU address
-    // WARNING: This uses naive offset cycling - prefer WriteToSlot for frame constants
+    // Write data into the next slice of the current frame's region
+    // Each frame has its own isolated region, preventing overwrites while GPU reads
     D3D12_GPU_VIRTUAL_ADDRESS AllocateAndWrite(const T& data) {
         if (!mappedBytes || alignedSize == 0) {
             return gpuAddress;
         }
-        if (offset + alignedSize > bufferSize) {
-            offset = 0; // wrap for simplicity; safe because we fence per frame
+        if (offset + alignedSize > frameRegionEnd) {
+            // Wrap within current frame's region if we run out of space
+            offset = frameRegionStart;
         }
         memcpy(mappedBytes + offset, &data, sizeof(T));
         D3D12_GPU_VIRTUAL_ADDRESS addr = gpuAddress + offset;

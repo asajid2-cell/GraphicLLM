@@ -2861,10 +2861,12 @@ void Renderer::BeginFrame() {
         }
     }
 
-    // Reset dynamic constant buffer offsets (safe because we fence each frame)
-    m_objectConstantBuffer.ResetOffset();
-    m_materialConstantBuffer.ResetOffset();
-    m_shadowConstantBuffer.ResetOffset();
+    // Reset dynamic constant buffer offsets to the current frame's region
+    // Each frame index has its own region in the buffer (triple-buffering)
+    // to prevent overwriting data that the GPU is still reading
+    m_objectConstantBuffer.ResetOffset(m_frameIndex);
+    m_materialConstantBuffer.ResetOffset(m_frameIndex);
+    m_shadowConstantBuffer.ResetOffset(m_frameIndex);
 
     // Ensure outstanding uploads are complete before reusing upload allocator
     if (m_uploadQueue) {

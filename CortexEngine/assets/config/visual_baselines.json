@@ -28,7 +28,7 @@
         "nonblack_ratio": { "min": 0.95 },
         "saturated_ratio": { "max": 0.12 },
         "near_white_ratio": { "max": 0.14 },
-        "dark_detail_ratio": { "max": 0.68 }
+        "dark_detail_ratio": { "max": 0.69 }
       }
     },
     {
@@ -51,6 +51,28 @@
         "saturated_ratio": { "max": 0.12 },
         "near_white_ratio": { "max": 0.20 },
         "dark_detail_ratio": { "max": 0.08 }
+      }
+    },
+    {
+      "id": "effects_showcase_hero_release",
+      "scene": "effects_showcase",
+      "camera_bookmark": "hero",
+      "environment": "night_city",
+      "graphics_preset": "release_showcase",
+      "lighting_rig": "night_emissive",
+      "required": true,
+      "capture": {
+        "filename": "visual_validation_rt_showcase.bmp",
+        "smoke_frames": 180
+      },
+      "metrics": {
+        "gpu_frame_ms": { "max": 16.7 },
+        "avg_luma": { "min": 30.0, "max": 185.0 },
+        "center_avg_luma": { "min": 20.0, "max": 210.0 },
+        "nonblack_ratio": { "min": 0.80 },
+        "saturated_ratio": { "max": 0.20 },
+        "near_white_ratio": { "max": 0.24 },
+        "dark_detail_ratio": { "max": 0.85 }
       }
     }
   ]

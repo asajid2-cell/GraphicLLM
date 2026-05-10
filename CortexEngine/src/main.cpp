@@ -359,6 +359,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         state->comboScene = makeCombo(IDC_LAUNCH_SCENE, y);
         SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"RT Showcase Gallery"));
         SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Material Lab"));
+        SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Effects Showcase"));
         SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Cornell Box"));
         SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dragon Over Water"));
         SendMessageW(state->comboScene, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"God Rays Atrium"));
@@ -431,9 +432,10 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 default:
                 case 0: state->config->initialScenePreset = "rt_showcase"; break;
                 case 1: state->config->initialScenePreset = "material_lab"; break;
-                case 2: state->config->initialScenePreset = "cornell";     break;
-                case 3: state->config->initialScenePreset = "dragon";      break;
-                case 4: state->config->initialScenePreset = "god_rays";    break;
+                case 2: state->config->initialScenePreset = "effects_showcase"; break;
+                case 3: state->config->initialScenePreset = "cornell";     break;
+                case 4: state->config->initialScenePreset = "dragon";      break;
+                case 5: state->config->initialScenePreset = "god_rays";    break;
                 }
                 // Quality
                 int selQuality = static_cast<int>(SendMessageW(state->comboQuality, CB_GETCURSEL, 0, 0));
@@ -621,7 +623,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Optional: parse simple command-line flags
-        //   --scene <dragon|rt_showcase|material_lab|temporal_validation|cornell>
+        //   --scene <dragon|rt_showcase|material_lab|effects_showcase|temporal_validation|cornell>
         //   --environment <manifest_id>
         //   --graphics-preset <preset_id>
         //   --camera-bookmark <bookmark_id>

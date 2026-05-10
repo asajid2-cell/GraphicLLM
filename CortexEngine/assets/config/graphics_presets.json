@@ -54,7 +54,8 @@
         "preset": "clean_filmic",
         "bloom_threshold": 1.0,
         "bloom_soft_knee": 0.5,
-        "vignette": 0.0,
+        "vignette": 0.12,
+        "lens_dirt": 0.18,
         "motion_blur": 0.0
       }
     },

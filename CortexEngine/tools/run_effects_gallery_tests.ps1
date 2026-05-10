@@ -21,19 +21,18 @@ $stderrPath = Join-Path $LogDir "effects_gallery_stderr.txt"
 $reportPath = Join-Path $LogDir "frame_report_last.json"
 $catalogPath = Join-Path $root "assets/config/advanced_graphics_catalog.json"
 
-$rtArgs = @(
+$effectsArgs = @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
-    "-File", (Join-Path $PSScriptRoot "run_rt_showcase_smoke.ps1"),
+    "-File", (Join-Path $PSScriptRoot "run_effects_showcase_smoke.ps1"),
     "-LogDir", $LogDir,
-    "-SmokeFrames", [string]$SmokeFrames,
-    "-SkipSurfaceDebug"
+    "-SmokeFrames", [string]$SmokeFrames
 )
 if ($NoBuild) {
-    $rtArgs += "-NoBuild"
+    $effectsArgs += "-NoBuild"
 }
 
-$output = & powershell @rtArgs 2>&1
+$output = & powershell @effectsArgs 2>&1
 $exitCode = $LASTEXITCODE
 $output | Set-Content -Encoding UTF8 $stdoutPath
 "" | Set-Content -Encoding UTF8 $stderrPath
@@ -41,7 +40,7 @@ $output | Set-Content -Encoding UTF8 $stdoutPath
 if ($exitCode -ne 0) {
     $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
     $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "" }
-    throw "RT showcase smoke failed during effects gallery validation. log=$LogDir`n$stderrText`n$stdoutText"
+    throw "Effects Showcase smoke failed during effects gallery validation. log=$LogDir`n$stderrText`n$stdoutText"
 }
 
 if (-not (Test-Path $reportPath)) {
@@ -65,6 +64,10 @@ function Get-FrameContractPass([object]$reportObject, [string]$name) {
         }
     }
     return $null
+}
+
+if ([string]$report.scene -ne "effects_showcase") {
+    Add-Failure "effects gallery validated scene '$($report.scene)', expected effects_showcase"
 }
 
 if (-not (Test-Path $catalogPath)) {

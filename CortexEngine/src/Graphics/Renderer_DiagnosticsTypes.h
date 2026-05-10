@@ -238,7 +238,10 @@ struct RendererLightingState {
     float directionalIntensity = 5.0f;
     glm::vec3 ambientColor{0.04f};
     float ambientIntensity = 1.0f;
+    std::string activeRigId = "custom";
+    std::string activeRigSource = "manual";
     bool useSafeRigOnLowVRAM = false;
+    bool safeRigVariantActive = false;
     float areaLightSizeScale = 1.0f;
 };
 

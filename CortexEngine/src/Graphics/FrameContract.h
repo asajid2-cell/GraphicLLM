@@ -204,6 +204,10 @@ struct FrameContract {
     };
 
     struct LightingInfo {
+        std::string rigId = "custom";
+        std::string rigSource = "manual";
+        bool safeRigOnLowVRAM = false;
+        bool safeRigVariantActive = false;
         float exposure = 1.0f;
         float sunIntensity = 0.0f;
         float iblDiffuseIntensity = 0.0f;

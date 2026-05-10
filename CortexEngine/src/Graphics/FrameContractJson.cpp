@@ -171,6 +171,10 @@ json FrameContractToJson(const FrameContract& contract) {
             {"low_roughness_normal", contract.materials.lowRoughnessNormal}
         }},
         {"lighting", {
+            {"rig_id", contract.lighting.rigId},
+            {"rig_source", contract.lighting.rigSource},
+            {"safe_rig_on_low_vram", contract.lighting.safeRigOnLowVRAM},
+            {"safe_rig_variant_active", contract.lighting.safeRigVariantActive},
             {"exposure", contract.lighting.exposure},
             {"sun_intensity", contract.lighting.sunIntensity},
             {"ibl_diffuse_intensity", contract.lighting.iblDiffuseIntensity},

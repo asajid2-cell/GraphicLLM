@@ -23,11 +23,11 @@
     {
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
-      "status": "state_bundle_started",
-      "current_issue": "bloom, post constants, and cinematic controls need a shared state boundary",
+      "status": "state_boundary_validated",
+      "current_issue": "bloom, temporal-screen, and post controls are separate state boundaries; graph/end-frame orchestration still coordinates them",
       "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],
-      "next_step": "add a post/cinematic state bundle before adding new post effects"
+      "next_step": "keep new post effects inside these state files and move orchestration helpers out of Renderer when touched"
     },
     {
       "id": "particle_resources",

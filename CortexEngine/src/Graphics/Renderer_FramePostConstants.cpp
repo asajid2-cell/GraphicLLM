@@ -75,11 +75,6 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         iblEnabled,
         m_environmentState.backgroundExposure);
 
-    const float effectiveVignette =
-        m_postProcessState.cinematicEnabled ? m_postProcessState.vignette : 0.0f;
-    const float effectiveLensDirt =
-        m_postProcessState.cinematicEnabled ? m_postProcessState.lensDirt : 0.0f;
-
     // Color grading parameters (warm/cool) for post-process. We repurpose
     // colorGrade.z for volumetric sun shafts and colorGrade.w for vignette
     // so Phase 3 cinematic controls stay in the existing frame constants.
@@ -87,7 +82,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_postProcessState.warm,
         m_postProcessState.cool,
         m_postProcessState.godRayIntensity,
-        effectiveVignette);
+        m_postProcessState.EffectiveVignette());
 
     // Exponential height fog parameters
     frameData.fogParams = glm::vec4(
@@ -153,9 +148,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     if (m_visibilityBufferState.plannedThisFrame) {
         postFxFlags |= 16u;
     }
-    const uint32_t lensDirtByte = static_cast<uint32_t>(
-        glm::clamp(effectiveLensDirt, 0.0f, 1.0f) * 255.0f + 0.5f);
-    postFxFlags |= (lensDirtByte & 0xFFu) << 8u;
+    postFxFlags |= m_postProcessState.EncodedLensDirtByte() << 8u;
     frameData.bloomParams = glm::vec4( 
         m_bloomResources.threshold,
         m_bloomResources.softKnee,

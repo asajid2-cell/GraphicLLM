@@ -40,6 +40,13 @@ if (-not (Test-Path $particleRendererPath)) {
     throw "Renderer_Particles.cpp not found: $particleRendererPath"
 }
 $particleRenderer = Get-Content $particleRendererPath -Raw
+$postStatePath = Join-Path $root "src/Graphics/RendererPostProcessState.h"
+if (-not (Test-Path $postStatePath)) {
+    throw "RendererPostProcessState.h not found: $postStatePath"
+}
+$postState = Get-Content $postStatePath -Raw
+$bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
+$temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -116,6 +123,20 @@ foreach ($target in $doc.targets) {
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {
             Add-Failure "particle_resources public renderer path is not the ECS billboard particle path"
+        }
+    }
+
+    if ($id -eq "postprocess_resources") {
+        if (-not (Test-Path $bloomStatePath)) {
+            Add-Failure "postprocess_resources missing RendererBloomState.h"
+        }
+        if (-not (Test-Path $temporalScreenPath)) {
+            Add-Failure "postprocess_resources missing RendererTemporalScreenState.h"
+        }
+        foreach ($required in @("cinematicEnabled", "EffectiveVignette", "EffectiveLensDirt", "EncodedLensDirtByte")) {
+            if ($postState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "postprocess_resources missing post-state ownership marker in RendererPostProcessState.h: $required"
+            }
         }
     }
 }

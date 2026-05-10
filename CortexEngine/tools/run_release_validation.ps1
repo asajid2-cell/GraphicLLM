@@ -188,6 +188,19 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "phase3_visual_matrix" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_phase3_visual_matrix.ps1"),
+        "-NoBuild",
+        "-TemporalSmokeFrames", "90",
+        "-RTSmokeFrames", "180",
+        "-IBLGalleryMaxEnvironments", [string]$IBLGalleryMaxEnvironments,
+        "-SkipSurfaceDebug"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "renderer_ownership" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

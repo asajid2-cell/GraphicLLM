@@ -79,13 +79,39 @@
     {
       "id": "glass_water_courtyard",
       "display_name": "Glass and Water Courtyard",
-      "current_status": "planned",
+      "current_status": "implemented_public_scene",
       "target_status": "public_showcase",
       "default_environment": "sunset_courtyard",
       "default_lighting_rig": "sunset_rim",
       "required_bookmarks": ["hero", "water_closeup"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Glass and water hero",
+          "position": [0.0, 2.55, -8.8],
+          "target": [0.0, 1.05, -0.35],
+          "fov": 54.0,
+          "validation": true
+        },
+        {
+          "id": "water_closeup",
+          "label": "Water reflection closeup",
+          "position": [-2.8, 1.35, -4.0],
+          "target": [-0.4, 0.25, -0.4],
+          "fov": 42.0,
+          "validation": false
+        },
+        {
+          "id": "glass_canopy",
+          "label": "Glass canopy and rim light",
+          "position": [3.6, 2.0, -4.2],
+          "target": [0.4, 2.1, 0.7],
+          "fov": 46.0,
+          "validation": false
+        }
+      ],
       "required_features": ["water", "glass", "fog", "rt_reflections"],
-      "polish_gaps": ["scene implementation", "water/glass validation", "background composition"]
+      "polish_gaps": ["human-reviewed final composition"]
     },
     {
       "id": "effects_showcase",

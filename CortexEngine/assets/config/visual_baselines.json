@@ -74,6 +74,28 @@
         "near_white_ratio": { "max": 0.24 },
         "dark_detail_ratio": { "max": 0.85 }
       }
+    },
+    {
+      "id": "glass_water_courtyard_hero_release",
+      "scene": "glass_water_courtyard",
+      "camera_bookmark": "hero",
+      "environment": "sunset_courtyard",
+      "graphics_preset": "release_showcase",
+      "lighting_rig": "sunset_rim",
+      "required": true,
+      "capture": {
+        "filename": "visual_validation_rt_showcase.bmp",
+        "smoke_frames": 180
+      },
+      "metrics": {
+        "gpu_frame_ms": { "max": 16.7 },
+        "avg_luma": { "min": 55.0, "max": 190.0 },
+        "center_avg_luma": { "min": 45.0, "max": 210.0 },
+        "nonblack_ratio": { "min": 0.92 },
+        "saturated_ratio": { "max": 0.16 },
+        "near_white_ratio": { "max": 0.20 },
+        "dark_detail_ratio": { "max": 0.72 }
+      }
     }
   ]
 }

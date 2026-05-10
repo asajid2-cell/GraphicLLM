@@ -111,6 +111,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::MaterialLab:
         BuildMaterialLabScene();
         break;
+    case ScenePreset::GlassWaterCourtyard:
+        BuildGlassWaterCourtyardScene();
+        break;
     case ScenePreset::EffectsShowcase:
         BuildEffectsShowcaseScene();
         break;
@@ -132,6 +135,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
     case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
+    case ScenePreset::GlassWaterCourtyard:presetName = "Glass and Water Courtyard"; break;
     case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
@@ -884,6 +888,251 @@ void Engine::BuildMaterialLabScene() {
         l.range = 8.0f;
         l.castsShadows = false;
     }
+}
+
+void Engine::BuildGlassWaterCourtyardScene() {
+    spdlog::info("Building public scene: Glass and Water Courtyard");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        Graphics::ApplyGlassWaterCourtyardSceneControls(*renderer);
+    }
+
+    auto floorPlane = Utils::MeshGenerator::CreatePlane(18.0f, 14.0f);
+    auto wallPlane = Utils::MeshGenerator::CreatePlane(18.0f, 7.0f);
+    auto sideWallPlane = Utils::MeshGenerator::CreatePlane(14.0f, 7.0f);
+    auto poolPlane = Utils::MeshGenerator::CreatePlane(7.2f, 5.2f);
+    auto quadMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto columnMesh = Utils::MeshGenerator::CreateCylinder(0.28f, 3.2f, 32);
+
+    if (renderer) {
+        auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+            if (!mesh) return true;
+            auto res = renderer->UploadMesh(mesh);
+            if (res.IsErr()) {
+                spdlog::warn("Failed to upload GlassWaterCourtyard {} mesh: {}", label, res.Error());
+                return false;
+            }
+            if (renderer->IsDeviceRemoved()) {
+                spdlog::error("DX12 device was removed while uploading GlassWaterCourtyard {} mesh", label);
+                return false;
+            }
+            return true;
+        };
+
+        if (!uploadMesh(floorPlane, "floor") ||
+            !uploadMesh(wallPlane, "wall") ||
+            !uploadMesh(sideWallPlane, "side wall") ||
+            !uploadMesh(poolPlane, "pool") ||
+            !uploadMesh(quadMesh, "quad") ||
+            !uploadMesh(cubeMesh, "cube") ||
+            !uploadMesh(sphereMesh, "sphere") ||
+            !uploadMesh(columnMesh, "column")) {
+            return;
+        }
+    }
+
+    {
+        entt::entity camEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
+        t.position = glm::vec3(0.0f, 2.55f, -8.8f);
+        const glm::vec3 target(0.0f, 1.05f, -0.35f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = 54.0f;
+        cam.isActive = true;
+        m_activeCameraEntity = camEntity;
+    }
+
+    auto addRenderable = [&](const char* tag,
+                             const std::shared_ptr<Scene::MeshData>& mesh,
+                             const glm::vec3& position,
+                             const glm::vec3& scale,
+                             const glm::vec3& euler,
+                             const glm::vec4& color,
+                             float metallic,
+                             float roughness,
+                             const char* preset) -> entt::entity {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.scale = scale;
+        t.rotation = glm::quat(euler);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = color;
+        r.metallic = metallic;
+        r.roughness = roughness;
+        r.ao = 1.0f;
+        r.presetName = preset;
+        return e;
+    };
+
+    if (floorPlane && floorPlane->gpuBuffers) {
+        auto floor = addRenderable("GlassWaterCourtyard_Floor", floorPlane,
+                                   glm::vec3(0.0f, 0.0f, 0.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.42f, 0.37f, 0.32f, 1.0f),
+                                   0.0f, 0.78f, "masonry");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
+        r.doubleSided = true;
+        r.normalScale = 0.22f;
+    }
+
+    if (wallPlane && wallPlane->gpuBuffers) {
+        auto back = addRenderable("GlassWaterCourtyard_BackWall", wallPlane,
+                                  glm::vec3(0.0f, 3.5f, 5.8f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
+                                  glm::vec4(0.62f, 0.52f, 0.44f, 1.0f),
+                                  0.0f, 0.66f, "masonry");
+        m_registry->GetComponent<Scene::RenderableComponent>(back).doubleSided = true;
+    }
+
+    if (sideWallPlane && sideWallPlane->gpuBuffers) {
+        auto left = addRenderable("GlassWaterCourtyard_LeftWall", sideWallPlane,
+                                  glm::vec3(-9.0f, 3.5f, -0.2f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), glm::half_pi<float>(), 0.0f),
+                                  glm::vec4(0.56f, 0.48f, 0.42f, 1.0f),
+                                  0.0f, 0.70f, "masonry");
+        auto right = addRenderable("GlassWaterCourtyard_RightWall", sideWallPlane,
+                                   glm::vec3(9.0f, 3.5f, -0.2f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(-glm::half_pi<float>(), -glm::half_pi<float>(), 0.0f),
+                                   glm::vec4(0.56f, 0.48f, 0.42f, 1.0f),
+                                   0.0f, 0.70f, "masonry");
+        m_registry->GetComponent<Scene::RenderableComponent>(left).doubleSided = true;
+        m_registry->GetComponent<Scene::RenderableComponent>(right).doubleSided = true;
+    }
+
+    if (poolPlane && poolPlane->gpuBuffers) {
+        auto rim = addRenderable("GlassWaterCourtyard_PoolRim", poolPlane,
+                                 glm::vec3(0.0f, 0.003f, -0.25f),
+                                 glm::vec3(1.15f),
+                                 glm::vec3(0.0f),
+                                 glm::vec4(0.72f, 0.68f, 0.62f, 1.0f),
+                                 0.0f, 0.7f, "masonry");
+        m_registry->GetComponent<Scene::RenderableComponent>(rim).doubleSided = true;
+
+        auto water = addRenderable("GlassWaterCourtyard_WaterSurface", poolPlane,
+                                   glm::vec3(0.0f, -0.02f, -0.25f),
+                                   glm::vec3(0.92f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.04f, 0.16f, 0.22f, 0.66f),
+                                   0.0f, 0.045f, "water");
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, Scene::WaterSurfaceComponent{0.0f});
+    }
+
+    if (columnMesh && columnMesh->gpuBuffers) {
+        const glm::vec3 columnPositions[] = {
+            {-4.8f, 1.6f, -2.8f},
+            { 4.8f, 1.6f, -2.8f},
+            {-4.8f, 1.6f,  2.8f},
+            { 4.8f, 1.6f,  2.8f}
+        };
+        for (int i = 0; i < 4; ++i) {
+            addRenderable(("GlassWaterCourtyard_Column_" + std::to_string(i)).c_str(),
+                          columnMesh,
+                          columnPositions[i],
+                          glm::vec3(1.0f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.70f, 0.64f, 0.56f, 1.0f),
+                          0.0f, 0.42f, "masonry");
+        }
+    }
+
+    if (quadMesh && quadMesh->gpuBuffers) {
+        auto roof = addRenderable("GlassWaterCourtyard_GlassCanopy", quadMesh,
+                                  glm::vec3(0.0f, 3.15f, -0.25f),
+                                  glm::vec3(6.4f, 4.6f, 1.0f),
+                                  glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f),
+                                  glm::vec4(0.72f, 0.90f, 1.0f, 1.0f),
+                                  0.0f, 0.035f, "glass_panel");
+        auto& roofR = m_registry->GetComponent<Scene::RenderableComponent>(roof);
+        roofR.transmissionFactor = 0.55f;
+        roofR.ior = 1.45f;
+        roofR.specularFactor = 1.2f;
+        roofR.doubleSided = true;
+
+        auto warmPanel = addRenderable("GlassWaterCourtyard_SunsetPanel", quadMesh,
+                                       glm::vec3(-3.2f, 2.5f, 5.65f),
+                                       glm::vec3(2.4f, 0.65f, 1.0f),
+                                       glm::vec3(0.0f),
+                                       glm::vec4(1.0f, 0.58f, 0.28f, 1.0f),
+                                       0.0f, 0.2f, "emissive_panel");
+        auto& panelR = m_registry->GetComponent<Scene::RenderableComponent>(warmPanel);
+        panelR.emissiveColor = glm::vec3(1.0f, 0.48f, 0.20f);
+        panelR.emissiveStrength = 2.6f;
+        panelR.doubleSided = true;
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        auto glassBlock = addRenderable("GlassWaterCourtyard_GlassBlock", cubeMesh,
+                                        glm::vec3(2.8f, 0.72f, -1.3f),
+                                        glm::vec3(0.85f, 1.1f, 0.85f),
+                                        glm::vec3(0.0f, 0.55f, 0.0f),
+                                        glm::vec4(0.64f, 0.86f, 1.0f, 1.0f),
+                                        0.0f, 0.04f, "glass");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(glassBlock);
+        r.transmissionFactor = 0.68f;
+        r.ior = 1.47f;
+        r.specularFactor = 1.15f;
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        addRenderable("GlassWaterCourtyard_MirrorSphere", sphereMesh,
+                      glm::vec3(-2.7f, 0.78f, -1.2f),
+                      glm::vec3(1.05f),
+                      glm::vec3(0.0f),
+                      glm::vec4(0.82f, 0.78f, 0.72f, 1.0f),
+                      1.0f, 0.08f, "mirror");
+    }
+
+    auto addLight = [&](const char* tag,
+                        Scene::LightType type,
+                        const glm::vec3& position,
+                        const glm::vec3& direction,
+                        const glm::vec3& color,
+                        float intensity,
+                        float range) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        if (glm::length(direction) > 0.001f) {
+            t.rotation = glm::quatLookAtLH(glm::normalize(direction), glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = type;
+        l.color = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.castsShadows = type != Scene::LightType::Point;
+        if (type == Scene::LightType::Spot) {
+            l.innerConeDegrees = 24.0f;
+            l.outerConeDegrees = 42.0f;
+        } else if (type == Scene::LightType::AreaRect) {
+            l.areaSize = glm::vec2(4.5f, 2.0f);
+        }
+    };
+
+    addLight("GlassWaterCourtyard_SunsetKey", Scene::LightType::Spot,
+             glm::vec3(-4.2f, 4.8f, -4.4f), glm::vec3(0.58f, -0.85f, 0.72f),
+             glm::vec3(1.0f, 0.70f, 0.44f), 6.6f, 24.0f);
+    addLight("GlassWaterCourtyard_CoolRim", Scene::LightType::AreaRect,
+             glm::vec3(4.6f, 3.2f, -3.8f), glm::vec3(-0.6f, -0.45f, 0.8f),
+             glm::vec3(0.52f, 0.72f, 1.0f), 2.5f, 14.0f);
+    addLight("GlassWaterCourtyard_UnderwaterFill", Scene::LightType::Point,
+             glm::vec3(0.0f, -0.35f, -0.25f), glm::vec3(0.0f),
+             glm::vec3(0.16f, 0.42f, 0.95f), 2.4f, 9.0f);
 }
 
 void Engine::BuildEffectsShowcaseScene() {

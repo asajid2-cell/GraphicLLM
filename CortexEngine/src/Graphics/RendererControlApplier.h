@@ -34,6 +34,7 @@ void ApplyHeroVisualBaselineControls(Renderer& renderer);
 void ApplyAutoDemoFeatureLock(Renderer& renderer);
 void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode);
 void ApplyMaterialLabSceneControls(Renderer& renderer);
+void ApplyGlassWaterCourtyardSceneControls(Renderer& renderer);
 void ApplyEffectsShowcaseSceneControls(Renderer& renderer);
 void ApplyTemporalValidationSceneControls(Renderer& renderer);
 void ApplyCornellSceneControls(Renderer& renderer);

@@ -11,15 +11,16 @@ void Renderer::CaptureRTReflectionSignalStats() {
     if (!m_frameLifecycle.rtReflectionWrittenThisFrame ||
         !m_services.rtReflectionSignalStats || !m_services.rtReflectionSignalStats->IsReady() ||
         !m_rtReflectionTargets.color || !m_rtReflectionTargets.srv.IsValid() ||
-        !m_rtReflectionSignalState.rawStatsBuffer || !m_rtReflectionSignalState.rawStatsUAV.IsValid() ||
+        !m_rtReflectionSignalState.rawResources.statsBuffer ||
+        !m_rtReflectionSignalState.rawResources.statsUAV.IsValid() ||
         m_frameRuntime.frameIndex >= kFrameCount ||
-        !m_rtReflectionSignalState.rawReadback[m_frameRuntime.frameIndex] ||
+        !m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex] ||
         !m_services.device || !m_services.descriptorManager || !m_commandResources.graphicsList) {
         return;
     }
-    if (!m_rtReflectionSignalState.descriptorTablesValid ||
-        !m_rtReflectionSignalState.descriptorSrvTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid() ||
-        !m_rtReflectionSignalState.descriptorUavTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid()) {
+    if (!m_rtReflectionSignalState.descriptors.valid ||
+        !m_rtReflectionSignalState.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid() ||
+        !m_rtReflectionSignalState.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid()) {
         return;
     }
 
@@ -50,8 +51,8 @@ void Renderer::CaptureRTReflectionSignalStats() {
     };
 
     transition(m_rtReflectionTargets.color.Get(), m_rtReflectionTargets.colorState, kSrvState);
-    transition(m_rtReflectionSignalState.rawStatsBuffer.Get(),
-               m_rtReflectionSignalState.rawStatsResourceState,
+    transition(m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
+               m_rtReflectionSignalState.rawResources.statsResourceState,
                D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     RTReflectionSignalStats::DispatchDesc desc{};
@@ -59,11 +60,11 @@ void Renderer::CaptureRTReflectionSignalStats() {
     desc.height = height;
     desc.target = RTReflectionSignalStats::SignalTarget::Raw;
     desc.reflectionSRV = m_rtReflectionTargets.srv;
-    desc.statsUAV = m_rtReflectionSignalState.rawStatsUAV;
+    desc.statsUAV = m_rtReflectionSignalState.rawResources.statsUAV;
     desc.reflectionResource = m_rtReflectionTargets.color.Get();
-    desc.statsResource = m_rtReflectionSignalState.rawStatsBuffer.Get();
-    desc.srvTable = m_rtReflectionSignalState.descriptorSrvTables[m_frameRuntime.frameIndex % kFrameCount][0];
-    desc.uavTable = m_rtReflectionSignalState.descriptorUavTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    desc.statsResource = m_rtReflectionSignalState.rawResources.statsBuffer.Get();
+    desc.srvTable = m_rtReflectionSignalState.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    desc.uavTable = m_rtReflectionSignalState.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
 
     const bool executed = m_services.rtReflectionSignalStats->Dispatch(
         m_commandResources.graphicsList.Get(),
@@ -76,21 +77,21 @@ void Renderer::CaptureRTReflectionSignalStats() {
 
     D3D12_RESOURCE_BARRIER statsUavBarrier{};
     statsUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.rawStatsBuffer.Get();
+    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.rawResources.statsBuffer.Get();
     m_commandResources.graphicsList->ResourceBarrier(1, &statsUavBarrier);
 
-    transition(m_rtReflectionSignalState.rawStatsBuffer.Get(),
-               m_rtReflectionSignalState.rawStatsResourceState,
+    transition(m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
+               m_rtReflectionSignalState.rawResources.statsResourceState,
                D3D12_RESOURCE_STATE_COPY_SOURCE);
     m_commandResources.graphicsList->CopyBufferRegion(
-        m_rtReflectionSignalState.rawReadback[m_frameRuntime.frameIndex].Get(),
+        m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex].Get(),
         0,
-        m_rtReflectionSignalState.rawStatsBuffer.Get(),
+        m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
         0,
         RTReflectionSignalStats::kStatsBytes);
 
-    m_rtReflectionSignalState.rawReadbackPending[m_frameRuntime.frameIndex] = true;
-    m_rtReflectionSignalState.rawSampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;
+    m_rtReflectionSignalState.rawResources.readbackPending[m_frameRuntime.frameIndex] = true;
+    m_rtReflectionSignalState.rawResources.sampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;
     m_rtReflectionSignalState.rawCapturedThisFrame = true;
 
     RecordFramePass("RTReflectionSignalStats",
@@ -105,15 +106,16 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
     if (!m_rtDenoiseState.reflectionDenoisedThisFrame ||
         !m_services.rtReflectionSignalStats || !m_services.rtReflectionSignalStats->IsReady() ||
         !m_rtReflectionTargets.history || !m_rtReflectionTargets.historySRV.IsValid() ||
-        !m_rtReflectionSignalState.historyStatsBuffer || !m_rtReflectionSignalState.historyStatsUAV.IsValid() ||
+        !m_rtReflectionSignalState.historyResources.statsBuffer ||
+        !m_rtReflectionSignalState.historyResources.statsUAV.IsValid() ||
         m_frameRuntime.frameIndex >= kFrameCount ||
-        !m_rtReflectionSignalState.historyReadback[m_frameRuntime.frameIndex] ||
+        !m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex] ||
         !m_services.device || !m_services.descriptorManager || !m_commandResources.graphicsList) {
         return;
     }
-    if (!m_rtReflectionSignalState.descriptorTablesValid ||
-        !m_rtReflectionSignalState.descriptorSrvTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid() ||
-        !m_rtReflectionSignalState.descriptorUavTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid()) {
+    if (!m_rtReflectionSignalState.descriptors.valid ||
+        !m_rtReflectionSignalState.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid() ||
+        !m_rtReflectionSignalState.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount][0].IsValid()) {
         return;
     }
 
@@ -144,8 +146,8 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
     };
 
     transition(m_rtReflectionTargets.history.Get(), m_rtReflectionTargets.historyState, kSrvState);
-    transition(m_rtReflectionSignalState.historyStatsBuffer.Get(),
-               m_rtReflectionSignalState.historyStatsResourceState,
+    transition(m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
+               m_rtReflectionSignalState.historyResources.statsResourceState,
                D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     RTReflectionSignalStats::DispatchDesc desc{};
@@ -153,11 +155,11 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
     desc.height = height;
     desc.target = RTReflectionSignalStats::SignalTarget::History;
     desc.reflectionSRV = m_rtReflectionTargets.historySRV;
-    desc.statsUAV = m_rtReflectionSignalState.historyStatsUAV;
+    desc.statsUAV = m_rtReflectionSignalState.historyResources.statsUAV;
     desc.reflectionResource = m_rtReflectionTargets.history.Get();
-    desc.statsResource = m_rtReflectionSignalState.historyStatsBuffer.Get();
-    desc.srvTable = m_rtReflectionSignalState.descriptorSrvTables[m_frameRuntime.frameIndex % kFrameCount][0];
-    desc.uavTable = m_rtReflectionSignalState.descriptorUavTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    desc.statsResource = m_rtReflectionSignalState.historyResources.statsBuffer.Get();
+    desc.srvTable = m_rtReflectionSignalState.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    desc.uavTable = m_rtReflectionSignalState.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
 
     const bool executed = m_services.rtReflectionSignalStats->Dispatch(
         m_commandResources.graphicsList.Get(),
@@ -170,21 +172,21 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
 
     D3D12_RESOURCE_BARRIER statsUavBarrier{};
     statsUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.historyStatsBuffer.Get();
+    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.historyResources.statsBuffer.Get();
     m_commandResources.graphicsList->ResourceBarrier(1, &statsUavBarrier);
 
-    transition(m_rtReflectionSignalState.historyStatsBuffer.Get(),
-               m_rtReflectionSignalState.historyStatsResourceState,
+    transition(m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
+               m_rtReflectionSignalState.historyResources.statsResourceState,
                D3D12_RESOURCE_STATE_COPY_SOURCE);
     m_commandResources.graphicsList->CopyBufferRegion(
-        m_rtReflectionSignalState.historyReadback[m_frameRuntime.frameIndex].Get(),
+        m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex].Get(),
         0,
-        m_rtReflectionSignalState.historyStatsBuffer.Get(),
+        m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
         0,
         RTReflectionSignalStats::kStatsBytes);
 
-    m_rtReflectionSignalState.historyReadbackPending[m_frameRuntime.frameIndex] = true;
-    m_rtReflectionSignalState.historySampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;
+    m_rtReflectionSignalState.historyResources.readbackPending[m_frameRuntime.frameIndex] = true;
+    m_rtReflectionSignalState.historyResources.sampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;
     m_rtReflectionSignalState.historyCapturedThisFrame = true;
 
     RecordFramePass("RTReflectionHistorySignalStats",
@@ -263,11 +265,11 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
     float brightRatio = 0.0f;
     float outlierRatio = 0.0f;
     const bool rawHadPendingReadback =
-        m_rtReflectionSignalState.rawReadbackPending[m_frameRuntime.frameIndex] &&
-        m_rtReflectionSignalState.rawReadback[m_frameRuntime.frameIndex];
+        m_rtReflectionSignalState.rawResources.readbackPending[m_frameRuntime.frameIndex] &&
+        m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex];
     const bool rawValid = readStats(
-        m_rtReflectionSignalState.rawReadback[m_frameRuntime.frameIndex].Get(),
-        m_rtReflectionSignalState.rawReadbackPending[m_frameRuntime.frameIndex],
+        m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex].Get(),
+        m_rtReflectionSignalState.rawResources.readbackPending[m_frameRuntime.frameIndex],
         "RT reflection signal stats",
         pixels,
         avgLuma,
@@ -277,7 +279,8 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
         outlierRatio);
     if (rawValid) {
         m_rtReflectionSignalState.raw.valid = true;
-        m_rtReflectionSignalState.raw.sampleFrame = m_rtReflectionSignalState.rawSampleFrame[m_frameRuntime.frameIndex];
+        m_rtReflectionSignalState.raw.sampleFrame =
+            m_rtReflectionSignalState.rawResources.sampleFrame[m_frameRuntime.frameIndex];
         m_rtReflectionSignalState.raw.pixelCount = pixels;
         m_rtReflectionSignalState.raw.avgLuma = avgLuma;
         m_rtReflectionSignalState.raw.maxLuma = maxLuma;
@@ -300,11 +303,11 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
     float historyBrightRatio = 0.0f;
     float historyOutlierRatio = 0.0f;
     const bool historyHadPendingReadback =
-        m_rtReflectionSignalState.historyReadbackPending[m_frameRuntime.frameIndex] &&
-        m_rtReflectionSignalState.historyReadback[m_frameRuntime.frameIndex];
+        m_rtReflectionSignalState.historyResources.readbackPending[m_frameRuntime.frameIndex] &&
+        m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex];
     const bool historyValid = readStats(
-        m_rtReflectionSignalState.historyReadback[m_frameRuntime.frameIndex].Get(),
-        m_rtReflectionSignalState.historyReadbackPending[m_frameRuntime.frameIndex],
+        m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex].Get(),
+        m_rtReflectionSignalState.historyResources.readbackPending[m_frameRuntime.frameIndex],
         "RT reflection history signal stats",
         historyPixels,
         historyAvgLuma,
@@ -314,7 +317,8 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
         historyOutlierRatio);
     if (historyValid) {
         m_rtReflectionSignalState.history.valid = true;
-        m_rtReflectionSignalState.history.sampleFrame = m_rtReflectionSignalState.historySampleFrame[m_frameRuntime.frameIndex];
+        m_rtReflectionSignalState.history.sampleFrame =
+            m_rtReflectionSignalState.historyResources.sampleFrame[m_frameRuntime.frameIndex];
         m_rtReflectionSignalState.history.pixelCount = historyPixels;
         m_rtReflectionSignalState.history.avgLuma = historyAvgLuma;
         m_rtReflectionSignalState.history.maxLuma = historyMaxLuma;

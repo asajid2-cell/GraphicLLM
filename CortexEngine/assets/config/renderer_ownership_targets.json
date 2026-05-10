@@ -5,11 +5,11 @@
     {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
-      "status": "partially_extracted",
-      "current_issue": "stats resources and readbacks are still coordinated through Renderer",
+      "status": "resource_bundle_extracted",
+      "current_issue": "raw/history stats resources and descriptor tables are bundled, but capture/readback execution is still orchestrated by Renderer",
       "target_files": ["RendererRTState.h", "RTReflectionSignalStats.h"],
       "renderer_state_members": ["m_rtReflectionSignalState", "m_rtReflectionTargets", "m_rtReflectionReadiness"],
-      "next_step": "move raw/history stats buffers and descriptor table ownership behind one pass resource bundle"
+      "next_step": "move capture/readback execution helpers behind the RT reflection stats pass boundary without changing frame-contract metrics"
     },
     {
       "id": "environment_resources",

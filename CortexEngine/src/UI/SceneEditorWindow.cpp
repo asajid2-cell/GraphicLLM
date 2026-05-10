@@ -2,6 +2,7 @@
 
 #include "Core/ServiceLocator.h"
 #include "Core/Engine.h"
+#include "Graphics/MaterialPresetRegistry.h"
 #include "Graphics/Renderer.h"
 #include "LLM/SceneCommands.h"
 #include "Utils/GLTFLoader.h"
@@ -45,6 +46,7 @@ enum ControlIdEditor : int {
     IDC_SE_FOCUSED_SCALE_SLIDER= 3210,
     IDC_SE_APPLY_MATERIAL      = 3211,
     IDC_SE_APPLY_SCALE         = 3212,
+    IDC_SE_MATERIAL_VALIDATION = 3213,
 };
 
 struct SceneEditorState {
@@ -73,6 +75,7 @@ struct SceneEditorState {
     HWND sliderFocusedScale = nullptr;
     HWND btnApplyMaterial = nullptr;
     HWND btnApplyScale = nullptr;
+    HWND lblMaterialValidation = nullptr;
 
     std::vector<std::string> modelNames;
 
@@ -169,6 +172,45 @@ std::string WStringToUtf8(const std::wstring& s) {
     return out;
 }
 
+std::string GetFocusedPresetFromUI() {
+    int matIndex = static_cast<int>(SendMessage(g_ed.comboFocusedMaterial, CB_GETCURSEL, 0, 0));
+    if (matIndex <= 0 || matIndex >= static_cast<int>(std::size(kMaterialPresetLabels))) {
+        return {};
+    }
+    std::wstring wlabel = kMaterialPresetLabels[matIndex];
+    return WStringToUtf8(wlabel);
+}
+
+void RefreshMaterialValidationStatus() {
+    if (!g_ed.lblMaterialValidation) {
+        return;
+    }
+
+    auto* engine = Cortex::ServiceLocator::GetEngine();
+    if (!engine || engine->GetFocusTarget().empty()) {
+        SetWindowTextW(g_ed.lblMaterialValidation, L"Material validation: focus an entity before editing");
+        return;
+    }
+
+    const std::string preset = GetFocusedPresetFromUI();
+    const float metallic = Slider01ToFloat(g_ed.sliderFocusedMetallic, 0.0f, 1.0f);
+    const float roughness = Slider01ToFloat(g_ed.sliderFocusedRoughness, 0.0f, 1.0f);
+    const Graphics::MaterialPresetInfo info = Graphics::MaterialPresetRegistry::Resolve(preset);
+
+    std::wstring status = L"Material validation: OK";
+    if (preset.empty()) {
+        status = L"Material validation: OK - numeric material";
+    } else if (info.transmissive && metallic > 0.1f) {
+        status = L"Material validation: warning - glass/water should stay nonmetallic";
+    } else if (info.metallic && metallic < 0.5f) {
+        status = L"Material validation: warning - metallic preset with low metallic slider";
+    } else if (info.clearcoat && roughness > 0.8f) {
+        status = L"Material validation: warning - clearcoat is very rough";
+    }
+
+    SetWindowTextW(g_ed.lblMaterialValidation, status.c_str());
+}
+
 void RefreshFocusedFromEngine() {
     if (!g_ed.lblFocusedName) {
         return;
@@ -184,6 +226,7 @@ void RefreshFocusedFromEngine() {
     }
 
     SetWindowTextW(g_ed.lblFocusedName, wname.c_str());
+    RefreshMaterialValidationStatus();
 }
 
 void SpawnPrimitiveFromUI() {
@@ -292,6 +335,7 @@ void ApplyMaterialToFocusedFromUI() {
     cmd->setAO = false;
 
     engine->EnqueueSceneCommand(std::move(cmd));
+    RefreshMaterialValidationStatus();
 }
 
 void ApplyScaleToFocusedFromUI() {
@@ -522,6 +566,15 @@ void RegisterSceneEditorClass() {
             g_ed.btnApplyMaterial = makeButton(IDC_SE_APPLY_MATERIAL, L"Apply Material to Focused", y);
             y += 28 + rowGap;
 
+            makeLabel(L"Validation", y);
+            g_ed.lblMaterialValidation = CreateWindowExW(
+                0, L"STATIC", L"Material validation: focus an entity before editing",
+                WS_CHILD | WS_VISIBLE,
+                x + colLabelWidth, y, colFieldWidth, labelHeight * 2,
+                hwnd, reinterpret_cast<HMENU>(IDC_SE_MATERIAL_VALIDATION), nullptr, nullptr);
+            SendMessageW(g_ed.lblMaterialValidation, WM_SETFONT, reinterpret_cast<WPARAM>(g_ed.font), TRUE);
+            y += labelHeight * 2 + rowGap;
+
             g_ed.btnApplyScale = makeButton(IDC_SE_APPLY_SCALE, L"Apply Scale to Focused", y);
             y += 28 + rowGap;
 
@@ -622,9 +675,15 @@ void RegisterSceneEditorClass() {
                     RefreshFocusedFromEngine();
                     return 0;
                 }
+            } else if (code == CBN_SELCHANGE && id == IDC_SE_FOCUSED_MAT_PRESET) {
+                RefreshMaterialValidationStatus();
+                return 0;
             }
             break;
         }
+        case WM_HSCROLL:
+            RefreshMaterialValidationStatus();
+            return 0;
         case WM_CLOSE:
             ShowWindow(hwnd, SW_HIDE);
             g_ed.visible = false;

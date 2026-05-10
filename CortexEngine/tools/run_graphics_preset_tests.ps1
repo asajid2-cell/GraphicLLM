@@ -1,5 +1,9 @@
 param(
-    [string]$PresetPath = ""
+    [string]$PresetPath = "",
+    [switch]$RuntimeSmoke,
+    [switch]$NoBuild,
+    [int]$SmokeFrames = 90,
+    [string]$LogDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,6 +11,13 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($PresetPath)) {
     $PresetPath = Join-Path $root "assets/config/graphics_presets.json"
+}
+if ([string]::IsNullOrWhiteSpace($LogDir)) {
+    $runId = "graphics_preset_{0}_{1}_{2}" -f `
+        (Get-Date -Format "yyyyMMdd_HHmmss_fff"),
+        $PID,
+        ([Guid]::NewGuid().ToString("N").Substring(0, 8))
+    $LogDir = Join-Path (Join-Path $root "build/bin/logs/runs") $runId
 }
 
 $failures = New-Object System.Collections.Generic.List[string]
@@ -91,6 +102,68 @@ try {
     Remove-Item -Force -ErrorAction SilentlyContinue $roundTripPath
 }
 
+if ($RuntimeSmoke -and $failures.Count -eq 0) {
+    $exe = Join-Path $root "build/bin/CortexEngine.exe"
+    if (-not $NoBuild) {
+        cmake --build (Join-Path $root "build") --config Release --target CortexEngine
+    }
+    if (-not (Test-Path $exe)) {
+        Add-Failure "CortexEngine executable not found at $exe. Build Release first or run with -NoBuild."
+    } else {
+        New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+        $env:CORTEX_LOG_DIR = $LogDir
+        $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
+        $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
+        $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+
+        Push-Location (Split-Path -Parent $exe)
+        try {
+            $output = & $exe `
+                "--scene" "temporal_validation" `
+                "--graphics-preset" "release_showcase" `
+                "--mode=default" `
+                "--no-llm" `
+                "--no-dreamer" `
+                "--no-launcher" `
+                "--smoke-frames=$SmokeFrames" `
+                "--exit-after-visual-validation" 2>&1
+            $exitCode = $LASTEXITCODE
+            $output | Set-Content -Encoding UTF8 (Join-Path $LogDir "engine_stdout.txt")
+        } finally {
+            Pop-Location
+            Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
+            Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
+            Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue
+        }
+
+        $reportPath = Join-Path $LogDir "frame_report_last.json"
+        if ($exitCode -ne 0) {
+            Add-Failure "runtime graphics preset smoke failed with exit code $exitCode. logs=$LogDir"
+        } elseif (-not (Test-Path $reportPath)) {
+            Add-Failure "runtime graphics preset smoke did not write frame report: $reportPath"
+        } else {
+            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+            $contractPreset = [string]$report.frame_contract.graphics_preset.id
+            $dirty = [bool]$report.frame_contract.graphics_preset.dirty_from_ui
+            $renderScale = [double]$report.frame_contract.graphics_preset.render_scale
+            $exposure = [double]$report.frame_contract.lighting.exposure
+            if ($contractPreset -ne "release_showcase") {
+                Add-Failure "runtime contract graphics preset was '$contractPreset', expected 'release_showcase'"
+            }
+            if ($dirty) {
+                Add-Failure "runtime contract reported release_showcase as dirty_from_ui"
+            }
+            if ([Math]::Abs($renderScale - 0.85) -gt 0.04) {
+                Add-Failure "runtime contract render_scale was $renderScale, expected about 0.85"
+            }
+            if ([Math]::Abs($exposure - 1.12) -gt 0.03) {
+                Add-Failure "runtime contract exposure was $exposure, expected about 1.12"
+            }
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Graphics preset tests failed:" -ForegroundColor Red
     foreach ($failure in $failures) {
@@ -100,3 +173,6 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host "Graphics preset tests passed: presets=$($presetDoc.presets.Count) default=$($presetDoc.default)" -ForegroundColor Green
+if ($RuntimeSmoke) {
+    Write-Host "logs=$LogDir"
+}

@@ -19,6 +19,7 @@ json ToJson(const RendererTuningState& state) {
         {"schema", 1},
         {"quality", {
             {"preset", state.quality.preset},
+            {"dirty_from_ui", state.quality.dirtyFromUI},
             {"render_scale", state.quality.renderScale},
             {"taa", state.quality.taaEnabled},
             {"fxaa", state.quality.fxaaEnabled},
@@ -97,6 +98,7 @@ RendererTuningState FromJson(const json& root) {
     if (root.contains("quality") && root.at("quality").is_object()) {
         const auto& q = root.at("quality");
         ReadValue(q, "preset", state.quality.preset);
+        ReadValue(q, "dirty_from_ui", state.quality.dirtyFromUI);
         ReadValue(q, "render_scale", state.quality.renderScale);
         ReadValue(q, "taa", state.quality.taaEnabled);
         ReadValue(q, "fxaa", state.quality.fxaaEnabled);
@@ -171,6 +173,61 @@ RendererTuningState FromJson(const json& root) {
     return ClampRendererTuningState(state);
 }
 
+json GraphicsPresetToTuningJson(const json& preset) {
+    json root = json::object();
+    root["schema"] = 1;
+
+    root["quality"] = preset.value("quality", json::object());
+    root["quality"]["preset"] = preset.value("id", "runtime");
+    root["quality"]["dirty_from_ui"] = false;
+
+    root["lighting"] = preset.value("lighting", json::object());
+
+    root["environment"] = json::object();
+    if (preset.contains("environment") && preset.at("environment").is_object()) {
+        const auto& env = preset.at("environment");
+        if (env.contains("environment_id")) {
+            root["environment"]["id"] = env.at("environment_id");
+        }
+        if (env.contains("id")) {
+            root["environment"]["id"] = env.at("id");
+        }
+        if (env.contains("ibl_enabled")) {
+            root["environment"]["ibl_enabled"] = env.at("ibl_enabled");
+        }
+        if (env.contains("ibl_limit_enabled")) {
+            root["environment"]["ibl_limit_enabled"] = env.at("ibl_limit_enabled");
+        }
+        if (env.contains("diffuse_intensity")) {
+            root["environment"]["diffuse_intensity"] = env.at("diffuse_intensity");
+        }
+        if (env.contains("specular_intensity")) {
+            root["environment"]["specular_intensity"] = env.at("specular_intensity");
+        }
+    }
+
+    root["ray_tracing"] = preset.value("ray_tracing", json::object());
+    root["screen_space"] = preset.value("screen_space", json::object());
+    root["atmosphere"] = preset.value("atmosphere", json::object());
+    root["water"] = preset.value("water", json::object());
+
+    root["particles"] = json::object();
+    if (preset.contains("particles") && preset.at("particles").is_object()) {
+        const auto& particles = preset.at("particles");
+        if (particles.contains("enabled")) {
+            root["particles"]["enabled"] = particles.at("enabled");
+        }
+        if (particles.contains("density_scale")) {
+            root["particles"]["density_scale"] = particles.at("density_scale");
+        } else if (particles.contains("density")) {
+            root["particles"]["density_scale"] = particles.at("density");
+        }
+    }
+
+    root["cinematic_post"] = preset.value("cinematic_post", json::object());
+    return root;
+}
+
 } // namespace
 
 RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
@@ -182,6 +239,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     const auto water = renderer.GetWaterState();
     const auto post = renderer.GetPostProcessState();
 
+    state.quality.preset = renderer.GetActiveGraphicsPreset();
+    state.quality.dirtyFromUI = renderer.IsGraphicsPresetDirtyFromUI();
     state.quality.renderScale = quality.renderScale;
     state.quality.taaEnabled = features.taaEnabled;
     state.quality.fxaaEnabled = features.fxaaEnabled;
@@ -278,6 +337,7 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
 void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& rawState) {
     const RendererTuningState state = ClampRendererTuningState(rawState);
 
+    renderer.SetActiveGraphicsPreset(state.quality.preset, state.quality.dirtyFromUI);
     ApplyRenderScaleControl(renderer, state.quality.renderScale);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::TAA, state.quality.taaEnabled);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::FXAA, state.quality.fxaaEnabled);
@@ -341,6 +401,21 @@ std::filesystem::path GetDefaultRendererTuningStatePath() {
     return std::filesystem::current_path() / "user" / "graphics_settings.json";
 }
 
+std::filesystem::path GetDefaultRendererGraphicsPresetCollectionPath() {
+    namespace fs = std::filesystem;
+    const fs::path cwd = fs::current_path();
+    const fs::path direct = cwd / "assets" / "config" / "graphics_presets.json";
+    if (fs::exists(direct)) {
+        return direct;
+    }
+    const fs::path buildBinRelative = cwd.parent_path().parent_path() /
+        "assets" / "config" / "graphics_presets.json";
+    if (fs::exists(buildBinRelative)) {
+        return buildBinRelative;
+    }
+    return direct;
+}
+
 std::optional<RendererTuningState> LoadRendererTuningStateFile(const std::filesystem::path& path,
                                                                std::string* error) {
     if (error) {
@@ -368,6 +443,85 @@ std::optional<RendererTuningState> LoadRendererTuningStateFile(const std::filesy
             return std::nullopt;
         }
         return FromJson(root);
+    } catch (const std::exception& e) {
+        if (error) {
+            *error = e.what();
+        }
+        return std::nullopt;
+    }
+}
+
+std::optional<RendererTuningState> LoadRendererGraphicsPresetFile(const std::filesystem::path& path,
+                                                                  const std::string& presetId,
+                                                                  std::string* resolvedPresetId,
+                                                                  std::string* error) {
+    if (resolvedPresetId) {
+        resolvedPresetId->clear();
+    }
+    if (error) {
+        error->clear();
+    }
+
+    std::ifstream in(path);
+    if (!in) {
+        if (error) {
+            *error = "failed to open graphics preset collection";
+        }
+        return std::nullopt;
+    }
+
+    try {
+        json root;
+        in >> root;
+        if (!root.is_object()) {
+            if (error) {
+                *error = "graphics preset root is not an object";
+            }
+            return std::nullopt;
+        }
+        const int schema = root.value("schema", 1);
+        if (schema != 1) {
+            if (error) {
+                *error = "unsupported graphics preset schema";
+            }
+            return std::nullopt;
+        }
+        if (!root.contains("presets") || !root.at("presets").is_array()) {
+            if (error) {
+                *error = "graphics preset collection has no presets array";
+            }
+            return std::nullopt;
+        }
+
+        std::string requested = presetId.empty() ? root.value("default", "") : presetId;
+        if (requested.empty()) {
+            if (error) {
+                *error = "graphics preset id is empty and no default is configured";
+            }
+            return std::nullopt;
+        }
+
+        for (const auto& preset : root.at("presets")) {
+            if (!preset.is_object()) {
+                continue;
+            }
+            const std::string id = preset.value("id", "");
+            if (id != requested) {
+                continue;
+            }
+            RendererTuningState state = FromJson(GraphicsPresetToTuningJson(preset));
+            state.quality.preset = id;
+            state.quality.dirtyFromUI = false;
+            if (resolvedPresetId) {
+                *resolvedPresetId = id;
+            }
+            return state;
+        }
+
+        if (error) {
+            *error = "graphics preset '" + requested + "' was not found";
+        }
+        return std::nullopt;
     } catch (const std::exception& e) {
         if (error) {
             *error = e.what();

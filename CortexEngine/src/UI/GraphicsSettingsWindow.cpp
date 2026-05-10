@@ -208,6 +208,7 @@ void ApplyTuningState() {
     }
     SyncStateFromToggles();
     SyncStateFromSliders();
+    g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
 }

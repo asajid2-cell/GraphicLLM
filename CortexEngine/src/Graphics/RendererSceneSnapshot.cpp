@@ -14,6 +14,8 @@ namespace Cortex::Graphics {
 
 namespace {
 
+constexpr float kDefaultEpsilon = 1.0e-4f;
+
 [[nodiscard]] float EstimateDielectricFresnel(const MaterialModel& material) {
     const float ior = std::max(material.ior, 1.0f);
     const float numerator = ior - 1.0f;
@@ -259,7 +261,6 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
 
         if (!renderable.presetName.empty()) {
             ++snapshot.materials.presetNamed;
-            constexpr float kDefaultEpsilon = 1.0e-4f;
             if (!materialModel.textures.metallic &&
                 std::abs(renderable.metallic - materialModel.metallic) > kDefaultEpsilon) {
                 ++snapshot.materials.presetDefaultMetallic;
@@ -292,6 +293,41 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
         }
         if (materialModel.clearcoatFactor > 0.001f) {
             ++snapshot.materials.resolvedClearcoat;
+        }
+        const bool advancedClearcoat = materialModel.clearcoatFactor > 0.001f ||
+            materialModel.textures.clearcoat ||
+            materialModel.textures.clearcoatRoughness;
+        const bool advancedTransmission = materialModel.transmissionFactor > 0.01f ||
+            materialModel.textures.transmission;
+        const bool advancedSpecular = materialModel.textures.specular ||
+            materialModel.textures.specularColor ||
+            std::abs(materialModel.specularFactor - 1.0f) > kDefaultEpsilon ||
+            std::abs(materialModel.specularColorFactor.r - 1.0f) > kDefaultEpsilon ||
+            std::abs(materialModel.specularColorFactor.g - 1.0f) > kDefaultEpsilon ||
+            std::abs(materialModel.specularColorFactor.b - 1.0f) > kDefaultEpsilon;
+        const bool advancedSheen = materialModel.sheenWeight > 0.001f;
+        const bool advancedSubsurface = materialModel.subsurfaceWrap > 0.001f;
+        if (advancedClearcoat) {
+            ++snapshot.materials.advancedClearcoat;
+        }
+        if (advancedTransmission) {
+            ++snapshot.materials.advancedTransmission;
+        }
+        if (resolvedEmissive) {
+            ++snapshot.materials.advancedEmissive;
+        }
+        if (advancedSpecular) {
+            ++snapshot.materials.advancedSpecular;
+        }
+        if (advancedSheen) {
+            ++snapshot.materials.advancedSheen;
+        }
+        if (advancedSubsurface) {
+            ++snapshot.materials.advancedSubsurface;
+        }
+        if (advancedClearcoat || advancedTransmission || resolvedEmissive ||
+            advancedSpecular || advancedSheen || advancedSubsurface) {
+            ++snapshot.materials.advancedFeatureMaterials;
         }
 
         const std::vector<MaterialValidationIssue> materialIssues =

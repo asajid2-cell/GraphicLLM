@@ -904,6 +904,25 @@ if ($null -ne $report.frame_contract.materials.resolved_emissive -and
     [int]$report.frame_contract.materials.resolved_emissive -lt 1) {
     Add-Failure "RT showcase did not report any resolved emissive materials"
 }
+if ($null -eq $report.frame_contract.materials.advanced_feature_materials) {
+    Add-Failure "RT showcase frame contract is missing advanced material feature coverage"
+} else {
+    if ([int]$report.frame_contract.materials.advanced_feature_materials -lt 4) {
+        Add-Failure "RT showcase advanced material feature coverage is $($report.frame_contract.materials.advanced_feature_materials), expected >= 4"
+    }
+    if ([int]$report.frame_contract.materials.advanced_clearcoat -lt 1) {
+        Add-Failure "RT showcase did not report any advanced clearcoat materials"
+    }
+    if ([int]$report.frame_contract.materials.advanced_transmission -lt 1) {
+        Add-Failure "RT showcase did not report any advanced transmission materials"
+    }
+    if ([int]$report.frame_contract.materials.advanced_emissive -lt 1) {
+        Add-Failure "RT showcase did not report any advanced emissive materials"
+    }
+    if ([int]$report.frame_contract.materials.advanced_specular -lt 1) {
+        Add-Failure "RT showcase did not report any advanced specular materials"
+    }
+}
 if ($null -ne $report.frame_contract.materials.reflection_eligible -and
     [int]$report.frame_contract.materials.reflection_eligible -lt 3) {
     Add-Failure "RT showcase reflection-eligible material count is $($report.frame_contract.materials.reflection_eligible), expected >= 3"
@@ -1141,7 +1160,7 @@ if ($null -ne $surfaceDebugReport -and $null -ne $surfaceDebugReport.visual_vali
         [double]$surfaceDebugReport.visual_validation.image_stats.nonblack_ratio)
 }
 
-Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2}/{6:N0} rt_mb={7:N2}/{8:N0} write_mb={9:N2}/{10:N0} luma={11:N2} center_luma={12:N2} dark={13:N3}/{14:N2} sat={15:N3}/{16:N2} near_white={17:N3}/{18:N2} water_draws={19}/{20} max_albedo={21:N3}/{22:N1} material_issues={23} resolved_mat={24}/{25}/{26} preset_defaults={27}/{28}/{29}/{30} reflection={31}/{32}/{33:N2}/{34:N2} rt_parity={35}/{36} rt_refl_ready={37}/{38} rt_signal={39:N4}/{40:N4}/{41:N4}/{42:N4} rt_hist={43:N4}/{44:N4}/{45:N4}/{46:N4} transient_delta={47} rt_budget={48} lighting={49}/{50} startup_realloc=0 temporal_diff={51} surface_debug={52}" -f `
+Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2}/{6:N0} rt_mb={7:N2}/{8:N0} write_mb={9:N2}/{10:N0} luma={11:N2} center_luma={12:N2} dark={13:N3}/{14:N2} sat={15:N3}/{16:N2} near_white={17:N3}/{18:N2} water_draws={19}/{20} max_albedo={21:N3}/{22:N1} material_issues={23} resolved_mat={24}/{25}/{26} preset_defaults={27}/{28}/{29}/{30} reflection={31}/{32}/{33:N2}/{34:N2} rt_parity={35}/{36} rt_refl_ready={37}/{38} rt_signal={39:N4}/{40:N4}/{41:N4}/{42:N4} rt_hist={43:N4}/{44:N4}/{45:N4}/{46:N4} transient_delta={47} rt_budget={48} lighting={49}/{50} startup_realloc=0 temporal_diff={51} surface_debug={52} advanced_mat={53}/{54}/{55}/{56}/{57}" -f `
     $report.smoke_automation.total_frames,
     [double]$report.gpu_frame_ms,
     $MaxGpuFrameMs,
@@ -1194,4 +1213,9 @@ Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2
     [string]$report.frame_contract.lighting.rig_id,
     [int]$report.frame_contract.lighting.light_count,
     $temporalDiffSummary,
-    $surfaceDebugSummary)
+    $surfaceDebugSummary,
+    [int]$report.frame_contract.materials.advanced_feature_materials,
+    [int]$report.frame_contract.materials.advanced_clearcoat,
+    [int]$report.frame_contract.materials.advanced_transmission,
+    [int]$report.frame_contract.materials.advanced_emissive,
+    [int]$report.frame_contract.materials.advanced_specular)

@@ -40,6 +40,10 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.defaultRoughness = 0.02f;
         info.hasDefaultTransmission = true;
         info.defaultTransmission = 0.85f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 1.25f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(0.92f, 0.97f, 1.0f);
     } else if (contains("mirror")) {
         info.materialType = 2.0f;
         info.metallic = true;
@@ -99,6 +103,12 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.defaultMetallic = 1.0f;
         info.hasDefaultRoughness = true;
         info.defaultRoughness = contains("chrome") ? 0.08f : 0.12f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 1.15f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = contains("gold")
+            ? glm::vec3(1.0f, 0.82f, 0.42f)
+            : glm::vec3(0.88f, 0.90f, 0.96f);
     }
 
     if (contains("metal") || contains("gold")) {

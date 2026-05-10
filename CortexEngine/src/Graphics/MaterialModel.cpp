@@ -34,6 +34,11 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
     return glm::all(glm::lessThanEqual(glm::abs(value), glm::vec3(kDefaultEpsilon)));
 }
 
+[[nodiscard]] bool IsNearWhite(const glm::vec3& value) {
+    return glm::all(glm::lessThanEqual(glm::abs(value - glm::vec3(1.0f)),
+                                       glm::vec3(kDefaultEpsilon)));
+}
+
 void ApplyPresetDefaults(MaterialModel& model, const MaterialPresetInfo& preset) {
     if (preset.hasDefaultMetallic && !model.textures.metallic &&
         IsDefaultScalar(model.metallic, 0.0f)) {
@@ -59,6 +64,17 @@ void ApplyPresetDefaults(MaterialModel& model, const MaterialPresetInfo& preset)
     if (preset.hasDefaultEmissiveStrength && preset.emissive &&
         model.emissiveStrength <= 1.0f + kDefaultEpsilon) {
         model.emissiveStrength = std::max(model.emissiveStrength, preset.defaultEmissiveStrength);
+    }
+
+    if (preset.hasDefaultSpecularFactor && !model.textures.specular &&
+        IsDefaultScalar(model.specularFactor, 1.0f)) {
+        model.specularFactor = glm::clamp(preset.defaultSpecularFactor, 0.0f, 2.0f);
+    }
+
+    if (preset.hasDefaultSpecularColor && !model.textures.specularColor &&
+        IsNearWhite(model.specularColorFactor)) {
+        model.specularColorFactor =
+            glm::clamp(preset.defaultSpecularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f));
     }
 
     if (preset.transmissive && model.transmissionFactor > 0.0f) {

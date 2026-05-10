@@ -286,6 +286,31 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
              std::to_string(materialClassTotal) +
              ":sampled=" + std::to_string(contract.materials.sampled));
     }
+    auto materialCountExceedsSampled = [&](uint32_t count, const char* name) {
+        if (count > contract.materials.sampled) {
+            warn(std::string("material_advanced_count_exceeds_sampled:") + name +
+                 ":count=" + std::to_string(count) +
+                 ":sampled=" + std::to_string(contract.materials.sampled));
+        }
+    };
+    materialCountExceedsSampled(contract.materials.advancedFeatureMaterials,
+                                "advanced_feature_materials");
+    materialCountExceedsSampled(contract.materials.advancedClearcoat, "advanced_clearcoat");
+    materialCountExceedsSampled(contract.materials.advancedTransmission, "advanced_transmission");
+    materialCountExceedsSampled(contract.materials.advancedEmissive, "advanced_emissive");
+    materialCountExceedsSampled(contract.materials.advancedSpecular, "advanced_specular");
+    materialCountExceedsSampled(contract.materials.advancedSheen, "advanced_sheen");
+    materialCountExceedsSampled(contract.materials.advancedSubsurface, "advanced_subsurface");
+    const uint32_t advancedFeatureSum =
+        contract.materials.advancedClearcoat +
+        contract.materials.advancedTransmission +
+        contract.materials.advancedEmissive +
+        contract.materials.advancedSpecular +
+        contract.materials.advancedSheen +
+        contract.materials.advancedSubsurface;
+    if (contract.materials.advancedFeatureMaterials > 0 && advancedFeatureSum == 0) {
+        warn("material_advanced_feature_materials_without_feature_counts");
+    }
     auto classMismatch = [](uint32_t a, uint32_t b) {
         return static_cast<uint32_t>(std::abs(static_cast<int64_t>(a) - static_cast<int64_t>(b)));
     };

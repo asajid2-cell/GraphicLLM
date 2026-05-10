@@ -10,6 +10,7 @@
 #include <glm/geometric.hpp>
 
 #include "FrameContract.h"
+#include "RendererPostProcessState.h"
 
 namespace Cortex::Graphics {
 
@@ -213,18 +214,6 @@ struct RendererFractalSurfaceState {
     float gain = 0.5f;
     float warpStrength = 0.0f;
     float noiseType = 0.0f;
-};
-
-struct RendererPostProcessState {
-    bool fxaaEnabled = true;
-    float warm = 0.0f;
-    float cool = 0.0f;
-    float godRayIntensity = 1.0f;
-    float bloomThreshold = 1.0f;
-    float bloomSoftKnee = 0.5f;
-    float bloomMaxContribution = 4.0f;
-    float vignette = 0.0f;
-    float lensDirt = 0.0f;
 };
 
 struct RendererFogState {

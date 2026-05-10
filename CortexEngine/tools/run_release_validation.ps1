@@ -149,6 +149,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "material_lab" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_material_lab_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "visual_baseline_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -65,8 +65,8 @@ struct EngineConfig {
     bool enableRayTracing = true;
 
     // Optional initial scene preset. When empty, the engine chooses its
-    // default (currently the RT showcase gallery). Accepted values are
-    // "dragon", "rt_showcase", "temporal_validation", and "cornell".
+    // default (currently the RT showcase gallery). Accepted values include
+    // "dragon", "rt_showcase", "material_lab", "temporal_validation", and "cornell".
     std::string initialScenePreset;
     std::string initialEnvironmentPreset;
     std::string initialGraphicsPreset;
@@ -145,6 +145,7 @@ private:
         GodRays           = 3,
         ProceduralTerrain = 4,
         TemporalValidation = 5,
+        MaterialLab       = 6,
     };
 
     void ProcessInput();
@@ -160,6 +161,7 @@ private:
     void BuildEditorModeTerrainScene();
     void BuildDragonStudioScene();
     void BuildRTShowcaseScene();
+    void BuildMaterialLabScene();
     void BuildGodRaysScene();
     void BuildTemporalValidationScene();
 

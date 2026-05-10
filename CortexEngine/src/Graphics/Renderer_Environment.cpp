@@ -573,6 +573,10 @@ void Renderer::EnforceIBLResidencyLimit() {
             PendingEnvironment pending;
             pending.path = victim.path;
             pending.name = victim.name;
+            pending.budgetClass = victim.budgetClass;
+            pending.maxRuntimeDimension = victim.maxRuntimeDimension;
+            pending.defaultDiffuseIntensity = victim.defaultDiffuseIntensity;
+            pending.defaultSpecularIntensity = victim.defaultSpecularIntensity;
             m_environmentState.pending.push_back(std::move(pending));
             m_assetRuntime.registry.UnregisterTexture(victim.path);
         }

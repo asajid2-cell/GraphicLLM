@@ -45,6 +45,11 @@ if (-not (Test-Path $postStatePath)) {
     throw "RendererPostProcessState.h not found: $postStatePath"
 }
 $postState = Get-Content $postStatePath -Raw
+$environmentStatePath = Join-Path $root "src/Graphics/RendererEnvironmentState.h"
+if (-not (Test-Path $environmentStatePath)) {
+    throw "RendererEnvironmentState.h not found: $environmentStatePath"
+}
+$environmentState = Get-Content $environmentStatePath -Raw
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 
@@ -136,6 +141,14 @@ foreach ($target in $doc.targets) {
         foreach ($required in @("cinematicEnabled", "EffectiveVignette", "EffectiveLensDirt", "EncodedLensDirtByte")) {
             if ($postState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "postprocess_resources missing post-state ownership marker in RendererPostProcessState.h: $required"
+            }
+        }
+    }
+
+    if ($id -eq "environment_resources") {
+        foreach ($required in @("ActiveEnvironment", "ActiveEnvironmentName", "UsingFallbackEnvironment", "ResidentCount", "PendingCount")) {
+            if ($environmentState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "environment_resources missing state ownership marker in RendererEnvironmentState.h: $required"
             }
         }
     }

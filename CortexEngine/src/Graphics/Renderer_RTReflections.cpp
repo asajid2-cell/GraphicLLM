@@ -214,14 +214,9 @@ void Renderer::RenderRayTracedReflections() {
         tex->SetState(kDesired);
     };
 
-    if (!m_environmentState.maps.empty()) {
-        size_t envIndex = m_environmentState.currentIndex;
-        if (envIndex >= m_environmentState.maps.size()) {
-            envIndex = 0;
-        }
-        const EnvironmentMaps& env = m_environmentState.maps[envIndex];
-        ensureTextureNonPixelReadable(env.diffuseIrradiance);
-        ensureTextureNonPixelReadable(env.specularPrefiltered);
+    if (const EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
+        ensureTextureNonPixelReadable(env->diffuseIrradiance);
+        ensureTextureNonPixelReadable(env->specularPrefiltered);
     }
 
     // Ensure the descriptor table (space1, t0-t6) is up to date before DXR

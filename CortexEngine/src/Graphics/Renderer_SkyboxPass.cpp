@@ -4,7 +4,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderSkybox() {
-    if (!m_mainTargets.hdrColor) {
+    if (!m_mainTargets.hdrColor || !m_environmentState.backgroundVisible) {
         return;
     }
 

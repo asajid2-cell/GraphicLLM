@@ -37,6 +37,9 @@ struct RendererEnvironmentTuning {
     bool iblLimitEnabled = true;
     float diffuseIntensity = 1.0f;
     float specularIntensity = 1.0f;
+    bool backgroundVisible = true;
+    float backgroundExposure = 1.0f;
+    float backgroundBlur = 0.0f;
 };
 
 struct RendererRayTracingTuning {

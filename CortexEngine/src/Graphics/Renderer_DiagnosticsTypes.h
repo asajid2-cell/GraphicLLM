@@ -183,6 +183,9 @@ struct RendererFeatureState {
     float fogFalloff = 0.0f;
     float iblDiffuseIntensity = 0.0f;
     float iblSpecularIntensity = 0.0f;
+    bool backgroundVisible = true;
+    float backgroundExposure = 1.0f;
+    float backgroundBlur = 0.0f;
     float godRayIntensity = 0.0f;
     float areaLightSizeScale = 1.0f;
     float sunIntensity = 0.0f;

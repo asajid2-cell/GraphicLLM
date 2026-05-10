@@ -99,6 +99,14 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.environment.residentCount > contract.environment.residentLimit) {
         warn("environment_resident_count_exceeds_limit");
     }
+    if (contract.environment.backgroundExposure < 0.0f ||
+        contract.environment.backgroundExposure > 4.0f) {
+        warn("environment_background_exposure_out_of_range");
+    }
+    if (contract.environment.backgroundBlur < 0.0f ||
+        contract.environment.backgroundBlur > 1.0f) {
+        warn("environment_background_blur_out_of_range");
+    }
 
     if (!contract.features.voxelBackendEnabled) {
         requireResource("depth", true, "core_depth_contract");

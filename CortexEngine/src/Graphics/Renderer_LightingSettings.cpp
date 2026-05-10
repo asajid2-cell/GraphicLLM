@@ -434,6 +434,24 @@ void Renderer::SetIBLEnabled(bool enabled) {
     spdlog::info("Image-based lighting {}", m_environmentState.enabled ? "ENABLED" : "DISABLED");
 }
 
+void Renderer::SetBackgroundPresentation(bool visible, float exposure, float blur) {
+    const float clampedExposure = glm::clamp(exposure, 0.0f, 4.0f);
+    const float clampedBlur = glm::clamp(blur, 0.0f, 1.0f);
+    if (m_environmentState.backgroundVisible == visible &&
+        std::abs(m_environmentState.backgroundExposure - clampedExposure) < 1e-4f &&
+        std::abs(m_environmentState.backgroundBlur - clampedBlur) < 1e-4f) {
+        return;
+    }
+
+    m_environmentState.backgroundVisible = visible;
+    m_environmentState.backgroundExposure = clampedExposure;
+    m_environmentState.backgroundBlur = clampedBlur;
+    spdlog::info("Background presentation: visible={} exposure={} blur={}",
+                 visible,
+                 m_environmentState.backgroundExposure,
+                 m_environmentState.backgroundBlur);
+}
+
 void Renderer::SetSunDirection(const glm::vec3& dir) {
     glm::vec3 d = dir;
     if (!std::isfinite(d.x) || !std::isfinite(d.y) || !std::isfinite(d.z) ||

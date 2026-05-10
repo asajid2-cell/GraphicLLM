@@ -202,6 +202,12 @@ void ApplyIBLIntensityControl(Renderer& renderer, float diffuse, float specular)
                              std::clamp(specular, 0.0f, 3.0f));
 }
 
+void ApplyBackgroundPresentationControl(Renderer& renderer, bool visible, float exposure, float blur) {
+    renderer.SetBackgroundPresentation(visible,
+                                       std::clamp(exposure, 0.0f, 4.0f),
+                                       std::clamp(blur, 0.0f, 1.0f));
+}
+
 void ApplyColorGradeControl(Renderer& renderer, float warm, float cool) {
     renderer.SetColorGrade(std::clamp(warm, -1.0f, 1.0f),
                            std::clamp(cool, -1.0f, 1.0f));

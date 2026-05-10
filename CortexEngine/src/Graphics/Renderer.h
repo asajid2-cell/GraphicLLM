@@ -204,6 +204,7 @@ public:
     [[nodiscard]] float GetIBLSpecularIntensity() const;
     void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
     void SetIBLEnabled(bool enabled);
+    void SetBackgroundPresentation(bool visible, float exposure, float blur);
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
     void SetCinematicPost(float vignette, float lensDirt);

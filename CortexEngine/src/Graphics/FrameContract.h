@@ -75,6 +75,9 @@ struct FrameContract {
         bool fallback = false;
         bool manifestPresent = false;
         bool iblLimitEnabled = false;
+        bool backgroundVisible = true;
+        float backgroundExposure = 1.0f;
+        float backgroundBlur = 0.0f;
         uint32_t residentCount = 0;
         uint32_t pendingCount = 0;
         uint32_t residentLimit = 0;

@@ -4,16 +4,44 @@
 #include "Scene/Components.h"
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <limits>
+#include <string>
+#include <vector>
 
 namespace Cortex {
 namespace {
+    using nlohmann::json;
     constexpr float kHeroPoolZ = -3.0f;
+
+    std::vector<std::filesystem::path> GetShowcaseSceneConfigCandidates() {
+        const std::filesystem::path cwd = std::filesystem::current_path();
+        return {
+            cwd / "assets" / "config" / "showcase_scenes.json",
+            cwd / ".." / ".." / "assets" / "config" / "showcase_scenes.json",
+            cwd / ".." / ".." / ".." / "assets" / "config" / "showcase_scenes.json"
+        };
+    }
+
+    bool ReadVec3(const json& value, glm::vec3& out) {
+        if (!value.is_array() || value.size() != 3) {
+            return false;
+        }
+        for (const auto& component : value) {
+            if (!component.is_number()) {
+                return false;
+            }
+        }
+        out = glm::vec3(value[0].get<float>(), value[1].get<float>(), value[2].get<float>());
+        return true;
+    }
 
     bool RayIntersectsAABB(const glm::vec3& rayOrigin,
                            const glm::vec3& rayDir,
@@ -100,6 +128,116 @@ namespace {
         outAxisLength = axisLength;
         outThreshold = threshold;
     }
+}
+
+bool Engine::ApplyShowcaseCameraBookmark(const std::string& bookmarkId) {
+    if (bookmarkId.empty() || !m_registry ||
+        m_activeCameraEntity == entt::null ||
+        !m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) ||
+        !m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        return false;
+    }
+
+    const char* sceneId = "default";
+    switch (m_currentScenePreset) {
+    case ScenePreset::CornellBox: sceneId = "cornell_box"; break;
+    case ScenePreset::DragonOverWater: sceneId = "dragon_over_water"; break;
+    case ScenePreset::RTShowcase: sceneId = "rt_showcase"; break;
+    case ScenePreset::GodRays: sceneId = "god_rays"; break;
+    case ScenePreset::TemporalValidation: sceneId = "temporal_validation"; break;
+    case ScenePreset::ProceduralTerrain: sceneId = "procedural_terrain"; break;
+    default: break;
+    }
+
+    std::filesystem::path loadedPath;
+    json root;
+    for (const auto& candidate : GetShowcaseSceneConfigCandidates()) {
+        std::error_code ec;
+        const auto normalized = std::filesystem::weakly_canonical(candidate, ec);
+        const auto& path = ec ? candidate : normalized;
+        if (!std::filesystem::is_regular_file(path, ec)) {
+            continue;
+        }
+        try {
+            std::ifstream in(path);
+            in >> root;
+            loadedPath = path;
+            break;
+        } catch (const std::exception& ex) {
+            spdlog::warn("Failed to parse showcase scene config '{}': {}", path.string(), ex.what());
+            return false;
+        }
+    }
+
+    if (root.is_null() || !root.contains("scenes") || !root["scenes"].is_array()) {
+        return false;
+    }
+
+    const json* scene = nullptr;
+    for (const auto& candidateScene : root["scenes"]) {
+        if (candidateScene.value("id", std::string{}) == sceneId) {
+            scene = &candidateScene;
+            break;
+        }
+    }
+    if (!scene || !scene->contains("camera_bookmarks") || !(*scene)["camera_bookmarks"].is_array()) {
+        return false;
+    }
+
+    const json* bookmark = nullptr;
+    for (const auto& candidateBookmark : (*scene)["camera_bookmarks"]) {
+        if (candidateBookmark.value("id", std::string{}) == bookmarkId) {
+            bookmark = &candidateBookmark;
+            break;
+        }
+    }
+    if (!bookmark) {
+        return false;
+    }
+
+    glm::vec3 position(0.0f);
+    glm::vec3 target(0.0f);
+    if (!ReadVec3(bookmark->value("position", json::array()), position) ||
+        !ReadVec3(bookmark->value("target", json::array()), target)) {
+        spdlog::warn("Showcase camera bookmark '{}:{}' has invalid position/target",
+                     sceneId, bookmarkId);
+        return false;
+    }
+
+    glm::vec3 forward = target - position;
+    if (glm::length2(forward) < 1e-6f) {
+        spdlog::warn("Showcase camera bookmark '{}:{}' has a degenerate target",
+                     sceneId, bookmarkId);
+        return false;
+    }
+    forward = glm::normalize(forward);
+
+    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(forward, up)) > 0.99f) {
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+    auto& camera = m_registry->GetComponent<Scene::CameraComponent>(m_activeCameraEntity);
+    transform.position = position;
+    transform.rotation = glm::quatLookAtLH(forward, up);
+
+    const float fov = bookmark->value("fov", camera.fov);
+    if (fov > 1.0f && fov < 179.0f) {
+        camera.fov = fov;
+    }
+
+    m_cameraYaw = std::atan2(forward.x, forward.z);
+    m_cameraPitch = std::asin(glm::clamp(forward.y, -1.0f, 1.0f));
+    const float pitchLimit = glm::radians(89.0f);
+    m_cameraPitch = glm::clamp(m_cameraPitch, -pitchLimit, pitchLimit);
+    m_cameraVelocity = glm::vec3(0.0f);
+    m_autoDemoEnabled = false;
+    m_activeCameraBookmark = bookmarkId;
+
+    spdlog::info("Applied showcase camera bookmark '{}:{}' from '{}'",
+                 sceneId, bookmarkId, loadedPath.string());
+    return true;
 }
 
 bool Engine::ComputeCameraRayFromMouse(float mouseX, float mouseY,
@@ -566,6 +704,7 @@ void Engine::InitializeCameraController() {
     // Reset to the default position/orientation for the current scene preset
     // and derive yaw/pitch from the resulting forward vector.
     SetCameraToSceneDefault(transform);
+    m_activeCameraBookmark.clear();
 
     m_cameraControllerInitialized = true;
 }

@@ -516,6 +516,11 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
     InitializeScene();
     InitializeCameraController();
+    if (!config.initialCameraBookmark.empty() &&
+        !ApplyShowcaseCameraBookmark(config.initialCameraBookmark)) {
+        spdlog::warn("Startup camera bookmark '{}' was not found for the active scene",
+                     config.initialCameraBookmark);
+    }
 
     // If Engine Editor mode, enter Play mode for terrain navigation.
     if (m_engineEditorMode) {
@@ -1474,6 +1479,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
             glm::normalize(cameraTransform.rotation * glm::vec3(0.0f, 0.0f, 1.0f));
         report["camera"] = {
             {"active", true},
+            {"bookmark", m_activeCameraBookmark},
             {"position", {
                 {"x", cameraTransform.position.x},
                 {"y", cameraTransform.position.y},

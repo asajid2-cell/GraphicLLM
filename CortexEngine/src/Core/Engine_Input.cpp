@@ -347,10 +347,19 @@ void Engine::ProcessInput() {
                     break;
                 }
                 if (key == SDLK_1 || key == SDLK_2 || key == SDLK_3) {
+                    const char* bookmarkId =
+                        (key == SDLK_1) ? "hero" :
+                        (key == SDLK_2) ? "reflection_closeup" :
+                                          "material_overview";
+                    if (ApplyShowcaseCameraBookmark(bookmarkId)) {
+                        break;
+                    }
+
                     // Camera bookmarks for the current scene preset.
                     if (m_registry && m_activeCameraEntity != entt::null &&
                         m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity)) {
                         m_autoDemoEnabled = false;
+                        m_activeCameraBookmark.clear();
                         auto& t = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
                         glm::vec3 center;
                         if (m_currentScenePreset == ScenePreset::CornellBox) {

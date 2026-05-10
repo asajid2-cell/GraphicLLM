@@ -70,6 +70,7 @@ struct EngineConfig {
     std::string initialScenePreset;
     std::string initialEnvironmentPreset;
     std::string initialGraphicsPreset;
+    std::string initialCameraBookmark;
 
     // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
     // interactive behavior. exitAfterVisualValidationCapture exits once the
@@ -168,6 +169,7 @@ private:
     void SyncDebugMenuFromRenderer();
     void DebugDrawSceneGraph();
     void SetCameraToSceneDefault(Scene::TransformComponent& transform);
+    bool ApplyShowcaseCameraBookmark(const std::string& bookmarkId);
 
     void CaptureScreenshot();
     void CaptureScreenshot(const std::filesystem::path& outputPath);
@@ -269,6 +271,7 @@ private:
     float m_cameraRollSpeed = 1.5f;       // radians/s roll rate
     float m_cameraRollDamping = 3.0f;     // how quickly roll recenters when no input
     entt::entity m_activeCameraEntity = entt::null;
+    std::string m_activeCameraBookmark;
 
     // Simple auto-demo orbit around the hero scene so the engine can present
     // itself without manual camera input.

@@ -85,6 +85,21 @@ float Renderer::GetRenderScale() const {
     return GetQualityState().renderScale;
 }
 
+void Renderer::SetActiveGraphicsPreset(const std::string& id, bool dirtyFromUI) {
+    m_qualityRuntimeState.activeGraphicsPresetId = id.empty() ? "runtime" : id;
+    m_qualityRuntimeState.graphicsPresetDirtyFromUI = dirtyFromUI;
+}
+
+std::string Renderer::GetActiveGraphicsPreset() const {
+    return m_qualityRuntimeState.activeGraphicsPresetId.empty()
+        ? "runtime"
+        : m_qualityRuntimeState.activeGraphicsPresetId;
+}
+
+bool Renderer::IsGraphicsPresetDirtyFromUI() const {
+    return m_qualityRuntimeState.graphicsPresetDirtyFromUI;
+}
+
 void Renderer::SetRenderScale(float scale) {
     if (m_frameLifecycle.deviceRemoved) {
         return;

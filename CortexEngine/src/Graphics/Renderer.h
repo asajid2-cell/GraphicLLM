@@ -258,6 +258,9 @@ public:
 
     [[nodiscard]] float GetRenderScale() const;
     void SetRenderScale(float scale);
+    void SetActiveGraphicsPreset(const std::string& id, bool dirtyFromUI);
+    [[nodiscard]] std::string GetActiveGraphicsPreset() const;
+    [[nodiscard]] bool IsGraphicsPresetDirtyFromUI() const;
 
     // Optional RT feature toggles exposed to UI.
     void SetRTReflectionsEnabled(bool enabled);

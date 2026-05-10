@@ -764,6 +764,28 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         }
     }
 
+    if (!config.initialGraphicsPreset.empty() && m_renderer) {
+        std::string resolvedPreset;
+        std::string loadError;
+        const auto presetPath = Graphics::GetDefaultRendererGraphicsPresetCollectionPath();
+        auto preset = Graphics::LoadRendererGraphicsPresetFile(
+            presetPath,
+            config.initialGraphicsPreset,
+            &resolvedPreset,
+            &loadError);
+        if (preset) {
+            Graphics::ApplyRendererTuningState(*m_renderer, *preset);
+            spdlog::info("Startup graphics preset '{}' applied from '{}'",
+                         resolvedPreset.empty() ? config.initialGraphicsPreset : resolvedPreset,
+                         presetPath.string());
+        } else {
+            spdlog::warn("Ignoring startup graphics preset '{}': {} ({})",
+                         config.initialGraphicsPreset,
+                         loadError.empty() ? "unknown error" : loadError,
+                         presetPath.string());
+        }
+    }
+
     if (!config.initialEnvironmentPreset.empty() && m_renderer) {
         Graphics::ApplyEnvironmentPresetControl(*m_renderer, config.initialEnvironmentPreset);
         Graphics::ApplyFeatureToggleControl(*m_renderer, Graphics::RendererFeatureToggle::IBL, true);

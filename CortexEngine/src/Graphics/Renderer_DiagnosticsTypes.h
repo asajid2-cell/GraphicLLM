@@ -50,6 +50,8 @@ struct RendererDescriptorStats {
 struct RendererHealthState {
     std::string adapterName;
     std::string qualityPreset;
+    std::string graphicsPresetId;
+    bool graphicsPresetDirtyFromUI = false;
     bool rayTracingRequested = false;
     bool rayTracingEffective = false;
     bool environmentLoaded = false;
@@ -150,6 +152,8 @@ struct RendererFrameDiagnosticsState {
 };
 
 struct RendererQualityState {
+    std::string activeGraphicsPresetId = "runtime";
+    bool graphicsPresetDirtyFromUI = false;
     float exposure = 1.0f;
     float bloomIntensity = 0.0f;
     float renderScale = 1.0f;

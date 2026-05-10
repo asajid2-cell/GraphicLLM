@@ -9,7 +9,8 @@ namespace Cortex::Graphics {
 class Renderer;
 
 struct RendererQualityTuning {
-    std::string preset = "8gb_balanced";
+    std::string preset = "runtime";
+    bool dirtyFromUI = false;
     float renderScale = 1.0f;
     bool taaEnabled = true;
     bool fxaaEnabled = false;
@@ -97,8 +98,13 @@ struct RendererTuningState {
 [[nodiscard]] RendererTuningState ClampRendererTuningState(RendererTuningState state);
 void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& state);
 [[nodiscard]] std::filesystem::path GetDefaultRendererTuningStatePath();
+[[nodiscard]] std::filesystem::path GetDefaultRendererGraphicsPresetCollectionPath();
 [[nodiscard]] std::optional<RendererTuningState> LoadRendererTuningStateFile(const std::filesystem::path& path,
                                                                               std::string* error = nullptr);
+[[nodiscard]] std::optional<RendererTuningState> LoadRendererGraphicsPresetFile(const std::filesystem::path& path,
+                                                                                const std::string& presetId,
+                                                                                std::string* resolvedPresetId = nullptr,
+                                                                                std::string* error = nullptr);
 bool SaveRendererTuningStateFile(const std::filesystem::path& path,
                                  const RendererTuningState& state,
                                  std::string* error = nullptr);

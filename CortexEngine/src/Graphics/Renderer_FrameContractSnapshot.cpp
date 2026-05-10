@@ -131,7 +131,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
             contract.environment.activeHeight = env.diffuseIrradiance->GetHeight();
         }
     }
-    contract.graphicsPreset.id = health.qualityPreset;
+    contract.graphicsPreset.id = health.graphicsPresetId.empty() ? health.qualityPreset : health.graphicsPresetId;
+    contract.graphicsPreset.dirtyFromUI = health.graphicsPresetDirtyFromUI;
     contract.graphicsPreset.renderScale = m_qualityRuntimeState.renderScale;
 
     contract.plannedFeatures = featurePlan.planned;

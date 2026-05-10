@@ -5,7 +5,8 @@ param(
     [int]$IBLGalleryMaxEnvironments = 3,
     [int]$BudgetTemporalRuns = 1,
     [int]$BudgetMaxParallel = 1,
-    [int]$VoxelSmokeFrames = 120
+    [int]$VoxelSmokeFrames = 120,
+    [int]$StepRetries = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,51 +23,68 @@ $failures = New-Object System.Collections.Generic.List[string]
 $steps = New-Object System.Collections.Generic.List[object]
 
 function Invoke-ReleaseStep([string]$Name, [string[]]$Arguments) {
-    $stepLogDir = Join-Path $script:releaseLogDir $Name
-    New-Item -ItemType Directory -Force -Path $stepLogDir | Out-Null
+    $maxAttempts = 1 + [Math]::Max(0, $script:StepRetries)
+    $lastStdout = ""
+    $lastStderr = ""
+    $lastLogDir = ""
+    $lastExitCode = 0
 
-    $stdoutPath = Join-Path $stepLogDir "stdout.txt"
-    $stderrPath = Join-Path $stepLogDir "stderr.txt"
-    $started = Get-Date
+    for ($attempt = 1; $attempt -le $maxAttempts; ++$attempt) {
+        $attemptName = if ($attempt -eq 1) { $Name } else { "{0}_retry{1}" -f $Name, $attempt }
+        $stepLogDir = Join-Path $script:releaseLogDir $attemptName
+        New-Item -ItemType Directory -Force -Path $stepLogDir | Out-Null
 
-    Write-Host "==> $Name" -ForegroundColor Cyan
-    $process = Start-Process `
-        -FilePath "powershell" `
-        -ArgumentList $Arguments `
-        -RedirectStandardOutput $stdoutPath `
-        -RedirectStandardError $stderrPath `
-        -PassThru `
-        -Wait `
-        -WindowStyle Hidden
+        $stdoutPath = Join-Path $stepLogDir "stdout.txt"
+        $stderrPath = Join-Path $stepLogDir "stderr.txt"
+        $started = Get-Date
 
-    $elapsed = [Math]::Round(((Get-Date) - $started).TotalSeconds, 1)
-    $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
-    $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "" }
+        if ($attempt -eq 1) {
+            Write-Host "==> $Name" -ForegroundColor Cyan
+        } else {
+            Write-Host "==> $Name retry $attempt/$maxAttempts" -ForegroundColor Yellow
+        }
 
-    $script:steps.Add([pscustomobject]@{
-        Name = $Name
-        ExitCode = $process.ExitCode
-        Seconds = $elapsed
-        LogDir = $stepLogDir
-    })
+        $output = & powershell @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+        $output | Set-Content -Encoding UTF8 $stdoutPath
+        "" | Set-Content -Encoding UTF8 $stderrPath
 
-    if ($process.ExitCode -ne 0) {
-        $script:failures.Add(
-            "$Name failed with exit code $($process.ExitCode). logs=$stepLogDir`n$stderrText`n$stdoutText")
-        Write-Host "FAILED $Name in ${elapsed}s" -ForegroundColor Red
-        return
+        $elapsed = [Math]::Round(((Get-Date) - $started).TotalSeconds, 1)
+        $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
+        $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "" }
+        $lastStdout = $stdoutText
+        $lastStderr = $stderrText
+        $lastLogDir = $stepLogDir
+        $lastExitCode = $exitCode
+
+        $script:steps.Add([pscustomobject]@{
+            Name = $attemptName
+            ExitCode = $exitCode
+            Seconds = $elapsed
+            LogDir = $stepLogDir
+        })
+
+        if ($exitCode -eq 0) {
+            Write-Host "PASSED $Name in ${elapsed}s" -ForegroundColor Green
+            if (-not [string]::IsNullOrWhiteSpace($stdoutText)) {
+                $stdoutText -split "`r?`n" |
+                    Where-Object {
+                        $_ -match "passed" -or
+                        $_ -match "^\s+frames=" -or
+                        $_ -match "^\s+logs="
+                    } |
+                    Select-Object -Last 8 |
+                    ForEach-Object { Write-Host $_ }
+            }
+            return
+        }
+
+        Write-Host "FAILED $Name attempt $attempt in ${elapsed}s" -ForegroundColor Red
     }
 
-    Write-Host "PASSED $Name in ${elapsed}s" -ForegroundColor Green
-    if (-not [string]::IsNullOrWhiteSpace($stdoutText)) {
-        $stdoutText -split "`r?`n" |
-            Where-Object {
-                $_ -match "passed" -or
-                $_ -match "^\s+frames=" -or
-                $_ -match "^\s+logs="
-            } |
-            Select-Object -Last 8 |
-            ForEach-Object { Write-Host $_ }
+    if ($lastExitCode -ne 0) {
+        $script:failures.Add(
+            "$Name failed with exit code $lastExitCode after $maxAttempts attempt(s). logs=$lastLogDir`n$lastStderr`n$lastStdout")
     }
 }
 
@@ -107,6 +125,16 @@ if ($failures.Count -eq 0) {
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $PSScriptRoot "run_graphics_settings_persistence_tests.ps1"),
         "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "graphics_preset" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_graphics_preset_tests.ps1"),
+        "-NoBuild",
+        "-RuntimeSmoke"
     )
 }
 

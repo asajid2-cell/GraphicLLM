@@ -1,8 +1,12 @@
 #pragma once
 
+#include <string>
+
 namespace Cortex::Graphics {
 
 struct RendererQualityRuntimeState {
+    std::string activeGraphicsPresetId = "runtime";
+    bool graphicsPresetDirtyFromUI = false;
     float exposure = 1.0f;
 
     // Internal rendering resolution scale for simple supersampling. Default

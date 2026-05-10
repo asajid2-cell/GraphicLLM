@@ -38,6 +38,10 @@ namespace Cortex::Graphics {
 
 Renderer::QualityState Renderer::GetQualityState() const {
     QualityState state{};
+    state.activeGraphicsPresetId = m_qualityRuntimeState.activeGraphicsPresetId.empty()
+        ? "runtime"
+        : m_qualityRuntimeState.activeGraphicsPresetId;
+    state.graphicsPresetDirtyFromUI = m_qualityRuntimeState.graphicsPresetDirtyFromUI;
     state.exposure = m_qualityRuntimeState.exposure;
     state.bloomIntensity = m_bloomResources.intensity;
     state.renderScale = m_qualityRuntimeState.renderScale;
@@ -110,6 +114,10 @@ Renderer::HealthState Renderer::BuildHealthState() const {
     state.qualityPreset = m_framePlanning.budgetPlan.profileName.empty()
         ? "runtime"
         : m_framePlanning.budgetPlan.profileName;
+    state.graphicsPresetId = m_qualityRuntimeState.activeGraphicsPresetId.empty()
+        ? "runtime"
+        : m_qualityRuntimeState.activeGraphicsPresetId;
+    state.graphicsPresetDirtyFromUI = m_qualityRuntimeState.graphicsPresetDirtyFromUI;
     state.rayTracingRequested = m_rtRuntimeState.enabled ||
                                 m_rtRuntimeState.reflectionsEnabled ||
                                 m_rtRuntimeState.giEnabled;

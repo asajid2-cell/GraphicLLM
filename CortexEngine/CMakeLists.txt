@@ -85,6 +85,7 @@ set(CORTEX_SOURCES
     src/Core/Engine_PlayMode.cpp
     src/Core/Engine_UI.cpp
     src/Core/EngineEditorMode.cpp
+    src/Core/StartupPreflight.cpp
     src/Core/VisualValidation.cpp
     src/Core/Window.cpp
     src/Core/ServiceLocator.cpp
@@ -326,6 +327,7 @@ set(CORTEX_SOURCES
 set(CORTEX_HEADERS
     src/Core/Engine.h
     src/Core/EngineEditorMode.h
+    src/Core/StartupPreflight.h
     src/Core/VisualValidation.h
     src/Core/Window.h
     src/Core/ServiceLocator.h

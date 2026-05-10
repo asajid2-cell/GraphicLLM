@@ -35,6 +35,55 @@ inline bool IsDoubleSidedDepthClass(RenderableDepthClass depthClass) {
 }
 
 struct FrameContract {
+    struct StartupInfo {
+        bool preflightRan = false;
+        bool preflightPassed = true;
+        bool safeMode = false;
+        bool dxrRequested = false;
+        bool environmentManifestPresent = false;
+        bool environmentFallbackAvailable = false;
+        uint32_t issueCount = 0;
+        uint32_t warningCount = 0;
+        uint32_t errorCount = 0;
+        std::string configProfile = "default";
+        std::string workingDirectory;
+    };
+
+    struct HealthInfo {
+        std::string adapterName;
+        std::string qualityPreset;
+        bool rayTracingRequested = false;
+        bool rayTracingEffective = false;
+        bool environmentLoaded = false;
+        bool environmentFallback = false;
+        uint32_t frameWarnings = 0;
+        uint32_t assetFallbacks = 0;
+        uint32_t descriptorPersistentUsed = 0;
+        uint32_t descriptorPersistentBudget = 0;
+        uint32_t descriptorTransientUsed = 0;
+        uint32_t descriptorTransientBudget = 0;
+        uint64_t estimatedVRAMBytes = 0;
+        std::string lastWarningCode;
+        std::string lastWarningMessage;
+    };
+
+    struct EnvironmentInfo {
+        std::string active;
+        bool loaded = false;
+        bool fallback = false;
+        bool manifestPresent = false;
+        uint32_t residentCount = 0;
+        uint32_t pendingCount = 0;
+        uint64_t residentBytes = 0;
+    };
+
+    struct GraphicsPresetInfo {
+        std::string id = "runtime";
+        uint32_t schema = 1;
+        bool dirtyFromUI = false;
+        float renderScale = 1.0f;
+    };
+
     struct FeatureFlags {
         bool rayTracingSupported = false;
         bool rayTracingEnabled = false;
@@ -431,6 +480,10 @@ struct FrameContract {
     uint32_t presentationWidth = 0;
     uint32_t presentationHeight = 0;
 
+    StartupInfo startup;
+    HealthInfo health;
+    EnvironmentInfo environment;
+    GraphicsPresetInfo graphicsPreset;
     FeatureFlags features;
     FeatureFlags plannedFeatures;
     FeatureFlags executedFeatures;

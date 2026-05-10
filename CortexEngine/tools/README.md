@@ -44,6 +44,21 @@ validation enabled, and checks the generated frame report for:
 
 Use `-NoBuild` when the Release executable is already current.
 
+## Phase 3 Validation
+
+Run the Phase 3 foundation checks:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
+```
+
+The visual matrix currently wraps the stabilized temporal-validation and RT
+showcase smoke paths, then writes JSON and Markdown summaries under
+`build/bin/logs/runs`. Add new public scenes to this matrix only after their
+camera, lighting, and IBL choices are stable enough to avoid churn.
+
 Default budgets are intentionally strict for the RT showcase scene:
 
 - GPU frame time: 16.7 ms,

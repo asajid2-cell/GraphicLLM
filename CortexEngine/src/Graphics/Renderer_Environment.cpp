@@ -22,6 +22,9 @@ struct EnvironmentLoadCandidate {
     std::filesystem::path path;
     std::string name;
     EnvironmentBudgetClass budgetClass = EnvironmentBudgetClass::Small;
+    uint32_t maxRuntimeDimension = 2048;
+    float defaultDiffuseIntensity = 1.0f;
+    float defaultSpecularIntensity = 1.0f;
     bool required = false;
     bool defaultEnvironment = false;
 };
@@ -118,6 +121,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                 candidate.path = runtimePath;
                 candidate.name = entry.id;
                 candidate.budgetClass = entry.budgetClass;
+                candidate.maxRuntimeDimension = entry.maxRuntimeDimension;
+                candidate.defaultDiffuseIntensity = entry.defaultDiffuseIntensity;
+                candidate.defaultSpecularIntensity = entry.defaultSpecularIntensity;
                 candidate.required = entry.required;
                 candidate.defaultEnvironment = (entry.id == manifest.defaultEnvironment);
                 envFiles.push_back(std::move(candidate));
@@ -145,6 +151,7 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                     candidate.path = entry.path();
                     candidate.name = entry.path().stem().string();
                     candidate.budgetClass = EnvironmentBudgetClass::Medium;
+                    candidate.maxRuntimeDimension = 4096;
                     envFiles.push_back(std::move(candidate));
                 }
             }
@@ -191,6 +198,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
             EnvironmentMaps env;
             env.name = name;
             env.path = pathStr;
+            env.budgetClass = ToString(candidate.budgetClass);
+            env.maxRuntimeDimension = candidate.maxRuntimeDimension;
+            env.defaultDiffuseIntensity = candidate.defaultDiffuseIntensity;
+            env.defaultSpecularIntensity = candidate.defaultSpecularIntensity;
             env.diffuseIrradiance = tex;
             env.specularPrefiltered = tex;
             m_environmentState.maps.push_back(env);
@@ -215,6 +226,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
             PendingEnvironment pending;
             pending.path = pathStr;
             pending.name = name;
+            pending.budgetClass = ToString(candidate.budgetClass);
+            pending.maxRuntimeDimension = candidate.maxRuntimeDimension;
+            pending.defaultDiffuseIntensity = candidate.defaultDiffuseIntensity;
+            pending.defaultSpecularIntensity = candidate.defaultSpecularIntensity;
             m_environmentState.pending.push_back(std::move(pending));
         }
     }
@@ -224,6 +239,10 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         spdlog::warn("No HDR environments loaded; using placeholder");
         EnvironmentMaps fallback;
         fallback.name = "Placeholder";
+        fallback.budgetClass = "tiny";
+        fallback.maxRuntimeDimension = 0;
+        fallback.defaultDiffuseIntensity = 0.75f;
+        fallback.defaultSpecularIntensity = 0.35f;
 
         // The engine's IBL shaders treat environment maps as lat-long 2D
         // textures. Use the existing placeholder 2D texture so SRV dimension
@@ -469,6 +488,10 @@ void Renderer::ProcessPendingEnvironmentMaps(uint32_t maxPerFrame) {
         EnvironmentMaps env;
         env.name = pending.name;
         env.path = pending.path;
+        env.budgetClass = pending.budgetClass;
+        env.maxRuntimeDimension = pending.maxRuntimeDimension;
+        env.defaultDiffuseIntensity = pending.defaultDiffuseIntensity;
+        env.defaultSpecularIntensity = pending.defaultSpecularIntensity;
         env.diffuseIrradiance = tex;
         env.specularPrefiltered = tex;
         m_environmentState.maps.push_back(env);

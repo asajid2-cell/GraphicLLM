@@ -324,12 +324,15 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
     size_t targetIndex = m_environmentState.currentIndex;
     bool found = false;
 
-    for (size_t i = 0; i < m_environmentState.maps.size(); ++i) {
-        std::string envNameLower = m_environmentState.maps[i].name;
+    auto matchesRequestedName = [&](const std::string& environmentName) {
+        std::string envNameLower = environmentName;
         std::transform(envNameLower.begin(), envNameLower.end(), envNameLower.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return std::tolower(c); });
+        return envNameLower.find(lowerName) != std::string::npos;
+    };
 
-        if (envNameLower.find(lowerName) != std::string::npos) {
+    for (size_t i = 0; i < m_environmentState.maps.size(); ++i) {
+        if (matchesRequestedName(m_environmentState.maps[i].name)) {
             targetIndex = i;
             found = true;
             break;
@@ -337,16 +340,63 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
     }
 
     if (!found) {
+        auto pendingIt = std::find_if(
+            m_environmentState.pending.begin(),
+            m_environmentState.pending.end(),
+            [&](const PendingEnvironment& pending) {
+                return matchesRequestedName(pending.name);
+            });
+
+        if (pendingIt != m_environmentState.pending.end()) {
+            PendingEnvironment pending = *pendingIt;
+            m_environmentState.pending.erase(pendingIt);
+
+            auto texResult = LoadTextureFromFile(pending.path, false, AssetRegistry::TextureKind::Environment);
+            if (texResult.IsErr()) {
+                spdlog::warn("Environment '{}' requested but failed to load '{}': {}",
+                             name,
+                             pending.path,
+                             texResult.Error());
+                return;
+            }
+
+            EnvironmentMaps env;
+            env.name = pending.name;
+            env.path = pending.path;
+            env.budgetClass = pending.budgetClass;
+            env.maxRuntimeDimension = pending.maxRuntimeDimension;
+            env.defaultDiffuseIntensity = pending.defaultDiffuseIntensity;
+            env.defaultSpecularIntensity = pending.defaultSpecularIntensity;
+            env.diffuseIrradiance = texResult.Value();
+            env.specularPrefiltered = env.diffuseIrradiance;
+
+            m_environmentState.maps.push_back(std::move(env));
+            m_environmentState.currentIndex = m_environmentState.maps.size() - 1;
+            EnforceIBLResidencyLimit();
+            UpdateEnvironmentDescriptorTable();
+
+            const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
+            SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
+            spdlog::info("Environment preset '{}' loaded on demand from '{}'",
+                         current.name,
+                         current.path);
+            return;
+        }
+
         spdlog::warn("Environment '{}' not found, keeping current environment", name);
         return;
     }
 
     if (targetIndex == m_environmentState.currentIndex) {
+        const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
+        SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
         return;
     }
 
     m_environmentState.currentIndex = targetIndex;
     UpdateEnvironmentDescriptorTable();
+    const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
+    SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
 
     spdlog::info("Environment preset set to '{}'", m_environmentState.maps[m_environmentState.currentIndex].name);
 }

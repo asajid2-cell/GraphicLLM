@@ -2,6 +2,7 @@ param(
     [switch]$NoBuild,
     [int]$TemporalSmokeFrames = 140,
     [int]$RTSmokeFrames = 240,
+    [int]$IBLGalleryMaxEnvironments = 3,
     [int]$BudgetTemporalRuns = 1,
     [int]$BudgetMaxParallel = 1,
     [int]$VoxelSmokeFrames = 120
@@ -97,6 +98,24 @@ if ($failures.Count -eq 0) {
         "-NoBuild",
         "-IsolatedLogs",
         "-SmokeFrames", [string]$RTSmokeFrames
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "environment_manifest" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_environment_manifest_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "ibl_gallery" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_ibl_gallery_tests.ps1"),
+        "-NoBuild",
+        "-MaxEnvironments", [string]$IBLGalleryMaxEnvironments
     )
 }
 

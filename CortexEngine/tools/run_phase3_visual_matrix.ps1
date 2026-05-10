@@ -2,6 +2,7 @@ param(
     [switch]$NoBuild,
     [int]$TemporalSmokeFrames = 140,
     [int]$RTSmokeFrames = 240,
+    [int]$IBLGalleryMaxEnvironments = 3,
     [switch]$SkipSurfaceDebug
 )
 
@@ -110,6 +111,19 @@ if ($failures.Count -eq 0) {
         $rtArgs += "-SkipSurfaceDebug"
     }
     Invoke-MatrixStep "rt_showcase_release" $rtArgs (Join-Path $rtLogDir "frame_report_last.json")
+}
+
+if ($failures.Count -eq 0) {
+    $iblLogDir = Join-Path $matrixLogDir "ibl_gallery"
+    $iblArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_ibl_gallery_tests.ps1"),
+        "-NoBuild",
+        "-LogDir", $iblLogDir,
+        "-MaxEnvironments", [string]$IBLGalleryMaxEnvironments
+    )
+    Invoke-MatrixStep "ibl_gallery" $iblArgs ""
 }
 
 $summaryPath = Join-Path $matrixLogDir "phase3_visual_matrix_summary.json"

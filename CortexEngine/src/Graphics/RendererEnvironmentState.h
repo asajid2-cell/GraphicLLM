@@ -13,6 +13,10 @@ namespace Cortex::Graphics {
 struct EnvironmentMaps {
     std::string name;
     std::string path;
+    std::string budgetClass = "small";
+    uint32_t maxRuntimeDimension = 2048;
+    float defaultDiffuseIntensity = 1.0f;
+    float defaultSpecularIntensity = 1.0f;
     std::shared_ptr<DX12Texture> diffuseIrradiance;
     std::shared_ptr<DX12Texture> specularPrefiltered;
     DescriptorHandle diffuseIrradianceSRV{};
@@ -22,6 +26,10 @@ struct EnvironmentMaps {
 struct PendingEnvironment {
     std::string path;
     std::string name;
+    std::string budgetClass = "small";
+    uint32_t maxRuntimeDimension = 2048;
+    float defaultDiffuseIntensity = 1.0f;
+    float defaultSpecularIntensity = 1.0f;
 };
 
 struct EnvironmentLightingState {

@@ -732,6 +732,12 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         UI::PerformanceWindow::Initialize(m_window->GetHWND());
     }
 
+    if (!config.initialEnvironmentPreset.empty() && m_renderer) {
+        Graphics::ApplyEnvironmentPresetControl(*m_renderer, config.initialEnvironmentPreset);
+        Graphics::ApplyFeatureToggleControl(*m_renderer, Graphics::RendererFeatureToggle::IBL, true);
+        spdlog::info("Startup environment preset applied: '{}'", config.initialEnvironmentPreset);
+    }
+
     m_running = true;
     {
         auto now = std::chrono::high_resolution_clock::now();

@@ -10,10 +10,17 @@ Run the full local release gate from the repository root:
 powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
-The release gate builds Release once, then runs:
+The release gate builds Release once, then runs the core Phase 3 public
+validation suite:
 
 - temporal validation smoke,
 - full RT showcase smoke,
+- graphics settings persistence and UI contract checks,
+- graphics preset, showcase scene, and visual baseline contracts,
+- Phase 3 visual matrix summary generation,
+- renderer ownership and fatal error contract checks,
+- advanced graphics catalog and effects gallery checks,
+- environment manifest and IBL gallery checks,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -58,10 +65,10 @@ powershell -ExecutionPolicy Bypass -File tools/run_effects_gallery_tests.ps1 -No
 
 The UI contract test verifies the unified graphics settings window is compiled,
 initialized, bound to F8/ESC, and backed by `RendererTuningState`. The visual
-matrix currently wraps the stabilized temporal-validation and RT showcase smoke
-paths, then writes JSON and Markdown summaries under `build/bin/logs/runs`. Add
-new public scenes to this matrix only after their camera, lighting, and IBL
-choices are stable enough to avoid churn.
+matrix wraps temporal validation, RT showcase, Material Lab, Glass and Water
+Courtyard, Effects Showcase, and the IBL gallery, then writes JSON and Markdown
+summaries under `build/bin/logs/runs`. Add new public scenes to this matrix only
+after their camera, lighting, and IBL choices are stable enough to avoid churn.
 
 The effects gallery test currently uses the RT showcase as the first public
 effects scene and asserts that the particle contract is present, the particles

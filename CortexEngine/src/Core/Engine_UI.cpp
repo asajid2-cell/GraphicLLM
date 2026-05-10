@@ -51,7 +51,7 @@ void Engine::ShowCameraHelpOverlay() {
         "  R                   - Cycle gizmo mode (translate / rotate / resize)\n"
         "  U                   - Open scene editor window\n"
         "  F5                  - Increase shadow PCF radius\n"
-        "  F7                  - Decrease shadow bias\n"
+        "  F7                  - Cycle HUD mode (off/minimal/performance/health/debug)\n"
         "  F8                  - Open unified graphics settings\n"
         "  P                   - Open performance diagnostics\n"
         "  F9 / F10            - Adjust cascade split lambda\n"
@@ -223,6 +223,8 @@ void Engine::RenderHUD() {
     bool rtSupported = rt.supported;
     bool rtEnabled = rt.enabled;
     std::string envNameUtf8 = renderer->GetCurrentEnvironmentName();
+    const bool forceFullHud = m_settingsOverlayVisible || UI::DebugMenu::IsVisible() || debugMode == 6;
+    const bool showFullDebug = forceFullHud || m_hudMode == EngineHudMode::FullDebug;
 
     // Approximate FPS from last frame time
     float fps = (m_frameTime > 0.0f) ? (1.0f / m_frameTime) : 0.0f;
@@ -243,6 +245,9 @@ void Engine::RenderHUD() {
     if (!dc) {
         return;
     }
+    auto releaseHudDC = [&]() {
+        ReleaseDC(hwnd, dc);
+    };
 
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, RGB(0, 255, 0));
@@ -258,11 +263,19 @@ void Engine::RenderHUD() {
     // Always show top-level FPS / frame time and an approximate VRAM estimate
     swprintf_s(buffer, L"FPS: %.1f  Frame: %.2f ms", fps, m_frameTime * 1000.0f);
     drawLine(buffer);
+    if (m_hudMode == EngineHudMode::Minimal && !forceFullHud) {
+        releaseHudDC();
+        return;
+    }
 
     swprintf_s(buffer, L"VRAM (est): %.0f MB  tgt %.0f  post %.0f  asset %.0f  rt %.0f",
                vramMB, targetMB, postMB, assetMB,
                static_cast<double>(vram.rtStructureBytes) * kBytesToMB);
     drawLine(buffer);
+    if (m_hudMode == EngineHudMode::Performance && !forceFullHud) {
+        releaseHudDC();
+        return;
+    }
 
     if (haveCamera) {
         swprintf_s(buffer, L"Camera: (%.2f, %.2f, %.2f) FOV: %.1f",
@@ -331,9 +344,13 @@ void Engine::RenderHUD() {
             : L"Dragon Over Water Studio";
     swprintf_s(buffer, L"Scene: %s  (press N to switch)", sceneLabel);
     drawLine(buffer);
+    if (m_hudMode == EngineHudMode::RendererHealth && !forceFullHud) {
+        releaseHudDC();
+        return;
+    }
 
     // Only show detailed renderer/light/command information in debug screen mode
-    if (debugMode == 6) {
+    if (showFullDebug) {
         swprintf_s(buffer, L"Exposure (EV): %.2f  Bloom: %.2f", exposure, bloomIntensity);
         drawLine(buffer);
 
@@ -409,42 +426,44 @@ void Engine::RenderHUD() {
         }
     }
 
-    // Selection / camera mode / controls hint (always shown)
-    std::wstring selName = L"<none>";
-    if (m_selectedEntity != entt::null &&
-        m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
-        const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
-        selName.assign(tag.tag.begin(), tag.tag.end());
-    }
-
-    swprintf_s(buffer, L"Selected: %s  Focus: %hs  Mode: %hs",
-               selName.c_str(),
-               m_focusTargetName.empty() ? "<none>" : m_focusTargetName.c_str(),
-               m_droneFlightEnabled ? "Drone" : "Orbit");
-    drawLine(buffer);
-
-    // When an object is selected, expose its material numerically.
-    if (m_selectedEntity != entt::null &&
-        m_registry->HasComponent<Scene::RenderableComponent>(m_selectedEntity)) {
-        const auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(m_selectedEntity);
-        std::wstring preset;
-        if (!renderable.presetName.empty()) {
-            preset.assign(renderable.presetName.begin(), renderable.presetName.end());
-        } else {
-            preset = L"<none>";
+    if (showFullDebug) {
+        // Selection / camera mode / controls hint.
+        std::wstring selName = L"<none>";
+        if (m_selectedEntity != entt::null &&
+            m_registry->HasComponent<Scene::TagComponent>(m_selectedEntity)) {
+            const auto& tag = m_registry->GetComponent<Scene::TagComponent>(m_selectedEntity);
+            selName.assign(tag.tag.begin(), tag.tag.end());
         }
-        swprintf_s(buffer, L"Material: preset=%s  base=(%.2f, %.2f, %.2f)  metal=%.2f  rough=%.2f  ao=%.2f",
-                   preset.c_str(),
-                   renderable.albedoColor.r,
-                   renderable.albedoColor.g,
-                   renderable.albedoColor.b,
-                   renderable.metallic,
-                   renderable.roughness,
-                   renderable.ao);
-        drawLine(buffer);
-    }
 
-    drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan");
+        swprintf_s(buffer, L"Selected: %s  Focus: %hs  Mode: %hs",
+                   selName.c_str(),
+                   m_focusTargetName.empty() ? "<none>" : m_focusTargetName.c_str(),
+                   m_droneFlightEnabled ? "Drone" : "Orbit");
+        drawLine(buffer);
+
+        // When an object is selected, expose its material numerically.
+        if (m_selectedEntity != entt::null &&
+            m_registry->HasComponent<Scene::RenderableComponent>(m_selectedEntity)) {
+            const auto& renderable = m_registry->GetComponent<Scene::RenderableComponent>(m_selectedEntity);
+            std::wstring preset;
+            if (!renderable.presetName.empty()) {
+                preset.assign(renderable.presetName.begin(), renderable.presetName.end());
+            } else {
+                preset = L"<none>";
+            }
+            swprintf_s(buffer, L"Material: preset=%s  base=(%.2f, %.2f, %.2f)  metal=%.2f  rough=%.2f  ao=%.2f",
+                       preset.c_str(),
+                       renderable.albedoColor.r,
+                       renderable.albedoColor.g,
+                       renderable.albedoColor.b,
+                       renderable.metallic,
+                       renderable.roughness,
+                       renderable.ao);
+            drawLine(buffer);
+        }
+
+        drawLine(L"LMB: select  F: frame  G: drone  RMB: orbit  MMB: pan");
+    }
 
     // When the GPU settings overlay is visible (M / F2), render a textual
     // legend so it is obvious what each row controls and what the current
@@ -510,7 +529,7 @@ void Engine::RenderHUD() {
         }
     }
 
-    ReleaseDC(hwnd, dc);
+    releaseHudDC();
 }
 
 void Engine::CaptureScreenshot() {

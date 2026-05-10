@@ -15,7 +15,7 @@ validation suite:
 
 - temporal validation smoke,
 - full RT showcase smoke,
-- graphics settings persistence and UI contract checks,
+- graphics settings persistence, UI contract, and HUD mode checks,
 - graphics preset, showcase scene, and visual baseline contracts,
 - Phase 3 visual matrix summary generation,
 - renderer ownership and fatal error contract checks,
@@ -59,6 +59,7 @@ Run the Phase 3 foundation checks:
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_effects_gallery_tests.ps1 -NoBuild
 ```
@@ -69,6 +70,9 @@ matrix wraps temporal validation, RT showcase, Material Lab, Glass and Water
 Courtyard, Effects Showcase, and the IBL gallery, then writes JSON and Markdown
 summaries under `build/bin/logs/runs`. Add new public scenes to this matrix only
 after their camera, lighting, and IBL choices are stable enough to avoid churn.
+The HUD mode contract verifies the Phase 3 clean-HUD modes, F7 cycling, and
+`--hud` / `CORTEX_HUD_MODE` automation path; it runs short off/full-debug cases
+and checks the generated frame report.
 
 The effects gallery test currently uses the RT showcase as the first public
 effects scene and asserts that the particle contract is present, the particles

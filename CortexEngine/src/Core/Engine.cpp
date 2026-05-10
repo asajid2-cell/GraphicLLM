@@ -97,6 +97,17 @@ namespace {
     constexpr float kCornellHalfExtent = 2.0f; // half-size in X/Z
     constexpr float kCornellHeight     = 2.0f; // Y height
 
+    const char* HudModeName(EngineHudMode mode) {
+        switch (mode) {
+        case EngineHudMode::Off: return "off";
+        case EngineHudMode::Minimal: return "minimal";
+        case EngineHudMode::Performance: return "performance";
+        case EngineHudMode::RendererHealth: return "renderer_health";
+        case EngineHudMode::FullDebug: return "full_debug";
+        }
+        return "renderer_health";
+    }
+
     bool IsExperimentalTerrainEnabled() {
         const char* value = std::getenv("CORTEX_ENABLE_EXPERIMENTAL_TERRAIN");
         if (!value) {
@@ -397,6 +408,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     spdlog::info("Version: 0.1.0 - Phase 1: Iron Foundation");
     m_maxFrames = config.maxFrames;
     m_exitAfterVisualValidationCapture = config.exitAfterVisualValidationCapture;
+    m_hudMode = config.initialHudMode;
     if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture) {
         spdlog::info("Smoke automation: maxFrames={} exitAfterVisualValidationCapture={}",
                      static_cast<unsigned long long>(m_maxFrames),
@@ -1414,11 +1426,10 @@ void Engine::Render(float deltaTime) {
         m_renderer->Render(m_registry.get(), deltaTime);
     }
 
-    // Render HUD overlay using GDI on top of the swap chain (for FPS/camera
-    // text). Even when the user has hidden the normal HUD, keep RenderHUD()
-    // active while either the settings overlay or the native settings window
-    // is visible so the menu legend and row labels remain accessible.
-    if (m_showHUD || m_settingsOverlayVisible || UI::DebugMenu::IsVisible()) {
+    // Render HUD overlay using GDI on top of the swap chain. Even when the HUD
+    // mode is off, keep RenderHUD() active while overlays are visible so the
+    // menu legend and row labels remain accessible.
+    if (m_hudMode != EngineHudMode::Off || m_settingsOverlayVisible || UI::DebugMenu::IsVisible()) {
         RenderHUD();
     }
 
@@ -1761,6 +1772,11 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         {"max_frames", m_maxFrames},
         {"total_frames", m_totalFrameCount},
         {"exit_after_visual_validation_capture", m_exitAfterVisualValidationCapture}
+    };
+    report["hud"] = {
+        {"mode", HudModeName(m_hudMode)},
+        {"visible", m_hudMode != EngineHudMode::Off},
+        {"overlay_forced", m_settingsOverlayVisible || UI::DebugMenu::IsVisible()}
     };
     report["health_warnings"] = std::move(health);
 

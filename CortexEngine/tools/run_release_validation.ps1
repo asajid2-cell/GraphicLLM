@@ -137,6 +137,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "hud_mode_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_hud_mode_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "graphics_preset" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

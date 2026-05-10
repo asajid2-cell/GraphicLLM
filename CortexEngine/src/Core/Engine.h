@@ -25,6 +25,14 @@ namespace Cortex {
 // Forward declaration
 class EngineEditorMode;
 
+enum class EngineHudMode {
+    Off = 0,
+    Minimal = 1,
+    Performance = 2,
+    RendererHealth = 3,
+    FullDebug = 4
+};
+
 struct EngineConfig {
     WindowConfig window;
     Graphics::DeviceConfig device;
@@ -72,6 +80,7 @@ struct EngineConfig {
     std::string initialEnvironmentPreset;
     std::string initialGraphicsPreset;
     std::string initialCameraBookmark;
+    EngineHudMode initialHudMode = EngineHudMode::RendererHealth;
 
     // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
     // interactive behavior. exitAfterVisualValidationCapture exits once the
@@ -245,7 +254,7 @@ private:
 
     // HUD / debug overlay
     void RenderHUD();
-    bool m_showHUD = true;
+    EngineHudMode m_hudMode = EngineHudMode::RendererHealth;
     std::deque<std::string> m_recentCommandMessages;
     bool m_qualityAutoReduced = false;
     bool m_perfScaleReduced = false;

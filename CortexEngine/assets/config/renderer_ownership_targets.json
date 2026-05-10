@@ -32,11 +32,11 @@
     {
       "id": "particle_resources",
       "owner": "Particles",
-      "status": "public_path_selected_cpu_billboards",
-      "current_issue": "ECS billboard particles and GPUParticleSystem are separate paths",
+      "status": "public_path_validated_cpu_billboards",
+      "current_issue": "ECS billboard particles are the public Phase 3 path; GPUParticleSystem remains a separate experimental/future path",
       "target_files": ["RendererParticleState.h", "GPUParticles.h"],
       "renderer_state_members": ["m_particleState"],
-      "next_step": "choose the public Phase 3 path and report live particle counts through frame contracts"
+      "next_step": "keep the GPU particle path behind an explicit future migration instead of mixing it into the public billboard path"
     }
   ]
 }

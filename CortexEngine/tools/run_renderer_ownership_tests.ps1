@@ -30,6 +30,16 @@ if (-not (Test-Path $rendererRtStatePath)) {
     throw "RendererRTState.h not found: $rendererRtStatePath"
 }
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
+$particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
+if (-not (Test-Path $particleStatePath)) {
+    throw "RendererParticleState.h not found: $particleStatePath"
+}
+$particleState = Get-Content $particleStatePath -Raw
+$particleRendererPath = Join-Path $root "src/Graphics/Renderer_Particles.cpp"
+if (-not (Test-Path $particleRendererPath)) {
+    throw "Renderer_Particles.cpp not found: $particleRendererPath"
+}
+$particleRenderer = Get-Content $particleRendererPath -Raw
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -95,6 +105,17 @@ foreach ($target in $doc.targets) {
             if ($rendererRtState -match "\b$([regex]::Escape($oldField))\b") {
                 Add-Failure "rt_reflection_stats still exposes loose state field in RendererRTState.h: $oldField"
             }
+        }
+    }
+
+    if ($id -eq "particle_resources") {
+        foreach ($required in @("struct ParticleRenderState", "densityScale", "frameLiveParticles", "frameSubmittedInstances", "frameDensityScale", "InstanceBufferBytes")) {
+            if ($particleState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "particle_resources missing public billboard state marker in RendererParticleState.h: $required"
+            }
+        }
+        if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {
+            Add-Failure "particle_resources public renderer path is not the ECS billboard particle path"
         }
     }
 }

@@ -14,11 +14,11 @@
     {
       "id": "environment_resources",
       "owner": "Environment/IBL",
-      "status": "policy_manifest_implemented",
-      "current_issue": "environment loading, residency, descriptor binding, and policy still meet in Renderer_Environment",
+      "status": "state_boundary_validated",
+      "current_issue": "manifest policy and environment runtime state are separated, but Renderer_Environment still orchestrates loading, residency, and descriptor binding",
       "target_files": ["RendererEnvironmentState.h", "EnvironmentManifest.h"],
       "renderer_state_members": ["m_environmentState"],
-      "next_step": "keep manifest/policy parsing outside Renderer and leave Renderer_Environment as the GPU binding adapter"
+      "next_step": "move loading/residency orchestration helpers out of Renderer_Environment when environment runtime grows again"
     },
     {
       "id": "postprocess_resources",

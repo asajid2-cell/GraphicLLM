@@ -347,19 +347,14 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
     std::shared_ptr<DX12Texture> diffuseSrc;
     std::shared_ptr<DX12Texture> specularSrc;
 
-    if (!m_environmentState.maps.empty()) {
-        size_t envIndex = m_environmentState.currentIndex;
-        if (envIndex >= m_environmentState.maps.size()) {
-            envIndex = 0;
-        }
-        EnvironmentMaps& env = m_environmentState.maps[envIndex];
-        EnsureEnvironmentBindlessSRVs(env);
+    if (EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
+        EnsureEnvironmentBindlessSRVs(*env);
 
-        if (env.diffuseIrradiance && env.diffuseIrradiance->GetResource()) {
-            diffuseSrc = env.diffuseIrradiance;
+        if (env->diffuseIrradiance && env->diffuseIrradiance->GetResource()) {
+            diffuseSrc = env->diffuseIrradiance;
         }
-        if (env.specularPrefiltered && env.specularPrefiltered->GetResource()) {
-            specularSrc = env.specularPrefiltered;
+        if (env->specularPrefiltered && env->specularPrefiltered->GetResource()) {
+            specularSrc = env->specularPrefiltered;
         }
     }
 

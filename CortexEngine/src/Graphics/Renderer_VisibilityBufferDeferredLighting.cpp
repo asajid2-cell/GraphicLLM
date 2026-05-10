@@ -76,14 +76,13 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
     deferredParams.clusterParams = glm::uvec4(24, 128, static_cast<uint32_t>(inputs.localLights.size()), 0);
     deferredParams.reflectionProbeParams = glm::uvec4(0, 0, m_debugViewState.mode, 0);
 
-    if (!m_environmentState.maps.empty() && m_environmentState.currentIndex < m_environmentState.maps.size()) {
-        auto& env = m_environmentState.maps[m_environmentState.currentIndex];
-        if (env.diffuseIrradiance) {
-            inputs.envDiffuseResource = env.diffuseIrradiance->GetResource();
-            inputs.envFormat = env.diffuseIrradiance->GetFormat();
+    if (auto* env = m_environmentState.ActiveEnvironment()) {
+        if (env->diffuseIrradiance) {
+            inputs.envDiffuseResource = env->diffuseIrradiance->GetResource();
+            inputs.envFormat = env->diffuseIrradiance->GetFormat();
         }
-        if (env.specularPrefiltered) {
-            inputs.envSpecularResource = env.specularPrefiltered->GetResource();
+        if (env->specularPrefiltered) {
+            inputs.envSpecularResource = env->specularPrefiltered->GetResource();
         }
     }
     if (!inputs.envDiffuseResource && m_materialFallbacks.albedo) {

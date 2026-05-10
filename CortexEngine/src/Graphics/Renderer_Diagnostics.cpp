@@ -128,12 +128,11 @@ Renderer::HealthState Renderer::BuildHealthState() const {
     state.rayTracingEffective = m_rtRuntimeState.supported &&
                                 m_rtRuntimeState.enabled &&
                                 !m_frameLifecycle.deviceRemoved;
-    state.environmentLoaded = !m_environmentState.maps.empty();
-    state.activeEnvironment = GetCurrentEnvironmentName();
-    state.environmentFallback = state.activeEnvironment == "Placeholder" ||
-                                state.activeEnvironment == "procedural_sky";
-    state.residentEnvironments = static_cast<uint32_t>(m_environmentState.maps.size());
-    state.pendingEnvironments = static_cast<uint32_t>(m_environmentState.pending.size());
+    state.environmentLoaded = m_environmentState.HasResidentEnvironment();
+    state.activeEnvironment = m_environmentState.ActiveEnvironmentName();
+    state.environmentFallback = m_environmentState.UsingFallbackEnvironment();
+    state.residentEnvironments = m_environmentState.ResidentCount();
+    state.pendingEnvironments = m_environmentState.PendingCount();
     state.frameWarnings = static_cast<uint32_t>(m_frameDiagnostics.contract.contract.warnings.size());
     state.assetFallbacks = state.environmentFallback ? 1u : 0u;
 

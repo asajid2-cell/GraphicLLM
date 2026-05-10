@@ -120,18 +120,13 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.pendingCount = health.pendingEnvironments;
     contract.environment.residentLimit = m_framePlanning.budgetPlan.iblResidentEnvironmentLimit;
     contract.environment.residentBytes = health.environmentBytes;
-    if (!m_environmentState.maps.empty()) {
-        size_t envIndex = m_environmentState.currentIndex;
-        if (envIndex >= m_environmentState.maps.size()) {
-            envIndex = 0;
-        }
-        const auto& env = m_environmentState.maps[envIndex];
-        contract.environment.runtimePath = env.path;
-        contract.environment.budgetClass = env.budgetClass;
-        contract.environment.maxRuntimeDimension = env.maxRuntimeDimension;
-        if (env.diffuseIrradiance) {
-            contract.environment.activeWidth = env.diffuseIrradiance->GetWidth();
-            contract.environment.activeHeight = env.diffuseIrradiance->GetHeight();
+    if (const auto* env = m_environmentState.ActiveEnvironment()) {
+        contract.environment.runtimePath = env->path;
+        contract.environment.budgetClass = env->budgetClass;
+        contract.environment.maxRuntimeDimension = env->maxRuntimeDimension;
+        if (env->diffuseIrradiance) {
+            contract.environment.activeWidth = env->diffuseIrradiance->GetWidth();
+            contract.environment.activeHeight = env->diffuseIrradiance->GetHeight();
         }
     }
     contract.graphicsPreset.id = health.graphicsPresetId.empty() ? health.qualityPreset : health.graphicsPresetId;

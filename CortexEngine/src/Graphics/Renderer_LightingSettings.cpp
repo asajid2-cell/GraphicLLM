@@ -375,11 +375,12 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
             EnforceIBLResidencyLimit();
             UpdateEnvironmentDescriptorTable();
 
-            const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
-            SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
-            spdlog::info("Environment preset '{}' loaded on demand from '{}'",
-                         current.name,
-                         current.path);
+            if (const EnvironmentMaps* current = m_environmentState.ActiveEnvironment()) {
+                SetIBLIntensity(current->defaultDiffuseIntensity, current->defaultSpecularIntensity);
+                spdlog::info("Environment preset '{}' loaded on demand from '{}'",
+                             current->name,
+                             current->path);
+            }
             return;
         }
 
@@ -388,30 +389,24 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
     }
 
     if (targetIndex == m_environmentState.currentIndex) {
-        const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
-        SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
+        if (const EnvironmentMaps* current = m_environmentState.ActiveEnvironment()) {
+            SetIBLIntensity(current->defaultDiffuseIntensity, current->defaultSpecularIntensity);
+        }
         return;
     }
 
     m_environmentState.currentIndex = targetIndex;
     UpdateEnvironmentDescriptorTable();
-    const auto& current = m_environmentState.maps[m_environmentState.currentIndex];
-    SetIBLIntensity(current.defaultDiffuseIntensity, current.defaultSpecularIntensity);
+    const EnvironmentMaps* current = m_environmentState.ActiveEnvironment();
+    if (current) {
+        SetIBLIntensity(current->defaultDiffuseIntensity, current->defaultSpecularIntensity);
+    }
 
-    spdlog::info("Environment preset set to '{}'", m_environmentState.maps[m_environmentState.currentIndex].name);
+    spdlog::info("Environment preset set to '{}'", current ? current->name : "None");
 }
 
 std::string Renderer::GetCurrentEnvironmentName() const {
-    if (m_environmentState.maps.empty()) {
-        return m_environmentState.enabled ? "None" : "None";
-    }
-
-    size_t index = m_environmentState.currentIndex;
-    if (index >= m_environmentState.maps.size()) {
-        index = 0;
-    }
-
-    return m_environmentState.maps[index].name;
+    return m_environmentState.ActiveEnvironmentName();
 }
 
 void Renderer::SetIBLIntensity(float diffuseIntensity, float specularIntensity) {
@@ -498,7 +493,7 @@ void Renderer::CycleEnvironmentPreset() {
         m_environmentState.currentIndex = 0;
         UpdateEnvironmentDescriptorTable();
 
-        const std::string& name = m_environmentState.maps[m_environmentState.currentIndex].name;
+        const std::string name = m_environmentState.ActiveEnvironmentName();
         spdlog::info("Environment cycled to '{}' ({}/{})", name, m_environmentState.currentIndex + 1, m_environmentState.maps.size());
         return;
     }
@@ -508,7 +503,7 @@ void Renderer::CycleEnvironmentPreset() {
         m_environmentState.currentIndex++;
         UpdateEnvironmentDescriptorTable();
 
-        const std::string& name = m_environmentState.maps[m_environmentState.currentIndex].name;
+        const std::string name = m_environmentState.ActiveEnvironmentName();
         spdlog::info("Environment cycled to '{}' ({}/{})", name, m_environmentState.currentIndex + 1, m_environmentState.maps.size());
     } else {
         // Wrapped past the last preset: switch to a neutral "no IBL" mode.

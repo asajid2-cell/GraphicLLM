@@ -62,6 +62,43 @@ struct EnvironmentLightingState {
         pending.clear();
         currentIndex = 0;
     }
+
+    [[nodiscard]] bool HasResidentEnvironment() const {
+        return !maps.empty();
+    }
+
+    [[nodiscard]] size_t ActiveIndex() const {
+        if (maps.empty()) {
+            return 0;
+        }
+        return currentIndex < maps.size() ? currentIndex : 0;
+    }
+
+    [[nodiscard]] EnvironmentMaps* ActiveEnvironment() {
+        return maps.empty() ? nullptr : &maps[ActiveIndex()];
+    }
+
+    [[nodiscard]] const EnvironmentMaps* ActiveEnvironment() const {
+        return maps.empty() ? nullptr : &maps[ActiveIndex()];
+    }
+
+    [[nodiscard]] std::string ActiveEnvironmentName() const {
+        const EnvironmentMaps* env = ActiveEnvironment();
+        return env ? env->name : "None";
+    }
+
+    [[nodiscard]] bool UsingFallbackEnvironment() const {
+        const std::string name = ActiveEnvironmentName();
+        return name == "Placeholder" || name == "procedural_sky";
+    }
+
+    [[nodiscard]] uint32_t ResidentCount() const {
+        return static_cast<uint32_t>(maps.size());
+    }
+
+    [[nodiscard]] uint32_t PendingCount() const {
+        return static_cast<uint32_t>(pending.size());
+    }
 };
 
 } // namespace Cortex::Graphics

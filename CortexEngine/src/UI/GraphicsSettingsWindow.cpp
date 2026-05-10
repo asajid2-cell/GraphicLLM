@@ -55,6 +55,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_ENV_NEXT = 9203,
     IDC_GFX_ENV_ONE = 9204,
     IDC_GFX_ENV_ALL = 9205,
+    IDC_GFX_SAVE = 9206,
+    IDC_GFX_LOAD = 9207,
 };
 
 struct SliderBinding {
@@ -472,6 +474,12 @@ void RegisterGraphicsSettingsClass() {
                 makeButton(IDC_GFX_RESET_FROM_RENDERER, L"Refresh", margin + (buttonWidth + 6) * 2, y, buttonWidth);
                 y += 24 + rowGap;
             }
+            {
+                const int buttonWidth = (width - margin * 2 - 6) / 2;
+                makeButton(IDC_GFX_SAVE, L"Save Settings", margin, y, buttonWidth);
+                makeButton(IDC_GFX_LOAD, L"Load Settings", margin + buttonWidth + 6, y, buttonWidth);
+                y += 24 + rowGap;
+            }
 
             g_gfx.contentHeight = y + margin;
             g_gfx.scrollPos = 0;
@@ -571,6 +579,35 @@ void RegisterGraphicsSettingsClass() {
             case IDC_GFX_ENV_ALL:
                 Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 64);
                 break;
+            case IDC_GFX_SAVE: {
+                SyncStateFromToggles();
+                SyncStateFromSliders();
+                std::string error;
+                const auto path = Graphics::GetDefaultRendererTuningStatePath();
+                if (Graphics::SaveRendererTuningStateFile(path, g_gfx.tuning, &error)) {
+                    SetWindowTextW(g_gfx.txtWarning, L"Settings saved to user/graphics_settings.json");
+                } else {
+                    const std::wstring status = L"Settings save failed: " + ToWide(error);
+                    SetWindowTextW(g_gfx.txtWarning, status.c_str());
+                }
+                break;
+            }
+            case IDC_GFX_LOAD: {
+                std::string error;
+                const auto loaded = Graphics::LoadRendererTuningStateFile(
+                    Graphics::GetDefaultRendererTuningStatePath(),
+                    &error);
+                if (loaded) {
+                    Graphics::ApplyRendererTuningState(*renderer, *loaded);
+                    SetWindowTextW(g_gfx.txtWarning, L"Settings loaded from user/graphics_settings.json");
+                } else {
+                    const std::wstring status = error.empty()
+                        ? L"No saved graphics settings found"
+                        : (L"Settings load failed: " + ToWide(error));
+                    SetWindowTextW(g_gfx.txtWarning, status.c_str());
+                }
+                break;
+            }
             default:
                 ApplyTuningState();
                 break;

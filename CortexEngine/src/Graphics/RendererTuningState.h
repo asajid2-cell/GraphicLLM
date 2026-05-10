@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <optional>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -94,5 +96,11 @@ struct RendererTuningState {
 [[nodiscard]] RendererTuningState CaptureRendererTuningState(const Renderer& renderer);
 [[nodiscard]] RendererTuningState ClampRendererTuningState(RendererTuningState state);
 void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& state);
+[[nodiscard]] std::filesystem::path GetDefaultRendererTuningStatePath();
+[[nodiscard]] std::optional<RendererTuningState> LoadRendererTuningStateFile(const std::filesystem::path& path,
+                                                                              std::string* error = nullptr);
+bool SaveRendererTuningStateFile(const std::filesystem::path& path,
+                                 const RendererTuningState& state,
+                                 std::string* error = nullptr);
 
 } // namespace Cortex::Graphics

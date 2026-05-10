@@ -399,6 +399,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         contract.rayTracing.surfaceWater = tlasStats.surfaceWater;
     }
     contract.draws = m_frameDiagnostics.contract.drawCounts;
+    if (contract.particles.executed && contract.draws.particleInstances > 0) {
+        contract.particles.submittedInstances = contract.draws.particleInstances;
+    }
     contract.passes = m_frameDiagnostics.contract.passRecords;
     contract.renderGraph = m_frameDiagnostics.renderGraph.info;
     contract.renderGraph.passRecords = 0;

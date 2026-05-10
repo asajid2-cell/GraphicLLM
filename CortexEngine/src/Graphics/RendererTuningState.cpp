@@ -4,8 +4,174 @@
 #include "Graphics/RendererControlApplier.h"
 
 #include <algorithm>
+#include <exception>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace Cortex::Graphics {
+
+namespace {
+
+using nlohmann::json;
+
+json ToJson(const RendererTuningState& state) {
+    return {
+        {"schema", 1},
+        {"quality", {
+            {"preset", state.quality.preset},
+            {"render_scale", state.quality.renderScale},
+            {"taa", state.quality.taaEnabled},
+            {"fxaa", state.quality.fxaaEnabled},
+            {"gpu_culling", state.quality.gpuCullingEnabled},
+            {"safe_lighting_rig_on_low_vram", state.quality.safeLightingRigOnLowVRAM}
+        }},
+        {"lighting", {
+            {"exposure", state.lighting.exposure},
+            {"bloom_intensity", state.lighting.bloomIntensity},
+            {"warm", state.lighting.warm},
+            {"cool", state.lighting.cool},
+            {"sun_intensity", state.lighting.sunIntensity},
+            {"god_ray_intensity", state.lighting.godRayIntensity},
+            {"area_light_size_scale", state.lighting.areaLightSizeScale},
+            {"shadow_bias", state.lighting.shadowBias},
+            {"shadow_pcf_radius", state.lighting.shadowPCFRadius},
+            {"cascade_split_lambda", state.lighting.cascadeSplitLambda}
+        }},
+        {"environment", {
+            {"id", state.environment.environmentId},
+            {"ibl_enabled", state.environment.iblEnabled},
+            {"ibl_limit_enabled", state.environment.iblLimitEnabled},
+            {"diffuse_intensity", state.environment.diffuseIntensity},
+            {"specular_intensity", state.environment.specularIntensity}
+        }},
+        {"ray_tracing", {
+            {"enabled", state.rayTracing.enabled},
+            {"reflections", state.rayTracing.reflectionsEnabled},
+            {"gi", state.rayTracing.giEnabled}
+        }},
+        {"screen_space", {
+            {"ssao", state.screenSpace.ssaoEnabled},
+            {"ssao_radius", state.screenSpace.ssaoRadius},
+            {"ssao_bias", state.screenSpace.ssaoBias},
+            {"ssao_intensity", state.screenSpace.ssaoIntensity},
+            {"ssr", state.screenSpace.ssrEnabled},
+            {"pcss", state.screenSpace.pcssEnabled}
+        }},
+        {"atmosphere", {
+            {"fog", state.atmosphere.fogEnabled},
+            {"fog_density", state.atmosphere.fogDensity},
+            {"fog_height", state.atmosphere.fogHeight},
+            {"fog_falloff", state.atmosphere.fogFalloff}
+        }},
+        {"water", {
+            {"level_y", state.water.levelY},
+            {"wave_amplitude", state.water.waveAmplitude},
+            {"wave_length", state.water.waveLength},
+            {"wave_speed", state.water.waveSpeed},
+            {"secondary_amplitude", state.water.secondaryAmplitude}
+        }},
+        {"particles", {
+            {"enabled", state.particles.enabled},
+            {"density_scale", state.particles.densityScale}
+        }},
+        {"cinematic_post", {
+            {"enabled", state.cinematicPost.enabled},
+            {"bloom_threshold", state.cinematicPost.bloomThreshold},
+            {"bloom_soft_knee", state.cinematicPost.bloomSoftKnee},
+            {"vignette", state.cinematicPost.vignette},
+            {"lens_dirt", state.cinematicPost.lensDirt}
+        }}
+    };
+}
+
+template <typename T>
+void ReadValue(const json& object, const char* key, T& value) {
+    if (object.contains(key) && !object.at(key).is_null()) {
+        value = object.at(key).get<T>();
+    }
+}
+
+RendererTuningState FromJson(const json& root) {
+    RendererTuningState state{};
+
+    if (root.contains("quality") && root.at("quality").is_object()) {
+        const auto& q = root.at("quality");
+        ReadValue(q, "preset", state.quality.preset);
+        ReadValue(q, "render_scale", state.quality.renderScale);
+        ReadValue(q, "taa", state.quality.taaEnabled);
+        ReadValue(q, "fxaa", state.quality.fxaaEnabled);
+        ReadValue(q, "gpu_culling", state.quality.gpuCullingEnabled);
+        ReadValue(q, "safe_lighting_rig_on_low_vram", state.quality.safeLightingRigOnLowVRAM);
+    }
+    if (root.contains("lighting") && root.at("lighting").is_object()) {
+        const auto& l = root.at("lighting");
+        ReadValue(l, "exposure", state.lighting.exposure);
+        ReadValue(l, "bloom_intensity", state.lighting.bloomIntensity);
+        ReadValue(l, "warm", state.lighting.warm);
+        ReadValue(l, "cool", state.lighting.cool);
+        ReadValue(l, "sun_intensity", state.lighting.sunIntensity);
+        ReadValue(l, "god_ray_intensity", state.lighting.godRayIntensity);
+        ReadValue(l, "area_light_size_scale", state.lighting.areaLightSizeScale);
+        ReadValue(l, "shadow_bias", state.lighting.shadowBias);
+        ReadValue(l, "shadow_pcf_radius", state.lighting.shadowPCFRadius);
+        ReadValue(l, "cascade_split_lambda", state.lighting.cascadeSplitLambda);
+    }
+    if (root.contains("environment") && root.at("environment").is_object()) {
+        const auto& e = root.at("environment");
+        ReadValue(e, "id", state.environment.environmentId);
+        ReadValue(e, "ibl_enabled", state.environment.iblEnabled);
+        ReadValue(e, "ibl_limit_enabled", state.environment.iblLimitEnabled);
+        ReadValue(e, "diffuse_intensity", state.environment.diffuseIntensity);
+        ReadValue(e, "specular_intensity", state.environment.specularIntensity);
+    }
+    if (root.contains("ray_tracing") && root.at("ray_tracing").is_object()) {
+        const auto& rt = root.at("ray_tracing");
+        ReadValue(rt, "enabled", state.rayTracing.enabled);
+        ReadValue(rt, "reflections", state.rayTracing.reflectionsEnabled);
+        ReadValue(rt, "gi", state.rayTracing.giEnabled);
+    }
+    if (root.contains("screen_space") && root.at("screen_space").is_object()) {
+        const auto& ss = root.at("screen_space");
+        ReadValue(ss, "ssao", state.screenSpace.ssaoEnabled);
+        ReadValue(ss, "ssao_radius", state.screenSpace.ssaoRadius);
+        ReadValue(ss, "ssao_bias", state.screenSpace.ssaoBias);
+        ReadValue(ss, "ssao_intensity", state.screenSpace.ssaoIntensity);
+        ReadValue(ss, "ssr", state.screenSpace.ssrEnabled);
+        ReadValue(ss, "pcss", state.screenSpace.pcssEnabled);
+    }
+    if (root.contains("atmosphere") && root.at("atmosphere").is_object()) {
+        const auto& a = root.at("atmosphere");
+        ReadValue(a, "fog", state.atmosphere.fogEnabled);
+        ReadValue(a, "fog_density", state.atmosphere.fogDensity);
+        ReadValue(a, "fog_height", state.atmosphere.fogHeight);
+        ReadValue(a, "fog_falloff", state.atmosphere.fogFalloff);
+    }
+    if (root.contains("water") && root.at("water").is_object()) {
+        const auto& w = root.at("water");
+        ReadValue(w, "level_y", state.water.levelY);
+        ReadValue(w, "wave_amplitude", state.water.waveAmplitude);
+        ReadValue(w, "wave_length", state.water.waveLength);
+        ReadValue(w, "wave_speed", state.water.waveSpeed);
+        ReadValue(w, "secondary_amplitude", state.water.secondaryAmplitude);
+    }
+    if (root.contains("particles") && root.at("particles").is_object()) {
+        const auto& p = root.at("particles");
+        ReadValue(p, "enabled", state.particles.enabled);
+        ReadValue(p, "density_scale", state.particles.densityScale);
+    }
+    if (root.contains("cinematic_post") && root.at("cinematic_post").is_object()) {
+        const auto& c = root.at("cinematic_post");
+        ReadValue(c, "enabled", state.cinematicPost.enabled);
+        ReadValue(c, "bloom_threshold", state.cinematicPost.bloomThreshold);
+        ReadValue(c, "bloom_soft_knee", state.cinematicPost.bloomSoftKnee);
+        ReadValue(c, "vignette", state.cinematicPost.vignette);
+        ReadValue(c, "lens_dirt", state.cinematicPost.lensDirt);
+    }
+
+    return ClampRendererTuningState(state);
+}
+
+} // namespace
 
 RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     RendererTuningState state{};
@@ -166,6 +332,72 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,
                            4.0f);
+}
+
+std::filesystem::path GetDefaultRendererTuningStatePath() {
+    return std::filesystem::current_path() / "user" / "graphics_settings.json";
+}
+
+std::optional<RendererTuningState> LoadRendererTuningStateFile(const std::filesystem::path& path,
+                                                               std::string* error) {
+    if (error) {
+        error->clear();
+    }
+    std::ifstream in(path);
+    if (!in) {
+        return std::nullopt;
+    }
+
+    try {
+        json root;
+        in >> root;
+        if (!root.is_object()) {
+            if (error) {
+                *error = "graphics settings root is not an object";
+            }
+            return std::nullopt;
+        }
+        const int schema = root.value("schema", 1);
+        if (schema != 1) {
+            if (error) {
+                *error = "unsupported graphics settings schema";
+            }
+            return std::nullopt;
+        }
+        return FromJson(root);
+    } catch (const std::exception& e) {
+        if (error) {
+            *error = e.what();
+        }
+        return std::nullopt;
+    }
+}
+
+bool SaveRendererTuningStateFile(const std::filesystem::path& path,
+                                 const RendererTuningState& state,
+                                 std::string* error) {
+    if (error) {
+        error->clear();
+    }
+    try {
+        if (!path.parent_path().empty()) {
+            std::filesystem::create_directories(path.parent_path());
+        }
+        std::ofstream out(path, std::ios::trunc);
+        if (!out) {
+            if (error) {
+                *error = "failed to open graphics settings file for write";
+            }
+            return false;
+        }
+        out << ToJson(ClampRendererTuningState(state)).dump(2) << '\n';
+        return true;
+    } catch (const std::exception& e) {
+        if (error) {
+            *error = e.what();
+        }
+        return false;
+    }
 }
 
 } // namespace Cortex::Graphics

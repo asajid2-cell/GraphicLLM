@@ -8,6 +8,7 @@
 #include "UI/DebugMenu.h"
 #include "UI/QuickSettingsWindow.h"
 #include "UI/QualitySettingsWindow.h"
+#include "UI/GraphicsSettingsWindow.h"
 #include "UI/SceneEditorWindow.h"
 #include "UI/PerformanceWindow.h"
 #include <SDL3/SDL.h>
@@ -222,6 +223,15 @@ void Engine::ProcessInput() {
                     } else if (UI::QuickSettingsWindow::IsVisible()) {
                         UI::QuickSettingsWindow::SetVisible(false);
                         spdlog::info("Quick settings window HIDDEN (ESC)");
+                    } else if (UI::GraphicsSettingsWindow::IsVisible()) {
+                        UI::GraphicsSettingsWindow::SetVisible(false);
+                        spdlog::info("Graphics settings window HIDDEN (ESC)");
+                    } else if (UI::QualitySettingsWindow::IsVisible()) {
+                        UI::QualitySettingsWindow::SetVisible(false);
+                        spdlog::info("Quality settings window HIDDEN (ESC)");
+                    } else if (UI::PerformanceWindow::IsVisible()) {
+                        UI::PerformanceWindow::SetVisible(false);
+                        spdlog::info("Performance window HIDDEN (ESC)");
                     } else {
                         m_running = false;
                     }
@@ -234,10 +244,10 @@ void Engine::ProcessInput() {
                       break;
                   }
                   if (key == SDLK_F8) {
-                      // Native quality/performance tuning window with
-                      // render-scale and RTX feature controls.
-                      UI::QualitySettingsWindow::Toggle();
-                      spdlog::info("Quality settings window toggled (F8)");
+                      // Unified Phase 3 graphics tuning window backed by
+                      // RendererTuningState and renderer control appliers.
+                      UI::GraphicsSettingsWindow::Toggle();
+                      spdlog::info("Graphics settings window toggled (F8)");
                       break;
                   }
                   if (key == SDLK_B) {

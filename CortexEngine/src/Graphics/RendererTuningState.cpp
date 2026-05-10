@@ -18,6 +18,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.quality.renderScale = quality.renderScale;
     state.quality.taaEnabled = features.taaEnabled;
     state.quality.fxaaEnabled = features.fxaaEnabled;
+    state.quality.gpuCullingEnabled = renderer.IsGPUCullingEnabled();
     state.quality.safeLightingRigOnLowVRAM = features.useSafeLightingRigOnLowVRAM;
 
     state.lighting.exposure = quality.exposure;

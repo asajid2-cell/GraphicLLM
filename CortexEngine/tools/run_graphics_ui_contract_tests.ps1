@@ -1,0 +1,54 @@
+param(
+    [string]$SourceRoot = ""
+)
+
+$ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $SourceRoot = Resolve-Path (Join-Path $scriptDir "..")
+} else {
+    $SourceRoot = Resolve-Path $SourceRoot
+}
+
+function Read-Text([string]$relativePath) {
+    $path = Join-Path $SourceRoot $relativePath
+    if (-not (Test-Path $path)) {
+        throw "Missing required file: $relativePath"
+    }
+    return Get-Content -Raw -Path $path
+}
+
+function Assert-Contains([string]$text, [string]$needle, [string]$message) {
+    if ($text.IndexOf($needle, [StringComparison]::Ordinal) -lt 0) {
+        throw $message
+    }
+}
+
+$cmake = Read-Text "CMakeLists.txt"
+$engine = Read-Text "src/Core/Engine.cpp"
+$input = Read-Text "src/Core/Engine_Input.cpp"
+$ui = Read-Text "src/UI/GraphicsSettingsWindow.cpp"
+$header = Read-Text "src/UI/GraphicsSettingsWindow.h"
+
+Assert-Contains $cmake "src/UI/GraphicsSettingsWindow.cpp" "GraphicsSettingsWindow.cpp is not compiled by CMake."
+Assert-Contains $cmake "src/UI/GraphicsSettingsWindow.h" "GraphicsSettingsWindow.h is not listed by CMake."
+
+Assert-Contains $engine "UI/GraphicsSettingsWindow.h" "Engine.cpp does not include GraphicsSettingsWindow."
+Assert-Contains $engine "GraphicsSettingsWindow::Initialize" "GraphicsSettingsWindow is not initialized."
+Assert-Contains $engine "GraphicsSettingsWindow::Shutdown" "GraphicsSettingsWindow is not shut down."
+
+Assert-Contains $input "UI/GraphicsSettingsWindow.h" "Engine_Input.cpp does not include GraphicsSettingsWindow."
+Assert-Contains $input "GraphicsSettingsWindow::Toggle" "F8 path does not toggle GraphicsSettingsWindow."
+Assert-Contains $input "GraphicsSettingsWindow::IsVisible" "ESC path does not check GraphicsSettingsWindow visibility."
+Assert-Contains $input "GraphicsSettingsWindow::SetVisible(false)" "ESC path does not hide GraphicsSettingsWindow."
+
+Assert-Contains $header "class GraphicsSettingsWindow" "GraphicsSettingsWindow public facade is missing."
+Assert-Contains $ui "Graphics::RendererTuningState" "GraphicsSettingsWindow does not own RendererTuningState."
+Assert-Contains $ui "Graphics::CaptureRendererTuningState" "GraphicsSettingsWindow does not capture renderer tuning state."
+Assert-Contains $ui "Graphics::ApplyRendererTuningState" "GraphicsSettingsWindow does not apply renderer tuning state."
+Assert-Contains $ui "BuildHealthState" "GraphicsSettingsWindow does not surface renderer health state."
+Assert-Contains $ui "ApplyEnvironmentResidencyLoadControl" "GraphicsSettingsWindow does not expose environment residency controls."
+Assert-Contains $ui "ApplyHeroVisualBaselineControls" "GraphicsSettingsWindow does not expose showcase baseline controls."
+
+Write-Host "Graphics UI contract tests passed"

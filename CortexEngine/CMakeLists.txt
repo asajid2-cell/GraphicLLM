@@ -365,6 +365,7 @@ set(CORTEX_HEADERS
     src/Graphics/TextureUploadTicket.h
     src/Graphics/Renderer_ConstantBuffer.h
     src/Graphics/Renderer_DiagnosticsTypes.h
+    src/Graphics/RendererPostProcessState.h
     src/Graphics/RendererControlApplier.h
     src/Graphics/RendererControlTypes.h
     src/Graphics/RendererTuningState.h

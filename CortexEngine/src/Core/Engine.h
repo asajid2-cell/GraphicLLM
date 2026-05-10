@@ -125,6 +125,7 @@ public:
 
     // Scene preset controls (used by debug UI / hotkeys)
     void ToggleScenePreset();
+    bool ApplyShowcaseCameraBookmark(const std::string& bookmarkId);
 
     // Engine Editor Mode - check if launched in parallel engine editor architecture
     [[nodiscard]] bool IsEngineEditorMode() const { return m_engineEditorMode; }
@@ -169,7 +170,6 @@ private:
     void SyncDebugMenuFromRenderer();
     void DebugDrawSceneGraph();
     void SetCameraToSceneDefault(Scene::TransformComponent& transform);
-    bool ApplyShowcaseCameraBookmark(const std::string& bookmarkId);
 
     void CaptureScreenshot();
     void CaptureScreenshot(const std::filesystem::path& outputPath);

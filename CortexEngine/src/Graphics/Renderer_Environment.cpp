@@ -1,18 +1,30 @@
 #include "Renderer.h"
 
+#include "Graphics/EnvironmentManifest.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 namespace Cortex::Graphics {
 
 namespace {
+
+struct EnvironmentLoadCandidate {
+    std::filesystem::path path;
+    std::string name;
+    EnvironmentBudgetClass budgetClass = EnvironmentBudgetClass::Small;
+    bool required = false;
+    bool defaultEnvironment = false;
+};
 
 bool WriteTexture2DSRV(ID3D12Device* device,
                        const std::shared_ptr<DX12Texture>& texture,
@@ -63,13 +75,65 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
     }
     m_environmentState.ResetMaps();
 
-    // Scan assets directory for all HDR and EXR files
     namespace fs = std::filesystem;
-    std::vector<fs::path> envFiles;
+    std::vector<EnvironmentLoadCandidate> envFiles;
 
     const fs::path assetsDir = "assets";
+    const auto budget = BudgetPlanner::BuildPlan(
+        m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0,
+        m_services.window ? std::max(1u, m_services.window->GetWidth()) : 0,
+        m_services.window ? std::max(1u, m_services.window->GetHeight()) : 0);
 
-    if (fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
+    const fs::path manifestPath = assetsDir / "environments" / "environments.json";
+    bool usedManifest = false;
+    if (fs::exists(manifestPath)) {
+        auto manifestResult = LoadEnvironmentManifest(manifestPath);
+        if (manifestResult.IsErr()) {
+            spdlog::warn("Environment manifest ignored: {}", manifestResult.Error());
+        } else {
+            usedManifest = true;
+            const auto& manifest = manifestResult.Value();
+            for (const auto& entry : manifest.environments) {
+                if (!entry.enabled || entry.id == manifest.fallback) {
+                    continue;
+                }
+                if (!IsEnvironmentAllowedForBudget(budget.profile, entry.budgetClass)) {
+                    spdlog::info("Environment '{}' skipped for profile '{}' (budget_class={})",
+                                 entry.id,
+                                 budget.profileName,
+                                 ToString(entry.budgetClass));
+                    continue;
+                }
+
+                const fs::path runtimePath = ResolveEnvironmentAssetPath(manifestPath, entry.runtimePath);
+                if (!fs::exists(runtimePath)) {
+                    spdlog::warn("Environment manifest {} entry '{}' missing runtime asset '{}'",
+                                 entry.required ? "required" : "optional",
+                                 entry.id,
+                                 runtimePath.string());
+                    continue;
+                }
+
+                EnvironmentLoadCandidate candidate;
+                candidate.path = runtimePath;
+                candidate.name = entry.id;
+                candidate.budgetClass = entry.budgetClass;
+                candidate.required = entry.required;
+                candidate.defaultEnvironment = (entry.id == manifest.defaultEnvironment);
+                envFiles.push_back(std::move(candidate));
+            }
+
+            spdlog::info("Environment manifest loaded from '{}': {} candidates (default='{}', fallback='{}')",
+                         manifestPath.string(),
+                         envFiles.size(),
+                         manifest.defaultEnvironment,
+                         manifest.fallback);
+        }
+    }
+
+    // Legacy fallback: scan assets directory for all HDR and EXR files when no
+    // manifest exists or the manifest has no usable runtime entries.
+    if (envFiles.empty() && fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
         for (const auto& entry : fs::directory_iterator(assetsDir)) {
             if (entry.is_regular_file()) {
                 std::string ext = entry.path().extension().string();
@@ -77,27 +141,40 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                                [](unsigned char c) { return std::tolower(c); });
 
                 if (ext == ".hdr" || ext == ".exr") {
-                    envFiles.push_back(entry.path());
+                    EnvironmentLoadCandidate candidate;
+                    candidate.path = entry.path();
+                    candidate.name = entry.path().stem().string();
+                    candidate.budgetClass = EnvironmentBudgetClass::Medium;
+                    envFiles.push_back(std::move(candidate));
                 }
             }
         }
+        if (usedManifest) {
+            spdlog::warn("Environment manifest had no usable entries; falling back to legacy HDR/EXR scan");
+        }
     }
 
-    std::sort(envFiles.begin(), envFiles.end());
-
-    const auto budget = BudgetPlanner::BuildPlan(
-        m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0,
-        m_services.window ? std::max(1u, m_services.window->GetWidth()) : 0,
-        m_services.window ? std::max(1u, m_services.window->GetHeight()) : 0);
+    std::sort(envFiles.begin(),
+              envFiles.end(),
+              [](const EnvironmentLoadCandidate& a, const EnvironmentLoadCandidate& b) {
+                  if (a.defaultEnvironment != b.defaultEnvironment) {
+                      return a.defaultEnvironment;
+                  }
+                  if (a.required != b.required) {
+                      return a.required;
+                  }
+                  return a.name < b.name;
+              });
     const size_t maxStartupEnvs =
         std::max<size_t>(1, static_cast<size_t>(budget.iblResidentEnvironmentLimit));
 
     int successCount = 0;
     bool envBudgetReached = false;
     for (size_t index = 0; index < envFiles.size(); ++index) {
-        const auto& envPath = envFiles[index];
+        const auto& candidate = envFiles[index];
+        const auto& envPath = candidate.path;
         std::string pathStr = envPath.string();
-        std::string name = envPath.stem().string();
+        std::string name = candidate.name.empty() ? envPath.stem().string() : candidate.name;
 
         if (!envBudgetReached && successCount < static_cast<int>(maxStartupEnvs)) {
             // Load a limited number of environments synchronously during

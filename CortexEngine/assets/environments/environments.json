@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "default": "studio",
+  "fallback": "procedural_sky",
+  "policy": {
+    "runtime_format_preference": ["dds", "hdr", "exr"],
+    "normal_startup_downloads": false,
+    "source_assets_optional": true,
+    "thumbnail_required": false,
+    "notes": "Runtime startup must use committed local assets or procedural_sky. Optional source HDR/EXR assets can be converted by tools, but startup must not download environments."
+  },
+  "budget_classes": {
+    "tiny": {
+      "max_runtime_dimension": 1024,
+      "low_memory_allowed": true
+    },
+    "small": {
+      "max_runtime_dimension": 2048,
+      "low_memory_allowed": true
+    },
+    "medium": {
+      "max_runtime_dimension": 4096,
+      "low_memory_allowed": false
+    },
+    "large": {
+      "max_runtime_dimension": 8192,
+      "low_memory_allowed": false,
+      "release_required": false
+    }
+  },
+  "environments": [
+    {
+      "id": "procedural_sky",
+      "display_name": "Procedural Sky Fallback",
+      "type": "procedural",
+      "budget_class": "tiny",
+      "enabled": true,
+      "required": true,
+      "default_diffuse": 0.75,
+      "default_specular": 0.35,
+      "max_runtime_dimension": 0
+    },
+    {
+      "id": "studio",
+      "display_name": "Natural Studio",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": true,
+      "runtime_path": "../MR_INT-001_NaturalStudio_NAD.dds",
+      "source_path": "../MR_INT-001_NaturalStudio_NAD.hdr",
+      "default_diffuse": 1.05,
+      "default_specular": 0.78,
+      "max_runtime_dimension": 2048,
+      "tags": ["default", "studio", "material_review", "rt_showcase"]
+    },
+    {
+      "id": "warm_gallery",
+      "display_name": "Mirrored Hall",
+      "type": "equirectangular",
+      "budget_class": "medium",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../mirrored_hall_4k.exr",
+      "default_diffuse": 0.9,
+      "default_specular": 1.15,
+      "max_runtime_dimension": 4096,
+      "tags": ["gallery", "warm", "showcase"]
+    },
+    {
+      "id": "sunset_courtyard",
+      "display_name": "Sky On Fire",
+      "type": "equirectangular",
+      "budget_class": "medium",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../the_sky_is_on_fire_4k.exr",
+      "default_diffuse": 0.85,
+      "default_specular": 0.9,
+      "max_runtime_dimension": 4096,
+      "tags": ["sunset", "water", "glass"]
+    },
+    {
+      "id": "cool_overcast",
+      "display_name": "Kloofendal Overcast",
+      "type": "equirectangular",
+      "budget_class": "medium",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../kloofendal_48d_partly_cloudy_puresky_4k.exr",
+      "default_diffuse": 0.95,
+      "default_specular": 0.75,
+      "max_runtime_dimension": 4096,
+      "tags": ["overcast", "neutral", "material_review"]
+    },
+    {
+      "id": "night_city",
+      "display_name": "Shanghai Bund Night",
+      "type": "equirectangular",
+      "budget_class": "medium",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../shanghai_bund_4k.exr",
+      "default_diffuse": 0.55,
+      "default_specular": 1.25,
+      "max_runtime_dimension": 4096,
+      "tags": ["night", "emissive", "effects"]
+    }
+  ]
+}

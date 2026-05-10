@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/vec3.hpp>
+
 #include <string>
 #include <string_view>
 
@@ -15,10 +17,14 @@ struct MaterialPresetInfo {
     float defaultRoughness = 0.5f;
     float defaultTransmission = 0.0f;
     float defaultEmissiveStrength = 0.0f;
+    float defaultSpecularFactor = 1.0f;
+    glm::vec3 defaultSpecularColorFactor = glm::vec3(1.0f);
     bool hasDefaultMetallic = false;
     bool hasDefaultRoughness = false;
     bool hasDefaultTransmission = false;
     bool hasDefaultEmissiveStrength = false;
+    bool hasDefaultSpecularFactor = false;
+    bool hasDefaultSpecularColor = false;
     bool emissive = false;
     bool metallic = false;
     bool transmissive = false;

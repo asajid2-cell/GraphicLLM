@@ -185,6 +185,13 @@ struct FrameContract {
         uint32_t resolvedTransmissive = 0;
         uint32_t resolvedEmissive = 0;
         uint32_t resolvedClearcoat = 0;
+        uint32_t advancedFeatureMaterials = 0;
+        uint32_t advancedClearcoat = 0;
+        uint32_t advancedTransmission = 0;
+        uint32_t advancedEmissive = 0;
+        uint32_t advancedSpecular = 0;
+        uint32_t advancedSheen = 0;
+        uint32_t advancedSubsurface = 0;
         uint32_t surfaceDefault = 0;
         uint32_t surfaceGlass = 0;
         uint32_t surfaceMirror = 0;

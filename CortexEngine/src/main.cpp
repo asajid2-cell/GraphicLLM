@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <utility>
+#include <nlohmann/json.hpp>
 
 using namespace Cortex;
 
@@ -22,6 +23,7 @@ namespace {
 
 // Forward declarations (helpers defined later in this TU).
 std::string GetExecutableDirectory();
+std::filesystem::path GetLogDirectory();
 
 struct RunLogState {
     std::filesystem::path logFilePath;
@@ -49,6 +51,22 @@ bool IsExperimentalTerrainEnabled() {
            normalized != "no";
 }
 
+bool EnvTruthy(const char* name) {
+    const char* value = std::getenv(name);
+    if (!value) {
+        return false;
+    }
+
+    std::string normalized = value;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return !normalized.empty() &&
+           normalized != "0" &&
+           normalized != "false" &&
+           normalized != "off" &&
+           normalized != "no";
+}
+
 bool TrySetRenderBackend(EngineConfig& config, std::string backend) {
     std::transform(backend.begin(), backend.end(), backend.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -62,6 +80,53 @@ bool TrySetRenderBackend(EngineConfig& config, std::string backend) {
         return true;
     }
     return false;
+}
+
+std::filesystem::path WriteRendererFailureSummary(const std::string& kind,
+                                                  const std::string& message,
+                                                  int exitCode,
+                                                  int argc = 0,
+                                                  char* argv[] = nullptr) {
+    namespace fs = std::filesystem;
+
+    const fs::path logDir = GetLogDirectory();
+    const fs::path summaryPath = logDir / "last_renderer_failure.json";
+    const auto& logState = GetRunLogState();
+
+    nlohmann::json summary;
+    summary["schema"] = "cortex.renderer_failure.v1";
+    summary["failure"] = {
+        {"kind", kind},
+        {"message", message},
+        {"exit_code", exitCode}
+    };
+    summary["working_directory"] = fs::current_path().string();
+    summary["executable_directory"] = GetExecutableDirectory();
+    summary["log_file"] = logState.logFilePath.string();
+
+    nlohmann::json args = nlohmann::json::array();
+    for (int i = 0; i < argc; ++i) {
+        args.push_back(argv && argv[i] ? argv[i] : "");
+    }
+    summary["argv"] = std::move(args);
+
+    nlohmann::json recentLogs = nlohmann::json::array();
+    if (logState.ringSink) {
+        for (const auto& line : logState.ringSink->last_formatted(80)) {
+            recentLogs.push_back(line);
+        }
+    }
+    summary["recent_log_lines"] = std::move(recentLogs);
+
+    std::ofstream out(summaryPath, std::ios::binary | std::ios::trunc);
+    out << summary.dump(2) << '\n';
+    out.close();
+
+    spdlog::critical("Renderer failure summary written to '{}'", summaryPath.string());
+    if (auto logger = spdlog::default_logger()) {
+        logger->flush();
+    }
+    return summaryPath;
 }
 
 std::filesystem::path GetLogDirectory() {
@@ -568,6 +633,10 @@ int main(int argc, char* argv[]) {
     spdlog::info("===================================");
 
     try {
+        if (EnvTruthy("CORTEX_FORCE_FATAL_ERROR")) {
+            throw std::runtime_error("Forced fatal error requested by CORTEX_FORCE_FATAL_ERROR");
+        }
+
         // Create engine configuration
         EngineConfig config;
         config.window.title = "Project Cortex - Phase 2: The Architect";
@@ -752,6 +821,12 @@ int main(int argc, char* argv[]) {
         StoreStartupPreflightResult(std::move(preflight));
         if (!canLaunch) {
             spdlog::critical("Startup preflight failed; aborting before renderer initialization.");
+            WriteRendererFailureSummary(
+                "startup_preflight",
+                "Startup preflight failed before renderer initialization",
+                1,
+                argc,
+                argv);
             return 1;
         }
 
@@ -851,6 +926,7 @@ int main(int argc, char* argv[]) {
 
         if (initResult.IsErr()) {
             spdlog::critical("Failed to initialize engine: {}", initResult.Error());
+            WriteRendererFailureSummary("engine_initialize", initResult.Error(), 1, argc, argv);
             return 1;
         }
 
@@ -871,10 +947,12 @@ int main(int argc, char* argv[]) {
     }
     catch (const std::exception& e) {
         spdlog::critical("Fatal exception: {}", e.what());
+        WriteRendererFailureSummary("exception", e.what(), 1, argc, argv);
         return 1;
     }
     catch (...) {
         spdlog::critical("Unknown fatal exception");
+        WriteRendererFailureSummary("unknown_exception", "Unknown fatal exception", 1, argc, argv);
         return 1;
     }
 }

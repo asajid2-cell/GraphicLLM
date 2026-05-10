@@ -62,6 +62,9 @@ enum ControlIdGraphics : int {
     IDC_GFX_ENV_ALL = 9205,
     IDC_GFX_SAVE = 9206,
     IDC_GFX_LOAD = 9207,
+    IDC_GFX_BOOKMARK_HERO = 9208,
+    IDC_GFX_BOOKMARK_REFLECTION = 9209,
+    IDC_GFX_BOOKMARK_MATERIALS = 9210,
 };
 
 struct SliderBinding {
@@ -491,6 +494,13 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);
             makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
+            {
+                const int buttonWidth = (width - margin * 2 - 12) / 3;
+                makeButton(IDC_GFX_BOOKMARK_HERO, L"Hero View", margin, y, buttonWidth);
+                makeButton(IDC_GFX_BOOKMARK_REFLECTION, L"Reflection", margin + buttonWidth + 6, y, buttonWidth);
+                makeButton(IDC_GFX_BOOKMARK_MATERIALS, L"Materials", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                y += 24 + rowGap;
+            }
 
             makeSection(L"Actions");
             {
@@ -605,6 +615,26 @@ void RegisterGraphicsSettingsClass() {
             case IDC_GFX_ENV_ALL:
                 Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 64);
                 break;
+            case IDC_GFX_BOOKMARK_HERO:
+            case IDC_GFX_BOOKMARK_REFLECTION:
+            case IDC_GFX_BOOKMARK_MATERIALS: {
+                auto* engine = Cortex::ServiceLocator::GetEngine();
+                if (!engine) {
+                    break;
+                }
+                const char* bookmark =
+                    (LOWORD(wParam) == IDC_GFX_BOOKMARK_HERO) ? "hero" :
+                    (LOWORD(wParam) == IDC_GFX_BOOKMARK_REFLECTION) ? "reflection_closeup" :
+                                                                       "material_overview";
+                if (engine->ApplyShowcaseCameraBookmark(bookmark)) {
+                    const std::wstring status = L"Camera bookmark applied: " + ToWide(bookmark);
+                    SetWindowTextW(g_gfx.txtWarning, status.c_str());
+                } else {
+                    const std::wstring status = L"Camera bookmark unavailable: " + ToWide(bookmark);
+                    SetWindowTextW(g_gfx.txtWarning, status.c_str());
+                }
+                break;
+            }
             case IDC_GFX_SAVE: {
                 SyncStateFromToggles();
                 SyncStateFromSliders();

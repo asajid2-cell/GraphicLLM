@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "purpose": "Public-scene polish and validation targets for Phase 3.",
+  "scenes": [
+    {
+      "id": "rt_showcase",
+      "display_name": "RT Gallery",
+      "current_status": "implemented_validation_scene",
+      "target_status": "public_showcase",
+      "default_environment": "studio",
+      "default_lighting_rig": "studio_three_point",
+      "required_bookmarks": ["hero", "reflection_closeup"],
+      "required_features": ["rt_reflections", "material_parity", "raw_reflection_signal", "history_reflection_signal"],
+      "polish_gaps": ["camera_bookmark_data", "single unified graphics preset", "environment manifest binding"]
+    },
+    {
+      "id": "material_lab",
+      "display_name": "Material Lab",
+      "current_status": "planned",
+      "target_status": "public_showcase",
+      "default_environment": "cool_overcast",
+      "default_lighting_rig": "soft_material_review",
+      "required_bookmarks": ["hero"],
+      "required_features": ["material_preset_rows", "surface_class_debug", "advanced_shader_rows"],
+      "polish_gaps": ["scene implementation", "material preset coverage", "validation gates"]
+    },
+    {
+      "id": "glass_water_courtyard",
+      "display_name": "Glass and Water Courtyard",
+      "current_status": "planned",
+      "target_status": "public_showcase",
+      "default_environment": "sunset_courtyard",
+      "default_lighting_rig": "sunset_rim",
+      "required_bookmarks": ["hero", "water_closeup"],
+      "required_features": ["water", "glass", "fog", "rt_reflections"],
+      "polish_gaps": ["scene implementation", "water/glass validation", "background composition"]
+    },
+    {
+      "id": "effects_showcase",
+      "display_name": "Effects Showcase",
+      "current_status": "planned",
+      "target_status": "late_phase3_or_phase4",
+      "default_environment": "night_city",
+      "default_lighting_rig": "night_emissive",
+      "required_bookmarks": ["hero"],
+      "required_features": ["particles", "emissive_bloom", "cinematic_post", "advanced_materials"],
+      "polish_gaps": ["particle path consolidation", "cinematic post controls", "effect budget gates"]
+    }
+  ]
+}

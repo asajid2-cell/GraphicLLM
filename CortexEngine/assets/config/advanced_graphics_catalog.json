@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "purpose": "Phase 3 advanced graphics work registry. These are feature projects, not small UI tweaks.",
+  "systems": [
+    {
+      "id": "advanced_materials",
+      "existing_entry_points": [
+        "src/Graphics/MaterialPresetRegistry.h",
+        "src/Graphics/MaterialModel.cpp",
+        "assets/shaders/PBR_Lighting.hlsli",
+        "assets/shaders/RaytracingMaterials.hlsli"
+      ],
+      "planned_features": ["clearcoat", "anisotropy", "wetness", "sheen", "subsurface_approximation", "procedural_masks"],
+      "first_validation_scene": "material_lab"
+    },
+    {
+      "id": "lighting_rigs",
+      "existing_entry_points": [
+        "src/Graphics/Renderer_LightingSettings.cpp",
+        "src/Graphics/RendererLightingRigControl.cpp"
+      ],
+      "planned_features": ["soft_material_review", "sunset_rim", "night_emissive", "product_key_fill_rim"],
+      "first_validation_scene": "rt_showcase"
+    },
+    {
+      "id": "particles",
+      "existing_entry_points": [
+        "src/Graphics/Renderer_Particles.cpp",
+        "src/Graphics/RendererParticleState.h",
+        "src/Graphics/GPUParticles.h",
+        "assets/shaders/Particles.hlsl",
+        "assets/shaders/ParticleSimulate.hlsl",
+        "assets/shaders/ParticleRender.hlsl"
+      ],
+      "planned_features": ["dust_motes", "sparks", "embers", "smoke", "mist", "rain", "snow"],
+      "first_validation_scene": "effects_showcase"
+    },
+    {
+      "id": "cinematic_post",
+      "existing_entry_points": [
+        "src/Graphics/Renderer_PostProcess.cpp",
+        "src/Graphics/Renderer_Bloom.cpp",
+        "assets/shaders/PostProcess.hlsl"
+      ],
+      "planned_features": ["bloom_threshold", "soft_knee", "vignette", "lens_dirt", "depth_of_field", "color_grade_presets"],
+      "first_validation_scene": "effects_showcase"
+    }
+  ]
+}

@@ -115,6 +115,7 @@ set(CORTEX_SOURCES
      src/Graphics/TextureLoader.cpp
     src/Graphics/RenderableClassification.cpp
     src/Graphics/BudgetPlanner.cpp
+    src/Graphics/EnvironmentManifest.cpp
     src/Graphics/FrameFeaturePlan.cpp
     src/Graphics/FrameContractValidation.cpp
     src/Graphics/FrameContractResources.cpp
@@ -184,6 +185,7 @@ set(CORTEX_SOURCES
     src/Graphics/RendererControlApplier_Debug.cpp
     src/Graphics/RendererControlApplier_Runtime.cpp
     src/Graphics/RendererControlApplier_ScenePresets.cpp
+    src/Graphics/RendererTuningState.cpp
     src/Graphics/RendererLightingRigControl.cpp
     src/Graphics/Renderer_DepthPasses.cpp
     src/Graphics/Renderer_DepthTarget.cpp
@@ -345,6 +347,7 @@ set(CORTEX_HEADERS
     src/Graphics/FrameContractValidation.h
     src/Graphics/FrameContractResources.h
     src/Graphics/FrameContractJson.h
+    src/Graphics/EnvironmentManifest.h
     src/Graphics/MaterialPresetRegistry.h
     src/Graphics/MaterialModel.h
     src/Graphics/RTDenoiser.h
@@ -361,6 +364,7 @@ set(CORTEX_HEADERS
     src/Graphics/Renderer_DiagnosticsTypes.h
     src/Graphics/RendererControlApplier.h
     src/Graphics/RendererControlTypes.h
+    src/Graphics/RendererTuningState.h
     src/Graphics/RendererLightingRigControl.h
     src/Graphics/RendererGeometryUtils.h
     src/Graphics/RendererSceneSnapshot.h

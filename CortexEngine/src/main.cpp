@@ -82,6 +82,34 @@ bool TrySetRenderBackend(EngineConfig& config, std::string backend) {
     return false;
 }
 
+bool TrySetHudMode(EngineConfig& config, std::string mode) {
+    std::transform(mode.begin(), mode.end(), mode.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::replace(mode.begin(), mode.end(), '-', '_');
+
+    if (mode == "off" || mode == "hidden") {
+        config.initialHudMode = EngineHudMode::Off;
+        return true;
+    }
+    if (mode == "minimal" || mode == "min") {
+        config.initialHudMode = EngineHudMode::Minimal;
+        return true;
+    }
+    if (mode == "performance" || mode == "perf") {
+        config.initialHudMode = EngineHudMode::Performance;
+        return true;
+    }
+    if (mode == "renderer_health" || mode == "health" || mode == "default") {
+        config.initialHudMode = EngineHudMode::RendererHealth;
+        return true;
+    }
+    if (mode == "full_debug" || mode == "debug" || mode == "full") {
+        config.initialHudMode = EngineHudMode::FullDebug;
+        return true;
+    }
+    return false;
+}
+
 std::filesystem::path WriteRendererFailureSummary(const std::string& kind,
                                                   const std::string& message,
                                                   int exitCode,
@@ -664,6 +692,7 @@ int main(int argc, char* argv[]) {
         bool hasModeFlag  = false;
         bool hasBackendFlag = false;
         bool hasGraphicsPresetFlag = false;
+        bool hasHudFlag = false;
         bool noLauncher   = false;
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
@@ -677,6 +706,8 @@ int main(int argc, char* argv[]) {
                 hasBackendFlag = true;
             } else if (arg == "--graphics-preset" || arg.rfind("--graphics-preset=", 0) == 0) {
                 hasGraphicsPresetFlag = true;
+            } else if (arg == "--hud" || arg.rfind("--hud=", 0) == 0) {
+                hasHudFlag = true;
             } else if (arg == "--camera-bookmark" || arg.rfind("--camera-bookmark=", 0) == 0) {
                 hasSceneFlag = true;
             } else if (arg == "--no-launcher") {
@@ -685,7 +716,7 @@ int main(int argc, char* argv[]) {
         }
 
         const bool useLauncher = !noLauncher && !hasSceneFlag && !hasModeFlag &&
-                                 !hasBackendFlag && !hasGraphicsPresetFlag;
+                                 !hasBackendFlag && !hasGraphicsPresetFlag && !hasHudFlag;
         if (useLauncher) {
             if (!ShowLauncher(config)) {
                 spdlog::info("Launcher cancelled; exiting.");
@@ -700,6 +731,7 @@ int main(int argc, char* argv[]) {
         //   --camera-bookmark <bookmark_id>
         //   --mode  <default|conservative>
         //   --backend <raster|voxel>
+        //   --hud <off|minimal|performance|renderer_health|full_debug>
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             if (arg == "--scene" && i + 1 < argc) {
@@ -720,6 +752,16 @@ int main(int argc, char* argv[]) {
                 config.initialCameraBookmark = argv[++i];
             } else if (arg.rfind("--camera-bookmark=", 0) == 0) {
                 config.initialCameraBookmark = arg.substr(std::string("--camera-bookmark=").size());
+            } else if (arg == "--hud" && i + 1 < argc) {
+                const std::string hud = argv[++i];
+                if (!TrySetHudMode(config, hud)) {
+                    spdlog::warn("Ignoring unknown HUD mode '{}'", hud);
+                }
+            } else if (arg.rfind("--hud=", 0) == 0) {
+                const std::string hud = arg.substr(std::string("--hud=").size());
+                if (!TrySetHudMode(config, hud)) {
+                    spdlog::warn("Ignoring unknown HUD mode '{}'", hud);
+                }
             } else if (arg == "--mode" && i + 1 < argc) {
                 std::string mode = argv[++i];
                 if (mode == "conservative") {
@@ -810,6 +852,11 @@ int main(int argc, char* argv[]) {
             std::string value = envExitVisual;
             if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
                 config.exitAfterVisualValidationCapture = true;
+            }
+        }
+        if (const char* envHudMode = std::getenv("CORTEX_HUD_MODE")) {
+            if (!TrySetHudMode(config, envHudMode)) {
+                spdlog::warn("Ignoring unknown CORTEX_HUD_MODE '{}'", envHudMode);
             }
         }
 

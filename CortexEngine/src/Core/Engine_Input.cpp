@@ -250,6 +250,38 @@ void Engine::ProcessInput() {
                       spdlog::info("Graphics settings window toggled (F8)");
                       break;
                   }
+                  if (key == SDLK_F7) {
+                      auto hudModeName = [](EngineHudMode mode) -> const char* {
+                          switch (mode) {
+                          case EngineHudMode::Off: return "off";
+                          case EngineHudMode::Minimal: return "minimal";
+                          case EngineHudMode::Performance: return "performance";
+                          case EngineHudMode::RendererHealth: return "renderer_health";
+                          case EngineHudMode::FullDebug: return "full_debug";
+                          }
+                          return "renderer_health";
+                      };
+
+                      switch (m_hudMode) {
+                      case EngineHudMode::Off:
+                          m_hudMode = EngineHudMode::Minimal;
+                          break;
+                      case EngineHudMode::Minimal:
+                          m_hudMode = EngineHudMode::Performance;
+                          break;
+                      case EngineHudMode::Performance:
+                          m_hudMode = EngineHudMode::RendererHealth;
+                          break;
+                      case EngineHudMode::RendererHealth:
+                          m_hudMode = EngineHudMode::FullDebug;
+                          break;
+                      case EngineHudMode::FullDebug:
+                          m_hudMode = EngineHudMode::Off;
+                          break;
+                      }
+                      spdlog::info("HUD mode set to {} (F7)", hudModeName(m_hudMode));
+                      break;
+                  }
                   if (key == SDLK_B) {
                       ApplyHeroVisualBaseline();
                       break;
@@ -668,10 +700,7 @@ void Engine::ProcessInput() {
                     }
                 }
                 else if (key == SDLK_F7) {
-                    if (m_renderer) {
-                        Graphics::ApplyShadowBiasDeltaControl(*m_renderer, -0.0002f);
-                        SyncDebugMenuFromRenderer();
-                    }
+                    // F7 is handled above as the Phase 3 HUD mode cycle.
                 }
                 else if (key == SDLK_F8) {
                     if (m_renderer) {

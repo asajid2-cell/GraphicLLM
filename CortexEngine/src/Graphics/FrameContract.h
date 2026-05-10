@@ -99,6 +99,7 @@ struct FrameContract {
         bool fxaaEnabled = false;
         bool iblEnabled = false;
         bool fogEnabled = false;
+        bool particlesEnabled = false;
         bool voxelBackendEnabled = false;
     };
 
@@ -243,6 +244,21 @@ struct FrameContract {
         uint32_t hzbMipCount = 0;
         uint64_t hzbCaptureFrame = 0;
         uint64_t hzbAgeFrames = 0;
+    };
+
+    struct ParticleInfo {
+        bool enabled = false;
+        bool planned = false;
+        bool executed = false;
+        bool instanceMapFailed = false;
+        bool capped = false;
+        uint32_t emitterCount = 0;
+        uint32_t liveParticles = 0;
+        uint32_t submittedInstances = 0;
+        uint32_t frustumCulled = 0;
+        uint32_t maxInstances = 0;
+        uint32_t instanceCapacity = 0;
+        uint64_t instanceBufferBytes = 0;
     };
 
     struct MotionVectorInfo {
@@ -491,6 +507,7 @@ struct FrameContract {
     MaterialStats materials;
     LightingInfo lighting;
     CullingInfo culling;
+    ParticleInfo particles;
     MotionVectorInfo motionVectors;
     TemporalMaskInfo temporalMask;
     BudgetInfo budget;

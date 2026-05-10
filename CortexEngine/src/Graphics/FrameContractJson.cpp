@@ -26,6 +26,7 @@ json FeatureFlagsToJson(const FrameContract::FeatureFlags& features) {
         {"fxaa_enabled", features.fxaaEnabled},
         {"ibl_enabled", features.iblEnabled},
         {"fog_enabled", features.fogEnabled},
+        {"particles_enabled", features.particlesEnabled},
         {"voxel_backend_enabled", features.voxelBackendEnabled}
     };
 }
@@ -209,6 +210,20 @@ json FrameContractToJson(const FrameContract& contract) {
             {"hzb_mip_count", contract.culling.hzbMipCount},
             {"hzb_capture_frame", contract.culling.hzbCaptureFrame},
             {"hzb_age_frames", contract.culling.hzbAgeFrames}
+        }},
+        {"particles", {
+            {"enabled", contract.particles.enabled},
+            {"planned", contract.particles.planned},
+            {"executed", contract.particles.executed},
+            {"instance_map_failed", contract.particles.instanceMapFailed},
+            {"capped", contract.particles.capped},
+            {"emitter_count", contract.particles.emitterCount},
+            {"live_particles", contract.particles.liveParticles},
+            {"submitted_instances", contract.particles.submittedInstances},
+            {"frustum_culled", contract.particles.frustumCulled},
+            {"max_instances", contract.particles.maxInstances},
+            {"instance_capacity", contract.particles.instanceCapacity},
+            {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
         }},
         {"motion_vectors", {
             {"planned", contract.motionVectors.planned},

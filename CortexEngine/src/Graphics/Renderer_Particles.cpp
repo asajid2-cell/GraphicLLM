@@ -15,6 +15,7 @@ namespace Cortex::Graphics {
 #define CORTEX_REPORT_DEVICE_REMOVED(ctx, hr) \
     ReportDeviceRemoved((ctx), (hr), __FILE__, __LINE__)
 void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
+    m_particleState.ResetFrameStats();
     if (m_frameLifecycle.deviceRemoved || !registry || !m_pipelineState.particle || !m_mainTargets.hdrColor || m_particleState.instanceMapFailed) {
         return;
     }
@@ -23,6 +24,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     // per-frame instance buffer small and avoid pathological memory usage if
     // an emitter accidentally spawns an excessive number of particles.
     static constexpr uint32_t kMaxParticleInstances = 4096;
+    m_particleState.frameMaxInstances = kMaxParticleInstances;
 
     auto view = registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
     if (view.begin() == view.end()) {
@@ -37,6 +39,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     for (auto entity : view) {
         auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
+        ++m_particleState.frameEmitterCount;
 
         glm::vec3 emitterWorldPos = glm::vec3(transform.worldMatrix[3]);
 
@@ -57,8 +60,10 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             if (p.age >= p.lifetime) {
                 continue;
             }
+            ++m_particleState.frameLiveParticles;
 
             if (instances.size() >= kMaxParticleInstances) {
+                m_particleState.frameCapped = true;
                 break;
             }
 
@@ -68,6 +73,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             inst.color    = p.color;
 
             if (!SphereIntersectsFrustumCPU(frustum, inst.position, glm::max(0.01f, inst.size))) {
+                ++m_particleState.frameFrustumCulled;
                 continue;
             }
 
@@ -89,6 +95,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     }
 
     const UINT instanceCount = static_cast<UINT>(instances.size());
+    m_particleState.frameSubmittedInstances = instanceCount;
     const UINT requiredCapacity = instanceCount;
     const UINT minCapacity = 256;
 
@@ -278,6 +285,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     m_commandResources.graphicsList->DrawInstanced(4, instanceCount, 0, 0);
+    m_particleState.frameExecuted = true;
     ++m_frameDiagnostics.contract.drawCounts.particleDraws;
     m_frameDiagnostics.contract.drawCounts.particleInstances += instanceCount;
 }

@@ -53,6 +53,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_effects_gallery_tests.ps1 -NoBuild
 ```
 
 The UI contract test verifies the unified graphics settings window is compiled,
@@ -61,6 +62,10 @@ matrix currently wraps the stabilized temporal-validation and RT showcase smoke
 paths, then writes JSON and Markdown summaries under `build/bin/logs/runs`. Add
 new public scenes to this matrix only after their camera, lighting, and IBL
 choices are stable enough to avoid churn.
+
+The effects gallery test currently uses the RT showcase as the first public
+effects scene and asserts that the particle contract is present, the particles
+pass executed, particles were submitted, and the pass stayed within its cap.
 
 Default budgets are intentionally strict for the RT showcase scene:
 

@@ -1,7 +1,7 @@
 # Cortex Engine Release Readiness
 
 This note summarizes the current public-release posture of Cortex after the
-Phase 2 renderer refactor.
+Phase 3 renderer overhaul.
 
 ## Status
 
@@ -17,6 +17,13 @@ The current verified local gate covers:
 - Release rebuild,
 - temporal validation smoke,
 - full RT showcase smoke,
+- graphics settings persistence and unified graphics UI contracts,
+- HUD mode, graphics preset, material editor, and showcase scene contracts,
+- Material Lab, Glass and Water Courtyard, Effects Showcase, and visual baseline smokes,
+- Phase 3 visual matrix,
+- renderer ownership and fatal error contracts,
+- advanced graphics catalog and effects gallery contracts,
+- environment manifest and IBL gallery validation,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -25,25 +32,31 @@ The current verified local gate covers:
 Latest local release validation:
 
 ```text
-powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
 Result:
 
-- temporal validation: `gpu_ms=2.044`, `warnings=0`,
+- build_release: passed;
+- temporal validation: `gpu_ms=1.995`, `warnings=0`,
   `object_motion=0.0731`;
-- RT showcase: `gpu_ms=1.868/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=2.010/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`;
-- budget matrix: 8 GB, 4 GB, and 2 GB RT profiles passed;
-- voxel backend: `gpu_ms=21.87`, `avg_luma=116.9`, `nonblack=1`.
+- graphics UI, HUD, preset, material editor, showcase, ownership, fatal error,
+  environment manifest, advanced graphics catalog, and effects gallery contracts passed;
+- Phase 3 visual matrix passed across temporal validation, RT Showcase,
+  Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
+- budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
+  release gate, with RT Showcase covering the balanced profile;
+- voxel backend: `gpu_ms=15.371`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260509_190246_577_70480_b012d0d6
+CortexEngine/build/bin/logs/runs/release_validation_20260510_081419_716_120580_62fbe9d2
 ```
 
 ## Renderer Scope
@@ -57,7 +70,11 @@ infinite-world engine. The validated path emphasizes:
 - material and surface classification,
 - RT scheduling and readiness contracts,
 - raw and denoised RT reflection signal metrics,
-- temporal validation and RT budget profiles.
+- temporal validation and RT budget profiles,
+- unified graphics settings and preset persistence,
+- environment/IBL manifest policy with procedural fallback,
+- public showcase scenes with stable camera bookmarks and lighting rigs,
+- advanced material, particle, and cinematic-post release foundations.
 
 ## Known Limitations
 
@@ -68,6 +85,7 @@ infinite-world engine. The validated path emphasizes:
   procedural fallback when no TensorRT engines are present.
 - The voxel backend is a smoke-tested experimental backend, not the primary
   renderer path.
-- Material and showcase polish can continue, but the current validation gates
-  protect the renderer from silent RT reflection, material parity, visual
-  metric, budget, and descriptor regressions.
+- Future effects work should extend the validated Phase 3 foundations rather
+  than creating parallel systems. The current validation gates protect the
+  renderer from silent RT reflection, material parity, visual metric, budget,
+  descriptor, environment, graphics UI, particle, and post-process regressions.

@@ -8,6 +8,9 @@ It is designed as a portfolio-quality engine that demonstrates:
 - Frame contracts, resource contracts, and repeatable smoke validation
 - Visibility-buffer rendering, GPU culling, TAA, SSAO, SSR, bloom, and IBL
 - RT shadows, reflections, GI targets, denoising, and signal-quality diagnostics
+- Phase 3 public showcase scenes, graphics presets, HUD modes, and renderer UI controls
+- Environment/IBL manifests with procedural fallback behavior
+- Advanced material, particle, lighting-rig, and cinematic-post release foundations
 - EnTT-based Entity Component System
 - Natural-language scene control via Llama.cpp
 - Asynchronous diffusion-based texture generation (TensorRT)
@@ -43,12 +46,14 @@ Run the full local release gate from the repository root:
 powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
-The gate builds Release, then runs:
+The gate builds Release, then runs the current public renderer suite:
 
-- temporal validation smoke,
-- full RT showcase smoke,
-- RT budget profile matrix,
-- voxel backend smoke.
+- temporal validation and full RT showcase smokes,
+- graphics settings persistence, graphics UI, HUD mode, material editor, and preset contracts,
+- public showcase scene, material lab, glass/water courtyard, effects showcase, and visual baseline checks,
+- Phase 3 visual matrix and IBL gallery validation,
+- renderer ownership, fatal error, environment manifest, advanced graphics catalog, and effects gallery contracts,
+- RT budget profile matrix and voxel backend smoke.
 
 Use `-NoBuild` only when `build/bin/CortexEngine.exe` is already current.
 Each step writes isolated logs under `build/bin/logs/runs`.
@@ -189,6 +194,11 @@ build\bin\Release\CortexEngine.exe
     state, resource/budget validation, RT scheduling, temporal validation, and
     repeatable showcase gates.
 
+- **Phase 3 - Public Renderer Surface**
+  - Validate the public graphics control surface, environment/IBL policy,
+    polished showcase scenes, material editor checks, clean HUD modes, advanced
+    material/effects foundations, and pass-owned renderer state boundaries.
+
 - **Architect / LLM Control**
   - Integrate Llama.cpp, define a constrained JSON command format, and drive
     the scene from natural-language prompts without blocking the render loop.
@@ -197,8 +207,9 @@ build\bin\Release\CortexEngine.exe
   - Integrate SDXL-Turbo via TensorRT, generate textures asynchronously,
     and stream them into the renderer without stalling the frame.
 
-Current active polish focuses on material/lighting quality, showcase readiness,
-release documentation, and keeping the validation gates reproducible.
+Current active polish is post-release hardening: keep validation reproducible,
+avoid reintroducing loose renderer ownership, and grow future effects only
+behind the same preset, budget, frame-contract, and visual-validation gates.
 
 ---
 

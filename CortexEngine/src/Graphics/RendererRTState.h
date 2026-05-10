@@ -74,21 +74,48 @@ struct RTReflectionSignalStatsState {
         }
     };
 
-    ComPtr<ID3D12Resource> rawStatsBuffer;
-    ComPtr<ID3D12Resource> historyStatsBuffer;
-    std::array<ComPtr<ID3D12Resource>, kFrameCount> rawReadback{};
-    std::array<ComPtr<ID3D12Resource>, kFrameCount> historyReadback{};
-    DescriptorHandle rawStatsUAV;
-    DescriptorHandle historyStatsUAV;
-    D3D12_RESOURCE_STATES rawStatsResourceState = D3D12_RESOURCE_STATE_COMMON;
-    D3D12_RESOURCE_STATES historyStatsResourceState = D3D12_RESOURCE_STATE_COMMON;
-    std::array<bool, kFrameCount> rawReadbackPending{};
-    std::array<bool, kFrameCount> historyReadbackPending{};
-    std::array<uint64_t, kFrameCount> rawSampleFrame{};
-    std::array<uint64_t, kFrameCount> historySampleFrame{};
-    std::array<std::array<DescriptorHandle, 11>, kFrameCount> descriptorSrvTables{};
-    std::array<std::array<DescriptorHandle, 4>, kFrameCount> descriptorUavTables{};
-    bool descriptorTablesValid = false;
+    struct TargetResources {
+        ComPtr<ID3D12Resource> statsBuffer;
+        std::array<ComPtr<ID3D12Resource>, kFrameCount> readback{};
+        DescriptorHandle statsUAV;
+        D3D12_RESOURCE_STATES statsResourceState = D3D12_RESOURCE_STATE_COMMON;
+        std::array<bool, kFrameCount> readbackPending{};
+        std::array<uint64_t, kFrameCount> sampleFrame{};
+
+        void ResetResources() {
+            statsBuffer.Reset();
+            for (auto& readbackBuffer : readback) {
+                readbackBuffer.Reset();
+            }
+            statsResourceState = D3D12_RESOURCE_STATE_COMMON;
+            readbackPending.fill(false);
+            sampleFrame.fill(0);
+        }
+    };
+
+    struct DescriptorTableBundle {
+        std::array<std::array<DescriptorHandle, 11>, kFrameCount> srvTables{};
+        std::array<std::array<DescriptorHandle, 4>, kFrameCount> uavTables{};
+        bool valid = false;
+
+        void ResetHandles() {
+            valid = false;
+            for (auto& table : srvTables) {
+                for (auto& handle : table) {
+                    handle = {};
+                }
+            }
+            for (auto& table : uavTables) {
+                for (auto& handle : table) {
+                    handle = {};
+                }
+            }
+        }
+    };
+
+    TargetResources rawResources;
+    TargetResources historyResources;
+    DescriptorTableBundle descriptors;
     bool rawCapturedThisFrame = false;
     bool historyCapturedThisFrame = false;
     Metrics raw;
@@ -105,20 +132,8 @@ struct RTReflectionSignalStatsState {
     }
 
     void ResetResources() {
-        rawStatsBuffer.Reset();
-        historyStatsBuffer.Reset();
-        for (auto& readback : rawReadback) {
-            readback.Reset();
-        }
-        for (auto& readback : historyReadback) {
-            readback.Reset();
-        }
-        rawStatsResourceState = D3D12_RESOURCE_STATE_COMMON;
-        historyStatsResourceState = D3D12_RESOURCE_STATE_COMMON;
-        rawReadbackPending.fill(false);
-        historyReadbackPending.fill(false);
-        rawSampleFrame.fill(0);
-        historySampleFrame.fill(0);
+        rawResources.ResetResources();
+        historyResources.ResetResources();
         ResetFrame();
         ResetMetrics();
     }

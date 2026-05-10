@@ -243,9 +243,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         ? m_framePlanning.rtPlan.budget.giHeight
         : halfHeight;
     addResource("rt_reflection", m_rtReflectionTargets.color.Get(), expectedReflectionWidth, expectedReflectionHeight);
-    addResource("rt_reflection_signal_stats", m_rtReflectionSignalState.rawStatsBuffer.Get(), 0, 0);
+    addResource("rt_reflection_signal_stats", m_rtReflectionSignalState.rawResources.statsBuffer.Get(), 0, 0);
     addResource("rt_reflection_history", m_rtReflectionTargets.history.Get(), expectedReflectionWidth, expectedReflectionHeight);
-    addResource("rt_reflection_history_signal_stats", m_rtReflectionSignalState.historyStatsBuffer.Get(), 0, 0);
+    addResource("rt_reflection_history_signal_stats", m_rtReflectionSignalState.historyResources.statsBuffer.Get(), 0, 0);
     addResource("rt_gi", m_rtGITargets.color.Get(), expectedGIWidth, expectedGIHeight);
     addResource("rt_gi_history", m_rtGITargets.history.Get(), expectedGIWidth, expectedGIHeight);
     addResource("shadow_map",

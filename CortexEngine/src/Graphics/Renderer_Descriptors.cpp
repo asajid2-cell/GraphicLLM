@@ -140,17 +140,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_rtReflectionSignalState.descriptorTablesValid = false;
-    for (auto& table : m_rtReflectionSignalState.descriptorSrvTables) {
-        for (auto& handle : table) {
-            handle = {};
-        }
-    }
-    for (auto& table : m_rtReflectionSignalState.descriptorUavTables) {
-        for (auto& handle : table) {
-            handle = {};
-        }
-    }
+    m_rtReflectionSignalState.descriptors.ResetHandles();
     m_ssaoResources.descriptorTablesValid = false;
     for (auto& table : m_ssaoResources.srvTables) {
         for (auto& handle : table) {
@@ -259,13 +249,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         return temporalMaskStatsUavTableResult;
     }
     auto rtReflectionSignalStatsSrvResult = allocateTableSet(
-        m_rtReflectionSignalState.descriptorSrvTables,
+        m_rtReflectionSignalState.descriptors.srvTables,
         "RT reflection signal stats SRV");
     if (rtReflectionSignalStatsSrvResult.IsErr()) {
         return rtReflectionSignalStatsSrvResult;
     }
     auto rtReflectionSignalStatsUavResult = allocateTableSet(
-        m_rtReflectionSignalState.descriptorUavTables,
+        m_rtReflectionSignalState.descriptors.uavTables,
         "RT reflection signal stats UAV");
     if (rtReflectionSignalStatsUavResult.IsErr()) {
         return rtReflectionSignalStatsUavResult;
@@ -333,13 +323,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     validateTableSet(m_temporalMaskState.statsSrvTables, temporalMaskStatsSrvValid, "Temporal mask stats SRV");
     validateTableSet(m_temporalMaskState.statsUavTables, temporalMaskStatsUavValid, "Temporal mask stats UAV");
     m_temporalMaskState.statsDescriptorTablesValid = temporalMaskStatsSrvValid && temporalMaskStatsUavValid;
-    validateTableSet(m_rtReflectionSignalState.descriptorSrvTables,
+    validateTableSet(m_rtReflectionSignalState.descriptors.srvTables,
                      rtReflectionSignalStatsSrvValid,
                      "RT reflection signal stats SRV");
-    validateTableSet(m_rtReflectionSignalState.descriptorUavTables,
+    validateTableSet(m_rtReflectionSignalState.descriptors.uavTables,
                      rtReflectionSignalStatsUavValid,
                      "RT reflection signal stats UAV");
-    m_rtReflectionSignalState.descriptorTablesValid =
+    m_rtReflectionSignalState.descriptors.valid =
         rtReflectionSignalStatsSrvValid && rtReflectionSignalStatsUavValid;
     validateTableSet(m_bloomResources.srvTables, m_bloomResources.srvTableValid, "Bloom");
     return Result<void>::Ok();

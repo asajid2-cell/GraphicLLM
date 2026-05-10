@@ -25,6 +25,11 @@ if (-not (Test-Path $rendererHeaderPath)) {
     throw "Renderer.h not found: $rendererHeaderPath"
 }
 $rendererHeader = Get-Content $rendererHeaderPath -Raw
+$rendererRtStatePath = Join-Path $root "src/Graphics/RendererRTState.h"
+if (-not (Test-Path $rendererRtStatePath)) {
+    throw "RendererRTState.h not found: $rendererRtStatePath"
+}
+$rendererRtState = Get-Content $rendererRtStatePath -Raw
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -76,6 +81,19 @@ foreach ($target in $doc.targets) {
             $memberName = [string]$member
             if ($rendererHeader -notmatch "\b$([regex]::Escape($memberName))\b") {
                 Add-Failure "$id renderer state member not found in Renderer.h: $memberName"
+            }
+        }
+    }
+
+    if ($id -eq "rt_reflection_stats") {
+        foreach ($required in @("struct TargetResources", "struct DescriptorTableBundle", "rawResources", "historyResources", "descriptors")) {
+            if ($rendererRtState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_reflection_stats missing bundled ownership marker in RendererRTState.h: $required"
+            }
+        }
+        foreach ($oldField in @("rawStatsBuffer", "historyStatsBuffer", "rawReadback", "historyReadback", "descriptorSrvTables", "descriptorUavTables")) {
+            if ($rendererRtState -match "\b$([regex]::Escape($oldField))\b") {
+                Add-Failure "rt_reflection_stats still exposes loose state field in RendererRTState.h: $oldField"
             }
         }
     }

@@ -6,6 +6,7 @@
 #include "Debug/GPUProfiler.h"
 #include "Graphics/RendererControlApplier.h"
 #include "Graphics/RendererLightingRigControl.h"
+#include "Graphics/RendererTuningState.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/FrameContractJson.h"
 #include "Utils/MeshGenerator.h"
@@ -730,6 +731,37 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         UI::GraphicsSettingsWindow::Initialize(m_window->GetHWND());
         UI::SceneEditorWindow::Initialize(m_window->GetHWND());
         UI::PerformanceWindow::Initialize(m_window->GetHWND());
+    }
+
+    if (m_renderer) {
+        const bool forceUserGraphicsSettings = [] {
+            const char* value = std::getenv("CORTEX_LOAD_USER_GRAPHICS_SETTINGS");
+            return value && value[0] != '\0' && value[0] != '0';
+        }();
+        const bool disableUserGraphicsSettings = [] {
+            const char* value = std::getenv("CORTEX_DISABLE_USER_GRAPHICS_SETTINGS");
+            return value && value[0] != '\0' && value[0] != '0';
+        }();
+        const bool interactiveLaunch = m_maxFrames == 0 && !m_exitAfterVisualValidationCapture;
+        if (!disableUserGraphicsSettings && (interactiveLaunch || forceUserGraphicsSettings)) {
+            std::filesystem::path settingsPath = Graphics::GetDefaultRendererTuningStatePath();
+            if (const char* overridePath = std::getenv("CORTEX_GRAPHICS_SETTINGS_PATH")) {
+                if (overridePath[0] != '\0') {
+                    settingsPath = overridePath;
+                }
+            }
+
+            std::string loadError;
+            auto loaded = Graphics::LoadRendererTuningStateFile(settingsPath, &loadError);
+            if (loaded) {
+                Graphics::ApplyRendererTuningState(*m_renderer, *loaded);
+                spdlog::info("Loaded user graphics settings from '{}'", settingsPath.string());
+            } else if (!loadError.empty()) {
+                spdlog::warn("Ignoring user graphics settings '{}': {}",
+                             settingsPath.string(),
+                             loadError);
+            }
+        }
     }
 
     if (!config.initialEnvironmentPreset.empty() && m_renderer) {

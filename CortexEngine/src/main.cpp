@@ -614,6 +614,7 @@ int main(int argc, char* argv[]) {
 
         // Optional: parse simple command-line flags
         //   --scene <dragon|rt_showcase|temporal_validation|cornell>
+        //   --environment <manifest_id>
         //   --mode  <default|conservative>
         //   --backend <raster|voxel>
         for (int i = 1; i < argc; ++i) {
@@ -622,6 +623,12 @@ int main(int argc, char* argv[]) {
                 config.initialScenePreset = argv[++i];
             } else if (arg.rfind("--scene=", 0) == 0) {
                 config.initialScenePreset = arg.substr(std::string("--scene=").size());
+            } else if ((arg == "--environment" || arg == "--ibl-environment") && i + 1 < argc) {
+                config.initialEnvironmentPreset = argv[++i];
+            } else if (arg.rfind("--environment=", 0) == 0) {
+                config.initialEnvironmentPreset = arg.substr(std::string("--environment=").size());
+            } else if (arg.rfind("--ibl-environment=", 0) == 0) {
+                config.initialEnvironmentPreset = arg.substr(std::string("--ibl-environment=").size());
             } else if (arg == "--mode" && i + 1 < argc) {
                 std::string mode = argv[++i];
                 if (mode == "conservative") {

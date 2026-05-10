@@ -86,11 +86,18 @@ json FrameContractToJson(const FrameContract& contract) {
         }},
         {"environment", {
             {"active", contract.environment.active},
+            {"runtime_path", contract.environment.runtimePath},
+            {"budget_class", contract.environment.budgetClass},
             {"loaded", contract.environment.loaded},
             {"fallback", contract.environment.fallback},
             {"manifest_present", contract.environment.manifestPresent},
+            {"ibl_limit_enabled", contract.environment.iblLimitEnabled},
             {"resident_count", contract.environment.residentCount},
             {"pending_count", contract.environment.pendingCount},
+            {"resident_limit", contract.environment.residentLimit},
+            {"active_width", contract.environment.activeWidth},
+            {"active_height", contract.environment.activeHeight},
+            {"max_runtime_dimension", contract.environment.maxRuntimeDimension},
             {"resident_bytes", contract.environment.residentBytes}
         }},
         {"graphics_preset", {

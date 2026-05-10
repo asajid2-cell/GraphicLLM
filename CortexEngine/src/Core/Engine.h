@@ -68,6 +68,7 @@ struct EngineConfig {
     // default (currently the RT showcase gallery). Accepted values are
     // "dragon", "rt_showcase", "temporal_validation", and "cornell".
     std::string initialScenePreset;
+    std::string initialEnvironmentPreset;
 
     // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
     // interactive behavior. exitAfterVisualValidationCapture exits once the

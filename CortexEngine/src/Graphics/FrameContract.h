@@ -69,11 +69,18 @@ struct FrameContract {
 
     struct EnvironmentInfo {
         std::string active;
+        std::string runtimePath;
+        std::string budgetClass = "unknown";
         bool loaded = false;
         bool fallback = false;
         bool manifestPresent = false;
+        bool iblLimitEnabled = false;
         uint32_t residentCount = 0;
         uint32_t pendingCount = 0;
+        uint32_t residentLimit = 0;
+        uint32_t activeWidth = 0;
+        uint32_t activeHeight = 0;
+        uint32_t maxRuntimeDimension = 0;
         uint64_t residentBytes = 0;
     };
 

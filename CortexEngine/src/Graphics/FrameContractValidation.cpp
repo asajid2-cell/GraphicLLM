@@ -78,6 +78,27 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.assetMemory.rtStructureBudgetExceeded) {
         warn("asset_rt_structure_budget_exceeded");
     }
+    if (contract.environment.loaded && contract.environment.active.empty()) {
+        warn("environment_loaded_without_active_id");
+    }
+    if (contract.environment.loaded && !contract.environment.fallback) {
+        if (contract.environment.runtimePath.empty()) {
+            warn("environment_runtime_path_missing");
+        }
+        if (contract.environment.activeWidth == 0 || contract.environment.activeHeight == 0) {
+            warn("environment_active_extent_missing");
+        }
+        if (contract.environment.maxRuntimeDimension > 0 &&
+            (contract.environment.activeWidth > contract.environment.maxRuntimeDimension ||
+             contract.environment.activeHeight > contract.environment.maxRuntimeDimension)) {
+            warn("environment_exceeds_manifest_runtime_dimension");
+        }
+    }
+    if (contract.environment.iblLimitEnabled &&
+        contract.environment.residentLimit > 0 &&
+        contract.environment.residentCount > contract.environment.residentLimit) {
+        warn("environment_resident_count_exceeds_limit");
+    }
 
     if (!contract.features.voxelBackendEnabled) {
         requireResource("depth", true, "core_depth_contract");

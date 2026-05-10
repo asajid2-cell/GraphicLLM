@@ -90,13 +90,39 @@
     {
       "id": "effects_showcase",
       "display_name": "Effects Showcase",
-      "current_status": "planned",
-      "target_status": "late_phase3_or_phase4",
+      "current_status": "implemented_public_scene",
+      "target_status": "public_showcase",
       "default_environment": "night_city",
       "default_lighting_rig": "night_emissive",
       "required_bookmarks": ["hero"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Particles and cinematic post hero",
+          "position": [0.0, 2.15, -8.6],
+          "target": [0.0, 1.25, -0.15],
+          "fov": 55.0,
+          "validation": true
+        },
+        {
+          "id": "particles_closeup",
+          "label": "Emitter and bloom closeup",
+          "position": [-3.5, 1.65, -3.3],
+          "target": [-1.8, 1.35, -0.4],
+          "fov": 42.0,
+          "validation": false
+        },
+        {
+          "id": "neon_materials",
+          "label": "Neon and advanced materials",
+          "position": [3.8, 1.85, -4.0],
+          "target": [1.0, 1.45, 1.2],
+          "fov": 46.0,
+          "validation": false
+        }
+      ],
       "required_features": ["particles", "emissive_bloom", "cinematic_post", "advanced_materials"],
-      "polish_gaps": ["particle path consolidation", "cinematic post controls", "effect budget gates"]
+      "polish_gaps": ["GPU particle path consolidation", "human-reviewed final composition"]
     }
   ]
 }

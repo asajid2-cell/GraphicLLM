@@ -123,7 +123,9 @@ namespace {
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return normalized == "rt" || normalized == "rtshowcase" ||
                normalized == "rt_showcase" || normalized == "material_lab" ||
-               normalized == "materiallab" || normalized == "god_rays" ||
+               normalized == "materiallab" || normalized == "effects_showcase" ||
+               normalized == "effectsshowcase" || normalized == "effects" ||
+               normalized == "god_rays" ||
                normalized == "godrays" || normalized == "temporal" ||
                normalized == "temporalvalidation" ||
                normalized == "temporal_validation";
@@ -482,6 +484,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::RTShowcase;
         } else if (sceneLower == "material_lab" || sceneLower == "materiallab" || sceneLower == "materials") {
             m_currentScenePreset = ScenePreset::MaterialLab;
+        } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
+            m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
                    sceneLower == "temporalvalidation" ||
                    sceneLower == "temporal_validation") {
@@ -924,6 +928,9 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::MaterialLab;
         break;
     case ScenePreset::MaterialLab:
+        next = ScenePreset::EffectsShowcase;
+        break;
+    case ScenePreset::EffectsShowcase:
         next = ScenePreset::TemporalValidation;
         break;
     case ScenePreset::TemporalValidation:
@@ -1462,6 +1469,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::DragonOverWater: return "dragon_over_water";
         case ScenePreset::RTShowcase: return "rt_showcase";
         case ScenePreset::MaterialLab: return "material_lab";
+        case ScenePreset::EffectsShowcase: return "effects_showcase";
         case ScenePreset::GodRays: return "god_rays";
         case ScenePreset::TemporalValidation: return "temporal_validation";
         case ScenePreset::ProceduralTerrain: return "procedural_terrain";
@@ -1778,6 +1786,7 @@ void Engine::InitializeScene() {
     case ScenePreset::DragonOverWater:
     case ScenePreset::RTShowcase:
     case ScenePreset::MaterialLab:
+    case ScenePreset::EffectsShowcase:
     case ScenePreset::GodRays:
     case ScenePreset::TemporalValidation:
         break;

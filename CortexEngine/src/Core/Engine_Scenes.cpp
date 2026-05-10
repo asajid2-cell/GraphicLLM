@@ -111,6 +111,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::MaterialLab:
         BuildMaterialLabScene();
         break;
+    case ScenePreset::EffectsShowcase:
+        BuildEffectsShowcaseScene();
+        break;
     case ScenePreset::TemporalValidation:
         BuildTemporalValidationScene();
         break;
@@ -129,6 +132,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
     case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
+    case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
     case ScenePreset::ProceduralTerrain: presetName = "Procedural Terrain"; break;
@@ -879,6 +883,285 @@ void Engine::BuildMaterialLabScene() {
         l.intensity = 2.4f;
         l.range = 8.0f;
         l.castsShadows = false;
+    }
+}
+
+void Engine::BuildEffectsShowcaseScene() {
+    spdlog::info("Building public scene: Effects Showcase");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        Graphics::ApplyEffectsShowcaseSceneControls(*renderer);
+    }
+
+    auto floorPlane = Utils::MeshGenerator::CreatePlane(18.0f, 12.0f);
+    auto wallPlane = Utils::MeshGenerator::CreatePlane(18.0f, 6.0f);
+    auto sideWallPlane = Utils::MeshGenerator::CreatePlane(12.0f, 6.0f);
+    auto quadMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.22f, 2.4f, 32);
+    auto torusMesh = Utils::MeshGenerator::CreateTorus(0.58f, 0.14f, 32, 16);
+
+    if (renderer) {
+        auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+            if (!mesh) return true;
+            auto res = renderer->UploadMesh(mesh);
+            if (res.IsErr()) {
+                spdlog::warn("Failed to upload EffectsShowcase {} mesh: {}", label, res.Error());
+                return false;
+            }
+            if (renderer->IsDeviceRemoved()) {
+                spdlog::error("DX12 device was removed while uploading EffectsShowcase {} mesh", label);
+                return false;
+            }
+            return true;
+        };
+
+        if (!uploadMesh(floorPlane, "floor") ||
+            !uploadMesh(wallPlane, "wall") ||
+            !uploadMesh(sideWallPlane, "side wall") ||
+            !uploadMesh(quadMesh, "quad") ||
+            !uploadMesh(cubeMesh, "cube") ||
+            !uploadMesh(sphereMesh, "sphere") ||
+            !uploadMesh(cylinderMesh, "cylinder") ||
+            !uploadMesh(torusMesh, "torus")) {
+            return;
+        }
+    }
+
+    {
+        entt::entity camEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
+        t.position = glm::vec3(0.0f, 2.15f, -8.6f);
+        const glm::vec3 target(0.0f, 1.25f, -0.15f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = 55.0f;
+        cam.isActive = true;
+        m_activeCameraEntity = camEntity;
+    }
+
+    auto addRenderable = [&](const char* tag,
+                             const std::shared_ptr<Scene::MeshData>& mesh,
+                             const glm::vec3& position,
+                             const glm::vec3& scale,
+                             const glm::vec3& euler,
+                             const glm::vec4& color,
+                             float metallic,
+                             float roughness,
+                             const char* preset) -> entt::entity {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.scale = scale;
+        t.rotation = glm::quat(euler);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = color;
+        r.metallic = metallic;
+        r.roughness = roughness;
+        r.ao = 1.0f;
+        r.presetName = preset;
+        return e;
+    };
+
+    if (floorPlane && floorPlane->gpuBuffers) {
+        auto floor = addRenderable("EffectsShowcase_Floor", floorPlane,
+                                   glm::vec3(0.0f, 0.0f, 0.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.10f, 0.11f, 0.14f, 1.0f),
+                                   0.0f, 0.62f, "masonry");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
+        r.doubleSided = true;
+        r.normalScale = 0.18f;
+    }
+
+    if (wallPlane && wallPlane->gpuBuffers) {
+        auto back = addRenderable("EffectsShowcase_BackWall", wallPlane,
+                                  glm::vec3(0.0f, 3.0f, 4.8f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
+                                  glm::vec4(0.08f, 0.09f, 0.13f, 1.0f),
+                                  0.0f, 0.72f, "backdrop");
+        m_registry->GetComponent<Scene::RenderableComponent>(back).doubleSided = true;
+    }
+
+    if (sideWallPlane && sideWallPlane->gpuBuffers) {
+        auto left = addRenderable("EffectsShowcase_LeftWall", sideWallPlane,
+                                  glm::vec3(-9.0f, 3.0f, -1.0f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), glm::half_pi<float>(), 0.0f),
+                                  glm::vec4(0.09f, 0.09f, 0.12f, 1.0f),
+                                  0.0f, 0.76f, "masonry");
+        auto right = addRenderable("EffectsShowcase_RightWall", sideWallPlane,
+                                   glm::vec3(9.0f, 3.0f, -1.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(-glm::half_pi<float>(), -glm::half_pi<float>(), 0.0f),
+                                   glm::vec4(0.09f, 0.09f, 0.12f, 1.0f),
+                                   0.0f, 0.76f, "masonry");
+        m_registry->GetComponent<Scene::RenderableComponent>(left).doubleSided = true;
+        m_registry->GetComponent<Scene::RenderableComponent>(right).doubleSided = true;
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        auto plinthA = addRenderable("EffectsShowcase_CenterPlinth", cubeMesh,
+                                     glm::vec3(-2.1f, 0.28f, -0.1f),
+                                     glm::vec3(1.45f, 0.56f, 1.45f),
+                                     glm::vec3(0.0f),
+                                     glm::vec4(0.18f, 0.18f, 0.22f, 1.0f),
+                                     0.0f, 0.5f, "backdrop");
+        auto plinthB = addRenderable("EffectsShowcase_GlassPlinth", cubeMesh,
+                                     glm::vec3(2.2f, 0.28f, -0.2f),
+                                     glm::vec3(1.35f, 0.56f, 1.35f),
+                                     glm::vec3(0.0f),
+                                     glm::vec4(0.16f, 0.16f, 0.20f, 1.0f),
+                                     0.0f, 0.52f, "backdrop");
+        (void)plinthA;
+        (void)plinthB;
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        addRenderable("EffectsShowcase_ChromeOrb", sphereMesh,
+                      glm::vec3(-2.1f, 1.08f, -0.1f),
+                      glm::vec3(1.25f),
+                      glm::vec3(0.0f),
+                      glm::vec4(0.66f, 0.68f, 0.75f, 1.0f),
+                      1.0f, 0.10f, "chrome");
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        auto glass = addRenderable("EffectsShowcase_GlassCube", cubeMesh,
+                                   glm::vec3(2.2f, 1.1f, -0.2f),
+                                   glm::vec3(1.1f),
+                                   glm::vec3(0.0f, 0.55f, 0.0f),
+                                   glm::vec4(0.58f, 0.86f, 1.0f, 1.0f),
+                                   0.0f, 0.04f, "glass");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(glass);
+        r.transmissionFactor = 0.62f;
+        r.ior = 1.45f;
+        r.specularFactor = 1.15f;
+    }
+
+    if (torusMesh && torusMesh->gpuBuffers) {
+        auto torus = addRenderable("EffectsShowcase_ClearcoatTorus", torusMesh,
+                                   glm::vec3(0.0f, 1.05f, 1.7f),
+                                   glm::vec3(0.95f),
+                                   glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f),
+                                   glm::vec4(0.22f, 0.15f, 0.80f, 1.0f),
+                                   0.0f, 0.18f, "clearcoat");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(torus);
+        r.clearcoatFactor = 0.85f;
+        r.clearcoatRoughnessFactor = 0.08f;
+        r.specularColorFactor = glm::vec3(0.75f, 0.85f, 1.0f);
+    }
+
+    if (cylinderMesh && cylinderMesh->gpuBuffers) {
+        for (int i = 0; i < 5; ++i) {
+            const float x = -5.4f + static_cast<float>(i) * 2.7f;
+            addRenderable(("EffectsShowcase_LightColumn_" + std::to_string(i)).c_str(),
+                          cylinderMesh,
+                          glm::vec3(x, 1.2f, 2.6f),
+                          glm::vec3(0.75f, 1.0f, 0.75f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.13f, 0.15f, 0.18f, 1.0f),
+                          0.0f, 0.44f, "brushed_metal");
+        }
+    }
+
+    if (quadMesh && quadMesh->gpuBuffers) {
+        const struct NeonPanel {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec3 color;
+            float strength;
+        } panels[] = {
+            {"EffectsShowcase_NeonPanel_Magenta", glm::vec3(-4.6f, 2.2f, 4.68f), glm::vec3(2.0f, 0.52f, 1.0f), glm::vec3(1.0f, 0.18f, 0.78f), 6.0f},
+            {"EffectsShowcase_NeonPanel_Cyan", glm::vec3(0.0f, 2.9f, 4.67f), glm::vec3(2.4f, 0.42f, 1.0f), glm::vec3(0.12f, 0.75f, 1.0f), 5.4f},
+            {"EffectsShowcase_NeonPanel_Amber", glm::vec3(4.5f, 2.1f, 4.66f), glm::vec3(1.8f, 0.52f, 1.0f), glm::vec3(1.0f, 0.55f, 0.12f), 5.0f}
+        };
+
+        for (const auto& panel : panels) {
+            auto e = addRenderable(panel.tag, quadMesh,
+                                   panel.position,
+                                   panel.scale,
+                                   glm::vec3(0.0f),
+                                   glm::vec4(panel.color, 1.0f),
+                                   0.0f, 0.25f, "emissive_panel");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.emissiveColor = panel.color;
+            r.emissiveStrength = panel.strength;
+            r.doubleSided = true;
+        }
+    }
+
+    auto addPointLight = [&](const char* tag,
+                             const glm::vec3& position,
+                             const glm::vec3& color,
+                             float intensity,
+                             float range) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Point;
+        l.color = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.castsShadows = false;
+    };
+
+    addPointLight("EffectsShowcase_MagentaGlow", glm::vec3(-4.6f, 2.4f, 3.2f), glm::vec3(1.0f, 0.22f, 0.76f), 5.4f, 8.0f);
+    addPointLight("EffectsShowcase_CyanGlow", glm::vec3(0.0f, 3.0f, 2.7f), glm::vec3(0.16f, 0.72f, 1.0f), 4.8f, 8.0f);
+    addPointLight("EffectsShowcase_AmberGlow", glm::vec3(4.6f, 2.3f, 3.1f), glm::vec3(1.0f, 0.54f, 0.14f), 4.6f, 7.0f);
+
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "EffectsShowcase_FireEmitter");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(-2.0f, 1.32f, -0.85f);
+
+        Scene::ParticleEmitterComponent emitter;
+        emitter.type = Scene::ParticleEmitterType::Fire;
+        emitter.rate = 95.0f;
+        emitter.lifetime = 0.85f;
+        emitter.initialVelocity = glm::vec3(0.2f, 2.8f, 0.75f);
+        emitter.velocityRandom = glm::vec3(0.65f, 0.9f, 0.65f);
+        emitter.sizeStart = 0.055f;
+        emitter.sizeEnd = 0.34f;
+        emitter.colorStart = glm::vec4(3.3f, 1.35f, 0.35f, 0.9f);
+        emitter.colorEnd = glm::vec4(0.75f, 0.04f, 0.0f, 0.0f);
+        emitter.gravity = 0.7f;
+        emitter.localSpace = true;
+        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "EffectsShowcase_MoteEmitter");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(1.2f, 1.65f, 0.2f);
+
+        Scene::ParticleEmitterComponent emitter;
+        emitter.type = Scene::ParticleEmitterType::Smoke;
+        emitter.rate = 48.0f;
+        emitter.lifetime = 4.4f;
+        emitter.initialVelocity = glm::vec3(0.0f, 0.22f, 0.0f);
+        emitter.velocityRandom = glm::vec3(0.18f, 0.28f, 0.18f);
+        emitter.sizeStart = 0.04f;
+        emitter.sizeEnd = 0.17f;
+        emitter.colorStart = glm::vec4(0.65f, 0.88f, 1.0f, 0.28f);
+        emitter.colorEnd = glm::vec4(0.35f, 0.55f, 1.0f, 0.0f);
+        emitter.gravity = -0.08f;
+        emitter.localSpace = true;
+        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
     }
 }
 

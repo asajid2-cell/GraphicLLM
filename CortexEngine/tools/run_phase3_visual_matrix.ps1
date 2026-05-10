@@ -125,6 +125,18 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    $effectsLogDir = Join-Path $matrixLogDir "effects_showcase_release"
+    Invoke-MatrixStep "effects_showcase_release" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_effects_showcase_smoke.ps1"),
+        "-NoBuild",
+        "-LogDir", $effectsLogDir,
+        "-SmokeFrames", [string]$TemporalSmokeFrames
+    ) (Join-Path $effectsLogDir "frame_report_last.json")
+}
+
+if ($failures.Count -eq 0) {
     $iblLogDir = Join-Path $matrixLogDir "ibl_gallery"
     $iblArgs = @(
         "-NoProfile",

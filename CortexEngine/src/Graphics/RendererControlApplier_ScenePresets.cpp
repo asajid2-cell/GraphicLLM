@@ -144,6 +144,51 @@ void ApplyMaterialLabSceneControls(Renderer& renderer) {
         0.0f);
 }
 
+void ApplyEffectsShowcaseSceneControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("night_emissive", "scene_preset", false);
+    renderer.SetParticlesEnabled(true);
+    renderer.SetEnvironmentPreset("night_city");
+    renderer.SetIBLEnabled(true);
+    renderer.SetIBLIntensity(0.55f, 1.25f);
+    renderer.SetBackgroundPresentation(true, 1.0f, 0.15f);
+
+    renderer.SetShadowsEnabled(true);
+    renderer.SetShadowBias(0.0005f);
+    renderer.SetShadowPCFRadius(1.3f);
+    renderer.SetCascadeSplitLambda(0.52f);
+
+    const glm::vec3 sunDir = glm::normalize(glm::vec3(-0.18f, 0.75f, 0.42f));
+    renderer.SetSunDirection(sunDir);
+    renderer.SetSunColor(glm::vec3(0.72f, 0.82f, 1.0f));
+    renderer.SetSunIntensity(1.25f);
+
+    renderer.SetRenderScale(0.85f);
+    renderer.SetExposure(1.18f);
+    renderer.SetBloomIntensity(0.34f);
+    renderer.SetBloomShape(0.75f, 0.55f, 1.65f);
+    renderer.SetCinematicPost(0.18f, 0.34f);
+    renderer.SetColorGrade(0.08f, 0.24f);
+
+    renderer.SetFXAAEnabled(true);
+    renderer.SetTAAEnabled(true);
+    renderer.SetSSREnabled(true);
+    renderer.SetSSAOEnabled(true);
+    renderer.SetSSAOParams(0.26f, 0.035f, 0.26f);
+    renderer.SetFogEnabled(true);
+    renderer.SetFogParams(0.018f, 0.0f, 0.48f);
+    renderer.SetGodRayIntensity(0.28f);
+
+    renderer.SetRTReflectionsEnabled(true);
+    renderer.SetWaterParams(
+        -10.0f,
+        0.0f,
+        8.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f);
+}
+
 void ApplyTemporalValidationSceneControls(Renderer& renderer) {
     renderer.SetLightingRigContract("temporal_validation_lab", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(-0.35f, -0.85f, 0.25f)));

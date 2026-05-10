@@ -303,6 +303,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.water.secondaryAmplitude = water.secondaryAmplitude;
 
     state.particles.enabled = features.particlesEnabled;
+    state.particles.densityScale = features.particleDensityScale;
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
@@ -412,6 +413,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.water.waveSpeed,
                            state.water.secondaryAmplitude);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::Particles, state.particles.enabled);
+    renderer.SetParticleDensityScale(state.particles.densityScale);
     ApplyBloomShapeControl(renderer,
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,

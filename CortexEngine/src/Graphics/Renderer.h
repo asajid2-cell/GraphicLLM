@@ -220,6 +220,8 @@ public:
     // billboard particles without affecting global renderer state.
     void SetParticlesEnabled(bool enabled);
     [[nodiscard]] bool GetParticlesEnabled() const;
+    void SetParticleDensityScale(float scale);
+    [[nodiscard]] float GetParticleDensityScale() const;
     void SetSSREnabled(bool enabled);
     void ToggleSSR();
     void CycleScreenSpaceEffectsDebug();

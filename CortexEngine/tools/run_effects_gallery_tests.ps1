@@ -19,6 +19,7 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $stdoutPath = Join-Path $LogDir "effects_gallery_stdout.txt"
 $stderrPath = Join-Path $LogDir "effects_gallery_stderr.txt"
 $reportPath = Join-Path $LogDir "frame_report_last.json"
+$catalogPath = Join-Path $root "assets/config/advanced_graphics_catalog.json"
 
 $rtArgs = @(
     "-NoProfile",
@@ -32,16 +33,12 @@ if ($NoBuild) {
     $rtArgs += "-NoBuild"
 }
 
-$process = Start-Process `
-    -FilePath "powershell" `
-    -ArgumentList $rtArgs `
-    -RedirectStandardOutput $stdoutPath `
-    -RedirectStandardError $stderrPath `
-    -PassThru `
-    -Wait `
-    -WindowStyle Hidden
+$output = & powershell @rtArgs 2>&1
+$exitCode = $LASTEXITCODE
+$output | Set-Content -Encoding UTF8 $stdoutPath
+"" | Set-Content -Encoding UTF8 $stderrPath
 
-if ($process.ExitCode -ne 0) {
+if ($exitCode -ne 0) {
     $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
     $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "" }
     throw "RT showcase smoke failed during effects gallery validation. log=$LogDir`n$stderrText`n$stdoutText"
@@ -68,6 +65,23 @@ function Get-FrameContractPass([object]$reportObject, [string]$name) {
         }
     }
     return $null
+}
+
+if (-not (Test-Path $catalogPath)) {
+    Add-Failure "advanced graphics catalog is missing: $catalogPath"
+} else {
+    $catalog = Get-Content $catalogPath -Raw | ConvertFrom-Json
+    $systemIds = @{}
+    foreach ($system in $catalog.systems) {
+        $systemIds[[string]$system.id] = $system
+    }
+    foreach ($requiredSystem in @("particles", "cinematic_post")) {
+        if (-not $systemIds.ContainsKey($requiredSystem)) {
+            Add-Failure "advanced graphics catalog missing '$requiredSystem' system"
+        } elseif ([string]$systemIds[$requiredSystem].first_validation_scene -ne "effects_showcase") {
+            Add-Failure "catalog '$requiredSystem' first_validation_scene is '$($systemIds[$requiredSystem].first_validation_scene)', expected effects_showcase"
+        }
+    }
 }
 
 $particles = $report.frame_contract.particles

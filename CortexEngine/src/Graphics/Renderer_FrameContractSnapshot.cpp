@@ -262,6 +262,19 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         contract.culling.visible = stats.visible;
     }
 
+    contract.particles.enabled = m_particleState.enabledForScene;
+    contract.particles.planned = featurePlan.runParticles;
+    contract.particles.executed = m_particleState.frameExecuted;
+    contract.particles.instanceMapFailed = m_particleState.instanceMapFailed;
+    contract.particles.capped = m_particleState.frameCapped;
+    contract.particles.emitterCount = m_particleState.frameEmitterCount;
+    contract.particles.liveParticles = m_particleState.frameLiveParticles;
+    contract.particles.submittedInstances = m_particleState.frameSubmittedInstances;
+    contract.particles.frustumCulled = m_particleState.frameFrustumCulled;
+    contract.particles.maxInstances = m_particleState.frameMaxInstances;
+    contract.particles.instanceCapacity = m_particleState.instanceCapacity;
+    contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
+
     contract.motionVectors = m_frameDiagnostics.contract.motionVectors;
     contract.temporalMask = m_frameDiagnostics.contract.temporalMask;
 

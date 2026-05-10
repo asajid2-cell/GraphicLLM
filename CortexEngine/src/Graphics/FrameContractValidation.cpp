@@ -573,6 +573,18 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (d.particleDraws > 0 && !passExecuted("Particles")) {
         warn("particle_draws_without_pass_record");
     }
+    if (contract.particles.executed && d.particleDraws == 0) {
+        warn("particle_contract_executed_without_draw_count");
+    }
+    if (contract.particles.submittedInstances != d.particleInstances) {
+        warn("particle_contract_instance_count_mismatch");
+    }
+    if (contract.particles.capped) {
+        warn("particle_instances_capped");
+    }
+    if (contract.particles.instanceMapFailed) {
+        warn("particle_instance_map_failed");
+    }
     if (d.debugLineDraws > 0 && !passExecuted("DebugLines")) {
         warn("debug_line_draws_without_pass_record");
     }

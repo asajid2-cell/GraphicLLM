@@ -77,6 +77,7 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
     plan.planned.fxaaEnabled = inputs.fxaaEnabled;
     plan.planned.iblEnabled = inputs.iblEnabled;
     plan.planned.fogEnabled = inputs.fogEnabled;
+    plan.planned.particlesEnabled = inputs.particlesEnabledForScene;
     plan.planned.voxelBackendEnabled = inputs.voxelBackendEnabled;
 
     plan.active = plan.planned;
@@ -101,6 +102,8 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
         (inputs.hasSSAOComputePipeline || inputs.hasSSAOPipeline);
     plan.active.bloomEnabled =
         plan.planned.bloomEnabled && inputs.hasBloomBase && inputs.hasBloomDownsamplePipeline;
+    plan.active.particlesEnabled =
+        !plan.runMinimalFrame && !plan.runVoxelBackend && plan.planned.particlesEnabled;
     plan.active.voxelBackendEnabled =
         plan.planned.voxelBackendEnabled && inputs.hasVoxelPipeline;
 
@@ -122,7 +125,7 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
         !plan.runMinimalFrame && !plan.runVoxelBackend && !plan.debug.disablePostProcess &&
         inputs.hasPostProcessPipeline && inputs.hasHDRColor;
     plan.runParticles =
-        !plan.runMinimalFrame && !plan.runVoxelBackend && inputs.particlesEnabledForScene;
+        !plan.runMinimalFrame && !plan.runVoxelBackend && plan.active.particlesEnabled;
     plan.runDebugLines = !plan.runMinimalFrame && !plan.runVoxelBackend;
     plan.runHZB =
         !plan.runMinimalFrame && !plan.runVoxelBackend && plan.debug.enableHZB;
@@ -144,6 +147,7 @@ FrameFeaturePlan BuildFrameFeaturePlan(const FrameFeaturePlanInputs& inputs) {
         plan.active.fxaaEnabled = false;
         plan.active.iblEnabled = false;
         plan.active.fogEnabled = false;
+        plan.active.particlesEnabled = false;
         plan.active.voxelBackendEnabled = plan.runVoxelBackend;
     }
 

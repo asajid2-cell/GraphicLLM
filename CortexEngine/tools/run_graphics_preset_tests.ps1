@@ -68,6 +68,8 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.quality.render_scale" ([double]$preset.quality.render_scale) 0.5 1.5
     Assert-Range "$id.environment.diffuse_intensity" ([double]$preset.environment.diffuse_intensity) 0.0 4.0
     Assert-Range "$id.environment.specular_intensity" ([double]$preset.environment.specular_intensity) 0.0 4.0
+    Assert-Range "$id.environment.background_exposure" ([double]$preset.environment.background_exposure) 0.0 4.0
+    Assert-Range "$id.environment.background_blur" ([double]$preset.environment.background_blur) 0.0 1.0
     Assert-Range "$id.lighting.exposure" ([double]$preset.lighting.exposure) 0.01 8.0
     Assert-Range "$id.lighting.bloom_intensity" ([double]$preset.lighting.bloom_intensity) 0.0 5.0
     Assert-Range "$id.screen_space.ssao_radius" ([double]$preset.screen_space.ssao_radius) 0.05 5.0
@@ -148,6 +150,8 @@ if ($RuntimeSmoke -and $failures.Count -eq 0) {
             $dirty = [bool]$report.frame_contract.graphics_preset.dirty_from_ui
             $renderScale = [double]$report.frame_contract.graphics_preset.render_scale
             $exposure = [double]$report.frame_contract.lighting.exposure
+            $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
+            $backgroundBlur = [double]$report.frame_contract.environment.background_blur
             if ($contractPreset -ne "release_showcase") {
                 Add-Failure "runtime contract graphics preset was '$contractPreset', expected 'release_showcase'"
             }
@@ -159,6 +163,12 @@ if ($RuntimeSmoke -and $failures.Count -eq 0) {
             }
             if ([Math]::Abs($exposure - 1.12) -gt 0.03) {
                 Add-Failure "runtime contract exposure was $exposure, expected about 1.12"
+            }
+            if ([Math]::Abs($backgroundExposure - 1.0) -gt 0.03) {
+                Add-Failure "runtime contract background exposure was $backgroundExposure, expected about 1.0"
+            }
+            if ([Math]::Abs($backgroundBlur - 0.0) -gt 0.03) {
+                Add-Failure "runtime contract background blur was $backgroundBlur, expected about 0.0"
             }
         }
     }

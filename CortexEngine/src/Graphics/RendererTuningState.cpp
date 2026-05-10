@@ -43,7 +43,10 @@ json ToJson(const RendererTuningState& state) {
             {"ibl_enabled", state.environment.iblEnabled},
             {"ibl_limit_enabled", state.environment.iblLimitEnabled},
             {"diffuse_intensity", state.environment.diffuseIntensity},
-            {"specular_intensity", state.environment.specularIntensity}
+            {"specular_intensity", state.environment.specularIntensity},
+            {"background_visible", state.environment.backgroundVisible},
+            {"background_exposure", state.environment.backgroundExposure},
+            {"background_blur", state.environment.backgroundBlur}
         }},
         {"ray_tracing", {
             {"enabled", state.rayTracing.enabled},
@@ -125,6 +128,9 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(e, "ibl_limit_enabled", state.environment.iblLimitEnabled);
         ReadValue(e, "diffuse_intensity", state.environment.diffuseIntensity);
         ReadValue(e, "specular_intensity", state.environment.specularIntensity);
+        ReadValue(e, "background_visible", state.environment.backgroundVisible);
+        ReadValue(e, "background_exposure", state.environment.backgroundExposure);
+        ReadValue(e, "background_blur", state.environment.backgroundBlur);
     }
     if (root.contains("ray_tracing") && root.at("ray_tracing").is_object()) {
         const auto& rt = root.at("ray_tracing");
@@ -204,6 +210,15 @@ json GraphicsPresetToTuningJson(const json& preset) {
         if (env.contains("specular_intensity")) {
             root["environment"]["specular_intensity"] = env.at("specular_intensity");
         }
+        if (env.contains("background_visible")) {
+            root["environment"]["background_visible"] = env.at("background_visible");
+        }
+        if (env.contains("background_exposure")) {
+            root["environment"]["background_exposure"] = env.at("background_exposure");
+        }
+        if (env.contains("background_blur")) {
+            root["environment"]["background_blur"] = env.at("background_blur");
+        }
     }
 
     root["ray_tracing"] = preset.value("ray_tracing", json::object());
@@ -261,6 +276,9 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.environment.iblLimitEnabled = features.iblLimitEnabled;
     state.environment.diffuseIntensity = features.iblDiffuseIntensity;
     state.environment.specularIntensity = features.iblSpecularIntensity;
+    state.environment.backgroundVisible = features.backgroundVisible;
+    state.environment.backgroundExposure = features.backgroundExposure;
+    state.environment.backgroundBlur = features.backgroundBlur;
 
     state.rayTracing.enabled = rt.enabled;
     state.rayTracing.reflectionsEnabled = rt.reflectionsEnabled;
@@ -310,6 +328,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
 
     state.environment.diffuseIntensity = std::clamp(state.environment.diffuseIntensity, 0.0f, 3.0f);
     state.environment.specularIntensity = std::clamp(state.environment.specularIntensity, 0.0f, 3.0f);
+    state.environment.backgroundExposure = std::clamp(state.environment.backgroundExposure, 0.0f, 4.0f);
+    state.environment.backgroundBlur = std::clamp(state.environment.backgroundBlur, 0.0f, 1.0f);
 
     state.screenSpace.ssaoRadius = std::clamp(state.screenSpace.ssaoRadius, 0.01f, 5.0f);
     state.screenSpace.ssaoBias = std::clamp(state.screenSpace.ssaoBias, 0.0f, 1.0f);
@@ -362,6 +382,10 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyIBLIntensityControl(renderer,
                              state.environment.diffuseIntensity,
                              state.environment.specularIntensity);
+    ApplyBackgroundPresentationControl(renderer,
+                                       state.environment.backgroundVisible,
+                                       state.environment.backgroundExposure,
+                                       state.environment.backgroundBlur);
 
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RayTracing, state.rayTracing.enabled);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RTReflections, state.rayTracing.reflectionsEnabled);

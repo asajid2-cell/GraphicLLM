@@ -36,6 +36,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_BLOOM_KNEE = 9023,
     IDC_GFX_VIGNETTE = 9024,
     IDC_GFX_LENS_DIRT = 9025,
+    IDC_GFX_BACKGROUND_EXPOSURE = 9026,
+    IDC_GFX_BACKGROUND_BLUR = 9027,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -50,6 +52,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_IBL_LIMIT = 9110,
     IDC_GFX_FOG = 9111,
     IDC_GFX_PARTICLES = 9112,
+    IDC_GFX_BACKGROUND_VISIBLE = 9113,
 
     IDC_GFX_SAFE_PRESET = 9200,
     IDC_GFX_HERO_BASELINE = 9201,
@@ -88,6 +91,8 @@ struct GraphicsSettingsState {
     SliderBinding areaLight;
     SliderBinding iblDiffuse;
     SliderBinding iblSpecular;
+    SliderBinding backgroundExposure;
+    SliderBinding backgroundBlur;
     SliderBinding ssaoRadius;
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
@@ -108,6 +113,7 @@ struct GraphicsSettingsState {
     HWND chkPCSS = nullptr;
     HWND chkIBL = nullptr;
     HWND chkIBLLimit = nullptr;
+    HWND chkBackgroundVisible = nullptr;
     HWND chkFog = nullptr;
     HWND chkParticles = nullptr;
 
@@ -177,6 +183,7 @@ void SyncStateFromToggles() {
 
     g_gfx.tuning.environment.iblEnabled = GetCheckbox(g_gfx.chkIBL);
     g_gfx.tuning.environment.iblLimitEnabled = GetCheckbox(g_gfx.chkIBLLimit);
+    g_gfx.tuning.environment.backgroundVisible = GetCheckbox(g_gfx.chkBackgroundVisible);
 
     g_gfx.tuning.atmosphere.fogEnabled = GetCheckbox(g_gfx.chkFog);
     g_gfx.tuning.particles.enabled = GetCheckbox(g_gfx.chkParticles);
@@ -191,6 +198,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.lighting.areaLightSizeScale = SliderToFloat(g_gfx.areaLight);
     g_gfx.tuning.environment.diffuseIntensity = SliderToFloat(g_gfx.iblDiffuse);
     g_gfx.tuning.environment.specularIntensity = SliderToFloat(g_gfx.iblSpecular);
+    g_gfx.tuning.environment.backgroundExposure = SliderToFloat(g_gfx.backgroundExposure);
+    g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
     g_gfx.tuning.screenSpace.ssaoRadius = SliderToFloat(g_gfx.ssaoRadius);
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
@@ -229,6 +238,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.areaLight, g_gfx.tuning.lighting.areaLightSizeScale);
     SetSliderFromFloat(g_gfx.iblDiffuse, g_gfx.tuning.environment.diffuseIntensity);
     SetSliderFromFloat(g_gfx.iblSpecular, g_gfx.tuning.environment.specularIntensity);
+    SetSliderFromFloat(g_gfx.backgroundExposure, g_gfx.tuning.environment.backgroundExposure);
+    SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
     SetSliderFromFloat(g_gfx.ssaoRadius, g_gfx.tuning.screenSpace.ssaoRadius);
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
@@ -249,6 +260,7 @@ void RefreshControlsFromRenderer() {
     SetCheckbox(g_gfx.chkPCSS, g_gfx.tuning.screenSpace.pcssEnabled);
     SetCheckbox(g_gfx.chkIBL, g_gfx.tuning.environment.iblEnabled);
     SetCheckbox(g_gfx.chkIBLLimit, g_gfx.tuning.environment.iblLimitEnabled);
+    SetCheckbox(g_gfx.chkBackgroundVisible, g_gfx.tuning.environment.backgroundVisible);
     SetCheckbox(g_gfx.chkFog, g_gfx.tuning.atmosphere.fogEnabled);
     SetCheckbox(g_gfx.chkParticles, g_gfx.tuning.particles.enabled);
 }
@@ -450,8 +462,11 @@ void RegisterGraphicsSettingsClass() {
             makeSection(L"Environment / IBL");
             g_gfx.chkIBL = makeCheckbox(IDC_GFX_IBL, L"IBL Enabled");
             g_gfx.chkIBLLimit = makeCheckbox(IDC_GFX_IBL_LIMIT, L"IBL Residency Limit");
+            g_gfx.chkBackgroundVisible = makeCheckbox(IDC_GFX_BACKGROUND_VISIBLE, L"Background Visible");
             makeSlider(IDC_GFX_IBL_DIFFUSE, L"IBL Diffuse", g_gfx.iblDiffuse, 0.0f, 3.0f);
             makeSlider(IDC_GFX_IBL_SPECULAR, L"IBL Specular", g_gfx.iblSpecular, 0.0f, 3.0f);
+            makeSlider(IDC_GFX_BACKGROUND_EXPOSURE, L"Background Exposure", g_gfx.backgroundExposure, 0.0f, 4.0f);
+            makeSlider(IDC_GFX_BACKGROUND_BLUR, L"Background Blur", g_gfx.backgroundBlur, 0.0f, 1.0f);
             {
                 const int buttonWidth = (width - margin * 2 - 12) / 3;
                 makeButton(IDC_GFX_ENV_NEXT, L"Next Env", margin, y, buttonWidth);

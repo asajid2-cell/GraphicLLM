@@ -15,7 +15,10 @@
         "environment_id": "studio",
         "ibl_enabled": true,
         "diffuse_intensity": 1.05,
-        "specular_intensity": 0.78
+        "specular_intensity": 0.78,
+        "background_visible": true,
+        "background_exposure": 1.0,
+        "background_blur": 0.0
       },
       "lighting": {
         "exposure": 1.12,
@@ -68,7 +71,10 @@
         "environment_id": "studio",
         "ibl_enabled": true,
         "diffuse_intensity": 0.85,
-        "specular_intensity": 0.55
+        "specular_intensity": 0.55,
+        "background_visible": true,
+        "background_exposure": 0.9,
+        "background_blur": 0.25
       },
       "lighting": {
         "exposure": 1.0,

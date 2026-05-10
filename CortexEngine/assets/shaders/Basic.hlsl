@@ -22,7 +22,7 @@ cbuffer FrameConstants : register(b1)
     float4 g_CameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
     float4 g_TimeAndExposure;
-    // rgb: ambient color * intensity, w unused
+    // rgb: ambient color * intensity, w = background blur amount
     float4 g_AmbientColor;
     uint4 g_LightCount;
     // Forward lights (light 0 is the sun). Must match the size used in
@@ -56,7 +56,7 @@ cbuffer FrameConstants : register(b1)
     // w = RT sun shadows enabled (>0.5)
     float4 g_PostParams;
     // x = diffuse IBL intensity, y = specular IBL intensity,
-    // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
+    // z = IBL enabled (>0.5), w = background exposure
     float4 g_EnvParams;
     // x = warm tint (-1..1), y = cool tint (-1..1),
     // z = god-ray intensity scale, w reserved
@@ -2094,13 +2094,15 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
     // If IBL is disabled, fall back to flat ambient
     if (g_EnvParams.z <= 0.5f)
     {
-        return float4(g_AmbientColor.rgb, 1.0f);
+        return float4(g_AmbientColor.rgb * g_EnvParams.w, 1.0f);
     }
 
     // Proper 3D environment sampling: convert the world-space direction to
     // lat-long UVs for the equirectangular panorama so the background rotates
     // correctly with the camera.
     float2 skyUV = DirectionToLatLong(dir);
-    float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, 0.0f).rgb * g_EnvParams.y;
+    float backgroundMip = saturate(g_AmbientColor.w) * 8.0f;
+    float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, backgroundMip).rgb *
+                   g_EnvParams.y * g_EnvParams.w;
     return float4(color, 1.0f);
 }

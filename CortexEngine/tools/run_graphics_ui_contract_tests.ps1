@@ -54,6 +54,9 @@ Assert-Contains $ui "SaveRendererTuningStateFile" "GraphicsSettingsWindow does n
 Assert-Contains $ui "LoadRendererTuningStateFile" "GraphicsSettingsWindow does not expose settings load."
 Assert-Contains $ui "IDC_GFX_VIGNETTE" "GraphicsSettingsWindow does not expose vignette control."
 Assert-Contains $ui "IDC_GFX_LENS_DIRT" "GraphicsSettingsWindow does not expose lens dirt control."
+Assert-Contains $ui "IDC_GFX_BACKGROUND_VISIBLE" "GraphicsSettingsWindow does not expose background visibility control."
+Assert-Contains $ui "IDC_GFX_BACKGROUND_EXPOSURE" "GraphicsSettingsWindow does not expose background exposure control."
+Assert-Contains $ui "IDC_GFX_BACKGROUND_BLUR" "GraphicsSettingsWindow does not expose background blur control."
 Assert-Contains $engine "CORTEX_GRAPHICS_SETTINGS_PATH" "Engine does not support user graphics settings path override."
 
 Write-Host "Graphics UI contract tests passed"

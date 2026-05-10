@@ -29,7 +29,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
     frameData.timeAndExposure = glm::vec4(m_frameRuntime.totalTime, deltaTime, m_qualityRuntimeState.exposure, bloom);
 
     glm::vec3 ambient = m_lightingState.ambientColor * m_lightingState.ambientIntensity;
-    frameData.ambientColor = glm::vec4(ambient, 0.0f);
+    frameData.ambientColor = glm::vec4(ambient, m_environmentState.backgroundBlur);
 
     // Fill forward light array (light 0 = directional sun)
     glm::vec3 dirToLight = glm::normalize(m_lightingState.directionalDirection);

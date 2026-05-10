@@ -70,7 +70,7 @@ struct FrameConstants {
     glm::vec4 cameraPosition;
     // x = time, y = deltaTime, z = exposure, w = bloom intensity
     glm::vec4 timeAndExposure;
-    // rgb: ambient color * intensity, w unused
+    // rgb: ambient color * intensity, w = background blur amount
     glm::vec4 ambientColor;
 // Forward light list (currently up to 4 lights; light[0] is the sun)
     alignas(16) glm::uvec4 lightCount;
@@ -112,7 +112,7 @@ struct FrameConstants {
     // w = RT sun shadows enabled (>0.5)
     glm::vec4 postParams;
     // x = diffuse IBL intensity, y = specular IBL intensity,
-    // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
+    // z = IBL enabled (>0.5), w = background exposure
     glm::vec4 envParams;
     // x = warm tint (-1..1), y = cool tint (-1..1),
     // z = god-ray intensity scale, w = vignette

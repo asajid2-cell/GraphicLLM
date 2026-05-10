@@ -73,7 +73,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_environmentState.diffuseIntensity,
         m_environmentState.specularIntensity,
         iblEnabled,
-        static_cast<float>(m_environmentState.currentIndex));
+        m_environmentState.backgroundExposure);
 
     // Color grading parameters (warm/cool) for post-process. We repurpose
     // colorGrade.z for volumetric sun shafts and colorGrade.w for vignette

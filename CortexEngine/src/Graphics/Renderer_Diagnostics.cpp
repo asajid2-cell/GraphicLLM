@@ -73,6 +73,9 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.fogFalloff = m_fogState.falloff;
     state.iblDiffuseIntensity = m_environmentState.diffuseIntensity;
     state.iblSpecularIntensity = m_environmentState.specularIntensity;
+    state.backgroundVisible = m_environmentState.backgroundVisible;
+    state.backgroundExposure = m_environmentState.backgroundExposure;
+    state.backgroundBlur = m_environmentState.backgroundBlur;
     state.godRayIntensity = m_postProcessState.godRayIntensity;
     state.areaLightSizeScale = m_lightingState.areaLightSizeScale;
     state.sunIntensity = m_lightingState.directionalIntensity;

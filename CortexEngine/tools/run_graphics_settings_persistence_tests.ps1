@@ -47,7 +47,10 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "ibl_enabled": true,
     "ibl_limit_enabled": true,
     "diffuse_intensity": 1.1,
-    "specular_intensity": 0.9
+    "specular_intensity": 0.9,
+    "background_visible": true,
+    "background_exposure": 1.23,
+    "background_blur": 0.37
   },
   "ray_tracing": {
     "enabled": false,
@@ -141,6 +144,14 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([bool]$report.frame_contract.ray_tracing.enabled) {
         Add-Failure "valid settings did not disable ray tracing"
+    }
+    $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
+    $backgroundBlur = [double]$report.frame_contract.environment.background_blur
+    if ([Math]::Abs($backgroundExposure - 1.23) -gt 0.03) {
+        Add-Failure "valid settings background exposure was $backgroundExposure, expected 1.23"
+    }
+    if ([Math]::Abs($backgroundBlur - 0.37) -gt 0.03) {
+        Add-Failure "valid settings background blur was $backgroundBlur, expected 0.37"
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt

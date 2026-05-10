@@ -53,6 +53,9 @@ struct EnvironmentLightingState {
     float diffuseIntensity = 1.1f;
     float specularIntensity = 1.3f;
     bool enabled = true;
+    bool backgroundVisible = true;
+    float backgroundExposure = 1.0f;
+    float backgroundBlur = 0.0f;
 
     void ResetMaps() {
         maps.clear();

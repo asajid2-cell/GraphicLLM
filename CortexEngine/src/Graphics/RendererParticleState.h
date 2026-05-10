@@ -16,6 +16,7 @@ struct ParticleInstance {
 struct ParticleRenderState {
     bool instanceMapFailed = false;
     bool enabledForScene = true;
+    float densityScale = 1.0f;
     ComPtr<ID3D12Resource> instanceBuffer;
     UINT instanceCapacity = 0;
     ComPtr<ID3D12Resource> quadVertexBuffer;
@@ -25,6 +26,7 @@ struct ParticleRenderState {
     uint32_t frameSubmittedInstances = 0;
     uint32_t frameFrustumCulled = 0;
     uint32_t frameMaxInstances = 4096;
+    float frameDensityScale = 1.0f;
     bool frameCapped = false;
     bool frameExecuted = false;
 
@@ -38,6 +40,7 @@ struct ParticleRenderState {
         frameSubmittedInstances = 0;
         frameFrustumCulled = 0;
         frameMaxInstances = 4096;
+        frameDensityScale = densityScale;
         frameCapped = false;
         frameExecuted = false;
     }

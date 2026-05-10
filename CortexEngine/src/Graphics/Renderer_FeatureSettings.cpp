@@ -111,6 +111,14 @@ bool Renderer::GetParticlesEnabled() const {
     return GetFeatureState().particlesEnabled;
 }
 
+void Renderer::SetParticleDensityScale(float scale) {
+    m_particleState.densityScale = std::clamp(scale, 0.0f, 2.0f);
+}
+
+float Renderer::GetParticleDensityScale() const {
+    return m_particleState.densityScale;
+}
+
 void Renderer::SetSSREnabled(bool enabled) {
     if (m_ssrResources.enabled == enabled) {
         return;

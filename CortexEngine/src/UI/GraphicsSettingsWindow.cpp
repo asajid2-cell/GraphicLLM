@@ -38,6 +38,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_LENS_DIRT = 9025,
     IDC_GFX_BACKGROUND_EXPOSURE = 9026,
     IDC_GFX_BACKGROUND_BLUR = 9027,
+    IDC_GFX_PARTICLE_DENSITY = 9028,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -104,6 +105,7 @@ struct GraphicsSettingsState {
     SliderBinding bloomKnee;
     SliderBinding vignette;
     SliderBinding lensDirt;
+    SliderBinding particleDensity;
 
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
@@ -211,6 +213,7 @@ void SyncStateFromSliders() {
     g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
     g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
     g_gfx.tuning.cinematicPost.lensDirt = SliderToFloat(g_gfx.lensDirt);
+    g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
 }
 
 void ApplyTuningState() {
@@ -251,6 +254,7 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
     SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
     SetSliderFromFloat(g_gfx.lensDirt, g_gfx.tuning.cinematicPost.lensDirt);
+    SetSliderFromFloat(g_gfx.particleDensity, g_gfx.tuning.particles.densityScale);
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -489,6 +493,7 @@ void RegisterGraphicsSettingsClass() {
 
             makeSection(L"Showcase Effects");
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
+            makeSlider(IDC_GFX_PARTICLE_DENSITY, L"Particle Density", g_gfx.particleDensity, 0.0f, 2.0f);
             makeSlider(IDC_GFX_WATER_WAVE, L"Water Wave Amp", g_gfx.waterWave, 0.0f, 2.0f);
             makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);

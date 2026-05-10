@@ -24,7 +24,18 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     // per-frame instance buffer small and avoid pathological memory usage if
     // an emitter accidentally spawns an excessive number of particles.
     static constexpr uint32_t kMaxParticleInstances = 4096;
-    m_particleState.frameMaxInstances = kMaxParticleInstances;
+    const float densityScale = std::clamp(m_particleState.densityScale, 0.0f, 2.0f);
+    m_particleState.frameDensityScale = densityScale;
+    if (densityScale <= 0.0f) {
+        m_particleState.frameMaxInstances = 0;
+        return;
+    }
+
+    const uint32_t scaledMaxInstances = static_cast<uint32_t>(
+        std::clamp(densityScale * static_cast<float>(kMaxParticleInstances),
+                   1.0f,
+                   static_cast<float>(kMaxParticleInstances * 2u)));
+    m_particleState.frameMaxInstances = scaledMaxInstances;
 
     auto view = registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
     if (view.begin() == view.end()) {
@@ -62,7 +73,15 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             }
             ++m_particleState.frameLiveParticles;
 
-            if (instances.size() >= kMaxParticleInstances) {
+            if (densityScale < 1.0f) {
+                const float samplePhase = static_cast<float>(m_particleState.frameLiveParticles) * densityScale;
+                const float previousPhase = static_cast<float>(m_particleState.frameLiveParticles - 1u) * densityScale;
+                if (static_cast<uint32_t>(samplePhase) == static_cast<uint32_t>(previousPhase)) {
+                    continue;
+                }
+            }
+
+            if (instances.size() >= scaledMaxInstances) {
                 m_particleState.frameCapped = true;
                 break;
             }
@@ -80,7 +99,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             instances.push_back(inst);
         }
 
-        if (instances.size() >= kMaxParticleInstances) {
+        if (instances.size() >= scaledMaxInstances) {
             break;
         }
     }

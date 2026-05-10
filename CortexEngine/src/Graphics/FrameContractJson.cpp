@@ -238,6 +238,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"executed", contract.particles.executed},
             {"instance_map_failed", contract.particles.instanceMapFailed},
             {"capped", contract.particles.capped},
+            {"density_scale", contract.particles.densityScale},
             {"emitter_count", contract.particles.emitterCount},
             {"live_particles", contract.particles.liveParticles},
             {"submitted_instances", contract.particles.submittedInstances},

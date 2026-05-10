@@ -177,6 +177,7 @@ struct RendererFeatureState {
     bool ssrEnabled = false;
     bool fogEnabled = false;
     bool particlesEnabled = false;
+    float particleDensityScale = 1.0f;
     bool vegetationEnabled = false;
     float fogDensity = 0.0f;
     float fogHeight = 0.0f;

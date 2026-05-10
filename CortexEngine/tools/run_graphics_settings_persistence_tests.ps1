@@ -68,7 +68,7 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "particles": {
     "enabled": false,
-    "density_scale": 1.0
+    "density_scale": 0.43
   },
   "cinematic_post": {
     "bloom_threshold": 1.2,
@@ -160,6 +160,10 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($lensDirt - 0.22) -gt 0.02) {
         Add-Failure "valid settings lens dirt was $lensDirt, expected 0.22"
+    }
+    $particleDensity = [double]$report.frame_contract.particles.density_scale
+    if ([Math]::Abs($particleDensity - 0.43) -gt 0.02) {
+        Add-Failure "valid settings particle density was $particleDensity, expected 0.43"
     }
 }
 

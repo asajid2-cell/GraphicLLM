@@ -273,6 +273,7 @@ struct FrameContract {
         bool executed = false;
         bool instanceMapFailed = false;
         bool capped = false;
+        float densityScale = 1.0f;
         uint32_t emitterCount = 0;
         uint32_t liveParticles = 0;
         uint32_t submittedInstances = 0;

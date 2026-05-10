@@ -57,6 +57,7 @@ Assert-Contains $ui "IDC_GFX_LENS_DIRT" "GraphicsSettingsWindow does not expose 
 Assert-Contains $ui "IDC_GFX_BACKGROUND_VISIBLE" "GraphicsSettingsWindow does not expose background visibility control."
 Assert-Contains $ui "IDC_GFX_BACKGROUND_EXPOSURE" "GraphicsSettingsWindow does not expose background exposure control."
 Assert-Contains $ui "IDC_GFX_BACKGROUND_BLUR" "GraphicsSettingsWindow does not expose background blur control."
+Assert-Contains $ui "IDC_GFX_PARTICLE_DENSITY" "GraphicsSettingsWindow does not expose particle density control."
 Assert-Contains $ui "IDC_GFX_BOOKMARK_HERO" "GraphicsSettingsWindow does not expose hero camera bookmark control."
 Assert-Contains $ui "IDC_GFX_BOOKMARK_REFLECTION" "GraphicsSettingsWindow does not expose reflection camera bookmark control."
 Assert-Contains $ui "IDC_GFX_BOOKMARK_MATERIALS" "GraphicsSettingsWindow does not expose material overview camera bookmark control."

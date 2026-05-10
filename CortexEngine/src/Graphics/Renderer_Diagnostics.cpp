@@ -67,6 +67,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.ssrEnabled = m_ssrResources.enabled;
     state.fogEnabled = m_fogState.enabled;
     state.particlesEnabled = m_particleState.enabledForScene;
+    state.particleDensityScale = m_particleState.densityScale;
     state.vegetationEnabled = m_vegetationState.enabled;
     state.fogDensity = m_fogState.density;
     state.fogHeight = m_fogState.height;

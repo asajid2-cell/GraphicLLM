@@ -19,6 +19,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_HEALTH = 9001,
     IDC_GFX_MEMORY = 9002,
     IDC_GFX_WARNING = 9003,
+    IDC_GFX_RT_SCHEDULER = 9004,
 
     IDC_GFX_RENDER_SCALE = 9010,
     IDC_GFX_EXPOSURE = 9011,
@@ -87,6 +88,7 @@ struct GraphicsSettingsState {
     HWND txtHealth = nullptr;
     HWND txtMemory = nullptr;
     HWND txtWarning = nullptr;
+    HWND txtRTScheduler = nullptr;
 
     SliderBinding renderScale;
     SliderBinding exposure;
@@ -327,6 +329,27 @@ void RefreshHealthLabels() {
                    message.empty() ? L"" : message.c_str());
         SetWindowTextW(g_gfx.txtWarning, buffer);
     }
+    if (g_gfx.txtRTScheduler) {
+        const auto& rt = renderer->GetFrameContract().rayTracing;
+        const std::wstring profile = ToWide(rt.budgetProfile);
+        const std::string reason = !rt.schedulerDisabledReason.empty()
+            ? rt.schedulerDisabledReason
+            : (!rt.reflectionReadinessReason.empty()
+                ? rt.reflectionReadinessReason
+                : (rt.dispatchReflections ? "ready" : "not_scheduled_this_frame"));
+        const std::wstring reasonWide = ToWide(reason);
+        swprintf_s(buffer,
+                   L"RT Scheduler: %ls | TLAS %u/%u | shadows=%ls refl=%ls/%ls GI=%ls | reason=%ls",
+                   profile.empty() ? L"profile unknown" : profile.c_str(),
+                   rt.schedulerTLASCandidates,
+                   rt.schedulerMaxTLASInstances,
+                   rt.dispatchShadows ? L"scheduled" : L"skipped",
+                   rt.dispatchReflections ? L"scheduled" : L"skipped",
+                   rt.reflectionDispatchReady ? L"ready" : L"not ready",
+                   rt.dispatchGI ? L"scheduled" : L"skipped",
+                   reasonWide.empty() ? L"none" : reasonWide.c_str());
+        SetWindowTextW(g_gfx.txtRTScheduler, buffer);
+    }
 }
 
 void RegisterGraphicsSettingsClass() {
@@ -462,6 +485,12 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkRT = makeCheckbox(IDC_GFX_RT, L"RT Master");
             g_gfx.chkRTReflections = makeCheckbox(IDC_GFX_RT_REFLECTIONS, L"RT Reflections");
             g_gfx.chkRTGI = makeCheckbox(IDC_GFX_RT_GI, L"RT GI");
+            g_gfx.txtRTScheduler = makeStaticWithHeight(
+                IDC_GFX_RT_SCHEDULER,
+                L"RT Scheduler: --",
+                y,
+                labelHeight * 2);
+            y += labelHeight * 2 + rowGap;
 
             makeSection(L"Lighting");
             makeSlider(IDC_GFX_EXPOSURE, L"Exposure", g_gfx.exposure, 0.05f, 5.0f);

@@ -248,6 +248,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
         }},
         {"cinematic_post", {
+            {"enabled", contract.cinematicPost.enabled},
             {"post_process_planned", contract.cinematicPost.postProcessPlanned},
             {"post_process_executed", contract.cinematicPost.postProcessExecuted},
             {"bloom_planned", contract.cinematicPost.bloomPlanned},

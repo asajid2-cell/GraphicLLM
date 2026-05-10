@@ -284,6 +284,7 @@ struct FrameContract {
     };
 
     struct CinematicPostInfo {
+        bool enabled = false;
         bool postProcessPlanned = false;
         bool postProcessExecuted = false;
         bool bloomPlanned = false;

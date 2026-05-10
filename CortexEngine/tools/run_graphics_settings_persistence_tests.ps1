@@ -71,6 +71,7 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "density_scale": 0.43
   },
   "cinematic_post": {
+    "enabled": true,
     "bloom_threshold": 1.2,
     "bloom_soft_knee": 0.4,
     "vignette": 0.31,
@@ -155,6 +156,9 @@ if ($validRun.exit_code -ne 0) {
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
+    if (-not [bool]$report.frame_contract.cinematic_post.enabled) {
+        Add-Failure "valid settings cinematic post was not enabled"
+    }
     if ([Math]::Abs($vignette - 0.31) -gt 0.02) {
         Add-Failure "valid settings vignette was $vignette, expected 0.31"
     }

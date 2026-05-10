@@ -300,6 +300,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.instanceCapacity = m_particleState.instanceCapacity;
     contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
 
+    contract.cinematicPost.enabled = m_postProcessState.cinematicEnabled;
     contract.cinematicPost.postProcessPlanned = featurePlan.runPostProcess;
     contract.cinematicPost.postProcessExecuted = m_frameDiagnostics.timings.postMs > 0.0f;
     contract.cinematicPost.bloomPlanned = featurePlan.runBloom;
@@ -308,8 +309,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.bloomThreshold = m_bloomResources.threshold;
     contract.cinematicPost.bloomSoftKnee = m_bloomResources.softKnee;
     contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
-    contract.cinematicPost.vignette = m_postProcessState.vignette;
-    contract.cinematicPost.lensDirt = m_postProcessState.lensDirt;
+    contract.cinematicPost.vignette = m_postProcessState.cinematicEnabled ? m_postProcessState.vignette : 0.0f;
+    contract.cinematicPost.lensDirt = m_postProcessState.cinematicEnabled ? m_postProcessState.lensDirt : 0.0f;
     contract.cinematicPost.warm = m_postProcessState.warm;
     contract.cinematicPost.cool = m_postProcessState.cool;
     contract.cinematicPost.godRayIntensity = m_postProcessState.godRayIntensity;

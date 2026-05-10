@@ -120,6 +120,9 @@ $cinematicPost = $report.frame_contract.cinematic_post
 if ($null -eq $cinematicPost) {
     Add-Failure "frame_contract.cinematic_post is missing"
 } else {
+    if (-not [bool]$cinematicPost.enabled) {
+        Add-Failure "cinematic_post.enabled is false"
+    }
     if (-not [bool]$cinematicPost.post_process_planned) {
         Add-Failure "cinematic_post.post_process_planned is false"
     }

@@ -66,6 +66,14 @@ void Renderer::SetColorGrade(float warm, float cool) {
                  m_postProcessState.cool);
 }
 
+void Renderer::SetCinematicPostEnabled(bool enabled) {
+    if (m_postProcessState.cinematicEnabled == enabled) {
+        return;
+    }
+    m_postProcessState.cinematicEnabled = enabled;
+    spdlog::info("Cinematic post {}", m_postProcessState.cinematicEnabled ? "ENABLED" : "DISABLED");
+}
+
 void Renderer::SetCinematicPost(float vignette, float lensDirt) {
     const float clampedVignette = glm::clamp(vignette, 0.0f, 1.0f);
     const float clampedLensDirt = glm::clamp(lensDirt, 0.0f, 1.0f);

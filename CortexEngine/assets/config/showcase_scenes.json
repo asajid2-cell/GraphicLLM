@@ -10,8 +10,34 @@
       "default_environment": "studio",
       "default_lighting_rig": "studio_three_point",
       "required_bookmarks": ["hero", "reflection_closeup"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Validation hero",
+          "position": [-14.0, 2.05, -6.8],
+          "target": [-14.0, 1.05, 0.25],
+          "fov": 56.0,
+          "validation": true
+        },
+        {
+          "id": "reflection_closeup",
+          "label": "Mirror reflection closeup",
+          "position": [-21.2, 1.72, -3.15],
+          "target": [-23.75, 1.6, 0.2],
+          "fov": 48.0,
+          "validation": false
+        },
+        {
+          "id": "material_overview",
+          "label": "Material and lighting overview",
+          "position": [-10.6, 2.65, -7.25],
+          "target": [-15.9, 1.45, -0.5],
+          "fov": 54.0,
+          "validation": false
+        }
+      ],
       "required_features": ["rt_reflections", "material_parity", "raw_reflection_signal", "history_reflection_signal"],
-      "polish_gaps": ["camera_bookmark_data", "single unified graphics preset", "environment manifest binding"]
+      "polish_gaps": ["golden visual baseline", "final public capture polish"]
     },
     {
       "id": "material_lab",

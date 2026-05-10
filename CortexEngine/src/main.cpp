@@ -602,6 +602,8 @@ int main(int argc, char* argv[]) {
                 hasBackendFlag = true;
             } else if (arg == "--graphics-preset" || arg.rfind("--graphics-preset=", 0) == 0) {
                 hasGraphicsPresetFlag = true;
+            } else if (arg == "--camera-bookmark" || arg.rfind("--camera-bookmark=", 0) == 0) {
+                hasSceneFlag = true;
             } else if (arg == "--no-launcher") {
                 noLauncher = true;
             }
@@ -620,6 +622,7 @@ int main(int argc, char* argv[]) {
         //   --scene <dragon|rt_showcase|temporal_validation|cornell>
         //   --environment <manifest_id>
         //   --graphics-preset <preset_id>
+        //   --camera-bookmark <bookmark_id>
         //   --mode  <default|conservative>
         //   --backend <raster|voxel>
         for (int i = 1; i < argc; ++i) {
@@ -638,6 +641,10 @@ int main(int argc, char* argv[]) {
                 config.initialGraphicsPreset = argv[++i];
             } else if (arg.rfind("--graphics-preset=", 0) == 0) {
                 config.initialGraphicsPreset = arg.substr(std::string("--graphics-preset=").size());
+            } else if (arg == "--camera-bookmark" && i + 1 < argc) {
+                config.initialCameraBookmark = argv[++i];
+            } else if (arg.rfind("--camera-bookmark=", 0) == 0) {
+                config.initialCameraBookmark = arg.substr(std::string("--camera-bookmark=").size());
             } else if (arg == "--mode" && i + 1 < argc) {
                 std::string mode = argv[++i];
                 if (mode == "conservative") {

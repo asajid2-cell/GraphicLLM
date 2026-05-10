@@ -139,6 +139,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "showcase_scene_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_showcase_scene_contract_tests.ps1"),
+        "-NoBuild",
+        "-RuntimeSmoke"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "effects_gallery" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

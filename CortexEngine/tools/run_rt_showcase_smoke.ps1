@@ -30,6 +30,7 @@ param(
     [double]$MinVisualCenterLuma = 60.0,
     [double]$MaxVisualDarkDetailRatio = 0.68,
     [double]$MaxCameraPositionError = 0.25,
+    [string]$CameraBookmark = "hero",
     [bool]$ValidateSurfaceDebug = $true,
     [switch]$SkipSurfaceDebug,
     [int]$SurfaceDebugView = 41,
@@ -107,7 +108,7 @@ if (-not [string]::IsNullOrWhiteSpace($RTBudgetProfile)) {
     $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile
 }
 
-$exitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
+$exitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--camera-bookmark", $CameraBookmark, "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
 
 Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
 Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
@@ -313,6 +314,10 @@ if ([int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_t
 if (-not [bool]$report.camera.active) {
     Add-Failure "diagnostics report does not contain an active camera"
 } else {
+    if (-not [string]::IsNullOrWhiteSpace($CameraBookmark) -and
+        [string]$report.camera.bookmark -ne $CameraBookmark) {
+        Add-Failure "RT showcase camera bookmark is '$($report.camera.bookmark)', expected '$CameraBookmark'"
+    }
     $cameraError = [Math]::Sqrt(
         [Math]::Pow([double]$report.camera.position.x - (-14.0), 2.0) +
         [Math]::Pow([double]$report.camera.position.y - 2.05, 2.0) +
@@ -1015,7 +1020,7 @@ if ($failures.Count -eq 0 -and $TemporalRuns -gt 1) {
             $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile
         }
 
-        $temporalExitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
+        $temporalExitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--camera-bookmark", $CameraBookmark, "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
 
         Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
         Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
@@ -1102,7 +1107,7 @@ if ($failures.Count -eq 0 -and $ValidateSurfaceDebug) {
         $env:CORTEX_RT_BUDGET_PROFILE = $RTBudgetProfile
     }
 
-    $surfaceDebugExitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
+    $surfaceDebugExitCode = Invoke-CortexEngine @("--scene", "rt_showcase", "--camera-bookmark", $CameraBookmark, "--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
 
     Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue
     Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue

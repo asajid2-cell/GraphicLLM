@@ -318,6 +318,7 @@ set(CORTEX_SOURCES
     src/UI/DebugMenu.cpp
     src/UI/QuickSettingsWindow.cpp
     src/UI/QualitySettingsWindow.cpp
+    src/UI/GraphicsSettingsWindow.cpp
     src/UI/SceneEditorWindow.cpp
     src/UI/PerformanceWindow.cpp
     src/UI/LightingWindow.cpp
@@ -431,6 +432,7 @@ set(CORTEX_HEADERS
     src/UI/DebugMenu.h
     src/UI/QuickSettingsWindow.h
     src/UI/QualitySettingsWindow.h
+    src/UI/GraphicsSettingsWindow.h
     src/UI/SceneEditorWindow.h
     src/UI/PerformanceWindow.h
     src/UI/LightingWindow.h

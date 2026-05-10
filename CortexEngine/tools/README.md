@@ -51,13 +51,16 @@ Run the Phase 3 foundation checks:
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
 ```
 
-The visual matrix currently wraps the stabilized temporal-validation and RT
-showcase smoke paths, then writes JSON and Markdown summaries under
-`build/bin/logs/runs`. Add new public scenes to this matrix only after their
-camera, lighting, and IBL choices are stable enough to avoid churn.
+The UI contract test verifies the unified graphics settings window is compiled,
+initialized, bound to F8/ESC, and backed by `RendererTuningState`. The visual
+matrix currently wraps the stabilized temporal-validation and RT showcase smoke
+paths, then writes JSON and Markdown summaries under `build/bin/logs/runs`. Add
+new public scenes to this matrix only after their camera, lighting, and IBL
+choices are stable enough to avoid churn.
 
 Default budgets are intentionally strict for the RT showcase scene:
 

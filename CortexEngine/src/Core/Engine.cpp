@@ -17,6 +17,7 @@
 #include "UI/DebugMenu.h"
 #include "UI/QuickSettingsWindow.h"
 #include "UI/QualitySettingsWindow.h"
+#include "UI/GraphicsSettingsWindow.h"
 #include "UI/SceneEditorWindow.h"
 #include "UI/PerformanceWindow.h"
 #include <windows.h>
@@ -726,6 +727,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         UI::DebugMenu::Initialize(m_window->GetHWND(), dbg);
         UI::QuickSettingsWindow::Initialize(m_window->GetHWND());
         UI::QualitySettingsWindow::Initialize(m_window->GetHWND());
+        UI::GraphicsSettingsWindow::Initialize(m_window->GetHWND());
         UI::SceneEditorWindow::Initialize(m_window->GetHWND());
         UI::PerformanceWindow::Initialize(m_window->GetHWND());
     }
@@ -766,7 +768,9 @@ void Engine::Shutdown() {
     UI::DebugMenu::Shutdown();
     UI::QuickSettingsWindow::Shutdown();
     UI::QualitySettingsWindow::Shutdown();
+    UI::GraphicsSettingsWindow::Shutdown();
     UI::SceneEditorWindow::Shutdown();
+    UI::PerformanceWindow::Shutdown();
 
     // Shutdown Engine Editor Mode controller
     if (m_editorModeController) {

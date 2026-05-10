@@ -121,6 +121,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;
     contract.features = featurePlan.active;
+    contract.lighting.rigId = m_lightingState.activeRigId;
+    contract.lighting.rigSource = m_lightingState.activeRigSource;
+    contract.lighting.safeRigOnLowVRAM = m_lightingState.useSafeRigOnLowVRAM;
+    contract.lighting.safeRigVariantActive = m_lightingState.safeRigVariantActive;
     contract.lighting.exposure = m_qualityRuntimeState.exposure;
     contract.lighting.sunIntensity = m_lightingState.directionalIntensity;
     contract.lighting.iblDiffuseIntensity = m_environmentState.diffuseIntensity;

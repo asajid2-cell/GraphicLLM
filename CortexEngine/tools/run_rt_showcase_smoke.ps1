@@ -287,6 +287,26 @@ if ($report.health_warnings.Count -ne 0) {
 if ($report.frame_contract.warnings.Count -ne 0) {
     Add-Failure "frame_contract warnings is not empty: $($report.frame_contract.warnings -join ', ')"
 }
+$lighting = $report.frame_contract.lighting
+if ($null -eq $lighting) {
+    Add-Failure "frame_contract.lighting is missing"
+} else {
+    if ([string]$lighting.rig_id -ne "rt_showcase_gallery") {
+        Add-Failure "RT showcase lighting rig is '$($lighting.rig_id)', expected 'rt_showcase_gallery'"
+    }
+    if ([string]$lighting.rig_source -ne "scene_preset") {
+        Add-Failure "RT showcase lighting rig source is '$($lighting.rig_source)', expected 'scene_preset'"
+    }
+    if ([int]$lighting.light_count -lt 4) {
+        Add-Failure "RT showcase light count is $($lighting.light_count), expected >= 4"
+    }
+    if ([int]$lighting.shadow_casting_light_count -lt 1) {
+        Add-Failure "RT showcase shadow-casting light count is $($lighting.shadow_casting_light_count), expected >= 1"
+    }
+    if ([double]$lighting.total_light_intensity -le 0.0 -or [double]$lighting.max_light_intensity -le 0.0) {
+        Add-Failure "RT showcase lighting intensity contract is not positive"
+    }
+}
 if ([int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total -ne 0) {
     Add-Failure "transient descriptor delta is $($report.frame_contract.pass_budget_summary.transient_descriptor_delta_total), expected 0"
 }
@@ -1121,7 +1141,7 @@ if ($null -ne $surfaceDebugReport -and $null -ne $surfaceDebugReport.visual_vali
         [double]$surfaceDebugReport.visual_validation.image_stats.nonblack_ratio)
 }
 
-Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2}/{6:N0} rt_mb={7:N2}/{8:N0} write_mb={9:N2}/{10:N0} luma={11:N2} center_luma={12:N2} dark={13:N3}/{14:N2} sat={15:N3}/{16:N2} near_white={17:N3}/{18:N2} water_draws={19}/{20} max_albedo={21:N3}/{22:N1} material_issues={23} resolved_mat={24}/{25}/{26} preset_defaults={27}/{28}/{29}/{30} reflection={31}/{32}/{33:N2}/{34:N2} rt_parity={35}/{36} rt_refl_ready={37}/{38} rt_signal={39:N4}/{40:N4}/{41:N4}/{42:N4} rt_hist={43:N4}/{44:N4}/{45:N4}/{46:N4} transient_delta={47} rt_budget={48} startup_realloc=0 temporal_diff={49} surface_debug={50}" -f `
+Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2}/{6:N0} rt_mb={7:N2}/{8:N0} write_mb={9:N2}/{10:N0} luma={11:N2} center_luma={12:N2} dark={13:N3}/{14:N2} sat={15:N3}/{16:N2} near_white={17:N3}/{18:N2} water_draws={19}/{20} max_albedo={21:N3}/{22:N1} material_issues={23} resolved_mat={24}/{25}/{26} preset_defaults={27}/{28}/{29}/{30} reflection={31}/{32}/{33:N2}/{34:N2} rt_parity={35}/{36} rt_refl_ready={37}/{38} rt_signal={39:N4}/{40:N4}/{41:N4}/{42:N4} rt_hist={43:N4}/{44:N4}/{45:N4}/{46:N4} transient_delta={47} rt_budget={48} lighting={49}/{50} startup_realloc=0 temporal_diff={51} surface_debug={52}" -f `
     $report.smoke_automation.total_frames,
     [double]$report.gpu_frame_ms,
     $MaxGpuFrameMs,
@@ -1171,5 +1191,7 @@ Write-Host (" frames={0} gpu_ms={1:N3}/{2:N1} dxgi_mb={3:N2}/{4:N0} est_mb={5:N2
     [double]$report.frame_contract.ray_tracing.reflection_history_signal_avg_luma_delta,
     [int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total,
     [string]$report.frame_contract.ray_tracing.budget_profile,
+    [string]$report.frame_contract.lighting.rig_id,
+    [int]$report.frame_contract.lighting.light_count,
     $temporalDiffSummary,
     $surfaceDebugSummary)

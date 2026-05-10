@@ -51,6 +51,7 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
         frame_warnings = $null
         environment = ""
         health_preset = ""
+        lighting_rig = ""
         rt_ready = $null
         particles = $null
     }
@@ -70,6 +71,7 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
         $row.frame_warnings = $report.frame_contract.warnings.Count
         $row.environment = $report.frame_contract.environment.active
         $row.health_preset = $report.frame_contract.health.quality_preset
+        $row.lighting_rig = $report.frame_contract.lighting.rig_id
         $row.rt_ready = $report.frame_contract.ray_tracing.reflection_dispatch_ready
         if ($null -ne $report.frame_contract.particles) {
             $row.particles = $report.frame_contract.particles.submitted_instances
@@ -117,16 +119,17 @@ $rows | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryPath
 $md = New-Object System.Collections.Generic.List[string]
 $md.Add("# Phase 3 Visual Matrix")
 $md.Add("")
-$md.Add("| Case | Passed | GPU ms | Avg luma | Environment | Preset | Warnings | Particles |")
-$md.Add("|---|---:|---:|---:|---|---|---:|---:|")
+$md.Add("| Case | Passed | GPU ms | Avg luma | Environment | Preset | Lighting Rig | Warnings | Particles |")
+$md.Add("|---|---:|---:|---:|---|---|---|---:|---:|")
 foreach ($row in $rows) {
-    $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |" -f `
+    $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |" -f `
         $row.name,
         $row.passed,
         $row.gpu_ms,
         $row.avg_luma,
         $row.environment,
         $row.health_preset,
+        $row.lighting_rig,
         $row.frame_warnings,
         $row.particles))
 }

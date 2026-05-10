@@ -47,6 +47,7 @@ void ApplyAutoDemoFeatureLock(Renderer& renderer) {
 }
 
 void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode) {
+    renderer.SetLightingRigContract("rt_showcase_gallery", "scene_preset", conservativeMode);
     renderer.SetParticlesEnabled(true);
     renderer.SetEnvironmentPreset("studio");
     renderer.SetIBLEnabled(true);
@@ -106,6 +107,7 @@ void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode) {
 }
 
 void ApplyTemporalValidationSceneControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("temporal_validation_lab", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(-0.35f, -0.85f, 0.25f)));
     renderer.SetSunColor(glm::vec3(1.0f, 0.96f, 0.88f));
     renderer.SetSunIntensity(3.2f);
@@ -127,6 +129,7 @@ void ApplyTemporalValidationSceneControls(Renderer& renderer) {
 }
 
 void ApplyCornellSceneControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("cornell_god_rays", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f)));
     renderer.SetSunColor(glm::vec3(1.0f));
     renderer.SetSunIntensity(2.0f);
@@ -145,6 +148,7 @@ void ApplyCornellSceneControls(Renderer& renderer) {
 }
 
 void ApplyGodRaysSceneControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("god_rays_volume", "scene_preset", false);
     renderer.SetEnvironmentPreset("studio");
     renderer.SetIBLEnabled(true);
     renderer.SetIBLIntensity(0.75f, 1.1f);
@@ -175,6 +179,7 @@ void ApplyGodRaysSceneControls(Renderer& renderer) {
 }
 
 void ApplyDragonWaterStudioSunControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("dragon_water_studio_sun", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)));
     renderer.SetSunColor(glm::vec3(1.0f));
     renderer.SetSunIntensity(5.0f);
@@ -184,6 +189,7 @@ void ApplyOutdoorWorldSceneControls(Renderer& renderer,
                                     const glm::vec3& sunDirection,
                                     const glm::vec3& sunColor,
                                     float sunIntensity) {
+    renderer.SetLightingRigContract("outdoor_world_sun", "scene_preset", false);
     renderer.SetIBLEnabled(false);
     renderer.SetSSREnabled(true);
     renderer.SetRTReflectionsEnabled(true);
@@ -198,6 +204,7 @@ void ApplyOutdoorWorldSceneControls(Renderer& renderer,
 }
 
 void ApplyEditorModeBaseControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("editor_time_of_day", "editor", false);
     renderer.SetIBLEnabled(false);
     renderer.SetFogEnabled(true);
 }

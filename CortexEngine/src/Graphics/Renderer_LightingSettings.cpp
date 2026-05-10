@@ -8,11 +8,27 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/gtx/norm.hpp>
 
 namespace Cortex::Graphics {
+
+namespace {
+
+const char* LightingRigId(Renderer::LightingRig rig) {
+    switch (rig) {
+    case Renderer::LightingRig::StudioThreePoint: return "studio_three_point";
+    case Renderer::LightingRig::TopDownWarehouse: return "top_down_warehouse";
+    case Renderer::LightingRig::HorrorSideLight: return "horror_side_light";
+    case Renderer::LightingRig::StreetLanterns: return "street_lanterns";
+    case Renderer::LightingRig::Custom:
+    default: return "custom";
+    }
+}
+
+} // namespace
 
 float Renderer::GetIBLDiffuseIntensity() const {
     return GetFeatureState().iblDiffuseIntensity;
@@ -32,6 +48,18 @@ void Renderer::SetUseSafeLightingRigOnLowVRAM(bool enabled) {
 
 bool Renderer::GetUseSafeLightingRigOnLowVRAM() const {
     return GetFeatureState().useSafeLightingRigOnLowVRAM;
+}
+
+void Renderer::SetLightingRigContract(std::string rigId, std::string source, bool safeVariantActive) {
+    if (rigId.empty()) {
+        rigId = "custom";
+    }
+    if (source.empty()) {
+        source = "manual";
+    }
+    m_lightingState.activeRigId = std::move(rigId);
+    m_lightingState.activeRigSource = std::move(source);
+    m_lightingState.safeRigVariantActive = safeVariantActive;
 }
 
 void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) {
@@ -76,6 +104,8 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
             useSafeRig = true;
         }
     }
+
+    SetLightingRigContract(LightingRigId(rig), "renderer_rig", useSafeRig);
 
     switch (rig) {
     case LightingRig::Custom:

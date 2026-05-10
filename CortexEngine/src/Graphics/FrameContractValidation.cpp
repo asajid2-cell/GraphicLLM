@@ -213,6 +213,16 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
                             contract.executedFeatures.voxelBackendEnabled,
                             "voxel_backend");
 
+    if (contract.lighting.rigId.empty()) {
+        warn("lighting_rig_id_missing");
+    }
+    if (contract.lighting.rigSource.empty()) {
+        warn("lighting_rig_source_missing");
+    }
+    if (contract.lighting.safeRigVariantActive && contract.lighting.rigId == "custom") {
+        warn("lighting_safe_variant_active_for_custom_rig");
+    }
+
     if (contract.features.rayTracingEnabled &&
         contract.rayTracing.tlasInstances != contract.rayTracing.materialRecords) {
         warn("rt_material_record_mismatch:tlas_instances=" +

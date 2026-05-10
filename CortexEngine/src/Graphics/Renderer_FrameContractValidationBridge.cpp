@@ -51,6 +51,19 @@ void Renderer::ValidateFrameContract() {
             "material_metallic_transmission_count:" +
             std::to_string(materials.metallicTransmission));
     }
+
+    m_frameDiagnostics.contract.contract.health.frameWarnings =
+        static_cast<uint32_t>(m_frameDiagnostics.contract.contract.warnings.size());
+    if (!m_frameDiagnostics.contract.contract.warnings.empty()) {
+        const std::string& warning = m_frameDiagnostics.contract.contract.warnings.back();
+        m_frameDiagnostics.contract.contract.health.lastWarningMessage = warning;
+        const size_t split = warning.find(':');
+        m_frameDiagnostics.contract.contract.health.lastWarningCode =
+            split == std::string::npos ? warning : warning.substr(0, split);
+    } else {
+        m_frameDiagnostics.contract.contract.health.lastWarningCode.clear();
+        m_frameDiagnostics.contract.contract.health.lastWarningMessage.clear();
+    }
 }
 
 } // namespace Cortex::Graphics

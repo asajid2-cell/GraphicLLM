@@ -86,6 +86,71 @@ Renderer::RayTracingState Renderer::GetRayTracingState() const {
     return state;
 }
 
+Renderer::HealthState Renderer::BuildHealthState() const {
+    HealthState state{};
+    state.adapterName = "unknown";
+    if (m_services.device && m_services.device->GetAdapter()) {
+        DXGI_ADAPTER_DESC1 desc{};
+        if (SUCCEEDED(m_services.device->GetAdapter()->GetDesc1(&desc))) {
+            std::wstring wide(desc.Description);
+            state.adapterName.clear();
+            state.adapterName.reserve(wide.size());
+            for (wchar_t c : wide) {
+                if (c == L'\0') {
+                    break;
+                }
+                state.adapterName.push_back(c >= 0 && c < 128 ? static_cast<char>(c) : '?');
+            }
+            if (state.adapterName.empty()) {
+                state.adapterName = "unknown";
+            }
+        }
+    }
+
+    state.qualityPreset = m_framePlanning.budgetPlan.profileName.empty()
+        ? "runtime"
+        : m_framePlanning.budgetPlan.profileName;
+    state.rayTracingRequested = m_rtRuntimeState.enabled ||
+                                m_rtRuntimeState.reflectionsEnabled ||
+                                m_rtRuntimeState.giEnabled;
+    state.rayTracingEffective = m_rtRuntimeState.supported &&
+                                m_rtRuntimeState.enabled &&
+                                !m_frameLifecycle.deviceRemoved;
+    state.environmentLoaded = !m_environmentState.maps.empty();
+    state.activeEnvironment = GetCurrentEnvironmentName();
+    state.environmentFallback = state.activeEnvironment == "Placeholder" ||
+                                state.activeEnvironment == "procedural_sky";
+    state.residentEnvironments = static_cast<uint32_t>(m_environmentState.maps.size());
+    state.pendingEnvironments = static_cast<uint32_t>(m_environmentState.pending.size());
+    state.frameWarnings = static_cast<uint32_t>(m_frameDiagnostics.contract.contract.warnings.size());
+    state.assetFallbacks = state.environmentFallback ? 1u : 0u;
+
+    const DescriptorStats descriptors = GetDescriptorStats();
+    state.descriptorPersistentUsed = descriptors.persistentUsed;
+    state.descriptorPersistentBudget = descriptors.persistentReserve;
+    state.descriptorTransientUsed =
+        descriptors.transientEnd > descriptors.transientStart
+            ? descriptors.transientEnd - descriptors.transientStart
+            : 0u;
+    state.descriptorTransientBudget = state.descriptorTransientUsed;
+
+    const VRAMBreakdown vram = GetEstimatedVRAMBreakdown();
+    state.estimatedVRAMBytes = vram.TotalBytes();
+    state.textureBytes = vram.textureBytes;
+    state.environmentBytes = vram.environmentBytes;
+    state.geometryBytes = vram.geometryBytes;
+    state.rtStructureBytes = vram.rtStructureBytes;
+
+    if (!m_frameDiagnostics.contract.contract.warnings.empty()) {
+        state.lastWarningMessage = m_frameDiagnostics.contract.contract.warnings.back();
+        const size_t split = state.lastWarningMessage.find(':');
+        state.lastWarningCode = split == std::string::npos
+            ? state.lastWarningMessage
+            : state.lastWarningMessage.substr(0, split);
+    }
+    return state;
+}
+
 Renderer::WaterState Renderer::GetWaterState() const {
     return m_waterState;
 }

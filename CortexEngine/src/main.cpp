@@ -1,4 +1,5 @@
 #include "Core/Engine.h"
+#include "Core/StartupPreflight.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -13,6 +14,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 using namespace Cortex;
 
@@ -712,6 +714,18 @@ int main(int argc, char* argv[]) {
                 config.exitAfterVisualValidationCapture = true;
             }
         }
+
+        auto preflight = RunStartupPreflight(config);
+        if (preflight.usedSafeMode) {
+            config.qualityMode = EngineConfig::QualityMode::Conservative;
+        }
+        const bool canLaunch = preflight.canLaunch;
+        StoreStartupPreflightResult(std::move(preflight));
+        if (!canLaunch) {
+            spdlog::critical("Startup preflight failed; aborting before renderer initialization.");
+            return 1;
+        }
+
         // Resolve model path relative to the executable location (robust to working directory)
         namespace fs = std::filesystem;
 

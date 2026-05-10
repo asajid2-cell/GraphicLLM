@@ -264,6 +264,7 @@ public:
 
     using VRAMBreakdown = RendererVRAMBreakdown;
     using DescriptorStats = RendererDescriptorStats;
+    using HealthState = RendererHealthState;
     using QualityState = RendererQualityState;
     using FeatureState = RendererFeatureState;
     using RayTracingState = RendererRayTracingState;
@@ -300,6 +301,7 @@ public:
     [[nodiscard]] float GetLastSSAOTimeMS() const;
     [[nodiscard]] float GetLastBloomTimeMS() const;
     [[nodiscard]] DescriptorStats GetDescriptorStats() const;
+    [[nodiscard]] HealthState BuildHealthState() const;
     [[nodiscard]] const Debug::GPUFrameProfile* GetLastGPUProfile() const;
     [[nodiscard]] const FrameContract& GetFrameContract() const;
 

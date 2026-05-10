@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Core/StartupPreflight.h"
 #include "Graphics/FrameContractResources.h"
 #include "Graphics/FrameContractValidation.h"
 #include "Graphics/RenderableClassification.h"
@@ -76,6 +77,46 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.renderHeight = GetInternalRenderHeight();
     contract.presentationWidth = m_services.window ? m_services.window->GetWidth() : 0;
     contract.presentationHeight = m_services.window ? m_services.window->GetHeight() : 0;
+
+    const auto& preflight = Cortex::GetStartupPreflightResult();
+    contract.startup.preflightRan = preflight.ran;
+    contract.startup.preflightPassed = preflight.canLaunch;
+    contract.startup.safeMode = preflight.usedSafeMode;
+    contract.startup.dxrRequested = preflight.dxrRequested;
+    contract.startup.environmentManifestPresent = preflight.environmentManifestPresent;
+    contract.startup.environmentFallbackAvailable = preflight.environmentFallbackAvailable;
+    contract.startup.issueCount = static_cast<uint32_t>(preflight.issues.size());
+    contract.startup.warningCount = preflight.WarningCount();
+    contract.startup.errorCount = preflight.ErrorCount();
+    contract.startup.configProfile = preflight.configProfile;
+    contract.startup.workingDirectory = preflight.workingDirectory.string();
+
+    const auto health = BuildHealthState();
+    contract.health.adapterName = health.adapterName;
+    contract.health.qualityPreset = health.qualityPreset;
+    contract.health.rayTracingRequested = health.rayTracingRequested;
+    contract.health.rayTracingEffective = health.rayTracingEffective;
+    contract.health.environmentLoaded = health.environmentLoaded;
+    contract.health.environmentFallback = health.environmentFallback;
+    contract.health.frameWarnings = health.frameWarnings;
+    contract.health.assetFallbacks = health.assetFallbacks;
+    contract.health.descriptorPersistentUsed = health.descriptorPersistentUsed;
+    contract.health.descriptorPersistentBudget = health.descriptorPersistentBudget;
+    contract.health.descriptorTransientUsed = health.descriptorTransientUsed;
+    contract.health.descriptorTransientBudget = health.descriptorTransientBudget;
+    contract.health.estimatedVRAMBytes = health.estimatedVRAMBytes;
+    contract.health.lastWarningCode = health.lastWarningCode;
+    contract.health.lastWarningMessage = health.lastWarningMessage;
+
+    contract.environment.active = health.activeEnvironment;
+    contract.environment.loaded = health.environmentLoaded;
+    contract.environment.fallback = health.environmentFallback;
+    contract.environment.manifestPresent = preflight.environmentManifestPresent;
+    contract.environment.residentCount = health.residentEnvironments;
+    contract.environment.pendingCount = health.pendingEnvironments;
+    contract.environment.residentBytes = health.environmentBytes;
+    contract.graphicsPreset.id = health.qualityPreset;
+    contract.graphicsPreset.renderScale = m_qualityRuntimeState.renderScale;
 
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;

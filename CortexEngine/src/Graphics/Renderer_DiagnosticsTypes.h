@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <glm/vec2.hpp>
@@ -43,6 +44,31 @@ struct RendererDescriptorStats {
     uint32_t stagingCapacity = 0;
     uint32_t bindlessAllocated = 0;
     uint32_t bindlessCapacity = 0;
+};
+
+struct RendererHealthState {
+    std::string adapterName;
+    std::string qualityPreset;
+    bool rayTracingRequested = false;
+    bool rayTracingEffective = false;
+    bool environmentLoaded = false;
+    bool environmentFallback = false;
+    std::string activeEnvironment;
+    uint32_t residentEnvironments = 0;
+    uint32_t pendingEnvironments = 0;
+    uint32_t frameWarnings = 0;
+    uint32_t assetFallbacks = 0;
+    uint32_t descriptorPersistentUsed = 0;
+    uint32_t descriptorPersistentBudget = 0;
+    uint32_t descriptorTransientUsed = 0;
+    uint32_t descriptorTransientBudget = 0;
+    uint64_t estimatedVRAMBytes = 0;
+    uint64_t textureBytes = 0;
+    uint64_t environmentBytes = 0;
+    uint64_t geometryBytes = 0;
+    uint64_t rtStructureBytes = 0;
+    std::string lastWarningCode;
+    std::string lastWarningMessage;
 };
 
 struct RendererFrameRuntimeState {

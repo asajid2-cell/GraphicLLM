@@ -53,6 +53,51 @@ json FrameContractToJson(const FrameContract& contract) {
             {"width", contract.presentationWidth},
             {"height", contract.presentationHeight}
         }},
+        {"startup", {
+            {"preflight_ran", contract.startup.preflightRan},
+            {"preflight_passed", contract.startup.preflightPassed},
+            {"safe_mode", contract.startup.safeMode},
+            {"dxr_requested", contract.startup.dxrRequested},
+            {"environment_manifest_present", contract.startup.environmentManifestPresent},
+            {"environment_fallback_available", contract.startup.environmentFallbackAvailable},
+            {"issue_count", contract.startup.issueCount},
+            {"warning_count", contract.startup.warningCount},
+            {"error_count", contract.startup.errorCount},
+            {"config_profile", contract.startup.configProfile},
+            {"working_directory", contract.startup.workingDirectory}
+        }},
+        {"health", {
+            {"adapter_name", contract.health.adapterName},
+            {"quality_preset", contract.health.qualityPreset},
+            {"ray_tracing_requested", contract.health.rayTracingRequested},
+            {"ray_tracing_effective", contract.health.rayTracingEffective},
+            {"environment_loaded", contract.health.environmentLoaded},
+            {"environment_fallback", contract.health.environmentFallback},
+            {"frame_warnings", contract.health.frameWarnings},
+            {"asset_fallbacks", contract.health.assetFallbacks},
+            {"descriptor_persistent_used", contract.health.descriptorPersistentUsed},
+            {"descriptor_persistent_budget", contract.health.descriptorPersistentBudget},
+            {"descriptor_transient_used", contract.health.descriptorTransientUsed},
+            {"descriptor_transient_budget", contract.health.descriptorTransientBudget},
+            {"estimated_vram_bytes", contract.health.estimatedVRAMBytes},
+            {"last_warning_code", contract.health.lastWarningCode},
+            {"last_warning_message", contract.health.lastWarningMessage}
+        }},
+        {"environment", {
+            {"active", contract.environment.active},
+            {"loaded", contract.environment.loaded},
+            {"fallback", contract.environment.fallback},
+            {"manifest_present", contract.environment.manifestPresent},
+            {"resident_count", contract.environment.residentCount},
+            {"pending_count", contract.environment.pendingCount},
+            {"resident_bytes", contract.environment.residentBytes}
+        }},
+        {"graphics_preset", {
+            {"id", contract.graphicsPreset.id},
+            {"schema", contract.graphicsPreset.schema},
+            {"dirty_from_ui", contract.graphicsPreset.dirtyFromUI},
+            {"render_scale", contract.graphicsPreset.renderScale}
+        }},
         {"features", FeatureFlagsToJson(contract.features)},
         {"planned_features", FeatureFlagsToJson(contract.plannedFeatures)},
         {"executed_features", FeatureFlagsToJson(contract.executedFeatures)},

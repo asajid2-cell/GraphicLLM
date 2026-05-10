@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "default": "release_showcase",
+  "presets": [
+    {
+      "id": "release_showcase",
+      "display_name": "Release Showcase",
+      "quality": {
+        "render_scale": 0.85,
+        "taa": true,
+        "fxaa": true,
+        "gpu_culling": true
+      },
+      "environment": {
+        "environment_id": "studio",
+        "ibl_enabled": true,
+        "diffuse_intensity": 1.05,
+        "specular_intensity": 0.78
+      },
+      "lighting": {
+        "exposure": 1.12,
+        "bloom_intensity": 0.12,
+        "sun_intensity": 6.0,
+        "god_ray_intensity": 0.42
+      },
+      "screen_space": {
+        "ssao": true,
+        "ssao_radius": 0.2,
+        "ssao_bias": 0.04,
+        "ssao_intensity": 0.22,
+        "ssr": true
+      },
+      "ray_tracing": {
+        "enabled": true,
+        "reflections": true,
+        "gi": true
+      },
+      "atmosphere": {
+        "fog": true,
+        "fog_density": 0.012,
+        "fog_height": 0.0,
+        "fog_falloff": 0.55
+      },
+      "particles": {
+        "enabled": true,
+        "density": 1.0,
+        "quality": "balanced"
+      },
+      "cinematic_post": {
+        "enabled": true,
+        "preset": "clean_filmic",
+        "vignette": 0.0,
+        "motion_blur": 0.0
+      }
+    },
+    {
+      "id": "safe_startup",
+      "display_name": "Safe Startup",
+      "quality": {
+        "render_scale": 0.67,
+        "taa": true,
+        "fxaa": true,
+        "gpu_culling": true
+      },
+      "environment": {
+        "environment_id": "studio",
+        "ibl_enabled": true,
+        "diffuse_intensity": 0.85,
+        "specular_intensity": 0.55
+      },
+      "lighting": {
+        "exposure": 1.0,
+        "bloom_intensity": 0.06,
+        "sun_intensity": 4.0,
+        "god_ray_intensity": 0.0
+      },
+      "screen_space": {
+        "ssao": true,
+        "ssao_radius": 0.18,
+        "ssao_bias": 0.04,
+        "ssao_intensity": 0.16,
+        "ssr": false
+      },
+      "ray_tracing": {
+        "enabled": false,
+        "reflections": false,
+        "gi": false
+      },
+      "atmosphere": {
+        "fog": false,
+        "fog_density": 0.0,
+        "fog_height": 0.0,
+        "fog_falloff": 0.5
+      },
+      "particles": {
+        "enabled": false,
+        "density": 0.0,
+        "quality": "low"
+      },
+      "cinematic_post": {
+        "enabled": false,
+        "preset": "neutral",
+        "vignette": 0.0,
+        "motion_blur": 0.0
+      }
+    }
+  ]
+}

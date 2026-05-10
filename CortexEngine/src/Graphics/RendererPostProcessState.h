@@ -4,6 +4,7 @@ namespace Cortex::Graphics {
 
 struct RendererPostProcessState {
     bool fxaaEnabled = true;
+    bool cinematicEnabled = false;
     float warm = 0.0f;
     float cool = 0.0f;
     float godRayIntensity = 1.0f;

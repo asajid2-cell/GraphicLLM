@@ -307,6 +307,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
+    state.cinematicPost.enabled = post.cinematicEnabled;
     state.cinematicPost.vignette = post.vignette;
     state.cinematicPost.lensDirt = post.lensDirt;
 
@@ -418,6 +419,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,
                            4.0f);
+    renderer.SetCinematicPostEnabled(state.cinematicPost.enabled);
     ApplyCinematicPostControl(renderer,
                               state.cinematicPost.vignette,
                               state.cinematicPost.lensDirt);

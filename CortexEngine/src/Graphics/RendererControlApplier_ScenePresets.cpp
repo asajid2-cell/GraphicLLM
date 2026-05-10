@@ -166,6 +166,7 @@ void ApplyGlassWaterCourtyardSceneControls(Renderer& renderer) {
     renderer.SetExposure(1.08f);
     renderer.SetBloomIntensity(0.10f);
     renderer.SetBloomShape(1.05f, 0.45f, 2.0f);
+    renderer.SetCinematicPostEnabled(true);
     renderer.SetCinematicPost(0.10f, 0.10f);
     renderer.SetColorGrade(0.20f, 0.04f);
 
@@ -212,6 +213,7 @@ void ApplyEffectsShowcaseSceneControls(Renderer& renderer) {
     renderer.SetExposure(1.18f);
     renderer.SetBloomIntensity(0.34f);
     renderer.SetBloomShape(0.75f, 0.55f, 1.65f);
+    renderer.SetCinematicPostEnabled(true);
     renderer.SetCinematicPost(0.18f, 0.34f);
     renderer.SetColorGrade(0.08f, 0.24f);
 

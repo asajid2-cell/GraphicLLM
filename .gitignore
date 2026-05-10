@@ -7,6 +7,23 @@ CortexEngine/vcpkg_installed/
 CortexEngine/build/bin/
 CortexEngine/rebuild_log.txt
 .claude/
+debug_logs/
+flickering_tests/
+fix_verification/
+full_history.txt
+ps-history*.txt
+tmp_*.cpp
+head_*.cpp
+fix_postprocess.cpp
+temp_build.bat
+nul
+**/nul
+
+# Local generated diagnostics
+*.log
+*.mp4
+*.avi
+*.mov
 
 # Large engine assets that can be downloaded/generated locally
 CortexEngine/models/

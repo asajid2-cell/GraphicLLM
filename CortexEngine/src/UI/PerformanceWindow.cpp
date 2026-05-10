@@ -2,6 +2,7 @@
 
 #include "Core/ServiceLocator.h"
 #include "Core/Engine.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetRegistry.h"
 
@@ -129,32 +130,35 @@ void RefreshControlsFromState() {
         return;
     }
 
+    const auto quality = renderer->GetQualityState();
+    const auto features = renderer->GetFeatureState();
+    const auto rt = renderer->GetRayTracingState();
+
     // Render scale slider (0.5 .. 1.0)
     SetSliderFromFloat(g_perf.sliderRenderScale,
-                       renderer->GetRenderScale(),
+                       quality.renderScale,
                        0.5f,
                        1.0f);
 
     // Bloom intensity (0.0 .. 5.0)
     SetSliderFromFloat(g_perf.sliderBloom,
-                       renderer->GetBloomIntensity(),
+                       quality.bloomIntensity,
                        0.0f,
                        5.0f);
 
     // Feature toggles
-    SetCheckbox(g_perf.chkRTMaster,
-                renderer->IsRayTracingSupported() && renderer->IsRayTracingEnabled());
-    SetCheckbox(g_perf.chkRTRefl,   renderer->GetRTReflectionsEnabled());
-    SetCheckbox(g_perf.chkRTGI,     renderer->GetRTGIEnabled());
-    SetCheckbox(g_perf.chkTAA,      renderer->IsTAAEnabled());
-    SetCheckbox(g_perf.chkFXAA,     renderer->IsFXAAEnabled());
-    SetCheckbox(g_perf.chkSSR,      renderer->GetSSREnabled());
-    SetCheckbox(g_perf.chkSSAO,     renderer->GetSSAOEnabled());
-    SetCheckbox(g_perf.chkIBL,      renderer->GetIBLEnabled());
-    SetCheckbox(g_perf.chkFog,      renderer->IsFogEnabled());
-    SetCheckbox(g_perf.chkParticles, renderer->GetParticlesEnabled());
-    SetCheckbox(g_perf.chkIBLLimit, renderer->IsIBLLimitEnabled());
-    SetCheckbox(g_perf.chkPCSS,     renderer->IsPCSS());
+    SetCheckbox(g_perf.chkRTMaster, rt.supported && rt.enabled);
+    SetCheckbox(g_perf.chkRTRefl,   rt.reflectionsEnabled);
+    SetCheckbox(g_perf.chkRTGI,     rt.giEnabled);
+    SetCheckbox(g_perf.chkTAA,      features.taaEnabled);
+    SetCheckbox(g_perf.chkFXAA,     features.fxaaEnabled);
+    SetCheckbox(g_perf.chkSSR,      features.ssrEnabled);
+    SetCheckbox(g_perf.chkSSAO,     features.ssaoEnabled);
+    SetCheckbox(g_perf.chkIBL,      features.iblEnabled);
+    SetCheckbox(g_perf.chkFog,      features.fogEnabled);
+    SetCheckbox(g_perf.chkParticles, features.particlesEnabled);
+    SetCheckbox(g_perf.chkIBLLimit, features.iblLimitEnabled);
+    SetCheckbox(g_perf.chkPCSS,     features.pcssEnabled);
 }
 
 void RefreshStats() {
@@ -200,16 +204,20 @@ void RefreshStats() {
     }
 
     // Memory breakdown
-    auto mem = renderer->GetAssetMemoryBreakdown();
+    const auto mem = renderer->GetEstimatedVRAMBreakdown();
     constexpr double kToMB = 1.0 / (1024.0 * 1024.0);
-    const double texMB  = static_cast<double>(mem.textureBytes) * kToMB;
-    const double envMB  = static_cast<double>(mem.environmentBytes) * kToMB;
-    const double geomMB = static_cast<double>(mem.geometryBytes) * kToMB;
-    const double rtMB   = static_cast<double>(mem.rtStructureBytes) * kToMB;
+    const double totalMB   = static_cast<double>(mem.TotalBytes()) * kToMB;
+    const double targetsMB = static_cast<double>(mem.renderTargetBytes) * kToMB;
+    const double postMB    = static_cast<double>(mem.postProcessBytes) * kToMB;
+    const double texMB     = static_cast<double>(mem.textureBytes) * kToMB;
+    const double envMB     = static_cast<double>(mem.environmentBytes) * kToMB;
+    const double geomMB    = static_cast<double>(mem.geometryBytes) * kToMB;
+    const double rtMB      = static_cast<double>(mem.rtStructureBytes) * kToMB;
 
     if (g_perf.txtMem) {
-        swprintf_s(buffer, L"GPU mem: tex=%.0f MB  env=%.0f MB  geom=%.0f MB  RT=%.0f MB",
-                   texMB, envMB, geomMB, rtMB);
+        swprintf_s(buffer,
+                   L"GPU mem: total=%.0f MB  targets=%.0f  post=%.0f  tex=%.0f  env=%.0f  geom=%.0f  RT=%.0f",
+                   totalMB, targetsMB, postMB, texMB, envMB, geomMB, rtMB);
         SetWindowTextW(g_perf.txtMem, buffer);
     }
 
@@ -334,7 +342,7 @@ void RegisterPerfWindowClass() {
                     0, L"STATIC", text,
                     WS_CHILD | WS_VISIBLE,
                     x, yy, width - margin * 2, labelHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_perf.font), TRUE);
                 return h;
             };
@@ -344,7 +352,7 @@ void RegisterPerfWindowClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colSliderWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -354,7 +362,7 @@ void RegisterPerfWindowClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, checkHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_perf.font), TRUE);
                 return h;
             };
@@ -364,7 +372,7 @@ void RegisterPerfWindowClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                     x, yy, width - margin * 2, 24,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_perf.font), TRUE);
                 return h;
             };
@@ -377,7 +385,7 @@ void RegisterPerfWindowClass() {
                     WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
                     xx, yy, w, h,
                     hwnd,
-                    reinterpret_cast<HMENU>(id),
+                    reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
                     nullptr,
                     nullptr);
                 SendMessageW(e, WM_SETFONT, reinterpret_cast<WPARAM>(g_perf.font), TRUE);
@@ -549,25 +557,11 @@ void RegisterPerfWindowClass() {
             HWND slider = reinterpret_cast<HWND>(lParam);
             if (slider == g_perf.sliderRenderScale) {
                 if (scrollCode == TB_ENDTRACK || scrollCode == TB_THUMBPOSITION) {
-                    float scale = SliderToFloat(slider, 0.5f, 1.0f);
-                    if (scale < 0.5f) scale = 0.5f;
-                    if (scale > 1.0f) scale = 1.0f;
-
-                    float current = renderer->GetRenderScale();
-                    if (std::fabs(scale - current) > 0.01f) {
-                        renderer->SetRenderScale(scale);
-                    }
+                    Graphics::ApplyRenderScaleControl(*renderer, SliderToFloat(slider, 0.5f, 1.0f));
                 }
             } else if (slider == g_perf.sliderBloom) {
                 if (scrollCode == TB_ENDTRACK || scrollCode == TB_THUMBPOSITION) {
-                    float value = SliderToFloat(slider, 0.0f, 5.0f);
-                    if (value < 0.0f) value = 0.0f;
-                    if (value > 5.0f) value = 5.0f;
-
-                    float current = renderer->GetBloomIntensity();
-                    if (std::fabs(value - current) > 0.01f) {
-                        renderer->SetBloomIntensity(value);
-                    }
+                    Graphics::ApplyBloomIntensityControl(*renderer, SliderToFloat(slider, 0.0f, 5.0f));
                 }
             }
             return 0;
@@ -583,83 +577,81 @@ void RegisterPerfWindowClass() {
 
                 switch (id) {
                 case IDC_PERF_SAFE_PRESET: {
-                    renderer->ApplySafeQualityPreset();
+                    Graphics::ApplySafeQualityPresetControl(*renderer);
                     RefreshControlsFromState();
                     RefreshStats();
                     break;
                 }
                 case IDC_PERF_LOAD_ENV_ONE: {
-                    renderer->LoadAdditionalEnvironmentMaps(1);
+                    Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 1);
                     RefreshStats();
                     break;
                 }
                 case IDC_PERF_LOAD_ENV_ALL: {
                     // Use a generous upper bound; the renderer will clamp
                     // internally to the number of pending environments.
-                    renderer->LoadAdditionalEnvironmentMaps(64);
+                    Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 64);
                     RefreshStats();
                     break;
                 }
                 case IDC_PERF_RT_MASTER: {
                     bool enabled = GetCheckbox(g_perf.chkRTMaster);
-                    if (renderer->IsRayTracingSupported()) {
-                        renderer->SetRayTracingEnabled(enabled);
-                    }
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RayTracing, enabled);
                     break;
                 }
                 case IDC_PERF_RT_REFL: {
                     bool enabled = GetCheckbox(g_perf.chkRTRefl);
-                    renderer->SetRTReflectionsEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RTReflections, enabled);
                     break;
                 }
                 case IDC_PERF_RT_GI: {
                     bool enabled = GetCheckbox(g_perf.chkRTGI);
-                    renderer->SetRTGIEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RTGI, enabled);
                     break;
                 }
                 case IDC_PERF_TAA: {
                     bool enabled = GetCheckbox(g_perf.chkTAA);
-                    renderer->SetTAAEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::TAA, enabled);
                     break;
                 }
                 case IDC_PERF_FXAA: {
                     bool enabled = GetCheckbox(g_perf.chkFXAA);
-                    renderer->SetFXAAEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::FXAA, enabled);
                     break;
                 }
                 case IDC_PERF_SSR: {
                     bool enabled = GetCheckbox(g_perf.chkSSR);
-                    renderer->SetSSREnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::SSR, enabled);
                     break;
                 }
                 case IDC_PERF_SSAO: {
                     bool enabled = GetCheckbox(g_perf.chkSSAO);
-                    renderer->SetSSAOEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::SSAO, enabled);
                     break;
                 }
                 case IDC_PERF_IBL: {
                     bool enabled = GetCheckbox(g_perf.chkIBL);
-                    renderer->SetIBLEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::IBL, enabled);
                     break;
                 }
                 case IDC_PERF_FOG: {
                     bool enabled = GetCheckbox(g_perf.chkFog);
-                    renderer->SetFogEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::Fog, enabled);
                     break;
                 }
                 case IDC_PERF_PARTICLES: {
                     bool enabled = GetCheckbox(g_perf.chkParticles);
-                    renderer->SetParticlesEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::Particles, enabled);
                     break;
                 }
                 case IDC_PERF_IBL_LIMIT: {
                     bool enabled = GetCheckbox(g_perf.chkIBLLimit);
-                    renderer->SetIBLLimitEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::IBLLimit, enabled);
                     break;
                 }
                 case IDC_PERF_PCSS: {
                     bool enabled = GetCheckbox(g_perf.chkPCSS);
-                    renderer->SetPCSS(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::PCSS, enabled);
                     break;
                 }
                 default:

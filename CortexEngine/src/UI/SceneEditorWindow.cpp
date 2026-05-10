@@ -157,7 +157,16 @@ bool GetCheckbox(HWND hwnd) {
 }
 
 std::string WStringToUtf8(const std::wstring& s) {
-    return std::string(s.begin(), s.end());
+    if (s.empty()) {
+        return {};
+    }
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) {
+        return {};
+    }
+    std::string out(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), bytes, nullptr, nullptr);
+    return out;
 }
 
 void RefreshFocusedFromEngine() {
@@ -384,7 +393,7 @@ void RegisterSceneEditorClass() {
                     0, L"COMBOBOX", L"",
                     WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
                     x + colLabelWidth, yy, colFieldWidth, comboHeight * 6,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_ed.font), TRUE);
                 return h;
             };
@@ -394,7 +403,7 @@ void RegisterSceneEditorClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colFieldWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -404,7 +413,7 @@ void RegisterSceneEditorClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, labelHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_ed.font), TRUE);
                 return h;
             };
@@ -414,7 +423,7 @@ void RegisterSceneEditorClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                     x, yy, width - margin * 2, 24,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_ed.font), TRUE);
                 return h;
             };
@@ -424,7 +433,7 @@ void RegisterSceneEditorClass() {
                     WS_EX_CLIENTEDGE, L"EDIT", L"",
                     WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
                     x + colLabelWidth, yy, colFieldWidth, 20,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_ed.font), TRUE);
                 return h;
             };

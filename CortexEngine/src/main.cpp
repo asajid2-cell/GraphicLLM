@@ -11,6 +11,8 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <algorithm>
+#include <cctype>
 
 using namespace Cortex;
 
@@ -29,7 +31,49 @@ RunLogState& GetRunLogState() {
     return s;
 }
 
+bool IsExperimentalTerrainEnabled() {
+    const char* value = std::getenv("CORTEX_ENABLE_EXPERIMENTAL_TERRAIN");
+    if (!value) {
+        return false;
+    }
+
+    std::string normalized = value;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return !normalized.empty() &&
+           normalized != "0" &&
+           normalized != "false" &&
+           normalized != "off" &&
+           normalized != "no";
+}
+
+bool TrySetRenderBackend(EngineConfig& config, std::string backend) {
+    std::transform(backend.begin(), backend.end(), backend.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (backend == "voxel" || backend == "voxelexperimental") {
+        config.renderBackend = EngineConfig::RenderBackend::VoxelExperimental;
+        return true;
+    }
+    if (backend == "raster" || backend == "rasterdx12") {
+        config.renderBackend = EngineConfig::RenderBackend::RasterDX12;
+        return true;
+    }
+    return false;
+}
+
 std::filesystem::path GetLogDirectory() {
+    if (const char* overrideDir = std::getenv("CORTEX_LOG_DIR")) {
+        if (*overrideDir) {
+            std::filesystem::path logDir = std::filesystem::path(overrideDir);
+            std::error_code ec;
+            std::filesystem::create_directories(logDir, ec);
+            if (!ec) {
+                return logDir;
+            }
+        }
+    }
+
     std::filesystem::path exeDir = GetExecutableDirectory();
     std::filesystem::path logDir = exeDir / "logs";
     std::error_code ec;
@@ -273,7 +317,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 0, L"COMBOBOX", L"",
                 WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
                 xCtrl, yy, ctrlW, 120,
-                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
             SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
             return h;
         };
@@ -283,7 +327,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 0, L"BUTTON", text,
                 WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                 xCtrl, yy, ctrlW, ctrlH,
-                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
             SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
             return h;
         };
@@ -293,7 +337,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 0, L"BUTTON", text,
                 WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
                 xCtrl, yy, ctrlW, ctrlH,
-                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
             SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
             return h;
         };
@@ -303,7 +347,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 0, L"BUTTON", text,
                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                 xx, yy, w, ctrlH + 4,
-                hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
             SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
             return h;
         };
@@ -363,9 +407,12 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         // then actions) instead of anchoring them to the bottom edge.
         int btnW = 100;
         int btnY = y;
-        // Three buttons: Launch Demo | Engine Editor | Exit
+        // The terrain editor path is experimental debt and is hidden from the
+        // normal launcher unless explicitly requested for debugging.
         state->btnLaunch = makeButton(IDC_LAUNCH_OK, L"Launch Demo", margin, btnY, btnW);
-        state->btnEditor = makeButton(IDC_LAUNCH_EDITOR, L"Engine Editor", margin + btnW + rowGap, btnY, btnW);
+        if (IsExperimentalTerrainEnabled()) {
+            state->btnEditor = makeButton(IDC_LAUNCH_EDITOR, L"Terrain Exp.", margin + btnW + rowGap, btnY, btnW);
+        }
         state->btnCancel = makeButton(IDC_LAUNCH_CANCEL, L"Exit", width - margin - 60, btnY, 60);
 
         return 0;
@@ -407,7 +454,7 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 PostQuitMessage(0);
                 return 0;
             }
-            if (id == IDC_LAUNCH_EDITOR && state && state->config) {
+            if (id == IDC_LAUNCH_EDITOR && state && state->config && IsExperimentalTerrainEnabled()) {
                 // Engine Editor mode - launch directly into terrain world
                 state->config->initialScenePreset = "engine_editor";
                 state->config->qualityMode = EngineConfig::QualityMode::Default;
@@ -538,6 +585,7 @@ int main(int argc, char* argv[]) {
         // via CLI or by specifying a scene/mode explicitly.
         bool hasSceneFlag = false;
         bool hasModeFlag  = false;
+        bool hasBackendFlag = false;
         bool noLauncher   = false;
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
@@ -545,12 +593,16 @@ int main(int argc, char* argv[]) {
                 hasSceneFlag = true;
             } else if (arg == "--mode" || arg.rfind("--mode=", 0) == 0) {
                 hasModeFlag = true;
+            } else if (arg == "--backend" || arg == "--render-backend" ||
+                       arg.rfind("--backend=", 0) == 0 ||
+                       arg.rfind("--render-backend=", 0) == 0) {
+                hasBackendFlag = true;
             } else if (arg == "--no-launcher") {
                 noLauncher = true;
             }
         }
 
-        const bool useLauncher = !noLauncher && !hasSceneFlag && !hasModeFlag;
+        const bool useLauncher = !noLauncher && !hasSceneFlag && !hasModeFlag && !hasBackendFlag;
         if (useLauncher) {
             if (!ShowLauncher(config)) {
                 spdlog::info("Launcher cancelled; exiting.");
@@ -559,8 +611,9 @@ int main(int argc, char* argv[]) {
         }
 
         // Optional: parse simple command-line flags
-        //   --scene <dragon|rt_showcase|cornell>
+        //   --scene <dragon|rt_showcase|temporal_validation|cornell>
         //   --mode  <default|conservative>
+        //   --backend <raster|voxel>
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             if (arg == "--scene" && i + 1 < argc) {
@@ -577,6 +630,21 @@ int main(int argc, char* argv[]) {
                 if (mode == "conservative") {
                     config.qualityMode = EngineConfig::QualityMode::Conservative;
                 }
+            } else if ((arg == "--backend" || arg == "--render-backend") && i + 1 < argc) {
+                const std::string backend = argv[++i];
+                if (!TrySetRenderBackend(config, backend)) {
+                    spdlog::warn("Ignoring unknown render backend '{}'", backend);
+                }
+            } else if (arg.rfind("--backend=", 0) == 0) {
+                const std::string backend = arg.substr(std::string("--backend=").size());
+                if (!TrySetRenderBackend(config, backend)) {
+                    spdlog::warn("Ignoring unknown render backend '{}'", backend);
+                }
+            } else if (arg.rfind("--render-backend=", 0) == 0) {
+                const std::string backend = arg.substr(std::string("--render-backend=").size());
+                if (!TrySetRenderBackend(config, backend)) {
+                    spdlog::warn("Ignoring unknown render backend '{}'", backend);
+                }
             }
         }
 
@@ -592,6 +660,9 @@ int main(int argc, char* argv[]) {
         //   --llm-model=<path.gguf>  : force a specific model file
         //   --no-dreamer             : disable Dreamer texture pipeline
         //   CORTEX_DISABLE_DREAMER=1 : same as --no-dreamer
+        //   --backend=voxel          : select experimental voxel backend
+        //   --smoke-frames=<n>       : exit after n rendered frames
+        //   --exit-after-visual-validation : exit after validation capture
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             spdlog::info("Command line arg[{}]: '{}'", i, arg);
@@ -604,6 +675,18 @@ int main(int argc, char* argv[]) {
             } else if (arg == "--no-dreamer") {
                 config.enableDreamer = false;
                 spdlog::info("  -> Dreamer disabled via --no-dreamer");
+            } else if ((arg == "--smoke-frames" || arg == "--max-frames") && i + 1 < argc) {
+                config.maxFrames = std::strtoull(argv[++i], nullptr, 10);
+                spdlog::info("  -> Smoke max frames set to {}", static_cast<unsigned long long>(config.maxFrames));
+            } else if (arg.rfind("--smoke-frames=", 0) == 0) {
+                config.maxFrames = std::strtoull(arg.substr(std::string("--smoke-frames=").size()).c_str(), nullptr, 10);
+                spdlog::info("  -> Smoke max frames set to {}", static_cast<unsigned long long>(config.maxFrames));
+            } else if (arg.rfind("--max-frames=", 0) == 0) {
+                config.maxFrames = std::strtoull(arg.substr(std::string("--max-frames=").size()).c_str(), nullptr, 10);
+                spdlog::info("  -> Smoke max frames set to {}", static_cast<unsigned long long>(config.maxFrames));
+            } else if (arg == "--exit-after-visual-validation") {
+                config.exitAfterVisualValidationCapture = true;
+                spdlog::info("  -> Smoke exit after visual validation capture enabled");
             }
         }
         spdlog::info("After parsing args: enableDreamer={}, enableLLM={}", config.enableDreamer, config.enableLLM);
@@ -618,6 +701,15 @@ int main(int argc, char* argv[]) {
             std::string value = envDisableDreamer;
             if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
                 config.enableDreamer = false;
+            }
+        }
+        if (const char* envSmokeFrames = std::getenv("CORTEX_SMOKE_FRAMES")) {
+            config.maxFrames = std::strtoull(envSmokeFrames, nullptr, 10);
+        }
+        if (const char* envExitVisual = std::getenv("CORTEX_EXIT_AFTER_VISUAL_VALIDATION")) {
+            std::string value = envExitVisual;
+            if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+                config.exitAfterVisualValidationCapture = true;
             }
         }
         // Resolve model path relative to the executable location (robust to working directory)

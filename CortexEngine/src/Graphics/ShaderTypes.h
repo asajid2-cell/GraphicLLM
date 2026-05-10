@@ -102,7 +102,9 @@ struct FrameConstants {
     //                      26 = material layers debug (clear-coat / sheen / SSS),
     //                      27 = anisotropy debug,
     //                      28 = fog factor debug (post-process),
-    //                      29 = water debug (height/slope/foam)),
+    //                      29 = water debug (height/slope/foam),
+    //                      40 = VB material class target,
+    //                      41 = material class overlay),
     //     w = RT history valid (>0.5), y/z reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight,

@@ -81,13 +81,13 @@ uint64_t DX12CommandQueue::Signal() {
     return fenceValue;
 }
 
-void DX12CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
+bool DX12CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
     if (fenceValue == 0 || !m_fence || !m_fenceEvent) {
-        return;
+        return true;
     }
 
     if (IsFenceComplete(fenceValue)) {
-        return;
+        return true;
     }
 
     // Schedule an event when the fence reaches the specified value
@@ -95,11 +95,28 @@ void DX12CommandQueue::WaitForFenceValue(uint64_t fenceValue) {
     if (FAILED(hr)) {
         spdlog::error("Failed to set fence completion event: 0x{:08X}",
                       static_cast<unsigned int>(hr));
-        return;
+        return false;
     }
 
-    // Wait for the event to be signaled
-    WaitForSingleObject(m_fenceEvent, INFINITE);
+    constexpr DWORD kFenceWaitTimeoutMs = 30000;
+    const DWORD waitResult = WaitForSingleObject(m_fenceEvent, kFenceWaitTimeoutMs);
+    if (waitResult == WAIT_OBJECT_0) {
+        return true;
+    }
+
+    const uint64_t completed = GetLastCompletedFenceValue();
+    if (waitResult == WAIT_TIMEOUT) {
+        spdlog::error("Timed out waiting for command queue fence: expected={}, completed={}, timeout_ms={}",
+                      fenceValue,
+                      completed,
+                      kFenceWaitTimeoutMs);
+    } else {
+        spdlog::error("Command queue fence wait failed: wait_result={}, expected={}, completed={}",
+                      waitResult,
+                      fenceValue,
+                      completed);
+    }
+    return false;
 }
 
 void DX12CommandQueue::WaitForQueue(ID3D12Fence* otherFence, uint64_t fenceValue) {
@@ -121,7 +138,7 @@ void DX12CommandQueue::Flush() {
         return;
     }
     uint64_t fenceValue = Signal();
-    WaitForFenceValue(fenceValue);
+    (void)WaitForFenceValue(fenceValue);
 }
 
 bool DX12CommandQueue::IsFenceComplete(uint64_t fenceValue) const {

@@ -1,0 +1,330 @@
+#include "Renderer.h"
+
+#include "Graphics/FrameContractResources.h"
+#include "Graphics/FrameContractValidation.h"
+#include "Graphics/RenderableClassification.h"
+#include "Graphics/SurfaceClassification.h"
+#include "Scene/Components.h"
+#include "Scene/ECS_Registry.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+#include <vector>
+
+#include <glm/geometric.hpp>
+
+namespace Cortex::Graphics {
+
+namespace {
+void ApplyRTPlanToContract(FrameContract::RayTracingInfo& info, const RTFramePlan& plan) {
+    info.schedulerEnabled = plan.enabled;
+    info.schedulerBuildTLAS = plan.buildTLAS;
+    info.dispatchShadows = plan.dispatchShadows;
+    info.dispatchReflections = plan.dispatchReflections;
+    info.dispatchGI = plan.dispatchGI;
+    info.denoiseShadows = plan.denoiseShadows;
+    info.denoiseReflections = plan.denoiseReflections;
+    info.denoiseGI = plan.denoiseGI;
+    info.budgetProfile = plan.budget.profileName;
+    info.schedulerDisabledReason = plan.disabledReason;
+    info.schedulerTLASCandidates = plan.tlasCandidateCount;
+    info.schedulerMaxTLASInstances = plan.budget.maxTLASInstances;
+    info.reflectionWidth = plan.budget.reflectionWidth;
+    info.reflectionHeight = plan.budget.reflectionHeight;
+    info.giWidth = plan.budget.giWidth;
+    info.giHeight = plan.budget.giHeight;
+    info.reflectionUpdateCadence = plan.budget.reflectionUpdateCadence;
+    info.giUpdateCadence = plan.budget.giUpdateCadence;
+    info.reflectionFramePhase = plan.reflectionFramePhase;
+    info.giFramePhase = plan.giFramePhase;
+    info.dedicatedVideoMemoryBytes = plan.budget.dedicatedVideoMemoryBytes;
+    info.maxBLASBuildBytesPerFrame = plan.budget.maxBLASBuildBytesPerFrame;
+    info.maxBLASTotalBytes = plan.budget.maxBLASTotalBytes;
+}
+
+void ApplyBudgetPlanToContract(FrameContract::BudgetInfo& info, const RendererBudgetPlan& plan) {
+    info.profileName = plan.profileName;
+    info.forced = plan.forced;
+    info.dedicatedVideoMemoryBytes = plan.dedicatedVideoMemoryBytes;
+    info.targetRenderScale = plan.targetRenderScale;
+    info.maxRenderWidth = plan.maxRenderWidth;
+    info.maxRenderHeight = plan.maxRenderHeight;
+    info.ssaoDivisor = plan.ssaoDivisor;
+    info.shadowMapSize = plan.shadowMapSize;
+    info.bloomLevels = plan.bloomLevels;
+    info.iblResidentEnvironmentLimit = plan.iblResidentEnvironmentLimit;
+    info.materialTextureMaxDimension = plan.materialTextureMaxDimension;
+    info.materialTextureBudgetFloorDimension = plan.materialTextureBudgetFloorDimension;
+    info.textureBudgetBytes = plan.textureBudgetBytes;
+    info.environmentBudgetBytes = plan.environmentBudgetBytes;
+    info.geometryBudgetBytes = plan.geometryBudgetBytes;
+    info.rtStructureBudgetBytes = plan.rtStructureBudgetBytes;
+    info.rtResolutionScale = plan.rtResolutionScale;
+    info.reflectionUpdateCadence = plan.reflectionUpdateCadence;
+    info.giUpdateCadence = plan.giUpdateCadence;
+}
+
+} // namespace
+
+void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
+                                           const FrameFeaturePlan& featurePlan) {
+    FrameContract contract{};
+    contract.absoluteFrame = m_frameLifecycle.renderFrameCounter;
+    contract.swapchainFrameIndex = m_frameRuntime.frameIndex;
+    contract.renderWidth = GetInternalRenderWidth();
+    contract.renderHeight = GetInternalRenderHeight();
+    contract.presentationWidth = m_services.window ? m_services.window->GetWidth() : 0;
+    contract.presentationHeight = m_services.window ? m_services.window->GetHeight() : 0;
+
+    contract.plannedFeatures = featurePlan.planned;
+    contract.executedFeatures = featurePlan.active;
+    contract.features = featurePlan.active;
+    contract.lighting.exposure = m_qualityRuntimeState.exposure;
+    contract.lighting.sunIntensity = m_lightingState.directionalIntensity;
+    contract.lighting.iblDiffuseIntensity = m_environmentState.diffuseIntensity;
+    contract.lighting.iblSpecularIntensity = m_environmentState.specularIntensity;
+    contract.lighting.bloomIntensity = m_bloomResources.intensity;
+    contract.lighting.ssaoRadius = m_ssaoResources.radius;
+    contract.lighting.ssaoBias = m_ssaoResources.bias;
+    contract.lighting.ssaoIntensity = m_ssaoResources.intensity;
+    contract.lighting.fogDensity = m_fogState.density;
+    contract.lighting.fogHeight = m_fogState.height;
+    contract.lighting.fogFalloff = m_fogState.falloff;
+    contract.lighting.godRayIntensity = m_postProcessState.godRayIntensity;
+    contract.lighting.shadowBias = m_shadowResources.bias;
+    contract.lighting.shadowPCFRadius = m_shadowResources.pcfRadius;
+
+    if (m_framePlanning.sceneSnapshot.IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
+        contract.renderables = m_framePlanning.sceneSnapshot.renderables;
+        contract.materials = m_framePlanning.sceneSnapshot.materials;
+    }
+
+    if (registry) {
+        auto lightView = registry->View<Scene::LightComponent>();
+        for (auto entity : lightView) {
+            const auto& light = lightView.get<Scene::LightComponent>(entity);
+            ++contract.lighting.lightCount;
+            if (light.castsShadows) {
+                ++contract.lighting.shadowCastingLightCount;
+            }
+            contract.lighting.totalLightIntensity += light.intensity;
+            contract.lighting.maxLightIntensity =
+                std::max(contract.lighting.maxLightIntensity, light.intensity);
+        }
+    }
+
+    auto addResource = [&](const char* name, ID3D12Resource* resource, uint32_t expectedWidth, uint32_t expectedHeight) {
+        FrameContract::ResourceInfo info{};
+        info.name = name ? name : "";
+        info.expectedWidth = expectedWidth;
+        info.expectedHeight = expectedHeight;
+        info.valid = resource != nullptr;
+        if (resource) {
+            const D3D12_RESOURCE_DESC desc = resource->GetDesc();
+            if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
+                info.width = static_cast<uint32_t>(desc.Width);
+                info.height = desc.Height;
+                info.bytes = static_cast<uint64_t>(info.width) *
+                             static_cast<uint64_t>(info.height) *
+                             BytesPerPixelForContract(desc.Format);
+            } else if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER) {
+                info.bytes = desc.Width;
+            }
+        }
+        if (expectedWidth > 0 && expectedHeight > 0) {
+            info.sizeMatchesContract =
+                info.valid && info.width == expectedWidth && info.height == expectedHeight;
+        }
+        contract.resources.push_back(std::move(info));
+    };
+
+    const uint32_t halfWidth = std::max(1u, contract.renderWidth / 2u);
+    const uint32_t halfHeight = std::max(1u, contract.renderHeight / 2u);
+    const uint32_t ssaoDivisor = std::max(1u, m_framePlanning.budgetPlan.ssaoDivisor);
+    const uint32_t ssaoWidth = std::max(1u, contract.renderWidth / ssaoDivisor);
+    const uint32_t ssaoHeight = std::max(1u, contract.renderHeight / ssaoDivisor);
+
+    addResource("depth", m_depthResources.buffer.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("hdr_color", m_mainTargets.hdrColor.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("gbuffer_normal_roughness", m_mainTargets.gbufferNormalRoughness.Get(), contract.renderWidth, contract.renderHeight);
+    if (m_services.visibilityBuffer) {
+        addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);
+        addResource("vb_gbuffer_normal_roughness", m_services.visibilityBuffer->GetNormalRoughnessBuffer(), contract.renderWidth, contract.renderHeight);
+        addResource("vb_gbuffer_emissive_metallic", m_services.visibilityBuffer->GetEmissiveMetallicBuffer(), contract.renderWidth, contract.renderHeight);
+        addResource("vb_gbuffer_material_ext0", m_services.visibilityBuffer->GetMaterialExt0Buffer(), contract.renderWidth, contract.renderHeight);
+        addResource("vb_gbuffer_material_ext1", m_services.visibilityBuffer->GetMaterialExt1Buffer(), contract.renderWidth, contract.renderHeight);
+        addResource("vb_gbuffer_material_ext2", m_services.visibilityBuffer->GetMaterialExt2Buffer(), contract.renderWidth, contract.renderHeight);
+    }
+    addResource("ssao", m_ssaoResources.texture.Get(), ssaoWidth, ssaoHeight);
+    addResource("ssr_color", m_ssrResources.color.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("velocity", m_temporalScreenState.velocityBuffer.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("temporal_rejection_mask", m_temporalMaskState.texture.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("temporal_rejection_mask_stats", m_temporalMaskState.statsBuffer.Get(), 0, 0);
+    addResource("taa_history", m_temporalScreenState.historyColor.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("taa_intermediate", m_temporalScreenState.taaIntermediate.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("rt_shadow_mask", m_rtShadowTargets.mask.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("rt_shadow_history", m_rtShadowTargets.history.Get(), contract.renderWidth, contract.renderHeight);
+    const uint32_t expectedReflectionWidth = m_framePlanning.rtPlan.budget.reflectionWidth > 0
+        ? m_framePlanning.rtPlan.budget.reflectionWidth
+        : halfWidth;
+    const uint32_t expectedReflectionHeight = m_framePlanning.rtPlan.budget.reflectionHeight > 0
+        ? m_framePlanning.rtPlan.budget.reflectionHeight
+        : halfHeight;
+    const uint32_t expectedGIWidth = m_framePlanning.rtPlan.budget.giWidth > 0
+        ? m_framePlanning.rtPlan.budget.giWidth
+        : halfWidth;
+    const uint32_t expectedGIHeight = m_framePlanning.rtPlan.budget.giHeight > 0
+        ? m_framePlanning.rtPlan.budget.giHeight
+        : halfHeight;
+    addResource("rt_reflection", m_rtReflectionTargets.color.Get(), expectedReflectionWidth, expectedReflectionHeight);
+    addResource("rt_reflection_signal_stats", m_rtReflectionSignalState.rawStatsBuffer.Get(), 0, 0);
+    addResource("rt_reflection_history", m_rtReflectionTargets.history.Get(), expectedReflectionWidth, expectedReflectionHeight);
+    addResource("rt_reflection_history_signal_stats", m_rtReflectionSignalState.historyStatsBuffer.Get(), 0, 0);
+    addResource("rt_gi", m_rtGITargets.color.Get(), expectedGIWidth, expectedGIHeight);
+    addResource("rt_gi_history", m_rtGITargets.history.Get(), expectedGIWidth, expectedGIHeight);
+    addResource("shadow_map",
+                m_shadowResources.map.Get(),
+                static_cast<uint32_t>(m_shadowResources.mapSize),
+                static_cast<uint32_t>(m_shadowResources.mapSize));
+    for (uint32_t level = 0; level < m_bloomResources.activeLevels; ++level) {
+        const uint32_t div = 1u << (level + 1u);
+        const uint32_t bloomWidth = std::max(1u, contract.renderWidth / div);
+        const uint32_t bloomHeight = std::max(1u, contract.renderHeight / div);
+        addResource(("bloom_a_" + std::to_string(level)).c_str(), m_bloomResources.texA[level].Get(), bloomWidth, bloomHeight);
+        addResource(("bloom_b_" + std::to_string(level)).c_str(), m_bloomResources.texB[level].Get(), bloomWidth, bloomHeight);
+    }
+
+    contract.culling.gpuCullingEnabled = m_gpuCullingState.enabled;
+    contract.culling.cullingFrozen = m_gpuCullingState.freeze || (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
+    contract.culling.visibilityBufferPlanned = m_visibilityBufferState.plannedThisFrame;
+    contract.culling.visibilityBufferRendered = m_visibilityBufferState.renderedThisFrame;
+    contract.culling.hzbResourceValid = m_hzbResources.texture != nullptr;
+    contract.culling.hzbValid = m_hzbResources.valid;
+    contract.culling.hzbCaptureValid = m_hzbResources.captureValid;
+    contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_visibilityBufferState.hzbOcclusionUsedThisFrame;
+    contract.culling.hzbOcclusionUsedByGpuCulling = m_gpuCullingState.hzbOcclusionUsedThisFrame;
+    contract.culling.hzbWidth = m_hzbResources.width;
+    contract.culling.hzbHeight = m_hzbResources.height;
+    contract.culling.hzbMipCount = m_hzbResources.mipCount;
+    contract.culling.hzbCaptureFrame = m_hzbResources.captureFrameCounter;
+    contract.culling.hzbAgeFrames =
+        (m_hzbResources.captureValid && m_frameLifecycle.renderFrameCounter >= m_hzbResources.captureFrameCounter)
+            ? (m_frameLifecycle.renderFrameCounter - m_hzbResources.captureFrameCounter)
+            : 0;
+    if (m_services.gpuCulling) {
+        const auto stats = m_services.gpuCulling->GetDebugStats();
+        contract.culling.statsValid = stats.valid;
+        contract.culling.tested = stats.tested;
+        contract.culling.frustumCulled = stats.frustumCulled;
+        contract.culling.occluded = stats.occluded;
+        contract.culling.visible = stats.visible;
+    }
+
+    contract.motionVectors = m_frameDiagnostics.contract.motionVectors;
+    contract.temporalMask = m_frameDiagnostics.contract.temporalMask;
+
+    contract.rayTracing.supported = m_rtRuntimeState.supported;
+    contract.rayTracing.enabled = m_rtRuntimeState.enabled;
+    contract.rayTracing.warmingUp = IsRTWarmingUp();
+    ApplyBudgetPlanToContract(contract.budget, m_framePlanning.budgetPlan);
+    const auto assetMem = m_assetRuntime.registry.GetMemoryBreakdown();
+    contract.assetMemory.textureBytes = assetMem.textureBytes;
+    contract.assetMemory.environmentBytes = assetMem.environmentBytes;
+    contract.assetMemory.geometryBytes = assetMem.geometryBytes;
+    contract.assetMemory.rtStructureBytes = assetMem.rtStructureBytes;
+    contract.assetMemory.textureBudgetExceeded =
+        contract.budget.textureBudgetBytes > 0 && assetMem.textureBytes > contract.budget.textureBudgetBytes;
+    contract.assetMemory.environmentBudgetExceeded =
+        contract.budget.environmentBudgetBytes > 0 && assetMem.environmentBytes > contract.budget.environmentBudgetBytes;
+    contract.assetMemory.geometryBudgetExceeded =
+        contract.budget.geometryBudgetBytes > 0 && assetMem.geometryBytes > contract.budget.geometryBudgetBytes;
+    contract.assetMemory.rtStructureBudgetExceeded =
+        contract.budget.rtStructureBudgetBytes > 0 && assetMem.rtStructureBytes > contract.budget.rtStructureBudgetBytes;
+    ApplyRTPlanToContract(contract.rayTracing, m_framePlanning.rtPlan);
+    contract.rayTracing.denoiserExecuted = m_rtDenoiseState.executedThisFrame;
+    contract.rayTracing.denoiserPasses = m_rtDenoiseState.passCountThisFrame;
+    contract.rayTracing.denoiserUsesDepthNormalRejection = m_rtDenoiseState.usedDepthNormalRejectionThisFrame;
+    contract.rayTracing.denoiserUsesVelocityReprojection = m_rtDenoiseState.usedVelocityThisFrame;
+    contract.rayTracing.denoiserUsesDisocclusionRejection = m_rtDenoiseState.usedDisocclusionRejectionThisFrame;
+    contract.rayTracing.shadowDenoiseAlpha = m_rtDenoiseState.shadowAlpha;
+    contract.rayTracing.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionAlpha;
+    contract.rayTracing.giDenoiseAlpha = m_rtDenoiseState.giAlpha;
+    contract.rayTracing.reflectionDispatchReady = m_rtReflectionReadiness.ready;
+    contract.rayTracing.reflectionHasPipeline = m_rtReflectionReadiness.hasPipeline;
+    contract.rayTracing.reflectionHasTLAS = m_rtReflectionReadiness.hasTLAS;
+    contract.rayTracing.reflectionHasMaterialBuffer = m_rtReflectionReadiness.hasMaterialBuffer;
+    contract.rayTracing.reflectionHasOutput = m_rtReflectionReadiness.hasOutput;
+    contract.rayTracing.reflectionHasDepth = m_rtReflectionReadiness.hasDepth;
+    contract.rayTracing.reflectionHasNormalRoughness = m_rtReflectionReadiness.hasNormalRoughness;
+    contract.rayTracing.reflectionHasMaterialExt2 = m_rtReflectionReadiness.hasMaterialExt2;
+    contract.rayTracing.reflectionHasEnvironmentTable = m_rtReflectionReadiness.hasEnvironmentTable;
+    contract.rayTracing.reflectionHasFrameConstants = m_rtReflectionReadiness.hasFrameConstants;
+    contract.rayTracing.reflectionHasDispatchDescriptors = m_rtReflectionReadiness.hasDispatchDescriptors;
+    contract.rayTracing.reflectionDispatchWidth = m_rtReflectionReadiness.dispatchWidth;
+    contract.rayTracing.reflectionDispatchHeight = m_rtReflectionReadiness.dispatchHeight;
+    contract.rayTracing.reflectionReadinessReason = m_rtReflectionReadiness.reason;
+    contract.rayTracing.reflectionSignalStatsCaptured = m_rtReflectionSignalState.rawCapturedThisFrame;
+    contract.rayTracing.reflectionSignalValid = m_rtReflectionSignalState.raw.valid;
+    contract.rayTracing.reflectionSignalSampleFrame = m_rtReflectionSignalState.raw.sampleFrame;
+    contract.rayTracing.reflectionSignalPixelCount = m_rtReflectionSignalState.raw.pixelCount;
+    contract.rayTracing.reflectionSignalAvgLuma = m_rtReflectionSignalState.raw.avgLuma;
+    contract.rayTracing.reflectionSignalMaxLuma = m_rtReflectionSignalState.raw.maxLuma;
+    contract.rayTracing.reflectionSignalNonZeroRatio = m_rtReflectionSignalState.raw.nonZeroRatio;
+    contract.rayTracing.reflectionSignalBrightRatio = m_rtReflectionSignalState.raw.brightRatio;
+    contract.rayTracing.reflectionSignalOutlierRatio = m_rtReflectionSignalState.raw.outlierRatio;
+    contract.rayTracing.reflectionSignalReadbackLatencyFrames = m_rtReflectionSignalState.raw.readbackLatencyFrames;
+    contract.rayTracing.reflectionHistorySignalStatsCaptured =
+        m_rtReflectionSignalState.historyCapturedThisFrame;
+    contract.rayTracing.reflectionHistorySignalValid = m_rtReflectionSignalState.history.valid;
+    contract.rayTracing.reflectionHistorySignalSampleFrame = m_rtReflectionSignalState.history.sampleFrame;
+    contract.rayTracing.reflectionHistorySignalPixelCount = m_rtReflectionSignalState.history.pixelCount;
+    contract.rayTracing.reflectionHistorySignalAvgLuma = m_rtReflectionSignalState.history.avgLuma;
+    contract.rayTracing.reflectionHistorySignalMaxLuma = m_rtReflectionSignalState.history.maxLuma;
+    contract.rayTracing.reflectionHistorySignalNonZeroRatio = m_rtReflectionSignalState.history.nonZeroRatio;
+    contract.rayTracing.reflectionHistorySignalBrightRatio = m_rtReflectionSignalState.history.brightRatio;
+    contract.rayTracing.reflectionHistorySignalOutlierRatio = m_rtReflectionSignalState.history.outlierRatio;
+    contract.rayTracing.reflectionHistorySignalAvgLumaDelta = m_rtReflectionSignalState.history.avgLumaDelta;
+    contract.rayTracing.reflectionHistorySignalReadbackLatencyFrames =
+        m_rtReflectionSignalState.history.readbackLatencyFrames;
+    contract.rayTracing.pendingBLAS = m_services.rayTracingContext ? m_services.rayTracingContext->GetPendingBLASCount() : 0;
+    contract.rayTracing.pendingRendererBLASJobs = m_assetRuntime.gpuJobs.pendingBLASJobs;
+    contract.rayTracing.tlasInstances = m_services.rayTracingContext ? m_services.rayTracingContext->GetLastTLASInstanceCount() : 0;
+    contract.rayTracing.materialRecords = m_services.rayTracingContext ? m_services.rayTracingContext->GetLastRTMaterialCount() : 0;
+    contract.rayTracing.materialBufferBytes = m_services.rayTracingContext ? m_services.rayTracingContext->GetRTMaterialBufferBytes() : 0;
+    if (m_services.rayTracingContext) {
+        const auto& tlasStats = m_services.rayTracingContext->GetLastTLASBuildStats();
+        contract.rayTracing.tlasCandidates = tlasStats.candidates;
+        contract.rayTracing.tlasSkippedInvalid = tlasStats.skippedInvisibleOrInvalid;
+        contract.rayTracing.tlasMissingGeometry = tlasStats.missingGeometry;
+        contract.rayTracing.tlasDistanceCulled = tlasStats.distanceCulled;
+        contract.rayTracing.tlasBLASBuildRequested = tlasStats.blasBuildRequested;
+        contract.rayTracing.tlasBLASBuildBudgetDeferred = tlasStats.blasBuildBudgetDeferred;
+        contract.rayTracing.tlasBLASTotalBudgetSkipped = tlasStats.blasTotalBudgetSkipped;
+        contract.rayTracing.tlasBLASBuildFailed = tlasStats.blasBuildFailed;
+        contract.rayTracing.surfaceDefault = tlasStats.surfaceDefault;
+        contract.rayTracing.surfaceGlass = tlasStats.surfaceGlass;
+        contract.rayTracing.surfaceMirror = tlasStats.surfaceMirror;
+        contract.rayTracing.surfacePlastic = tlasStats.surfacePlastic;
+        contract.rayTracing.surfaceMasonry = tlasStats.surfaceMasonry;
+        contract.rayTracing.surfaceEmissive = tlasStats.surfaceEmissive;
+        contract.rayTracing.surfaceBrushedMetal = tlasStats.surfaceBrushedMetal;
+        contract.rayTracing.surfaceWood = tlasStats.surfaceWood;
+        contract.rayTracing.surfaceWater = tlasStats.surfaceWater;
+    }
+    contract.draws = m_frameDiagnostics.contract.drawCounts;
+    contract.passes = m_frameDiagnostics.contract.passRecords;
+    contract.renderGraph = m_frameDiagnostics.renderGraph.info;
+    contract.renderGraph.passRecords = 0;
+    for (const auto& pass : m_frameDiagnostics.contract.passRecords) {
+        if (pass.renderGraph) {
+            ++contract.renderGraph.passRecords;
+        }
+    }
+
+    m_frameDiagnostics.contract.contract = std::move(contract);
+    UpdateFrameContractHistories();
+    ValidateFrameContract();
+}
+
+} // namespace Cortex::Graphics

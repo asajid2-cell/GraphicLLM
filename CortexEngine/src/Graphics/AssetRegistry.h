@@ -38,6 +38,10 @@ public:
     // RT acceleration structures are tracked as a single bucket updated by the
     // DXR context; this folds BLAS/TLAS memory into the inspector.
     void SetRTStructureBytes(uint64_t bytes);
+    void SetBudgets(uint64_t textureBytes,
+                    uint64_t environmentBytes,
+                    uint64_t geometryBytes,
+                    uint64_t rtStructureBytes);
 
     [[nodiscard]] MemoryBreakdown GetMemoryBreakdown() const;
     [[nodiscard]] std::vector<HeavyAsset> GetHeaviestTextures(size_t maxCount) const;

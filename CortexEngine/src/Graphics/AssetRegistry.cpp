@@ -39,22 +39,22 @@ void AssetRegistry::UpdateBudgetFlagsLocked(const MemoryBreakdown& mem) const {
     if (texOver && !m_texBudgetExceeded) {
         const double usedMB   = static_cast<double>(mem.textureBytes) * (1.0 / (1024.0 * 1024.0));
         const double budgetMB = static_cast<double>(m_texBudgetBytes) * (1.0 / (1024.0 * 1024.0));
-        spdlog::warn("Texture budget exceeded: tex≈{:.0f} MB > budget≈{:.0f} MB", usedMB, budgetMB);
+        spdlog::warn("Texture budget exceeded: tex~{:.0f} MB > budget~{:.0f} MB", usedMB, budgetMB);
     }
     if (envOver && !m_envBudgetExceeded) {
         const double usedMB   = static_cast<double>(mem.environmentBytes) * (1.0 / (1024.0 * 1024.0));
         const double budgetMB = static_cast<double>(m_envBudgetBytes) * (1.0 / (1024.0 * 1024.0));
-        spdlog::warn("Environment budget exceeded: env≈{:.0f} MB > budget≈{:.0f} MB", usedMB, budgetMB);
+        spdlog::warn("Environment budget exceeded: env~{:.0f} MB > budget~{:.0f} MB", usedMB, budgetMB);
     }
     if (geomOver && !m_geomBudgetExceeded) {
         const double usedMB   = static_cast<double>(mem.geometryBytes) * (1.0 / (1024.0 * 1024.0));
         const double budgetMB = static_cast<double>(m_geomBudgetBytes) * (1.0 / (1024.0 * 1024.0));
-        spdlog::warn("Geometry budget exceeded: geom≈{:.0f} MB > budget≈{:.0f} MB", usedMB, budgetMB);
+        spdlog::warn("Geometry budget exceeded: geom~{:.0f} MB > budget~{:.0f} MB", usedMB, budgetMB);
     }
     if (rtOver && !m_rtBudgetExceeded) {
         const double usedMB   = static_cast<double>(mem.rtStructureBytes) * (1.0 / (1024.0 * 1024.0));
         const double budgetMB = static_cast<double>(m_rtBudgetBytes) * (1.0 / (1024.0 * 1024.0));
-        spdlog::warn("RT structure budget exceeded: rt≈{:.0f} MB > budget≈{:.0f} MB", usedMB, budgetMB);
+        spdlog::warn("RT structure budget exceeded: rt~{:.0f} MB > budget~{:.0f} MB", usedMB, budgetMB);
     }
 
     m_texBudgetExceeded  = texOver;
@@ -140,6 +140,28 @@ void AssetRegistry::SetRTStructureBytes(uint64_t bytes) {
     UpdateBudgetFlagsLocked(mem);
 }
 
+void AssetRegistry::SetBudgets(uint64_t textureBytes,
+                               uint64_t environmentBytes,
+                               uint64_t geometryBytes,
+                               uint64_t rtStructureBytes) {
+    std::scoped_lock lock(m_mutex);
+    if (textureBytes > 0) {
+        m_texBudgetBytes = textureBytes;
+    }
+    if (environmentBytes > 0) {
+        m_envBudgetBytes = environmentBytes;
+    }
+    if (geometryBytes > 0) {
+        m_geomBudgetBytes = geometryBytes;
+    }
+    if (rtStructureBytes > 0) {
+        m_rtBudgetBytes = rtStructureBytes;
+    }
+
+    auto mem = ComputeMemoryBreakdownLocked();
+    UpdateBudgetFlagsLocked(mem);
+}
+
 AssetRegistry::MemoryBreakdown AssetRegistry::GetMemoryBreakdown() const {
     std::scoped_lock lock(m_mutex);
     return ComputeMemoryBreakdownLocked();
@@ -220,6 +242,13 @@ AssetRegistry::GetHeaviestMeshes(size_t maxCount) const {
 void AssetRegistry::ResetAllRefCounts() {
     std::scoped_lock lock(m_mutex);
     for (auto& [_, t] : m_textures) {
+        // Environment maps are global renderer assets, not scene-owned
+        // material references. Their lifetime is controlled by the IBL
+        // residency policy, so scene ref rebuilds must not hide them from
+        // memory diagnostics.
+        if (t.kind == TextureKind::Environment) {
+            continue;
+        }
         t.refCount = 0;
     }
     for (auto& [_, m] : m_meshes) {

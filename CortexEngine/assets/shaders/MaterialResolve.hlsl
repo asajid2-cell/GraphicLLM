@@ -5,6 +5,7 @@
 
 // Include biome materials for terrain rendering
 #include "BiomeMaterials.hlsli"
+#include "SurfaceClassification.hlsli"
 
 // Root signature:
 // b0: Resolution constants
@@ -18,6 +19,7 @@
 // u2: Emissive+Metallic UAV output
 // u3: MaterialExt0 UAV output
 // u4: MaterialExt1 UAV output
+// u5: MaterialExt2 UAV output
 // s0: Static sampler (linear wrap) for bindless textures
 
 cbuffer ResolutionConstants : register(b0) {
@@ -88,7 +90,7 @@ struct VBMaterialConstants {
     float alphaCutoff;
     uint alphaMode; // 0=opaque, 1=mask, 2=blend
     uint doubleSided;
-    uint _pad1;
+    uint materialClass;
 };
 
 // Per-mesh table entry (matches VBMeshTableEntry in C++)
@@ -112,6 +114,7 @@ RWTexture2D<float4> g_NormalRoughnessOut : register(u1);     // RGBA16F
 RWTexture2D<float4> g_EmissiveMetallicOut : register(u2);    // RGBA16F
 RWTexture2D<float4> g_MaterialExt0Out : register(u3);        // RGBA16F: clearcoat/IOR/specularFactor
 RWTexture2D<float4> g_MaterialExt1Out : register(u4);        // RGBA16F: specularColor/transmission
+RWTexture2D<unorm float4> g_MaterialExt2Out : register(u5);  // RGBA8: encoded surface class / masks
 
 SamplerState g_Sampler : register(s0);
 
@@ -203,11 +206,19 @@ float ApplyRoughnessFloor(float baseRoughness)
 
 float ApplyMetallicRoughnessFloor(float baseRoughness, float metallic)
 {
-    // Additional roughness floor for metallic surfaces.
-    // Metals have strong specular and no diffuse, so they need more roughness.
-    const float kMetallicMinRoughness = 0.25f;  // Tunable: 0.20-0.35
+    // Preserve authored mirror-class materials. The old global 0.25 metallic
+    // floor made real mirrors behave like brushed metal in the G-buffer and
+    // forced the RT path to compensate with excessive post blending.
+    if (metallic > 0.9f && baseRoughness <= 0.06f) {
+        return max(baseRoughness, 0.02f);
+    }
+
+    // Additional roughness floor for ordinary metals. Metals have strong
+    // specular and no diffuse, so they need a modest floor to avoid triangle-
+    // scale sparkle, but not enough to erase glossy/chrome material classes.
+    const float kMetallicMinRoughness = 0.12f;
     float minRoughness = metallic * kMetallicMinRoughness;
-    float floor = max(kMetallicMinRoughness * 0.3f, minRoughness); // At least 7.5% for any metallic
+    float floor = max(kMetallicMinRoughness * 0.35f, minRoughness);
     return max(baseRoughness, floor);
 }
 
@@ -321,6 +332,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
         g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
         g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
+        g_MaterialExt2Out[pixelCoord] = float4(EncodeSurfaceClass(SURFACE_CLASS_DEFAULT), 0, 0, 0);
         return;
     }
 
@@ -333,6 +345,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
         g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
         g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
+        g_MaterialExt2Out[pixelCoord] = float4(EncodeSurfaceClass(SURFACE_CLASS_DEFAULT), 0, 0, 0);
         return;
     }
 
@@ -355,6 +368,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         g_EmissiveMetallicOut[pixelCoord] = float4(0, 0, 0, 0);
         g_MaterialExt0Out[pixelCoord] = float4(0.0f, 1.0f, 1.5f, 1.0f);
         g_MaterialExt1Out[pixelCoord] = float4(1.0f, 1.0f, 1.0f, 0.0f);
+        g_MaterialExt2Out[pixelCoord] = float4(EncodeSurfaceClass(SURFACE_CLASS_DEFAULT), 0, 0, 0);
         return;
     }
 
@@ -444,6 +458,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float ior = 1.5f;
     float specularFactor = 1.0f;
     float3 specularColor = 1.0f;
+    uint materialClass = SURFACE_CLASS_DEFAULT;
 
     float2 ddxUV = float2(0.0f, 0.0f);
     float2 ddyUV = float2(0.0f, 0.0f);
@@ -463,6 +478,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         ior = max(mat.transmissionParams.y, 1.0f);
         specularColor = saturate(mat.specularParams.rgb);
         specularFactor = saturate(mat.specularParams.w);
+        materialClass = mat.materialClass;
 
         const bool wantsGrad =
             (mat.textureIndices.x != INVALID_BINDLESS_INDEX) ||
@@ -510,8 +526,12 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
         if (mat.textureIndices.y != INVALID_BINDLESS_INDEX) {
             Texture2D normalTex = ResourceDescriptorHeap[mat.textureIndices.y];
-            float3 nTS = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).xyz * 2.0f - 1.0f;
-            nTS.xy *= normalScale;
+            // Most authored showcase normal maps are BC5: XY are stored and Z
+            // must be reconstructed. Treat all tangent-space normal maps this
+            // way so BC5 assets do not decode with a bogus blue channel.
+            float2 nXY = normalTex.SampleGrad(g_Sampler, texCoord, ddxUV, ddyUV).xy * 2.0f - 1.0f;
+            nXY *= normalScale;
+            float3 nTS = normalize(float3(nXY, sqrt(saturate(1.0f - dot(nXY, nXY)))));
 
             float3 T = tangent.xyz;
             T = normalize(T - normalWS * dot(normalWS, T));
@@ -630,4 +650,8 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     g_EmissiveMetallicOut[pixelCoord] = float4(emissive, metallic);
     g_MaterialExt0Out[pixelCoord] = float4(clearCoatWeight, clearCoatRoughness, ior, specularFactor);
     g_MaterialExt1Out[pixelCoord] = float4(specularColor, transmission);
+    float reflectionClassMask =
+        (SurfaceIsMirrorClass(materialClass) || SurfaceIsWater(materialClass) ||
+         materialClass == SURFACE_CLASS_GLASS || materialClass == SURFACE_CLASS_BRUSHED_METAL) ? 1.0f : 0.0f;
+    g_MaterialExt2Out[pixelCoord] = float4(EncodeSurfaceClass(materialClass), reflectionClassMask, 0.0f, 0.0f);
 }

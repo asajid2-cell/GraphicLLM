@@ -3,6 +3,7 @@
 #include "UI/DebugMenu.h"
 #include "Core/ServiceLocator.h"
 #include "Core/Engine.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
 
 #include <commctrl.h>
@@ -113,10 +114,26 @@ void RefreshControlsFromState() {
 
     auto* renderer = Cortex::ServiceLocator::GetRenderer();
     if (renderer) {
-        SetSliderFromFloat(g_qs.sliderWaterSteepness, renderer->GetWaterSteepness(), 0.0f, 1.0f);
-        SetSliderFromFloat(g_qs.sliderFogDensity,     renderer->GetFogDensity(),      0.0f, 0.1f);
-        SetSliderFromFloat(g_qs.sliderGodRays,        renderer->GetGodRayIntensity(), 0.0f, 3.0f);
-        SetSliderFromFloat(g_qs.sliderAreaSize,       renderer->GetAreaLightSizeScale(), 0.25f, 2.0f);
+        const auto quality = renderer->GetQualityState();
+        const auto features = renderer->GetFeatureState();
+        const auto water = renderer->GetWaterState();
+        SetSliderFromFloat(g_qs.sliderWaterSteepness, water.steepness, 0.0f, 1.0f);
+        SetSliderFromFloat(g_qs.sliderFogDensity,     features.fogDensity, 0.0f, 0.1f);
+        SetSliderFromFloat(g_qs.sliderGodRays,        features.godRayIntensity, 0.0f, 3.0f);
+        SetSliderFromFloat(g_qs.sliderAreaSize,       features.areaLightSizeScale, 0.25f, 2.0f);
+
+        if (g_qs.btnDebugView) {
+            const wchar_t* label = L"Debug View";
+            switch (quality.debugViewMode) {
+                case 0:  label = L"Debug View: Shaded"; break;
+                case 6:  label = L"Debug View: DebugScreen"; break;
+                case 13: label = L"Debug View: SSAO"; break;
+                case 15: label = L"Debug View: SSR"; break;
+                case 25: label = L"Debug View: TAA"; break;
+                default: label = L"Debug View: Other"; break;
+            }
+            SetWindowTextW(g_qs.btnDebugView, label);
+        }
     }
 
     SetCheckbox(g_qs.chkShadows, s.shadowsEnabled);
@@ -126,21 +143,6 @@ void RefreshControlsFromState() {
     SetCheckbox(g_qs.chkIBL,     s.iblEnabled);
     SetCheckbox(g_qs.chkFog,     s.fogEnabled);
     SetCheckbox(g_qs.chkRT,      s.rayTracingEnabled);
-
-    // Button labels that depend on current engine state.
-    if (renderer && g_qs.btnDebugView) {
-        int mode = renderer->GetDebugViewMode();
-        const wchar_t* label = L"Debug View";
-        switch (mode) {
-            case 0:  label = L"Debug View: Shaded"; break;
-            case 6:  label = L"Debug View: DebugScreen"; break;
-            case 13: label = L"Debug View: SSAO"; break;
-            case 15: label = L"Debug View: SSR"; break;
-            case 25: label = L"Debug View: TAA"; break;
-            default: label = L"Debug View: Other"; break;
-        }
-        SetWindowTextW(g_qs.btnDebugView, label);
-    }
 
     if (renderer && g_qs.btnEnvNext) {
         std::string envNameUtf8 = renderer->GetCurrentEnvironmentName();
@@ -212,7 +214,7 @@ void RegisterQuickSettingsClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colSliderWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -222,7 +224,7 @@ void RegisterQuickSettingsClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, checkHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_qs.font), TRUE);
                 return h;
             };
@@ -232,7 +234,7 @@ void RegisterQuickSettingsClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                     x, yy, width - margin * 2, 24,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_qs.font), TRUE);
                 return h;
             };
@@ -388,27 +390,16 @@ void RegisterQuickSettingsClass() {
                 if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
                     if (slider == g_qs.sliderWaterSteepness) {
                         float steep = SliderToFloat(slider, 0.0f, 1.0f);
-                        renderer->SetWaterParams(
-                            renderer->GetWaterLevel(),
-                            renderer->GetWaterWaveAmplitude(),
-                            renderer->GetWaterWaveLength(),
-                            renderer->GetWaterWaveSpeed(),
-                            renderer->GetWaterPrimaryDir().x,
-                            renderer->GetWaterPrimaryDir().y,
-                            renderer->GetWaterSecondaryAmplitude(),
-                            steep);
+                        Graphics::ApplyWaterSteepnessControl(*renderer, steep);
                     } else if (slider == g_qs.sliderFogDensity) {
                         float density = SliderToFloat(slider, 0.0f, 0.1f);
-                        renderer->SetFogParams(
-                            density,
-                            renderer->GetFogHeight(),
-                            renderer->GetFogFalloff());
+                        Graphics::ApplyFogDensityControl(*renderer, density);
                     } else if (slider == g_qs.sliderGodRays) {
                         float g = SliderToFloat(slider, 0.0f, 3.0f);
-                        renderer->SetGodRayIntensity(g);
+                        Graphics::ApplyGodRayIntensityControl(*renderer, g);
                     } else if (slider == g_qs.sliderAreaSize) {
                         float sArea = SliderToFloat(slider, 0.25f, 2.0f);
-                        renderer->SetAreaLightSizeScale(sArea);
+                        Graphics::ApplyAreaLightSizeControl(*renderer, sArea);
                     }
                 }
 
@@ -426,14 +417,14 @@ void RegisterQuickSettingsClass() {
             if (HIWORD(wParam) == BN_CLICKED) {
                 if (id == IDC_QS_DEBUGVIEW) {
                     if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
-                        renderer->CycleDebugViewMode();
+                        Graphics::CycleDebugViewControl(*renderer);
                     }
                     RefreshControlsFromState();
                     return 0;
                 }
                 if (id == IDC_QS_ENV_NEXT) {
                     if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
-                        renderer->CycleEnvironmentPreset();
+                        Graphics::CycleEnvironmentPresetControl(*renderer);
                     }
                     RefreshControlsFromState();
                     return 0;

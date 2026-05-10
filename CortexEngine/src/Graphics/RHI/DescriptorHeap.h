@@ -100,6 +100,39 @@ public:
     [[nodiscard]] uint32_t GetCBVSrvUavCapacity() const {
         return m_cbvSrvUavHeap.GetCapacity();
     }
+    [[nodiscard]] uint32_t GetRTVCapacity() const {
+        return m_rtvHeap.GetCapacity();
+    }
+    [[nodiscard]] uint32_t GetRTVUsedCount() const {
+        return m_rtvHeap.GetUsedCount();
+    }
+    [[nodiscard]] uint32_t GetDSVCapacity() const {
+        return m_dsvHeap.GetCapacity();
+    }
+    [[nodiscard]] uint32_t GetDSVUsedCount() const {
+        return m_dsvHeap.GetUsedCount();
+    }
+    [[nodiscard]] uint32_t GetCBVSrvUavUsedCount() const {
+        return m_cbvSrvUavHeap.GetUsedCount();
+    }
+    [[nodiscard]] uint32_t GetCBVSrvUavPersistentCount() const {
+        return m_cbvSrvUavPersistentCount;
+    }
+    [[nodiscard]] uint32_t GetCBVSrvUavPersistentReserve() const {
+        return m_cbvSrvUavPersistentReserved;
+    }
+    [[nodiscard]] uint32_t GetCBVSrvUavTransientStart() const {
+        return m_transientSegmentStart;
+    }
+    [[nodiscard]] uint32_t GetCBVSrvUavTransientEnd() const {
+        return m_transientSegmentEnd;
+    }
+    [[nodiscard]] uint32_t GetStagingCBVSrvUavCapacity() const {
+        return m_stagingCbvSrvUavHeap.GetCapacity();
+    }
+    [[nodiscard]] uint32_t GetStagingCBVSrvUavUsedCount() const {
+        return m_stagingCbvSrvUavHeap.GetUsedCount();
+    }
 
     // Get a CBV/SRV/UAV handle for a specific heap index. This is primarily
     // used to materialize handles inside a contiguous transient range.

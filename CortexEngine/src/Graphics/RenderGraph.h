@@ -207,6 +207,17 @@ struct RGPass {
 //
 class RenderGraph {
 public:
+    struct TransientStats {
+        uint32_t transientResourceCount = 0;
+        uint32_t placedResourceCount = 0;
+        uint32_t aliasedResourceCount = 0;
+        uint32_t aliasBarrierCount = 0;
+        uint64_t requestedBytes = 0;
+        uint64_t heapUsedBytes = 0;
+        uint64_t heapSizeBytes = 0;
+        uint64_t savedBytes = 0;
+    };
+
     RenderGraph() = default;
     ~RenderGraph() = default;
 
@@ -222,7 +233,9 @@ public:
     // Shutdown and release resources
     void Shutdown();
 
-    // Begin a new frame (clears passes, resets transient allocations)
+    // Begin a new graph recording scope. Transient resources from the previous
+    // scope are retired through the deferred GPU deletion queue because several
+    // graph scopes can be recorded into one still-open frame command list.
     void BeginFrame();
 
     // Import an external resource (lifetime managed externally)
@@ -242,7 +255,7 @@ public:
     // Execute all passes on the command list
     Result<void> Execute(ID3D12GraphicsCommandList* cmdList);
 
-    // End frame (release transient resources if using aliasing)
+    // End the current graph recording scope.
     void EndFrame();
 
     // Get resource by handle (for execute callbacks)
@@ -258,6 +271,7 @@ public:
     [[nodiscard]] uint32_t GetPassCount() const { return static_cast<uint32_t>(m_passes.size()); }
     [[nodiscard]] uint32_t GetCulledPassCount() const { return m_culledPassCount; }
     [[nodiscard]] uint32_t GetBarrierCount() const { return m_totalBarrierCount; }
+    [[nodiscard]] const TransientStats& GetTransientStats() const { return m_transientStats; }
 
 private:
     friend class RGPassBuilder;
@@ -312,6 +326,7 @@ private:
     // Statistics
     uint32_t m_culledPassCount = 0;
     uint32_t m_totalBarrierCount = 0;
+    TransientStats m_transientStats{};
 
     bool m_compiled = false;
 };

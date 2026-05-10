@@ -1,9 +1,12 @@
-// Minimal DXR ray-traced sun shadow pass.
+// DXR ray-traced sun shadow visibility pass.
 // This shader library is designed to be used with a dedicated DXR pipeline
 // that binds:
 //   - TLAS and depth in SRV space2 (t0, t1)
+//   - Compact RT material buffer in SRV space2 (t3), keyed by TLAS InstanceID()
 //   - Shadow mask UAV in space2 (u0)
 //   - FrameConstants in space0 (b0), matching ShaderTypes.h / Basic.hlsl.
+
+#include "RaytracingMaterials.hlsli"
 
 RaytracingAccelerationStructure g_TopLevel : register(t0, space2);
 Texture2D<float>               g_Depth     : register(t1, space2);
@@ -49,20 +52,37 @@ cbuffer FrameConstants : register(b0, space0)
 
 struct ShadowPayload
 {
-    bool occluded;
+    float visibility;
 };
+
+void StoreShadowBlock(uint2 launchIndex, uint2 launchDims, float value)
+{
+    [unroll]
+    for (uint y = 0u; y < 2u; ++y)
+    {
+        [unroll]
+        for (uint x = 0u; x < 2u; ++x)
+        {
+            uint2 p = launchIndex + uint2(x, y);
+            if (p.x < launchDims.x && p.y < launchDims.y)
+            {
+                g_ShadowMask[p] = value;
+            }
+        }
+    }
+}
 
 [shader("miss")]
 void Miss_Shadow(inout ShadowPayload payload)
 {
-    payload.occluded = false;
+    payload.visibility = 1.0f;
 }
 
 [shader("closesthit")]
 void ClosestHit_Shadow(inout ShadowPayload payload, in BuiltInTriangleIntersectionAttributes /*attribs*/)
 {
-    // Any hit along the ray counts as occlusion for sun shadows.
-    payload.occluded = true;
+    RTMaterial material = g_RTMaterials[InstanceID()];
+    payload.visibility = RTMaterialSunVisibility(material);
 }
 
 [shader("raygeneration")]
@@ -71,11 +91,20 @@ void RayGen_Shadow()
     uint2 launchIndex = DispatchRaysIndex().xy;
     uint2 launchDims  = DispatchRaysDimensions().xy;
 
+    // The raster shadow map remains the primary high-frequency shadow source.
+    // RT sun shadows are a contact/visibility refinement, so trace at quarter
+    // rate and broadcast across a 2x2 block. TAA and PCF hide the small spatial
+    // quantization while the number of expensive TraceRay calls drops sharply.
+    if (((launchIndex.x | launchIndex.y) & 1u) != 0u)
+    {
+        return;
+    }
+
     // Load depth; if depth is invalid, treat as unshadowed.
     float depth = g_Depth.Load(int3(launchIndex, 0));
     if (depth <= 0.0f || depth >= 1.0f)
     {
-        g_ShadowMask[launchIndex] = 1.0f;
+        StoreShadowBlock(launchIndex, launchDims, 1.0f);
         return;
     }
 
@@ -92,7 +121,7 @@ void RayGen_Shadow()
     float4 worldH = mul(g_InvViewProjMatrix, clipPos);
     if (worldH.w == 0.0f)
     {
-        g_ShadowMask[launchIndex] = 1.0f;
+        StoreShadowBlock(launchIndex, launchDims, 1.0f);
         return;
     }
     float3 worldPos = worldH.xyz / worldH.w;
@@ -111,7 +140,7 @@ void RayGen_Shadow()
     float3 origin = worldPos + sunDir * bias;
 
     ShadowPayload payload;
-    payload.occluded = false;
+    payload.visibility = 1.0f;
 
     RayDesc ray;
     ray.Origin = origin;
@@ -129,5 +158,5 @@ void RayGen_Shadow()
         ray,
         payload);
 
-    g_ShadowMask[launchIndex] = payload.occluded ? 0.0f : 1.0f;
+    StoreShadowBlock(launchIndex, launchDims, saturate(payload.visibility));
 }

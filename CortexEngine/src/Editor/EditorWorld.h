@@ -83,7 +83,7 @@ struct EditorWorldConfig {
 
     // Threading
     uint32_t chunkGeneratorThreads = 2;
-    uint32_t maxChunksPerFrame = 4;   // Max chunks to upload per frame
+    uint32_t maxChunksPerFrame = 4;   // Generation requests and uploads allowed per frame
 };
 
 // EditorWorld - manages the game world in Engine Editor mode
@@ -100,6 +100,9 @@ public:
                            Scene::ECS_Registry* registry,
                            const EditorWorldConfig& config = {});
     void Shutdown();
+
+    // Clear all loaded chunks (call when scene is rebuilt externally)
+    void ClearAllChunks();
 
     // Frame update
     void Update(const glm::vec3& cameraPosition, float deltaTime);

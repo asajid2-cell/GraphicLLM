@@ -1,0 +1,24 @@
+{
+  "recording": {
+    "duration": 30,
+    "framerate": 30,
+    "quality": "ultrafast",
+    "output_directory": "test_recordings"
+  },
+  "build": {
+    "skip_build": true,
+    "build_config": "Release"
+  },
+  "commands": {
+    "wait_before_commands": 3,
+    "key_sequences": [
+      {
+        "description": "Quick smoke test",
+        "keys": ["w", "s", "a", "d"],
+        "delay_between_keys": 200,
+        "delay_after_sequence": 500
+      }
+    ],
+    "custom_notes": "Quick 30-second test - skips build, basic movement only"
+  }
+}

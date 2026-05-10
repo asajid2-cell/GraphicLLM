@@ -1,7 +1,7 @@
 #include "DebugMenu.h"
 
 #include "Core/ServiceLocator.h"
-#include "Graphics/Renderer.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Core/Engine.h"
 
 #include <commctrl.h>
@@ -103,6 +103,36 @@ bool GetCheckbox(HWND hwnd) {
     return SendMessage(hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
+Graphics::RendererDebugControlState ToRendererDebugControlState(const DebugMenuState& state) {
+    Graphics::RendererDebugControlState controls{};
+    controls.exposure = state.exposure;
+    controls.shadowBias = state.shadowBias;
+    controls.shadowPCFRadius = state.shadowPCFRadius;
+    controls.cascadeLambda = state.cascadeLambda;
+    controls.cascade0ResolutionScale = state.cascade0ResolutionScale;
+    controls.bloomIntensity = state.bloomIntensity;
+    controls.fractalAmplitude = state.fractalAmplitude;
+    controls.fractalFrequency = state.fractalFrequency;
+    controls.fractalOctaves = state.fractalOctaves;
+    controls.fractalCoordMode = state.fractalCoordMode;
+    controls.fractalScaleX = state.fractalScaleX;
+    controls.fractalScaleZ = state.fractalScaleZ;
+    controls.fractalLacunarity = state.fractalLacunarity;
+    controls.fractalGain = state.fractalGain;
+    controls.fractalWarpStrength = state.fractalWarpStrength;
+    controls.fractalNoiseType = state.fractalNoiseType;
+    controls.shadowsEnabled = state.shadowsEnabled;
+    controls.pcssEnabled = state.pcssEnabled;
+    controls.fxaaEnabled = state.fxaaEnabled;
+    controls.taaEnabled = state.taaEnabled;
+    controls.ssrEnabled = state.ssrEnabled;
+    controls.ssaoEnabled = state.ssaoEnabled;
+    controls.iblEnabled = state.iblEnabled;
+    controls.fogEnabled = state.fogEnabled;
+    controls.rayTracingEnabled = state.rayTracingEnabled;
+    return controls;
+}
+
 // Apply the current state into the renderer.
 void ApplyStateToRenderer(const DebugMenuState& state) {
     auto* renderer = Cortex::ServiceLocator::GetRenderer();
@@ -110,42 +140,7 @@ void ApplyStateToRenderer(const DebugMenuState& state) {
         return;
     }
 
-    renderer->SetExposure(state.exposure);
-    renderer->SetShadowBias(state.shadowBias);
-    renderer->SetShadowPCFRadius(state.shadowPCFRadius);
-    renderer->SetCascadeSplitLambda(state.cascadeLambda);
-
-    float currentScale = renderer->GetCascadeResolutionScale(0);
-    float targetScale = state.cascade0ResolutionScale;
-    renderer->AdjustCascadeResolutionScale(0, targetScale - currentScale);
-
-    renderer->SetBloomIntensity(state.bloomIntensity);
-
-    renderer->SetFractalParams(
-        state.fractalAmplitude,
-        state.fractalFrequency,
-        state.fractalOctaves,
-        state.fractalCoordMode,
-        state.fractalScaleX,
-        state.fractalScaleZ,
-        state.fractalLacunarity,
-        state.fractalGain,
-        state.fractalWarpStrength,
-        state.fractalNoiseType);
-
-    // Feature toggles
-    renderer->SetShadowsEnabled(state.shadowsEnabled);
-    renderer->SetPCSS(state.pcssEnabled);
-    renderer->SetFXAAEnabled(state.fxaaEnabled);
-    renderer->SetTAAEnabled(state.taaEnabled);
-    renderer->SetSSREnabled(state.ssrEnabled);
-    renderer->SetSSAOEnabled(state.ssaoEnabled);
-    renderer->SetIBLEnabled(state.iblEnabled);
-    renderer->SetFogEnabled(state.fogEnabled);
-
-    if (renderer->IsRayTracingSupported()) {
-        renderer->SetRayTracingEnabled(state.rayTracingEnabled);
-    }
+    Graphics::ApplyDebugControlState(*renderer, ToRendererDebugControlState(state));
 }
 
 // Refresh the Win32 controls from g_state.current so that both keyboard
@@ -199,7 +194,7 @@ void RegisterDebugMenuClass() {
                     0, L"STATIC", text,
                     WS_CHILD | WS_VISIBLE,
                     x, yy, colLabelWidth - 4, labelHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
                 return h;
             };
@@ -209,7 +204,7 @@ void RegisterDebugMenuClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colSliderWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -219,7 +214,7 @@ void RegisterDebugMenuClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, checkHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(state->font), TRUE);
                 return h;
             };
@@ -613,15 +608,7 @@ void DebugMenu::ResetToDefaults() {
     }
 
     if (auto* renderer = Cortex::ServiceLocator::GetRenderer()) {
-        renderer->SetShadowsEnabled(true);
-        renderer->SetDebugViewMode(0);
-        renderer->SetPCSS(false);
-        renderer->SetFXAAEnabled(true);
-        renderer->SetTAAEnabled(false);
-        renderer->SetSSREnabled(true);
-        renderer->SetSSAOEnabled(true);
-        renderer->SetIBLEnabled(true);
-        renderer->SetFogEnabled(false);
+        Graphics::ApplyDebugControlReset(*renderer);
     }
 
     g_state.current = g_state.defaults;

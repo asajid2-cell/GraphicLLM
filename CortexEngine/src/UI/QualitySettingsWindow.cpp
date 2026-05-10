@@ -1,11 +1,11 @@
-﻿#include "QualitySettingsWindow.h"
+#include "QualitySettingsWindow.h"
 
 #include "Core/ServiceLocator.h"
 #include "Core/Engine.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
 
 #include <commctrl.h>
-#include <cmath>
 
 namespace Cortex::UI {
 
@@ -99,22 +99,25 @@ void RefreshControlsFromState() {
         return;
     }
 
+    const auto quality = renderer->GetQualityState();
+    const auto features = renderer->GetFeatureState();
+    const auto rt = renderer->GetRayTracingState();
+
     // Render scale slider
     SetSliderFromFloat(g_q.sliderRenderScale,
-                       renderer->GetRenderScale(),
+                       quality.renderScale,
                        0.5f,
                        1.0f);
 
     // Feature toggles
-    SetCheckbox(g_q.chkRTMaster,
-                renderer->IsRayTracingSupported() && renderer->IsRayTracingEnabled());
-    SetCheckbox(g_q.chkRTRefl, renderer->GetRTReflectionsEnabled());
-    SetCheckbox(g_q.chkRTGI,   renderer->GetRTGIEnabled());
-    SetCheckbox(g_q.chkTAA,    renderer->IsTAAEnabled());
-    SetCheckbox(g_q.chkSSR,    renderer->GetSSREnabled());
-    SetCheckbox(g_q.chkSSAO,   renderer->GetSSAOEnabled());
-    SetCheckbox(g_q.chkIBL,    renderer->GetIBLEnabled());
-    SetCheckbox(g_q.chkFog,    renderer->IsFogEnabled());
+    SetCheckbox(g_q.chkRTMaster, rt.supported && rt.enabled);
+    SetCheckbox(g_q.chkRTRefl, rt.reflectionsEnabled);
+    SetCheckbox(g_q.chkRTGI,   rt.giEnabled);
+    SetCheckbox(g_q.chkTAA,    features.taaEnabled);
+    SetCheckbox(g_q.chkSSR,    features.ssrEnabled);
+    SetCheckbox(g_q.chkSSAO,   features.ssaoEnabled);
+    SetCheckbox(g_q.chkIBL,    features.iblEnabled);
+    SetCheckbox(g_q.chkFog,    features.fogEnabled);
 }
 
 void RefreshStatsLabels() {
@@ -189,7 +192,7 @@ void RegisterQualitySettingsClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colSliderWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -199,7 +202,7 @@ void RegisterQualitySettingsClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, checkHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_q.font), TRUE);
                 return h;
             };
@@ -209,7 +212,7 @@ void RegisterQualitySettingsClass() {
                     0, L"STATIC", text,
                     WS_CHILD | WS_VISIBLE,
                     x, yy, width - margin * 2, labelHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_q.font), TRUE);
                 return h;
             };
@@ -219,7 +222,7 @@ void RegisterQualitySettingsClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                     x, yy, width - margin * 2, 24,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_q.font), TRUE);
                 return h;
             };
@@ -358,14 +361,7 @@ void RegisterQualitySettingsClass() {
                 // thumb (end of drag) or clicks to a new position, instead of
                 // reallocating depth/HDR targets continuously while dragging.
                 if (scrollCode == TB_ENDTRACK || scrollCode == TB_THUMBPOSITION) {
-                    float scale = SliderToFloat(slider, 0.5f, 1.0f);
-                    if (scale < 0.5f) scale = 0.5f;
-                    if (scale > 1.0f) scale = 1.0f;
-
-                    float current = renderer->GetRenderScale();
-                    if (std::fabs(scale - current) > 0.01f) {
-                        renderer->SetRenderScale(scale);
-                    }
+                    Graphics::ApplyRenderScaleControl(*renderer, SliderToFloat(slider, 0.5f, 1.0f));
                 }
             }
             return 0;
@@ -381,49 +377,49 @@ void RegisterQualitySettingsClass() {
 
                 switch (id) {
                 case IDC_QL_SAFE_PRESET: {
-                    renderer->ApplySafeQualityPreset();
+                    Graphics::ApplySafeQualityPresetControl(*renderer);
                     RefreshControlsFromState();
                     RefreshStatsLabels();
                     break;
                 }
                 case IDC_QL_RT_MASTER: {
                     bool enabled = GetCheckbox(g_q.chkRTMaster);
-                    renderer->SetRayTracingEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RayTracing, enabled);
                     break;
                 }
                 case IDC_QL_RT_REFLECT: {
                     bool enabled = GetCheckbox(g_q.chkRTRefl);
-                    renderer->SetRTReflectionsEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RTReflections, enabled);
                     break;
                 }
                 case IDC_QL_RT_GI: {
                     bool enabled = GetCheckbox(g_q.chkRTGI);
-                    renderer->SetRTGIEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::RTGI, enabled);
                     break;
                 }
                 case IDC_QL_TAA: {
                     bool enabled = GetCheckbox(g_q.chkTAA);
-                    renderer->SetTAAEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::TAA, enabled);
                     break;
                 }
                 case IDC_QL_SSR: {
                     bool enabled = GetCheckbox(g_q.chkSSR);
-                    renderer->SetSSREnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::SSR, enabled);
                     break;
                 }
                 case IDC_QL_SSAO: {
                     bool enabled = GetCheckbox(g_q.chkSSAO);
-                    renderer->SetSSAOEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::SSAO, enabled);
                     break;
                 }
                 case IDC_QL_IBL: {
                     bool enabled = GetCheckbox(g_q.chkIBL);
-                    renderer->SetIBLEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::IBL, enabled);
                     break;
                 }
                 case IDC_QL_FOG: {
                     bool enabled = GetCheckbox(g_q.chkFog);
-                    renderer->SetFogEnabled(enabled);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::Fog, enabled);
                     break;
                 }
                 default:

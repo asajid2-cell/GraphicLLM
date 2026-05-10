@@ -1,4 +1,5 @@
 #include "CommandQueue.h"
+#include "RendererCommandApplier.h"
 #include "Graphics/Renderer.h"
 #include "Utils/MeshGenerator.h"
 #include "Utils/GLTFLoader.h"
@@ -567,6 +568,7 @@ void CommandQueue::ExecuteAddEntity(AddEntityCommand* cmd, Scene::ECS_Registry* 
 }
 
 void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* registry, Graphics::Renderer* renderer) {
+    (void)renderer;
     if (!registry || !cmd) {
         PushStatus(false, "AddLight skipped: missing registry");
         return;
@@ -639,7 +641,7 @@ void CommandQueue::ExecuteAddLight(AddLightCommand* cmd, Scene::ECS_Registry* re
     if (std::abs(glm::dot(up, forward)) > 0.99f) {
         up = glm::vec3(0.0f, 0.0f, 1.0f);
     }
-    transform.rotation = glm::quatLookAt(forward, up);
+    transform.rotation = glm::quatLookAtLH(forward, up);
 
     auto& light = registry->AddComponent<Scene::LightComponent>(e);
     switch (cmd->lightType) {
@@ -1004,7 +1006,7 @@ void CommandQueue::ExecuteModifyLight(ModifyLightCommand* cmd, Scene::ECS_Regist
         if (std::abs(glm::dot(up, forward)) > 0.99f) {
             up = glm::vec3(0.0f, 0.0f, 1.0f);
         }
-        transform.rotation = glm::quatLookAt(forward, up);
+        transform.rotation = glm::quatLookAtLH(forward, up);
         summary << "dir ";
         touched = true;
     }
@@ -1095,149 +1097,8 @@ void CommandQueue::ExecuteModifyRenderer(ModifyRendererCommand* cmd, Graphics::R
         return;
     }
 
-    std::ostringstream summary;
-    summary << "renderer: ";
-    bool touched = false;
-
-    if (cmd->setExposure) {
-        renderer->SetExposure(cmd->exposure);
-        summary << "exposure=" << cmd->exposure << " ";
-        touched = true;
-    }
-    if (cmd->setShadowsEnabled) {
-        renderer->SetShadowsEnabled(cmd->shadowsEnabled);
-        summary << "shadows=" << (cmd->shadowsEnabled ? "on" : "off") << " ";
-        touched = true;
-    }
-    if (cmd->setDebugMode) {
-        renderer->SetDebugViewMode(cmd->debugMode);
-        summary << "debug_mode=" << cmd->debugMode << " ";
-        touched = true;
-    }
-    if (cmd->setShadowBias) {
-        renderer->SetShadowBias(cmd->shadowBias);
-        summary << "bias=" << cmd->shadowBias << " ";
-        touched = true;
-    }
-    if (cmd->setShadowPCFRadius) {
-        renderer->SetShadowPCFRadius(cmd->shadowPCFRadius);
-        summary << "pcf=" << cmd->shadowPCFRadius << " ";
-        touched = true;
-    }
-    if (cmd->setCascadeSplitLambda) {
-        renderer->SetCascadeSplitLambda(cmd->cascadeSplitLambda);
-        summary << "lambda=" << cmd->cascadeSplitLambda << " ";
-        touched = true;
-    }
-    if (cmd->setEnvironment) {
-        renderer->SetEnvironmentPreset(cmd->environment);
-        summary << "environment=" << cmd->environment << " ";
-        touched = true;
-    }
-    if (cmd->setIBLEnabled) {
-        renderer->SetIBLEnabled(cmd->iblEnabled);
-        summary << "ibl=" << (cmd->iblEnabled ? "on" : "off") << " ";
-        touched = true;
-    }
-    if (cmd->setIBLIntensity) {
-        renderer->SetIBLIntensity(cmd->iblDiffuseIntensity, cmd->iblSpecularIntensity);
-        summary << "ibl_intensity=[" << cmd->iblDiffuseIntensity << "," << cmd->iblSpecularIntensity << "] ";
-        touched = true;
-    }
-    if (cmd->setColorGrade) {
-        renderer->SetColorGrade(cmd->colorGradeWarm, cmd->colorGradeCool);
-        summary << "grade=(" << cmd->colorGradeWarm << "," << cmd->colorGradeCool << ") ";
-        touched = true;
-    }
-    if (cmd->setSSAOEnabled) {
-        renderer->SetSSAOEnabled(cmd->ssaoEnabled);
-        summary << "ssao=" << (cmd->ssaoEnabled ? "on" : "off") << " ";
-        touched = true;
-    }
-    if (cmd->setSSAOParams) {
-        renderer->SetSSAOParams(cmd->ssaoRadius, cmd->ssaoBias, cmd->ssaoIntensity);
-        summary << "ssao_params=(r:" << cmd->ssaoRadius << ",b:" << cmd->ssaoBias << ",i:" << cmd->ssaoIntensity << ") ";
-        touched = true;
-    }
-    if (cmd->setFogEnabled) {
-        renderer->SetFogEnabled(cmd->fogEnabled);
-        summary << "fog=" << (cmd->fogEnabled ? "on" : "off") << " ";
-        touched = true;
-    }
-    if (cmd->setFogParams) {
-        renderer->SetFogParams(cmd->fogDensity, cmd->fogHeight, cmd->fogFalloff);
-        summary << "fog_params=(d:" << cmd->fogDensity << ",h:" << cmd->fogHeight << ",f:" << cmd->fogFalloff << ") ";
-        touched = true;
-    }
-    if (cmd->setSunDirection) {
-        renderer->SetSunDirection(cmd->sunDirection);
-        summary << "sun_dir=(" << cmd->sunDirection.x << "," << cmd->sunDirection.y << "," << cmd->sunDirection.z << ") ";
-        touched = true;
-    }
-    if (cmd->setSunColor) {
-        renderer->SetSunColor(cmd->sunColor);
-        summary << "sun_color=(" << cmd->sunColor.r << "," << cmd->sunColor.g << "," << cmd->sunColor.b << ") ";
-        touched = true;
-    }
-    if (cmd->setSunIntensity) {
-        renderer->SetSunIntensity(cmd->sunIntensity);
-        summary << "sun_intensity=" << cmd->sunIntensity << " ";
-        touched = true;
-    }
-    if (cmd->setWaterLevel || cmd->setWaterWaveAmplitude || cmd->setWaterWaveLength ||
-        cmd->setWaterWaveSpeed || cmd->setWaterSecondaryAmplitude) {
-        float level     = renderer->GetWaterLevel();
-        float amp       = renderer->GetWaterWaveAmplitude();
-        float waveLen   = renderer->GetWaterWaveLength();
-        float speed     = renderer->GetWaterWaveSpeed();
-        float secondary = renderer->GetWaterSecondaryAmplitude();
-
-        if (cmd->setWaterLevel)              level     = cmd->waterLevel;
-        if (cmd->setWaterWaveAmplitude)      amp       = cmd->waterWaveAmplitude;
-        if (cmd->setWaterWaveLength)         waveLen   = cmd->waterWaveLength;
-        if (cmd->setWaterWaveSpeed)          speed     = cmd->waterWaveSpeed;
-        if (cmd->setWaterSecondaryAmplitude) secondary = cmd->waterSecondaryAmplitude;
-
-        renderer->SetWaterParams(level, amp, waveLen, speed,
-                                 1.0f, 0.0f, secondary);
-        summary << "water(level=" << level
-                << ",amp=" << amp
-                << ",len=" << waveLen
-                << ",speed=" << speed
-                << ",secondary=" << secondary << ") ";
-        touched = true;
-    }
-    if (cmd->setLightingRig && registry) {
-        // Map string identifiers to renderer rigs. Accept a few aliases to
-        // keep prompts flexible.
-        std::string name = cmd->lightingRig;
-        std::transform(name.begin(), name.end(), name.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-        Graphics::Renderer::LightingRig rig = Graphics::Renderer::LightingRig::Custom;
-        if (name == "studio_three_point" || name == "studio" || name == "three_point") {
-            rig = Graphics::Renderer::LightingRig::StudioThreePoint;
-        } else if (name == "warehouse" || name == "top_down_warehouse" || name == "topdown_warehouse") {
-            rig = Graphics::Renderer::LightingRig::TopDownWarehouse;
-        } else if (name == "horror_side" || name == "horror" || name == "horror_side_light") {
-            rig = Graphics::Renderer::LightingRig::HorrorSideLight;
-        } else if (name == "street_lanterns" || name == "streetlights" || name == "street_lights" ||
-                   name == "alley_lights" || name == "road_lights") {
-            rig = Graphics::Renderer::LightingRig::StreetLanterns;
-        }
-
-        if (rig != Graphics::Renderer::LightingRig::Custom) {
-            renderer->ApplyLightingRig(rig, registry);
-            summary << "lighting_rig=" << name << " ";
-            touched = true;
-        }
-    }
-
-    if (touched) {
-        PushStatus(true, summary.str());
-    } else {
-        PushStatus(false, "modify_renderer had no effect (no fields set)");
-    }
+    const auto result = ApplyModifyRendererCommand(*cmd, *renderer, registry);
+    PushStatus(result.success, result.message);
 }
 
 void CommandQueue::ExecuteModifyCamera(ModifyCameraCommand* cmd, Scene::ECS_Registry* registry) {
@@ -1768,7 +1629,8 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
         if (cmd->jitter && cmd->jitterAmount > 0.0f &&
             cmd->pattern != AddPatternCommand::PatternType::Random) {
             std::string key = groupName.empty() ? "Pattern" : groupName;
-            uint32_t h = std::hash<std::string>{}(key) ^ (0x9E3779B9u + static_cast<uint32_t>(i) * 0x85EBCA6Bu);
+            uint32_t h = static_cast<uint32_t>(std::hash<std::string>{}(key)) ^
+                         (0x9E3779B9u + static_cast<uint32_t>(i) * 0x85EBCA6Bu);
             float jx = (static_cast<float>(h & 0xFFu) / 255.0f - 0.5f) * cmd->jitterAmount;
             float jz = (static_cast<float>((h >> 8) & 0xFFu) / 255.0f - 0.5f) * cmd->jitterAmount;
             worldPos.x += jx;
@@ -1778,7 +1640,7 @@ void CommandQueue::ExecuteAddPattern(AddPatternCommand* cmd, Scene::ECS_Registry
 
         if (herdMode) {
             // Small positional jitter so herds don't look like perfect lattices.
-            uint32_t h = std::hash<int>{}(i + 1u);
+            uint32_t h = static_cast<uint32_t>(std::hash<int>{}(static_cast<int>(i + 1u)));
             float jx = (static_cast<float>(h & 0xFFu) / 255.0f - 0.5f) * 0.6f;
             float jz = (static_cast<float>((h >> 8) & 0xFFu) / 255.0f - 0.5f) * 0.6f;
             worldPos.x += jx;

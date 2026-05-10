@@ -403,15 +403,20 @@ Result<void> InitializeSampleModelLibrary() {
         return Result<void>::Err("Failed to query current working directory for sample model library");
     }
 
-    // Resolve graphics root: .../CortexEngine/build/bin -> .../graphics
-    fs::path graphicsRoot = cwd;
-    for (int i = 0; i < 3; ++i) {
-        graphicsRoot = graphicsRoot.parent_path();
+    fs::path modelsRoot;
+    for (fs::path root = cwd; !root.empty(); root = root.parent_path()) {
+        fs::path candidate = root / "glTF-Sample-Models" / "2.0";
+        if (fs::exists(candidate)) {
+            modelsRoot = candidate;
+            break;
+        }
+        if (root == root.parent_path()) {
+            break;
+        }
     }
 
-    fs::path modelsRoot = graphicsRoot / "glTF-Sample-Models/2.0";
     if (!fs::exists(modelsRoot)) {
-        spdlog::info("SampleModelLibrary: glTF-Sample-Models repo not found at '{}'", modelsRoot.string());
+        spdlog::info("SampleModelLibrary: glTF-Sample-Models repo not found while walking upward from '{}'", cwd.string());
         return Result<void>::Err("glTF-Sample-Models repo not found");
     }
 

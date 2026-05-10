@@ -20,10 +20,15 @@ struct PerfSnapshot {
     double postMs  = 0.0;
 
     struct Memory {
-        double texMB  = 0.0;
-        double envMB  = 0.0;
-        double geomMB = 0.0;
-        double rtMB   = 0.0;
+        double totalMB        = 0.0;
+        double renderTargetMB = 0.0;
+        double postProcessMB  = 0.0;
+        double debugMB        = 0.0;
+        double voxelMB        = 0.0;
+        double texMB          = 0.0;
+        double envMB          = 0.0;
+        double geomMB         = 0.0;
+        double rtMB           = 0.0;
     } mem;
 
     struct Jobs {
@@ -35,9 +40,7 @@ struct PerfSnapshot {
     struct Governors {
         bool  vramGovernorFired = false;
         bool  perfGovernorFired = false;
-        bool  rtGIOff           = false;
-        bool  rtReflOff         = false;
-        bool  ssrOff            = false;
+        bool  scaleReduced      = false;
         float renderScale       = 1.0f;
         bool  texBudgetExceeded  = false;
         bool  envBudgetExceeded  = false;

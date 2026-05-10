@@ -14,13 +14,18 @@ void PerfDiagnostics::Update(const Engine& engine, const Graphics::Renderer& ren
     snap.rtMs    = static_cast<double>(renderer.GetLastRTTimeMS());
     snap.postMs  = static_cast<double>(renderer.GetLastPostTimeMS());
 
-    // Memory breakdown from the asset registry (MB)
-    auto mem = renderer.GetAssetMemoryBreakdown();
+    // Memory breakdown from actual renderer resources plus asset registry (MB).
+    const auto mem = renderer.GetEstimatedVRAMBreakdown();
     constexpr double kToMB = 1.0 / (1024.0 * 1024.0);
-    snap.mem.texMB  = static_cast<double>(mem.textureBytes) * kToMB;
-    snap.mem.envMB  = static_cast<double>(mem.environmentBytes) * kToMB;
-    snap.mem.geomMB = static_cast<double>(mem.geometryBytes) * kToMB;
-    snap.mem.rtMB   = static_cast<double>(mem.rtStructureBytes) * kToMB;
+    snap.mem.totalMB        = static_cast<double>(mem.TotalBytes()) * kToMB;
+    snap.mem.renderTargetMB = static_cast<double>(mem.renderTargetBytes) * kToMB;
+    snap.mem.postProcessMB  = static_cast<double>(mem.postProcessBytes) * kToMB;
+    snap.mem.debugMB        = static_cast<double>(mem.debugBytes) * kToMB;
+    snap.mem.voxelMB        = static_cast<double>(mem.voxelBytes) * kToMB;
+    snap.mem.texMB          = static_cast<double>(mem.textureBytes) * kToMB;
+    snap.mem.envMB          = static_cast<double>(mem.environmentBytes) * kToMB;
+    snap.mem.geomMB         = static_cast<double>(mem.geometryBytes) * kToMB;
+    snap.mem.rtMB           = static_cast<double>(mem.rtStructureBytes) * kToMB;
 
     // GPU job queue status
     snap.jobs.meshJobs    = renderer.GetPendingMeshJobs();
@@ -31,9 +36,7 @@ void PerfDiagnostics::Update(const Engine& engine, const Graphics::Renderer& ren
     const auto& registry = renderer.GetAssetRegistry();
     snap.governors.vramGovernorFired = engine.DidVRAMGovernorReduce();
     snap.governors.perfGovernorFired = engine.DidPerfGovernorAdjust();
-    snap.governors.rtGIOff           = engine.WasPerfRTGIDisabled();
-    snap.governors.rtReflOff         = engine.WasPerfRTReflectionsDisabled();
-    snap.governors.ssrOff            = engine.WasPerfSSROff();
+    snap.governors.scaleReduced      = engine.WasPerfScaleReduced();
     snap.governors.renderScale       = renderer.GetRenderScale();
     snap.governors.texBudgetExceeded  = registry.IsTextureBudgetExceeded();
     snap.governors.envBudgetExceeded  = registry.IsEnvironmentBudgetExceeded();

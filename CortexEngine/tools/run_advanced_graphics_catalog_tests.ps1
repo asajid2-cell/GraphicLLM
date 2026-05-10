@@ -66,8 +66,24 @@ foreach ($system in $catalog.systems) {
         }
     }
 
-    if ($null -eq $system.planned_features -or $system.planned_features.Count -lt 1) {
-        Add-Failure "$id planned_features is empty"
+    if ($null -ne $system.planned_features) {
+        Add-Failure "$id still uses planned_features; release catalog must use validated_features plus future_extensions"
+    }
+
+    if ([string]$system.release_status -ne "foundation_validated") {
+        Add-Failure "$id release_status is '$($system.release_status)', expected foundation_validated"
+    }
+    if ($null -eq $system.validated_features -or $system.validated_features.Count -lt 1) {
+        Add-Failure "$id validated_features is empty"
+    } else {
+        foreach ($feature in $system.validated_features) {
+            if ([string]::IsNullOrWhiteSpace([string]$feature)) {
+                Add-Failure "$id has an empty validated_features entry"
+            }
+        }
+    }
+    if ($null -eq $system.validation_contracts -or $system.validation_contracts.Count -lt 1) {
+        Add-Failure "$id validation_contracts is empty"
     }
 
     $validationScene = [string]$system.first_validation_scene
@@ -88,14 +104,58 @@ if ($systems.ContainsKey("advanced_materials") -and
     [string]$systems["advanced_materials"].first_validation_scene -ne "material_lab") {
     Add-Failure "advanced_materials must validate first in material_lab"
 }
+if ($systems.ContainsKey("advanced_materials")) {
+    $features = @{}
+    foreach ($feature in $systems["advanced_materials"].validated_features) {
+        $features[[string]$feature] = $true
+    }
+    foreach ($requiredFeature in @("clearcoat", "anisotropy_response", "wet_surface_response", "sheen", "subsurface_wrap", "emissive_bloom")) {
+        if (-not $features.ContainsKey($requiredFeature)) {
+            Add-Failure "advanced_materials missing validated feature '$requiredFeature'"
+        }
+    }
+}
 if ($systems.ContainsKey("lighting_rigs") -and
     -not $sceneIds.ContainsKey([string]$systems["lighting_rigs"].first_validation_scene)) {
     Add-Failure "lighting_rigs first_validation_scene is not a known showcase scene"
+}
+if ($systems.ContainsKey("lighting_rigs")) {
+    $features = @{}
+    foreach ($feature in $systems["lighting_rigs"].validated_features) {
+        $features[[string]$feature] = $true
+    }
+    foreach ($requiredRig in @("studio_three_point", "material_lab_review", "sunset_rim", "night_emissive")) {
+        if (-not $features.ContainsKey($requiredRig)) {
+            Add-Failure "lighting_rigs missing validated rig '$requiredRig'"
+        }
+    }
 }
 foreach ($effectsSystem in @("particles", "cinematic_post")) {
     if ($systems.ContainsKey($effectsSystem) -and
         [string]$systems[$effectsSystem].first_validation_scene -ne "effects_showcase") {
         Add-Failure "$effectsSystem must validate first in effects_showcase"
+    }
+}
+if ($systems.ContainsKey("particles")) {
+    $features = @{}
+    foreach ($feature in $systems["particles"].validated_features) {
+        $features[[string]$feature] = $true
+    }
+    foreach ($requiredParticleFeature in @("ecs_billboard_emitters", "fire", "smoke", "density_scale", "frame_contract_stats")) {
+        if (-not $features.ContainsKey($requiredParticleFeature)) {
+            Add-Failure "particles missing validated feature '$requiredParticleFeature'"
+        }
+    }
+}
+if ($systems.ContainsKey("cinematic_post")) {
+    $features = @{}
+    foreach ($feature in $systems["cinematic_post"].validated_features) {
+        $features[[string]$feature] = $true
+    }
+    foreach ($requiredPostFeature in @("bloom_threshold", "soft_knee", "vignette", "lens_dirt", "frame_contract_stats")) {
+        if (-not $features.ContainsKey($requiredPostFeature)) {
+            Add-Failure "cinematic_post missing validated feature '$requiredPostFeature'"
+        }
     }
 }
 

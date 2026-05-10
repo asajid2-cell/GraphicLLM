@@ -1,29 +1,36 @@
 {
   "schema": 1,
-  "purpose": "Phase 3 advanced graphics work registry. These are feature projects, not small UI tweaks.",
+  "purpose": "Phase 3 advanced graphics release foundation registry. Future extensions stay explicit and separate from validated public paths.",
   "systems": [
     {
       "id": "advanced_materials",
+      "release_status": "foundation_validated",
       "existing_entry_points": [
         "src/Graphics/MaterialPresetRegistry.h",
         "src/Graphics/MaterialModel.cpp",
         "assets/shaders/PBR_Lighting.hlsli",
         "assets/shaders/RaytracingMaterials.hlsli"
       ],
-      "planned_features": ["clearcoat", "anisotropy", "wetness", "sheen", "subsurface_approximation", "procedural_masks"],
-      "first_validation_scene": "material_lab"
+      "validated_features": ["clearcoat", "anisotropy_response", "wet_surface_response", "sheen", "subsurface_wrap", "emissive_bloom"],
+      "validation_contracts": ["material_lab", "effects_showcase", "advanced_graphics_catalog"],
+      "first_validation_scene": "material_lab",
+      "future_extensions": ["procedural_masks", "author-facing advanced material sliders"]
     },
     {
       "id": "lighting_rigs",
+      "release_status": "foundation_validated",
       "existing_entry_points": [
         "src/Graphics/Renderer_LightingSettings.cpp",
         "src/Graphics/RendererLightingRigControl.cpp"
       ],
-      "planned_features": ["soft_material_review", "sunset_rim", "night_emissive", "product_key_fill_rim"],
-      "first_validation_scene": "rt_showcase"
+      "validated_features": ["studio_three_point", "material_lab_review", "sunset_rim", "night_emissive"],
+      "validation_contracts": ["showcase_scene_contract", "phase3_visual_matrix"],
+      "first_validation_scene": "rt_showcase",
+      "future_extensions": ["product_key_fill_rim", "author-facing lighting-rig picker"]
     },
     {
       "id": "particles",
+      "release_status": "foundation_validated",
       "existing_entry_points": [
         "src/Graphics/Renderer_Particles.cpp",
         "src/Graphics/RendererParticleState.h",
@@ -32,18 +39,23 @@
         "assets/shaders/ParticleSimulate.hlsl",
         "assets/shaders/ParticleRender.hlsl"
       ],
-      "planned_features": ["dust_motes", "sparks", "embers", "smoke", "mist", "rain", "snow"],
-      "first_validation_scene": "effects_showcase"
+      "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "density_scale", "frame_contract_stats", "budgeted_zero_cost_disabled_path"],
+      "validation_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
+      "first_validation_scene": "effects_showcase",
+      "future_extensions": ["dust_motes", "sparks", "embers", "mist", "rain", "snow", "gpu_particle_public_path"]
     },
     {
       "id": "cinematic_post",
+      "release_status": "foundation_validated",
       "existing_entry_points": [
         "src/Graphics/Renderer_PostProcess.cpp",
         "src/Graphics/Renderer_Bloom.cpp",
         "assets/shaders/PostProcess.hlsl"
       ],
-      "planned_features": ["bloom_threshold", "soft_knee", "vignette", "lens_dirt", "depth_of_field", "color_grade_presets"],
-      "first_validation_scene": "effects_showcase"
+      "validated_features": ["bloom_threshold", "soft_knee", "vignette", "lens_dirt", "preset_serialization", "frame_contract_stats"],
+      "validation_contracts": ["graphics_preset", "effects_gallery", "phase3_visual_matrix"],
+      "first_validation_scene": "effects_showcase",
+      "future_extensions": ["depth_of_field", "motion_blur", "color_grade_presets"]
     }
   ]
 }

@@ -1,42 +1,46 @@
 {
   "schema": 1,
-  "purpose": "Pass-owned renderer state/resource extraction targets.",
+  "purpose": "Release-validated pass-owned renderer state/resource boundaries.",
   "targets": [
     {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
-      "status": "resource_bundle_extracted",
-      "current_issue": "raw/history stats resources and descriptor tables are bundled, but capture/readback execution is still orchestrated by Renderer",
+      "status": "release_boundary_validated",
+      "release_boundary": "raw/history stats resources and descriptor tables are owned by RTReflectionSignalState; frame-contract metrics remain stable across the public RT showcase path",
+      "validated_contracts": ["renderer_ownership", "rt_showcase", "phase3_visual_matrix"],
       "target_files": ["RendererRTState.h", "RTReflectionSignalStats.h"],
       "renderer_state_members": ["m_rtReflectionSignalState", "m_rtReflectionTargets", "m_rtReflectionReadiness"],
-      "next_step": "move capture/readback execution helpers behind the RT reflection stats pass boundary without changing frame-contract metrics"
+      "future_extension": "If RT reflection capture/readback grows again, move the execution helper behind the same stats boundary instead of adding loose Renderer members"
     },
     {
       "id": "environment_resources",
       "owner": "Environment/IBL",
-      "status": "state_boundary_validated",
-      "current_issue": "manifest policy and environment runtime state are separated, but Renderer_Environment still orchestrates loading, residency, and descriptor binding",
+      "status": "release_boundary_validated",
+      "release_boundary": "manifest policy is owned by EnvironmentManifest and runtime environment reporting is owned by RendererEnvironmentState; public startup uses committed assets or procedural fallback",
+      "validated_contracts": ["environment_manifest", "ibl_gallery", "phase3_visual_matrix"],
       "target_files": ["RendererEnvironmentState.h", "EnvironmentManifest.h"],
       "renderer_state_members": ["m_environmentState"],
-      "next_step": "move loading/residency orchestration helpers out of Renderer_Environment when environment runtime grows again"
+      "future_extension": "If environment streaming/residency becomes more complex, extract orchestration from Renderer_Environment without duplicating the manifest loader"
     },
     {
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
-      "status": "state_boundary_validated",
-      "current_issue": "bloom, temporal-screen, and post controls are separate state boundaries; graph/end-frame orchestration still coordinates them",
+      "status": "release_boundary_validated",
+      "release_boundary": "bloom, temporal-screen, and cinematic post controls are held in named state structs and validated through graphics presets plus effects showcase frame-contract reporting",
+      "validated_contracts": ["graphics_preset", "effects_gallery", "phase3_visual_matrix"],
       "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],
-      "next_step": "keep new post effects inside these state files and move orchestration helpers out of Renderer when touched"
+      "future_extension": "Keep new post effects inside these state files first; extract orchestration helpers only when a concrete new pass requires it"
     },
     {
       "id": "particle_resources",
       "owner": "Particles",
-      "status": "public_path_validated_cpu_billboards",
-      "current_issue": "ECS billboard particles are the public Phase 3 path; GPUParticleSystem remains a separate experimental/future path",
+      "status": "release_boundary_validated",
+      "release_boundary": "ECS billboard particles are the public Phase 3 path, with density controls, frame-contract stats, and effects showcase validation; GPUParticleSystem remains a non-public future migration path",
+      "validated_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
       "target_files": ["RendererParticleState.h", "GPUParticles.h"],
       "renderer_state_members": ["m_particleState"],
-      "next_step": "keep the GPU particle path behind an explicit future migration instead of mixing it into the public billboard path"
+      "future_extension": "Keep GPU particle migration explicit and separate from the public billboard contract until it has equivalent budget and visual validation"
     }
   ]
 }

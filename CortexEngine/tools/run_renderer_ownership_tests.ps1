@@ -75,14 +75,32 @@ foreach ($target in $doc.targets) {
     if ([string]::IsNullOrWhiteSpace([string]$target.owner)) {
         Add-Failure "$id owner is missing"
     }
-    if ([string]::IsNullOrWhiteSpace([string]$target.status)) {
+    $status = [string]$target.status
+    if ([string]::IsNullOrWhiteSpace($status)) {
         Add-Failure "$id status is missing"
+    } elseif ($status -notmatch "validated|release") {
+        Add-Failure "$id status '$status' is not release validated"
     }
-    if ([string]::IsNullOrWhiteSpace([string]$target.current_issue)) {
-        Add-Failure "$id current_issue is missing"
+    if ($null -ne $target.current_issue) {
+        Add-Failure "$id still declares current_issue; release ownership metadata must use release_boundary plus future_extension"
     }
-    if ([string]::IsNullOrWhiteSpace([string]$target.next_step)) {
-        Add-Failure "$id next_step is missing"
+    if ($null -ne $target.next_step) {
+        Add-Failure "$id still declares next_step; release ownership metadata must separate validated scope from future extension"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$target.release_boundary)) {
+        Add-Failure "$id release_boundary is missing"
+    }
+    if ($null -eq $target.validated_contracts -or $target.validated_contracts.Count -lt 1) {
+        Add-Failure "$id validated_contracts is empty"
+    } else {
+        foreach ($contract in $target.validated_contracts) {
+            if ([string]::IsNullOrWhiteSpace([string]$contract)) {
+                Add-Failure "$id has an empty validated_contracts entry"
+            }
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$target.future_extension)) {
+        Add-Failure "$id future_extension is missing"
     }
     if ($null -eq $target.target_files -or $target.target_files.Count -lt 1) {
         Add-Failure "$id target_files is empty"

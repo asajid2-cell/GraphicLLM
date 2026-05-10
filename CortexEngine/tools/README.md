@@ -78,9 +78,10 @@ The material editor contract verifies the focused-entity material preset
 dropdown, metallic/roughness sliders, validation status, and
 `ModifyMaterialCommand` apply path.
 
-The effects gallery test currently uses the RT showcase as the first public
-effects scene and asserts that the particle contract is present, the particles
-pass executed, particles were submitted, and the pass stayed within its cap.
+The effects gallery test uses the Effects Showcase scene and asserts that the
+advanced graphics catalog is release-foundation validated, the particle
+contract is present, the particles pass executed, particles were submitted, and
+cinematic post was active without breaking visual or budget gates.
 
 Default budgets are intentionally strict for the RT showcase scene:
 

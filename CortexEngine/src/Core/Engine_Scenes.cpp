@@ -698,8 +698,8 @@ void Engine::BuildMaterialLabScene() {
         Graphics::ApplyMaterialLabSceneControls(*renderer);
     }
 
-    auto floorPlane = Utils::MeshGenerator::CreatePlane(18.0f, 10.0f);
-    auto wallPlane = Utils::MeshGenerator::CreatePlane(18.0f, 6.0f);
+    auto floorPlane = Utils::MeshGenerator::CreatePlane(20.0f, 11.0f);
+    auto wallPlane = Utils::MeshGenerator::CreatePlane(20.0f, 6.5f);
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.32f, 1.3f, 32);
@@ -811,14 +811,16 @@ void Engine::BuildMaterialLabScene() {
         {"MaterialLab_ClearcoatCube", "clearcoat", glm::vec4(0.12f, 0.26f, 0.75f, 1.0f), 0.0f, 0.24f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, 0.42f, 0.0f)},
         {"MaterialLab_PlasticSphere", "plastic", glm::vec4(0.85f, 0.12f, 0.17f, 1.0f), 0.0f, 0.38f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
         {"MaterialLab_GlassCube", "glass", glm::vec4(0.72f, 0.92f, 1.0f, 1.0f), 0.0f, 0.05f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, -0.35f, 0.0f)},
-        {"MaterialLab_EmissiveTorus", "emissive_panel", glm::vec4(1.0f, 0.72f, 0.28f, 1.0f), 0.0f, 0.25f, &torusMesh, glm::vec3(1.0f), glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)}
+        {"MaterialLab_EmissiveTorus", "emissive_panel", glm::vec4(1.0f, 0.72f, 0.28f, 1.0f), 0.0f, 0.25f, &torusMesh, glm::vec3(1.0f), glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)},
+        {"MaterialLab_VelvetSphere", "velvet", glm::vec4(0.55f, 0.08f, 0.22f, 1.0f), 0.0f, 0.82f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_SubsurfaceCube", "skin_ish_wax", glm::vec4(0.92f, 0.54f, 0.42f, 1.0f), 0.0f, 0.46f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, -0.28f, 0.0f)}
     };
 
     constexpr int swatchCount = static_cast<int>(sizeof(swatches) / sizeof(swatches[0]));
     for (int i = 0; i < swatchCount; ++i) {
-        const int col = i % 4;
-        const int row = i / 4;
-        const float x = -5.4f + static_cast<float>(col) * 3.6f;
+        const int col = i % 5;
+        const int row = i / 5;
+        const float x = -6.4f + static_cast<float>(col) * 3.2f;
         const float z = -1.9f + static_cast<float>(row) * 2.6f;
         const auto& s = swatches[i];
         if (!s.mesh || !(*s.mesh) || !(*s.mesh)->gpuBuffers) {
@@ -843,10 +845,10 @@ void Engine::BuildMaterialLabScene() {
 
     // Neutral plinths make reflections and contact shadows easier to inspect.
     if (cubeMesh && cubeMesh->gpuBuffers) {
-        for (int i = 0; i < 8; ++i) {
-            const int col = i % 4;
-            const int row = i / 4;
-            const float x = -5.4f + static_cast<float>(col) * 3.6f;
+        for (int i = 0; i < swatchCount; ++i) {
+            const int col = i % 5;
+            const int row = i / 5;
+            const float x = -6.4f + static_cast<float>(col) * 3.2f;
             const float z = -1.9f + static_cast<float>(row) * 2.6f;
             addRenderable(("MaterialLab_Plinth_" + std::to_string(i)).c_str(),
                           cubeMesh,

@@ -21,7 +21,7 @@ Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 Texture2D<float4> g_GBufferMaterialExt0 : register(t4);      // RGBA16F: x=clearcoat, y=coatRough, z=IOR, w=specFactor
 Texture2D<float4> g_GBufferMaterialExt1 : register(t5);      // RGBA16F: rgb=specColor, a=transmission (unused in deferred)
-Texture2D<float4> g_GBufferMaterialExt2 : register(t6);      // RGBA8: r=encoded surface class
+Texture2D<float4> g_GBufferMaterialExt2 : register(t6);      // RGBA8: surface class, reflection mask, sheen, SSS wrap
 
 // Environment/shadow maps (matching forward renderer)
 Texture2D<float4> g_EnvDiffuse : register(t7);  // lat-long (equirect) irradiance
@@ -410,6 +410,8 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float specularFactor = saturate(materialExt0.w);
     float3 specularColor = saturate(materialExt1.rgb);
     uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    float sheenWeight = saturate(materialExt2.b);
+    float subsurfaceWrap = saturate(materialExt2.a);
 
     // Check for background pixels (depth = 1.0)
     if (depth >= 0.9999) {
@@ -510,6 +512,17 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     float3 kS = F;
     float3 kD = (1.0 - kS) * (1.0 - metallic);
+    if (subsurfaceWrap > 0.01f) {
+        float lambert = max(NdotL, 1e-4f);
+        float wrapped = saturate((NdotL + subsurfaceWrap) / (1.0f + subsurfaceWrap));
+        kD *= wrapped / lambert;
+    }
+
+    if (sheenWeight > 0.01f) {
+        float sheen = pow(saturate(1.0f - NdotL), 4.0f) *
+                      pow(saturate(1.0f - NdotV), 4.0f);
+        specular += sheenWeight * sheen * albedoColor;
+    }
 
     // Shadow
     float shadow = ComputeShadow(worldPos, normal);
@@ -626,6 +639,17 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
             float3 kS_l = F_l;
             float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
+            if (subsurfaceWrap > 0.01f) {
+                float lambert_l = max(NdotLl, 1e-4f);
+                float wrapped_l = saturate((NdotLl + subsurfaceWrap) / (1.0f + subsurfaceWrap));
+                kD_l *= wrapped_l / lambert_l;
+            }
+
+            if (sheenWeight > 0.01f) {
+                float sheen_l = pow(saturate(1.0f - NdotLl), 4.0f) *
+                                pow(saturate(1.0f - NdotV), 4.0f);
+                spec_l += sheenWeight * sheen_l * albedoColor;
+            }
 
             float shadowLocal = 1.0f;
             if (isSpot && light.params.y >= 0.0f) {
@@ -643,6 +667,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 specularIBL = 0.0f;
     float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
     float3 kD_ibl = (1.0 - metallic) * (1.0 - Fibl);
+    if (subsurfaceWrap > 0.01f) {
+        kD_ibl *= 1.0f + subsurfaceWrap * 0.35f;
+    }
 
     // Hemisphere ambient fallback when IBL is disabled (outdoor/terrain lighting).
     // Uses sky-ground gradient based on normal direction for natural ambient.
@@ -768,6 +795,10 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     ambient *= aoDiffuse;
     ambient += diffuseIBL * g_EnvParams.x * aoDiffuse;
     ambient += specularIBL * g_EnvParams.y * aoSpec;
+    if (sheenWeight > 0.01f) {
+        float grazing = pow(saturate(1.0f - NdotV), 4.0f);
+        ambient += albedoColor * sheenWeight * grazing * 0.08f;
+    }
 
     if (g_ReflectionProbeParams.z == 8u) {
         return float4(saturate(diffuseIBL * g_EnvParams.x * aoDiffuse), 1.0f);

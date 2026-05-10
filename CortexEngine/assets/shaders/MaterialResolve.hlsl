@@ -114,7 +114,7 @@ RWTexture2D<float4> g_NormalRoughnessOut : register(u1);     // RGBA16F
 RWTexture2D<float4> g_EmissiveMetallicOut : register(u2);    // RGBA16F
 RWTexture2D<float4> g_MaterialExt0Out : register(u3);        // RGBA16F: clearcoat/IOR/specularFactor
 RWTexture2D<float4> g_MaterialExt1Out : register(u4);        // RGBA16F: specularColor/transmission
-RWTexture2D<unorm float4> g_MaterialExt2Out : register(u5);  // RGBA8: encoded surface class / masks
+RWTexture2D<unorm float4> g_MaterialExt2Out : register(u5);  // RGBA8: surface class, reflection mask, sheen, SSS wrap
 
 SamplerState g_Sampler : register(s0);
 
@@ -458,6 +458,8 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float ior = 1.5f;
     float specularFactor = 1.0f;
     float3 specularColor = 1.0f;
+    float sheenWeight = 0.0f;
+    float subsurfaceWrap = 0.0f;
     uint materialClass = SURFACE_CLASS_DEFAULT;
 
     float2 ddxUV = float2(0.0f, 0.0f);
@@ -474,6 +476,8 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         emissive = max(mat.emissiveFactorStrength.rgb, 0.0f) * max(mat.emissiveFactorStrength.w, 0.0f);
         clearCoatWeight = saturate(mat.coatParams.x);
         clearCoatRoughness = saturate(mat.coatParams.y);
+        sheenWeight = saturate(mat.coatParams.z);
+        subsurfaceWrap = saturate(mat.coatParams.w);
         transmission = saturate(mat.transmissionParams.x);
         ior = max(mat.transmissionParams.y, 1.0f);
         specularColor = saturate(mat.specularParams.rgb);
@@ -653,5 +657,6 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float reflectionClassMask =
         (SurfaceIsMirrorClass(materialClass) || SurfaceIsWater(materialClass) ||
          materialClass == SURFACE_CLASS_GLASS || materialClass == SURFACE_CLASS_BRUSHED_METAL) ? 1.0f : 0.0f;
-    g_MaterialExt2Out[pixelCoord] = float4(EncodeSurfaceClass(materialClass), reflectionClassMask, 0.0f, 0.0f);
+    g_MaterialExt2Out[pixelCoord] =
+        float4(EncodeSurfaceClass(materialClass), reflectionClassMask, sheenWeight, subsurfaceWrap);
 }

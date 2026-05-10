@@ -111,9 +111,9 @@ foreach ($scene in $doc.scenes) {
             }
         }
 
-        foreach ($gap in $scene.polish_gaps) {
-            if ([string]$gap -eq "camera_bookmark_data") {
-                Add-Failure "$sceneId still lists camera_bookmark_data as a polish gap"
+        if ($null -ne $scene.polish_gaps -and $scene.polish_gaps.Count -gt 0) {
+            foreach ($gap in $scene.polish_gaps) {
+                Add-Failure "$sceneId still lists a public-release polish gap: $gap"
             }
         }
     }

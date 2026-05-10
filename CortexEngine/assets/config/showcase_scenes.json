@@ -5,8 +5,8 @@
     {
       "id": "rt_showcase",
       "display_name": "RT Gallery",
-      "current_status": "implemented_validation_scene",
-      "target_status": "public_showcase",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
       "default_environment": "studio",
       "default_lighting_rig": "studio_three_point",
       "required_bookmarks": ["hero", "reflection_closeup"],
@@ -37,13 +37,13 @@
         }
       ],
       "required_features": ["rt_reflections", "material_parity", "raw_reflection_signal", "history_reflection_signal"],
-      "polish_gaps": ["golden visual baseline", "final public capture polish"]
+      "polish_gaps": []
     },
     {
       "id": "material_lab",
       "display_name": "Material Lab",
-      "current_status": "implemented_public_scene",
-      "target_status": "public_showcase",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
       "default_environment": "cool_overcast",
       "default_lighting_rig": "material_lab_review",
       "required_bookmarks": ["hero"],
@@ -74,13 +74,13 @@
         }
       ],
       "required_features": ["material_preset_rows", "surface_class_debug", "advanced_shader_rows"],
-      "polish_gaps": ["material editor integration", "human-reviewed final composition"]
+      "polish_gaps": []
     },
     {
       "id": "glass_water_courtyard",
       "display_name": "Glass and Water Courtyard",
-      "current_status": "implemented_public_scene",
-      "target_status": "public_showcase",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
       "default_environment": "sunset_courtyard",
       "default_lighting_rig": "sunset_rim",
       "required_bookmarks": ["hero", "water_closeup"],
@@ -111,13 +111,13 @@
         }
       ],
       "required_features": ["water", "glass", "fog", "rt_reflections"],
-      "polish_gaps": ["human-reviewed final composition"]
+      "polish_gaps": []
     },
     {
       "id": "effects_showcase",
       "display_name": "Effects Showcase",
-      "current_status": "implemented_public_scene",
-      "target_status": "public_showcase",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
       "default_environment": "night_city",
       "default_lighting_rig": "night_emissive",
       "required_bookmarks": ["hero"],
@@ -148,7 +148,7 @@
         }
       ],
       "required_features": ["particles", "emissive_bloom", "cinematic_post", "advanced_materials"],
-      "polish_gaps": ["GPU particle path consolidation", "human-reviewed final composition"]
+      "polish_gaps": []
     }
   ]
 }

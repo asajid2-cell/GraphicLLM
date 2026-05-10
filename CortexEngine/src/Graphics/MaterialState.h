@@ -15,6 +15,7 @@ struct MaterialGPUState {
     static constexpr uint32_t kSlotCount = 11;
     std::array<DescriptorHandle, kSlotCount> descriptors{};
     std::array<std::weak_ptr<DX12Texture>, kSlotCount> sourceTextures{};
+    bool descriptorsAllocated = false;
     bool descriptorsReady = false;
 };
 

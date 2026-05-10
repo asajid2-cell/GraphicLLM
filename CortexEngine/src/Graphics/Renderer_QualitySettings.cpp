@@ -1,0 +1,118 @@
+#include "Renderer.h"
+
+#include <algorithm>
+#include <cmath>
+
+#include <glm/gtx/norm.hpp>
+
+namespace Cortex::Graphics {
+
+float Renderer::GetExposure() const {
+    return GetQualityState().exposure;
+}
+
+void Renderer::SetExposure(float exposure) {
+    float clamped = std::max(exposure, 0.01f);
+    if (std::abs(clamped - m_qualityRuntimeState.exposure) < 1e-6f) {
+        return;
+    }
+    m_qualityRuntimeState.exposure = clamped;
+    spdlog::info("Renderer exposure set to {}", m_qualityRuntimeState.exposure);
+}
+
+float Renderer::GetBloomIntensity() const {
+    return GetQualityState().bloomIntensity;
+}
+
+void Renderer::SetBloomIntensity(float intensity) {
+    float clamped = glm::clamp(intensity, 0.0f, 5.0f);
+    if (std::abs(clamped - m_bloomResources.intensity) < 1e-6f) {
+        return;
+    }
+    m_bloomResources.intensity = clamped;
+    spdlog::info("Renderer bloom intensity set to {}", m_bloomResources.intensity);
+}
+
+void Renderer::SetColorGrade(float warm, float cool) {
+    // Clamp to a reasonable range to keep grading subtle.
+    float clampedWarm = glm::clamp(warm, -1.0f, 1.0f);
+    float clampedCool = glm::clamp(cool, -1.0f, 1.0f);
+    if (std::abs(clampedWarm - m_postProcessState.warm) < 1e-3f &&
+        std::abs(clampedCool - m_postProcessState.cool) < 1e-3f) {
+        return;
+    }
+    m_postProcessState.warm = clampedWarm;
+    m_postProcessState.cool = clampedCool;
+    spdlog::info("Color grade warm/cool set to ({}, {})",
+                 m_postProcessState.warm,
+                 m_postProcessState.cool);
+}
+
+float Renderer::GetRenderScale() const {
+    return GetQualityState().renderScale;
+}
+
+void Renderer::SetRenderScale(float scale) {
+    if (m_frameLifecycle.deviceRemoved) {
+        return;
+    }
+
+    float clamped = std::clamp(scale, 0.5f, 1.5f);
+
+    if (m_services.window) {
+        const unsigned int width = std::max(1u, m_services.window->GetWidth());
+        const unsigned int height = std::max(1u, m_services.window->GetHeight());
+        const bool heavyEffects =
+            m_rtRuntimeState.enabled || m_ssrResources.enabled || m_ssaoResources.enabled ||
+            m_rtRuntimeState.reflectionsEnabled || m_rtRuntimeState.giEnabled;
+
+        if (m_services.device) {
+            const auto budget = BudgetPlanner::BuildPlan(
+                m_services.device->GetDedicatedVideoMemoryBytes(),
+                width,
+                height);
+            if (budget.targetRenderScale > 0.0f && budget.targetRenderScale < 1.0f) {
+                clamped = std::min(clamped, budget.targetRenderScale);
+            }
+        }
+
+        if (height >= 2160 || width >= 3840) {
+            const float maxScale = heavyEffects ? 0.6f : 0.75f;
+            clamped = std::clamp(clamped, 0.5f, maxScale);
+        } else if (height >= 1440 || width >= 2560) {
+            const float maxScale = heavyEffects ? 0.8f : 1.0f;
+            clamped = std::clamp(clamped, 0.5f, maxScale);
+        }
+    }
+
+    if (std::abs(m_qualityRuntimeState.renderScale - clamped) > 0.0001f) {
+        m_qualityRuntimeState.renderScale = clamped;
+        InvalidateTAAHistory("render_scale_changed");
+        InvalidateRTShadowHistory("render_scale_changed");
+        InvalidateRTReflectionHistory("render_scale_changed");
+        InvalidateRTGIHistory("render_scale_changed");
+    }
+}
+
+void Renderer::ApplySafeQualityPreset() {
+    // Budget preset for memory-constrained systems. Preserve renderer feature
+    // flags and reduce the resolution/shadow footprint first so advanced
+    // effects remain available for diagnosis and presentation.
+    SetRenderScale(0.67f);
+
+    // Cap shadow-map resolution aggressively to keep cascaded shadows from
+    // dominating memory and bandwidth in conservative mode.
+    m_shadowResources.mapSize = std::min(m_shadowResources.mapSize, 1024.0f);
+    for (uint32_t i = 0; i < kShadowCascadeCount; ++i) {
+        m_shadowResources.cascadeResolutionScale[i] =
+            std::min(m_shadowResources.cascadeResolutionScale[i], 0.60f);
+    }
+    // If the current atlas is larger than the new safe size, recreate it so
+    // the VRAM savings take effect immediately instead of waiting for a
+    // resize-triggered reallocation.
+    RecreateShadowMapResourcesForCurrentSize();
+
+    spdlog::info("Renderer: applied memory-budget preset (scale=0.67, shadows capped, feature flags preserved)");
+}
+
+} // namespace Cortex::Graphics

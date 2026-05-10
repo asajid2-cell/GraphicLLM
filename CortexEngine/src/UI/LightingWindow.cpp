@@ -3,6 +3,7 @@
 #include "UI/DebugMenu.h"
 #include "Core/ServiceLocator.h"
 #include "Core/Engine.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
 #include "LLM/SceneCommands.h"
 
@@ -123,7 +124,16 @@ bool GetCheckbox(HWND hwnd) {
 }
 
 std::string WStringToUtf8(const std::wstring& s) {
-    return std::string(s.begin(), s.end());
+    if (s.empty()) {
+        return {};
+    }
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) {
+        return {};
+    }
+    std::string out(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), bytes, nullptr, nullptr);
+    return out;
 }
 
 static int GetSelectedLightIndex() {
@@ -171,19 +181,20 @@ void RefreshControlsFromState() {
     // Global lighting state from renderer/debug menu
     auto* renderer = Cortex::ServiceLocator::GetRenderer();
     if (renderer) {
+        const auto features = renderer->GetFeatureState();
         SetSliderFromFloat(g_light.sliderSunIntensity,
-                           renderer->GetSunIntensity(),
+                           features.sunIntensity,
                            0.0f, 20.0f);
         SetSliderFromFloat(g_light.sliderIBLDiffuse,
-                           renderer->GetIBLDiffuseIntensity(),
+                           features.iblDiffuseIntensity,
                            0.0f, 3.0f);
         SetSliderFromFloat(g_light.sliderIBLSpecular,
-                           renderer->GetIBLSpecularIntensity(),
+                           features.iblSpecularIntensity,
                            0.0f, 3.0f);
         SetSliderFromFloat(g_light.sliderGodRays,
-                           renderer->GetGodRayIntensity(),
+                           features.godRayIntensity,
                            0.0f, 3.0f);
-        SetCheckbox(g_light.chkSafeRig, renderer->GetUseSafeLightingRigOnLowVRAM());
+        SetCheckbox(g_light.chkSafeRig, features.useSafeLightingRigOnLowVRAM);
     }
 
     // Lighting rig selection mirrors DebugMenuState.lightingRig
@@ -497,7 +508,7 @@ void RegisterLightingWindowClass() {
                     0, TRACKBAR_CLASSW, L"",
                     WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
                     x + colLabelWidth, yy, colSliderWidth, sliderHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
                 return h;
             };
@@ -507,7 +518,7 @@ void RegisterLightingWindowClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     x, yy, width - margin * 2, checkHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_light.font), TRUE);
                 return h;
             };
@@ -517,7 +528,7 @@ void RegisterLightingWindowClass() {
                     0, L"COMBOBOX", L"",
                     WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
                     x + colLabelWidth, yy, colSliderWidth, dropHeight,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_light.font), TRUE);
                 return h;
             };
@@ -527,7 +538,7 @@ void RegisterLightingWindowClass() {
                     WS_EX_CLIENTEDGE, L"EDIT", L"",
                     WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
                     x + colLabelWidth, yy, colSliderWidth, 20,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_light.font), TRUE);
                 return h;
             };
@@ -537,7 +548,7 @@ void RegisterLightingWindowClass() {
                     0, L"BUTTON", text,
                     WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                     x, yy, width - margin * 2, 24,
-                    hwnd, reinterpret_cast<HMENU>(id), nullptr, nullptr);
+                    hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
                 SendMessageW(h, WM_SETFONT, reinterpret_cast<WPARAM>(g_light.font), TRUE);
                 return h;
             };
@@ -737,15 +748,15 @@ void RegisterLightingWindowClass() {
 
             if (slider == g_light.sliderSunIntensity) {
                 float val = SliderToFloat(slider, 0.0f, 20.0f);
-                renderer->SetSunIntensity(val);
+                Graphics::ApplySunIntensityControl(*renderer, val);
             } else if (slider == g_light.sliderIBLDiffuse ||
                        slider == g_light.sliderIBLSpecular) {
                 float diff = SliderToFloat(g_light.sliderIBLDiffuse, 0.0f, 3.0f);
                 float spec = SliderToFloat(g_light.sliderIBLSpecular, 0.0f, 3.0f);
-                renderer->SetIBLIntensity(diff, spec);
+                Graphics::ApplyIBLIntensityControl(*renderer, diff, spec);
             } else if (slider == g_light.sliderGodRays) {
                 float g = SliderToFloat(slider, 0.0f, 3.0f);
-                renderer->SetGodRayIntensity(g);
+                Graphics::ApplyGodRayIntensityControl(*renderer, g);
             } else if (slider == g_light.sliderColorR ||
                        slider == g_light.sliderColorG ||
                        slider == g_light.sliderColorB) {
@@ -785,7 +796,7 @@ void RegisterLightingWindowClass() {
                     auto* renderer = Cortex::ServiceLocator::GetRenderer();
                     if (renderer) {
                         bool enabled = GetCheckbox(g_light.chkSafeRig);
-                        renderer->SetUseSafeLightingRigOnLowVRAM(enabled);
+                        Graphics::ApplySafeLightingRigControl(*renderer, enabled);
                     }
                     return 0;
                 }

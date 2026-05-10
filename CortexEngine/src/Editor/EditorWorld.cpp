@@ -164,6 +164,20 @@ void EditorWorld::Shutdown() {
     m_initialized = false;
 }
 
+void EditorWorld::ClearAllChunks() {
+    // Clear all loaded/pending chunks without shutting down the world.
+    // Call this when the scene registry is cleared externally (e.g., scene switch).
+    // The entities are already destroyed by registry.clear(), so just clear our tracking.
+    spdlog::info("EditorWorld: clearing {} chunks (external scene rebuild)", m_loadedChunks.size());
+    m_loadedChunks.clear();
+    m_pendingChunks.clear();
+    if (m_spatialGrid) {
+        m_spatialGrid->Clear();
+    }
+    // Reset stats
+    m_stats = {};
+}
+
 void EditorWorld::Update(const glm::vec3& cameraPosition, float /*deltaTime*/) {
     if (!m_initialized) {
         return;
@@ -183,12 +197,29 @@ void EditorWorld::Update(const glm::vec3& cameraPosition, float /*deltaTime*/) {
     m_stats.loadedChunks = m_loadedChunks.size();
     m_stats.pendingChunks = m_pendingChunks.size();
 
-    // Debug: log chunk activity when there are changes
-    if (m_stats.chunksLoadedThisFrame > 0 || m_stats.chunksUnloadedThisFrame > 0) {
-        spdlog::info("Chunks: loaded={} pending={} +{}/-{} cam=({:.0f},{:.0f},{:.0f})",
-            m_stats.loadedChunks, m_stats.pendingChunks,
-            m_stats.chunksLoadedThisFrame, m_stats.chunksUnloadedThisFrame,
-            cameraPosition.x, cameraPosition.y, cameraPosition.z);
+    // Debug: log chunk activity periodically
+    static uint32_t s_debugCounter = 0;
+    if (++s_debugCounter % 60 == 0) {  // Every ~1 second at 60fps
+        // Count actual terrain entities to verify they match m_loadedChunks
+        size_t entityCount = 0;
+        size_t entitiesWithGpuBuffers = 0;
+        if (m_registry) {
+            auto view = m_registry->GetRegistry().view<Scene::TerrainChunkComponent, Scene::RenderableComponent>();
+            for (auto entity : view) {
+                entityCount++;
+                const auto& renderable = view.get<Scene::RenderableComponent>(entity);
+                if (renderable.mesh && renderable.mesh->gpuBuffers &&
+                    renderable.mesh->gpuBuffers->vertexBuffer &&
+                    renderable.mesh->gpuBuffers->indexBuffer) {
+                    entitiesWithGpuBuffers++;
+                }
+            }
+        }
+        spdlog::info("Chunks: loaded={} pending={} generator_pending={} generator_completed={} | Entities: total={} withGPU={}",
+            m_loadedChunks.size(), m_pendingChunks.size(),
+            m_chunkGenerator ? m_chunkGenerator->GetPendingCount() : 0,
+            m_chunkGenerator ? m_chunkGenerator->GetCompletedCount() : 0,
+            entityCount, entitiesWithGpuBuffers);
     }
 }
 
@@ -277,6 +308,12 @@ void EditorWorld::UpdateChunkLoading(const glm::vec3& cameraPos) {
     // Unload distant chunks
     UnloadDistantChunks(cameraPos);
 
+    const size_t maxLoaded = static_cast<size_t>(m_config.maxLoadedChunks);
+    size_t residentOrRequested = m_loadedChunks.size() + m_pendingChunks.size();
+    if (residentOrRequested >= maxLoaded) {
+        return;
+    }
+
     // Request new chunks that aren't loaded or pending
     uint32_t requestsThisFrame = 0;
     for (const auto& coord : desiredChunks) {
@@ -300,12 +337,24 @@ void EditorWorld::UpdateChunkLoading(const glm::vec3& cameraPos) {
             m_pendingChunks.insert(coord);
 
             requestsThisFrame++;
-
-            // Limit requests per frame to avoid overwhelming the queue
-            if (requestsThisFrame >= m_config.maxChunksPerFrame * 2) {
+            ++residentOrRequested;
+            if (requestsThisFrame >= m_config.maxChunksPerFrame) {
+                break;
+            }
+            if (residentOrRequested >= maxLoaded) {
                 break;
             }
         }
+
+        if (requestsThisFrame >= m_config.maxChunksPerFrame ||
+            residentOrRequested >= maxLoaded) {
+            break;
+        }
+    }
+
+    // Log if we have many pending chunks (potential bottleneck)
+    if (requestsThisFrame > 0) {
+        spdlog::debug("Requested {} new chunks this frame", requestsThisFrame);
     }
 }
 
@@ -325,19 +374,27 @@ void EditorWorld::ProcessCompletedChunks() {
     constexpr auto timeBudget = std::chrono::milliseconds(16);
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // Calculate how many we can load this frame
-    size_t roomAvailable = static_cast<size_t>(m_config.maxLoadedChunks) - m_loadedChunks.size();
-    size_t maxToProcess = std::min(roomAvailable, static_cast<size_t>(m_config.maxChunksPerFrame));
-
-    // Get completed chunks (limited by both frame budget and available capacity)
-    auto completed = m_chunkGenerator->GetCompletedChunks(maxToProcess);
+    const size_t roomAvailable = static_cast<size_t>(m_config.maxLoadedChunks) - m_loadedChunks.size();
+    const size_t maxToProcess = std::min(roomAvailable, static_cast<size_t>(m_config.maxChunksPerFrame));
 
     float totalGenTime = 0.0f;
     size_t processedCount = 0;
 
-    for (auto& result : completed) {
+    while (processedCount < maxToProcess && m_chunkGenerator->HasCompletedChunks()) {
+        // Pull one result at a time. GetCompletedChunks() removes entries from
+        // the generator queue, so fetching a large batch and then breaking on
+        // the frame budget silently drops the unprocessed chunks.
+        auto completed = m_chunkGenerator->GetCompletedChunks(1);
+        if (completed.empty()) {
+            break;
+        }
+
+        auto& result = completed.front();
+
         // Skip if no longer desired (may have been cancelled)
         if (m_pendingChunks.find(result.coord) == m_pendingChunks.end()) {
+            spdlog::warn("Chunk ({}, {}) completed but not in pending set - skipping",
+                         result.coord.x, result.coord.z);
             continue;
         }
 
@@ -355,21 +412,27 @@ void EditorWorld::ProcessCompletedChunks() {
             }
         }
 
-        // Create entity only if upload succeeded
+        // Create entity only if upload succeeded and we have a mesh
         if (uploadSuccess && result.mesh) {
             CreateChunkEntity(result.coord, result.mesh, result.lod);
             m_stats.chunksLoadedThisFrame++;
             totalGenTime += result.generationTimeMs;
             processedCount++;
-        }
 
-        // Only mark as loaded if upload succeeded or mesh was null (nothing to upload)
-        if (uploadSuccess || !result.mesh) {
+            // Only mark as loaded if entity was actually created
             m_loadedChunks.insert(result.coord);
             m_spatialGrid->RegisterChunk(result.coord);
         } else {
-            spdlog::warn("Chunk ({}, {}) will be retried next frame",
-                         result.coord.x, result.coord.z);
+            // Log the failure reason. The coord has been removed from pending,
+            // so UpdateChunkLoading can request it again next frame if it is
+            // still inside the desired streaming radius.
+            if (!result.mesh) {
+                spdlog::error("Chunk ({}, {}) generation returned null mesh!",
+                             result.coord.x, result.coord.z);
+            } else {
+                spdlog::warn("Chunk ({}, {}) upload failed; it will be eligible for retry",
+                             result.coord.x, result.coord.z);
+            }
         }
 
         // Check time budget AFTER upload - if exceeded, stop processing more chunks

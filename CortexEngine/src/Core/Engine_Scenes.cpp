@@ -2,11 +2,14 @@
 // Cornell box + hero "Dragon Over Water Studio" layouts.
 
 #include "Engine.h"
+#include "EngineEditorMode.h"
+#include "Editor/EditorWorld.h"
 
 #include "Scene/Components.h"
 #include "Scene/TerrainNoise.h"
 #include "Utils/MeshGenerator.h"
 #include "Utils/GLTFLoader.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
 
 namespace Cortex {
@@ -52,6 +55,12 @@ void Engine::RebuildScene(ScenePreset preset) {
     m_terrainEnabled = false;
     m_loadedChunks.clear();
 
+    // Clear EditorWorld's chunk tracking BEFORE clearing the registry.
+    // This prevents EditorWorld from trying to access destroyed entities.
+    if (m_editorModeController && m_editorModeController->GetWorld()) {
+        m_editorModeController->GetWorld()->ClearAllChunks();
+    }
+
     // Clear all existing entities/components. This destroys RenderableComponents
     // which may release GPU resources (mesh buffers, etc.).
     m_registry->GetRegistry().clear();
@@ -88,12 +97,19 @@ void Engine::RebuildScene(ScenePreset preset) {
         // (EditorWorld handles terrain generation with its own chunk system)
         if (!m_engineEditorMode) {
             BuildProceduralTerrainScene();
+        } else {
+            // In editor mode, EditorWorld handles terrain chunks but we still need
+            // a camera and sun for the scene to work properly
+            BuildEditorModeTerrainScene();
         }
         break;
     case ScenePreset::RTShowcase:
     case ScenePreset::GodRays: // currently shares layout with RTShowcase
     default:
         BuildRTShowcaseScene();
+        break;
+    case ScenePreset::TemporalValidation:
+        BuildTemporalValidationScene();
         break;
     }
 
@@ -110,6 +126,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
+    case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
     case ScenePreset::ProceduralTerrain: presetName = "Procedural Terrain"; break;
     default:                             presetName = "Unknown"; break;
     }
@@ -126,7 +143,7 @@ void Engine::RebuildScene(ScenePreset preset) {
         const double envMB  = static_cast<double>(breakdown.environmentBytes) / (1024.0 * 1024.0);
         const double geomMB = static_cast<double>(breakdown.geometryBytes) / (1024.0 * 1024.0);
         const double rtMB   = static_cast<double>(breakdown.rtStructureBytes) / (1024.0 * 1024.0);
-        spdlog::info("Asset memory breakdown after rebuild: tex≈{:.0f} MB env≈{:.0f} MB geom≈{:.0f} MB RT≈{:.0f} MB",
+        spdlog::info("Asset memory breakdown after rebuild: tex~{:.0f} MB env~{:.0f} MB geom~{:.0f} MB RT~{:.0f} MB",
                      texMB, envMB, geomMB, rtMB);
 
         auto heavyTex = m_renderer->GetAssetRegistry().GetHeaviestTextures(3);
@@ -134,7 +151,7 @@ void Engine::RebuildScene(ScenePreset preset) {
             spdlog::info("Top textures by estimated GPU bytes:");
             for (const auto& t : heavyTex) {
                 const double mb = static_cast<double>(t.bytes) / (1024.0 * 1024.0);
-                spdlog::info("  {} ≈ {:.1f} MB", t.key, mb);
+                spdlog::info("  {} ~ {:.1f} MB", t.key, mb);
             }
         }
         auto heavyMesh = m_renderer->GetAssetRegistry().GetHeaviestMeshes(3);
@@ -142,7 +159,7 @@ void Engine::RebuildScene(ScenePreset preset) {
             spdlog::info("Top meshes by estimated GPU bytes:");
             for (const auto& m : heavyMesh) {
                 const double mb = static_cast<double>(m.bytes) / (1024.0 * 1024.0);
-                spdlog::info("  {} ≈ {:.1f} MB", m.key, mb);
+                spdlog::info("  {} ~ {:.1f} MB", m.key, mb);
             }
         }
     }
@@ -189,36 +206,15 @@ void Engine::BuildCornellScene() {
         glm::vec3 target(0.0f, 1.2f, 0.0f);
         glm::vec3 up(0.0f, 1.0f, 0.0f);
         glm::vec3 forward = glm::normalize(target - cameraTransform.position);
-        cameraTransform.rotation = glm::quatLookAt(forward, up);
+        cameraTransform.rotation = glm::quatLookAtLH(forward, up);
     }
 
     auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
     camera.fov = 50.0f;
     camera.isActive = true;
 
-    // Lighting: sun oriented downward plus a simple interior light rig. The
-    // interior spots approximate a ceiling area light and a small rim light
-    // so reflections and RT GI have strong local contrast.
     if (renderer) {
-        renderer->SetSunDirection(glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f)));
-        renderer->SetSunColor(glm::vec3(1.0f));
-        renderer->SetSunIntensity(2.0f);
-        renderer->SetEnvironmentPreset("studio");
-        renderer->SetIBLEnabled(true);
-        // Subtle volumetric fog and god-rays for the Cornell top light so the
-        // interior feels more atmospheric without overwhelming the small box.
-        renderer->SetFogEnabled(true);
-        renderer->SetFogParams(0.03f, 0.0f, 0.55f);
-        renderer->SetGodRayIntensity(0.9f);
-        // Keep water parameters gentle; the Cornell "puddle" is a shallow,
-        // mostly still surface used for specular highlights and SSR.
-        renderer->SetWaterParams(
-            0.0f,   // levelY
-            0.015f, // amplitude
-            4.0f,   // wavelength
-            0.5f,   // speed
-            1.0f, 0.0f,
-            0.01f); // secondaryAmplitude
+        Graphics::ApplyCornellSceneControls(*renderer);
     }
 
     // Shared plane meshes
@@ -633,7 +629,7 @@ void Engine::BuildCornellScene() {
         auto& t = m_registry->AddComponent<TransformComponent>(e);
         t.position = glm::vec3(0.0f, kCornellHeight - 0.05f, 0.0f);
         glm::vec3 dir(0.0f, -1.0f, 0.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 0.0f, 1.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 0.0f, 1.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::AreaRect;
@@ -651,7 +647,7 @@ void Engine::BuildCornellScene() {
         auto& t = m_registry->AddComponent<TransformComponent>(e);
         t.position = glm::vec3(0.0f, kCornellHeight - 0.1f, 0.0f);
         glm::vec3 dir(0.0f, -1.0f, 0.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 0.0f, 1.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 0.0f, 1.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
@@ -669,7 +665,7 @@ void Engine::BuildCornellScene() {
         auto& t = m_registry->AddComponent<TransformComponent>(e);
         t.position = glm::vec3(-kCornellHalfExtent + 0.3f, 1.8f, -1.5f);
         glm::vec3 dir(0.4f, -0.5f, 1.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
@@ -687,84 +683,9 @@ void Engine::BuildRTShowcaseScene() {
 
     auto* renderer = m_renderer.get();
 
-    // In conservative mode on 8 GB-class GPUs, disable particles for this
-    // scene to keep VRAM and per-frame work within a safer envelope.
-    if (renderer && m_device) {
-        const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
-        const std::uint64_t mb = bytes / (1024ull * 1024ull);
-        if (m_qualityMode == EngineConfig::QualityMode::Conservative &&
-            mb > 0 && mb <= 8192ull) {
-            renderer->SetParticlesEnabled(false);
-        }
-    }
-
-    // Global renderer defaults for the RT showcase. IBL and lighting are
-    // configured for the gallery in all modes, but heavy quality settings
-    // (higher internal resolution, SSR/SSAO/fog, strong bloom/god-rays) are
-    // only enabled when the engine was started in a high-quality mode.
     if (renderer) {
-        renderer->SetEnvironmentPreset("studio");
-        renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.9f, 1.2f);
-
-        renderer->SetShadowsEnabled(true);
-        renderer->SetShadowBias(0.0005f);
-        renderer->SetShadowPCFRadius(1.5f);
-        renderer->SetCascadeSplitLambda(0.5f);
-
-        // Single sun direction chosen to produce long gallery shadows, glancing
-        // pool reflections, and beams through the atrium windows.
-        glm::vec3 sunDir = glm::normalize(glm::vec3(0.35f, 0.85f, 0.25f));
-        renderer->SetSunDirection(sunDir);
-        renderer->SetSunColor(glm::vec3(1.0f));
-        renderer->SetSunIntensity(4.5f);
-
-        // Courtyard water tuning: modest waves and clear reflections.
-        renderer->SetWaterParams(
-            /*levelY*/ 0.0f,
-            /*amplitude*/ 0.15f,
-            /*waveLength*/ 10.0f,
-            /*speed*/ 1.0f,
-            /*dirX*/ 1.0f,
-            /*dirZ*/ 0.25f,
-            /*secondaryAmplitude*/ 0.08f,
-            /*steepness*/ 0.6f);
-
-        if (m_qualityMode == EngineConfig::QualityMode::Default) {
-            // High-quality RT showcase: request a slightly reduced internal
-            // resolution (clamped to ≈0.8 at 1440p with heavy effects), plus
-            // full TAA/FXAA, SSR/SSAO, and atmospheric fog/god-rays.
-            renderer->SetRenderScale(0.85f);
-            renderer->SetExposure(1.2f);
-            renderer->SetBloomIntensity(0.35f);
-
-            renderer->SetFXAAEnabled(true);
-            renderer->SetTAAEnabled(true);
-            renderer->SetSSREnabled(true);
-            renderer->SetSSAOEnabled(true);
-
-            renderer->SetFogEnabled(true);
-            renderer->SetFogParams(0.03f, 0.0f, 0.45f);
-            renderer->SetGodRayIntensity(1.8f);
-        } else {
-            // Conservative mode: enable all graphics features for maximum quality
-            renderer->SetRenderScale(1.0f);
-            renderer->SetExposure(1.1f);
-            renderer->SetBloomIntensity(0.25f);
-
-            renderer->SetFXAAEnabled(true);
-            renderer->SetTAAEnabled(true);
-            renderer->SetSSREnabled(true);
-            renderer->SetSSAOEnabled(true);
-            renderer->SetFogEnabled(true);
-            renderer->SetShadowsEnabled(true);
-            renderer->SetIBLEnabled(true);
-        }
-
-        // Leave ray tracing disabled by default; the user can toggle it
-        // explicitly (V key / debug menu) once the scene is up so that any
-        // DXR issues do not prevent the engine from becoming interactive.
-
+        const bool conservative = (m_qualityMode != EngineConfig::QualityMode::Default);
+        Graphics::ApplyRTShowcaseSceneControls(*renderer, conservative);
     }
 
     // Shared meshes
@@ -813,18 +734,19 @@ void Engine::BuildRTShowcaseScene() {
         }
     }
 
-    // Camera positioned at a central hub looking toward the three zones.
+    // Camera positioned as a gallery hero shot so the default validation
+    // frame exercises representative RT materials instead of mostly skybox.
     {
         entt::entity camEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
-        t.position = glm::vec3(0.0f, 3.5f, -13.0f);
-        glm::vec3 target(0.0f, 1.5f, 0.0f);
+        t.position = glm::vec3(-14.0f, 2.05f, -6.8f);
+        glm::vec3 target(-14.0f, 1.05f, 0.25f);
         glm::vec3 up(0.0f, 1.0f, 0.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(target - t.position), up);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), up);
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
-        cam.fov = 55.0f;
+        cam.fov = 56.0f;
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -843,10 +765,12 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = floorPlane;
-        r.albedoColor = glm::vec4(0.32f, 0.24f, 0.16f, 1.0f);
+        r.albedoColor = glm::vec4(0.70f, 0.62f, 0.52f, 1.0f);
         r.metallic = 0.0f;
-        r.roughness = 0.55f;
+        r.roughness = 0.92f;
         r.ao = 1.0f;
+        r.normalScale = 0.12f;
+        r.specularFactor = 0.15f;
         r.presetName = "wood_floor";
         r.doubleSided = true;
         // Phase 2: RT showcase floor uses pre-compressed BC7/BC5 textures when
@@ -874,6 +798,25 @@ void Engine::BuildRTShowcaseScene() {
         r.doubleSided = true;
     }
 
+    if (floorPlane && floorPlane->gpuBuffers) {
+        // Rear wall closes the validation view so the RT showcase reads as an
+        // authored gallery instead of an open HDRI probe.
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_RearWall");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(galleryX, 2.0f, 3.0f);
+        t.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = floorPlane;
+        r.albedoColor = glm::vec4(0.68f, 0.64f, 0.58f, 1.0f);
+        r.metallic = 0.0f;
+        r.roughness = 0.82f;
+        r.ao = 1.0f;
+        r.presetName = "backdrop";
+        r.doubleSided = true;
+    }
+
     if (wallPlane && wallPlane->gpuBuffers) {
         // Left wall (brick)
         entt::entity e = m_registry->CreateEntity();
@@ -884,7 +827,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = wallPlane;
-        r.albedoColor = glm::vec4(0.4f, 0.4f, 0.42f, 1.0f);
+        r.albedoColor = glm::vec4(0.62f, 0.60f, 0.58f, 1.0f);
         r.metallic = 0.0f;
         r.roughness = 0.85f;
         r.ao = 1.0f;
@@ -937,7 +880,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = wallPlane;
-        r.albedoColor = glm::vec4(0.86f, 0.86f, 0.9f, 1.0f);
+        r.albedoColor = glm::vec4(0.92f, 0.91f, 0.88f, 1.0f);
         r.metallic = 0.0f;
         r.roughness = 0.7f;
         r.ao = 1.0f;
@@ -959,9 +902,9 @@ void Engine::BuildRTShowcaseScene() {
 
             auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
             r.mesh = sphereMesh;
-            r.albedoColor = glm::vec4(0.8f, 0.8f, 0.85f, 1.0f);
+            r.albedoColor = glm::vec4(0.62f, 0.62f, 0.66f, 1.0f);
             r.metallic = 1.0f;
-            r.roughness = 0.03f;
+            r.roughness = 0.18f;
             r.ao = 1.0f;
             r.presetName = "chrome";
         }
@@ -1023,38 +966,13 @@ void Engine::BuildRTShowcaseScene() {
     if (dragonResult.IsOk()) {
         dragonMesh = dragonResult.Value();
         if (renderer) {
-            bool allowDragonUpload = true;
-            // On 8 GB-class adapters (or any time RT is enabled during init),
-            // the RT showcase scene creates extreme memory pressure during the
-            // first ~10 frames while BLAS structures are building. Defer the
-            // large dragon mesh upload to avoid device-removed errors. The mesh
-            // can be loaded later via LLM commands or scene switching.
-            //
-            // Root cause: ProcessGpuJobsPerFrame() uploads dragon (4.5 MB) while
-            // BuildTLAS() allocates BLAS scratch buffers (10s-100s of MB), causing
-            // CreateCommittedResource to fail with DEVICE_REMOVED during Present().
-            if (m_device) {
-                const std::uint64_t bytes = m_device->GetDedicatedVideoMemoryBytes();
-                const std::uint64_t mb = bytes / (1024ull * 1024ull);
-                // Skip dragon on ≤8GB cards, or if RT is enabled (to avoid init-time OOM)
-                if (mb > 0 && mb <= 8192ull) {
-                    allowDragonUpload = false;
-                    spdlog::info("RTShowcase: skipping dragon mesh upload on 8 GB card to prevent device-removed during RT warm-up");
-                }
-                // Also skip if ray tracing is active during scene init, regardless of VRAM
-                if (renderer && renderer->IsRayTracingEnabled()) {
-                    allowDragonUpload = false;
-                    spdlog::info("RTShowcase: deferring dragon mesh upload (RT enabled; avoiding init-time memory spike)");
-                }
-            }
-
-            if (allowDragonUpload) {
-                auto enqueue = renderer->EnqueueMeshUpload(dragonMesh, "RTShowcaseDragon");
-                if (enqueue.IsErr()) {
-                    spdlog::warn("Failed to enqueue RTShowcase dragon mesh upload: {}", enqueue.Error());
-                    dragonMesh.reset();
-                }
-            } else {
+            // Keep the hero asset present in the showcase. Renderer-side
+            // upload throttling, BLAS accounting and internal render scaling
+            // are responsible for staying within budget; the scene should not
+            // remove content just because RT is enabled.
+            auto upload = renderer->UploadMesh(dragonMesh);
+            if (upload.IsErr()) {
+                spdlog::warn("Failed to upload RTShowcase dragon mesh: {}", upload.Error());
                 dragonMesh.reset();
             }
         }
@@ -1083,15 +1001,15 @@ void Engine::BuildRTShowcaseScene() {
         m_registry->AddComponent<Scene::TagComponent>(de, "RTGallery_MetalDragon");
         auto& dt = m_registry->AddComponent<TransformComponent>(de);
         dt.position = glm::vec3(galleryX, 1.0f, 1.2f);
-        dt.scale = glm::vec3(1.0f);
+        dt.scale = glm::vec3(0.38f);
 
         auto& dr = m_registry->AddComponent<Scene::RenderableComponent>(de);
         dr.mesh = dragonMesh;
-        dr.albedoColor = glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
+        dr.albedoColor = glm::vec4(0.48f, 0.47f, 0.43f, 1.0f);
         dr.metallic = 1.0f;
-        dr.roughness = 0.08f;
+        dr.roughness = 0.36f;
         dr.ao = 1.0f;
-        dr.presetName = "chrome";
+        dr.presetName = "brushed_metal";
     }
 
     if (smallSphere && smallSphere->gpuBuffers && cubeMesh && cubeMesh->gpuBuffers) {
@@ -1117,9 +1035,9 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& sr = m_registry->AddComponent<Scene::RenderableComponent>(se);
         sr.mesh = smallSphere;
-        sr.albedoColor = glm::vec4(0.9f, 0.9f, 0.95f, 1.0f);
+        sr.albedoColor = glm::vec4(0.68f, 0.68f, 0.72f, 1.0f);
         sr.metallic = 1.0f;
-        sr.roughness = 0.04f;
+        sr.roughness = 0.18f;
         sr.ao = 1.0f;
         sr.presetName = "chrome";
     }
@@ -1127,16 +1045,34 @@ void Engine::BuildRTShowcaseScene() {
     // Gallery lights: warm key, cool rim
     {
         entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_Softbox");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(galleryX, 3.35f, -1.0f);
+        glm::vec3 dir(0.0f, -1.0f, 0.25f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::AreaRect;
+        l.color = glm::vec3(1.0f, 0.93f, 0.82f);
+        l.intensity = 3.8f;
+        l.range = 18.0f;
+        l.areaSize = glm::vec2(5.5f, 2.2f);
+        l.twoSided = false;
+        l.castsShadows = false;
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_KeyLight");
         auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
         t.position = glm::vec3(galleryX + 3.0f, 3.5f, -3.0f);
         glm::vec3 dir(-0.4f, -0.8f, 0.6f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         l.color = glm::vec3(1.0f, 0.95f, 0.85f);
-        l.intensity = 12.0f;
+        l.intensity = 6.2f;
         l.range = 30.0f;
         l.innerConeDegrees = 22.0f;
         l.outerConeDegrees = 40.0f;
@@ -1145,16 +1081,34 @@ void Engine::BuildRTShowcaseScene() {
 
     {
         entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_FillLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(galleryX + 1.5f, 2.3f, -4.6f);
+        glm::vec3 dir(-0.2f, -0.25f, 1.0f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::AreaRect;
+        l.color = glm::vec3(0.78f, 0.86f, 1.0f);
+        l.intensity = 2.3f;
+        l.range = 16.0f;
+        l.areaSize = glm::vec2(6.0f, 3.0f);
+        l.twoSided = false;
+        l.castsShadows = false;
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_RimLight");
         auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
         t.position = glm::vec3(galleryX - 6.0f, 3.0f, 3.0f);
         glm::vec3 dir(0.2f, -0.6f, -1.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         l.color = glm::vec3(0.8f, 0.9f, 1.0f);
-        l.intensity = 6.0f;
+        l.intensity = 3.2f;
         l.range = 25.0f;
         l.innerConeDegrees = 24.0f;
         l.outerConeDegrees = 42.0f;
@@ -1181,8 +1135,8 @@ void Engine::BuildRTShowcaseScene() {
         emitter.sizeStart = 0.08f;
         emitter.sizeEnd   = 0.40f;
         // High-intensity warm colors so particles act as emissive sources.
-        emitter.colorStart = glm::vec4(5.0f, 2.4f, 0.8f, 0.9f);
-        emitter.colorEnd   = glm::vec4(0.6f, 0.15f, 0.0f, 0.0f);
+        emitter.colorStart = glm::vec4(3.2f, 1.6f, 0.55f, 0.85f);
+        emitter.colorEnd   = glm::vec4(0.45f, 0.10f, 0.0f, 0.0f);
         // Positive gravity here accelerates particles upward, giving a rising
         // flame motion without needing additional forces.
         emitter.gravity = 0.8f;
@@ -1204,7 +1158,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = hubFloor;
-        r.albedoColor = glm::vec4(0.4f, 0.4f, 0.42f, 1.0f);
+        r.albedoColor = glm::vec4(0.48f, 0.48f, 0.5f, 1.0f);
         r.metallic = 0.0f;
         r.roughness = 0.8f;
         r.ao = 1.0f;
@@ -1237,7 +1191,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& wr = m_registry->AddComponent<Scene::RenderableComponent>(water);
         wr.mesh = poolPlane;
-        wr.albedoColor = glm::vec4(0.02f, 0.09f, 0.13f, 0.7f);
+        wr.albedoColor = glm::vec4(0.05f, 0.18f, 0.24f, 0.62f);
         wr.metallic = 0.0f;
         wr.roughness = 0.06f;
         wr.ao = 1.0f;
@@ -1296,10 +1250,12 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& er = m_registry->AddComponent<Scene::RenderableComponent>(ep);
         er.mesh = quadPanel;
-        er.albedoColor = glm::vec4(7.0f, 6.0f, 4.0f, 1.0f);
+        er.albedoColor = glm::vec4(1.0f, 0.86f, 0.58f, 1.0f);
         er.metallic = 0.0f;
         er.roughness = 0.2f;
         er.ao = 1.0f;
+        er.emissiveColor = glm::vec3(1.0f, 0.86f, 0.58f);
+        er.emissiveStrength = 6.0f;
         er.presetName = "emissive_panel";
     }
 
@@ -1314,7 +1270,7 @@ void Engine::BuildRTShowcaseScene() {
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Point;
         l.color = glm::vec3(0.2f, 0.4f, 0.9f);
-        l.intensity = 4.0f;
+        l.intensity = 1.8f;
         l.range = 10.0f;
         l.castsShadows = false;
     }
@@ -1333,7 +1289,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = floorPlane;
-        r.albedoColor = glm::vec4(0.28f, 0.28f, 0.3f, 1.0f);
+        r.albedoColor = glm::vec4(0.36f, 0.36f, 0.39f, 1.0f);
         r.metallic = 0.0f;
         r.roughness = 0.85f;
         r.ao = 1.0f;
@@ -1351,7 +1307,7 @@ void Engine::BuildRTShowcaseScene() {
 
             auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
             r.mesh = tallWall;
-            r.albedoColor = glm::vec4(0.12f, 0.12f, 0.14f, 1.0f);
+            r.albedoColor = glm::vec4(0.28f, 0.28f, 0.31f, 1.0f);
             r.metallic = 0.0f;
             r.roughness = 0.9f;
             r.ao = 1.0f;
@@ -1368,7 +1324,7 @@ void Engine::BuildRTShowcaseScene() {
 
             auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
             r.mesh = tallWall;
-            r.albedoColor = glm::vec4(0.2f, 0.2f, 0.24f, 1.0f);
+            r.albedoColor = glm::vec4(0.32f, 0.32f, 0.36f, 1.0f);
             r.metallic = 0.0f;
             r.roughness = 0.85f;
             r.ao = 1.0f;
@@ -1422,7 +1378,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
         r.mesh = torusMesh;
-        r.albedoColor = glm::vec4(0.4f, 0.4f, 0.42f, 1.0f);
+        r.albedoColor = glm::vec4(0.5f, 0.5f, 0.54f, 1.0f);
         r.metallic = 0.0f;
         r.roughness = 0.85f;
         r.ao = 1.0f;
@@ -1458,17 +1414,217 @@ void Engine::BuildRTShowcaseScene() {
         auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
         t.position = glm::vec3(atriumX + 2.0f, 3.0f, 0.0f);
         glm::vec3 dir(-0.4f, -1.0f, 0.1f);
-        t.rotation = glm::quatLookAt(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
+        t.rotation = glm::quatLookAtLH(glm::normalize(dir), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
         l.type = Scene::LightType::Spot;
         l.color = glm::vec3(1.0f, 0.95f, 0.9f);
-        l.intensity = 5.0f;
+        l.intensity = 2.6f;
         l.range = 15.0f;
         l.innerConeDegrees = 20.0f;
         l.outerConeDegrees = 35.0f;
         l.castsShadows = false;
     }
+}
+
+void Engine::BuildTemporalValidationScene() {
+    spdlog::info("Building validation scene: Temporal Reprojection Lab");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        Graphics::ApplyTemporalValidationSceneControls(*renderer);
+    }
+
+    auto floorMesh = Utils::MeshGenerator::CreatePlane(10.0f, 8.0f);
+    auto wallMesh = Utils::MeshGenerator::CreatePlane(10.0f, 4.0f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.55f, 32);
+    auto torusMesh = Utils::MeshGenerator::CreateTorus(0.55f, 0.16f, 32, 16);
+    auto quadMesh = Utils::MeshGenerator::CreateQuad(1.5f, 2.0f);
+    auto waterMesh = Utils::MeshGenerator::CreatePlane(4.0f, 2.5f);
+
+    if (renderer) {
+        auto upload = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+            if (!mesh) {
+                return false;
+            }
+            auto result = renderer->UploadMesh(mesh);
+            if (result.IsErr()) {
+                spdlog::warn("Failed to upload temporal validation {} mesh: {}", label, result.Error());
+                return false;
+            }
+            return !renderer->IsDeviceRemoved();
+        };
+        if (!upload(floorMesh, "floor") ||
+            !upload(wallMesh, "wall") ||
+            !upload(cubeMesh, "cube") ||
+            !upload(sphereMesh, "sphere") ||
+            !upload(torusMesh, "torus") ||
+            !upload(quadMesh, "alpha panel") ||
+            !upload(waterMesh, "water")) {
+            return;
+        }
+    }
+
+    {
+        entt::entity camEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
+        t.position = glm::vec3(0.0f, 2.3f, -6.4f);
+        const glm::vec3 target(0.0f, 1.0f, 0.1f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = 54.0f;
+        cam.isActive = true;
+        m_activeCameraEntity = camEntity;
+    }
+
+    auto addRenderable = [&](const char* tag,
+                             const std::shared_ptr<Scene::MeshData>& mesh,
+                             const glm::vec3& position,
+                             const glm::quat& rotation,
+                             const glm::vec3& scale,
+                             const glm::vec4& albedo,
+                             float metallic,
+                             float roughness) -> entt::entity {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.rotation = rotation;
+        t.scale = scale;
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = albedo;
+        r.metallic = metallic;
+        r.roughness = roughness;
+        r.ao = 1.0f;
+        r.presetName = tag ? tag : "";
+        return e;
+    };
+
+    if (floorMesh && floorMesh->gpuBuffers) {
+        auto floor = addRenderable("TemporalLab_Floor",
+                                   floorMesh,
+                                   glm::vec3(0.0f, 0.0f, 0.5f),
+                                   glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec4(0.45f, 0.48f, 0.52f, 1.0f),
+                                   0.0f,
+                                   0.72f);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
+        r.doubleSided = true;
+    }
+
+    if (wallMesh && wallMesh->gpuBuffers) {
+        auto back = addRenderable("TemporalLab_BackWall",
+                                  wallMesh,
+                                  glm::vec3(0.0f, 2.0f, 3.8f),
+                                  glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f)),
+                                  glm::vec3(1.0f),
+                                  glm::vec4(0.78f, 0.80f, 0.84f, 1.0f),
+                                  0.0f,
+                                  0.58f);
+        m_registry->GetComponent<Scene::RenderableComponent>(back).doubleSided = true;
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        auto e = addRenderable("TemporalLab_RotatingChromeBlock",
+                               cubeMesh,
+                               glm::vec3(-1.45f, 0.9f, 0.15f),
+                               glm::quat(glm::vec3(0.0f, 0.35f, 0.0f)),
+                               glm::vec3(0.75f, 1.25f, 0.75f),
+                               glm::vec4(0.85f, 0.88f, 0.92f, 1.0f),
+                               1.0f,
+                               0.18f);
+        m_registry->AddComponent<Scene::RotationComponent>(
+            e,
+            Scene::RotationComponent{glm::normalize(glm::vec3(0.2f, 1.0f, 0.1f)), 2.2f});
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        auto e = addRenderable("TemporalLab_RotatingRedSphere",
+                               sphereMesh,
+                               glm::vec3(0.0f, 0.85f, -0.05f),
+                               glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                               glm::vec3(1.0f),
+                               glm::vec4(0.95f, 0.12f, 0.08f, 1.0f),
+                               0.0f,
+                               0.36f);
+        m_registry->AddComponent<Scene::RotationComponent>(
+            e,
+            Scene::RotationComponent{glm::normalize(glm::vec3(0.0f, 1.0f, 0.6f)), 1.7f});
+    }
+
+    if (torusMesh && torusMesh->gpuBuffers) {
+        auto e = addRenderable("TemporalLab_EmissiveSpinner",
+                               torusMesh,
+                               glm::vec3(1.45f, 1.05f, 0.15f),
+                               glm::quat(glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)),
+                               glm::vec3(1.0f),
+                               glm::vec4(0.10f, 0.18f, 0.95f, 1.0f),
+                               0.0f,
+                               0.24f);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+        r.emissiveColor = glm::vec3(0.2f, 0.45f, 1.0f);
+        r.emissiveStrength = 1.8f;
+        r.presetName = "emissive";
+        m_registry->AddComponent<Scene::RotationComponent>(
+            e,
+            Scene::RotationComponent{glm::normalize(glm::vec3(1.0f, 0.2f, 0.0f)), 2.8f});
+    }
+
+    if (quadMesh && quadMesh->gpuBuffers) {
+        auto e = addRenderable("TemporalLab_AlphaMaskPanel",
+                               quadMesh,
+                               glm::vec3(0.0f, 1.1f, 1.15f),
+                               glm::quat(glm::vec3(0.0f, 0.0f, 0.0f)),
+                               glm::vec3(1.0f),
+                               glm::vec4(0.05f, 0.7f, 0.25f, 1.0f),
+                               0.0f,
+                               0.42f);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+        r.alphaMode = Scene::RenderableComponent::AlphaMode::Mask;
+        r.alphaCutoff = 0.5f;
+        r.doubleSided = true;
+        m_registry->AddComponent<Scene::RotationComponent>(
+            e,
+            Scene::RotationComponent{glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)), 1.1f});
+    }
+
+    if (waterMesh && waterMesh->gpuBuffers) {
+        auto e = addRenderable("TemporalLab_WaterSurface",
+                               waterMesh,
+                               glm::vec3(0.0f, 0.015f, -1.9f),
+                               glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                               glm::vec3(1.0f),
+                               glm::vec4(0.02f, 0.09f, 0.15f, 0.78f),
+                               0.0f,
+                               0.05f);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+        r.presetName = "water";
+        r.doubleSided = true;
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(e, Scene::WaterSurfaceComponent{0.0f});
+    }
+
+    auto addLight = [&](const char* tag,
+                        const glm::vec3& position,
+                        const glm::vec3& color,
+                        float intensity,
+                        float range) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        auto& light = m_registry->AddComponent<Scene::LightComponent>(e);
+        light.type = Scene::LightType::Point;
+        light.color = color;
+        light.intensity = intensity;
+        light.range = range;
+        light.castsShadows = false;
+    };
+    addLight("TemporalLab_KeyLight", glm::vec3(-2.6f, 3.2f, -2.6f), glm::vec3(1.0f, 0.86f, 0.72f), 7.0f, 8.0f);
+    addLight("TemporalLab_BlueRim", glm::vec3(2.4f, 2.4f, 1.5f), glm::vec3(0.35f, 0.55f, 1.0f), 4.0f, 7.0f);
 }
 
 void Engine::BuildGodRaysScene() {
@@ -1485,7 +1641,7 @@ void Engine::BuildGodRaysScene() {
         auto& t = m_registry->AddComponent<TransformComponent>(cameraEntity);
         t.position = glm::vec3(0.0f, 3.0f, -16.0f);
         glm::vec3 focus(0.0f, 1.5f, 0.0f);
-        t.rotation = glm::quatLookAt(glm::normalize(focus - t.position),
+        t.rotation = glm::quatLookAtLH(glm::normalize(focus - t.position),
                                      glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
@@ -1493,41 +1649,8 @@ void Engine::BuildGodRaysScene() {
         cam.isActive = true;
     }
 
-    // Global lighting / environment tuned for strong god rays over a reflective
-    // pool. We enable fog and increase god-ray intensity so beams through the
-    // atrium windows and across the water surface are clearly visible.
     if (renderer) {
-        renderer->SetEnvironmentPreset("studio");
-        renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.75f, 1.1f);
-
-        renderer->SetShadowsEnabled(true);
-        renderer->SetShadowBias(0.0005f);
-        renderer->SetShadowPCFRadius(1.5f);
-        renderer->SetCascadeSplitLambda(0.5f);
-
-        glm::vec3 sunDir = glm::normalize(glm::vec3(0.45f, 0.75f, 0.15f));
-        renderer->SetSunDirection(sunDir);
-        renderer->SetSunColor(glm::vec3(1.0f));
-        renderer->SetSunIntensity(4.0f);
-
-        renderer->SetFogEnabled(true);
-        renderer->SetFogParams(
-            /*density*/ 0.045f,
-            /*baseHeight*/ 0.0f,
-            /*falloff*/ 0.65f);
-        renderer->SetGodRayIntensity(2.0f);
-
-        // Slow, gentle waves for a shallow indoor pool.
-        renderer->SetWaterParams(
-            /*levelY*/ 0.0f,
-            /*amplitude*/ 0.05f,
-            /*waveLength*/ 8.0f,
-            /*speed*/ 0.5f,
-            /*dirX*/ 1.0f,
-            /*dirZ*/ 0.2f,
-            /*secondaryAmplitude*/ 0.02f,
-            /*steepness*/ 0.5f);
+        Graphics::ApplyGodRaysSceneControls(*renderer);
     }
 
     Graphics::Renderer* rendererPtr = m_renderer.get();
@@ -1782,7 +1905,7 @@ void Engine::BuildGodRaysScene() {
         if (std::abs(glm::dot(fwd, up)) > 0.99f) {
             up = glm::vec3(0.0f, 0.0f, 1.0f);
         }
-        return glm::quatLookAt(fwd, up);
+        return glm::quatLookAtLH(fwd, up);
     };
 
     // Warm key light from above-left, angled through the fog.
@@ -1824,6 +1947,363 @@ void Engine::BuildGodRaysScene() {
     }
 }
 
+void Engine::BuildDragonStudioScene() {
+    spdlog::info("Building hero scene: Dragon Over Water Studio");
+
+    // Hero staging scene: "Dragon Over Water Studio"
+    //
+    // This scene is designed to exercise:
+    //  - Planar water rendering (waves, reflections)
+    //  - Direct lighting + cascaded sun shadows
+    //  - Hybrid SSR / RT reflections and RT GI
+    //  - LLM-driven edits on top of a curated layout.
+    //
+    // Layout (left-handed, +Z forward):
+    //  - Large studio floor centered at z = -3
+    //  - Square pool and water surface inset into the floor
+    //  - Metal dragon hovering above the water
+    //  - Chrome sphere opposite the dragon
+    //  - Colored cube on the near rim
+    //  - Backdrop wall behind the pool
+    //  - Three-point studio lighting rig (key / fill / rim).
+
+    const float poolZ = -3.0f;
+
+    // Create a camera
+    entt::entity cameraEntity = m_registry->CreateEntity();
+    m_registry->AddComponent<Scene::TagComponent>(cameraEntity, "MainCamera");
+
+    auto& cameraTransform = m_registry->AddComponent<Scene::TransformComponent>(cameraEntity);
+    // Place camera above and behind the pool, looking toward its center.
+    cameraTransform.position = glm::vec3(0.0f, 3.0f, -8.0f);
+    glm::vec3 focus(0.0f, 1.0f, poolZ);
+    cameraTransform.rotation = glm::quatLookAtLH(
+        glm::normalize(focus - cameraTransform.position),
+        glm::vec3(0.0f, 1.0f, 0.0f));
+
+    auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
+    camera.fov = 55.0f;  // Slightly wider FOV for full scene framing
+    camera.isActive = true;
+
+    if (m_renderer) {
+        Graphics::ApplyDragonWaterStudioSunControls(*m_renderer);
+    }
+
+    // Initialize the Khronos sample model library so we can spawn the hero
+    // dragon mesh by logical name ("DragonAttenuation"). Failures here should
+    // not abort scene creation; we fall back to primitives if needed.
+    auto sampleLibResult = Utils::InitializeSampleModelLibrary();
+    if (sampleLibResult.IsErr()) {
+        spdlog::warn("SampleModelLibrary initialization failed: {}", sampleLibResult.Error());
+    }
+
+    // Convenience alias for the renderer pointer.
+    Graphics::Renderer* renderer = m_renderer.get();
+
+    // Studio floor: large plane under the pool.
+    auto floorMesh = Utils::MeshGenerator::CreatePlane(20.0f, 20.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(floorMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload floor mesh: {}", uploadResult.Error());
+            floorMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading floor mesh; aborting Dragon studio geometry build for this run.");
+            return;
+        }
+    }
+
+    if (floorMesh && floorMesh->gpuBuffers) {
+        entt::entity floorEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(floorEntity, "StudioFloor");
+        auto& floorXform = m_registry->AddComponent<Scene::TransformComponent>(floorEntity);
+        floorXform.position = glm::vec3(0.0f, 0.0f, poolZ);
+        floorXform.scale = glm::vec3(1.0f);
+
+        auto& floorRenderable = m_registry->AddComponent<Scene::RenderableComponent>(floorEntity);
+        floorRenderable.mesh = floorMesh;
+        floorRenderable.albedoColor = glm::vec4(0.35f, 0.25f, 0.18f, 1.0f);
+        floorRenderable.metallic = 0.0f;
+        floorRenderable.roughness = 0.6f;
+        floorRenderable.ao = 1.0f;
+        floorRenderable.presetName = "wood_floor";
+    } else {
+        spdlog::warn("Studio floor mesh is unavailable; 'StudioFloor' entity will be skipped.");
+    }
+
+    // Pool rim + water share the same underlying plane geometry.
+    auto poolMesh = Utils::MeshGenerator::CreatePlane(10.0f, 10.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(poolMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload pool mesh: {}", uploadResult.Error());
+            poolMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading pool mesh; aborting Dragon studio geometry build for this run.");
+            return;
+        }
+    }
+
+    if (poolMesh && poolMesh->gpuBuffers) {
+        // Pool rim: bright concrete ring around the water.
+        entt::entity rimEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(rimEntity, "PoolRim");
+        auto& rimXform = m_registry->AddComponent<Scene::TransformComponent>(rimEntity);
+        // Avoid coplanar z-fighting with the studio floor plane.
+        rimXform.position = glm::vec3(0.0f, 0.002f, poolZ);
+        rimXform.scale = glm::vec3(1.0f);
+
+        auto& rimRenderable = m_registry->AddComponent<Scene::RenderableComponent>(rimEntity);
+        rimRenderable.mesh = poolMesh;
+        rimRenderable.albedoColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+        rimRenderable.metallic = 0.0f;
+        rimRenderable.roughness = 0.8f;
+        rimRenderable.ao = 1.0f;
+        rimRenderable.presetName = "concrete";
+
+        // Water surface slightly below the rim so the edge reads clearly.
+        entt::entity waterEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(waterEntity, "WaterSurface");
+        auto& waterXform = m_registry->AddComponent<Scene::TransformComponent>(waterEntity);
+        waterXform.position = glm::vec3(0.0f, -0.02f, poolZ);
+        waterXform.scale = glm::vec3(1.0f);
+
+        auto& waterRenderable = m_registry->AddComponent<Scene::RenderableComponent>(waterEntity);
+        waterRenderable.mesh = poolMesh;
+        waterRenderable.albedoColor = glm::vec4(0.02f, 0.08f, 0.12f, 0.7f);
+        waterRenderable.metallic = 0.0f;
+        waterRenderable.roughness = 0.08f;
+        waterRenderable.ao = 1.0f;
+        waterRenderable.presetName = "water";
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(waterEntity, Scene::WaterSurfaceComponent{0.0f});
+    } else {
+        spdlog::warn("Pool mesh is unavailable; 'PoolRim' and 'WaterSurface' entities will be skipped.");
+    }
+
+    // Backdrop wall behind the pool to catch shadows and reflections.
+    auto wallMesh = Utils::MeshGenerator::CreatePlane(20.0f, 10.0f);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(wallMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload wall mesh: {}", uploadResult.Error());
+            wallMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading backdrop wall mesh; aborting remaining Dragon studio geometry.");
+            return;
+        }
+    }
+
+    if (wallMesh && wallMesh->gpuBuffers) {
+        entt::entity wallEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(wallEntity, "BackdropWall");
+        auto& wallXform = m_registry->AddComponent<Scene::TransformComponent>(wallEntity);
+        wallXform.position = glm::vec3(0.0f, 5.0f, poolZ + 8.0f);
+        // Rotate plane upright so its normal points roughly toward the camera.
+        wallXform.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f));
+        wallXform.scale = glm::vec3(1.0f);
+
+        auto& wallRenderable = m_registry->AddComponent<Scene::RenderableComponent>(wallEntity);
+        wallRenderable.mesh = wallMesh;
+        wallRenderable.albedoColor = glm::vec4(0.15f, 0.15f, 0.18f, 1.0f);
+        wallRenderable.metallic = 0.0f;
+        wallRenderable.roughness = 0.85f;
+        wallRenderable.ao = 1.0f;
+        wallRenderable.presetName = "backdrop";
+    } else {
+        spdlog::warn("Backdrop wall mesh is unavailable; 'BackdropWall' entity will be skipped.");
+    }
+
+    // Hero dragon mesh over the water.
+    std::shared_ptr<Scene::MeshData> dragonMesh;
+    auto dragonResult = Utils::LoadSampleModelMesh("DragonAttenuation");
+    if (dragonResult.IsOk()) {
+        dragonMesh = dragonResult.Value();
+        if (renderer) {
+            auto uploadResult = renderer->UploadMesh(dragonMesh);
+            if (uploadResult.IsErr()) {
+                spdlog::warn("Failed to upload dragon mesh: {}", uploadResult.Error());
+                dragonMesh.reset();
+            }
+        }
+    } else {
+        spdlog::warn("Failed to load DragonAttenuation sample mesh: {}", dragonResult.Error());
+    }
+
+    if (dragonMesh && dragonMesh->gpuBuffers) {
+        entt::entity dragonEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(dragonEntity, "MetalDragon");
+        auto& dragonXform = m_registry->AddComponent<Scene::TransformComponent>(dragonEntity);
+        dragonXform.position = glm::vec3(1.5f, 1.0f, poolZ);
+        dragonXform.scale = glm::vec3(1.0f);
+
+        auto& dragonRenderable = m_registry->AddComponent<Scene::RenderableComponent>(dragonEntity);
+        dragonRenderable.mesh = dragonMesh;
+        dragonRenderable.albedoColor = glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
+        dragonRenderable.metallic = 1.0f;
+        dragonRenderable.roughness = 0.22f;
+        dragonRenderable.ao = 1.0f;
+        dragonRenderable.presetName = "polished_metal";
+    }
+
+    // Chrome test sphere opposite the dragon.
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.75f, 32);
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(sphereMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload sphere mesh: {}", uploadResult.Error());
+            sphereMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading sphere mesh; remaining Dragon studio geometry will be skipped.");
+            return;
+        }
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        entt::entity sphereEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(sphereEntity, "MetalSphere");
+        auto& sphereXform = m_registry->AddComponent<Scene::TransformComponent>(sphereEntity);
+        sphereXform.position = glm::vec3(-1.5f, 1.0f, poolZ);
+        sphereXform.scale = glm::vec3(1.0f);
+
+        auto& sphereRenderable = m_registry->AddComponent<Scene::RenderableComponent>(sphereEntity);
+        sphereRenderable.mesh = sphereMesh;
+        sphereRenderable.albedoColor = glm::vec4(0.75f, 0.75f, 0.8f, 1.0f);
+        sphereRenderable.metallic = 1.0f;
+        sphereRenderable.roughness = 0.05f;
+        sphereRenderable.ao = 1.0f;
+        sphereRenderable.presetName = "chrome";
+    } else {
+        spdlog::warn("Sphere mesh is unavailable; 'MetalSphere' entity will be skipped.");
+    }
+
+    // Colored cube on the near rim for GI/reflection contrast.
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    if (renderer) {
+        auto uploadResult = renderer->UploadMesh(cubeMesh);
+        if (uploadResult.IsErr()) {
+            spdlog::warn("Failed to upload cube mesh: {}", uploadResult.Error());
+            cubeMesh.reset();
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading cube mesh; remaining Dragon studio geometry will be skipped.");
+            return;
+        }
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        entt::entity cubeEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(cubeEntity, "ColorCube");
+        auto& cubeXform = m_registry->AddComponent<Scene::TransformComponent>(cubeEntity);
+        cubeXform.position = glm::vec3(0.0f, 0.5f, poolZ - 1.5f);
+        cubeXform.scale = glm::vec3(1.5f, 1.0f, 1.5f);
+
+        auto& cubeRenderable = m_registry->AddComponent<Scene::RenderableComponent>(cubeEntity);
+        cubeRenderable.mesh = cubeMesh;
+        cubeRenderable.albedoColor = glm::vec4(0.5f, 0.1f, 0.8f, 1.0f);
+        cubeRenderable.metallic = 0.0f;
+        cubeRenderable.roughness = 0.4f;
+        cubeRenderable.ao = 1.0f;
+        cubeRenderable.presetName = "painted_plastic";
+    } else {
+        spdlog::warn("Cube mesh is unavailable; 'ColorCube' entity will be skipped.");
+    }
+
+    // Studio lighting rig: warm key, cool rim, and soft fill.
+    auto makeSpotRotation = [](const glm::vec3& dir) {
+        glm::vec3 fwd = glm::normalize(dir);
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        if (std::abs(glm::dot(fwd, up)) > 0.99f) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        return glm::quatLookAtLH(fwd, up);
+    };
+
+    // Key light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "KeyLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(3.0f, 4.0f, poolZ - 1.0f);
+        glm::vec3 dir(-0.6f, -0.8f, 0.7f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(1.0f, 0.95f, 0.85f);
+        // Slightly reduced intensity and a softer outer cone keep the floor
+        // hotspot under the dragon bright but less extreme. We rely on the
+        // sun/cascaded shadows for structure and disable key-light shadows
+        // entirely so small PCF/PCSS variations do not cause flicker in the
+        // patch under the dragon.
+        l.intensity = 10.0f;
+        l.range = 25.0f;
+        l.innerConeDegrees = 22.0f;
+        l.outerConeDegrees = 40.0f;
+        l.castsShadows = false;
+    }
+
+    // Fill light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "FillLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(-3.0f, 2.0f, poolZ - 0.0f);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Point;
+        l.color = glm::vec3(0.8f, 0.85f, 1.0f);
+        l.intensity = 4.0f;
+        l.range = 20.0f;
+        l.castsShadows = false;
+    }
+
+    // Rim light
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RimLight");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 3.0f, poolZ + 7.0f);
+        glm::vec3 dir(0.0f, -0.5f, -1.0f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = glm::vec3(0.9f, 0.9f, 1.0f);
+        l.intensity = 6.0f;
+        l.range = 25.0f;
+        l.innerConeDegrees = 25.0f;
+        l.outerConeDegrees = 42.0f;
+        l.castsShadows = false;
+    }
+
+    // Large softbox-style area light above the pool to produce broad,
+    // studio-like highlights on metals and water. This is implemented as a
+    // rectangular area light with no dedicated shadow map; it relies on the
+    // existing sun shadows and volumetric fog for structure.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "SoftboxArea");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(0.0f, 6.0f, poolZ - 1.0f);
+        glm::vec3 dir(0.0f, -1.0f, 0.1f);
+        t.rotation = makeSpotRotation(dir);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::AreaRect;
+        l.color = glm::vec3(1.0f, 0.98f, 0.94f);
+        l.intensity = 3.0f;
+        l.range = 30.0f;
+        l.areaSize = glm::vec2(6.0f, 4.0f);
+        l.twoSided = false;
+        l.castsShadows = false;
+    }
+
+}
+
 void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     glm::vec3 pos;
     glm::vec3 target;
@@ -1832,8 +2312,11 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
         pos = glm::vec3(0.0f, 1.6f, -3.0f);
         target = glm::vec3(0.0f, 1.2f, 0.0f);
     } else if (m_currentScenePreset == ScenePreset::RTShowcase) {
-        pos = glm::vec3(0.0f, 3.5f, -13.0f);
-        target = glm::vec3(0.0f, 1.5f, 0.0f);
+        pos = glm::vec3(-14.0f, 2.05f, -6.8f);
+        target = glm::vec3(-14.0f, 1.05f, 0.25f);
+    } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
+        pos = glm::vec3(0.0f, 2.3f, -6.4f);
+        target = glm::vec3(0.0f, 1.0f, 0.1f);
     } else if (m_currentScenePreset == ScenePreset::ProceduralTerrain) {
         pos = glm::vec3(0.0f, 50.0f, -10.0f);
         target = glm::vec3(0.0f, 30.0f, 50.0f);
@@ -1849,7 +2332,7 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     }
 
     transform.position = pos;
-    transform.rotation = glm::quatLookAt(forward, up);
+    transform.rotation = glm::quatLookAtLH(forward, up);
 
     forward = glm::normalize(forward);
     m_cameraYaw = std::atan2(forward.x, forward.z);
@@ -1896,7 +2379,7 @@ void Engine::BuildProceduralTerrainScene() {
         auto& transform = m_registry->AddComponent<TransformComponent>(camera);
         transform.position = glm::vec3(0.0f, startY, 0.0f);
         glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f));
-        transform.rotation = glm::quatLookAt(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+        transform.rotation = glm::quatLookAtLH(forward, glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camera);
         cam.fov = 75.0f;  // Wider FOV for exploration
@@ -1959,7 +2442,7 @@ void Engine::BuildProceduralTerrainScene() {
         auto& transform = m_registry->AddComponent<TransformComponent>(sun);
         transform.position = glm::vec3(500.0f, 800.0f, 300.0f);
         glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.85f, -0.4f));
-        transform.rotation = glm::quatLookAt(sunDir, glm::vec3(0.0f, 1.0f, 0.0f));
+        transform.rotation = glm::quatLookAtLH(sunDir, glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& light = m_registry->AddComponent<Scene::LightComponent>(sun);
         light.type = Scene::LightType::Directional;
@@ -2111,23 +2594,12 @@ void Engine::BuildProceduralTerrainScene() {
     spawnInteractable("GoldOrb", -4.0f, -8.0f, 0.5f, glm::vec4(1.0f, 0.8f, 0.2f, 1.0f));
     spawnInteractable("PurpleOrb", 12.0f, 3.0f, 0.38f, glm::vec4(0.7f, 0.2f, 0.9f, 1.0f));
 
-    // Configure renderer for outdoor world - disable all IBL-dependent effects
     if (m_renderer) {
-        m_renderer->SetIBLEnabled(false);  // Disable indoor cubemap skybox
-        m_renderer->SetSSREnabled(false);  // SSR samples IBL for miss rays - disable
-        m_renderer->SetRTReflectionsEnabled(false);  // RT reflections also use IBL fallback
-        m_renderer->SetFogEnabled(true);
-        m_renderer->SetFogParams(0.001f, 0.0f, 0.2f);  // Light atmospheric fog (density, height, falloff)
-        m_renderer->SetExposure(1.0f);
-        m_renderer->SetShadowsEnabled(true);
-        m_renderer->SetSSAOEnabled(true);  // Keep SSAO for ground contact shadows
-
-        // Sun direction/color/intensity now controlled by WorldState (time-of-day system)
-        // Force immediate update so sun is correctly positioned on scene entry
         m_worldState.Update(0.0f);
-        m_renderer->SetSunDirection(m_worldState.sunDirection);
-        m_renderer->SetSunColor(m_worldState.sunColor);
-        m_renderer->SetSunIntensity(m_worldState.sunIntensity);
+        Graphics::ApplyOutdoorWorldSceneControls(*m_renderer,
+                                                 m_worldState.sunDirection,
+                                                 m_worldState.sunColor,
+                                                 m_worldState.sunIntensity);
     }
 
     spdlog::info("=== TERRAIN WORLD READY ===");
@@ -2136,6 +2608,80 @@ void Engine::BuildProceduralTerrainScene() {
     spdlog::info("  Time: {:.1f}h - Press ./,/L to control time", m_worldState.timeOfDay);
     spdlog::info("  Press F5 for play mode, WASD to move, E to interact");
     spdlog::info("  Press J to exit terrain world");
+}
+
+void Engine::BuildEditorModeTerrainScene() {
+    // Minimal scene setup for Engine Editor Mode - EditorWorld handles terrain chunks
+    // We just need camera, sun, and basic settings
+
+    // Enable terrain system for player physics
+    m_terrainEnabled = true;
+
+    // Get terrain params from EditorWorld if available (so physics matches rendered terrain)
+    if (m_editorModeController && m_editorModeController->GetWorld()) {
+        m_terrainParams = m_editorModeController->GetWorld()->GetTerrainParams();
+    } else {
+        // Fallback to default params
+        m_terrainParams = Scene::TerrainNoiseParams{};
+        m_terrainParams.seed = 42;
+        m_terrainParams.amplitude = 20.0f;
+        m_terrainParams.frequency = 0.003f;
+        m_terrainParams.octaves = 6;
+        m_terrainParams.lacunarity = 2.0f;
+        m_terrainParams.gain = 0.5f;
+        m_terrainParams.warp = 15.0f;
+    }
+
+    // Create camera at origin, sample terrain height for starting position
+    {
+        entt::entity camera = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camera, "MainCamera");
+
+        float startY = Scene::SampleTerrainHeight(0.0, 0.0, m_terrainParams) + 2.0f;
+
+        auto& transform = m_registry->AddComponent<TransformComponent>(camera);
+        transform.position = glm::vec3(0.0f, startY, 0.0f);
+        glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f));
+        transform.rotation = glm::quatLookAtLH(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camera);
+        cam.fov = 75.0f;
+        cam.nearPlane = 0.1f;
+        cam.farPlane = 1500.0f;
+        cam.isActive = true;
+
+        m_activeCameraEntity = camera;
+    }
+
+    // Directional sun light
+    {
+        entt::entity sun = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(sun, "Sun");
+
+        auto& transform = m_registry->AddComponent<TransformComponent>(sun);
+        transform.position = glm::vec3(500.0f, 800.0f, 300.0f);
+        glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -0.85f, -0.4f));
+        transform.rotation = glm::quatLookAtLH(sunDir, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& light = m_registry->AddComponent<Scene::LightComponent>(sun);
+        light.type = Scene::LightType::Directional;
+        light.color = glm::vec3(1.0f, 0.95f, 0.8f);
+        light.intensity = 4.0f;
+        light.castsShadows = true;
+    }
+
+    if (m_renderer) {
+        m_worldState.Update(0.0f);
+        Graphics::ApplyOutdoorWorldSceneControls(*m_renderer,
+                                                 m_worldState.sunDirection,
+                                                 m_worldState.sunColor,
+                                                 m_worldState.sunIntensity);
+    }
+
+    spdlog::info("=== EDITOR MODE TERRAIN READY ===");
+    spdlog::info("  EditorWorld handles terrain chunks");
+    spdlog::info("  Time: {:.1f}h - Press ./,/L to control time", m_worldState.timeOfDay);
+    spdlog::info("  Press F5 for play mode, WASD to move, Space to jump");
 }
 
 } // namespace Cortex

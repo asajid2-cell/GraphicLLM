@@ -21,6 +21,7 @@ namespace Cortex {
     namespace Scene {
         class ECS_Registry;
         struct MeshData;
+        struct RenderableComponent;
     }
 }
 
@@ -28,6 +29,7 @@ namespace Cortex::Graphics {
 
 class DX12Device;
 class DescriptorHeapManager;
+struct MaterialModel;
 
 // DXR context responsible for:
 //  - Caching BLAS per unique MeshData
@@ -59,6 +61,13 @@ public:
     // Build or update TLAS for the current frame using the provided command
     // list. This also lazily builds BLAS instances as needed.
     void BuildTLAS(Scene::ECS_Registry* registry, ID3D12GraphicsCommandList4* cmdList);
+    struct TLASBuildInput {
+        uint32_t stableId = 0;
+        const Scene::RenderableComponent* renderable = nullptr;
+        glm::mat4 worldMatrix{1.0f};
+        float maxWorldScale = 1.0f;
+    };
+    void BuildTLAS(const std::vector<TLASBuildInput>& inputs, ID3D12GraphicsCommandList4* cmdList);
 
     // Dispatch the ray-traced sun-shadow pass. The caller is responsible for:
     //  - Ensuring the TLAS has been built for this frame.
@@ -87,6 +96,9 @@ public:
         D3D12_GPU_VIRTUAL_ADDRESS frameCBAddress,
         const DescriptorHandle& shadowEnvTable,
         const DescriptorHandle& normalRoughnessSrv,
+        const DescriptorHandle& materialExt2Srv,
+        ID3D12Resource* normalRoughnessResource,
+        ID3D12Resource* materialExt2Resource,
         uint32_t dispatchWidth,
         uint32_t dispatchHeight);
 
@@ -115,6 +127,8 @@ public:
     // called each frame before BuildTLAS so we know which frame's scratch
     // buffers are safe to release.
     void SetCurrentFrameIndex(uint64_t frameIndex) { m_currentFrameIndex = frameIndex; }
+    void SetAccelerationStructureBudgets(uint64_t maxBLASBytesTotal,
+                                         uint64_t maxBLASBuildBytesPerFrame);
 
     // Set a callback function that forces a GPU sync. This is used to safely
     // resize buffers when the GPU might still be using the old buffer.
@@ -129,15 +143,66 @@ public:
         return m_totalBLASBytes + m_totalTLASBytes;
     }
 
+    struct TLASBuildStats {
+        uint32_t candidates = 0;
+        uint32_t skippedInvisibleOrInvalid = 0;
+        uint32_t missingGeometry = 0;
+        uint32_t distanceCulled = 0;
+        uint32_t blasBuildRequested = 0;
+        uint32_t blasBuildBudgetDeferred = 0;
+        uint32_t blasTotalBudgetSkipped = 0;
+        uint32_t blasBuildFailed = 0;
+        uint32_t emittedInstances = 0;
+        uint32_t materialRecords = 0;
+        uint64_t materialBufferBytes = 0;
+        uint32_t surfaceDefault = 0;
+        uint32_t surfaceGlass = 0;
+        uint32_t surfaceMirror = 0;
+        uint32_t surfacePlastic = 0;
+        uint32_t surfaceMasonry = 0;
+        uint32_t surfaceEmissive = 0;
+        uint32_t surfaceBrushedMetal = 0;
+        uint32_t surfaceWood = 0;
+        uint32_t surfaceWater = 0;
+    };
+
+    [[nodiscard]] const TLASBuildStats& GetLastTLASBuildStats() const {
+        return m_lastTLASStats;
+    }
+
+    [[nodiscard]] uint32_t GetLastTLASInstanceCount() const {
+        return static_cast<uint32_t>(m_instanceDescs.size());
+    }
+
+    [[nodiscard]] uint32_t GetLastRTMaterialCount() const {
+        return static_cast<uint32_t>(m_rtMaterials.size());
+    }
+
+    [[nodiscard]] uint64_t GetRTMaterialBufferBytes() const {
+        return m_rtMaterialBuffer ? static_cast<uint64_t>(m_rtMaterialBufferSize) : 0ull;
+    }
+
     [[nodiscard]] bool HasPipeline() const { 
         // A usable pipeline requires a built state object + shader table.
-        // Descriptor binding for TLAS/depth/output is handled with transient
-        // descriptors per dispatch to avoid cross-frame aliasing.
+        // Descriptor binding for TLAS/depth/output uses persistent
+        // per-frame/per-pass tables to avoid cross-frame aliasing.
         return m_rtStateObject && m_rtStateProps && m_rtShaderTable; 
     } 
 
     [[nodiscard]] bool HasReflectionPipeline() const {
         return m_rtReflStateObject && m_rtReflStateProps && m_rtReflShaderTable;
+    }
+
+    [[nodiscard]] bool HasTLAS() const {
+        return m_tlas != nullptr;
+    }
+
+    [[nodiscard]] bool HasRTMaterialBuffer() const {
+        return m_rtMaterialBuffer != nullptr;
+    }
+
+    [[nodiscard]] bool HasDispatchDescriptorTables() const {
+        return m_dispatchDescriptorTablesValid;
     }
 
     [[nodiscard]] bool HasGIPipeline() const {
@@ -182,6 +247,30 @@ private:
         UINT64 scratchSize = 0;
     };
 
+    struct RTMaterialGPU {
+        glm::vec4 albedoMetallic{1.0f, 1.0f, 1.0f, 0.0f};
+        glm::vec4 emissiveRoughness{0.0f, 0.0f, 0.0f, 0.5f};
+        glm::vec4 params{1.0f, 0.0f, 0.0f, 0.0f};
+        glm::vec4 classification{0.0f, 0.0f, 1.0f, 0.0f};
+    };
+    static_assert(sizeof(RTMaterialGPU) == sizeof(glm::vec4) * 4,
+                  "RTMaterialGPU must stay layout-compatible with RaytracingMaterials.hlsli::RTMaterial");
+
+    [[nodiscard]] static RTMaterialGPU BuildRTMaterialGPU(const MaterialModel& material,
+                                                          uint32_t surfaceClassId);
+
+    Result<void> AllocateDispatchDescriptorTables();
+    Result<void> CreateGlobalRootSignature();
+    Result<void> InitializeShadowPipeline();
+    Result<void> InitializeReflectionPipeline();
+    Result<void> InitializeGIPipeline();
+    [[nodiscard]] uint32_t GetDescriptorFrameIndex() const;
+
+    static constexpr uint32_t kRTFrameCount = 3;
+    static constexpr uint32_t kShadowDescriptorCount = 3;
+    static constexpr uint32_t kReflectionDescriptorCount = 5;
+    static constexpr uint32_t kGIDescriptorCount = 3;
+
     ComPtr<ID3D12Device5> m_device5;
     DescriptorHeapManager* m_descriptors = nullptr;
 
@@ -193,6 +282,8 @@ private:
     // Approximate total GPU memory consumed by all BLAS buffers (result +
     // scratch). Updated as BLAS resources are allocated.
     uint64_t m_totalBLASBytes = 0;
+    uint64_t m_maxBLASBytesTotal = 1ull * 1024ull * 1024ull * 1024ull;
+    uint64_t m_maxBLASBuildBytesPerFrame = 256ull * 1024ull * 1024ull;
 
     // Current frame index set by the renderer. Used to track which frame a
     // BLAS build was recorded in so scratch buffers aren't released too early.
@@ -203,9 +294,15 @@ private:
     UINT64 m_instanceBufferSize = 0;
     UINT64 m_instanceBufferPendingSize = 0;  // Size to resize to next frame
     std::vector<D3D12_RAYTRACING_INSTANCE_DESC> m_instanceDescs;
+    ComPtr<ID3D12Resource> m_rtMaterialBuffer;
+    UINT64 m_rtMaterialBufferSize = 0;
+    std::vector<RTMaterialGPU> m_rtMaterials;
+    TLASBuildStats m_lastTLASStats;
 
-    // Cached camera information used for simple near/far culling when building
-    // the TLAS so we do not trace rays against obviously off-screen geometry.
+    // Cached camera information used for broad distance culling when building
+    // the TLAS. Ray tracing visibility is intentionally wider than raster
+    // visibility because reflections, shadows, and GI can sample off-screen
+    // contributors.
     glm::vec3 m_cameraPosWS{0.0f};
     glm::vec3 m_cameraForwardWS{0.0f, 0.0f, 1.0f};
     float     m_cameraNearPlane = 0.1f;
@@ -242,14 +339,13 @@ private:
     ComPtr<ID3D12Resource> m_rtGIShaderTable;
     UINT m_rtGIShaderTableStride = 0;
 
-    // Persistent descriptors used to bind the TLAS SRV, depth SRV, and
-    // RT shadow mask UAV for DispatchRays. The reflections pipeline reuses
-    // the same TLAS/depth/UAV slots, with the UAV pointing at the reflection
-    // color buffer instead of the sun-shadow mask.
-    DescriptorHandle m_rtTlasSrv;
-    DescriptorHandle m_rtDepthSrv;
-    DescriptorHandle m_rtMaskUav;
-    DescriptorHandle m_rtGBufferNormalSrv;  // G-buffer normal/roughness for proper RT reflections
+    // Persistent descriptors used to bind TLAS/depth/output resources for
+    // DispatchRays. Tables are split by frame and by RT pass so descriptor
+    // rewrites never alias another in-flight pass or frame.
+    DescriptorHandle m_shadowDispatchDescriptors[kRTFrameCount][kShadowDescriptorCount]{};
+    DescriptorHandle m_reflectionDispatchDescriptors[kRTFrameCount][kReflectionDescriptorCount]{};
+    DescriptorHandle m_giDispatchDescriptors[kRTFrameCount][kGIDescriptorCount]{};
+    bool m_dispatchDescriptorTablesValid = false;
 
     // Callback to force GPU sync before destroying buffers. Set by Renderer.
     FlushCallback m_flushCallback;

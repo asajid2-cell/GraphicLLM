@@ -5,6 +5,7 @@
 #include <atomic>
 #include <thread>
 #include <unordered_set>
+#include <filesystem>
 #include <entt/entt.hpp>
 #include "Window.h"
 #include "Graphics/RHI/DX12Device.h"
@@ -65,8 +66,14 @@ struct EngineConfig {
 
     // Optional initial scene preset. When empty, the engine chooses its
     // default (currently the RT showcase gallery). Accepted values are
-    // "dragon", "rt_showcase", and "cornell".
+    // "dragon", "rt_showcase", "temporal_validation", and "cornell".
     std::string initialScenePreset;
+
+    // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
+    // interactive behavior. exitAfterVisualValidationCapture exits once the
+    // RT showcase validation image has been captured and inspected.
+    uint64_t maxFrames = 0;
+    bool exitAfterVisualValidationCapture = false;
 };
 
 // Main engine class - orchestrates the game loop
@@ -105,11 +112,9 @@ public:
     // Diagnostics helpers for perf/memory governors.
     [[nodiscard]] bool DidVRAMGovernorReduce() const { return m_qualityAutoReduced; }
     [[nodiscard]] bool DidPerfGovernorAdjust() const {
-        return m_perfReflectionsDisabled || m_perfGIDisabled || m_perfScaleReduced || m_perfSSROff;
+        return m_perfScaleReduced;
     }
-    [[nodiscard]] bool WasPerfRTGIDisabled() const { return m_perfGIDisabled; }
-    [[nodiscard]] bool WasPerfRTReflectionsDisabled() const { return m_perfReflectionsDisabled; }
-    [[nodiscard]] bool WasPerfSSROff() const { return m_perfSSROff; }
+    [[nodiscard]] bool WasPerfScaleReduced() const { return m_perfScaleReduced; }
 
     // Logical focus target (most recently spawned or modified group/entity).
     void SetFocusTarget(const std::string& name);
@@ -121,6 +126,12 @@ public:
     // Engine Editor Mode - check if launched in parallel engine editor architecture
     [[nodiscard]] bool IsEngineEditorMode() const { return m_engineEditorMode; }
 
+    // Play mode state (for EngineEditorMode to sync camera)
+    [[nodiscard]] bool IsPlayModeActive() const { return m_playModeActive; }
+    [[nodiscard]] bool IsTerrainEnabled() const { return m_terrainEnabled; }
+    [[nodiscard]] glm::vec3 GetActiveCameraPosition() const;
+    [[nodiscard]] float GetPlayerEyeHeight() const { return m_playerEyeHeight; }
+
 private:
     // High-level scene presets for easy switching between curated layouts.
     enum class ScenePreset {
@@ -129,6 +140,7 @@ private:
         RTShowcase        = 2,
         GodRays           = 3,
         ProceduralTerrain = 4,
+        TemporalValidation = 5,
     };
 
     void ProcessInput();
@@ -141,9 +153,11 @@ private:
     void RebuildScene(ScenePreset preset);
     void BuildCornellScene();
     void BuildProceduralTerrainScene();
+    void BuildEditorModeTerrainScene();
     void BuildDragonStudioScene();
     void BuildRTShowcaseScene();
     void BuildGodRaysScene();
+    void BuildTemporalValidationScene();
 
     void InitializeCameraController();
     void UpdateCameraController(float deltaTime);
@@ -154,6 +168,8 @@ private:
     void SetCameraToSceneDefault(Scene::TransformComponent& transform);
 
     void CaptureScreenshot();
+    void CaptureScreenshot(const std::filesystem::path& outputPath);
+    void WriteFrameDiagnosticsReport(bool shutdownSnapshot = false);
 
     // Picking / camera helpers
     bool ComputeCameraRayFromMouse(float mouseX, float mouseY,
@@ -162,12 +178,11 @@ private:
     entt::entity PickEntityAt(float mouseX, float mouseY);
     void FrameSelectedEntity();
 
-    // VRAM-aware quality governor to automatically reduce expensive features
-    // when the estimated GPU memory footprint exceeds a soft limit.
+    // VRAM-aware quality governor that first reduces resolution and residency
+    // pressure when the estimated GPU memory footprint exceeds a soft limit.
     void ApplyVRAMQualityGovernor();
-    // Simple FPS-aware quality governor that progressively disables
-    // expensive features and lowers internal resolution when the smoothed
-    // frame time exceeds a budget.
+    // FPS-aware quality governor that can lower internal resolution when the
+    // smoothed frame time exceeds a budget.
     void ApplyPerfQualityGovernor();
 
     // Translation / rotation / scale gizmo helpers
@@ -209,18 +224,22 @@ private:
 
     float m_frameTime = 0.0f;
     uint32_t m_frameCount = 0;
+    uint64_t m_totalFrameCount = 0;
     float m_fpsTimer = 0.0f;
     float m_avgFrameTimeMs = 0.0f;
+    float m_qualityGovernorTimer = 0.0f;
+    float m_frameReportTimer = 0.0f;
+    uint64_t m_maxFrames = 0;
+    bool m_exitAfterVisualValidationCapture = false;
 
     // HUD / debug overlay
     void RenderHUD();
     bool m_showHUD = true;
     std::deque<std::string> m_recentCommandMessages;
     bool m_qualityAutoReduced = false;
-    bool m_perfReflectionsDisabled = false;
-    bool m_perfGIDisabled = false;
     bool m_perfScaleReduced = false;
-    bool m_perfSSROff = false;
+    bool m_visualValidationCaptured = false;
+    uint64_t m_visualValidationCapturedFrame = 0;
 
     // Central performance/memory diagnostics snapshotter.
     PerfDiagnostics m_perf;

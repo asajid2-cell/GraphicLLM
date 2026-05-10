@@ -3,13 +3,147 @@
 #include <spdlog/spdlog.h>
 #include <d3dcompiler.h>
 #include <dxcapi.h>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <unordered_set>
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
 
 namespace Cortex::Graphics {
+
+namespace {
+
+constexpr D3D12_DESCRIPTOR_RANGE_FLAGS kDynamicDescriptorRangeFlags =
+    static_cast<D3D12_DESCRIPTOR_RANGE_FLAGS>(
+        D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
+        D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+void HashCombine(std::size_t& seed, const std::string& value) {
+    const std::size_t h = std::hash<std::string>{}(value);
+    seed ^= h + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+}
+
+void HashCombine(std::size_t& seed, const std::wstring& value) {
+    const std::size_t h = std::hash<std::wstring>{}(value);
+    seed ^= h + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+}
+
+void HashShaderIncludes(std::size_t& seed,
+                        const std::string& source,
+                        const std::vector<std::wstring>& includeDirs,
+                        std::unordered_set<std::wstring>& visited) {
+    std::istringstream stream(source);
+    std::string line;
+    while (std::getline(stream, line)) {
+        const std::size_t includePos = line.find("#include");
+        if (includePos == std::string::npos) {
+            continue;
+        }
+
+        const std::size_t firstQuote = line.find('"', includePos);
+        const std::size_t secondQuote = (firstQuote == std::string::npos)
+            ? std::string::npos
+            : line.find('"', firstQuote + 1);
+        if (firstQuote == std::string::npos || secondQuote == std::string::npos || secondQuote <= firstQuote + 1) {
+            continue;
+        }
+
+        const std::string includeName = line.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+        for (const std::wstring& dir : includeDirs) {
+            const std::filesystem::path includePath = std::filesystem::path(dir) / includeName;
+            std::error_code ec;
+            if (!std::filesystem::exists(includePath, ec) || !std::filesystem::is_regular_file(includePath, ec)) {
+                continue;
+            }
+
+            const std::wstring canonical = std::filesystem::weakly_canonical(includePath, ec).wstring();
+            const std::wstring key = canonical.empty() ? includePath.wstring() : canonical;
+            if (!visited.insert(key).second) {
+                break;
+            }
+
+            std::ifstream in(includePath, std::ios::binary);
+            if (!in) {
+                break;
+            }
+            std::string includeSource((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            HashCombine(seed, key);
+            HashCombine(seed, includeSource);
+            HashShaderIncludes(seed, includeSource, includeDirs, visited);
+            break;
+        }
+    }
+}
+
+std::filesystem::path GetShaderCacheDirectory() {
+    return std::filesystem::current_path() / "build" / "shader_cache";
+}
+
+std::string MakeShaderCacheKey(const std::string& source,
+                               const std::string& entryPoint,
+                               const std::string& target,
+                               const std::vector<std::wstring>& includeDirs) {
+    std::size_t seed = 0;
+    HashCombine(seed, source);
+    HashCombine(seed, entryPoint);
+    HashCombine(seed, target);
+#ifdef _DEBUG
+    HashCombine(seed, "debug");
+#else
+    HashCombine(seed, "release");
+#endif
+#ifdef ENABLE_BINDLESS
+    HashCombine(seed, "bindless");
+#endif
+    for (const std::wstring& dir : includeDirs) {
+        HashCombine(seed, dir);
+    }
+    std::unordered_set<std::wstring> visited;
+    HashShaderIncludes(seed, source, includeDirs, visited);
+
+    std::ostringstream out;
+    out << std::hex << seed;
+    return out.str();
+}
+
+bool TryLoadShaderCache(const std::filesystem::path& path, ShaderBytecode& outBytecode) {
+    if (std::getenv("CORTEX_DISABLE_SHADER_CACHE")) {
+        return false;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return false;
+    }
+
+    outBytecode.data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    return !outBytecode.data.empty();
+}
+
+void StoreShaderCache(const std::filesystem::path& path, const ShaderBytecode& bytecode) {
+    if (std::getenv("CORTEX_DISABLE_SHADER_CACHE") || bytecode.data.empty()) {
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec) {
+        return;
+    }
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        return;
+    }
+    out.write(reinterpret_cast<const char*>(bytecode.data.data()),
+              static_cast<std::streamsize>(bytecode.data.size()));
+}
+
+} // namespace
 
 // ========== DX12Pipeline Implementation ==========
 
@@ -124,10 +258,10 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.RegisterSpace = 0;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 3: Descriptor table for textures (t0 - t9 in space0)
+    // Parameter 3: Descriptor table for textures (t0 - t12 in space0)
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 10;
+    descriptorRange.NumDescriptors = 13;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -425,6 +559,15 @@ static Result<ShaderBytecode> CompileWithDXC(
         arguments.push_back(dir.c_str());
     }
 
+    const std::string cacheKey = MakeShaderCacheKey(source, entryPoint, target, includeDirsStorage);
+    const std::filesystem::path cachePath =
+        GetShaderCacheDirectory() / (cacheKey + ".dxil");
+    ShaderBytecode cachedBytecode;
+    if (TryLoadShaderCache(cachePath, cachedBytecode)) {
+        spdlog::debug("Shader cache hit: {} ({})", entryPoint, target);
+        return Result<ShaderBytecode>::Ok(std::move(cachedBytecode));
+    }
+
     // Create DXC buffer for compilation
     DxcBuffer sourceBuffer = {};
     sourceBuffer.Ptr = sourceBlob->GetBufferPointer();
@@ -471,6 +614,7 @@ static Result<ShaderBytecode> CompileWithDXC(
     bytecode.data.resize(shaderBlob->GetBufferSize());
     memcpy(bytecode.data.data(), shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize());
 
+    StoreShaderCache(cachePath, bytecode);
     spdlog::info("Shader compiled with DXC: {} ({}) - SM6.6 bindless enabled", entryPoint, target);
     return Result<ShaderBytecode>::Ok(std::move(bytecode));
 }
@@ -579,15 +723,14 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // Parameter 3: Descriptor table for textures (t0 - t9 in space0)
+    // Parameter 3: Descriptor table for textures (t0 - t10 in space0)
     D3D12_DESCRIPTOR_RANGE1 descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 10;
+    descriptorRange.NumDescriptors = 11;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
-    // These SRVs often reference resources that are written later in the same
-    // command list (e.g., depth/HZB), so mark the underlying data as volatile.
-    descriptorRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+    // Frame-local descriptor tables are populated during command recording.
+    descriptorRange.Flags = kDynamicDescriptorRangeFlags;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -601,7 +744,7 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     shadowRange.NumDescriptors = 7;
     shadowRange.BaseShaderRegister = 0;
     shadowRange.RegisterSpace = 1;
-    shadowRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+    shadowRange.Flags = kDynamicDescriptorRangeFlags;
     shadowRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -622,7 +765,7 @@ Result<void> DX12ComputeRootSignature::Initialize(ID3D12Device* device) {
     uavRange.NumDescriptors = 4;
     uavRange.BaseShaderRegister = 0;
     uavRange.RegisterSpace = 0;
-    uavRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+    uavRange.Flags = kDynamicDescriptorRangeFlags;
     uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
     rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;

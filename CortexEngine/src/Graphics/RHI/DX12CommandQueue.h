@@ -34,8 +34,10 @@ public:
     // Signal the fence from the GPU side
     uint64_t Signal();
 
-    // Wait for a specific fence value (CPU blocks)
-    void WaitForFenceValue(uint64_t fenceValue);
+    // Wait for a specific fence value. Returns false if the fence wait times
+    // out or cannot be armed; callers that own GPU resources should treat
+    // failure as a fatal synchronization error for the current frame.
+    [[nodiscard]] bool WaitForFenceValue(uint64_t fenceValue);
 
     // GPU-side wait for another queue's fence (for cross-queue synchronization)
     void WaitForQueue(ID3D12Fence* otherFence, uint64_t fenceValue);

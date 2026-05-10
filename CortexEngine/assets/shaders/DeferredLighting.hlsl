@@ -3,10 +3,16 @@
 // Reads G-buffers and applies PBR lighting
 
 #include "PBR_Lighting.hlsli"
+#include "SurfaceClassification.hlsli"
 
 // Temporary debug views (compile-time).
 // 0 = off, 1 = normals, 2 = NdotL, 3 = clustered occupancy
 #define DEFERRED_DEBUG_VIEW 0
+
+static const uint LIGHT_TYPE_DIRECTIONAL = 0u;
+static const uint LIGHT_TYPE_POINT       = 1u;
+static const uint LIGHT_TYPE_SPOT        = 2u;
+static const uint LIGHT_TYPE_AREA_RECT   = 3u;
 
 // G-buffer inputs
 Texture2D<float4> g_GBufferAlbedo : register(t0);           // RGB = albedo (linear), A = AO
@@ -15,12 +21,13 @@ Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 Texture2D<float4> g_GBufferMaterialExt0 : register(t4);      // RGBA16F: x=clearcoat, y=coatRough, z=IOR, w=specFactor
 Texture2D<float4> g_GBufferMaterialExt1 : register(t5);      // RGBA16F: rgb=specColor, a=transmission (unused in deferred)
+Texture2D<float4> g_GBufferMaterialExt2 : register(t6);      // RGBA8: r=encoded surface class
 
 // Environment/shadow maps (matching forward renderer)
-Texture2D<float4> g_EnvDiffuse : register(t6);  // lat-long (equirect) irradiance
-Texture2D<float4> g_EnvSpecular : register(t7); // lat-long (equirect) prefiltered specular
-Texture2DArray<float> g_ShadowMap : register(t8);
-Texture2D<float2> g_BRDFLUT : register(t9);
+Texture2D<float4> g_EnvDiffuse : register(t7);  // lat-long (equirect) irradiance
+Texture2D<float4> g_EnvSpecular : register(t8); // lat-long (equirect) prefiltered specular
+Texture2DArray<float> g_ShadowMap : register(t9);
+Texture2D<float2> g_BRDFLUT : register(t10);
 
 struct Light {
     float4 position_type;
@@ -29,9 +36,9 @@ struct Light {
     float4 params;
 };
 
-StructuredBuffer<Light> g_LocalLights : register(t10);
-StructuredBuffer<uint2> g_ClusterRanges : register(t11);
-StructuredBuffer<uint> g_ClusterLightIndices : register(t12);
+StructuredBuffer<Light> g_LocalLights : register(t11);
+StructuredBuffer<uint2> g_ClusterRanges : register(t12);
+StructuredBuffer<uint> g_ClusterLightIndices : register(t13);
 
 SamplerState g_LinearSampler : register(s0);
 SamplerState g_ShadowSampler : register(s1);
@@ -79,16 +86,16 @@ float2 DirectionToLatLong(float3 dir)
     return uv;
 }
 
-float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex)
+float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex, float mipLevel)
 {
     float2 uv = DirectionToLatLong(dir);
 #ifdef ENABLE_BINDLESS
     if (diffuseIndex != INVALID_BINDLESS_INDEX) {
         Texture2D<float4> tex = ResourceDescriptorHeap[diffuseIndex];
-        return tex.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
+        return tex.SampleLevel(g_LinearSampler, uv, mipLevel).rgb;
     }
 #endif
-    return g_EnvDiffuse.SampleLevel(g_LinearSampler, uv, 0.0f).rgb;
+    return g_EnvDiffuse.SampleLevel(g_LinearSampler, uv, mipLevel).rgb;
 }
 
 float3 SampleEnvSpecular(float3 dir, float mipLevel, uint specularIndex)
@@ -212,9 +219,12 @@ float ComputeShadowCascade(float3 worldPos, float3 normal, uint cascadeIndex) {
     float cascadeScale = 1.0f + (float)cascadeIndex * 0.5f;
     bias *= cascadeScale;
 
+    // Slope-based bias: increase significantly for grazing angles (steep terrain)
     float3 lightDirWS = normalize(g_SunDirection.xyz);
     float ndotl = saturate(dot(normal, lightDirWS));
-    bias *= lerp(1.5f, 0.5f, ndotl);
+    // More aggressive slope scaling: 4x bias at grazing angles, 0.5x for facing surfaces
+    float slopeBias = lerp(4.0f, 0.5f, ndotl);
+    bias *= slopeBias;
 
     if (g_ShadowParams.w > 0.5f) {
         float2 texelSize = g_ShadowInvSizeAndSpecMaxMip.xy;
@@ -383,6 +393,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float4 emissiveMetallic = g_GBufferEmissiveMetallic.Load(int3(pixelCoord, 0));
     float4 materialExt0 = g_GBufferMaterialExt0.Load(int3(pixelCoord, 0));
     float4 materialExt1 = g_GBufferMaterialExt1.Load(int3(pixelCoord, 0));
+    float4 materialExt2 = g_GBufferMaterialExt2.Load(int3(pixelCoord, 0));
     float depth = g_DepthBuffer.Load(int3(pixelCoord, 0));
 
     // Unpack G-buffer data
@@ -398,6 +409,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float ior = max(materialExt0.z, 1.0f);
     float specularFactor = saturate(materialExt0.w);
     float3 specularColor = saturate(materialExt1.rgb);
+    uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
 
     // Check for background pixels (depth = 1.0)
     if (depth >= 0.9999) {
@@ -457,6 +469,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     // View direction
     float3 V = normalize(g_CameraPosition.xyz - worldPos);
     float NdotV = max(dot(normal, V), 0.0);
+    roughness = max(saturate(roughness), SurfaceRoughnessFloor(surfaceClass, metallic));
 
     // PBR material properties (KHR_materials_ior + KHR_materials_specular).
     float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
@@ -538,10 +551,12 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             }
 
             Light light = g_LocalLights[lightIndex];
-            float type = light.position_type.w;
+            uint type = (uint)(light.position_type.w + 0.5f);
             if (type < 0.5f) {
                 continue;
             }
+            const bool isSpot = (type == LIGHT_TYPE_SPOT);
+            const bool isAreaRect = (type == LIGHT_TYPE_AREA_RECT);
 
             float3 lightPos = light.position_type.xyz;
             float3 toLight = lightPos - worldPos;
@@ -563,10 +578,17 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
             float att = saturate(1.0f - dist / rangeMeters);
             att *= att;
+            if (isAreaRect) {
+                // Match the forward path's softbox approximation: rectangular
+                // area lights are broad emitters, not pin lights. Keeping a
+                // minimum falloff preserves fill while the roughness adjustment
+                // below prevents razor-sharp wet-floor highlights.
+                att = max(att, 0.35f);
+            }
             float invDist2 = 1.0f / max(dist * dist, 1e-3f);
 
             // Spot cone attenuation (approx).
-            if (type > 1.5f && type < 2.5f) {
+            if (isSpot) {
                 float3 spotDir = normalize(light.direction_cosInner.xyz);
                 float cosInner = light.direction_cosInner.w;
                 float cosOuter = light.params.x;
@@ -579,8 +601,12 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             float3 radiance = light.color_range.rgb * (att * invDist2);
 
             float3 Hl = normalize(V + Ll);
-            float NDF_l = DistributionGGX(normal, Hl, roughness);
-            float G_l = GeometrySmith(normal, V, Ll, roughness);
+            float roughForLight = roughness;
+            if (isAreaRect) {
+                roughForLight = saturate(roughness * 1.5f + 0.05f);
+            }
+            float NDF_l = DistributionGGX(normal, Hl, roughForLight);
+            float G_l = GeometrySmith(normal, V, Ll, roughForLight);
             float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
 
             float3 numerator_l = NDF_l * G_l * F_l;
@@ -590,17 +616,19 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             if (clearCoatWeight > 0.01f) {
                 float coatBlend = clearCoatWeight * 0.8f;
                 float3 F_coat = FresnelSchlick(max(dot(Hl, V), 0.0f), float3(0.04f, 0.04f, 0.04f));
-                float  D_coat = DistributionGGX(normal, Hl, clearCoatRoughness);
-                float  G_coat = GeometrySmith(normal, V, Ll, clearCoatRoughness);
+                float coatRoughForLight = isAreaRect ? saturate(clearCoatRoughness * 1.5f + 0.05f) : clearCoatRoughness;
+                float  D_coat = DistributionGGX(normal, Hl, coatRoughForLight);
+                float  G_coat = GeometrySmith(normal, V, Ll, coatRoughForLight);
                 float3 specCoat = (D_coat * G_coat * F_coat) / max(denom_l, 0.001f);
                 spec_l = lerp(spec_l, specCoat, coatBlend);
             }
+            spec_l = min(spec_l, 4.0f.xxx);
 
             float3 kS_l = F_l;
             float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
 
             float shadowLocal = 1.0f;
-            if (type == 2.0f && light.params.y >= 0.0f) {
+            if (isSpot && light.params.y >= 0.0f) {
                 shadowLocal = ComputeLocalLightShadow(worldPos, normal, Ll, light.params.y);
             }
             directLight += (kD_l * albedoColor / PI + spec_l) * radiance * NdotLl * shadowLocal;
@@ -651,6 +679,16 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float3 specDirGlobal = specDir;
     float probeWeight = 0.0f;
 
+    uint specWidth = 1u;
+    uint specHeight = 1u;
+    uint specMipCount = 1u;
+    g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMipCount);
+    float specMaxMip = max((specMipCount > 0u) ? (float)(specMipCount - 1u) : g_ShadowInvSizeAndSpecMaxMip.z, 0.0f);
+    if (specMaxMip <= 0.0f) {
+        specMaxMip = max(g_ShadowInvSizeAndSpecMaxMip.z, 0.0f);
+    }
+    const float diffuseMip = specMaxMip;
+
 #ifdef ENABLE_BINDLESS
     const uint probeCount = g_ReflectionProbeParams.y;
     const uint probeTableIndex = g_ReflectionProbeParams.x;
@@ -692,16 +730,19 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     // Diffuse IBL (irradiance)
     if (iblEnabled && g_EnvParams.x > 0.0f) {
-        float3 irradianceGlobal = SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX);
-        float3 irradianceLocal = SampleEnvDiffuse(normal, diffuseEnvIndex);
+        // The engine currently stores equirectangular environment maps rather
+        // than true convolved irradiance maps. Sampling the highest mip gives
+        // the deferred path a low-frequency irradiance approximation instead
+        // of projecting sharp HDRI features onto rough walls and floors.
+        float3 irradianceGlobal = SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX, diffuseMip);
+        float3 irradianceLocal = SampleEnvDiffuse(normal, diffuseEnvIndex, diffuseMip);
         float3 irradiance = lerp(irradianceGlobal, irradianceLocal, probeWeight);
         diffuseIBL = irradiance * albedoColor * kD_ibl;
     }
 
     // Specular IBL (split-sum)
     if (iblEnabled && g_EnvParams.y > 0.0f) {
-        float maxMip = g_ShadowInvSizeAndSpecMaxMip.z;
-        float mipLevel = roughness * maxMip;
+        float mipLevel = roughness * specMaxMip;
         float3 specGlobal = SampleEnvSpecular(specDirGlobal, mipLevel, INVALID_BINDLESS_INDEX);
         float3 specLocal = SampleEnvSpecular(specDir, mipLevel, specularEnvIndex);
         float3 prefilteredColor = lerp(specGlobal, specLocal, probeWeight);
@@ -710,7 +751,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
         if (clearCoatWeight > 0.01f) {
             float coatBlend = clearCoatWeight * 0.8f;
-            float coatMip = clearCoatRoughness * maxMip;
+            float coatMip = clearCoatRoughness * specMaxMip;
             float3 coatGlobal = SampleEnvSpecular(specDirGlobal, coatMip, INVALID_BINDLESS_INDEX);
             float3 coatLocal = SampleEnvSpecular(specDir, coatMip, specularEnvIndex);
             float3 coatPref = lerp(coatGlobal, coatLocal, probeWeight);
@@ -727,6 +768,23 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     ambient *= aoDiffuse;
     ambient += diffuseIBL * g_EnvParams.x * aoDiffuse;
     ambient += specularIBL * g_EnvParams.y * aoSpec;
+
+    if (g_ReflectionProbeParams.z == 8u) {
+        return float4(saturate(diffuseIBL * g_EnvParams.x * aoDiffuse), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 9u) {
+        return float4(saturate(specularIBL * g_EnvParams.y * aoSpec), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 11u) {
+        return float4(saturate(Fibl), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 12u) {
+        float mipVis = (specMaxMip > 0.0f) ? saturate((roughness * specMaxMip) / specMaxMip) : roughness;
+        return float4(mipVis.xxx, 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 41u) {
+        return float4(SurfaceClassDebugColor(surfaceClass), 1.0f);
+    }
 
     // Final color
     float3 color = directLight + ambient + emissive;

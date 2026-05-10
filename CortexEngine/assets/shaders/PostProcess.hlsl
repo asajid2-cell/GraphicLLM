@@ -1,5 +1,7 @@
 ﻿// Fullscreen post-process: exposure, ACES tonemapping, gamma, simple bloom stub
 
+#include "SurfaceClassification.hlsli"
+
 // Frame constants must match ShaderTypes.h / Basic.hlsl exactly
 cbuffer FrameConstants : register(b1)
 {
@@ -39,7 +41,7 @@ cbuffer FrameConstants : register(b1)
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 2 = night)
     float4   g_EnvParams;
-    // x = warm tint (-1..1), y = cool tint (-1..1), z,w reserved
+    // x = warm tint (-1..1), y = cool tint (-1..1), z = god-ray intensity, w reserved
     float4   g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4   g_FogParams;
@@ -73,6 +75,9 @@ Texture2D g_Velocity : register(t7);
 // accumulation/denoising.
 Texture2D g_RTReflection : register(t8);
 Texture2D g_RTReflectionHistory : register(t9);
+Texture2D g_EmissiveMetallic : register(t10);
+Texture2D g_MaterialExt1 : register(t11);
+Texture2D g_MaterialExt2 : register(t12);
 // Shadow map array is accessed via a separate descriptor table (space1) so
 // that t0-t5 in space0 can be used for post-process textures without aliasing.
 Texture2DArray g_ShadowMap : register(t0, space1);
@@ -536,6 +541,39 @@ float3 ReconstructWorldPosition(float2 uv, float depth)
     return world.xyz / max(world.w, 1e-4f);
 }
 
+float3 SanitizeHDRColor(float3 color)
+{
+    color.r = isfinite(color.r) ? color.r : 0.0f;
+    color.g = isfinite(color.g) ? color.g : 0.0f;
+    color.b = isfinite(color.b) ? color.b : 0.0f;
+    return max(color, 0.0f);
+}
+
+float ReflectionLuma(float3 color)
+{
+    const float3 lumaWeights = float3(0.2126f, 0.7152f, 0.0722f);
+    return dot(color, lumaWeights);
+}
+
+float3 SoftLimitReflectionLuma(float3 color)
+{
+    color = SanitizeHDRColor(color);
+
+    const float  kneeLuma    = 4.0f;
+    const float  maxLuma     = 16.0f;
+
+    float luma = ReflectionLuma(color);
+    if (!isfinite(luma) || luma <= 1e-5f || luma <= kneeLuma)
+    {
+        return color;
+    }
+
+    float over = luma - kneeLuma;
+    float range = max(maxLuma - kneeLuma, 1e-3f);
+    float limitedLuma = kneeLuma + range * (over / (over + range));
+    return color * saturate(limitedLuma / max(luma, 1e-5f));
+}
+
 // ----------------------------------------------------------------------------
 // HDR TAA resolve pass
 // ----------------------------------------------------------------------------
@@ -748,6 +786,11 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         finalBlend = 0.0f;
     }
 
+    // In the TAA descriptor table, t12 carries the shared temporal rejection
+    // mask instead of material ext2. x is accepted-history weight, y/z are
+    // disocclusion/high-motion rejection debug channels, w is in-bounds.
+    float4 sharedTemporalMask = g_MaterialExt2.SampleLevel(g_Sampler, uv, 0);
+    finalBlend *= sharedTemporalMask.x * sharedTemporalMask.w;
     finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
 
     // Clamp maximum history contribution per frame. Use a tighter cap on
@@ -766,6 +809,10 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
         // color. Bright pixels have strong temporal accumulation; dark
         // pixels lean towards the current frame.
         return float4(finalBlend.xxx, 1.0f);
+    }
+    if (debugView == 42u)
+    {
+        return float4(sharedTemporalMask.y, sharedTemporalMask.z, 1.0f - sharedTemporalMask.x, 1.0f);
     }
 
     return float4(result, 1.0f);
@@ -868,13 +915,40 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float4 nrSample = g_NormalRoughness.Sample(g_Sampler, uv);
     float3 gbufNormal = normalize(nrSample.xyz * 2.0f - 1.0f);
     float  roughness = nrSample.w;
+    float  metallic = saturate(g_EmissiveMetallic.Sample(g_Sampler, uv).a);
+    float4 materialExt1 = g_MaterialExt1.Sample(g_Sampler, uv);
+    float4 materialExt2 = g_MaterialExt2.Sample(g_Sampler, uv);
+    float  transmission = saturate(materialExt1.a);
+    uint   surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    float  reflectionClassMask = saturate(materialExt2.g);
+
+    if (g_DebugMode.x == 1.0f)
+    {
+        return float4(gbufNormal * 0.5f + 0.5f, 1.0f);
+    }
+    if (g_DebugMode.x == 2.0f)
+    {
+        return float4(roughness.xxx, 1.0f);
+    }
+    if (g_DebugMode.x == 3.0f)
+    {
+        return float4(metallic.xxx, 1.0f);
+    }
+    if (g_DebugMode.x == 4.0f)
+    {
+        return float4(saturate(g_SceneColor.Sample(g_Sampler, uv).rgb), 1.0f);
+    }
+    if (g_DebugMode.x == 41.0f)
+    {
+        return float4(SurfaceClassDebugColor(surfaceClass), 1.0f);
+    }
 
     // Screen-space refraction for thin transparent materials (glass, water).
     // We approximate refraction as a small UV offset in the scene color
     // buffer driven by the surface normal and opacity. This is not physically
     // exact but gives a convincing "bent background" look for glass bricks
     // and water without requiring a separate depth/scene-color prepass.
-    if (opacity < 0.99f)
+    if (SurfaceIsTransmissive(surfaceClass, transmission, opacity))
     {
         float3 N = gbufNormal;
         float2 dir = N.xy;
@@ -885,7 +959,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
         // for glossier materials; very rough transparent objects behave more
         // like frosted glass so the refraction offset is smaller.
         float gloss = saturate(1.0f - roughness);
-        float transparency = saturate(1.0f - opacity);
+        float transparency = max(saturate(1.0f - opacity), transmission);
 
         // Base strength in "pixels" at the current resolution. Values are
         // deliberately modest so the effect reads without becoming noisy.
@@ -913,21 +987,22 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float4 ssrSample   = ssrEnabled ? g_SSRColor.Sample(g_Sampler, uv) : float4(0.0f, 0.0f, 0.0f, 0.0f);
     float  ssrWeightRaw = saturate(ssrSample.a);
 
-    // Clamp extremely bright SSR highlights to avoid harsh color pops when
+    // Limit extremely bright SSR highlights to avoid harsh color pops when
     // the ray marches across very hot pixels in the environment or scene.
-    float3 ssrColor = ssrSample.rgb;
-    float  ssrMax   = max(max(ssrColor.r, ssrColor.g), ssrColor.b);
-    const float kMaxSSRIntensity = 32.0f;
-    if (ssrMax > kMaxSSRIntensity)
-    {
-        ssrColor *= (kMaxSSRIntensity / ssrMax);
-    }
+    float3 ssrColor = SoftLimitReflectionLuma(ssrSample.rgb);
 
     // Base reflection strength from roughness (shared by SSR and RT). This
     // roughly tracks the specular lobe so glossy surfaces get stronger
     // reflections while rough surfaces stay diffuse/IBL dominated.
     float gloss = saturate(1.0f - roughness);
     gloss *= gloss;
+    float depthForFresnel = g_Depth.Sample(g_Sampler, uv).r;
+    float3 worldForFresnel = ReconstructWorldPosition(uv, depthForFresnel);
+    float3 viewForFresnel = normalize(g_CameraPosition.xyz - worldForFresnel);
+    float nDotVForFresnel = saturate(dot(gbufNormal, viewForFresnel));
+    float dielectricFresnel = 0.04f + 0.96f * pow(1.0f - nDotVForFresnel, 5.0f);
+    float roughFresnelDamp = lerp(1.0f, 0.25f, roughness);
+    float materialReflectance = lerp(saturate(dielectricFresnel * roughFresnelDamp), 1.0f, metallic);
 
     // Scale SSR coverage into a soft weight; keep some headroom so the
     // underlying BRDF/IBL specular term can still contribute. Only allow
@@ -936,13 +1011,18 @@ float4 PSMain(VSOutput input) : SV_TARGET
     // mid-roughness walls and floors.
     const float kMaxSSRWeight = 0.6f;
     float  wSSR = 0.0f;
+    const bool isMirrorClass = SurfaceIsMirrorClass(surfaceClass);
+    const bool isWaterClass = SurfaceIsWater(surfaceClass);
+    const bool isPolishedConductor =
+        SurfaceIsPolishedConductor(surfaceClass, metallic, roughness) ||
+        (reflectionClassMask > 0.5f && metallic > 0.75f);
     // SSR is extremely fragile on near-perfect mirrors (roughness ~ 0) and
     // tends to self-intersect on convex glossy objects (chrome spheres),
     // producing the classic "inner copy" ghost. Prefer IBL/RT in that regime.
-    if (roughness > 0.08f && roughness < 0.35f && ssrWeightRaw > 0.4f)
+    if (!isMirrorClass && roughness > 0.08f && roughness < 0.28f && ssrWeightRaw > 0.4f)
     {
         float ssrConf = ssrWeightRaw * ssrWeightRaw;
-        wSSR = ssrConf * kMaxSSRWeight * gloss;
+        wSSR = ssrConf * kMaxSSRWeight * gloss * materialReflectance;
     }
 
     // Optional RT reflection buffer: when RT is enabled (postParams.w > 0.5)
@@ -966,14 +1046,9 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float4 rtCenter4 = SampleRtReflectionEdgeAware(uv, rtDim, depthDim, centerDepth, centerN);
         rtRefl = rtCenter4.rgb;
         float  rtValid = saturate(rtCenter4.a);
-        // Clamp extreme RT reflection intensity so very hot env texels do not
+        // Limit extreme RT reflection luma so very hot env texels do not
         // overpower the underlying BRDF/IBL term.
-        const float kMaxRTIntensity = 32.0f;
-        float rtMax = max(max(rtRefl.r, rtRefl.g), rtRefl.b);
-        if (rtMax > kMaxRTIntensity)
-        {
-            rtRefl *= (kMaxRTIntensity / rtMax);
-        }
+        rtRefl = SoftLimitReflectionLuma(rtRefl);
 
         // Small 5-tap cross filter in screen space over the RT reflection
         // buffer to reduce aliasing/fizzing from single-sample DXR. This is
@@ -995,7 +1070,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
         {
             float2 sampleUV = saturate(uv + offsets[i]);
             float4 sampleRT4 = SampleRtReflectionEdgeAware(sampleUV, rtDim, depthDim, centerDepth, centerN);
-            float3 sampleRT = sampleRT4.rgb;
+            float3 sampleRT = SoftLimitReflectionLuma(sampleRT4.rgb);
             float  sampleValid = saturate(sampleRT4.a);
 
             // Bilateral weights: keep RT reflections from bleeding across depth/normal edges.
@@ -1012,7 +1087,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
             total += w;
         } 
 
-        rtRefl = accum / max(total, 1e-4f); 
+        rtRefl = SoftLimitReflectionLuma(accum / max(total, 1e-4f));
  
         // If the RT reflection buffer has no meaningful signal, treat it as
         // unavailable so it does not pull reflections toward black (this can
@@ -1034,11 +1109,15 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float2 historyUV = saturate(uv + vel + g_TAAParams.xy); 
 
             float4 rtHist4 = g_RTReflectionHistory.Sample(g_Sampler, historyUV);
-            float3 rtHist = rtHist4.rgb;
+            float3 rtHist = SoftLimitReflectionLuma(rtHist4.rgb);
             float  histValid = saturate(rtHist4.a);
 
             float3 diff = abs(rtRefl - rtHist);
             float maxDiffHist = max(max(diff.r, diff.g), diff.b);
+            float currHistLuma = ReflectionLuma(rtRefl);
+            float prevHistLuma = ReflectionLuma(rtHist);
+            float lumaDelta = abs(currHistLuma - prevHistLuma);
+            float lumaNorm = lumaDelta / max(max(currHistLuma, prevHistLuma), 1e-3f);
 
             // Reject history on mismatched surfaces (disocclusion).
             float historyDepth = g_Depth.SampleLevel(g_Sampler, historyUV, 0).r;
@@ -1053,17 +1132,25 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float baseHist = lerp(0.25f, 0.05f, saturate(speedPx / 2.0f));
             float historyWeight = baseHist * histValid * reprojOk;
             historyWeight *= lerp(1.0f, 0.0f, saturate(maxDiffHist * 4.0f));
+            historyWeight *= 1.0f - smoothstep(0.12f, 0.55f, lumaNorm);
+            historyWeight *= 1.0f - smoothstep(0.15f, 1.0f, lumaDelta);
 
-            rtRefl = lerp(rtRefl, rtHist, historyWeight);
+            rtRefl = SoftLimitReflectionLuma(lerp(rtRefl, rtHist, historyWeight));
         }
     }
 
     // Prefer SSR whenever it is confident; let RT take over only when SSR
     // confidence is low so the total reflection energy stays stable and the
     // two lobes do not "fight" each other.
-    float  rawRTWeight = 1.0f - ssrWeightRaw;
+    float  effectiveSSRConfidence = (wSSR > 1e-5f) ? ssrWeightRaw : 0.0f;
+    float  rawRTWeight = 1.0f - effectiveSSRConfidence;
     rawRTWeight *= rawRTWeight;
-    float  wRT = rtEnabled ? rawRTWeight * gloss : 0.0f;
+    float smoothSurface = isMirrorClass ? 1.0f : (1.0f - smoothstep(0.18f, 0.50f, roughness));
+    float rtGloss = gloss * smoothSurface;
+    if (isWaterClass || isPolishedConductor) {
+        rtGloss = max(rtGloss, saturate(1.0f - roughness) * 0.75f);
+    }
+    float  wRT = rtEnabled ? rawRTWeight * rtGloss * materialReflectance : 0.0f;
 
     float  weightSum = wSSR + wRT;
     if (weightSum > 1e-4f)
@@ -1071,22 +1158,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float invSum = 1.0f / weightSum;
         float3 reflHybrid = (ssrColor * wSSR + rtRefl * wRT) * invSum;
 
-        // Detect water pixels approximately by comparing reconstructed
-        // world-space height to the global water level. This lets us boost
-        // reflection strength on water surfaces without introducing a full
-        // material ID system.
-        float depth = g_Depth.Sample(g_Sampler, uv).r;
-        float3 worldPos = ReconstructWorldPosition(uv, depth);
-        float waterLevelY = g_WaterParams0.w;
-        bool isWaterPixel = abs(worldPos.y - waterLevelY) < 0.3f;
+        float maxReflBlend = SurfaceReflectionCeiling(
+            surfaceClass,
+            roughness,
+            metallic,
+            transmission,
+            dielectricFresnel);
 
-        const float maxReflBlendNonWater = 0.3f;
-        const float maxReflBlendWater    = 0.75f;
-        float maxReflBlend = isWaterPixel ? maxReflBlendWater : maxReflBlendNonWater;
-
-        // Final lerp factor: surface gloss and total reflection weight gate
-        // how strongly we move towards the hybrid reflection color.
-        float reflBlend = maxReflBlend * saturate(weightSum);
+        // Final lerp factor: surface roughness and total reflection weight
+        // gate how strongly we move towards the hybrid reflection color.
+        float roughBlendGate = pow(saturate(1.0f - roughness), 2.0f);
+        float reflBlend = maxReflBlend * saturate(weightSum) * roughBlendGate;
         hdrColor = lerp(hdrColor, reflHybrid, reflBlend);
     }
 
@@ -1239,8 +1321,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
                     float2 toSun = sunUV - uv;
                     float distToSun = length(toSun);
 
+                    const float godRayScale = max(g_ColorGrade.z, 0.0f);
+
                     // Skip pixels very far from the sun projection to keep cost down.
-                    if (distToSun > 0.02f)
+                    if (distToSun > 0.02f && godRayScale > 1e-4f)
                     {
                         float2 step = toSun / (float)NUM_SAMPLES;
                         float2 sampleUV = uv;
@@ -1248,11 +1332,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
                         float3 godAccum = 0.0f;
                         float illumination = 1.0f;
 
-                        float density = max(g_FogParams.x, 0.0f);
-                        // Base intensity tied to fog density so thicker fog yields
-                        // stronger, more visible beams.
-                        float baseIntensity = saturate(density * 20.0f);
-                        float decay = 0.92f;
+                        float density = saturate(max(g_FogParams.x, 0.0f) * 24.0f);
+                        // Base intensity is controlled by fog density and the
+                        // UI/scene intensity scalar. Keep the value bounded so
+                        // shafts add energy gradually instead of flashing.
+                        float baseIntensity = density * godRayScale;
+                        float decay = lerp(0.88f, 0.96f, density);
 
                         [unroll]
                         for (int i = 0; i < NUM_SAMPLES; ++i)
@@ -1265,21 +1350,28 @@ float4 PSMain(VSOutput input) : SV_TARGET
                             }
 
                             float d = g_Depth.SampleLevel(g_Sampler, sampleUV, 0).r;
-                            // Treat fully-clear depth as sky; anything else occludes.
-                            float unoccluded = (d >= 1.0f - 1e-3f) ? 1.0f : 0.0f;
-                            illumination *= lerp(0.0f, 1.0f, unoccluded * decay);
+                            // Treat fully-clear depth as sky. Geometry
+                            // attenuates the ray instead of zeroing it so
+                            // subpixel depth changes do not pop the whole
+                            // shaft on/off while the camera moves.
+                            float unoccluded = smoothstep(0.996f, 0.9995f, d);
+                            illumination *= lerp(0.70f, decay, unoccluded);
 
                             float3 sampleHdr = g_SceneColor.SampleLevel(g_Sampler, sampleUV, 0).rgb;
-                            float lum = dot(sampleHdr, float3(0.299f, 0.587f, 0.114f));
+                            float lum = min(dot(sampleHdr, float3(0.299f, 0.587f, 0.114f)), 8.0f);
                             godAccum += lum.xxx * illumination;
                         }
 
                         float falloff = saturate(1.0f - distToSun * 1.5f);
-                        float3 godColor = g_AmbientColor.rgb;
-                        float3 godRays = godColor * godAccum * baseIntensity * falloff / (float)NUM_SAMPLES;
+                        falloff *= falloff;
+
+                        float3 sunRadiance = max(sun.color_range.rgb, 0.0f.xxx);
+                        float sunMax = max(max(sunRadiance.r, sunRadiance.g), sunRadiance.b);
+                        float3 sunTint = (sunMax > 1e-3f) ? (sunRadiance / sunMax) : max(g_AmbientColor.rgb, 0.0f.xxx);
+                        float3 godRays = sunTint * godAccum * baseIntensity * falloff * 0.35f / (float)NUM_SAMPLES;
 
                         // Clamp to avoid excessive streak brightness.
-                        godRays = min(godRays, 4.0f.xxx);
+                        godRays = min(godRays, 2.5f.xxx);
 
                         hdrBlurred += godRays;
                     }

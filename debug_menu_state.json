@@ -1,0 +1,21 @@
+{
+  "bloomIntensity": 0.25,
+  "cameraBaseSpeed": 5.0,
+  "cascade0ResolutionScale": 1.0,
+  "cascadeLambda": 0.5,
+  "exposure": 1.0,
+  "fractalAmplitude": 0.0,
+  "fractalCoordMode": 1.0,
+  "fractalFrequency": 0.5,
+  "fractalGain": 0.5,
+  "fractalLacunarity": 2.0,
+  "fractalNoiseType": 0.0,
+  "fractalOctaves": 4.0,
+  "fractalScaleX": 1.0,
+  "fractalScaleZ": 1.0,
+  "fractalWarpStrength": 0.0,
+  "lightingRig": 0,
+  "rayTracingEnabled": false,
+  "shadowBias": 0.0005000000237487257,
+  "shadowPCFRadius": 1.5
+}

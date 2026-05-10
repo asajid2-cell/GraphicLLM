@@ -49,7 +49,8 @@ cbuffer FrameConstants : register(b1)
     //                      7 = fractal height, 8 = IBL diffuse only,
     //                      9 = IBL specular only, 10 = env direction/UV,
     //                      11 = Fresnel (Fibl), 12 = specular mip,
-    //                      13 = SSAO only, 14 = SSAO overlay), others reserved
+    //                      13 = SSAO only, 14 = SSAO overlay,
+    //                      40/41 = material-class diagnostics), others reserved
     float4 g_DebugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight, z = FXAA enabled (>0.5),
     // w = RT sun shadows enabled (>0.5)
@@ -282,6 +283,16 @@ float4 SampleBindlessTextureOrDefault(uint textureIndex, float2 uv, float4 defau
 // Alpha-tested pixel shader for shadow maps (glTF alphaMode=MASK). We rely on
 // g_MaterialPad0 as the alpha cutoff when drawing masked materials.
 void PSShadowAlphaTest(VSShadowOutput input)
+{
+    float alphaCutoff = g_MaterialPad0;
+    float alpha = SampleAlbedo(input.texCoord).a * g_Albedo.a;
+    clip(alpha - alphaCutoff);
+}
+
+// Alpha-tested depth prepass for camera-visible masked geometry. This uses
+// the regular camera VS output so masked foliage/grates/windows contribute
+// only their opaque texels to the depth pyramid, SSAO, SSR and RT masks.
+void PSDepthAlphaTest(PSInput input)
 {
     float alphaCutoff = g_MaterialPad0;
     float alpha = SampleAlbedo(input.texCoord).a * g_Albedo.a;
@@ -753,9 +764,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float  bitangentSign = (tangentWS.w >= 0.0f) ? 1.0f : -1.0f;
     float3 B = normalize(cross(normal, T)) * bitangentSign;
 
-    // Clamp metallic to leave a small diffuse contribution even for "full"
-    // metals so that scenes remain readable under very dark environments.
-    metallic = min(saturate(metallic), 0.95f);
+    // Preserve the authored conductor value. Scene readability should come
+    // from lighting and exposure, not by injecting diffuse energy into metals.
+    metallic = saturate(metallic);
 
     // Glass, plastic, brick, and emissive surfaces are always treated as dielectrics in the
     // BRDF (metallic = 0) so they rely on Fresnel and the specular lobe
@@ -1323,18 +1334,21 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         float3 V = normalize(g_CameraPosition.xyz - worldPos);
         float NdotV = saturate(dot(N, V));
 
-        // Diffuse IBL from low-frequency environment in equirectangular form.
-        float2 envUV = DirectionToLatLong(N);
-        float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, 0.0f).rgb;
-
-        float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
-        diffuseIBL = irradiance * kd * albedo;
-
         // Specular IBL from prefiltered environment mip chain (mip-mapped
         // equirectangular texture).
         uint specWidth, specHeight, specMips;
         g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMips);
         float maxMip = specMips > 0 ? float(specMips - 1) : 0.0f;
+
+        // The current environment assets are raw equirectangular maps, not
+        // separately convolved irradiance maps. Use the highest mip as a
+        // low-frequency irradiance approximation so diffuse IBL does not
+        // project sharp HDRI room details onto every matte surface.
+        float2 envUV = DirectionToLatLong(N);
+        float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, maxMip).rgb;
+
+        float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
+        diffuseIBL = irradiance * kd * albedo;
 
         float3 R = reflect(-V, N);
         float2 specUV = DirectionToLatLong(R);
@@ -1618,10 +1632,14 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         float bitangentSign = (input.tangent.w >= 0.0f) ? 1.0f : -1.0f;
         float3 bitangent = normalize(cross(normal, tangent)) * bitangentSign;
         float3x3 TBN = float3x3(tangent, bitangent, normal);
-        float3 nSample = SampleNormal(input.texCoord).xyz * 2.0f - 1.0f;
-        // glTF normalScale: scale X/Y and renormalize.
         float normalScale = max(g_ExtraParams.y, 0.0f);
-        nSample.xy *= normalScale;
+        // Normal assets are commonly BC5-compressed, so only XY are stored.
+        // Reconstruct Z instead of trusting the sampled blue channel; reading
+        // BC5 as RGB gives invalid sideways normals and breaks rough-surface
+        // lighting/reflections.
+        float2 nXY = SampleNormal(input.texCoord).xy * 2.0f - 1.0f;
+        nXY *= normalScale;
+        float3 nSample = normalize(float3(nXY, sqrt(saturate(1.0f - dot(nXY, nXY)))));
         normal = normalize(mul(TBN, nSample));
     }
 
@@ -1932,11 +1950,14 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     }
 #endif
     color += emissive;
+    float explicitEmissiveLuminance = dot(emissive, float3(0.2126f, 0.7152f, 0.0722f));
 
     // Emissive / neon materials: add a simple self-illumination term derived
     // from the albedo color so that glowing panels and signs contribute
-    // visible light and feed into bloom/tonemapping. The preset encodes
-    // emission strength in the alpha channel of the albedo color.
+    // visible light and feed into bloom/tonemapping. This fallback is used
+    // only for legacy preset materials that do not provide explicit emissive
+    // factors; otherwise albedo remains a reflectance value and emission is
+    // carried by g_EmissiveFactorStrength.
     float materialType   = g_FractalParams1.w;
     bool isGlass         = (materialType > 0.5f && materialType < 1.5f);
     bool isMirror        = (materialType > 1.5f && materialType < 2.5f);
@@ -1945,11 +1966,10 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     bool isEmissive      = (materialType > 4.5f && materialType < 5.5f);
     bool anisoMetalFlag2 = (materialType > 5.5f && materialType < 6.5f);
     bool anisoWoodFlag2  = (materialType > 6.5f && materialType < 7.5f);
-    if (isEmissive)
+    if (isEmissive && explicitEmissiveLuminance <= 1e-4f)
     {
-        // Treat albedo alpha as a normalized emission control and map it
-        // into a practical intensity range so emissive presets can request
-        // brighter or dimmer surfaces without exploding HDR.
+        // Treat albedo alpha as a normalized legacy emission control and map
+        // it into a practical intensity range without exploding HDR.
         float emissiveControl = baseOpacity;
         float emissiveIntensity = lerp(2.0f, 12.0f, emissiveControl);
         float3 emissiveColor = albedo;

@@ -39,11 +39,29 @@ HierarchyState g_hierarchy;
 const wchar_t* kHierarchyWindowClassName = L"CortexHierarchyWindow";
 
 std::string WStringToUtf8(const std::wstring& s) {
-    return std::string(s.begin(), s.end());
+    if (s.empty()) {
+        return {};
+    }
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) {
+        return {};
+    }
+    std::string out(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), bytes, nullptr, nullptr);
+    return out;
 }
 
 std::wstring Utf8ToWide(const std::string& s) {
-    return std::wstring(s.begin(), s.end());
+    if (s.empty()) {
+        return {};
+    }
+    const int chars = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
+    if (chars <= 0) {
+        return {};
+    }
+    std::wstring out(static_cast<size_t>(chars), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), chars);
+    return out;
 }
 
 std::vector<HierarchyNode> BuildSceneHierarchy(Scene::ECS_Registry* ecs) {

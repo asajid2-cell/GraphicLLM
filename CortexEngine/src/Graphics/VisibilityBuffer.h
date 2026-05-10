@@ -2,6 +2,7 @@
 
 #include "RHI/D3D12Includes.h"
 #include <wrl/client.h>
+#include <array>
 #include <memory>
 #include <vector>
 #include <functional>
@@ -85,7 +86,7 @@ struct alignas(16) VBMaterialConstants {
     float alphaCutoff;  // For alpha-masked materials (alphaMode == Mask)
     uint32_t alphaMode; // 0=opaque, 1=mask, 2=blend
     uint32_t doubleSided;
-    uint32_t _pad1;
+    uint32_t materialClass; // Shared SURFACE_CLASS_* id used by deferred/post.
 };
 
 // Per-mesh lookup table entry for bindless buffer access in compute shaders.
@@ -114,6 +115,10 @@ struct VBMaterialOutput {
 
 // Triple buffering constant (must match Renderer.h kFrameCount)
 static constexpr uint32_t kVBFrameCount = 3;
+static constexpr uint32_t kVBResolveVisDepthSlots = 2;
+static constexpr uint32_t kVBResolveGBufferUavSlots = 6;
+static constexpr uint32_t kVBDeferredGBufferSrvSlots = 7;
+static constexpr uint32_t kVBDeferredEnvShadowSrvSlots = 4;
 
 // Visibility Buffer Renderer
 // Two-phase deferred rendering:
@@ -212,6 +217,19 @@ public:
         D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress = 0
     );
 
+    // Graph-friendly visibility stages. RenderVisibilityPass remains the
+    // compatibility wrapper that executes both in order.
+    Result<void> ClearVisibilityBuffer(ID3D12GraphicsCommandList* cmdList);
+
+    Result<void> RasterizeVisibilityBuffer(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* depthBuffer,
+        D3D12_CPU_DESCRIPTOR_HANDLE depthDSV,
+        const glm::mat4& viewProj,
+        const std::vector<VBMeshDrawInfo>& meshDraws,
+        D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress = 0
+    );
+
     // Phase 2: Material resolve via compute shader
     Result<void> ResolveMaterials(
         ID3D12GraphicsCommandList* cmdList,
@@ -265,24 +283,94 @@ public:
     // Optional: Build per-cluster light lists for the current frame (clustered deferred).
     Result<void> BuildClusteredLightLists(ID3D12GraphicsCommandList* cmdList, const DeferredLightingParams& params);
 
+    // Ensure the persistent split-sum BRDF lookup texture exists and is ready
+    // for deferred/RT lighting. Exposed so the render graph can schedule the
+    // generation pass explicitly.
+    Result<void> EnsureBRDFLUT(ID3D12GraphicsCommandList* cmdList);
+    [[nodiscard]] bool IsBRDFLUTReady() const { return m_brdfLutReady; }
+
     // Get output G-buffer textures
     [[nodiscard]] ID3D12Resource* GetAlbedoBuffer() const { return m_gbufferAlbedo.Get(); }
     [[nodiscard]] ID3D12Resource* GetNormalRoughnessBuffer() const { return m_gbufferNormalRoughness.Get(); }
     [[nodiscard]] ID3D12Resource* GetEmissiveMetallicBuffer() const { return m_gbufferEmissiveMetallic.Get(); }
     [[nodiscard]] ID3D12Resource* GetMaterialExt0Buffer() const { return m_gbufferMaterialExt0.Get(); }
     [[nodiscard]] ID3D12Resource* GetMaterialExt1Buffer() const { return m_gbufferMaterialExt1.Get(); }
+    [[nodiscard]] ID3D12Resource* GetMaterialExt2Buffer() const { return m_gbufferMaterialExt2.Get(); }
+    [[nodiscard]] ID3D12Resource* GetBRDFLUT() const { return m_brdfLut.Get(); }
+    [[nodiscard]] ID3D12Resource* GetClusterRangesBuffer() const { return m_clusterRangesBuffer.Get(); }
+    [[nodiscard]] ID3D12Resource* GetClusterLightIndicesBuffer() const { return m_clusterLightIndicesBuffer.Get(); }
+
+    struct ResourceStateSnapshot {
+        D3D12_RESOURCE_STATES visibility = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES albedo = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES normalRoughness = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES emissiveMetallic = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES materialExt0 = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES materialExt1 = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES materialExt2 = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES brdfLut = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES clusterRanges = D3D12_RESOURCE_STATE_COMMON;
+        D3D12_RESOURCE_STATES clusterLightIndices = D3D12_RESOURCE_STATE_COMMON;
+    };
+
+    [[nodiscard]] ResourceStateSnapshot GetResourceStateSnapshot() const {
+        return ResourceStateSnapshot{
+            m_visibilityState,
+            m_albedoState,
+            m_normalRoughnessState,
+            m_emissiveMetallicState,
+            m_materialExt0State,
+            m_materialExt1State,
+            m_materialExt2State,
+            m_brdfLutState,
+            m_clusterRangesState,
+            m_clusterLightIndicesState,
+        };
+    }
+
+    void ApplyResourceStateSnapshot(const ResourceStateSnapshot& states) {
+        m_visibilityState = states.visibility;
+        m_albedoState = states.albedo;
+        m_normalRoughnessState = states.normalRoughness;
+        m_emissiveMetallicState = states.emissiveMetallic;
+        m_materialExt0State = states.materialExt0;
+        m_materialExt1State = states.materialExt1;
+        m_materialExt2State = states.materialExt2;
+        m_brdfLutState = states.brdfLut;
+        m_clusterRangesState = states.clusterRanges;
+        m_clusterLightIndicesState = states.clusterLightIndices;
+    }
+
+    struct TransitionSkipControls {
+        bool visibilityPass = false;
+        bool materialResolve = false;
+        bool debugBlit = false;
+        bool clusteredLights = false;
+        bool brdfLut = false;
+        bool deferredLighting = false;
+    };
+
+    void SetTransitionSkipControls(const TransitionSkipControls& controls) {
+        m_transitionSkip = controls;
+    }
+
+    [[nodiscard]] TransitionSkipControls GetTransitionSkipControls() const {
+        return m_transitionSkip;
+    }
 
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetAlbedoSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetNormalRoughnessSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetEmissiveMetallicSRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetMaterialExt0SRV() const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetMaterialExt1SRV() const;
+    [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetMaterialExt2SRV() const;
 
     [[nodiscard]] const DescriptorHandle& GetAlbedoSRVHandle() const { return m_albedoSRV; }
     [[nodiscard]] const DescriptorHandle& GetNormalRoughnessSRVHandle() const { return m_normalRoughnessSRV; }
     [[nodiscard]] const DescriptorHandle& GetEmissiveMetallicSRVHandle() const { return m_emissiveMetallicSRV; }
     [[nodiscard]] const DescriptorHandle& GetMaterialExt0SRVHandle() const { return m_materialExt0SRV; }
     [[nodiscard]] const DescriptorHandle& GetMaterialExt1SRVHandle() const { return m_materialExt1SRV; }
+    [[nodiscard]] const DescriptorHandle& GetMaterialExt2SRVHandle() const { return m_materialExt2SRV; }
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetNormalRoughnessRTV() const { return m_normalRoughnessRTV.cpu; }
     [[nodiscard]] uint32_t GetReflectionProbeTableIndex() const { return m_reflectionProbeSRV.index; }
     [[nodiscard]] uint32_t GetLocalLightsTableIndex() const { return m_localLightsSRV.index; }
@@ -306,6 +394,7 @@ public:
         EmissiveMetallic,
         MaterialExt0,
         MaterialExt1,
+        MaterialExt2,
     };
 
     // Debug: Blit albedo to HDR buffer for visualization
@@ -352,7 +441,14 @@ private:
     Result<void> CreateGBuffers();
     Result<void> CreatePipelines();
     Result<void> CreateRootSignatures();
-    Result<void> EnsureBRDFLUT(ID3D12GraphicsCommandList* cmdList);
+    Result<void> CreateVisibilityPassPipelines();
+    Result<void> CreateMaterialResolvePipeline();
+    Result<void> CreateMotionVectorPipeline();
+    Result<void> CreateClusteredLightPipeline();
+    Result<void> CreateBRDFLUTPipeline();
+    Result<void> CreateDebugBlitPipelines();
+    Result<void> CreateDeferredLightingPipeline();
+    Result<void> UpdateMeshTable(const std::vector<VBMeshDrawInfo>& meshDraws);
 
     DX12Device* m_device = nullptr;
     DescriptorHeapManager* m_descriptorManager = nullptr;
@@ -375,12 +471,14 @@ private:
     ComPtr<ID3D12Resource> m_gbufferEmissiveMetallic; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt0; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt1; // RGBA16_FLOAT
+    ComPtr<ID3D12Resource> m_gbufferMaterialExt2; // RGBA8_UNORM: surface class / masks
 
     DescriptorHandle m_albedoRTV, m_albedoSRV, m_albedoUAV;
     DescriptorHandle m_normalRoughnessRTV, m_normalRoughnessSRV, m_normalRoughnessUAV;
     DescriptorHandle m_emissiveMetallicRTV, m_emissiveMetallicSRV, m_emissiveMetallicUAV;
     DescriptorHandle m_materialExt0RTV, m_materialExt0SRV, m_materialExt0UAV;
     DescriptorHandle m_materialExt1RTV, m_materialExt1SRV, m_materialExt1UAV;
+    DescriptorHandle m_materialExt2RTV, m_materialExt2SRV, m_materialExt2UAV;
 
     // Triple-buffered instance data buffers (one per frame in flight)
     // This prevents race conditions where CPU writes while GPU reads
@@ -480,9 +578,20 @@ private:
     D3D12_RESOURCE_STATES m_emissiveMetallicState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_materialExt0State = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_materialExt1State = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES m_materialExt2State = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_brdfLutState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_clusterRangesState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES m_clusterLightIndicesState = D3D12_RESOURCE_STATE_COMMON;
+    TransitionSkipControls m_transitionSkip{};
+
+    // Stable per-frame descriptor tables. These replace recurring transient
+    // table allocations in the visibility-buffer resolve and lighting path.
+    std::array<std::array<DescriptorHandle, kVBResolveVisDepthSlots>, kVBFrameCount> m_resolveVisDepthTables{};
+    std::array<std::array<DescriptorHandle, kVBResolveGBufferUavSlots>, kVBFrameCount> m_resolveGBufferUavTables{};
+    std::array<DescriptorHandle, kVBFrameCount> m_motionVelocityUavTables{};
+    std::array<std::array<DescriptorHandle, kVBDeferredGBufferSrvSlots>, kVBFrameCount> m_deferredGBufferSrvTables{};
+    std::array<std::array<DescriptorHandle, kVBDeferredEnvShadowSrvSlots>, kVBFrameCount> m_deferredEnvShadowSrvTables{};
+    std::array<DescriptorHandle, kVBFrameCount> m_debugDepthSrvTables{};
 
     FlushCallback m_flushCallback;
 };

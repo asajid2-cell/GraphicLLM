@@ -1,0 +1,53 @@
+{
+  "recording": {
+    "duration": 45,
+    "framerate": 60,
+    "quality": "ultrafast",
+    "output_directory": "test_recordings"
+  },
+  "build": {
+    "skip_build": true,
+    "build_config": "Release"
+  },
+  "commands": {
+    "wait_before_commands": 8,
+    "key_sequences": [
+      {
+        "description": "Switch to infinite world demo (F1)",
+        "keys": ["{F1}"],
+        "delay_after_sequence": 3000
+      },
+      {
+        "description": "Move camera forward continuously - hold W for 5 seconds",
+        "keys": ["w", "w", "w", "w", "w", "w", "w", "w", "w", "w"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 2000
+      },
+      {
+        "description": "Rotate camera left - hold A for 3 seconds",
+        "keys": ["a", "a", "a", "a", "a", "a"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 2000
+      },
+      {
+        "description": "Move camera right - hold D for 3 seconds",
+        "keys": ["d", "d", "d", "d", "d", "d"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 2000
+      },
+      {
+        "description": "Move camera backward - hold S for 3 seconds",
+        "keys": ["s", "s", "s", "s", "s", "s"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 2000
+      },
+      {
+        "description": "Continuous forward movement to trigger chunk loading",
+        "keys": ["w", "w", "w", "w", "w", "w", "w", "w"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 1000
+      }
+    ],
+    "custom_notes": "Test config designed to trigger flickering during camera movement in infinite world demo"
+  }
+}

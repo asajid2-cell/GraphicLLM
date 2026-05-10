@@ -10,7 +10,9 @@
 #include <memory>
 #include <functional>
 #include <queue>
+#include <mutex>
 #include <d3d12.h>
+#include <dxgi1_6.h>
 #include <wrl/client.h>
 
 using Microsoft::WRL::ComPtr;
@@ -124,10 +126,12 @@ struct QueryFrame {
 
     bool pending = false;
     uint64_t fenceValue = 0;
+    uint64_t frameNumber = 0;
 
     // Timestamp mapping (index -> name/category)
     std::vector<std::pair<const char*, const char*>> timestampNames;
     std::vector<uint32_t> timestampDepths;
+    std::vector<uint32_t> timestampEndIndices;
     std::vector<uint32_t> scopeStack;
 };
 
@@ -157,6 +161,7 @@ public:
 
     // Resolve queries (call after GPU work is complete)
     void ResolveQueries();
+    void NotifyFrameSubmitted();
 
     // Scope profiling
     void BeginScope(ID3D12GraphicsCommandList* commandList, const char* name,

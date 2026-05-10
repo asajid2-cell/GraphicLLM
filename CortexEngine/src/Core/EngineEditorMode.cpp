@@ -2,6 +2,7 @@
 // Implementation of the Engine Editor parallel architecture mode.
 
 #include "EngineEditorMode.h"
+#include "Graphics/RendererControlApplier.h"
 #include "Engine.h"
 #include "Window.h"
 #include "Graphics/Renderer.h"
@@ -160,11 +161,7 @@ Result<void> EngineEditorMode::Initialize(Engine* engine, Graphics::Renderer* re
     camTransform.worldMatrix = camTransform.GetLocalMatrix();  // Compute world matrix
     m_registry->GetRegistry().emplace<Scene::TransformComponent>(m_cameraEntity, camTransform);
 
-    // Configure renderer for editor mode
-    // - Disable IBL (use procedural sky for terrain)
-    // - Enable shadows
-    // - Set initial sun position from time of day
-    m_renderer->SetIBLEnabled(false);
+    Graphics::ApplyEditorModeBaseControls(*m_renderer);
     UpdateTimeOfDay(0.0f);  // Initialize sun position
 
     m_initialized = true;
@@ -217,12 +214,22 @@ void EngineEditorMode::Update(float deltaTime) {
     // Update sun position based on time
     UpdateTimeOfDay(deltaTime);
 
-    // Update camera movement input from keyboard state
-    UpdateCamera(deltaTime);
+    // Check if Engine is in play mode with terrain - sync EditorCamera to follow player
+    if (m_engine && m_engine->IsPlayModeActive() && m_engine->IsTerrainEnabled()) {
+        // In play mode, the Engine's active camera is controlled by UpdatePlayMode
+        // We sync EditorCamera to that position so terrain streaming follows the player
+        glm::vec3 playerPos = m_engine->GetActiveCameraPosition();
+        if (m_camera) {
+            m_camera->SetPosition(playerPos);
+        }
+    } else {
+        // Normal editor camera control
+        UpdateCamera(deltaTime);
 
-    // Update EditorCamera (handles movement, transitions, terrain clamping)
-    if (m_camera) {
-        m_camera->Update(deltaTime);
+        // Update EditorCamera (handles movement, transitions, terrain clamping)
+        if (m_camera) {
+            m_camera->Update(deltaTime);
+        }
     }
 
     // Update EditorWorld (chunk streaming based on camera position)
@@ -354,6 +361,9 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
         return;
     }
 
+    // When Engine is in play mode with terrain, let Engine handle all camera input
+    bool playModeActive = m_engine && m_engine->IsPlayModeActive() && m_engine->IsTerrainEnabled();
+
     switch (event.type) {
         case SDL_EVENT_KEY_DOWN: {
             SDL_Keycode key = event.key.key;
@@ -439,6 +449,9 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
         }
 
         case SDL_EVENT_MOUSE_MOTION: {
+            // Skip camera input when play mode is active (Engine handles it)
+            if (playModeActive) break;
+
             // Forward mouse motion to EditorCamera when camera control is active
             if (m_cameraControlActive && m_camera) {
                 m_camera->ProcessMouseMove(
@@ -450,6 +463,9 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
         }
 
         case SDL_EVENT_MOUSE_WHEEL: {
+            // Skip camera input when play mode is active
+            if (playModeActive) break;
+
             // Forward scroll to EditorCamera (for orbit zoom or fly speed adjustment)
             if (m_camera) {
                 m_camera->ProcessMouseScroll(static_cast<float>(event.wheel.y));
@@ -458,6 +474,9 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
         }
 
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            // Skip camera input when play mode is active
+            if (playModeActive) break;
+
             if (event.button.button == SDL_BUTTON_RIGHT) {
                 m_cameraControlActive = true;
                 if (m_engine && m_engine->GetWindow()) {
@@ -468,6 +487,9 @@ void EngineEditorMode::ProcessInput(const SDL_Event& event) {
         }
 
         case SDL_EVENT_MOUSE_BUTTON_UP: {
+            // Skip camera input when play mode is active
+            if (playModeActive) break;
+
             if (event.button.button == SDL_BUTTON_RIGHT) {
                 m_cameraControlActive = false;
                 if (m_engine && m_engine->GetWindow()) {
@@ -517,7 +539,33 @@ void EngineEditorMode::UpdateCamera(float /*deltaTime*/) {
 }
 
 void EngineEditorMode::SyncCameraToECS() {
-    if (!m_camera || !m_registry || m_cameraEntity == entt::null) {
+    if (!m_camera || !m_registry) {
+        return;
+    }
+
+    // Check if camera entity is still valid (might have been destroyed by scene rebuild)
+    if (m_cameraEntity == entt::null || !m_registry->GetRegistry().valid(m_cameraEntity)) {
+        // Recreate camera entity
+        m_cameraEntity = m_registry->CreateEntity();
+        Scene::CameraComponent cam;
+        cam.fov = m_camera->GetFOV();
+        cam.nearPlane = 0.1f;
+        cam.farPlane = 2000.0f;
+        cam.isActive = true;
+        m_registry->GetRegistry().emplace<Scene::CameraComponent>(m_cameraEntity, cam);
+
+        Scene::TransformComponent camTransform;
+        camTransform.position = m_camera->GetPosition();
+        float yaw = m_camera->GetYaw();
+        float pitch = m_camera->GetPitch();
+        glm::quat yawQuat = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::quat pitchQuat = glm::angleAxis(-pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+        camTransform.rotation = yawQuat * pitchQuat;
+        camTransform.scale = glm::vec3(1.0f);
+        camTransform.worldMatrix = camTransform.GetLocalMatrix();
+        m_registry->GetRegistry().emplace<Scene::TransformComponent>(m_cameraEntity, camTransform);
+
+        spdlog::info("EngineEditorMode: Recreated camera entity after scene rebuild");
         return;
     }
 
@@ -549,9 +597,7 @@ void EngineEditorMode::UpdateTimeOfDay(float /*deltaTime*/) {
     glm::vec3 sunColor = CalculateSunColor();
     float sunIntensity = CalculateSunIntensity();
 
-    m_renderer->SetSunDirection(sunDir);
-    m_renderer->SetSunColor(sunColor);
-    m_renderer->SetSunIntensity(sunIntensity);
+    Graphics::ApplyEditorTimeOfDayControls(*m_renderer, sunDir, sunColor, sunIntensity);
 }
 
 glm::vec3 EngineEditorMode::CalculateSunDirection() const {

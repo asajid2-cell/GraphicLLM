@@ -1,0 +1,60 @@
+{
+  "recording": {
+    "duration": 120,
+    "framerate": 30,
+    "quality": "medium",
+    "output_directory": "test_recordings"
+  },
+  "build": {
+    "skip_build": false,
+    "build_config": "Release"
+  },
+  "commands": {
+    "wait_before_commands": 8,
+    "key_sequences": [
+      {
+        "description": "Extended movement test",
+        "keys": ["w", "w", "w", "w"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 1000
+      },
+      {
+        "description": "Turn left and move",
+        "keys": ["a", "w", "w", "w"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 1000
+      },
+      {
+        "description": "Turn right and move",
+        "keys": ["d", "w", "w", "w"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 1000
+      },
+      {
+        "description": "Move backward",
+        "keys": ["s", "s", "s"],
+        "delay_between_keys": 500,
+        "delay_after_sequence": 1000
+      },
+      {
+        "description": "Jump test",
+        "keys": [" ", " ", " "],
+        "delay_between_keys": 800,
+        "delay_after_sequence": 2000
+      },
+      {
+        "description": "Open and close menu",
+        "keys": ["{ESC}", "{ESC}"],
+        "delay_between_keys": 1500,
+        "delay_after_sequence": 1000
+      },
+      {
+        "description": "Function key test",
+        "keys": ["{F1}", "{F2}", "{F3}"],
+        "delay_between_keys": 1000,
+        "delay_after_sequence": 1000
+      }
+    ],
+    "custom_notes": "Extended 2-minute test with comprehensive movement and UI testing"
+  }
+}

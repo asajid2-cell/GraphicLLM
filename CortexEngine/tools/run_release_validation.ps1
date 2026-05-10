@@ -159,6 +159,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "glass_water_courtyard" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_glass_water_courtyard_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "visual_baseline_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

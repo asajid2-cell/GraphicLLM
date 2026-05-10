@@ -66,8 +66,8 @@ struct EngineConfig {
 
     // Optional initial scene preset. When empty, the engine chooses its
     // default (currently the RT showcase gallery). Accepted values include
-    // "dragon", "rt_showcase", "material_lab", "effects_showcase",
-    // "temporal_validation", and "cornell".
+    // "dragon", "rt_showcase", "material_lab", "glass_water_courtyard",
+    // "effects_showcase", "temporal_validation", and "cornell".
     std::string initialScenePreset;
     std::string initialEnvironmentPreset;
     std::string initialGraphicsPreset;
@@ -148,6 +148,7 @@ private:
         TemporalValidation = 5,
         MaterialLab       = 6,
         EffectsShowcase   = 7,
+        GlassWaterCourtyard = 8,
     };
 
     void ProcessInput();
@@ -165,6 +166,7 @@ private:
     void BuildRTShowcaseScene();
     void BuildMaterialLabScene();
     void BuildEffectsShowcaseScene();
+    void BuildGlassWaterCourtyardScene();
     void BuildGodRaysScene();
     void BuildTemporalValidationScene();
 

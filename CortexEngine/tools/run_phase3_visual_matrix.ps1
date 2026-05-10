@@ -125,6 +125,18 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    $courtyardLogDir = Join-Path $matrixLogDir "glass_water_courtyard_release"
+    Invoke-MatrixStep "glass_water_courtyard_release" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_glass_water_courtyard_smoke.ps1"),
+        "-NoBuild",
+        "-LogDir", $courtyardLogDir,
+        "-SmokeFrames", [string]$TemporalSmokeFrames
+    ) (Join-Path $courtyardLogDir "frame_report_last.json")
+}
+
+if ($failures.Count -eq 0) {
     $effectsLogDir = Join-Path $matrixLogDir "effects_showcase_release"
     Invoke-MatrixStep "effects_showcase_release" @(
         "-NoProfile",

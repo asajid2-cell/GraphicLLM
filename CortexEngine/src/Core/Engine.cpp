@@ -125,6 +125,8 @@ namespace {
                normalized == "rt_showcase" || normalized == "material_lab" ||
                normalized == "materiallab" || normalized == "effects_showcase" ||
                normalized == "effectsshowcase" || normalized == "effects" ||
+               normalized == "glass_water_courtyard" ||
+               normalized == "glasswatercourtyard" || normalized == "courtyard" ||
                normalized == "god_rays" ||
                normalized == "godrays" || normalized == "temporal" ||
                normalized == "temporalvalidation" ||
@@ -484,6 +486,10 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::RTShowcase;
         } else if (sceneLower == "material_lab" || sceneLower == "materiallab" || sceneLower == "materials") {
             m_currentScenePreset = ScenePreset::MaterialLab;
+        } else if (sceneLower == "glass_water_courtyard" ||
+                   sceneLower == "glasswatercourtyard" ||
+                   sceneLower == "courtyard") {
+            m_currentScenePreset = ScenePreset::GlassWaterCourtyard;
         } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
             m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
@@ -928,6 +934,9 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::MaterialLab;
         break;
     case ScenePreset::MaterialLab:
+        next = ScenePreset::GlassWaterCourtyard;
+        break;
+    case ScenePreset::GlassWaterCourtyard:
         next = ScenePreset::EffectsShowcase;
         break;
     case ScenePreset::EffectsShowcase:
@@ -1469,6 +1478,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::DragonOverWater: return "dragon_over_water";
         case ScenePreset::RTShowcase: return "rt_showcase";
         case ScenePreset::MaterialLab: return "material_lab";
+        case ScenePreset::GlassWaterCourtyard: return "glass_water_courtyard";
         case ScenePreset::EffectsShowcase: return "effects_showcase";
         case ScenePreset::GodRays: return "god_rays";
         case ScenePreset::TemporalValidation: return "temporal_validation";
@@ -1786,6 +1796,7 @@ void Engine::InitializeScene() {
     case ScenePreset::DragonOverWater:
     case ScenePreset::RTShowcase:
     case ScenePreset::MaterialLab:
+    case ScenePreset::GlassWaterCourtyard:
     case ScenePreset::EffectsShowcase:
     case ScenePreset::GodRays:
     case ScenePreset::TemporalValidation:

@@ -139,8 +139,8 @@ if ($failures.Count -eq 0) {
         Add-Failure "visual validation image missing: $visualPath"
     }
 
-    if ([int]$materials.sampled -lt 16) {
-        Add-Failure "sampled material count is $($materials.sampled), expected >= 16"
+    if ([int]$materials.sampled -lt 18) {
+        Add-Failure "sampled material count is $($materials.sampled), expected >= 18"
     }
     if ([int]$materials.validation_warnings -ne 0 -or [int]$materials.validation_errors -ne 0) {
         Add-Failure "material validation issues: warnings=$($materials.validation_warnings) errors=$($materials.validation_errors)"
@@ -153,11 +153,13 @@ if ($failures.Count -eq 0) {
         [int]$materials.surface_brushed_metal -lt 1) {
         Add-Failure "material surface coverage is incomplete"
     }
-    if ([int]$materials.advanced_feature_materials -lt 5 -or
+    if ([int]$materials.advanced_feature_materials -lt 7 -or
         [int]$materials.advanced_clearcoat -lt 1 -or
         [int]$materials.advanced_transmission -lt 1 -or
         [int]$materials.advanced_emissive -lt 1 -or
-        [int]$materials.advanced_specular -lt 1) {
+        [int]$materials.advanced_specular -lt 1 -or
+        [int]$materials.advanced_sheen -lt 1 -or
+        [int]$materials.advanced_subsurface -lt 1) {
         Add-Failure "advanced material coverage is incomplete"
     }
 }

@@ -471,7 +471,7 @@ private:
     ComPtr<ID3D12Resource> m_gbufferEmissiveMetallic; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt0; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt1; // RGBA16_FLOAT
-    ComPtr<ID3D12Resource> m_gbufferMaterialExt2; // RGBA8_UNORM: surface class / masks
+    ComPtr<ID3D12Resource> m_gbufferMaterialExt2; // RGBA8_UNORM: surface class / reflection mask / sheen / SSS wrap
 
     DescriptorHandle m_albedoRTV, m_albedoSRV, m_albedoUAV;
     DescriptorHandle m_normalRoughnessRTV, m_normalRoughnessSRV, m_normalRoughnessUAV;

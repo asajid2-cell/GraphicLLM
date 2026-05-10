@@ -171,6 +171,7 @@ public:
     void SetShadowPCFRadius(float radius);
     void SetCascadeSplitLambda(float lambda);
     void SetBloomIntensity(float intensity);
+    void SetBloomShape(float threshold, float softKnee, float maxContribution);
     void SetFractalParams(float amplitude, float frequency, float octaves,
                           float coordMode, float scaleX, float scaleZ,
                           float lacunarity = 2.0f, float gain = 0.5f,
@@ -278,6 +279,7 @@ public:
     [[nodiscard]] FeatureState GetFeatureState() const;
     [[nodiscard]] RayTracingState GetRayTracingState() const;
     [[nodiscard]] WaterState GetWaterState() const;
+    [[nodiscard]] PostProcessState GetPostProcessState() const;
 
     // Estimated VRAM usage for the current frame. This walks renderer-owned
     // D3D12 resources plus asset-registry buckets so the UI reflects actual

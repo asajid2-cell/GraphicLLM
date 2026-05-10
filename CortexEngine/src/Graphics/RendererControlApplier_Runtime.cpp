@@ -59,6 +59,12 @@ bool ApplyBloomIntensityControl(Renderer& renderer, float intensity) {
     return true;
 }
 
+void ApplyBloomShapeControl(Renderer& renderer, float threshold, float softKnee, float maxContribution) {
+    renderer.SetBloomShape(std::clamp(threshold, 0.1f, 10.0f),
+                           std::clamp(softKnee, 0.0f, 1.0f),
+                           std::clamp(maxContribution, 0.0f, 16.0f));
+}
+
 void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle, bool enabled) {
     switch (toggle) {
     case RendererFeatureToggle::Shadows:

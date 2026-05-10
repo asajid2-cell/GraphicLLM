@@ -275,6 +275,18 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.instanceCapacity = m_particleState.instanceCapacity;
     contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
 
+    contract.cinematicPost.postProcessPlanned = featurePlan.runPostProcess;
+    contract.cinematicPost.postProcessExecuted = m_frameDiagnostics.timings.postMs > 0.0f;
+    contract.cinematicPost.bloomPlanned = featurePlan.runBloom;
+    contract.cinematicPost.bloomExecuted = m_frameDiagnostics.timings.bloomMs > 0.0f;
+    contract.cinematicPost.bloomIntensity = m_bloomResources.intensity;
+    contract.cinematicPost.bloomThreshold = m_bloomResources.threshold;
+    contract.cinematicPost.bloomSoftKnee = m_bloomResources.softKnee;
+    contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
+    contract.cinematicPost.warm = m_postProcessState.warm;
+    contract.cinematicPost.cool = m_postProcessState.cool;
+    contract.cinematicPost.godRayIntensity = m_postProcessState.godRayIntensity;
+
     contract.motionVectors = m_frameDiagnostics.contract.motionVectors;
     contract.temporalMask = m_frameDiagnostics.contract.temporalMask;
 

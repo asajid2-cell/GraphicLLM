@@ -225,6 +225,19 @@ json FrameContractToJson(const FrameContract& contract) {
             {"instance_capacity", contract.particles.instanceCapacity},
             {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
         }},
+        {"cinematic_post", {
+            {"post_process_planned", contract.cinematicPost.postProcessPlanned},
+            {"post_process_executed", contract.cinematicPost.postProcessExecuted},
+            {"bloom_planned", contract.cinematicPost.bloomPlanned},
+            {"bloom_executed", contract.cinematicPost.bloomExecuted},
+            {"bloom_intensity", contract.cinematicPost.bloomIntensity},
+            {"bloom_threshold", contract.cinematicPost.bloomThreshold},
+            {"bloom_soft_knee", contract.cinematicPost.bloomSoftKnee},
+            {"bloom_max_contribution", contract.cinematicPost.bloomMaxContribution},
+            {"warm", contract.cinematicPost.warm},
+            {"cool", contract.cinematicPost.cool},
+            {"god_ray_intensity", contract.cinematicPost.godRayIntensity}
+        }},
         {"motion_vectors", {
             {"planned", contract.motionVectors.planned},
             {"executed", contract.motionVectors.executed},

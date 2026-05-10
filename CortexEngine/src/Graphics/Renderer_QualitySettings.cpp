@@ -33,6 +33,24 @@ void Renderer::SetBloomIntensity(float intensity) {
     spdlog::info("Renderer bloom intensity set to {}", m_bloomResources.intensity);
 }
 
+void Renderer::SetBloomShape(float threshold, float softKnee, float maxContribution) {
+    const float clampedThreshold = glm::clamp(threshold, 0.1f, 10.0f);
+    const float clampedSoftKnee = glm::clamp(softKnee, 0.0f, 1.0f);
+    const float clampedMaxContribution = glm::clamp(maxContribution, 0.0f, 16.0f);
+    if (std::abs(clampedThreshold - m_bloomResources.threshold) < 1e-4f &&
+        std::abs(clampedSoftKnee - m_bloomResources.softKnee) < 1e-4f &&
+        std::abs(clampedMaxContribution - m_bloomResources.maxContribution) < 1e-4f) {
+        return;
+    }
+    m_bloomResources.threshold = clampedThreshold;
+    m_bloomResources.softKnee = clampedSoftKnee;
+    m_bloomResources.maxContribution = clampedMaxContribution;
+    spdlog::info("Renderer bloom shape set to threshold={} soft_knee={} max={}",
+                 m_bloomResources.threshold,
+                 m_bloomResources.softKnee,
+                 m_bloomResources.maxContribution);
+}
+
 void Renderer::SetColorGrade(float warm, float cool) {
     // Clamp to a reasonable range to keep grading subtle.
     float clampedWarm = glm::clamp(warm, -1.0f, 1.0f);

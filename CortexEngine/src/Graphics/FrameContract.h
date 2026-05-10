@@ -261,6 +261,20 @@ struct FrameContract {
         uint64_t instanceBufferBytes = 0;
     };
 
+    struct CinematicPostInfo {
+        bool postProcessPlanned = false;
+        bool postProcessExecuted = false;
+        bool bloomPlanned = false;
+        bool bloomExecuted = false;
+        float bloomIntensity = 0.0f;
+        float bloomThreshold = 1.0f;
+        float bloomSoftKnee = 0.5f;
+        float bloomMaxContribution = 4.0f;
+        float warm = 0.0f;
+        float cool = 0.0f;
+        float godRayIntensity = 0.0f;
+    };
+
     struct MotionVectorInfo {
         bool planned = false;
         bool executed = false;
@@ -508,6 +522,7 @@ struct FrameContract {
     LightingInfo lighting;
     CullingInfo culling;
     ParticleInfo particles;
+    CinematicPostInfo cinematicPost;
     MotionVectorInfo motionVectors;
     TemporalMaskInfo temporalMask;
     BudgetInfo budget;

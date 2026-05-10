@@ -155,6 +155,14 @@ Renderer::WaterState Renderer::GetWaterState() const {
     return m_waterState;
 }
 
+Renderer::PostProcessState Renderer::GetPostProcessState() const {
+    PostProcessState state = m_postProcessState;
+    state.bloomThreshold = m_bloomResources.threshold;
+    state.bloomSoftKnee = m_bloomResources.softKnee;
+    state.bloomMaxContribution = m_bloomResources.maxContribution;
+    return state;
+}
+
 bool Renderer::HasCapturedVisualValidation() const {
     return GetQualityState().visualValidationCaptured;
 }

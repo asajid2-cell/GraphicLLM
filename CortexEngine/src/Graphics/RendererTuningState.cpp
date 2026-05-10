@@ -14,6 +14,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     const auto features = renderer.GetFeatureState();
     const auto rt = renderer.GetRayTracingState();
     const auto water = renderer.GetWaterState();
+    const auto post = renderer.GetPostProcessState();
 
     state.quality.renderScale = quality.renderScale;
     state.quality.taaEnabled = features.taaEnabled;
@@ -59,6 +60,11 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.water.secondaryAmplitude = water.secondaryAmplitude;
 
     state.particles.enabled = features.particlesEnabled;
+
+    state.cinematicPost.bloomThreshold = post.bloomThreshold;
+    state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
+    state.cinematicPost.vignette = 0.0f;
+    state.cinematicPost.lensDirt = 0.0f;
 
     return ClampRendererTuningState(state);
 }
@@ -156,6 +162,10 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.water.waveSpeed,
                            state.water.secondaryAmplitude);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::Particles, state.particles.enabled);
+    ApplyBloomShapeControl(renderer,
+                           state.cinematicPost.bloomThreshold,
+                           state.cinematicPost.bloomSoftKnee,
+                           4.0f);
 }
 
 } // namespace Cortex::Graphics

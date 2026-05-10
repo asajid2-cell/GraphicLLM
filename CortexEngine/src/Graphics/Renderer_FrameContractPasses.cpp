@@ -173,6 +173,14 @@ void Renderer::RecordFramePass(const char* name,
             : 0u;
     m_frameDiagnostics.contract.lastPassDescriptorUsage = record.descriptors;
 
+    if (record.name == "Bloom") {
+        m_frameDiagnostics.contract.contract.cinematicPost.bloomPlanned = planned;
+        m_frameDiagnostics.contract.contract.cinematicPost.bloomExecuted = executed;
+    } else if (record.name == "PostProcess" || record.name == "RenderGraphEndFrame") {
+        m_frameDiagnostics.contract.contract.cinematicPost.postProcessPlanned = planned;
+        m_frameDiagnostics.contract.contract.cinematicPost.postProcessExecuted = executed;
+    }
+
     m_frameDiagnostics.contract.passRecords.push_back(std::move(record));
 }
 

@@ -64,6 +64,8 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.screen_space.ssao_intensity" ([double]$preset.screen_space.ssao_intensity) 0.0 3.0
     Assert-Range "$id.atmosphere.fog_density" ([double]$preset.atmosphere.fog_density) 0.0 0.2
     Assert-Range "$id.particles.density" ([double]$preset.particles.density) 0.0 2.0
+    Assert-Range "$id.cinematic_post.bloom_threshold" ([double]$preset.cinematic_post.bloom_threshold) 0.1 10.0
+    Assert-Range "$id.cinematic_post.bloom_soft_knee" ([double]$preset.cinematic_post.bloom_soft_knee) 0.0 1.0
     Assert-Range "$id.cinematic_post.vignette" ([double]$preset.cinematic_post.vignette) 0.0 1.0
     Assert-Range "$id.cinematic_post.motion_blur" ([double]$preset.cinematic_post.motion_blur) 0.0 1.0
 }

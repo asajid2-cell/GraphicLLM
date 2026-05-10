@@ -32,6 +32,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_SSAO_INTENSITY = 9019,
     IDC_GFX_FOG_DENSITY = 9020,
     IDC_GFX_WATER_WAVE = 9021,
+    IDC_GFX_BLOOM_THRESHOLD = 9022,
+    IDC_GFX_BLOOM_KNEE = 9023,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -86,6 +88,8 @@ struct GraphicsSettingsState {
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
     SliderBinding waterWave;
+    SliderBinding bloomThreshold;
+    SliderBinding bloomKnee;
 
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
@@ -185,6 +189,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
     g_gfx.tuning.water.waveAmplitude = SliderToFloat(g_gfx.waterWave);
+    g_gfx.tuning.cinematicPost.bloomThreshold = SliderToFloat(g_gfx.bloomThreshold);
+    g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
 }
 
 void ApplyTuningState() {
@@ -218,6 +224,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
     SetSliderFromFloat(g_gfx.waterWave, g_gfx.tuning.water.waveAmplitude);
+    SetSliderFromFloat(g_gfx.bloomThreshold, g_gfx.tuning.cinematicPost.bloomThreshold);
+    SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -453,6 +461,8 @@ void RegisterGraphicsSettingsClass() {
             makeSection(L"Showcase Effects");
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
             makeSlider(IDC_GFX_WATER_WAVE, L"Water Wave Amp", g_gfx.waterWave, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
+            makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);
 
             makeSection(L"Actions");
             {

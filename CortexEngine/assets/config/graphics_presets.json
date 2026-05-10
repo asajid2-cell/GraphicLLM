@@ -49,6 +49,8 @@
       "cinematic_post": {
         "enabled": true,
         "preset": "clean_filmic",
+        "bloom_threshold": 1.0,
+        "bloom_soft_knee": 0.5,
         "vignette": 0.0,
         "motion_blur": 0.0
       }
@@ -100,6 +102,8 @@
       "cinematic_post": {
         "enabled": false,
         "preset": "neutral",
+        "bloom_threshold": 1.2,
+        "bloom_soft_knee": 0.4,
         "vignette": 0.0,
         "motion_blur": 0.0
       }

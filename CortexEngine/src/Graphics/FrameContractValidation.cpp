@@ -585,6 +585,22 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.particles.instanceMapFailed) {
         warn("particle_instance_map_failed");
     }
+    if (contract.cinematicPost.bloomThreshold < 0.1f ||
+        contract.cinematicPost.bloomThreshold > 10.0f ||
+        contract.cinematicPost.bloomSoftKnee < 0.0f ||
+        contract.cinematicPost.bloomSoftKnee > 1.0f ||
+        contract.cinematicPost.bloomMaxContribution < 0.0f ||
+        contract.cinematicPost.bloomMaxContribution > 16.0f) {
+        warn("cinematic_post_bloom_shape_out_of_range");
+    }
+    if (contract.cinematicPost.bloomExecuted && !passExecuted("Bloom")) {
+        warn("cinematic_post_bloom_executed_without_pass_record");
+    }
+    if (contract.cinematicPost.postProcessExecuted &&
+        !passExecuted("PostProcess") &&
+        !passExecuted("RenderGraphEndFrame")) {
+        warn("cinematic_post_postprocess_executed_without_pass_record");
+    }
     if (d.debugLineDraws > 0 && !passExecuted("DebugLines")) {
         warn("debug_line_draws_without_pass_record");
     }

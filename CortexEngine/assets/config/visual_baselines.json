@@ -30,6 +30,28 @@
         "near_white_ratio": { "max": 0.14 },
         "dark_detail_ratio": { "max": 0.68 }
       }
+    },
+    {
+      "id": "material_lab_hero_release",
+      "scene": "material_lab",
+      "camera_bookmark": "hero",
+      "environment": "cool_overcast",
+      "graphics_preset": "release_showcase",
+      "lighting_rig": "material_lab_review",
+      "required": true,
+      "capture": {
+        "filename": "visual_validation_rt_showcase.bmp",
+        "smoke_frames": 140
+      },
+      "metrics": {
+        "gpu_frame_ms": { "max": 16.7 },
+        "avg_luma": { "min": 120.0, "max": 220.0 },
+        "center_avg_luma": { "min": 110.0, "max": 220.0 },
+        "nonblack_ratio": { "min": 0.95 },
+        "saturated_ratio": { "max": 0.12 },
+        "near_white_ratio": { "max": 0.20 },
+        "dark_detail_ratio": { "max": 0.08 }
+      }
     }
   ]
 }

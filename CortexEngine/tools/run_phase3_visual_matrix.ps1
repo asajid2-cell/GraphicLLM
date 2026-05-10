@@ -113,6 +113,18 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    $materialLogDir = Join-Path $matrixLogDir "material_lab_release"
+    Invoke-MatrixStep "material_lab_release" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_material_lab_smoke.ps1"),
+        "-NoBuild",
+        "-LogDir", $materialLogDir,
+        "-SmokeFrames", [string]$TemporalSmokeFrames
+    ) (Join-Path $materialLogDir "frame_report_last.json")
+}
+
+if ($failures.Count -eq 0) {
     $iblLogDir = Join-Path $matrixLogDir "ibl_gallery"
     $iblArgs = @(
         "-NoProfile",

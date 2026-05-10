@@ -106,6 +106,44 @@ void ApplyRTShowcaseSceneControls(Renderer& renderer, bool conservativeMode) {
     renderer.SetIBLEnabled(true);
 }
 
+void ApplyMaterialLabSceneControls(Renderer& renderer) {
+    renderer.SetLightingRigContract("material_lab_review", "scene_preset", false);
+    renderer.SetParticlesEnabled(false);
+    renderer.SetEnvironmentPreset("cool_overcast");
+    renderer.SetIBLEnabled(true);
+    renderer.SetIBLIntensity(0.95f, 1.15f);
+    renderer.SetBackgroundPresentation(true, 0.9f, 0.25f);
+
+    renderer.SetShadowsEnabled(true);
+    renderer.SetShadowBias(0.0005f);
+    renderer.SetShadowPCFRadius(1.2f);
+    renderer.SetCascadeSplitLambda(0.55f);
+
+    const glm::vec3 sunDir = glm::normalize(glm::vec3(-0.28f, 0.82f, 0.38f));
+    renderer.SetSunDirection(sunDir);
+    renderer.SetSunColor(glm::vec3(1.0f, 0.98f, 0.94f));
+    renderer.SetSunIntensity(2.2f);
+
+    renderer.SetRenderScale(0.85f);
+    renderer.SetExposure(1.08f);
+    renderer.SetBloomIntensity(0.08f);
+    renderer.SetFXAAEnabled(true);
+    renderer.SetTAAEnabled(true);
+    renderer.SetSSREnabled(true);
+    renderer.SetSSAOEnabled(true);
+    renderer.SetSSAOParams(0.24f, 0.035f, 0.24f);
+    renderer.SetFogEnabled(false);
+    renderer.SetGodRayIntensity(0.0f);
+    renderer.SetWaterParams(
+        -10.0f,
+        0.0f,
+        8.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f);
+}
+
 void ApplyTemporalValidationSceneControls(Renderer& renderer) {
     renderer.SetLightingRigContract("temporal_validation_lab", "scene_preset", false);
     renderer.SetSunDirection(glm::normalize(glm::vec3(-0.35f, -0.85f, 0.25f)));

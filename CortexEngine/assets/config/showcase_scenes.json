@@ -42,13 +42,39 @@
     {
       "id": "material_lab",
       "display_name": "Material Lab",
-      "current_status": "planned",
+      "current_status": "implemented_public_scene",
       "target_status": "public_showcase",
       "default_environment": "cool_overcast",
-      "default_lighting_rig": "soft_material_review",
+      "default_lighting_rig": "material_lab_review",
       "required_bookmarks": ["hero"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Material review hero",
+          "position": [0.0, 2.45, -8.2],
+          "target": [0.0, 1.05, -0.15],
+          "fov": 54.0,
+          "validation": true
+        },
+        {
+          "id": "metal_closeup",
+          "label": "Metal response closeup",
+          "position": [-3.8, 1.55, -4.2],
+          "target": [-4.2, 0.9, -1.2],
+          "fov": 42.0,
+          "validation": false
+        },
+        {
+          "id": "glass_emissive",
+          "label": "Glass and emissive closeup",
+          "position": [3.7, 1.65, -3.9],
+          "target": [3.6, 0.92, 0.8],
+          "fov": 44.0,
+          "validation": false
+        }
+      ],
       "required_features": ["material_preset_rows", "surface_class_debug", "advanced_shader_rows"],
-      "polish_gaps": ["scene implementation", "material preset coverage", "validation gates"]
+      "polish_gaps": ["material editor integration", "human-reviewed final composition"]
     },
     {
       "id": "glass_water_courtyard",

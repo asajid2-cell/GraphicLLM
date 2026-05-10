@@ -108,6 +108,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     default:
         BuildRTShowcaseScene();
         break;
+    case ScenePreset::MaterialLab:
+        BuildMaterialLabScene();
+        break;
     case ScenePreset::TemporalValidation:
         BuildTemporalValidationScene();
         break;
@@ -125,6 +128,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::CornellBox:        presetName = "Cornell Box"; break;
     case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
+    case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
     case ScenePreset::ProceduralTerrain: presetName = "Procedural Terrain"; break;
@@ -674,6 +678,206 @@ void Engine::BuildCornellScene() {
         l.range = 10.0f;
         l.innerConeDegrees = 25.0f;
         l.outerConeDegrees = 40.0f;
+        l.castsShadows = false;
+    }
+}
+
+void Engine::BuildMaterialLabScene() {
+    spdlog::info("Building public scene: Material Lab");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        Graphics::ApplyMaterialLabSceneControls(*renderer);
+    }
+
+    auto floorPlane = Utils::MeshGenerator::CreatePlane(18.0f, 10.0f);
+    auto wallPlane = Utils::MeshGenerator::CreatePlane(18.0f, 6.0f);
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.32f, 1.3f, 32);
+    auto torusMesh = Utils::MeshGenerator::CreateTorus(0.52f, 0.16f, 32, 16);
+
+    if (renderer) {
+        auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+            if (!mesh) return true;
+            auto res = renderer->UploadMesh(mesh);
+            if (res.IsErr()) {
+                spdlog::warn("Failed to upload MaterialLab {} mesh: {}", label, res.Error());
+                return false;
+            }
+            if (renderer->IsDeviceRemoved()) {
+                spdlog::error("DX12 device was removed while uploading MaterialLab {} mesh", label);
+                return false;
+            }
+            return true;
+        };
+
+        if (!uploadMesh(floorPlane, "floor") ||
+            !uploadMesh(wallPlane, "wall") ||
+            !uploadMesh(sphereMesh, "sphere") ||
+            !uploadMesh(cubeMesh, "cube") ||
+            !uploadMesh(cylinderMesh, "cylinder") ||
+            !uploadMesh(torusMesh, "torus")) {
+            return;
+        }
+    }
+
+    {
+        entt::entity camEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
+        t.position = glm::vec3(0.0f, 2.45f, -8.2f);
+        const glm::vec3 target(0.0f, 1.05f, -0.15f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = 54.0f;
+        cam.isActive = true;
+        m_activeCameraEntity = camEntity;
+    }
+
+    auto addRenderable = [&](const char* tag,
+                             const std::shared_ptr<Scene::MeshData>& mesh,
+                             const glm::vec3& position,
+                             const glm::vec3& scale,
+                             const glm::vec3& euler,
+                             const glm::vec4& color,
+                             float metallic,
+                             float roughness,
+                             const char* preset) -> entt::entity {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.scale = scale;
+        t.rotation = glm::quat(euler);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = color;
+        r.metallic = metallic;
+        r.roughness = roughness;
+        r.ao = 1.0f;
+        r.presetName = preset;
+        return e;
+    };
+
+    if (floorPlane && floorPlane->gpuBuffers) {
+        auto floor = addRenderable("MaterialLab_Floor", floorPlane,
+                                   glm::vec3(0.0f, 0.0f, 0.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.56f, 0.58f, 0.58f, 1.0f),
+                                   0.0f, 0.78f, "masonry");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
+        r.doubleSided = true;
+        r.normalScale = 0.2f;
+    }
+
+    if (wallPlane && wallPlane->gpuBuffers) {
+        auto back = addRenderable("MaterialLab_Backdrop", wallPlane,
+                                  glm::vec3(0.0f, 3.0f, 4.2f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
+                                  glm::vec4(0.74f, 0.75f, 0.73f, 1.0f),
+                                  0.0f, 0.68f, "backdrop");
+        m_registry->GetComponent<Scene::RenderableComponent>(back).doubleSided = true;
+    }
+
+    struct Swatch {
+        const char* tag;
+        const char* preset;
+        glm::vec4 color;
+        float metallic;
+        float roughness;
+        const std::shared_ptr<Scene::MeshData>* mesh;
+        glm::vec3 scale;
+        glm::vec3 euler;
+    };
+
+    const Swatch swatches[] = {
+        {"MaterialLab_MirrorSphere", "mirror", glm::vec4(1.0f), 1.0f, 0.02f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_ChromeSphere", "chrome", glm::vec4(0.68f, 0.68f, 0.72f, 1.0f), 1.0f, 0.14f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_BrushedCylinder", "brushed_metal", glm::vec4(0.72f, 0.72f, 0.76f, 1.0f), 1.0f, 0.32f, &cylinderMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_GoldTorus", "gold", glm::vec4(1.0f, 0.76f, 0.35f, 1.0f), 1.0f, 0.20f, &torusMesh, glm::vec3(1.0f), glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)},
+        {"MaterialLab_ClearcoatCube", "clearcoat", glm::vec4(0.12f, 0.26f, 0.75f, 1.0f), 0.0f, 0.24f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, 0.42f, 0.0f)},
+        {"MaterialLab_PlasticSphere", "plastic", glm::vec4(0.85f, 0.12f, 0.17f, 1.0f), 0.0f, 0.38f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_GlassCube", "glass", glm::vec4(0.72f, 0.92f, 1.0f, 1.0f), 0.0f, 0.05f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, -0.35f, 0.0f)},
+        {"MaterialLab_EmissiveTorus", "emissive_panel", glm::vec4(1.0f, 0.72f, 0.28f, 1.0f), 0.0f, 0.25f, &torusMesh, glm::vec3(1.0f), glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)}
+    };
+
+    constexpr int swatchCount = static_cast<int>(sizeof(swatches) / sizeof(swatches[0]));
+    for (int i = 0; i < swatchCount; ++i) {
+        const int col = i % 4;
+        const int row = i / 4;
+        const float x = -5.4f + static_cast<float>(col) * 3.6f;
+        const float z = -1.9f + static_cast<float>(row) * 2.6f;
+        const auto& s = swatches[i];
+        if (!s.mesh || !(*s.mesh) || !(*s.mesh)->gpuBuffers) {
+            continue;
+        }
+
+        entt::entity e = addRenderable(s.tag, *s.mesh, glm::vec3(x, 0.78f, z), s.scale, s.euler,
+                                       s.color, s.metallic, s.roughness, s.preset);
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+        if (std::string(s.preset) == "glass") {
+            r.transmissionFactor = 0.68f;
+            r.ior = 1.45f;
+            r.specularFactor = 1.0f;
+        } else if (std::string(s.preset) == "clearcoat") {
+            r.clearcoatFactor = 0.9f;
+            r.clearcoatRoughnessFactor = 0.08f;
+        } else if (std::string(s.preset) == "emissive_panel") {
+            r.emissiveColor = glm::vec3(1.0f, 0.58f, 0.22f);
+            r.emissiveStrength = 3.4f;
+        }
+    }
+
+    // Neutral plinths make reflections and contact shadows easier to inspect.
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        for (int i = 0; i < 8; ++i) {
+            const int col = i % 4;
+            const int row = i / 4;
+            const float x = -5.4f + static_cast<float>(col) * 3.6f;
+            const float z = -1.9f + static_cast<float>(row) * 2.6f;
+            addRenderable(("MaterialLab_Plinth_" + std::to_string(i)).c_str(),
+                          cubeMesh,
+                          glm::vec3(x, 0.25f, z),
+                          glm::vec3(1.35f, 0.5f, 1.35f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.66f, 0.66f, 0.64f, 1.0f),
+                          0.0f, 0.62f, "backdrop");
+        }
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "MaterialLab_KeySoftbox");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(-2.8f, 5.0f, -3.2f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(glm::vec3(0.4f, -1.0f, 0.35f)),
+                                       glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::AreaRect;
+        l.color = glm::vec3(1.0f, 0.96f, 0.9f);
+        l.intensity = 3.2f;
+        l.range = 18.0f;
+        l.areaSize = glm::vec2(4.5f, 2.2f);
+        l.castsShadows = true;
+    }
+
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "MaterialLab_CoolRim");
+        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
+        t.position = glm::vec3(4.8f, 2.7f, 1.9f);
+
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Point;
+        l.color = glm::vec3(0.58f, 0.72f, 1.0f);
+        l.intensity = 2.4f;
+        l.range = 8.0f;
         l.castsShadows = false;
     }
 }
@@ -2314,6 +2518,9 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::RTShowcase) {
         pos = glm::vec3(-14.0f, 2.05f, -6.8f);
         target = glm::vec3(-14.0f, 1.05f, 0.25f);
+    } else if (m_currentScenePreset == ScenePreset::MaterialLab) {
+        pos = glm::vec3(0.0f, 2.45f, -8.2f);
+        target = glm::vec3(0.0f, 1.05f, -0.15f);
     } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
         pos = glm::vec3(0.0f, 2.3f, -6.4f);
         target = glm::vec3(0.0f, 1.0f, 0.1f);

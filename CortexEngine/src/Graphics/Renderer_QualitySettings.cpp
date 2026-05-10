@@ -66,6 +66,21 @@ void Renderer::SetColorGrade(float warm, float cool) {
                  m_postProcessState.cool);
 }
 
+void Renderer::SetCinematicPost(float vignette, float lensDirt) {
+    const float clampedVignette = glm::clamp(vignette, 0.0f, 1.0f);
+    const float clampedLensDirt = glm::clamp(lensDirt, 0.0f, 1.0f);
+    if (std::abs(clampedVignette - m_postProcessState.vignette) < 1e-3f &&
+        std::abs(clampedLensDirt - m_postProcessState.lensDirt) < 1e-3f) {
+        return;
+    }
+
+    m_postProcessState.vignette = clampedVignette;
+    m_postProcessState.lensDirt = clampedLensDirt;
+    spdlog::info("Cinematic post set to vignette={} lens_dirt={}",
+                 m_postProcessState.vignette,
+                 m_postProcessState.lensDirt);
+}
+
 float Renderer::GetRenderScale() const {
     return GetQualityState().renderScale;
 }

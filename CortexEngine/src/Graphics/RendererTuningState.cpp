@@ -229,8 +229,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
-    state.cinematicPost.vignette = 0.0f;
-    state.cinematicPost.lensDirt = 0.0f;
+    state.cinematicPost.vignette = post.vignette;
+    state.cinematicPost.lensDirt = post.lensDirt;
 
     return ClampRendererTuningState(state);
 }
@@ -332,6 +332,9 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,
                            4.0f);
+    ApplyCinematicPostControl(renderer,
+                              state.cinematicPost.vignette,
+                              state.cinematicPost.lensDirt);
 }
 
 std::filesystem::path GetDefaultRendererTuningStatePath() {

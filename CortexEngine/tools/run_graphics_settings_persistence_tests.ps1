@@ -69,7 +69,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "cinematic_post": {
     "bloom_threshold": 1.2,
-    "bloom_soft_knee": 0.4
+    "bloom_soft_knee": 0.4,
+    "vignette": 0.31,
+    "lens_dirt": 0.22
   }
 }
 '@ | Set-Content -Encoding UTF8 $validPath
@@ -139,6 +141,14 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([bool]$report.frame_contract.ray_tracing.enabled) {
         Add-Failure "valid settings did not disable ray tracing"
+    }
+    $vignette = [double]$report.frame_contract.cinematic_post.vignette
+    $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
+    if ([Math]::Abs($vignette - 0.31) -gt 0.02) {
+        Add-Failure "valid settings vignette was $vignette, expected 0.31"
+    }
+    if ([Math]::Abs($lensDirt - 0.22) -gt 0.02) {
+        Add-Failure "valid settings lens dirt was $lensDirt, expected 0.22"
     }
 }
 

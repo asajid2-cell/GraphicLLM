@@ -115,7 +115,7 @@ struct FrameConstants {
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 1 = sunset, 2 = night)
     glm::vec4 envParams;
     // x = warm tint (-1..1), y = cool tint (-1..1),
-    // z = god-ray intensity scale, w reserved
+    // z = god-ray intensity scale, w = vignette
     glm::vec4 colorGrade;
     // Exponential height fog parameters:
     // x = density, y = base height, z = height falloff, w = enabled (>0.5)
@@ -123,7 +123,7 @@ struct FrameConstants {
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
-    // w = SSR enabled (>0.5) for the post-process debug overlay
+    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255
     glm::vec4 bloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     glm::vec4 taaParams;

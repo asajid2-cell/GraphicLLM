@@ -303,6 +303,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.bloomThreshold = m_bloomResources.threshold;
     contract.cinematicPost.bloomSoftKnee = m_bloomResources.softKnee;
     contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
+    contract.cinematicPost.vignette = m_postProcessState.vignette;
+    contract.cinematicPost.lensDirt = m_postProcessState.lensDirt;
     contract.cinematicPost.warm = m_postProcessState.warm;
     contract.cinematicPost.cool = m_postProcessState.cool;
     contract.cinematicPost.godRayIntensity = m_postProcessState.godRayIntensity;

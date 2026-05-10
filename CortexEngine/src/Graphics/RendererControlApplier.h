@@ -61,6 +61,7 @@ void ApplySunDirectionControl(Renderer& renderer, const glm::vec3& direction);
 void ApplySunColorControl(Renderer& renderer, const glm::vec3& color);
 void ApplyIBLIntensityControl(Renderer& renderer, float diffuse, float specular);
 void ApplyColorGradeControl(Renderer& renderer, float warm, float cool);
+void ApplyCinematicPostControl(Renderer& renderer, float vignette, float lensDirt);
 void ApplySSAOParamsControl(Renderer& renderer, float radius, float bias, float intensity);
 void ApplyGodRayIntensityControl(Renderer& renderer, float intensity);
 void ApplySafeLightingRigControl(Renderer& renderer, bool enabled);

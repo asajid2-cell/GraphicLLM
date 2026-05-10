@@ -646,8 +646,12 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.cinematicPost.bloomSoftKnee < 0.0f ||
         contract.cinematicPost.bloomSoftKnee > 1.0f ||
         contract.cinematicPost.bloomMaxContribution < 0.0f ||
-        contract.cinematicPost.bloomMaxContribution > 16.0f) {
-        warn("cinematic_post_bloom_shape_out_of_range");
+        contract.cinematicPost.bloomMaxContribution > 16.0f ||
+        contract.cinematicPost.vignette < 0.0f ||
+        contract.cinematicPost.vignette > 1.0f ||
+        contract.cinematicPost.lensDirt < 0.0f ||
+        contract.cinematicPost.lensDirt > 1.0f) {
+        warn("cinematic_post_params_out_of_range");
     }
     if (contract.cinematicPost.bloomExecuted && !passExecuted("Bloom")) {
         warn("cinematic_post_bloom_executed_without_pass_record");

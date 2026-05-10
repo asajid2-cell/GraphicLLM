@@ -76,14 +76,13 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         static_cast<float>(m_environmentState.currentIndex));
 
     // Color grading parameters (warm/cool) for post-process. We repurpose
-    // colorGrade.z as a simple scalar for volumetric sun shafts so the
-    // intensity of "god rays" can be tuned from the UI without adding a new
-    // constant buffer field.
+    // colorGrade.z for volumetric sun shafts and colorGrade.w for vignette
+    // so Phase 3 cinematic controls stay in the existing frame constants.
     frameData.colorGrade = glm::vec4(
         m_postProcessState.warm,
         m_postProcessState.cool,
         m_postProcessState.godRayIntensity,
-        0.0f);
+        m_postProcessState.vignette);
 
     // Exponential height fog parameters
     frameData.fogParams = glm::vec4(
@@ -149,6 +148,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     if (m_visibilityBufferState.plannedThisFrame) {
         postFxFlags |= 16u;
     }
+    const uint32_t lensDirtByte = static_cast<uint32_t>(
+        glm::clamp(m_postProcessState.lensDirt, 0.0f, 1.0f) * 255.0f + 0.5f);
+    postFxFlags |= (lensDirtByte & 0xFFu) << 8u;
     frameData.bloomParams = glm::vec4( 
         m_bloomResources.threshold,
         m_bloomResources.softKnee,

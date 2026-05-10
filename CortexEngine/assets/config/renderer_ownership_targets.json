@@ -5,29 +5,37 @@
     {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
+      "status": "partially_extracted",
       "current_issue": "stats resources and readbacks are still coordinated through Renderer",
       "target_files": ["RendererRTState.h", "RTReflectionSignalStats.h"],
+      "renderer_state_members": ["m_rtReflectionSignalState", "m_rtReflectionTargets", "m_rtReflectionReadiness"],
       "next_step": "move raw/history stats buffers and descriptor table ownership behind one pass resource bundle"
     },
     {
       "id": "environment_resources",
       "owner": "Environment/IBL",
+      "status": "policy_manifest_implemented",
       "current_issue": "environment loading, residency, descriptor binding, and policy still meet in Renderer_Environment",
       "target_files": ["RendererEnvironmentState.h", "EnvironmentManifest.h"],
+      "renderer_state_members": ["m_environmentState"],
       "next_step": "keep manifest/policy parsing outside Renderer and leave Renderer_Environment as the GPU binding adapter"
     },
     {
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
+      "status": "state_bundle_started",
       "current_issue": "bloom, post constants, and cinematic controls need a shared state boundary",
-      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h"],
+      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h"],
+      "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],
       "next_step": "add a post/cinematic state bundle before adding new post effects"
     },
     {
       "id": "particle_resources",
       "owner": "Particles",
+      "status": "public_path_selected_cpu_billboards",
       "current_issue": "ECS billboard particles and GPUParticleSystem are separate paths",
       "target_files": ["RendererParticleState.h", "GPUParticles.h"],
+      "renderer_state_members": ["m_particleState"],
       "next_step": "choose the public Phase 3 path and report live particle counts through frame contracts"
     }
   ]

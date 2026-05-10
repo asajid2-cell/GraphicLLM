@@ -34,6 +34,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_WATER_WAVE = 9021,
     IDC_GFX_BLOOM_THRESHOLD = 9022,
     IDC_GFX_BLOOM_KNEE = 9023,
+    IDC_GFX_VIGNETTE = 9024,
+    IDC_GFX_LENS_DIRT = 9025,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -92,6 +94,8 @@ struct GraphicsSettingsState {
     SliderBinding waterWave;
     SliderBinding bloomThreshold;
     SliderBinding bloomKnee;
+    SliderBinding vignette;
+    SliderBinding lensDirt;
 
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
@@ -193,6 +197,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.water.waveAmplitude = SliderToFloat(g_gfx.waterWave);
     g_gfx.tuning.cinematicPost.bloomThreshold = SliderToFloat(g_gfx.bloomThreshold);
     g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
+    g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
+    g_gfx.tuning.cinematicPost.lensDirt = SliderToFloat(g_gfx.lensDirt);
 }
 
 void ApplyTuningState() {
@@ -228,6 +234,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.waterWave, g_gfx.tuning.water.waveAmplitude);
     SetSliderFromFloat(g_gfx.bloomThreshold, g_gfx.tuning.cinematicPost.bloomThreshold);
     SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
+    SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
+    SetSliderFromFloat(g_gfx.lensDirt, g_gfx.tuning.cinematicPost.lensDirt);
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -465,6 +473,8 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_WATER_WAVE, L"Water Wave Amp", g_gfx.waterWave, 0.0f, 2.0f);
             makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
 
             makeSection(L"Actions");
             {

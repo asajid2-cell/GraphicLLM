@@ -65,6 +65,11 @@ void ApplyBloomShapeControl(Renderer& renderer, float threshold, float softKnee,
                            std::clamp(maxContribution, 0.0f, 16.0f));
 }
 
+void ApplyCinematicPostControl(Renderer& renderer, float vignette, float lensDirt) {
+    renderer.SetCinematicPost(std::clamp(vignette, 0.0f, 1.0f),
+                              std::clamp(lensDirt, 0.0f, 1.0f));
+}
+
 void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle, bool enabled) {
     switch (toggle) {
     case RendererFeatureToggle::Shadows:

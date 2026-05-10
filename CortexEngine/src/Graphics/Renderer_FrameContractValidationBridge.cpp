@@ -31,38 +31,43 @@ void Renderer::ValidateFrameContract() {
     context.rtReflectionWrittenThisFrame = m_frameLifecycle.rtReflectionWrittenThisFrame;
     context.rtReflectionDenoisedThisFrame = m_rtDenoiseState.reflectionDenoisedThisFrame;
 
-    ValidateFrameContractSnapshot(m_frameDiagnostics.contract.contract, context);
+    auto& contract = m_frameDiagnostics.contract.contract;
+    if (contract.particles.executed && contract.draws.particleInstances > 0) {
+        contract.particles.submittedInstances = contract.draws.particleInstances;
+    }
 
-    const auto& materials = m_frameDiagnostics.contract.contract.materials;
+    ValidateFrameContractSnapshot(contract, context);
+
+    const auto& materials = contract.materials;
     if (materials.validationWarnings > 0 || materials.validationErrors > 0) {
-        m_frameDiagnostics.contract.contract.warnings.push_back(
+        contract.warnings.push_back(
             "material_validation_issues:" +
             std::to_string(materials.validationIssues) +
             " warnings=" + std::to_string(materials.validationWarnings) +
             " errors=" + std::to_string(materials.validationErrors));
     }
     if (materials.blendTransmission > 0) {
-        m_frameDiagnostics.contract.contract.warnings.push_back(
+        contract.warnings.push_back(
             "material_blend_transmission_count:" +
             std::to_string(materials.blendTransmission));
     }
     if (materials.metallicTransmission > 0) {
-        m_frameDiagnostics.contract.contract.warnings.push_back(
+        contract.warnings.push_back(
             "material_metallic_transmission_count:" +
             std::to_string(materials.metallicTransmission));
     }
 
-    m_frameDiagnostics.contract.contract.health.frameWarnings =
-        static_cast<uint32_t>(m_frameDiagnostics.contract.contract.warnings.size());
-    if (!m_frameDiagnostics.contract.contract.warnings.empty()) {
-        const std::string& warning = m_frameDiagnostics.contract.contract.warnings.back();
-        m_frameDiagnostics.contract.contract.health.lastWarningMessage = warning;
+    contract.health.frameWarnings =
+        static_cast<uint32_t>(contract.warnings.size());
+    if (!contract.warnings.empty()) {
+        const std::string& warning = contract.warnings.back();
+        contract.health.lastWarningMessage = warning;
         const size_t split = warning.find(':');
-        m_frameDiagnostics.contract.contract.health.lastWarningCode =
+        contract.health.lastWarningCode =
             split == std::string::npos ? warning : warning.substr(0, split);
     } else {
-        m_frameDiagnostics.contract.contract.health.lastWarningCode.clear();
-        m_frameDiagnostics.contract.contract.health.lastWarningMessage.clear();
+        contract.health.lastWarningCode.clear();
+        contract.health.lastWarningMessage.clear();
     }
 }
 

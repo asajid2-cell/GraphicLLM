@@ -206,6 +206,7 @@ public:
     void SetIBLEnabled(bool enabled);
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
+    void SetCinematicPost(float vignette, float lensDirt);
     void SetSSAOEnabled(bool enabled);
     void SetSSAOParams(float radius, float bias, float intensity);
     void SetPCSS(bool enabled);

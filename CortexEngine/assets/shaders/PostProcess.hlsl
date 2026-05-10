@@ -41,14 +41,14 @@ cbuffer FrameConstants : register(b1)
     // x = diffuse IBL intensity, y = specular IBL intensity,
     // z = IBL enabled (>0.5), w = environment index (0 = studio, 2 = night)
     float4   g_EnvParams;
-    // x = warm tint (-1..1), y = cool tint (-1..1), z = god-ray intensity, w reserved
+    // x = warm tint (-1..1), y = cool tint (-1..1), z = god-ray intensity, w = vignette
     float4   g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4   g_FogParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
-    // w = SSR enabled (>0.5) for the post-process debug overlay
+    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255
     float4   g_BloomParams;
     // x,y = jitter delta in UV (prevJitter - currJitter),
     // z = TAA blend factor, w = TAA history valid (>0.5)
@@ -869,6 +869,26 @@ float4 SampleRtReflectionEdgeAware(float2 sampleUV,
     return best;
 }
 
+float Hash21(float2 p)
+{
+    p = frac(p * float2(123.34f, 456.21f));
+    p += dot(p, p + 45.32f);
+    return frac(p.x * p.y);
+}
+
+float LensDirtMask(float2 uv)
+{
+    float2 cell = floor(uv * float2(42.0f, 27.0f));
+    float coarse = Hash21(cell);
+    float speckle = smoothstep(0.82f, 1.0f, coarse);
+
+    float2 fineCell = floor(uv * float2(160.0f, 100.0f));
+    float fine = smoothstep(0.90f, 1.0f, Hash21(fineCell));
+
+    float radial = saturate(1.0f - length(uv - 0.5f) * 1.35f);
+    return saturate((speckle * 0.75f + fine * 0.25f) * radial);
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 uv = input.uv;
@@ -881,12 +901,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
     //   bit2: RT reflection history valid
     //   bit3: disable RT reflection temporal (debug)
     //   bit4: visibility-buffer path active (HUD / debug)
+    //   bits 8-15: lens dirt amount quantized to 0..255
     uint postFxFlags = (uint)(g_BloomParams.w + 0.5f); 
     bool ssrEnabled = ((postFxFlags & 1u) != 0u); 
     bool rtReflEnabled = ((postFxFlags & 2u) != 0u); 
     bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u); 
     bool rtReflTemporalOff = ((postFxFlags & 8u) != 0u); 
     bool vbActive = ((postFxFlags & 16u) != 0u);
+    float lensDirtAmount = (float)((postFxFlags >> 8u) & 255u) * (1.0f / 255.0f);
     uint depthW, depthH;
     g_Depth.GetDimensions(depthW, depthH);
     uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
@@ -1183,6 +1205,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
         if (maxBloom > 0.0f)
         {
             bloom = min(bloom, maxBloom.xxx);
+        }
+
+        if (lensDirtAmount > 0.001f)
+        {
+            float dirt = LensDirtMask(uv);
+            bloom += bloom * dirt * lensDirtAmount * 0.75f;
         }
     }
 
@@ -1552,6 +1580,16 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float3 warmTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(1.05f, 1.0f, 0.95f), warm);
     float3 coolTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(0.96f, 1.0f, 1.05f), cool);
     color *= warmTint * coolTint;
+
+    float vignetteStrength = saturate(g_ColorGrade.w);
+    if (vignetteStrength > 0.001f)
+    {
+        float2 centered = uv * 2.0f - 1.0f;
+        centered.x *= g_PostParams.y / max(g_PostParams.x, 1e-6f);
+        float radius2 = dot(centered, centered);
+        float vignette = smoothstep(1.70f, 0.30f, radius2);
+        color *= lerp(1.0f, lerp(0.55f, 1.0f, vignette), vignetteStrength);
+    }
 
     // Screen-space ambient occlusion modulation (applied after tonemapping/grading).
     float ao = 1.0f;

@@ -99,6 +99,24 @@ if ($null -eq $particlePass) {
     Add-Failure "Particles pass record was not executed"
 }
 
+$cinematicPost = $report.frame_contract.cinematic_post
+if ($null -eq $cinematicPost) {
+    Add-Failure "frame_contract.cinematic_post is missing"
+} else {
+    if (-not [bool]$cinematicPost.post_process_planned) {
+        Add-Failure "cinematic_post.post_process_planned is false"
+    }
+    if (-not [bool]$cinematicPost.post_process_executed) {
+        Add-Failure "cinematic_post.post_process_executed is false"
+    }
+    if ($null -eq $cinematicPost.vignette) {
+        Add-Failure "cinematic_post.vignette is missing"
+    }
+    if ($null -eq $cinematicPost.lens_dirt) {
+        Add-Failure "cinematic_post.lens_dirt is missing"
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Effects gallery tests failed:" -ForegroundColor Red
     foreach ($failure in $failures) {

@@ -52,6 +52,8 @@ Assert-Contains $ui "ApplyEnvironmentResidencyLoadControl" "GraphicsSettingsWind
 Assert-Contains $ui "ApplyHeroVisualBaselineControls" "GraphicsSettingsWindow does not expose showcase baseline controls."
 Assert-Contains $ui "SaveRendererTuningStateFile" "GraphicsSettingsWindow does not expose settings save."
 Assert-Contains $ui "LoadRendererTuningStateFile" "GraphicsSettingsWindow does not expose settings load."
+Assert-Contains $ui "IDC_GFX_VIGNETTE" "GraphicsSettingsWindow does not expose vignette control."
+Assert-Contains $ui "IDC_GFX_LENS_DIRT" "GraphicsSettingsWindow does not expose lens dirt control."
 Assert-Contains $engine "CORTEX_GRAPHICS_SETTINGS_PATH" "Engine does not support user graphics settings path override."
 
 Write-Host "Graphics UI contract tests passed"

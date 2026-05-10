@@ -178,6 +178,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "advanced_graphics_catalog" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_advanced_graphics_catalog_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "effects_gallery" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

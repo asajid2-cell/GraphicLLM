@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "purpose": "Tolerant visual baseline contracts for public Phase 3 captures. These are metric gates, not pixel-perfect golden images.",
+  "policy": {
+    "baseline_type": "metric_tolerance",
+    "image_assets_committed": false,
+    "capture_format": "bmp",
+    "warmup_frames": 30,
+    "notes": "Only add committed bitmap baselines after the public scene composition has stopped changing."
+  },
+  "cases": [
+    {
+      "id": "rt_showcase_hero_release",
+      "scene": "rt_showcase",
+      "camera_bookmark": "hero",
+      "environment": "studio",
+      "graphics_preset": "release_showcase",
+      "lighting_rig": "rt_showcase_gallery",
+      "required": true,
+      "capture": {
+        "filename": "visual_validation_rt_showcase.bmp",
+        "smoke_frames": 240
+      },
+      "metrics": {
+        "gpu_frame_ms": { "max": 16.7 },
+        "avg_luma": { "min": 60.0, "max": 95.0 },
+        "center_avg_luma": { "min": 60.0, "max": 115.0 },
+        "nonblack_ratio": { "min": 0.95 },
+        "saturated_ratio": { "max": 0.12 },
+        "near_white_ratio": { "max": 0.14 },
+        "dark_detail_ratio": { "max": 0.68 }
+      }
+    }
+  ]
+}

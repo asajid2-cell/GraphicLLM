@@ -27,14 +27,10 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
     $started = Get-Date
 
     Write-Host "==> $Name" -ForegroundColor Cyan
-    $process = Start-Process `
-        -FilePath "powershell" `
-        -ArgumentList $Arguments `
-        -RedirectStandardOutput $stdoutPath `
-        -RedirectStandardError $stderrPath `
-        -PassThru `
-        -Wait `
-        -WindowStyle Hidden
+    $output = & powershell @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    $output | Set-Content -Encoding UTF8 $stdoutPath
+    "" | Set-Content -Encoding UTF8 $stderrPath
 
     $seconds = [Math]::Round(((Get-Date) - $started).TotalSeconds, 1)
     $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
@@ -42,14 +38,15 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
 
     $row = [ordered]@{
         name = $Name
-        exit_code = $process.ExitCode
+        exit_code = $exitCode
         seconds = $seconds
         log_dir = $stepLogDir
         report = $ReportPath
-        passed = $process.ExitCode -eq 0
+        passed = $exitCode -eq 0
         gpu_ms = $null
         avg_luma = $null
         frame_warnings = $null
+        camera_bookmark = ""
         environment = ""
         health_preset = ""
         lighting_rig = ""
@@ -57,8 +54,8 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
         particles = $null
     }
 
-    if ($process.ExitCode -ne 0) {
-        $script:failures.Add("$Name failed with exit code $($process.ExitCode). logs=$stepLogDir`n$stderrText`n$stdoutText")
+    if ($exitCode -ne 0) {
+        $script:failures.Add("$Name failed with exit code $exitCode. logs=$stepLogDir`n$stderrText`n$stdoutText")
         $script:rows.Add([pscustomobject]$row)
         return
     }
@@ -70,6 +67,7 @@ function Invoke-MatrixStep([string]$Name, [string[]]$Arguments, [string]$ReportP
             $row.avg_luma = $report.visual_validation.image_stats.avg_luma
         }
         $row.frame_warnings = $report.frame_contract.warnings.Count
+        $row.camera_bookmark = $report.camera.bookmark
         $row.environment = $report.frame_contract.environment.active
         $row.health_preset = $report.frame_contract.health.quality_preset
         $row.lighting_rig = $report.frame_contract.lighting.rig_id
@@ -105,6 +103,7 @@ if ($failures.Count -eq 0) {
         "-File", (Join-Path $PSScriptRoot "run_rt_showcase_smoke.ps1"),
         "-NoBuild",
         "-LogDir", $rtLogDir,
+        "-CameraBookmark", "hero",
         "-SmokeFrames", [string]$RTSmokeFrames
     )
     if ($SkipSurfaceDebug) {
@@ -133,14 +132,15 @@ $rows | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryPath
 $md = New-Object System.Collections.Generic.List[string]
 $md.Add("# Phase 3 Visual Matrix")
 $md.Add("")
-$md.Add("| Case | Passed | GPU ms | Avg luma | Environment | Preset | Lighting Rig | Warnings | Particles |")
-$md.Add("|---|---:|---:|---:|---|---|---|---:|---:|")
+$md.Add("| Case | Passed | GPU ms | Avg luma | Camera | Environment | Preset | Lighting Rig | Warnings | Particles |")
+$md.Add("|---|---:|---:|---:|---|---|---|---|---:|---:|")
 foreach ($row in $rows) {
-    $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |" -f `
+    $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} |" -f `
         $row.name,
         $row.passed,
         $row.gpu_ms,
         $row.avg_luma,
+        $row.camera_bookmark,
         $row.environment,
         $row.health_preset,
         $row.lighting_rig,

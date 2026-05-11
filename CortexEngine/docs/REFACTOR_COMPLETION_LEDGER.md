@@ -38,15 +38,18 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_191044_513_136388_1f91bf39
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_192026_492_140800_cd8984c4
 ```
 
 Key evidence from that run:
 
 - Release build: passed.
-- Temporal validation: `gpu_ms=1.273`, `disocclusion=0.00685`,
-  `high_motion=0.005223`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
-- RT showcase: `frames=33`, `gpu_ms=1.892/16.7`,
+- Temporal validation: `gpu_ms=1.521`, `disocclusion=0.006919`,
+  `high_motion=0.005239`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal camera cut: `frames=53`, `cut_frame=20`,
+  `camera=reflection_closeup`, `gpu_ms=2.446`,
+  `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
+- RT showcase: `frames=33`, `gpu_ms=2.733/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -58,9 +61,9 @@ Key evidence from that run:
 - Renderer ownership, fatal error, advanced graphics catalog, effects gallery,
   environment manifest, IBL gallery, budget profile matrix, and voxel backend
   gates passed.
-- New focused gates passed in release validation: graphics UI interaction,
-  screenshot negative gates, particle-disabled zero-cost, Phase 3 fallback
-  matrix, and RT firefly/outlier.
+- New focused gates passed in release validation: temporal camera cut,
+  graphics UI interaction, screenshot negative gates, particle-disabled
+  zero-cost, Phase 3 fallback matrix, and RT firefly/outlier.
 
 Recent git history relevant to the audit:
 
@@ -121,6 +124,7 @@ long file/function lists in every row.
 | `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release and runs all listed checks below. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
 | `tools/run_temporal_validation_smoke.ps1` | runtime | Temporal-scene gate for temporal mask, motion vectors, histories, budget, visual capture. |
+| `tools/run_temporal_camera_cut_validation.ps1` | runtime | RT Showcase camera-bookmark jump gate that verifies RT shadow/reflection/GI histories report `camera_cut`, reseed, and remain resource-valid. |
 | `tools/run_budget_profile_matrix.ps1` | runtime | RT showcase under budget profiles including low-memory variants. |
 | `tools/run_voxel_backend_smoke.ps1` | runtime | Experimental voxel backend smoke. |
 | `tools/run_phase3_visual_matrix.ps1` | runtime wrapper | Public scene matrix for Phase 3; relevant to newer release-readiness claims, not proof of all Phase 2 aspirations. |
@@ -188,9 +192,9 @@ of `phase2.md`.
 | P2-PASS-05B | Pass 5B - Material Validation And RT Material Bridge | DONE_VERIFIED | SRC-MATERIAL, SRC-RT, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase: `rt_parity=True/0`, `material_issues=0`. | More material presets can be added, but bridge is validated. |
 | P2-PASS-06A | Pass 6A - RT Scheduler Scaffold And Denoise Contract | DONE_VERIFIED | SRC-RT, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_budget_profile_matrix.ps1 -NoBuild` | RT showcase reports `rt_budget=8gb_balanced`, readiness, raw/history signal. Budget matrix passed. | UI explanation added in Phase 3, but scheduler core is done. |
 | P2-PASS-06B | Pass 6B - RT Denoiser And Low-Memory Validation | DONE_VERIFIED | SRC-RT, `assets/shaders/RTDenoise*.hlsl` if present | `tools/run_budget_profile_matrix.ps1 -NoBuild -TemporalRuns 1 -MaxParallel 1` | Latest budget matrix passed 4 GB and 2 GB profiles; RT history signal nonzero in RT showcase. | Denoiser quality tuning remains future work. |
-| P2-PASS-07A | Pass 7A - Temporal Manager And RT Reprojection Correctness | DONE_VERIFIED | SRC-TEMPORAL, SRC-RT | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with nonzero disocclusion/high-motion/object-motion and warnings=0. | Camera-cut invalidation coverage remains separate; see P2-TEMP-03. |
+| P2-PASS-07A | Pass 7A - Temporal Manager And RT Reprojection Correctness | DONE_VERIFIED | SRC-TEMPORAL, SRC-RT, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with nonzero disocclusion/high-motion/object-motion and warnings=0. Camera-cut gate passed with RT histories reset at frame 20 and reseeded by frame 53. | Additional long-duration ghosting analysis remains quality work, not a blocker for this pass. |
 | P2-PASS-07B | Pass 7B - Shared Temporal Rejection Mask | DONE_VERIFIED | SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal script checks `temporal_rejection_mask` and stats resources/passes; latest temporal smoke passed. | Additional scenes could improve coverage. |
-| P2-PASS-07C | Pass 7C - Motion Vector History Contract | DONE_VERIFIED | SRC-TEMPORAL, `Renderer_RenderGraphMotionVectors.cpp`, `RendererGPUCullingState.h` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation reports object motion and visible count with warnings=0. | Explicit camera-cut history test remains absent. |
+| P2-PASS-07C | Pass 7C - Motion Vector History Contract | DONE_VERIFIED | SRC-TEMPORAL, `Renderer_RenderGraphMotionVectors.cpp`, `RendererGPUCullingState.h`, `Renderer_FrameTemporalConstants.cpp` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation reports object motion and visible count with warnings=0. Camera-cut gate verifies RT shadow/reflection/GI history invalidation reporting and recovery. | Add more non-RT/TAA camera-cut coverage only if broader temporal UI/debug goals require it. |
 | P2-PASS-07D | Pass 7D - Temporal Mask RenderGraph Ownership | DONE_VERIFIED | SRC-TEMPORAL, `Renderer_RenderGraphTemporalMask.cpp` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal script requires `TemporalRejectionMask` pass to be render graph and no fallback; passed. | None for current runtime path. |
 | P2-PASS-07E | Pass 7E - Temporal Mask Statistics Contract | DONE_VERIFIED | SRC-TEMPORAL, SRC-CONTRACT | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal script requires valid temporal stats and ratios; passed. | None for current scene. |
 | P2-PASS-07F | Pass 7F - Temporal Motion Validation Scene | DONE_VERIFIED | `src/Core/Engine_Scenes.cpp`, SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation passed and scene log lists validation objects. | Add more temporal stress scenes for camera cuts, alpha, and high-speed geometry. |
@@ -210,8 +214,8 @@ of `phase2.md`.
 | P2-SYS-05 | Material system maturity: shared raster/VB/RT model and validation warnings. | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_rt_showcase_smoke.ps1` | Material Lab passed; RT showcase `material_issues=0`, `rt_parity=True/0`. | More authoring UI/preset depth belongs to Phase 3+ and is partial. |
 | P2-SYS-06 | Material gallery passes visual validation. | PARTIAL | SRC-SCENES, SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material Lab runtime smoke passed. | It is a smoke/luma/material coverage gate, not a full golden gallery review. |
 | P2-SYS-07 | RT scheduler, denoising, low-memory behavior, and diagnostics. | DONE_VERIFIED | SRC-RT | `tools/run_release_validation.ps1` | RT showcase plus budget matrix passed with raw/history signal and readiness. | Quality tuning remains future work. |
-| P2-SYS-08 | Temporal filters expose invalidation/reprojection and do not hide ghosting. | PARTIAL | SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with temporal mask stats. | "Never hide popping/create ghost silhouettes" is a visual-quality claim; current validation is necessary but not sufficient. |
-| P2-SYS-09 | Explicit camera-cut invalidation coverage. | NOT_STARTED | SRC-TEMPORAL likely | none found | No dedicated camera-cut validation script found. | Add camera-cut scene/test that invalidates histories and asserts reason/reporting. |
+| P2-SYS-08 | Temporal filters expose invalidation/reprojection and do not hide ghosting. | PARTIAL | SRC-TEMPORAL, SRC-RT | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with temporal mask stats. Camera-cut gate passed and proves RT histories invalidate/reseed on a large camera jump. | "Never hide popping/create ghost silhouettes" is a visual-quality claim; current validation is necessary but not sufficient. |
+| P2-SYS-09 | Explicit camera-cut invalidation coverage. | DONE_VERIFIED | `src/Core/Engine.cpp::Engine::Initialize`, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants`, SRC-TEMPORAL | `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Targeted run passed: frames=53, cut_frame=20, camera=`reflection_closeup`, `rt_reflection_reset=camera_cut`, `invalidated_frame=20`, RT shadow/reflection/GI histories reseeded and resource-valid. | None for RT history camera-cut coverage. TAA-specific camera-cut policy can be separately tightened if needed. |
 | P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; historical debug captures | Runtime VB path passes; some debug views historically verified. | Local reflection probes/probe blending are not implemented as a validated feature. |
 | P2-SYS-11 | GPU culling and HZB diagnostics are visible and budgeted. | DONE_VERIFIED | `Renderer_GPUDriven.cpp`, `Renderer_GPUCulling*.cpp`, `Renderer_HZB*.cpp`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase reports GPU culling and HZB logs; smoke budget passed. | More occlusion-correctness scene tests could be added. |
 | P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1` | Memory/descriptor budgets passed; bloom transients default-on. | Full render-graph transient alias validation matrix is not part of current release gate. |
@@ -627,19 +631,19 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 2. Add and pass missing focused gates:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_transient_matrix.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_descriptor_memory_stress_scene.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
    ```
 
-   These five scripts still do not currently exist; their absence is part of
+   These four scripts still do not currently exist; their absence is part of
    the remaining work.
 
 3. Keep the added Phase 3 focused gates passing:
 
    ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_phase3_fallback_matrix.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_graphics_ui_interaction_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_screenshot_negative_gates.ps1
@@ -648,7 +652,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    ```
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and
-   passed individually after the fallback-reporting checkpoint.
+   passed individually after the fallback-reporting and camera-cut checkpoints.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

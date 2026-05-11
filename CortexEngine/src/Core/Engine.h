@@ -250,7 +250,10 @@ private:
     float m_qualityGovernorTimer = 0.0f;
     float m_frameReportTimer = 0.0f;
     uint64_t m_maxFrames = 0;
+    uint64_t m_cameraCutAutomationFrame = 0;
     bool m_exitAfterVisualValidationCapture = false;
+    bool m_cameraCutAutomationApplied = false;
+    std::string m_cameraCutAutomationBookmark;
 
     // HUD / debug overlay
     void RenderHUD();

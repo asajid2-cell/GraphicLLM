@@ -24,18 +24,21 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     // per-frame instance buffer small and avoid pathological memory usage if
     // an emitter accidentally spawns an excessive number of particles.
     static constexpr uint32_t kMaxParticleInstances = 4096;
-    const float densityScale = std::clamp(m_particleState.densityScale, 0.0f, 2.0f);
-    const float qualityScale = std::clamp(m_particleState.qualityScale, 0.25f, 2.0f);
-    const float bloomContribution = std::clamp(m_particleState.bloomContribution, 0.0f, 2.0f);
-    const float softDepthFade = std::clamp(m_particleState.softDepthFade, 0.0f, 1.0f);
-    const float windInfluence = std::clamp(m_particleState.windInfluence, 0.0f, 2.0f);
-    m_particleState.frameDensityScale = densityScale;
-    m_particleState.frameQualityScale = qualityScale;
-    m_particleState.frameBloomContribution = bloomContribution;
-    m_particleState.frameSoftDepthFade = softDepthFade;
-    m_particleState.frameWindInfluence = windInfluence;
+    const auto& controls = m_particleState.controls;
+    auto& frame = m_particleState.frame;
+    auto& resources = m_particleState.resources;
+    const float densityScale = std::clamp(controls.densityScale, 0.0f, 2.0f);
+    const float qualityScale = std::clamp(controls.qualityScale, 0.25f, 2.0f);
+    const float bloomContribution = std::clamp(controls.bloomContribution, 0.0f, 2.0f);
+    const float softDepthFade = std::clamp(controls.softDepthFade, 0.0f, 1.0f);
+    const float windInfluence = std::clamp(controls.windInfluence, 0.0f, 2.0f);
+    frame.frameDensityScale = densityScale;
+    frame.frameQualityScale = qualityScale;
+    frame.frameBloomContribution = bloomContribution;
+    frame.frameSoftDepthFade = softDepthFade;
+    frame.frameWindInfluence = windInfluence;
     if (densityScale <= 0.0f) {
-        m_particleState.frameMaxInstances = 0;
+        frame.frameMaxInstances = 0;
         return;
     }
 
@@ -43,7 +46,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         std::clamp(densityScale * qualityScale * static_cast<float>(kMaxParticleInstances),
                    1.0f,
                    static_cast<float>(kMaxParticleInstances * 2u)));
-    m_particleState.frameMaxInstances = scaledMaxInstances;
+    frame.frameMaxInstances = scaledMaxInstances;
 
     auto view = registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
     if (view.begin() == view.end()) {
@@ -58,12 +61,12 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     for (auto entity : view) {
         auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
-        ++m_particleState.frameEmitterCount;
-        if (m_particleState.effectPreset == "gallery_mix" ||
-            emitter.effectPresetId == m_particleState.effectPreset) {
-            ++m_particleState.framePresetMatchedEmitters;
+        ++frame.frameEmitterCount;
+        if (controls.effectPreset == "gallery_mix" ||
+            emitter.effectPresetId == controls.effectPreset) {
+            ++frame.framePresetMatchedEmitters;
         } else {
-            ++m_particleState.framePresetMismatchedEmitters;
+            ++frame.framePresetMismatchedEmitters;
         }
 
         glm::vec3 emitterWorldPos = glm::vec3(transform.worldMatrix[3]);
@@ -85,18 +88,18 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             if (p.age >= p.lifetime) {
                 continue;
             }
-            ++m_particleState.frameLiveParticles;
+            ++frame.frameLiveParticles;
 
             if (densityScale < 1.0f) {
-                const float samplePhase = static_cast<float>(m_particleState.frameLiveParticles) * densityScale;
-                const float previousPhase = static_cast<float>(m_particleState.frameLiveParticles - 1u) * densityScale;
+                const float samplePhase = static_cast<float>(frame.frameLiveParticles) * densityScale;
+                const float previousPhase = static_cast<float>(frame.frameLiveParticles - 1u) * densityScale;
                 if (static_cast<uint32_t>(samplePhase) == static_cast<uint32_t>(previousPhase)) {
                     continue;
                 }
             }
 
             if (instances.size() >= scaledMaxInstances) {
-                m_particleState.frameCapped = true;
+                frame.frameCapped = true;
                 break;
             }
 
@@ -114,7 +117,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             inst.color.a *= std::clamp(1.0f - softDepthFade * 0.18f, 0.55f, 1.0f);
 
             if (!SphereIntersectsFrustumCPU(frustum, inst.position, glm::max(0.01f, inst.size))) {
-                ++m_particleState.frameFrustumCulled;
+                ++frame.frameFrustumCulled;
                 continue;
             }
 
@@ -136,13 +139,13 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     }
 
     const UINT instanceCount = static_cast<UINT>(instances.size());
-    m_particleState.frameSubmittedInstances = instanceCount;
+    frame.frameSubmittedInstances = instanceCount;
     const UINT requiredCapacity = instanceCount;
     const UINT minCapacity = 256;
 
-    if (!m_particleState.instanceBuffer || m_particleState.instanceCapacity < requiredCapacity) {
+    if (!resources.instanceBuffer || resources.instanceCapacity < requiredCapacity) {
         // CRITICAL: If replacing an existing buffer, wait for GPU to finish using it
-        if (m_particleState.instanceBuffer) {
+        if (resources.instanceBuffer) {
             WaitForGPU();
         }
 
@@ -180,18 +183,18 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             return;
         }
 
-        m_particleState.instanceBuffer = buffer;
-        m_particleState.instanceCapacity = newCapacity;
+        resources.instanceBuffer = buffer;
+        resources.instanceCapacity = newCapacity;
     }
 
     // Upload instance data
     void* mapped = nullptr;
     D3D12_RANGE readRange{0, 0};
     const UINT bufferSize = instanceCount * sizeof(ParticleInstance);
-    HRESULT mapHr = m_particleState.instanceBuffer->Map(0, &readRange, &mapped);
+    HRESULT mapHr = resources.instanceBuffer->Map(0, &readRange, &mapped);
     if (SUCCEEDED(mapHr)) {
         memcpy(mapped, instances.data(), bufferSize);
-        m_particleState.instanceBuffer->Unmap(0, nullptr);
+        resources.instanceBuffer->Unmap(0, nullptr);
     } else {
         spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
                      static_cast<unsigned int>(mapHr));
@@ -212,7 +215,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         {  0.5f,  0.5f, 0.0f, 1.0f, 0.0f },
     };
 
-    if (!m_particleState.quadVertexBuffer) {
+    if (!resources.quadVertexBuffer) {
         D3D12_HEAP_PROPERTIES quadHeapProps = {};
         quadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
         quadHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -237,7 +240,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             &vbDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&m_particleState.quadVertexBuffer));
+            IID_PPV_ARGS(&resources.quadVertexBuffer));
         if (FAILED(hrVB)) {
             spdlog::warn("RenderParticles: failed to allocate quad vertex buffer (hr=0x{:08X})",
                          static_cast<unsigned int>(hrVB));
@@ -246,15 +249,15 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         }
 
         void* quadMapped = nullptr;
-        HRESULT mapQuadHr = m_particleState.quadVertexBuffer->Map(0, &readRange, &quadMapped);
+        HRESULT mapQuadHr = resources.quadVertexBuffer->Map(0, &readRange, &quadMapped);
         if (SUCCEEDED(mapQuadHr)) {
             memcpy(quadMapped, kQuadVertices, sizeof(kQuadVertices));
-            m_particleState.quadVertexBuffer->Unmap(0, nullptr);
+            resources.quadVertexBuffer->Unmap(0, nullptr);
         } else {
             spdlog::warn("RenderParticles: failed to map quad vertex buffer (hr=0x{:08X})",
                          static_cast<unsigned int>(mapQuadHr));
             CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapQuadVB", mapQuadHr);
-            m_particleState.quadVertexBuffer.Reset();
+            resources.quadVertexBuffer.Reset();
             return;
         }
     }
@@ -313,11 +316,11 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objAddr);
 
     D3D12_VERTEX_BUFFER_VIEW vbViews[2] = {};
-    vbViews[0].BufferLocation = m_particleState.quadVertexBuffer->GetGPUVirtualAddress();
+    vbViews[0].BufferLocation = resources.quadVertexBuffer->GetGPUVirtualAddress();
     vbViews[0].StrideInBytes  = sizeof(QuadVertex);
     vbViews[0].SizeInBytes    = sizeof(kQuadVertices);
 
-    vbViews[1].BufferLocation = m_particleState.instanceBuffer->GetGPUVirtualAddress();
+    vbViews[1].BufferLocation = resources.instanceBuffer->GetGPUVirtualAddress();
     vbViews[1].StrideInBytes  = sizeof(ParticleInstance);
     vbViews[1].SizeInBytes    = bufferSize;
 
@@ -326,7 +329,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     m_commandResources.graphicsList->DrawInstanced(4, instanceCount, 0, 0);
-    m_particleState.frameExecuted = true;
+    frame.frameExecuted = true;
     ++m_frameDiagnostics.contract.drawCounts.particleDraws;
     m_frameDiagnostics.contract.drawCounts.particleInstances += instanceCount;
 }

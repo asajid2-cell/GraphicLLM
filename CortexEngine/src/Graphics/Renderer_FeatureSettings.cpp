@@ -140,7 +140,7 @@ void Renderer::ToggleTAA() {
 }
 
 void Renderer::SetParticlesEnabled(bool enabled) {
-    m_particleState.enabledForScene = enabled;
+    m_particleState.controls.enabledForScene = enabled;
 }
 
 bool Renderer::GetParticlesEnabled() const {
@@ -148,29 +148,26 @@ bool Renderer::GetParticlesEnabled() const {
 }
 
 void Renderer::SetParticleDensityScale(float scale) {
-    m_particleState.densityScale = std::clamp(scale, 0.0f, 2.0f);
+    m_particleState.controls.SetDensityScale(scale);
 }
 
 float Renderer::GetParticleDensityScale() const {
-    return m_particleState.densityScale;
+    return m_particleState.controls.densityScale;
 }
 
 void Renderer::SetParticleTuning(float qualityScale,
                                  float bloomContribution,
                                  float softDepthFade,
                                  float windInfluence) {
-    m_particleState.qualityScale = std::clamp(qualityScale, 0.25f, 2.0f);
-    m_particleState.bloomContribution = std::clamp(bloomContribution, 0.0f, 2.0f);
-    m_particleState.softDepthFade = std::clamp(softDepthFade, 0.0f, 1.0f);
-    m_particleState.windInfluence = std::clamp(windInfluence, 0.0f, 2.0f);
+    m_particleState.controls.SetTuning(qualityScale, bloomContribution, softDepthFade, windInfluence);
 }
 
 void Renderer::SetParticleEffectPreset(const std::string& presetId) {
-    m_particleState.effectPreset = presetId.empty() ? "gallery_mix" : presetId;
+    m_particleState.controls.SetEffectPreset(presetId);
 }
 
 const std::string& Renderer::GetParticleEffectPreset() const {
-    return m_particleState.effectPreset;
+    return m_particleState.controls.effectPreset;
 }
 
 void Renderer::SetSSREnabled(bool enabled) {

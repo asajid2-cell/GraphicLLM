@@ -134,4 +134,63 @@ bool CopyIntermediateToHdr(const IntermediateCopyContext& context) {
     return true;
 }
 
+bool PrepareResolveInputs(const ResolveInputsContext& context) {
+    if (!context.commandList || !IsValid(context.taaIntermediate) || !IsValid(context.hdrColor) ||
+        !IsValid(context.historyColor)) {
+        return false;
+    }
+
+    D3D12_RESOURCE_BARRIER barriers[7]{};
+    UINT barrierCount = 0;
+    if (!context.skipTransitions) {
+        if (!AddTransitionIfNeeded(context.taaIntermediate, D3D12_RESOURCE_STATE_RENDER_TARGET, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.hdrColor, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.depth, context.depthSampleState, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.normalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.velocity, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.historyColor, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barriers, barrierCount, 7) ||
+            !AddTransitionIfNeeded(context.temporalMask, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, barriers, barrierCount, 7)) {
+            return false;
+        }
+        if (barrierCount > 0) {
+            context.commandList->ResourceBarrier(barrierCount, barriers);
+        }
+    }
+
+    SetState(context.taaIntermediate, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    SetState(context.hdrColor, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    SetState(context.depth, context.depthSampleState);
+    SetState(context.normalRoughness, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    SetState(context.velocity, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    SetState(context.historyColor, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    SetState(context.temporalMask, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    return true;
+}
+
+bool TransitionToShaderResource(ID3D12GraphicsCommandList* commandList,
+                                const ResourceStateRef& resource,
+                                bool skipTransitions) {
+    if (!commandList || !IsValid(resource)) {
+        return false;
+    }
+
+    if (!skipTransitions) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        UINT barrierCount = 0;
+        if (!AddTransitionIfNeeded(resource,
+                                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                                   &barrier,
+                                   barrierCount,
+                                   1)) {
+            return false;
+        }
+        if (barrierCount > 0) {
+            commandList->ResourceBarrier(1, &barrier);
+        }
+    }
+
+    SetState(resource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    return true;
+}
+
 } // namespace Cortex::Graphics::TAACopyPass

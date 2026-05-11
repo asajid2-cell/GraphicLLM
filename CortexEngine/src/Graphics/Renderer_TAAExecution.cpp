@@ -38,93 +38,19 @@ bool Renderer::ResolveTAAIntermediate(bool skipTransitions) {
         return false;
     }
 
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER barriers[6] = {};
-        UINT barrierCount = 0;
-
-        if (m_temporalScreenState.taaIntermediateState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_temporalScreenState.taaIntermediate.Get();
-            barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.taaIntermediateState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
-            barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
-            barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_temporalScreenState.velocityBuffer && m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_temporalScreenState.velocityBuffer.Get();
-            barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.velocityState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_temporalScreenState.historyState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_temporalScreenState.historyColor.Get();
-            barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.historyState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_temporalMaskState.texture &&
-            m_temporalMaskState.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_temporalMaskState.texture.Get();
-            barriers[barrierCount].Transition.StateBefore = m_temporalMaskState.resourceState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (barrierCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-        }
-    }
-
-    m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (m_depthResources.resources.buffer) {
-        m_depthResources.resources.resourceState = kDepthSampleState;
-    }
-    if (m_mainTargets.normalRoughness.resources.texture) {
-        m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-    if (m_temporalScreenState.velocityBuffer) {
-        m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-    m_temporalScreenState.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (m_temporalMaskState.texture) {
-        m_temporalMaskState.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (!TAACopyPass::PrepareResolveInputs({
+            m_commandResources.graphicsList.Get(),
+            {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState},
+            {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state},
+            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
+            {m_mainTargets.normalRoughness.resources.texture.Get(), &m_mainTargets.normalRoughness.resources.state},
+            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
+            {m_temporalScreenState.historyColor.Get(), &m_temporalScreenState.historyState},
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            kDepthSampleState,
+            skipTransitions,
+        })) {
+        return false;
     }
 
     UpdateTAAResolveDescriptorTable();
@@ -183,15 +109,10 @@ void Renderer::RenderTAA() {
     if (!m_temporalAAState.enabled || !m_pipelineState.taa || !m_mainTargets.hdr.resources.color || !m_temporalScreenState.taaIntermediate || !m_services.window) {
         // Ensure HDR is in a readable state for subsequent passes even when TAA
         // is disabled so SSR/post-process can still sample it.
-        if (m_mainTargets.hdr.resources.color && m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-            barrier.Transition.StateBefore = m_mainTargets.hdr.resources.state;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        if (m_mainTargets.hdr.resources.color &&
+            !TAACopyPass::TransitionToShaderResource(m_commandResources.graphicsList.Get(),
+                                                     {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state})) {
+            return;
         }
         // History is no longer meaningful once TAA has been disabled.
         InvalidateTAAHistory("feature_disabled");

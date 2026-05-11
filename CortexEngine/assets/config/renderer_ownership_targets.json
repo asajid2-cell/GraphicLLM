@@ -133,6 +133,16 @@
       "future_extension": "Keep future TAA history/intermediate copy mechanics in TAACopyPass instead of adding duplicated CopyResource/barrier batches in Renderer_TAAExecution.cpp"
     },
     {
+      "id": "taa_resolve_transitions",
+      "owner": "TAA resolve input transitions",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_TAAExecution.cpp still owns temporal policy, descriptor-table refresh, and TAAPass::Resolve invocation, but TAA resolve input resource-state preparation and disabled-path HDR shader-resource transition are owned by TAACopyPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/TAACopyPass.h", "Passes/TAACopyPass.cpp", "Renderer_TAAExecution.cpp"],
+      "renderer_state_members": ["m_temporalScreenState", "m_temporalMaskState", "m_mainTargets", "m_depthResources", "m_commandResources"],
+      "future_extension": "Keep future TAA resolve input barrier mechanics in TAACopyPass or a dedicated TAA target pass before adding more temporal resources"
+    },
+    {
       "id": "motion_vector_target_transitions",
       "owner": "Motion-vector velocity/depth targets",
       "status": "release_boundary_validated",

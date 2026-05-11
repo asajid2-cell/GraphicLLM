@@ -105,9 +105,15 @@ Assert-Contains "HZBPass.cpp" $hzb "builder.Read(hzbHandle, RGResourceUsage::Sha
 Assert-Contains "HZBPass.cpp" $hzb "builder.Write(hzbHandle, RGResourceUsage::UnorderedAccess, outMip)"
 
 $motion = Read-Text "src/Graphics/Passes/MotionVectorPass.cpp"
+$motionHeader = Read-Text "src/Graphics/Passes/MotionVectorPass.h"
+$rendererMotion = Read-Text "src/Graphics/Renderer_RenderGraphMotionVectors.cpp"
 Assert-Contains "MotionVectorPass.cpp" $motion "builder.Read(context.visibility, RGResourceUsage::ShaderResource)"
 Assert-Contains "MotionVectorPass.cpp" $motion "builder.Write(context.velocity, RGResourceUsage::UnorderedAccess)"
 Assert-Contains "MotionVectorPass.cpp" $motion "builder.Read(context.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead)"
+Assert-Contains "MotionVectorPass.cpp" $motion "MotionVectorTargetPass::TransitionCameraTargets(context.cameraTarget)"
+Assert-Contains "MotionVectorPass.cpp" $motion "Draw(context.cameraDraw)"
+Assert-NotContains "MotionVectorPass.h" $motionHeader "drawCameraMotion"
+Assert-NotContains "Renderer_RenderGraphMotionVectors.cpp" $rendererMotion "RenderMotionVectors();"
 
 $post = Read-Text "src/Graphics/Passes/PostProcessGraphPass.cpp"
 $postHeader = Read-Text "src/Graphics/Passes/PostProcessGraphPass.h"

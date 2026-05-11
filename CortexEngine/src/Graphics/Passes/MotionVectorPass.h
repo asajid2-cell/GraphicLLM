@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Graphics/Passes/MotionVectorTargetPass.h"
 #include "Graphics/RenderGraph.h"
 #include "Graphics/RHI/DX12Pipeline.h"
 #include "Graphics/RHI/DescriptorHeap.h"
@@ -29,7 +30,8 @@ struct GraphContext {
     RGResourceHandle visibility;
     bool useVisibilityBufferMotion = false;
     std::function<bool()> computeVisibilityBufferMotion;
-    std::function<bool()> drawCameraMotion;
+    MotionVectorTargetPass::CameraTargetContext cameraTarget;
+    DrawContext cameraDraw;
     std::function<void(const char*)> failStage;
 };
 

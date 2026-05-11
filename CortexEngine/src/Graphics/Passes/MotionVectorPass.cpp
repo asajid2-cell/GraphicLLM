@@ -20,7 +20,10 @@ void Fail(const GraphContext& context, const char* stage) {
     if (context.useVisibilityBufferMotion) {
         return context.visibility.IsValid() && static_cast<bool>(context.computeVisibilityBufferMotion);
     }
-    return context.depth.IsValid() && static_cast<bool>(context.drawCameraMotion);
+    return context.depth.IsValid() &&
+           context.cameraTarget.velocity.resource &&
+           context.cameraTarget.depth.resource &&
+           static_cast<bool>(context.cameraDraw.pipeline);
 }
 
 } // namespace
@@ -86,7 +89,8 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
             const bool ok = context.useVisibilityBufferMotion
                 ? (context.computeVisibilityBufferMotion && context.computeVisibilityBufferMotion())
-                : (context.drawCameraMotion && context.drawCameraMotion());
+                : (MotionVectorTargetPass::TransitionCameraTargets(context.cameraTarget) &&
+                   Draw(context.cameraDraw));
             if (!ok) {
                 Fail(context, context.useVisibilityBufferMotion ? "visibility_buffer_motion" : "camera_motion");
             }

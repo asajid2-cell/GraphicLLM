@@ -70,6 +70,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             vbResources.clusterLightIndices.IsValid();
 
         bool vbStageFailed = false;
+        std::string vbStageFailureStage;
+        std::string vbStageFailureError;
         auto markStageFailure = [&](const char* stage, const std::string& error) {
             if (!vbStageFailed) {
                 spdlog::warn("VisibilityBuffer RG {} failed: {}", stage, error);
@@ -109,57 +111,27 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.failStage = [&](const char* stage) {
             markStageFailure(stage ? stage : "graph_contract", "graph contract failed");
         };
-        vbGraphContext.clear = [&]() {
-            if (vbStageFailed) return;
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.visibility = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.visibilityPass = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            auto clearResult = m_services.visibilityBuffer->ClearVisibilityBuffer(m_commandResources.graphicsList.Get());
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (clearResult.IsErr()) {
-                markStageFailure("clear", clearResult.Error());
-            }
+        VisibilityBufferGraphPass::StageFailureContext vbFailure{
+            &vbStageFailed,
+            &vbStageFailureStage,
+            &vbStageFailureError
         };
-        vbGraphContext.visibility = [&]() {
-            if (vbStageFailed) return;
-            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.visibility = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.visibilityPass = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            auto visResult = m_services.visibilityBuffer->RasterizeVisibilityBuffer(
-                m_commandResources.graphicsList.Get(),
-                m_depthResources.resources.buffer.Get(),
-                m_depthResources.descriptors.dsv.cpu,
-                m_constantBuffers.frameCPU.viewProjectionMatrix,
-                m_visibilityBufferState.meshDraws,
-                vbCullMaskAddress);
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (visResult.IsErr()) {
-                markStageFailure("visibility", visResult.Error());
-                return;
-            }
-
-            uint32_t vbDrawBatches = 0;
-            for (const auto& draw : m_visibilityBufferState.meshDraws) {
-                vbDrawBatches += (draw.instanceCount > 0) ? 1u : 0u;
-                vbDrawBatches += (draw.instanceCountDoubleSided > 0) ? 1u : 0u;
-                vbDrawBatches += (draw.instanceCountAlpha > 0) ? 1u : 0u;
-                vbDrawBatches += (draw.instanceCountAlphaDoubleSided > 0) ? 1u : 0u;
-            }
-            m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances = static_cast<uint32_t>(m_visibilityBufferState.instances.size());
-            m_frameDiagnostics.contract.drawCounts.visibilityBufferMeshes = static_cast<uint32_t>(m_visibilityBufferState.meshDraws.size());
-            m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches = vbDrawBatches;
-        };
+        vbGraphContext.clear.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.clear.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.clear.failure = vbFailure;
+        vbGraphContext.visibility.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.visibility.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.visibility.depthBuffer = m_depthResources.resources.buffer.Get();
+        vbGraphContext.visibility.depthDSV = m_depthResources.descriptors.dsv.cpu;
+        vbGraphContext.visibility.viewProjection = &m_constantBuffers.frameCPU.viewProjectionMatrix;
+        vbGraphContext.visibility.meshDraws = &m_visibilityBufferState.meshDraws;
+        vbGraphContext.visibility.cullMaskAddress = vbCullMaskAddress;
+        vbGraphContext.visibility.depthState = &m_depthResources.resources.resourceState;
+        vbGraphContext.visibility.instanceCount = static_cast<uint32_t>(m_visibilityBufferState.instances.size());
+        vbGraphContext.visibility.contractInstances = &m_frameDiagnostics.contract.drawCounts.visibilityBufferInstances;
+        vbGraphContext.visibility.contractMeshes = &m_frameDiagnostics.contract.drawCounts.visibilityBufferMeshes;
+        vbGraphContext.visibility.contractDrawBatches = &m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches;
+        vbGraphContext.visibility.failure = vbFailure;
         vbGraphContext.materialResolve = [&]() {
             if (vbStageFailed) return;
             m_depthResources.resources.resourceState = kDepthSampleState;
@@ -327,6 +299,9 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         }
 
         const auto execResult = m_services.renderGraph->Execute(m_commandResources.graphicsList.Get());
+        if (!vbStageFailureStage.empty()) {
+            spdlog::warn("VisibilityBuffer RG {} failed: {}", vbStageFailureStage, vbStageFailureError);
+        }
         AccumulateRenderGraphExecutionStats(&result);
         if (execResult.IsErr()) {
             result.fallbackUsed = true;

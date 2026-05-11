@@ -10,6 +10,24 @@ void Fail(const GraphContext& context, const char* stage) {
     }
 }
 
+[[nodiscard]] bool HasFailed(const StageFailureContext& failure) {
+    return failure.failed && *failure.failed;
+}
+
+void RecordFailure(const StageFailureContext& failure, const char* stage, const std::string& error) {
+    if (failure.failed && !*failure.failed) {
+        if (failure.stage) {
+            *failure.stage = stage ? stage : "visibility_buffer_stage";
+        }
+        if (failure.error) {
+            *failure.error = error;
+        }
+    }
+    if (failure.failed) {
+        *failure.failed = true;
+    }
+}
+
 [[nodiscard]] bool HasBaseResources(const ResourceHandles& resources) {
     return resources.depth.IsValid() &&
            resources.hdr.IsValid() &&
@@ -25,11 +43,102 @@ void Fail(const GraphContext& context, const char* stage) {
            resources.materialExt2.IsValid();
 }
 
+[[nodiscard]] bool IsValid(const ClearContext& context) {
+    return context.renderer && context.commandList;
+}
+
+[[nodiscard]] bool IsValid(const VisibilityContext& context) {
+    return context.renderer &&
+           context.commandList &&
+           context.depthBuffer &&
+           context.viewProjection &&
+           context.meshDraws;
+}
+
 } // namespace
+
+bool Clear(const ClearContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "clear", "visibility-buffer clear context incomplete");
+        return false;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.visibility = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.visibilityPass = true;
+    context.renderer->SetTransitionSkipControls(controls);
+    auto clearResult = context.renderer->ClearVisibilityBuffer(context.commandList);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (clearResult.IsErr()) {
+        RecordFailure(context.failure, "clear", clearResult.Error());
+        return false;
+    }
+    return true;
+}
+
+bool RasterizeVisibility(const VisibilityContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "visibility", "visibility-buffer raster context incomplete");
+        return false;
+    }
+
+    if (context.depthState) {
+        *context.depthState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    }
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.visibility = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.visibilityPass = true;
+    context.renderer->SetTransitionSkipControls(controls);
+    auto visResult = context.renderer->RasterizeVisibilityBuffer(
+        context.commandList,
+        context.depthBuffer,
+        context.depthDSV,
+        *context.viewProjection,
+        *context.meshDraws,
+        context.cullMaskAddress);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (visResult.IsErr()) {
+        RecordFailure(context.failure, "visibility", visResult.Error());
+        return false;
+    }
+
+    uint32_t vbDrawBatches = 0;
+    for (const auto& draw : *context.meshDraws) {
+        vbDrawBatches += (draw.instanceCount > 0) ? 1u : 0u;
+        vbDrawBatches += (draw.instanceCountDoubleSided > 0) ? 1u : 0u;
+        vbDrawBatches += (draw.instanceCountAlpha > 0) ? 1u : 0u;
+        vbDrawBatches += (draw.instanceCountAlphaDoubleSided > 0) ? 1u : 0u;
+    }
+
+    if (context.contractInstances) {
+        *context.contractInstances = context.instanceCount;
+    }
+    if (context.contractMeshes) {
+        *context.contractMeshes = static_cast<uint32_t>(context.meshDraws->size());
+    }
+    if (context.contractDrawBatches) {
+        *context.contractDrawBatches = vbDrawBatches;
+    }
+    return true;
+}
 
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
-    if (!HasBaseResources(resources) || !context.clear || !context.visibility) {
+    if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
         Fail(context, "visibility_buffer_graph_contract");
         return false;
     }
@@ -53,7 +162,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
             builder.Write(resources.visibility, RGResourceUsage::UnorderedAccess);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            context.clear();
+            (void)Clear(context.clear);
         });
 
     graph.AddPass(
@@ -64,7 +173,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
             builder.Write(resources.depth, RGResourceUsage::DepthStencilWrite);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            context.visibility();
+            (void)RasterizeVisibility(context.visibility);
         });
 
     if (context.needsMaterialResolve) {

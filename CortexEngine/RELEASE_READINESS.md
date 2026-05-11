@@ -19,6 +19,7 @@ The current verified local gate covers:
 - repository hygiene checks for whitespace and generated artifacts,
 - source-list contract checks for CMake renderer split coverage,
 - render-graph boundary contract checks,
+- debug primitive ownership contract checks,
 - temporal validation smoke,
 - temporal camera-cut RT history invalidation smoke,
 - full RT showcase smoke,
@@ -58,16 +59,18 @@ Result:
   coverage verified;
 - render-graph boundary contract: passed; validation module and VB graph
   boundaries verified;
-- temporal validation: `gpu_ms=1.189`, `warnings=0`,
+- debug primitive contract: passed; debug-line state ownership and draw-contract
+  counters verified;
+- temporal validation: `gpu_ms=3.661`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.524/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=3.961/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `temporal_diff=mean=0.014/2.5 changed=0.000/0.08`;
+  `transient_delta=0`, `temporal_diff=mean=0.068/2.5 changed=0.001/0.08`;
 - VB debug views: depth view 34 and material-albedo view 35 passed with
   nonblack ratio `0.851` for both captures;
 - descriptor/memory stress: `persistent_descriptors=988/1024`,
@@ -93,7 +96,7 @@ Result:
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_202421_399_151816_c9416843
+CortexEngine/build/bin/logs/runs/release_validation_20260510_202847_377_148744_8c7443e2
 ```
 
 ## Renderer Scope

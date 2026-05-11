@@ -22,7 +22,7 @@ validation suite:
 - graphics preset, showcase scene, material editor, and visual baseline contracts,
 - screenshot negative gates for black/white/saturation/edge regressions,
 - Phase 3 visual matrix summary generation,
-- renderer ownership and fatal error contract checks,
+- renderer ownership, full ownership audit, and fatal error contract checks,
 - advanced graphics catalog and effects gallery checks,
 - particle-disabled zero-cost runtime check,
 - environment manifest and IBL gallery checks,
@@ -77,6 +77,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_phase3_fallback_matrix.ps1 -N
 powershell -ExecutionPolicy Bypass -File tools/run_particle_disabled_zero_cost.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_screenshot_negative_gates.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_rt_firefly_outlier_scene.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_renderer_full_ownership_audit.ps1
 ```
 
 The UI contract test verifies the unified graphics settings window is compiled,
@@ -100,6 +101,10 @@ resource-valid in the final frame contract.
 The render-graph transient matrix reruns RT Showcase with the graph transient
 validation pass enabled, then compares aliasing-on, aliasing-off, and
 bloom-transients-disabled modes through frame-contract render-graph counters.
+
+The full renderer ownership audit enumerates every `Renderer` member and
+requires it to remain a named state/service aggregate, with no loose GPU
+resources or descriptor handles reintroduced directly in `Renderer.h`.
 
 The graphics UI interaction smoke uses the same `RendererTuningState` file
 format as the graphics window save/load path, forces that state into a runtime

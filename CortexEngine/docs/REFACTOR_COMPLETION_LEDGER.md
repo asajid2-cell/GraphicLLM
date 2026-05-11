@@ -38,18 +38,18 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_192843_875_137568_e1f06141
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_193615_690_146580_bb588849
 ```
 
 Key evidence from that run:
 
 - Release build: passed.
-- Temporal validation: `gpu_ms=1.265`, `disocclusion=0.006953`,
-  `high_motion=0.005247`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.00695`,
+  `high_motion=0.005245`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.855`,
+  `camera=reflection_closeup`, `gpu_ms=2.703`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.622/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.621/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -62,13 +62,13 @@ Key evidence from that run:
   reported 0 final transient resources with validation still run.
 - Phase 3 visual matrix: temporal validation, RT showcase, material lab,
   glass/water courtyard, effects showcase, and IBL gallery passed.
-- Renderer ownership, fatal error, advanced graphics catalog, effects gallery,
-  environment manifest, IBL gallery, budget profile matrix, and voxel backend
-  gates passed.
+- Renderer ownership, full renderer ownership audit, fatal error, advanced
+  graphics catalog, effects gallery, environment manifest, IBL gallery, budget
+  profile matrix, and voxel backend gates passed.
 - New focused gates passed in release validation: temporal camera cut,
-  render-graph transient matrix, graphics UI interaction, screenshot negative
-  gates, particle-disabled zero-cost, Phase 3 fallback matrix, and RT
-  firefly/outlier.
+  render-graph transient matrix, full renderer ownership audit, graphics UI
+  interaction, screenshot negative gates, particle-disabled zero-cost, Phase 3
+  fallback matrix, and RT firefly/outlier.
 
 Recent git history relevant to the audit:
 
@@ -135,6 +135,7 @@ long file/function lists in every row.
 | `tools/run_voxel_backend_smoke.ps1` | runtime | Experimental voxel backend smoke. |
 | `tools/run_phase3_visual_matrix.ps1` | runtime wrapper | Public scene matrix for Phase 3; relevant to newer release-readiness claims, not proof of all Phase 2 aspirations. |
 | `tools/run_renderer_ownership_tests.ps1` | static/contract | Checks release ownership metadata and selected state-boundary markers. Does not prove all pass ownership is complete. |
+| `tools/run_renderer_full_ownership_audit.ps1` | static/contract | Exhaustively enumerates `Renderer.h` members, requiring every member to be a named state/service aggregate and rejecting loose GPU resource/descriptors in `Renderer.h`. |
 | `tools/run_graphics_ui_contract_tests.ps1` | static/contract | Checks unified graphics UI wiring. Phase 3 only. |
 | `tools/run_graphics_settings_persistence_tests.ps1` | runtime/static | Checks tuning persistence path. Phase 3 only. |
 | `tools/run_graphics_preset_tests.ps1` | runtime/static | Checks graphics preset schema and optional runtime smoke. |
@@ -161,7 +162,7 @@ long file/function lists in every row.
 | ID | Requirement or claim from `phase2.md` | Status | Source/functions | Validation command | Latest evidence | Remaining work |
 |---|---|---|---|---|---|---|
 | P2-GLOBAL-01 | Keep RT, visibility buffer, GPU culling, HZB, TAA, SSR, SSAO, bloom, IBL, fog, god-rays, water, transparency, particles, and eventual outdoor scenes first-class. | PARTIAL | SRC-RENDER-ORCH, SRC-RENDERGRAPH, SRC-VB, SRC-RT, SRC-TEMPORAL, SRC-BUDGET, SRC-SCENES | `tools/run_release_validation.ps1` | RT/VB/GPU culling/HZB/TAA/SSR/SSAO/bloom/IBL/fog/water/transparency are exercised by RT showcase and temporal/material/glass/effects smokes. Particles are covered in effects showcase. | Outdoor scenes are not implemented as a Phase 2 runtime gate. Particles are public ECS billboard path, not full GPU particle maturity. Treat "first-class eventual outdoor scenes" as not complete. |
-| P2-GLOBAL-02 | Make the renderer correct, measurable, budgeted, and cleanly owned. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-STATE, SRC-RENDERGRAPH | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1` | Full release gate passed; ownership test passed with four release boundaries. | Ownership test is selective. Renderer still orchestrates many cross-cutting systems. "Cleanly owned" remains broad and should not be marked complete. |
+| P2-GLOBAL-02 | Make the renderer correct, measurable, budgeted, and cleanly owned. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-STATE, SRC-RENDERGRAPH | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Full release gate passed; selected ownership gate passed; full ownership audit passed with 48/48 renderer members covered by named state/service aggregates. | Renderer still orchestrates many cross-cutting systems. "Cleanly owned" remains broad and should not be marked complete until pass/function ownership is reduced further or explicitly scoped. |
 | P2-SNAPSHOT-01 | Current build state is reproducible through checked-in rebuild script. | DONE_VERIFIED | `rebuild.ps1`, `tools/run_release_validation.ps1`, SRC-DOCS | `tools/run_release_validation.ps1` | `build_release` step passed in latest release run. | None for current local machine; still hardware/toolchain dependent. |
 | P2-SNAPSHOT-02 | Raw Ninja should not be used from an unprepared shell. | DONE_UNVERIFIED | SRC-DOCS | documentation inspection | `phase2.md` documents the caveat; scripts call `rebuild.ps1`. | Could add a script-level guard or README warning if this must be enforced. |
 | P2-SNAPSHOT-03 | Bloom transient validation passes in alias/no-alias modes and bloom transients are default-on. | DONE_VERIFIED | SRC-RENDERGRAPH, `Renderer_RenderGraphBloom.cpp::Renderer::ExecuteBloomInRenderGraph`, `Renderer_RenderGraphEndFrame.cpp::Renderer::ExecuteEndFrameInRenderGraph`, `Renderer_RenderGraphDiagnostics.cpp::Renderer::RunRenderGraphTransientValidation` | `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; release gate | Focused matrix passed: aliasing-on transients=6, aliased=2, barriers=2, saved=262144; aliasing-off transients=6, aliased=0, barriers=0, saved=0; bloom-transients-off transients=0 and `transient_validation_ran=true`. | None for alias/no-alias bloom-transient coverage. |
@@ -215,7 +216,7 @@ of `phase2.md`.
 |---|---|---|---|---|---|---|
 | P2-SYS-01 | Renderer orchestration: `Renderer.cpp` thin, explicit frame plan, stable named phases. | DONE_VERIFIED | SRC-RENDER-ORCH, SRC-FEATURE-PLAN | `tools/run_release_validation.ps1` | Build and runtime gate passed through named frame phases. | Renderer class still owns orchestration across many modules; deeper host split remains possible. |
 | P2-SYS-02 | Render graph owns pass ordering/resource transitions where migrated. | PARTIAL | SRC-RENDERGRAPH | `tools/run_release_validation.ps1`; historical transient validation | Major passes are graph-owned; release gate passes. | Manual/fallback paths remain. Not every pass/resource is graph-owned. |
-| P2-SYS-03 | Passes declare resources rather than reaching into renderer state. | PARTIAL | SRC-RENDERGRAPH, SRC-CONTRACT, SRC-STATE | `tools/run_renderer_ownership_tests.ps1` | Ownership test validates selected boundaries. | Many pass callbacks still access renderer members. This is not fully complete. |
+| P2-SYS-03 | Passes declare resources rather than reaching into renderer state. | PARTIAL | SRC-RENDERGRAPH, SRC-CONTRACT, SRC-STATE | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Ownership test validates selected boundaries. Full ownership audit passed with 48/48 `Renderer` members in named state/service aggregates and no loose GPU resource/descriptors in `Renderer.h`. | Many pass callbacks still access renderer aggregates directly. This is not full pass-owned resource declaration for every pass. |
 | P2-SYS-04 | Renderer scene snapshot is deterministic and drives main consumers. | DONE_VERIFIED | SRC-SNAPSHOT | `tools/run_release_validation.ps1` | RT/VB/shadow/material smokes passed. | Editor/debug fallback paths not exhaustive. |
 | P2-SYS-05 | Material system maturity: shared raster/VB/RT model and validation warnings. | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_rt_showcase_smoke.ps1` | Material Lab passed; RT showcase `material_issues=0`, `rt_parity=True/0`. | More authoring UI/preset depth belongs to Phase 3+ and is partial. |
 | P2-SYS-06 | Material gallery passes visual validation. | PARTIAL | SRC-SCENES, SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material Lab runtime smoke passed. | It is a smoke/luma/material coverage gate, not a full golden gallery review. |
@@ -354,7 +355,7 @@ foundation or contract rather than the full broad feature.
 | P2-11BD | Pass 11BD - Voxel Runtime State Header Extraction | DONE_VERIFIED | `RendererVoxelState.h`, `Renderer_Voxel.cpp` | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Voxel backend smoke passed. |
 | P2-11BE | Pass 11BE - Voxel Backend CLI Smoke Gate | DONE_VERIFIED | `Renderer_Voxel.cpp`, `src/Core/main.cpp` backend CLI parsing | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Latest release gate voxel backend passed: `gpu_ms=15.371 visible=7 avg_luma=116.9 nonblack=1`. |
 | P2-11BF | Pass 11BF - Vegetation Runtime State Completion | DONE_UNVERIFIED | `RendererVegetationState.h`, vegetation files | no focused current test found | Build passes only. | Need vegetation runtime test or defer. |
-| P2-11BG through P2-11CU | Renderer runtime/state boundaries: frame runtime/timing, pipeline, pipeline readiness, render graph transition/runtime, debug overlay, water, fractal surface, post grade, SSAO, bloom, fog, lighting, shadow, SSR, PCSS, post feature, debug view, RT runtime, TAA, GPU culling, camera frame, local shadow, VB frame, quality, shadow cascades, frame lifecycle, GPU culling entity history, frame runtime submission, VB enable, frame contract, constant buffer, breadcrumb, command resources, asset runtime, frame constants CPU, diagnostics, planning, temporal history, services, host services. | DONE_VERIFIED | SRC-STATE plus relevant files named by state headers and SRC-RENDER-ORCH/SRC-CONTRACT | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1` | Latest release gate passed; `Renderer.h` has state/service aggregates and renderer ownership test passed. | The broad state-boundary family is validated by build/runtime smoke, not by one focused test per state. Add exhaustive static ownership audit for full certainty. |
+| P2-11BG through P2-11CU | Renderer runtime/state boundaries: frame runtime/timing, pipeline, pipeline readiness, render graph transition/runtime, debug overlay, water, fractal surface, post grade, SSAO, bloom, fog, lighting, shadow, SSR, PCSS, post feature, debug view, RT runtime, TAA, GPU culling, camera frame, local shadow, VB frame, quality, shadow cascades, frame lifecycle, GPU culling entity history, frame runtime submission, VB enable, frame contract, constant buffer, breadcrumb, command resources, asset runtime, frame constants CPU, diagnostics, planning, temporal history, services, host services. | DONE_VERIFIED | SRC-STATE plus relevant files named by state headers and SRC-RENDER-ORCH/SRC-CONTRACT | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Latest release gate passed; `Renderer.h` has state/service aggregates, renderer ownership test passed, and full ownership audit covered all 48 renderer members. | The broad state-boundary family is validated by build/runtime smoke plus static member audit, not by one focused runtime test per state. |
 | P2-11CV | Pass 11CV - Release Validation Gate | DONE_VERIFIED | `tools/run_release_validation.ps1`, `tools/README.md` | `tools/run_release_validation.ps1` | Latest full release validation passed. |
 | P2-11CW | Pass 11CW - Public Renderer README Refresh | DONE_VERIFIED | SRC-DOCS | documentation inspection plus latest commit `5e7b69f` | README now names Phase 3 gate and current renderer capabilities. | None for docs currentness; keep updated as scope changes. |
 | P2-11CX | Pass 11CX - Dreamer Startup Release Polish | DONE_VERIFIED | `src/Core/Engine.cpp`, Dreamer startup path | `tools/run_release_validation.ps1` | Latest runtime logs include `Dreamer disabled by configuration`; no stale skipped message seen in inspected logs. | No positive Dreamer startup test with TensorRT engines. |
@@ -385,8 +386,8 @@ These items remain after the audit and should not be collapsed into
 | ID | Item | Status | Why it remains |
 |---|---|---|---|
 | REM-01 | Full render-graph ownership for every pass/resource and removal of all temporary legacy manual-barrier/fallback paths. | PARTIAL | Major passes are graph-owned, but `phase2.md` explicitly treats full ownership as the ideal; code still has fallback/manual paths. |
-| REM-02 | Exhaustive renderer state ownership audit, beyond selected ownership manifest checks. | PARTIAL | `run_renderer_ownership_tests.ps1` checks selected boundaries, not every renderer field/function coupling. |
-| REM-03 | Camera-cut temporal invalidation validation. | NOT_STARTED | Mentioned as remaining Pass 7 work; no focused current script found. |
+| REM-02 | Exhaustive renderer state ownership audit, beyond selected ownership manifest checks. | DONE_VERIFIED | `tools/run_renderer_full_ownership_audit.ps1` passed with 48/48 renderer members covered and no loose GPU resources/descriptors in `Renderer.h`; selected ownership manifest gate also passed. |
+| REM-03 | Camera-cut temporal invalidation validation. | DONE_VERIFIED | `tools/run_temporal_camera_cut_validation.ps1` is wired into release validation and passed, verifying RT shadow/reflection/GI history invalidation on the configured camera cut. |
 | REM-04 | Stress-memory / descriptor stress scene. | NOT_STARTED | Budget matrix exists but is not a stress scene. |
 | REM-05 | Full render-graph transient alias validation matrix. | DONE_VERIFIED | `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` passed and is wired into release validation. |
 | REM-06 | Local reflection probes and probe blending validation. | NOT_STARTED | Listed in visual-quality work; no source/runtime gate found. |
@@ -424,7 +425,7 @@ definition of done in `phase3.md`.
 | P3-DESIGN-03 | Environment assets have metadata, budget class, and fallback behavior. | PARTIAL | SRC-ENV-P3 | `tools/run_environment_manifest_tests.ps1`; `tools/run_ibl_gallery_tests.ps1 -NoBuild` | Manifest and IBL gallery passed. | Runtime missing-asset fallback matrix incomplete. |
 | P3-DESIGN-04 | Performance-sensitive features report scheduling and budget state. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-RT | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1` | RT scheduler/budget metrics reported; budget matrix passed. | Particles/cinematic post budgets are only foundation-level. |
 | P3-DESIGN-05 | Default view is clean enough for public capture while debug info remains available. | PARTIAL | `Engine_UI.cpp`, `Engine_Input.cpp`, `FrameContractJson.cpp` | `tools/run_hud_mode_contract_tests.ps1 -NoBuild` | HUD mode contract passed. | Full visual review of public default capture remains subjective. |
-| P3-DESIGN-06 | Renderer state moves into named structs as Phase 3 touches each area. | PARTIAL | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1` | Ownership test passed. | Test covers selected boundaries, not every touched resource/state. |
+| P3-DESIGN-06 | Renderer state moves into named structs as Phase 3 touches each area. | DONE_VERIFIED | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Ownership test passed. Full ownership audit passed with every `Renderer.h` member in a named state/service aggregate. | Future new renderer resources must extend the audit expectations. |
 
 ## Phase 3 Workstreams
 
@@ -438,7 +439,7 @@ definition of done in `phase3.md`.
 | P3-WS-06 | Material and surface correctness. | PARTIAL | SRC-MATERIAL, SRC-SCENES | `tools/run_material_lab_smoke.ps1 -NoBuild` | Material Lab passed. | Author-facing advanced material editor/sliders incomplete. |
 | P3-WS-07 | RT and temporal tuning. | PARTIAL | SRC-RT, SRC-TEMPORAL, SRC-UI-P3 | `tools/run_rt_showcase_smoke.ps1`; `tools/run_temporal_validation_smoke.ps1`; `tools/run_graphics_ui_contract_tests.ps1` | RT readiness/signal, temporal stats, scheduler UI passed. | RT tuning sliders, firefly scenes, and luma-aware tuning are incomplete. |
 | P3-WS-08 | User experience polish. | PARTIAL | SRC-UI-P3, SRC-DOCS | `tools/run_hud_mode_contract_tests.ps1`; `tools/run_graphics_preset_tests.ps1` | HUD/preset/docs passed. | Launcher/profile UX and interactive UI automation incomplete. |
-| P3-WS-09 | Renderer architecture cleanup. | PARTIAL | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_release_validation.ps1` | Ownership gate passed. | Full pass-owned resource extraction remains incomplete. |
+| P3-WS-09 | Renderer architecture cleanup. | PARTIAL | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1`; `tools/run_release_validation.ps1` | Ownership gate and full member audit passed. | Full pass-owned resource extraction remains incomplete; renderer orchestration still centralizes pass execution. |
 | P3-WS-10 | Advanced shaders, lighting, and particles. | PARTIAL | SRC-MATERIAL, SRC-SCENES, `Renderer_Particles.cpp`, `RendererPostProcessState.h` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_advanced_graphics_catalog_tests.ps1` | Effects gallery and catalog passed. | Planned advanced feature projects are not complete. |
 
 ## Phase 3 Pass Ledger
@@ -471,7 +472,7 @@ definition of done in `phase3.md`.
 | P3-3W | Settings Persistence. | DONE_VERIFIED | `RendererTuningState.cpp`, `GraphicsSettingsWindow.cpp` | `tools/run_graphics_settings_persistence_tests.ps1 -NoBuild` | Persistence tests passed. | Schema migration coverage can be added. |
 | P3-3X | Clean HUD Modes. | DONE_VERIFIED | `Engine.h`, `Engine_UI.cpp`, `Engine_Input.cpp`, `main.cpp` | `tools/run_hud_mode_contract_tests.ps1 -NoBuild` | HUD mode contract passed for CLI/env/F7/reporting. | None for current contract. |
 | P3-3Y | Presentation State Structs. | PARTIAL | SRC-STATE, `RendererPostProcessState.h`, `RendererEnvironmentState.h`, `RendererParticleState.h` | `tools/run_renderer_ownership_tests.ps1`; release gate | Ownership metadata and selected state structs validated. | Not every presentation control has a complete pass-owned bundle. |
-| P3-3Z | Pass-Owned Resource Bundles. | PARTIAL | SRC-STATE, `renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1` | Ownership test passed for RT stats/environment/post/particles. | Manifest itself preserves future extensions; full extraction not done. |
+| P3-3Z | Pass-Owned Resource Bundles. | PARTIAL | SRC-STATE, `renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Ownership test passed for RT stats/environment/post/particles. Full ownership audit verifies all current `Renderer` members are state/service aggregates. | Manifest itself preserves future extensions; per-pass resource ownership remains incomplete because many passes still reach through renderer aggregates. |
 | P3-3AA | Advanced Material Shader Framework. | PARTIAL | SRC-MATERIAL, `assets/shaders/Basic.hlsl`, `DeferredLighting.hlsl`, `MaterialResolve.hlsl` | `tools/run_material_lab_smoke.ps1`; `tools/run_advanced_graphics_catalog_tests.ps1` | Material Lab checks advanced material counts; catalog says foundation validated. | Procedural masks and author-facing advanced material sliders incomplete. |
 | P3-3AB | Cinematic Lighting Rigs. | PARTIAL | `RendererLightingRigControl.cpp`, `RendererControlApplier_ScenePresets.cpp`, SRC-SCENES | `tools/run_phase3_visual_matrix.ps1 -NoBuild`; `tools/run_showcase_scene_contract_tests.ps1` | Public scenes report explicit rigs: material_lab_review, sunset_rim, night_emissive, RT gallery. | UI selection/command routing for rigs not fully implemented/tested. |
 | P3-3AC | GPU Particle System Foundation. | PARTIAL | `Renderer_Particles.cpp`, `RendererParticleState.h`, `GPUParticles.h`, particle shaders | `tools/run_effects_showcase_smoke.ps1 -NoBuild`; `tools/run_effects_gallery_tests.ps1 -NoBuild` | Effects showcase passes with live/submitted ECS billboard particles. | Public path is CPU/ECS billboards; GPU particle simulation/sort/render path is not public validated. |
@@ -601,7 +602,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, particle-disabled, RT outlier, camera-cut, and render-graph transient matrix gates now exist and pass individually. | Descriptor stress, full ownership audit, visual probe/golden comparison, and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, particle-disabled, RT outlier, camera-cut, render-graph transient matrix, and full ownership audit gates now exist and pass individually. | Descriptor stress, visual probe/golden comparison, and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -637,17 +638,17 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 2. Add and pass missing focused gates:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_descriptor_memory_stress_scene.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
    ```
 
-   These three scripts still do not currently exist; their absence is part of
+   These two scripts still do not currently exist; their absence is part of
    the remaining work.
 
 3. Keep the added Phase 3 focused gates passing:
 
    ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_transient_matrix.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_phase3_fallback_matrix.ps1
@@ -658,7 +659,8 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    ```
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and
-   passed individually after the fallback-reporting and camera-cut checkpoints.
+   passed individually after the fallback-reporting, camera-cut, render-graph
+   transient, and full renderer ownership checkpoints.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

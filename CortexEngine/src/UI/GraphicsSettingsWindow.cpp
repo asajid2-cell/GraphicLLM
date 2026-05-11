@@ -26,6 +26,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_MEMORY = 9002,
     IDC_GFX_WARNING = 9003,
     IDC_GFX_RT_SCHEDULER = 9004,
+    IDC_GFX_RASTER_TEMPORAL = 9005,
 
     IDC_GFX_RENDER_SCALE = 9010,
     IDC_GFX_EXPOSURE = 9011,
@@ -172,6 +173,7 @@ struct GraphicsSettingsState {
     HWND txtMemory = nullptr;
     HWND txtWarning = nullptr;
     HWND txtRTScheduler = nullptr;
+    HWND txtRasterTemporal = nullptr;
 
     SliderBinding renderScale;
     SliderBinding exposure;
@@ -1046,7 +1048,7 @@ void RefreshHealthLabels() {
     const double fps = frameSeconds > 0.0f ? (1.0 / static_cast<double>(frameSeconds)) : 0.0;
     constexpr double kToMB = 1.0 / (1024.0 * 1024.0);
 
-    wchar_t buffer[512];
+    wchar_t buffer[1024];
     if (g_gfx.txtHealth) {
         const std::wstring adapter = ToWide(health.adapterName);
         const std::wstring preset = ToWide(health.qualityPreset);
@@ -1105,6 +1107,34 @@ void RefreshHealthLabels() {
                    rt.dispatchGI ? L"scheduled" : L"skipped",
                    reasonWide.empty() ? L"none" : reasonWide.c_str());
         SetWindowTextW(g_gfx.txtRTScheduler, buffer);
+    }
+    if (g_gfx.txtRasterTemporal) {
+        const auto& contract = renderer->GetFrameContract();
+        uint32_t validHistories = 0;
+        for (const auto& history : contract.histories) {
+            if (history.valid) {
+                ++validHistories;
+            }
+        }
+        swprintf_s(buffer,
+                   L"Raster/Temporal: VB=%ls inst=%u meshes=%u | HZB=%ls %ux%u mips=%u age=%llu | passes=%u RG=%u barriers=%u | TMask=%ls accept=%.2f disocc=%.2f | histories=%u/%llu",
+                   contract.culling.visibilityBufferRendered ? L"rendered" : (contract.culling.visibilityBufferPlanned ? L"planned" : L"off"),
+                   contract.draws.visibilityBufferInstances,
+                   contract.draws.visibilityBufferMeshes,
+                   contract.culling.hzbValid ? L"valid" : L"invalid",
+                   contract.culling.hzbWidth,
+                   contract.culling.hzbHeight,
+                   contract.culling.hzbMipCount,
+                   static_cast<unsigned long long>(contract.culling.hzbAgeFrames),
+                   static_cast<unsigned int>(contract.passes.size()),
+                   contract.renderGraph.graphPasses,
+                   contract.renderGraph.barriers,
+                   contract.temporalMask.built ? (contract.temporalMask.valid ? L"valid" : L"pending") : L"off",
+                   contract.temporalMask.acceptedRatio,
+                   contract.temporalMask.disocclusionRatio,
+                   validHistories,
+                   static_cast<unsigned long long>(contract.histories.size()));
+        SetWindowTextW(g_gfx.txtRasterTemporal, buffer);
     }
 }
 
@@ -1248,6 +1278,12 @@ void RegisterGraphicsSettingsClass() {
             y += labelHeight + rowGap;
             g_gfx.txtWarning = makeStatic(IDC_GFX_WARNING, L"Warnings: --", y);
             y += labelHeight + rowGap;
+            g_gfx.txtRasterTemporal = makeStaticWithHeight(
+                IDC_GFX_RASTER_TEMPORAL,
+                L"Raster/Temporal: --",
+                y,
+                labelHeight * 2);
+            y += labelHeight * 2 + rowGap;
 
             makeSection(L"Quality");
             g_gfx.cmbQualityPreset = makeCombo(IDC_GFX_QUALITY_PRESET_SELECT, L"Quality Preset");

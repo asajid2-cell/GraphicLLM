@@ -357,6 +357,7 @@ public:
     [[nodiscard]] bool IsRayTracingSupported() const;
     [[nodiscard]] bool IsRayTracingEnabled() const;
     [[nodiscard]] bool IsDeviceRemoved() const;
+    void SimulateDeviceRemovedForValidation(const char* context);
     void SetRayTracingEnabled(bool enabled);
 
     // GPU-driven rendering (Phase 1 GPU culling + indirect draw)

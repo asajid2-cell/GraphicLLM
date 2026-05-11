@@ -428,6 +428,14 @@ void Renderer::ReportDeviceRemoved(const char* context,
     m_frameLifecycle.deviceRemoved = true;
 }
 
+void Renderer::SimulateDeviceRemovedForValidation(const char* context) {
+    ReportDeviceRemoved(
+        context ? context : "SimulatedDeviceRemoved",
+        DXGI_ERROR_DEVICE_REMOVED,
+        __FILE__,
+        __LINE__);
+}
+
 void Renderer::LogDiagnostics() const {
     spdlog::info("---- Renderer Diagnostics ----");
     const char* lastPass = (m_frameLifecycle.lastCompletedPass && m_frameLifecycle.lastCompletedPass[0]) ? m_frameLifecycle.lastCompletedPass : "Unknown";

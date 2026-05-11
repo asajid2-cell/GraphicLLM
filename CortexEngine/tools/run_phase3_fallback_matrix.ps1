@@ -167,3 +167,4 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host "Phase 3 fallback matrix passed: cases=$($rows.Count) logs=$LogDir" -ForegroundColor Green
+exit 0

@@ -16,6 +16,7 @@ validation suite:
 - temporal validation smoke,
 - build entrypoint contract for `rebuild.ps1` / `cmake --build`,
 - repository hygiene checks for whitespace and generated artifacts,
+- source-list contract checks for CMake renderer split coverage,
 - temporal camera-cut history invalidation smoke,
 - full RT showcase smoke,
 - visibility-buffer debug view runtime checks,
@@ -76,6 +77,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_repo_hygiene_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_source_list_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_temporal_camera_cut_validation.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_vb_debug_views.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_render_graph_transient_matrix.ps1 -NoBuild
@@ -111,6 +113,10 @@ an unprepared shell.
 The repository hygiene check runs `git diff --check`, verifies that generated
 build/cache/log directories are not tracked, and checks that `.gitignore`
 contains the required local artifact guards.
+
+The source-list contract verifies that explicit CMake source entries exist,
+are not duplicated, cover every current `src/Graphics/Renderer*.cpp` split
+file, and do not pull temporary/backup source files into the engine target.
 
 The temporal camera-cut validation smoke uses the RT Showcase camera bookmarks
 to jump from `hero` to `reflection_closeup` during the run, then asserts that

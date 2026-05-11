@@ -59,7 +59,9 @@ struct GraphContext {
     RGResourceHandle depth;
     RGResourceHandle ssao;
     bool useCompute = false;
-    std::function<bool()> execute;
+    PrepareContext prepare;
+    GraphicsContext graphics;
+    ComputeContext compute;
     std::function<void(const char*)> failStage;
 };
 

@@ -16,7 +16,9 @@ void Fail(const GraphContext& context, const char* stage) {
 [[nodiscard]] bool IsUsable(const GraphContext& context) {
     return context.depth.IsValid() &&
            context.ssao.IsValid() &&
-           static_cast<bool>(context.execute);
+           context.prepare.commandList &&
+           (context.useCompute ? static_cast<bool>(context.compute.pipeline)
+                               : static_cast<bool>(context.graphics.pipeline));
 }
 
 } // namespace
@@ -173,8 +175,17 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
                           context.useCompute ? RGResourceUsage::UnorderedAccess : RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.execute || !context.execute()) {
-                Fail(context, "ssao_execute");
+            bool executed = false;
+            if (context.useCompute) {
+                executed = PrepareComputeTargets(context.prepare) &&
+                           DispatchCompute(context.compute) &&
+                           FinishComputeTarget(context.prepare);
+            } else {
+                executed = PrepareGraphicsTargets(context.prepare) &&
+                           DrawGraphics(context.graphics);
+            }
+            if (!executed) {
+                Fail(context, context.useCompute ? "ssao_compute_execute" : "ssao_graphics_execute");
             }
         });
 

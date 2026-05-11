@@ -31,6 +31,36 @@ function Add-Failure([string]$Message) {
     $script:failures.Add($Message)
 }
 
+function Assert-Contains([string]$Text, [string]$Needle, [string]$Message) {
+    if (-not $Text.Contains($Needle)) {
+        Add-Failure $Message
+    }
+}
+
+function Test-ShaderContract {
+    $shaderRoot = Join-Path $root "assets/shaders"
+    $materialResolve = Get-Content (Join-Path $shaderRoot "MaterialResolve.hlsl") -Raw
+    $deferredLighting = Get-Content (Join-Path $shaderRoot "DeferredLighting.hlsl") -Raw
+    $postProcess = Get-Content (Join-Path $shaderRoot "PostProcess.hlsl") -Raw
+
+    Assert-Contains $materialResolve "anisotropy = saturate(mat.extraParams.z)" `
+        "MaterialResolve does not source anisotropy from material extraParams.z"
+    Assert-Contains $materialResolve "float4(EncodeSurfaceClass(materialClass), anisotropy, sheenWeight, subsurfaceWrap)" `
+        "MaterialResolve does not write anisotropy into MaterialExt2.g"
+    Assert-Contains $deferredLighting "float anisotropy = saturate(materialExt2.g)" `
+        "DeferredLighting does not read MaterialExt2.g as anisotropy"
+    Assert-Contains $deferredLighting "ApplyDeferredAnisotropy" `
+        "DeferredLighting does not apply the dedicated anisotropy G-buffer channel"
+    Assert-Contains $postProcess "const bool reflectionEligibleClass" `
+        "PostProcess does not derive reflection eligibility from surface/material class"
+
+    if ($postProcess -match "reflectionClassMask\s*=\s*saturate\s*\(\s*materialExt2\.g\s*\)") {
+        Add-Failure "PostProcess still treats MaterialExt2.g as a reflection mask"
+    }
+}
+
+Test-ShaderContract
+
 function Invoke-MaterialCase([string]$Name, [bool]$DisableVisibilityBuffer) {
     $caseLogDir = Join-Path $LogDir $Name
     New-Item -ItemType Directory -Force -Path $caseLogDir | Out-Null

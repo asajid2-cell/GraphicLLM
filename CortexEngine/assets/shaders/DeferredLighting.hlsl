@@ -21,7 +21,7 @@ Texture2D<float4> g_GBufferEmissiveMetallic : register(t2); // RGB = emissive, A
 Texture2D<float> g_DepthBuffer : register(t3);              // Depth for position reconstruction
 Texture2D<float4> g_GBufferMaterialExt0 : register(t4);      // RGBA16F: x=clearcoat, y=coatRough, z=IOR, w=specFactor
 Texture2D<float4> g_GBufferMaterialExt1 : register(t5);      // RGBA16F: rgb=specColor, a=transmission (unused in deferred)
-Texture2D<float4> g_GBufferMaterialExt2 : register(t6);      // RGBA8: surface class, reflection mask, sheen, SSS wrap
+Texture2D<float4> g_GBufferMaterialExt2 : register(t6);      // RGBA8: surface class, anisotropy, sheen, SSS wrap
 
 // Environment/shadow maps (matching forward renderer)
 Texture2D<float4> g_EnvDiffuse : register(t7);  // lat-long (equirect) irradiance
@@ -390,6 +390,29 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
     return output;
 }
 
+float ApplyDeferredAnisotropy(
+    float baseRoughness,
+    float anisotropy,
+    float3 normal,
+    float3 halfVector,
+    out float lobeScale)
+{
+    lobeScale = 1.0f;
+    anisotropy = saturate(anisotropy);
+    baseRoughness = max(baseRoughness, 0.02f);
+    if (anisotropy <= 0.01f) {
+        return baseRoughness;
+    }
+
+    float3 up = (abs(normal.y) < 0.95f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+    float3 tangent = normalize(cross(up, normal));
+    float tangentAlignment = abs(dot(normalize(halfVector), tangent));
+    float anisotropicRoughness = max(0.02f, baseRoughness * (1.0f - 0.45f * anisotropy));
+
+    lobeScale = lerp(1.0f, lerp(0.72f, 1.28f, tangentAlignment), anisotropy);
+    return lerp(baseRoughness, anisotropicRoughness, anisotropy);
+}
+
 // Deferred lighting pixel shader
 float4 PSMain(VSOutput input) : SV_Target0 {
     uint2 pixelCoord = uint2(input.position.xy);
@@ -417,6 +440,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     float specularFactor = saturate(materialExt0.w);
     float3 specularColor = saturate(materialExt1.rgb);
     uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    float anisotropy = saturate(materialExt2.g);
     float sheenWeight = saturate(materialExt2.b);
     float subsurfaceWrap = saturate(materialExt2.a);
 
@@ -499,13 +523,15 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 #endif
 
     // Cook-Torrance BRDF
-    float NDF = DistributionGGX(normal, H, roughness);
-    float G = GeometrySmith(normal, V, L, roughness);
+    float anisotropicLobeScale = 1.0f;
+    float specularRoughness = ApplyDeferredAnisotropy(roughness, anisotropy, normal, H, anisotropicLobeScale);
+    float NDF = DistributionGGX(normal, H, specularRoughness);
+    float G = GeometrySmith(normal, V, L, specularRoughness);
     float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
     float3 numerator = NDF * G * F;
     float denominator = 4.0 * NdotV * NdotL;
-    float3 specular = numerator / max(denominator, 0.001);
+    float3 specular = (numerator / max(denominator, 0.001)) * anisotropicLobeScale;
 
     // Optional clearcoat layer: match Basic.hlsl behavior (second dielectric lobe).
     if (clearCoatWeight > 0.01f) {
@@ -625,13 +651,15 @@ float4 PSMain(VSOutput input) : SV_Target0 {
             if (isAreaRect) {
                 roughForLight = saturate(roughness * 1.5f + 0.05f);
             }
+            float localAnisotropicLobeScale = 1.0f;
+            roughForLight = ApplyDeferredAnisotropy(roughForLight, anisotropy, normal, Hl, localAnisotropicLobeScale);
             float NDF_l = DistributionGGX(normal, Hl, roughForLight);
             float G_l = GeometrySmith(normal, V, Ll, roughForLight);
             float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
 
             float3 numerator_l = NDF_l * G_l * F_l;
             float denom_l = 4.0f * NdotV * NdotLl;
-            float3 spec_l = numerator_l / max(denom_l, 0.001f);
+            float3 spec_l = (numerator_l / max(denom_l, 0.001f)) * localAnisotropicLobeScale;
 
             if (clearCoatWeight > 0.01f) {
                 float coatBlend = clearCoatWeight * 0.8f;

@@ -988,7 +988,6 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float4 materialExt2 = g_MaterialExt2.Sample(g_Sampler, uv);
     float  transmission = saturate(materialExt1.a);
     uint   surfaceClass = DecodeSurfaceClass(materialExt2.r);
-    float  reflectionClassMask = saturate(materialExt2.g);
 
     if (g_DebugMode.x == 1.0f)
     {
@@ -1081,9 +1080,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float  wSSR = 0.0f;
     const bool isMirrorClass = SurfaceIsMirrorClass(surfaceClass);
     const bool isWaterClass = SurfaceIsWater(surfaceClass);
+    const bool reflectionEligibleClass =
+        isMirrorClass ||
+        isWaterClass ||
+        surfaceClass == SURFACE_CLASS_GLASS ||
+        surfaceClass == SURFACE_CLASS_BRUSHED_METAL;
     const bool isPolishedConductor =
         SurfaceIsPolishedConductor(surfaceClass, metallic, roughness) ||
-        (reflectionClassMask > 0.5f && metallic > 0.75f);
+        (reflectionEligibleClass && metallic > 0.75f);
     // SSR is extremely fragile on near-perfect mirrors (roughness ~ 0) and
     // tends to self-intersect on convex glossy objects (chrome spheres),
     // producing the classic "inner copy" ghost. Prefer IBL/RT in that regime.

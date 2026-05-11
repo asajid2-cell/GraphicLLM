@@ -28,7 +28,7 @@ validation suite:
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
 - LLM/Architect renderer-command runtime smoke,
-- graphics preset, showcase scene, material editor, conductor-energy, and visual baseline contracts,
+- graphics preset, showcase scene, material editor, conductor-energy, vegetation-state, and visual baseline contracts,
 - descriptor/memory stress scene for the old 1024 persistent-descriptor ceiling,
 - visual probe validation across all public baseline cases,
 - screenshot negative gates for black/white/saturation/edge regressions,
@@ -82,6 +82,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_conductor_energy_contract_tests.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_vegetation_state_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_repo_hygiene_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_source_list_contract_tests.ps1
@@ -121,6 +122,9 @@ dropdown, metallic/roughness sliders, validation status, and
 The conductor-energy contract verifies forward/deferred shader energy split
 invariants and reruns Material Lab to prove full-metal conductors remain present
 without overbright visual statistics.
+The vegetation-state contract verifies the extracted vegetation state bundle,
+frame-contract reporting, and the explicitly dormant public draw path after
+world/outdoor vegetation rendering was deferred.
 
 The build entrypoint contract verifies that local rebuilds and release
 validation use `rebuild.ps1` / `cmake --build`, with Visual Studio environment

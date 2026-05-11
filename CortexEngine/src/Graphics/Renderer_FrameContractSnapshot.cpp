@@ -297,6 +297,21 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.instanceCapacity = m_particleState.instanceCapacity;
     contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
 
+    contract.vegetation.enabled = m_vegetationState.enabled;
+    contract.vegetation.meshPipelineReady = static_cast<bool>(m_vegetationState.meshPipeline);
+    contract.vegetation.billboardPipelineReady = static_cast<bool>(m_vegetationState.billboardPipeline);
+    contract.vegetation.grassPipelineReady = static_cast<bool>(m_vegetationState.grassCardPipeline);
+    contract.vegetation.shadowPipelineReady = static_cast<bool>(m_vegetationState.meshShadowPipeline);
+    contract.vegetation.atlasLoaded = static_cast<bool>(m_vegetationState.atlas);
+    contract.vegetation.totalInstances = m_vegetationState.stats.totalInstances;
+    contract.vegetation.visibleInstances = m_vegetationState.stats.visibleInstances;
+    contract.vegetation.meshInstances = m_vegetationState.meshInstances.count;
+    contract.vegetation.billboardInstances = m_vegetationState.billboardInstances.count;
+    contract.vegetation.grassInstances = m_vegetationState.grassInstances.count;
+    contract.vegetation.meshCapacity = m_vegetationState.meshInstances.capacity;
+    contract.vegetation.billboardCapacity = m_vegetationState.billboardInstances.capacity;
+    contract.vegetation.grassCapacity = m_vegetationState.grassInstances.capacity;
+
     contract.cinematicPost.enabled = m_postProcessState.cinematicEnabled;
     contract.cinematicPost.postProcessPlanned = featurePlan.runPostProcess;
     contract.cinematicPost.postProcessExecuted = m_frameDiagnostics.timings.postMs > 0.0f;

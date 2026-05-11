@@ -249,6 +249,22 @@ json FrameContractToJson(const FrameContract& contract) {
             {"instance_capacity", contract.particles.instanceCapacity},
             {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
         }},
+        {"vegetation", {
+            {"enabled", contract.vegetation.enabled},
+            {"mesh_pipeline_ready", contract.vegetation.meshPipelineReady},
+            {"billboard_pipeline_ready", contract.vegetation.billboardPipelineReady},
+            {"grass_pipeline_ready", contract.vegetation.grassPipelineReady},
+            {"shadow_pipeline_ready", contract.vegetation.shadowPipelineReady},
+            {"atlas_loaded", contract.vegetation.atlasLoaded},
+            {"total_instances", contract.vegetation.totalInstances},
+            {"visible_instances", contract.vegetation.visibleInstances},
+            {"mesh_instances", contract.vegetation.meshInstances},
+            {"billboard_instances", contract.vegetation.billboardInstances},
+            {"grass_instances", contract.vegetation.grassInstances},
+            {"mesh_capacity", contract.vegetation.meshCapacity},
+            {"billboard_capacity", contract.vegetation.billboardCapacity},
+            {"grass_capacity", contract.vegetation.grassCapacity}
+        }},
         {"cinematic_post", {
             {"enabled", contract.cinematicPost.enabled},
             {"post_process_planned", contract.cinematicPost.postProcessPlanned},

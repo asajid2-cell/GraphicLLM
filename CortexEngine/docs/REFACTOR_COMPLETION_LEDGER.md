@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_223141_744_28020_32263227
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_224040_143_21668_073062a0
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.007711`,
-  `high_motion=0.005352`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.183`, `disocclusion=0.006834`,
+  `high_motion=0.00522`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.477`,
+  `camera=reflection_closeup`, `gpu_ms=2.805`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.279/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.636/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -100,7 +100,8 @@ Key evidence from that run:
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, RT
-  firefly/outlier, LLM renderer command routing, and conductor energy.
+  firefly/outlier, LLM renderer command routing, conductor energy, and
+  vegetation state.
 - LLM renderer command smoke: deterministic mock Architect startup command
   applied exposure `1.35`, disabled shadows, enabled fog with density `0.031`,
   set water amplitude `0.07`, and selected `studio_three_point` lighting rig
@@ -109,6 +110,9 @@ Key evidence from that run:
   conductor energy split; Material Lab passed with `resolved_conductor=4`,
   `reflection_conductor=4`, `max_metallic=1.0`, `very_bright_albedo=0`, and
   bounded saturated/near-white ratios.
+- Vegetation state contract: extracted state bundle, renderer ownership audit
+  coverage, frame-contract serialization, and dormant public draw pipeline
+  reporting passed in the latest release gate.
 
 Recent git history relevant to the audit:
 
@@ -399,12 +403,12 @@ foundation or contract rather than the full broad feature.
 | P2-11AK | Pass 11AK - RT Reflection Outlier Composition Guard | PARTIAL | `Renderer_RTReflections.cpp`, RT shaders | `tools/run_rt_showcase_smoke.ps1` | Visual bright/saturation gates pass. | Need focused outlier/clamp test with known overbright reflection. |
 | P2-11AL | Pass 11AL - RT Reflection Luma-Aware History Blend | PARTIAL | RT denoise/reflection shaders, SRC-RT | `tools/run_rt_showcase_smoke.ps1` | Raw/history luma delta reported and gates pass. | Need quality tuning/scene-specific validation. |
 | P2-11AM through P2-11AZ | State header extractions: RT, temporal mask, HZB, SSAO, SSR, bloom, temporal screen, shadow map, depth, main target, debug line, material fallback texture, environment/IBL, particle, vegetation, upload command pool, texture upload queue, voxel. | DONE_VERIFIED | SRC-STATE, relevant `Renderer*State.h` files | `tools/run_renderer_ownership_tests.ps1`; `tools/run_release_validation.ps1` | Build/release and selected ownership gates pass; state headers exist and are included by `Renderer.h`. | Ownership test is selective; add exhaustive state-member audit if needed. |
-| P2-11BA | Pass 11BA - Vegetation Runtime State Header Extraction | DONE_UNVERIFIED | `RendererVegetationState.h` | build in release gate | Build passes; no vegetation runtime smoke found. | Add vegetation scene/test or mark deferred if unused. |
+| P2-11BA | Pass 11BA - Vegetation Runtime State Header Extraction | DONE_VERIFIED | `RendererVegetationState.h`, `Renderer_Vegetation.cpp`, `FrameContract.h`, `FrameContractJson.cpp`, `Renderer_FrameContractSnapshot.cpp` | `tools/run_vegetation_state_contract_tests.ps1`; `tools/run_release_validation.ps1` | Targeted gate passed: vegetation state bundle exists, full ownership audit accounts for `m_vegetationState`, frame contract serializes `vegetation`, temporal validation reports zero vegetation instances and dormant pipelines. | None for extracted state ownership/reporting. |
 | P2-11BB | Pass 11BB - Upload Command Pool State Header Extraction | DONE_VERIFIED | `RendererUploadState.h`, `RendererCommandResourceState.h` | `tools/run_release_validation.ps1` | Build/runtime pass. |
 | P2-11BC | Pass 11BC - Texture Upload Queue State Header Extraction | DONE_VERIFIED | `RendererTextureUploadState.h` | `tools/run_rt_showcase_smoke.ps1` | Texture upload diagnostics pass. |
 | P2-11BD | Pass 11BD - Voxel Runtime State Header Extraction | DONE_VERIFIED | `RendererVoxelState.h`, `Renderer_Voxel.cpp` | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Voxel backend smoke passed. |
 | P2-11BE | Pass 11BE - Voxel Backend CLI Smoke Gate | DONE_VERIFIED | `Renderer_Voxel.cpp`, `src/Core/main.cpp` backend CLI parsing | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Latest release gate voxel backend passed: `gpu_ms=15.371 visible=7 avg_luma=116.9 nonblack=1`. |
-| P2-11BF | Pass 11BF - Vegetation Runtime State Completion | DONE_UNVERIFIED | `RendererVegetationState.h`, vegetation files | no focused current test found | Build passes only. | Need vegetation runtime test or defer. |
+| P2-11BF | Pass 11BF - Vegetation Runtime State Completion | DEFERRED_BY_USER_ONLY | `RendererVegetationState.h`, `Renderer_Vegetation.cpp`, vegetation shaders/types | `tools/run_vegetation_state_contract_tests.ps1` | User direction de-scoped infinite/outdoor/world systems from the active renderer path. The gate now verifies the state boundary and explicitly detects the current dormant public draw path; mesh/billboard/grass/shadow vegetation rendering remains TODO-marked. | Reopen only if outdoor/world vegetation becomes a current public renderer requirement. |
 | P2-11BG through P2-11CU | Renderer runtime/state boundaries: frame runtime/timing, pipeline, pipeline readiness, render graph transition/runtime, debug overlay, water, fractal surface, post grade, SSAO, bloom, fog, lighting, shadow, SSR, PCSS, post feature, debug view, RT runtime, TAA, GPU culling, camera frame, local shadow, VB frame, quality, shadow cascades, frame lifecycle, GPU culling entity history, frame runtime submission, VB enable, frame contract, constant buffer, breadcrumb, command resources, asset runtime, frame constants CPU, diagnostics, planning, temporal history, services, host services. | DONE_VERIFIED | SRC-STATE plus relevant files named by state headers and SRC-RENDER-ORCH/SRC-CONTRACT | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Latest release gate passed; `Renderer.h` has state/service aggregates, renderer ownership test passed, and full ownership audit covered all 48 renderer members. | The broad state-boundary family is validated by build/runtime smoke plus static member audit, not by one focused runtime test per state. |
 | P2-11CV | Pass 11CV - Release Validation Gate | DONE_VERIFIED | `tools/run_release_validation.ps1`, `tools/README.md` | `tools/run_release_validation.ps1` | Latest full release validation passed. |
 | P2-11CW | Pass 11CW - Public Renderer README Refresh | DONE_VERIFIED | SRC-DOCS | documentation inspection plus latest commit `5e7b69f` | README now names Phase 3 gate and current renderer capabilities. | None for docs currentness; keep updated as scope changes. |
@@ -699,6 +703,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_conductor_energy_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_vegetation_state_contract_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

@@ -77,11 +77,11 @@ enum ControlIdGraphics : int {
     IDC_GFX_CASCADE_LAMBDA = 9073,
     IDC_GFX_DOF_FOCUS_DISTANCE = 9074,
     IDC_GFX_DOF_APERTURE = 9075,
-    IDC_GFX_SUN_AZIMUTH = 9076,
-    IDC_GFX_SUN_ELEVATION = 9077,
-    IDC_GFX_SUN_COLOR_R = 9078,
-    IDC_GFX_SUN_COLOR_G = 9079,
-    IDC_GFX_SUN_COLOR_B = 9080,
+    IDC_GFX_SUN_AZIMUTH = 9217,
+    IDC_GFX_SUN_ELEVATION = 9218,
+    IDC_GFX_SUN_COLOR_R = 9219,
+    IDC_GFX_SUN_COLOR_G = 9220,
+    IDC_GFX_SUN_COLOR_B = 9221,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -131,6 +131,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_PARTICLE_EFFECT_SELECT = 9213,
     IDC_GFX_ENV_BUDGET_SELECT = 9214,
     IDC_GFX_ENV_RELOAD_MANIFEST = 9215,
+    IDC_GFX_QUALITY_PRESET_SELECT = 9216,
 };
 
 struct SliderBinding {
@@ -229,10 +230,12 @@ struct GraphicsSettingsState {
     HWND chkFog = nullptr;
     HWND chkParticles = nullptr;
     HWND chkCinematicPost = nullptr;
+    HWND cmbQualityPreset = nullptr;
     HWND cmbEnvironmentBudget = nullptr;
     HWND cmbEnvironment = nullptr;
     HWND cmbParticleEffect = nullptr;
     std::string environmentBudgetFilter = "all";
+    std::vector<std::string> qualityPresetIds;
     std::vector<std::string> environmentIds;
     std::vector<std::string> particleEffectIds;
 
@@ -335,6 +338,40 @@ void SyncSelectedEnvironmentBudgetFilter() {
     case 4: g_gfx.environmentBudgetFilter = "large"; break;
     default: g_gfx.environmentBudgetFilter = "all"; break;
     }
+}
+
+void LoadQualityPresetOptions() {
+    g_gfx.qualityPresetIds.clear();
+    if (!g_gfx.cmbQualityPreset) {
+        return;
+    }
+
+    SendMessageW(g_gfx.cmbQualityPreset, CB_RESETCONTENT, 0, 0);
+    auto addPreset = [](const char* id, const wchar_t* label) {
+        g_gfx.qualityPresetIds.emplace_back(id);
+        SendMessageW(g_gfx.cmbQualityPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
+    };
+
+    addPreset("release_showcase", L"Release Showcase");
+    addPreset("safe_startup", L"Safe Startup");
+    SendMessageW(g_gfx.cmbQualityPreset, CB_SETCURSEL, 0, 0);
+}
+
+void SyncQualityPresetComboFromRenderer() {
+    if (!g_gfx.cmbQualityPreset || g_gfx.qualityPresetIds.empty()) {
+        return;
+    }
+
+    const std::string active = g_gfx.tuning.quality.preset.empty()
+        ? "release_showcase"
+        : g_gfx.tuning.quality.preset;
+    for (size_t i = 0; i < g_gfx.qualityPresetIds.size(); ++i) {
+        if (g_gfx.qualityPresetIds[i] == active) {
+            SendMessageW(g_gfx.cmbQualityPreset, CB_SETCURSEL, static_cast<WPARAM>(i), 0);
+            return;
+        }
+    }
+    SendMessageW(g_gfx.cmbQualityPreset, CB_SETCURSEL, 0, 0);
 }
 
 bool EnvironmentMatchesBudgetFilter(Graphics::EnvironmentBudgetClass budgetClass) {
@@ -477,6 +514,46 @@ void ApplySelectedParticleEffectFromGraphicsUI() {
     engine->ApplyParticleEffectPresetToScene(g_gfx.tuning.particles.effectPreset);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
     SyncParticleEffectComboFromRenderer();
+}
+
+void ApplySelectedQualityPresetFromGraphicsUI() {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (!renderer || renderer->IsDeviceRemoved() || !g_gfx.cmbQualityPreset || g_gfx.qualityPresetIds.empty()) {
+        return;
+    }
+
+    const int selected = static_cast<int>(SendMessageW(g_gfx.cmbQualityPreset, CB_GETCURSEL, 0, 0));
+    if (selected < 0 || static_cast<size_t>(selected) >= g_gfx.qualityPresetIds.size()) {
+        return;
+    }
+
+    std::string resolvedPresetId;
+    std::string error;
+    auto preset = Graphics::LoadRendererGraphicsPresetFile(Graphics::GetDefaultRendererGraphicsPresetCollectionPath(),
+                                                           g_gfx.qualityPresetIds[static_cast<size_t>(selected)],
+                                                           &resolvedPresetId,
+                                                           &error);
+    if (!preset) {
+        const std::wstring status = L"Graphics preset failed: " + ToWide(error);
+        SetWindowTextW(g_gfx.txtWarning, status.c_str());
+        return;
+    }
+
+    preset->quality.preset = resolvedPresetId.empty()
+        ? g_gfx.qualityPresetIds[static_cast<size_t>(selected)]
+        : resolvedPresetId;
+    preset->quality.dirtyFromUI = false;
+    Graphics::ApplyRendererTuningState(*renderer, *preset);
+    if (auto* engine = Cortex::ServiceLocator::GetEngine()) {
+        engine->ApplyParticleEffectPresetToScene(preset->particles.effectPreset);
+    }
+
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+    SyncQualityPresetComboFromRenderer();
+    SyncParticleEffectComboFromRenderer();
+    SyncEnvironmentComboFromRenderer();
+    const std::wstring status = L"Graphics preset applied: " + ToWide(g_gfx.tuning.quality.preset);
+    SetWindowTextW(g_gfx.txtWarning, status.c_str());
 }
 
 void ApplySelectedEnvironmentFromGraphicsUI(bool loadAllFirst = false) {
@@ -732,6 +809,7 @@ void RefreshControlsFromRenderer() {
     SetCheckbox(g_gfx.chkFog, g_gfx.tuning.atmosphere.fogEnabled);
     SetCheckbox(g_gfx.chkParticles, g_gfx.tuning.particles.enabled);
     SetCheckbox(g_gfx.chkCinematicPost, g_gfx.tuning.cinematicPost.enabled);
+    SyncQualityPresetComboFromRenderer();
     SyncEnvironmentComboFromRenderer();
 }
 
@@ -951,6 +1029,8 @@ void RegisterGraphicsSettingsClass() {
             y += labelHeight + rowGap;
 
             makeSection(L"Quality");
+            g_gfx.cmbQualityPreset = makeCombo(IDC_GFX_QUALITY_PRESET_SELECT, L"Quality Preset");
+            LoadQualityPresetOptions();
             makeSlider(IDC_GFX_RENDER_SCALE, L"Render Scale", g_gfx.renderScale, 0.5f, 1.0f);
             g_gfx.chkTAA = makeCheckbox(IDC_GFX_TAA, L"TAA");
             g_gfx.chkFXAA = makeCheckbox(IDC_GFX_FXAA, L"FXAA");
@@ -1185,6 +1265,12 @@ void RegisterGraphicsSettingsClass() {
             return 0;
         }
         case WM_COMMAND: {
+            if (LOWORD(wParam) == IDC_GFX_QUALITY_PRESET_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
+                ApplySelectedQualityPresetFromGraphicsUI();
+                RefreshControlsFromRenderer();
+                RefreshHealthLabels();
+                return 0;
+            }
             if (LOWORD(wParam) == IDC_GFX_ENV_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
                 ApplySelectedEnvironmentFromGraphicsUI();
                 RefreshControlsFromRenderer();

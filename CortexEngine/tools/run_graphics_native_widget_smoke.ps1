@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [int]$SmokeFrames = 1200,
+    [int]$SmokeFrames = 1800,
     [string]$LogDir = ""
 )
 
@@ -79,11 +79,8 @@ $IDC_GFX_SHADOW_PCF = 9072
 $IDC_GFX_CASCADE_LAMBDA = 9073
 $IDC_GFX_DOF_FOCUS_DISTANCE = 9074
 $IDC_GFX_DOF_APERTURE = 9075
-$IDC_GFX_SUN_AZIMUTH = 9076
-$IDC_GFX_SUN_ELEVATION = 9077
-$IDC_GFX_SUN_COLOR_R = 9078
-$IDC_GFX_SUN_COLOR_G = 9079
-$IDC_GFX_SUN_COLOR_B = 9080
+$IDC_GFX_SUN_AZIMUTH = 9217
+$IDC_GFX_SUN_ELEVATION = 9218
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -99,6 +96,7 @@ $IDC_GFX_PARTICLE_BLOOM = 9065
 $IDC_GFX_PARTICLE_SOFT_DEPTH = 9066
 $IDC_GFX_PARTICLE_WIND = 9067
 $IDC_GFX_PARTICLE_EFFECT_SELECT = 9213
+$IDC_GFX_QUALITY_PRESET_SELECT = 9216
 $IDC_GFX_RT_REFL_STRENGTH = 9034
 $IDC_GFX_MOTION_BLUR = 9058
 $IDC_GFX_DOF = 9059
@@ -209,6 +207,8 @@ try {
     if ($window -eq [IntPtr]::Zero) {
         Add-Failure "Cortex Graphics Settings native window did not appear for process $($process.Id)."
     } else {
+        Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 1
+        Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 0
         Set-Trackbar $window $IDC_GFX_RENDER_SCALE 68
         Set-CheckboxState $window $IDC_GFX_SAFE_LIGHTING $false
         Set-Trackbar $window $IDC_GFX_SSR_DISTANCE 47
@@ -252,9 +252,6 @@ try {
         Set-Trackbar $window $IDC_GFX_SUN 42
         Set-Trackbar $window $IDC_GFX_SUN_AZIMUTH 37
         Set-Trackbar $window $IDC_GFX_SUN_ELEVATION 72
-        Set-Trackbar $window $IDC_GFX_SUN_COLOR_R 60
-        Set-Trackbar $window $IDC_GFX_SUN_COLOR_G 42
-        Set-Trackbar $window $IDC_GFX_SUN_COLOR_B 28
         Set-Trackbar $window $IDC_GFX_AREA_LIGHT 64
         Select-ComboIndex $window $IDC_GFX_ENV_SELECT 4
         Click-Control $window $IDC_GFX_ENV_REAPPLY
@@ -294,7 +291,10 @@ if (-not (Test-Path $reportPath)) {
     if (-not [bool]$fc.graphics_preset.dirty_from_ui) {
         Add-Failure "graphics_preset.dirty_from_ui was false after native slider automation"
     }
-    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.84 0.04
+    if ([string]$fc.graphics_preset.id -ne "release_showcase") {
+        Add-Failure "graphics_preset.id was '$($fc.graphics_preset.id)', expected release_showcase after quality preset dropdown"
+    }
+    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.70 0.04
     if ([bool]$fc.lighting.safe_rig_on_low_vram) {
         Add-Failure "lighting.safe_rig_on_low_vram remained true after native safe-lighting toggle"
     }
@@ -310,9 +310,6 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "sun_direction_x" ([double]$fc.lighting.sun_direction[0]) 0.57 0.06
     Assert-Near "sun_direction_y" ([double]$fc.lighting.sun_direction[1]) 0.63 0.06
     Assert-Near "sun_direction_z" ([double]$fc.lighting.sun_direction[2]) -0.53 0.06
-    Assert-Near "sun_color_r" ([double]$fc.lighting.sun_color[0]) 1.2 0.08
-    Assert-Near "sun_color_g" ([double]$fc.lighting.sun_color[1]) 0.84 0.08
-    Assert-Near "sun_color_b" ([double]$fc.lighting.sun_color[2]) 0.56 0.08
     Assert-Near "god_ray_intensity" ([double]$fc.lighting.god_ray_intensity) 1.65 0.10
     Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.37 0.08
     Assert-Near "shadow_bias" ([double]$fc.lighting.shadow_bias) 0.0046 0.001

@@ -68,7 +68,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "atmosphere": {
     "fog": false,
-    "fog_density": 0.0
+    "fog_density": 0.0,
+    "fog_height": 4.25,
+    "fog_falloff": 0.72
   },
   "water": {
     "level_y": -0.12,
@@ -175,6 +177,14 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($backgroundBlur - 0.37) -gt 0.03) {
         Add-Failure "valid settings background blur was $backgroundBlur, expected 0.37"
+    }
+    $fogHeight = [double]$report.frame_contract.lighting.fog_height
+    $fogFalloff = [double]$report.frame_contract.lighting.fog_falloff
+    if ([Math]::Abs($fogHeight - 4.25) -gt 0.08) {
+        Add-Failure "valid settings fog height was $fogHeight, expected 4.25"
+    }
+    if ([Math]::Abs($fogFalloff - 0.72) -gt 0.04) {
+        Add-Failure "valid settings fog falloff was $fogFalloff, expected 0.72"
     }
     $water = $report.frame_contract.water
     if ($null -eq $water) {

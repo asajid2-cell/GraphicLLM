@@ -227,6 +227,7 @@ if ($validRun.exit_code -ne 0) {
     $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur
     $environmentRotation = [double]$report.frame_contract.environment.rotation_degrees
+    Assert-Near "area_light_size_scale" ([double]$report.frame_contract.lighting.area_light_size_scale) 1.0 0.04
     if ([Math]::Abs($backgroundExposure - 1.23) -gt 0.03) {
         Add-Failure "valid settings background exposure was $backgroundExposure, expected 1.23"
     }

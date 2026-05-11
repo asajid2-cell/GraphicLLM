@@ -214,6 +214,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"fog_height", contract.lighting.fogHeight},
             {"fog_falloff", contract.lighting.fogFalloff},
             {"god_ray_intensity", contract.lighting.godRayIntensity},
+            {"area_light_size_scale", contract.lighting.areaLightSizeScale},
             {"shadow_bias", contract.lighting.shadowBias},
             {"shadow_pcf_radius", contract.lighting.shadowPCFRadius},
             {"light_count", contract.lighting.lightCount},

@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [int]$SmokeFrames = 900,
+    [int]$SmokeFrames = 1200,
     [string]$LogDir = ""
 )
 
@@ -69,7 +69,11 @@ $IDC_GFX_SSAO_BIAS = 9042
 $IDC_GFX_SSR_DISTANCE = 9043
 $IDC_GFX_SSR_THICKNESS = 9044
 $IDC_GFX_SSR_STRENGTH = 9045
+$IDC_GFX_EXPOSURE = 9011
+$IDC_GFX_BLOOM = 9012
+$IDC_GFX_SUN = 9013
 $IDC_GFX_GOD_RAYS = 9014
+$IDC_GFX_AREA_LIGHT = 9015
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -203,6 +207,8 @@ try {
         Set-Trackbar $window $IDC_GFX_SSAO_RADIUS 52
         Set-Trackbar $window $IDC_GFX_SSAO_BIAS 63
         Set-Trackbar $window $IDC_GFX_SSAO_INTENSITY 39
+        Set-Trackbar $window $IDC_GFX_EXPOSURE 38
+        Set-Trackbar $window $IDC_GFX_BLOOM 24
         Set-Trackbar $window $IDC_GFX_GOD_RAYS 55
         Set-Trackbar $window $IDC_GFX_FOG_DENSITY 26
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
@@ -228,6 +234,8 @@ try {
         Click-Control $window $IDC_GFX_GRADE_COOL_MOON
         Click-Control $window $IDC_GFX_TONE_PUNCHY
         Click-Control $window $IDC_GFX_RIG_LANTERNS
+        Set-Trackbar $window $IDC_GFX_SUN 42
+        Set-Trackbar $window $IDC_GFX_AREA_LIGHT 64
         Select-ComboIndex $window $IDC_GFX_ENV_SELECT 4
         Click-Control $window $IDC_GFX_ENV_REAPPLY
     }
@@ -276,7 +284,11 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "ssao_radius" ([double]$fc.lighting.ssao_radius) 2.60 0.12
     Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.063 0.01
     Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 1.95 0.12
+    Assert-Near "exposure" ([double]$fc.lighting.exposure) 1.93 0.12
+    Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.48 0.08
+    Assert-Near "sun_intensity" ([double]$fc.lighting.sun_intensity) 8.4 0.4
     Assert-Near "god_ray_intensity" ([double]$fc.lighting.god_ray_intensity) 1.65 0.10
+    Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.37 0.08
     Assert-Near "fog_density" ([double]$fc.lighting.fog_density) 0.026 0.01
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 3.41 0.20

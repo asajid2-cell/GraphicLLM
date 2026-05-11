@@ -393,6 +393,14 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
             return;
         }
 
+        if (m_environmentState.selectionFallbackUsed &&
+            m_environmentState.requestedEnvironment == name &&
+            m_environmentState.fallbackReason == "requested_environment_load_failed") {
+            spdlog::warn("Environment '{}' still unavailable after earlier load failure; keeping current environment",
+                         name);
+            return;
+        }
+
         spdlog::warn("Environment '{}' not found, keeping current environment", name);
         m_environmentState.selectionFallbackUsed = true;
         m_environmentState.requestedEnvironment = name;

@@ -117,7 +117,7 @@ StartupPreflightResult RunStartupPreflight(const EngineConfig& config) {
     const std::filesystem::path assetsDir = "assets";
     const std::filesystem::path shadersDir = assetsDir / "shaders";
     const std::filesystem::path configDir = assetsDir / "config";
-    const std::filesystem::path environmentManifest = assetsDir / "environments" / "environments.json";
+    const std::filesystem::path environmentManifest = Graphics::DefaultEnvironmentManifestPath();
     const std::filesystem::path showcaseConfig = configDir / "showcase_scenes.json";
     const std::filesystem::path renderQualityConfig = configDir / "render_quality.json";
 

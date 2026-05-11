@@ -6,6 +6,7 @@
     "runtime_format_preference": ["dds", "hdr", "exr"],
     "normal_startup_downloads": false,
     "source_assets_optional": true,
+    "legacy_scan_fallback": false,
     "thumbnail_required": false,
     "notes": "Runtime startup must use committed local assets or procedural_sky. Optional source HDR/EXR assets can be converted by tools, but startup must not download environments."
   },

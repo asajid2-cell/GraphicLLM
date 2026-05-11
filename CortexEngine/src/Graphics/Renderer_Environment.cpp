@@ -87,8 +87,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         m_services.window ? std::max(1u, m_services.window->GetWidth()) : 0,
         m_services.window ? std::max(1u, m_services.window->GetHeight()) : 0);
 
-    const fs::path manifestPath = assetsDir / "environments" / "environments.json";
+    const fs::path manifestPath = DefaultEnvironmentManifestPath();
     bool usedManifest = false;
+    bool allowLegacyScan = true;
     if (fs::exists(manifestPath)) {
         auto manifestResult = LoadEnvironmentManifest(manifestPath);
         if (manifestResult.IsErr()) {
@@ -96,6 +97,7 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         } else {
             usedManifest = true;
             const auto& manifest = manifestResult.Value();
+            allowLegacyScan = manifest.legacyScanFallback;
             for (const auto& entry : manifest.environments) {
                 if (!entry.enabled || entry.id == manifest.fallback) {
                     continue;
@@ -114,6 +116,14 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
                                  entry.required ? "required" : "optional",
                                  entry.id,
                                  runtimePath.string());
+                    PendingEnvironment pending;
+                    pending.path = runtimePath.string();
+                    pending.name = entry.id;
+                    pending.budgetClass = ToString(entry.budgetClass);
+                    pending.maxRuntimeDimension = entry.maxRuntimeDimension;
+                    pending.defaultDiffuseIntensity = entry.defaultDiffuseIntensity;
+                    pending.defaultSpecularIntensity = entry.defaultSpecularIntensity;
+                    m_environmentState.pending.push_back(std::move(pending));
                     continue;
                 }
 
@@ -139,7 +149,7 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     // Legacy fallback: scan assets directory for all HDR and EXR files when no
     // manifest exists or the manifest has no usable runtime entries.
-    if (envFiles.empty() && fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
+    if (envFiles.empty() && allowLegacyScan && fs::exists(assetsDir) && fs::is_directory(assetsDir)) {
         for (const auto& entry : fs::directory_iterator(assetsDir)) {
             if (entry.is_regular_file()) {
                 std::string ext = entry.path().extension().string();
@@ -159,6 +169,8 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
         if (usedManifest) {
             spdlog::warn("Environment manifest had no usable entries; falling back to legacy HDR/EXR scan");
         }
+    } else if (envFiles.empty() && usedManifest && !allowLegacyScan) {
+        spdlog::warn("Environment manifest had no usable entries; legacy HDR/EXR scan is disabled by policy");
     }
 
     std::sort(envFiles.begin(),
@@ -236,9 +248,9 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     // If no environments loaded, create a fallback placeholder environment
     if (m_environmentState.maps.empty()) {
-        spdlog::warn("No HDR environments loaded; using placeholder");
+        spdlog::warn("No HDR environments loaded; using procedural sky placeholder");
         EnvironmentMaps fallback;
-        fallback.name = "Placeholder";
+        fallback.name = "procedural_sky";
         fallback.budgetClass = "tiny";
         fallback.maxRuntimeDimension = 0;
         fallback.defaultDiffuseIntensity = 0.75f;

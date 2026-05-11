@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_233128_383_15348_330e05eb
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_233633_407_34848_41636535
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.695`, `disocclusion=0.006617`,
-  `high_motion=0.005160`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.006852`,
+  `high_motion=0.005223`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=3.140`,
+  `camera=reflection_closeup`, `gpu_ms=2.898`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.641/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.025/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -90,7 +90,8 @@ Key evidence from that run:
   reported 0 aliased resources/barriers/saved bytes, and bloom-transients-off
   reported 0 final transient resources with validation still run.
 - Phase 3 visual matrix: temporal validation, RT showcase, material lab,
-  glass/water courtyard, effects showcase, and uncapped IBL gallery passed.
+  glass/water courtyard, effects showcase, uncapped IBL gallery, and fallback
+  matrix passed.
 - Renderer ownership, full renderer ownership audit, VB debug views,
   descriptor/memory stress, visual probe, fatal error, advanced graphics catalog, effects gallery,
   environment manifest, IBL asset policy, uncapped IBL gallery, budget profile matrix, and voxel backend
@@ -515,7 +516,7 @@ definition of done in `phase3.md`.
 | P3-3A | Startup Preflight Contract. | DONE_VERIFIED | SRC-PREFLIGHT, SRC-CONTRACT | `tools/run_release_validation.ps1`; `tools/run_phase3_fallback_matrix.ps1 -NoBuild` | Latest release shows default preflight `passed=true warnings=0 errors=0`; fallback matrix covers safe startup, missing selected environment, missing manifest, missing required/optional environment assets, and explicit no-RT profile. | None for current startup preflight contract fields. |
 | P3-3B | Runtime Health State. | PARTIAL | SRC-CONTRACT, SRC-UI-P3 | `tools/run_release_validation.ps1`; `tools/run_hud_mode_contract_tests.ps1 -NoBuild` | Frame reports include health/preset fields; HUD contract passed. | Debug UI health panel and release summary coverage are partial. |
 | P3-3C | Device Removed and Fatal Error UX. | PARTIAL | SRC-FATAL | `tools/run_fatal_error_contract_tests.ps1 -NoBuild` | Fatal error contract passed. | User-facing message box and real device-removed path not fully runtime-tested. |
-| P3-3D | Phase 3 Visual Matrix Script. | DONE_VERIFIED | `tools/run_phase3_visual_matrix.ps1` | `tools/run_phase3_visual_matrix.ps1 -NoBuild -TemporalSmokeFrames 90 -RTSmokeFrames 180 -SkipSurfaceDebug` | Latest uncapped matrix passed all rows and ran the IBL gallery for all enabled runtime IBLs. Logs: `phase3_visual_matrix_20260510_231344_693_26152_8a1c343f`. | Matrix is narrower than original blueprint cases: no explicit safe_startup/fallback_sky row. |
+| P3-3D | Phase 3 Visual Matrix Script. | DONE_VERIFIED | `tools/run_phase3_visual_matrix.ps1` | `tools/run_phase3_visual_matrix.ps1 -NoBuild -TemporalSmokeFrames 90 -RTSmokeFrames 180 -SkipSurfaceDebug` | Latest matrix passed temporal validation, RT showcase, material lab, glass/water courtyard, effects showcase, uncapped IBL gallery, and fallback matrix rows. Logs: `phase3_visual_matrix_20260510_233548_239_31856_bb145491`. | Additional optional visual rows can be added as new public scenes are stabilized. |
 | P3-3E | Screenshot Contract. | PARTIAL | SRC-VISUAL, smoke scripts | `tools/run_release_validation.ps1`; `tools/run_visual_baseline_contract_tests.ps1 -NoBuild -RuntimeSmoke -MaxRuntimeCases 1` | Visual stats gates pass in public smokes. | Edge occupancy, dominant hue warnings, forced black/overexposed failure tests, and object coverage masks are incomplete. |
 | P3-3F | Visual Gate Stabilization; no early golden churn. | PARTIAL | SRC-VISUAL, `assets/config/visual_baselines.json` | `tools/run_visual_baseline_contract_tests.ps1`; `tools/run_visual_probe_validation.ps1`; `tools/run_screenshot_negative_gates.ps1` | Visual baseline contract, all-case visual probe, and synthetic screenshot negative gates passed. | Golden/tolerant baselines exist as metadata and runtime probes; no committed full image-diff golden comparison. |
 | P3-3G | Renderer Tuning State. | DONE_VERIFIED | `RendererTuningState.h/cpp`, `RendererControlApplier_Runtime.cpp` | `tools/run_graphics_settings_persistence_tests.ps1 -NoBuild`; `tools/run_graphics_preset_tests.ps1 -NoBuild -RuntimeSmoke` | Persistence and preset runtime smoke passed. | Additional slider fields remain future work. |
@@ -585,7 +586,7 @@ definition of done in `phase3.md`.
 |---|---|---|---|---|---|---|
 | P3-GATE-01 | Engine build. | DONE_VERIFIED | build scripts | `tools/run_release_validation.ps1` | `build_release` passed. | None. |
 | P3-GATE-02 | Existing release validation. | DONE_VERIFIED | `tools/run_release_validation.ps1` | `tools/run_release_validation.ps1` | Latest full release gate passed. | None for current suite. |
-| P3-GATE-03 | Phase 3 visual matrix. | DONE_VERIFIED | `tools/run_phase3_visual_matrix.ps1` | release gate matrix step | Matrix passed. | Matrix lacks some original blueprint rows. |
+| P3-GATE-03 | Phase 3 visual matrix. | DONE_VERIFIED | `tools/run_phase3_visual_matrix.ps1` | release gate matrix step | Matrix passed with public scenes, uncapped IBL gallery, and fallback matrix rows. | Add more rows only as new public scenes/features stabilize. |
 | P3-GATE-04 | Graphics preset round-trip test. | DONE_VERIFIED | `tools/run_graphics_preset_tests.ps1`, `RendererTuningState.cpp` | release gate preset step | Preset tests passed. | Add migration/unknown negative coverage. |
 | P3-GATE-05 | IBL asset policy test. | DONE_VERIFIED | `tools/run_ibl_asset_policy_tests.ps1`, `tools/run_environment_manifest_tests.ps1`, manifest | `tools/run_ibl_asset_policy_tests.ps1` | Standalone policy gate passed: `runtime_assets=5`; startup downloads disabled; source assets optional; legacy scan fallback disabled; runtime format preferences and budget-class size caps enforced. | None for current IBL asset policy gate. |
 | P3-GATE-06 | Environment manifest test. | DONE_VERIFIED | `EnvironmentManifest.cpp`, `environments.json` | `tools/run_environment_manifest_tests.ps1` | Passed. | None for current manifest. |
@@ -635,7 +636,7 @@ definition of done in `phase3.md`.
 | P3-ORDER-07 | Add environment manifest parser and procedural fallback. | DONE_VERIFIED | `EnvironmentManifest.cpp`, procedural sky shader, environment fallback contract fields | manifest/IBL/fallback tests | Parser, fallback declaration, missing selected environment fallback, missing manifest warning, missing required physical asset fallback, and missing optional physical asset fallback all pass. | None for current parser/fallback contract. |
 | P3-ORDER-08 | Add frame contract environment/health/preset sections. | DONE_VERIFIED | SRC-CONTRACT | release gate plus focused tests | Current smokes consume these fields. | Startup/fallback negative variants partial. |
 | P3-ORDER-09 | Add Graphics Settings window tabs. | PARTIAL | `GraphicsSettingsWindow.cpp` | graphics UI contract | Contract passes. | Full planned tab/control inventory incomplete. |
-| P3-ORDER-10 | Add Phase 3 visual matrix. | DONE_VERIFIED | `run_phase3_visual_matrix.ps1` | release gate | Passed. | Matrix narrower than plan. |
+| P3-ORDER-10 | Add Phase 3 visual matrix. | DONE_VERIFIED | `run_phase3_visual_matrix.ps1` | release gate | Passed with temporal, RT, material, glass/water, effects, IBL, and fallback rows. | Add more rows only as new public scenes/features stabilize. |
 | P3-ORDER-11 | Stabilize public scene cameras, lighting rigs, IBL defaults before golden baselines. | PARTIAL | SRC-SCENES | showcase/visual matrix tests | Hero cameras/rigs/default envs pass. | Full golden image workflow incomplete. |
 | P3-ORDER-12 | Add IBL gallery scene and screenshot stats gates. | PARTIAL | IBL gallery tests, visual stats scripts | IBL gallery tests; `tools/run_screenshot_negative_gates.ps1 -NoBuild`; `tools/run_visual_probe_validation.ps1 -NoBuild` | All five enabled runtime IBL environments pass. Screenshot negative gates pass black/white/saturation/edge synthetic cases. Visual probe adds dominant-color and edge checks across all public baseline captures. | Full screenshot comparison set remains incomplete. |
 | P3-ORDER-13 | Add RT reflection tuning controls and outlier handling. | PARTIAL | SRC-RT, SRC-UI-P3 | RT smoke/UI contract; `tools/run_rt_firefly_outlier_scene.ps1 -NoBuild` | RT stats/scheduler pass and firefly/outlier gate passes. | Tuning sliders and deliberately overbright clamp scene incomplete. |
@@ -677,7 +678,7 @@ definition of done in `phase3.md`.
 | P3-REM-01 | Full graphics slider inventory. | PARTIAL | Current UI/presets cover foundations, not every slider in the blueprint. |
 | P3-REM-02 | Interactive UI automation for graphics settings/material editor/HUD beyond static contracts. | PARTIAL | `run_graphics_ui_interaction_smoke.ps1` now verifies runtime settings application through the same state file used by the UI, but native widget mouse/keyboard automation for graphics/material/HUD is still missing. |
 | P3-REM-03 | Missing optional/selected environment runtime fallback matrix. | DONE_VERIFIED | Missing selected environment, missing manifest, missing required physical asset, and missing optional physical asset fallback are runtime-tested and frame-contract-visible. |
-| P3-REM-04 | Safe-startup/fallback-sky/no-RT visual matrix rows. | PARTIAL | Budget profile matrix exists, but original Phase 3 matrix rows are narrower in current script. |
+| P3-REM-04 | Safe-startup/fallback-sky/no-RT visual matrix rows. | DONE_VERIFIED | Phase 3 visual matrix now includes `fallback_matrix`, which runs safe startup, missing selected environment, missing manifest, missing required/optional IBL asset, and explicit no-RT visual fallback cases. |
 | P3-REM-05 | Forced black/overexposed screenshot negative tests and edge/dominant-hue metrics. | DONE_VERIFIED | Synthetic black, white, saturated, and edge-heavy negative gates pass; visual probe validates edge structure and dominant-color ratios across all public baseline captures. |
 | P3-REM-06 | Full golden/tolerant image comparison workflow. | PARTIAL | Baseline contracts and all-case visual probes exist; committed full image comparison is not implemented by policy. |
 | P3-REM-07 | RT reflection tuning sliders and firefly/outlier stress scenes. | PARTIAL | Firefly/outlier gate now passes strict RT showcase raw/history outlier thresholds. Tuning sliders and a deliberately overbright clamp stress scene remain incomplete. |

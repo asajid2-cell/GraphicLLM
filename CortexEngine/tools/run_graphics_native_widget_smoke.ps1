@@ -51,10 +51,13 @@ $WM_COMMAND = 0x0111
 $TBM_SETPOS = 0x0405
 $TB_ENDTRACK = 8
 $BM_CLICK = 0x00F5
+$BM_GETCHECK = 0x00F0
+$BST_CHECKED = 1
 $CB_SETCURSEL = 0x014E
 $CBN_SELCHANGE = 1
 
 $IDC_GFX_RENDER_SCALE = 9010
+$IDC_GFX_SAFE_LIGHTING = 9115
 $IDC_GFX_ENV_SELECT = 9211
 $IDC_GFX_ENV_REAPPLY = 9212
 $IDC_GFX_ENV_ROTATION = 9068
@@ -156,6 +159,16 @@ function Click-Control([IntPtr]$Parent, [int]$Id) {
     Start-Sleep -Milliseconds 160
 }
 
+function Set-CheckboxState([IntPtr]$Parent, [int]$Id, [bool]$Checked) {
+    $control = Get-Control $Parent $Id
+    $current = [CortexWin32UiSmoke]::SendMessage($control, $BM_GETCHECK, [IntPtr]::Zero, [IntPtr]::Zero)
+    $isChecked = ($current.ToInt32() -eq $BST_CHECKED)
+    if ($isChecked -ne $Checked) {
+        [void][CortexWin32UiSmoke]::SendMessage($control, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 160
+    }
+}
+
 function Select-ComboIndex([IntPtr]$Parent, [int]$Id, [int]$Index) {
     $control = Get-Control $Parent $Id
     [void][CortexWin32UiSmoke]::SendMessage($control, $CB_SETCURSEL, [IntPtr]$Index, [IntPtr]::Zero)
@@ -170,6 +183,7 @@ try {
         Add-Failure "Cortex Graphics Settings native window did not appear for process $($process.Id)."
     } else {
         Set-Trackbar $window $IDC_GFX_RENDER_SCALE 68
+        Set-CheckboxState $window $IDC_GFX_SAFE_LIGHTING $false
         Set-Trackbar $window $IDC_GFX_SSR_STRENGTH 72
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
         Set-Trackbar $window $IDC_GFX_WATER_ROUGHNESS 41
@@ -227,6 +241,9 @@ if (-not (Test-Path $reportPath)) {
         Add-Failure "graphics_preset.dirty_from_ui was false after native slider automation"
     }
     Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.84 0.04
+    if ([bool]$fc.lighting.safe_rig_on_low_vram) {
+        Add-Failure "lighting.safe_rig_on_low_vram remained true after native safe-lighting toggle"
+    }
     Assert-Near "ssr_strength" ([double]$fc.screen_space.ssr_strength) 0.72 0.04
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.416 0.05

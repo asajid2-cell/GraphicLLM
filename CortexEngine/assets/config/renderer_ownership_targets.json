@@ -26,11 +26,11 @@
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
       "status": "release_boundary_validated",
-      "release_boundary": "raw/history stats resources and descriptor tables are owned by RTReflectionSignalState; frame-contract metrics remain stable across the public RT showcase path",
+      "release_boundary": "Raw/history stats resources and descriptor tables are owned by RTReflectionSignalState. RTReflectionSignalStats owns signal-resource transitions, stats UAV barriers, and stats readback copies for both raw and history captures; Renderer_RTReflectionSignalStats.cpp only selects targets, dispatch descriptors, and frame-contract bookkeeping",
       "validated_contracts": ["renderer_ownership", "rt_showcase", "phase3_visual_matrix"],
-      "target_files": ["RendererRTState.h", "RTReflectionSignalStats.h"],
+      "target_files": ["RendererRTState.h", "RTReflectionSignalStats.h", "RTReflectionSignalStats.cpp", "Renderer_RTReflectionSignalStats.cpp"],
       "renderer_state_members": ["m_rtReflectionSignalState", "m_rtReflectionTargets", "m_rtReflectionReadiness"],
-      "future_extension": "If RT reflection capture/readback grows again, move the execution helper behind the same stats boundary instead of adding loose Renderer members"
+      "future_extension": "If RT reflection capture/readback grows again, keep transition, UAV-barrier, and readback-copy mechanics behind the stats boundary instead of adding loose Renderer members"
     },
     {
       "id": "rt_history_copy",

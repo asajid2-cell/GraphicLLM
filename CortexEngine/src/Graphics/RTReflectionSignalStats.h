@@ -31,8 +31,19 @@ public:
         DescriptorHandle uavTable;
     };
 
+    struct CaptureResources {
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ID3D12Resource* reflectionResource = nullptr;
+        D3D12_RESOURCE_STATES* reflectionState = nullptr;
+        ID3D12Resource* statsResource = nullptr;
+        D3D12_RESOURCE_STATES* statsState = nullptr;
+        ID3D12Resource* readbackResource = nullptr;
+    };
+
     Result<void> Initialize(ID3D12Device* device, ID3D12RootSignature* rootSignature);
     [[nodiscard]] bool IsReady() const;
+    [[nodiscard]] static bool PrepareCaptureResources(const CaptureResources& resources);
+    [[nodiscard]] static bool FinalizeCaptureReadback(const CaptureResources& resources);
     [[nodiscard]] bool Dispatch(ID3D12GraphicsCommandList* cmdList,
                                 ID3D12Device* device,
                                 DescriptorHeapManager* descriptorManager,

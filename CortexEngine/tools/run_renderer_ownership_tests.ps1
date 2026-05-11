@@ -30,6 +30,8 @@ if (-not (Test-Path $rendererRtStatePath)) {
     throw "RendererRTState.h not found: $rendererRtStatePath"
 }
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
+$rtReflectionSignalStatsPath = Join-Path $root "src/Graphics/RTReflectionSignalStats.cpp"
+$rtReflectionSignalStatsRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflectionSignalStats.cpp"
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
@@ -196,6 +198,31 @@ foreach ($target in $doc.targets) {
             if ($rendererRtState -match "\b$([regex]::Escape($oldField))\b") {
                 Add-Failure "rt_reflection_stats still exposes loose state field in RendererRTState.h: $oldField"
             }
+        }
+        if (Test-Path $rtReflectionSignalStatsPath) {
+            $rtReflectionSignalStats = Get-Content $rtReflectionSignalStatsPath -Raw
+            foreach ($required in @("CaptureResources", "PrepareCaptureResources", "FinalizeCaptureReadback", "TransitionResource", "InsertUAVBarrier", "CopyBufferRegion", "D3D12_RESOURCE_STATE_COPY_SOURCE")) {
+                if ($rtReflectionSignalStats.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_reflection_stats missing RTReflectionSignalStats resource/readback marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_stats missing RTReflectionSignalStats.cpp"
+        }
+        if (Test-Path $rtReflectionSignalStatsRendererPath) {
+            $rtReflectionSignalStatsRenderer = Get-Content $rtReflectionSignalStatsRendererPath -Raw
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "CopyBufferRegion", "D3D12_RESOURCE_STATE_COPY_SOURCE", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS")) {
+                if ($rtReflectionSignalStatsRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_reflection_stats still owns resource/readback mechanics in Renderer_RTReflectionSignalStats.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("RTReflectionSignalStats::PrepareCaptureResources", "RTReflectionSignalStats::FinalizeCaptureReadback")) {
+                if ($rtReflectionSignalStatsRenderer.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_reflection_stats missing routed signal stats resource call in Renderer_RTReflectionSignalStats.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_stats missing Renderer_RTReflectionSignalStats.cpp"
         }
     }
 

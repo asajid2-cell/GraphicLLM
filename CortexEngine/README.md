@@ -54,6 +54,7 @@ The gate builds Release, then runs the current public renderer suite:
 - source-list contract checks for CMake renderer split coverage,
 - render-graph boundary contract checks,
 - debug primitive ownership contract checks,
+- editor frame path contract checks,
 - temporal camera-cut history invalidation smoke,
 - visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,

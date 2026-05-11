@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_202847_377_148744_8c7443e2
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_203347_600_159192_fc3ab321
 ```
 
 Key evidence from that run:
@@ -55,19 +55,21 @@ Key evidence from that run:
   validation module integration, and VB staged/legacy graph boundaries are covered.
 - Debug primitive contract: passed; debug-line state ownership and draw-contract
   counters are covered.
-- Temporal validation: `gpu_ms=3.661`, `disocclusion=0.006735`,
-  `high_motion=0.005202`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Editor frame contract: passed; editor renderer hooks and explicit editor frame
+  sequence are covered.
+- Temporal validation: `gpu_ms=1.989`, `disocclusion=0.006606`,
+  `high_motion=0.005156`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.645`,
+  `camera=reflection_closeup`, `gpu_ms=2.732`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=3.961/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.261/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.068/2.5 changed=0.001/0.08`,
+  `temporal_diff=mean=0.047/2.5 changed=0.001/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
@@ -159,6 +161,7 @@ long file/function lists in every row.
 | `tools/run_source_list_contract_tests.ps1` | static/contract | Checks explicit CMake source entries for existence, duplicates, renderer split coverage, and temporary/backup source names. |
 | `tools/run_render_graph_boundary_contract_tests.ps1` | static/contract | Checks transient-validation env wiring, `RenderGraphValidationPass` integration, and visibility-buffer staged/legacy graph boundary pass names/fallback accounting. |
 | `tools/run_debug_primitive_contract_tests.ps1` | static/contract | Checks debug-line state ownership, renderer API surface, and frame-contract debug draw counters. |
+| `tools/run_editor_frame_contract_tests.ps1` | static/contract | Checks editor renderer hook declarations/delegation and the explicit `EngineEditorMode` frame sequence. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
 | `tools/run_vb_debug_views.ps1` | runtime wrapper | RT Showcase debug-view matrix for visibility-buffer depth and material-albedo debug captures. |
 | `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
@@ -224,7 +227,7 @@ of `phase2.md`.
 | P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_UNVERIFIED | SRC-VB, SRC-RENDERGRAPH | Historical targeted VB debug captures in `phase2.md` | Historical evidence only in `phase2.md`; latest release gate does not enumerate each transition skip mode. | Add static/runtime test for skip-control use under graph-owned resources. |
 | P2-PASS-04H | Pass 4H - Visibility Buffer Internal Graph Nodes | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp` records `VBClear`, `VBVisibility`, `VBMaterialResolve`, `VBDeferredLighting` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes through VB path with frame contract pass records. | Debug path/fallback still not exhaustively tested. |
 | P2-PASS-04I | Pass 4I - VB Lighting Graph Resources And Subpass Records | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | Current frame contract checks pass; VB initialization log includes clustered light/BRDF LUT pipelines. | No separate assertion in top-level output for every VB subpass name. |
-| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_202902_944_153736_759b98b7`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
+| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_203407_586_156864_3da88568`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
 | P2-PASS-04K | Pass 4K - VB Graph Helper And Motion Vector Graph Adapter | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBufferHelpers.h::VisibilityBufferGraphResources`, `Renderer_RenderGraphMotionVectors.cpp::Renderer::ExecuteMotionVectorsInRenderGraph` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with `object_motion=0.0731`, `visible=7`, `warnings=0`. | Add explicit report of camera-only fallback absence for more scenes. |
 | P2-PASS-04L | Pass 4L - TAA And SSAO Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphTAA.cpp::Renderer::ExecuteTAAInRenderGraph`, `Renderer_RenderGraphSSAO.cpp::Renderer::ExecuteSSAOInRenderGraph` | `tools/run_release_validation.ps1` | Temporal and RT showcase smokes pass with TAA/SSAO enabled. | No dedicated SSAO visual comparison. |
 | P2-PASS-04M | Pass 4M - SSR Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphSSR.cpp::Renderer::ExecuteSSRInRenderGraph` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase smoke passes with SSR enabled in feature set. | SSR visual correctness is not deeply measured beyond luma/scene gates. |
@@ -297,7 +300,7 @@ foundation or contract rather than the full broad feature.
 | P2-09B | Pass 9B - Frame Execution Context Setup | DONE_VERIFIED | SRC-FEATURE-PLAN, SRC-RENDER-ORCH | `tools/run_release_validation.ps1` | Frame phases execute through `FrameExecutionContext`. |
 | P2-09C | Pass 9C - Pre-Frame Services Extraction | DONE_VERIFIED | SRC-RENDER-ORCH, SRC-STATE | `tools/run_release_validation.ps1` | Release build and smokes pass. |
 | P2-09D | Pass 9D - Begin-Frame Execution Boundary | DONE_VERIFIED | `Renderer_FrameBegin.cpp::Renderer::BeginFrame`, SRC-RENDER-ORCH | `tools/run_release_validation.ps1` | Runtime passes through begin-frame path. |
-| P2-09E | Pass 9E - Special Frame Path Extraction | DONE_UNVERIFIED | `Renderer_EditorHooks.cpp::Renderer::BeginFrameForEditor`, SRC-RENDER-ORCH | no focused current test found | Editor/special frame paths need focused validation. |
+| P2-09E | Pass 9E - Special Frame Path Extraction | DONE_VERIFIED | `Renderer_EditorHooks.cpp`, `Renderer.h`, `EngineEditorMode.cpp`, `tools/run_editor_frame_contract_tests.ps1` | `tools/run_editor_frame_contract_tests.ps1`; release gate | Targeted contract passed: editor hook declarations exist, `Renderer_EditorHooks.cpp` delegates to the explicit renderer frame/pass functions, and `EngineEditorMode` uses the extracted frame sequence from begin/update/prewarm/main-pass through post/debug/end. | None for current static editor-frame boundary; interactive editor rendering remains outside public release smokes. |
 | P2-09F | Pass 9F - Ray-Tracing Frame Phase Extraction | DONE_VERIFIED | `Renderer_FramePhases_Prepare.cpp::Renderer::ExecuteRayTracingFramePhase` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes. |
 | P2-09G | Pass 9G - Shadow Frame Phase Extraction | DONE_VERIFIED | `Renderer_FramePhases_Prepare.cpp::Renderer::ExecuteShadowFramePhase` | `tools/run_release_validation.ps1` | Shadows enabled in runtime scenes; no warnings. |
 | P2-09H | Pass 9H - Main Scene Setup Extraction | DONE_VERIFIED | `Renderer_FramePhases_Main.cpp::Renderer::BeginMainSceneFramePhase` | `tools/run_release_validation.ps1` | Runtime smokes pass main setup. |
@@ -680,6 +683,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_source_list_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_boundary_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_debug_primitive_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

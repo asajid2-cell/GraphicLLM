@@ -323,6 +323,16 @@
       "future_extension": "Move more pipeline/pass state into dedicated pass helpers before adding new forward-like draw paths"
     },
     {
+      "id": "mesh_upload_copy_submission",
+      "owner": "Mesh upload",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_MeshUpload.cpp still owns mesh validation, tangent generation, buffer allocation, staging-map writes, descriptor registration, queue/fence policy, and BLAS scheduling, but upload command allocator/list reset, vertex/index CopyBufferRegion commands, and command-list close are owned by MeshUploadCopyPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/MeshUploadCopyPass.h", "Passes/MeshUploadCopyPass.cpp", "Renderer_MeshUpload.cpp"],
+      "renderer_state_members": ["m_uploadCommands", "m_services", "m_assetRuntime"],
+      "future_extension": "Keep future upload command recording and copy submission mechanics in MeshUploadCopyPass or a dedicated upload service instead of adding CopyBufferRegion calls to Renderer_MeshUpload.cpp"
+    },
+    {
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",

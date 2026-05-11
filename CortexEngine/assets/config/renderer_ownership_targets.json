@@ -63,6 +63,16 @@
       "future_extension": "Move future RT shadow target texture/view mechanics into RTShadowTargetState or an adjacent RT target bundle instead of expanding Renderer_RTResources.cpp inline allocation code"
     },
     {
+      "id": "rt_gi_targets",
+      "owner": "RT global illumination",
+      "status": "release_boundary_validated",
+      "release_boundary": "RTGITargetState owns RT GI color/history texture creation, SRV/UAV descriptor allocation, view creation, and resource-state initialization; Renderer_RTResources.cpp computes budgeted dimensions, delegates target creation, copies public environment-table descriptors, and invalidates history",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererRTState.h", "Renderer_RTResources.cpp"],
+      "renderer_state_members": ["m_rtGITargets", "m_environmentState"],
+      "future_extension": "Move future RT GI target texture/view mechanics into RTGITargetState or an adjacent RT target bundle instead of expanding Renderer_RTResources.cpp inline allocation code"
+    },
+    {
       "id": "rt_history_copy",
       "owner": "RT temporal histories",
       "status": "release_boundary_validated",

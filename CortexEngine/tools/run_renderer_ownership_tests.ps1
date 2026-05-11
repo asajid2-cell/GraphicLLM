@@ -291,6 +291,35 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "rt_gi_targets") {
+        foreach ($required in @("struct RTGITargetState", "CreateResources", "CreateCommittedResource", "AllocateStagingCBV_SRV_UAV", "CreateShaderResourceView", "CreateUnorderedAccessView", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+            if ($rendererRtState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_gi_targets missing RendererRTState marker: $required"
+            }
+        }
+        if (Test-Path $rtResourcesPath) {
+            $rtResources = Get-Content $rtResourcesPath -Raw
+            if ($rtResources.IndexOf("m_rtGITargets.CreateResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_gi_targets missing RTGITargetState::CreateResources delegation in Renderer_RTResources.cpp"
+            }
+            foreach ($removedLocal in @(
+                "m_rtGITargets.color.Reset",
+                "m_rtGITargets.history.Reset",
+                "IID_PPV_ARGS(&m_rtGITargets.color",
+                "IID_PPV_ARGS(&m_rtGITargets.history",
+                "m_rtGITargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS",
+                "m_rtGITargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE",
+                "m_rtGITargets.uav =",
+                "m_rtGITargets.historyUAV =")) {
+                if ($rtResources.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_gi_targets still has direct RT GI target resource/view mechanics in Renderer_RTResources.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "rt_gi_targets missing Renderer_RTResources.cpp"
+        }
+    }
+
     if ($id -eq "diagnostic_breadcrumb_state") {
         if (Test-Path $breadcrumbStatePath) {
             $breadcrumbState = Get-Content $breadcrumbStatePath -Raw

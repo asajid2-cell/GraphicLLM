@@ -26,17 +26,14 @@ Result<void> Renderer::InitializeTAAResolveDescriptorTable() {
     }
 
     for (size_t frame = 0; frame < kFrameCount; ++frame) {
-        for (size_t i = 0; i < m_temporalScreenState.taaResolveSrvTables[frame].size(); ++i) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate TAA resolve descriptor: " + handleResult.Error());
-            }
-            m_temporalScreenState.taaResolveSrvTables[frame][i] = handleResult.Value();
-            DescriptorTable::WriteTexture2DSRV(
-                device,
-                m_temporalScreenState.taaResolveSrvTables[frame][i],
-                nullptr,
-                DXGI_FORMAT_R16G16B16A16_FLOAT);
+        auto tableResult = DescriptorTable::AllocateAndWriteNullSRVTable(
+            device,
+            m_services.descriptorManager.get(),
+            m_temporalScreenState.taaResolveSrvTables[frame],
+            "TAA resolve",
+            DXGI_FORMAT_R16G16B16A16_FLOAT);
+        if (tableResult.IsErr()) {
+            return tableResult;
         }
     }
 
@@ -187,18 +184,14 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
 
     auto allocateTableSet = [&](auto& tables, const char* label) -> Result<void> {
         for (size_t frame = 0; frame < kFrameCount; ++frame) {
-            for (size_t i = 0; i < tables[frame].size(); ++i) {
-                auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-                if (handleResult.IsErr()) {
-                    return Result<void>::Err(std::string("Failed to allocate ") + label +
-                                             " descriptor: " + handleResult.Error());
-                }
-                tables[frame][i] = handleResult.Value();
-                DescriptorTable::WriteTexture2DSRV(
-                    device,
-                    tables[frame][i],
-                    nullptr,
-                    DXGI_FORMAT_R16G16B16A16_FLOAT);
+            auto tableResult = DescriptorTable::AllocateAndWriteNullSRVTable(
+                device,
+                m_services.descriptorManager.get(),
+                tables[frame],
+                label,
+                DXGI_FORMAT_R16G16B16A16_FLOAT);
+            if (tableResult.IsErr()) {
+                return tableResult;
             }
         }
         return Result<void>::Ok();
@@ -266,15 +259,10 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     }
 
     auto allocateHandleSet = [&](auto& handles, const char* label) -> Result<void> {
-        for (size_t frame = 0; frame < kFrameCount; ++frame) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err(std::string("Failed to allocate ") + label +
-                                         " descriptor: " + handleResult.Error());
-            }
-            handles[frame] = handleResult.Value();
-        }
-        return Result<void>::Ok();
+        return DescriptorTable::AllocateHandleSet(
+            m_services.descriptorManager.get(),
+            handles,
+            label);
     };
 
     auto rtDispatchClearResult = allocateHandleSet(m_rtReflectionTargets.dispatchClearUAVs, "RT reflection dispatch clear UAV");

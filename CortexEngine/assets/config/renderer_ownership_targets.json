@@ -423,6 +423,16 @@
       "future_extension": "Keep future shared descriptor-heap binding in DescriptorTable or specific pass helpers instead of adding direct SetDescriptorHeaps calls to renderer orchestration files"
     },
     {
+      "id": "postprocess_descriptor_tables",
+      "owner": "Post-process descriptor tables",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_Descriptors.cpp still selects which per-frame tables and validity flags are initialized, but persistent descriptor allocation and null SRV table initialization are owned by DescriptorTable helpers",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase", "effects_showcase"],
+      "target_files": ["Passes/DescriptorTable.h", "Passes/DescriptorTable.cpp", "Renderer_Descriptors.cpp"],
+      "renderer_state_members": ["m_temporalScreenState", "m_ssrResources", "m_ssaoResources", "m_rtDenoiseState", "m_temporalMaskState", "m_rtReflectionSignalState", "m_bloomResources", "m_rtReflectionTargets"],
+      "future_extension": "Keep future persistent post-process descriptor allocation in DescriptorTable or a narrower table bundle before expanding Renderer_Descriptors.cpp"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

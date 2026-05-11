@@ -201,6 +201,9 @@ struct FrameContract {
         uint32_t advancedSpecular = 0;
         uint32_t advancedSheen = 0;
         uint32_t advancedSubsurface = 0;
+        uint32_t advancedAnisotropy = 0;
+        uint32_t advancedWetness = 0;
+        uint32_t advancedEmissiveBloom = 0;
         uint32_t surfaceDefault = 0;
         uint32_t surfaceGlass = 0;
         uint32_t surfaceMirror = 0;

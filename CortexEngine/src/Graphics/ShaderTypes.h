@@ -192,7 +192,7 @@ struct MaterialConstants {
     alignas(16) glm::uvec4 textureIndices2; // x: occlusion, y: emissive, z/w unused
     alignas(16) glm::uvec4 mapFlags2;       // x: occlusion, y: emissive, z/w unused
     alignas(16) glm::vec4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
-    alignas(16) glm::vec4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
+    alignas(16) glm::vec4 extraParams;            // x occlusion strength, y normal scale, z anisotropy, w wetness
     alignas(16) glm::vec4 fractalParams0;   // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     alignas(16) glm::vec4 fractalParams1;   // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     alignas(16) glm::vec4 fractalParams2;   // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
@@ -200,7 +200,7 @@ struct MaterialConstants {
     // z,w reserved for future layering parameters.
     alignas(16) glm::vec4 coatParams;
     // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
-    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w reserved.
     alignas(16) glm::vec4 transmissionParams;
     // Specular extension (KHR_materials_specular).
     // rgb = specular color factor (linear), w = specular factor.

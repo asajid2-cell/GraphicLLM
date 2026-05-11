@@ -1947,6 +1947,9 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
                 {"clearcoat_roughness", renderable.clearcoatRoughnessFactor},
                 {"sheen", renderable.sheenWeight},
                 {"subsurface", renderable.subsurfaceWrap},
+                {"anisotropy", renderable.anisotropyStrength},
+                {"wetness", renderable.wetnessFactor},
+                {"emissive_bloom", renderable.emissiveBloomFactor},
                 {"emissive_strength", renderable.emissiveStrength}
             };
             break;

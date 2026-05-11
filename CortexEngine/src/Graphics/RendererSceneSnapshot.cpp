@@ -307,6 +307,9 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
             std::abs(materialModel.specularColorFactor.b - 1.0f) > kDefaultEpsilon;
         const bool advancedSheen = materialModel.sheenWeight > 0.001f;
         const bool advancedSubsurface = materialModel.subsurfaceWrap > 0.001f;
+        const bool advancedAnisotropy = materialModel.anisotropyStrength > 0.001f;
+        const bool advancedWetness = materialModel.wetnessFactor > 0.001f;
+        const bool advancedEmissiveBloom = materialModel.emissiveBloomFactor > 0.001f;
         if (advancedClearcoat) {
             ++snapshot.materials.advancedClearcoat;
         }
@@ -325,8 +328,18 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
         if (advancedSubsurface) {
             ++snapshot.materials.advancedSubsurface;
         }
+        if (advancedAnisotropy) {
+            ++snapshot.materials.advancedAnisotropy;
+        }
+        if (advancedWetness) {
+            ++snapshot.materials.advancedWetness;
+        }
+        if (advancedEmissiveBloom) {
+            ++snapshot.materials.advancedEmissiveBloom;
+        }
         if (advancedClearcoat || advancedTransmission || resolvedEmissive ||
-            advancedSpecular || advancedSheen || advancedSubsurface) {
+            advancedSpecular || advancedSheen || advancedSubsurface ||
+            advancedAnisotropy || advancedWetness || advancedEmissiveBloom) {
             ++snapshot.materials.advancedFeatureMaterials;
         }
 

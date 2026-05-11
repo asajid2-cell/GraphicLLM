@@ -857,9 +857,13 @@ void Engine::BuildMaterialLabScene() {
         } else if (std::string(s.preset) == "clearcoat") {
             r.clearcoatFactor = 0.9f;
             r.clearcoatRoughnessFactor = 0.08f;
+            r.wetnessFactor = 0.55f;
+        } else if (std::string(s.preset) == "brushed_metal") {
+            r.anisotropyStrength = 0.75f;
         } else if (std::string(s.preset) == "emissive_panel") {
             r.emissiveColor = glm::vec3(1.0f, 0.58f, 0.22f);
             r.emissiveStrength = 3.4f;
+            r.emissiveBloomFactor = 0.6f;
         }
     }
 

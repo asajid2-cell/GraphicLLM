@@ -327,13 +327,19 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     materialCountExceedsSampled(contract.materials.advancedSpecular, "advanced_specular");
     materialCountExceedsSampled(contract.materials.advancedSheen, "advanced_sheen");
     materialCountExceedsSampled(contract.materials.advancedSubsurface, "advanced_subsurface");
+    materialCountExceedsSampled(contract.materials.advancedAnisotropy, "advanced_anisotropy");
+    materialCountExceedsSampled(contract.materials.advancedWetness, "advanced_wetness");
+    materialCountExceedsSampled(contract.materials.advancedEmissiveBloom, "advanced_emissive_bloom");
     const uint32_t advancedFeatureSum =
         contract.materials.advancedClearcoat +
         contract.materials.advancedTransmission +
         contract.materials.advancedEmissive +
         contract.materials.advancedSpecular +
         contract.materials.advancedSheen +
-        contract.materials.advancedSubsurface;
+        contract.materials.advancedSubsurface +
+        contract.materials.advancedAnisotropy +
+        contract.materials.advancedWetness +
+        contract.materials.advancedEmissiveBloom;
     if (contract.materials.advancedFeatureMaterials > 0 && advancedFeatureSum == 0) {
         warn("material_advanced_feature_materials_without_feature_counts");
     }

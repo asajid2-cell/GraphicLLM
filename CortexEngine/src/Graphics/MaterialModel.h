@@ -59,6 +59,9 @@ struct MaterialModel {
     float clearcoatRoughnessFactor = 0.0f;
     float sheenWeight = 0.0f;
     float subsurfaceWrap = 0.0f;
+    float anisotropyStrength = 0.0f;
+    float wetnessFactor = 0.0f;
+    float emissiveBloomFactor = 0.0f;
     float materialType = 0.0f;
     MaterialAlphaMode alphaMode = MaterialAlphaMode::Opaque;
     float alphaCutoff = 0.5f;

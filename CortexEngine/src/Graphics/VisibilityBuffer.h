@@ -69,11 +69,11 @@ struct alignas(16) VBMaterialConstants {
     alignas(16) glm::uvec4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
     alignas(16) glm::uvec4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
     glm::vec4 emissiveFactorStrength;       // rgb emissive factor, w emissive strength
-    glm::vec4 extraParams;                  // x occlusion strength, y normal scale, z/w reserved
+    glm::vec4 extraParams;                  // x occlusion strength, y normal scale, z anisotropy, w wetness
     // x = clear-coat weight, y = clear-coat roughness, z = sheen weight, w = SSS wrap
     glm::vec4 coatParams;
     // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
-    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w reserved.
     glm::vec4 transmissionParams;
     // Specular extension (KHR_materials_specular).
     // rgb = specular color factor (linear), w = specular factor.

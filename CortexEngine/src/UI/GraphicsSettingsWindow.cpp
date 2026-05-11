@@ -68,6 +68,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_PARTICLE_BLOOM = 9065,
     IDC_GFX_PARTICLE_SOFT_DEPTH = 9066,
     IDC_GFX_PARTICLE_WIND = 9067,
+    IDC_GFX_ENV_ROTATION = 9068,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -147,6 +148,7 @@ struct GraphicsSettingsState {
     SliderBinding iblSpecular;
     SliderBinding backgroundExposure;
     SliderBinding backgroundBlur;
+    SliderBinding environmentRotation;
     SliderBinding rtReflectionDenoise;
     SliderBinding rtReflectionStrength;
     SliderBinding rtReflectionRoughness;
@@ -379,6 +381,7 @@ void SyncStateFromSliders() {
     g_gfx.tuning.environment.specularIntensity = SliderToFloat(g_gfx.iblSpecular);
     g_gfx.tuning.environment.backgroundExposure = SliderToFloat(g_gfx.backgroundExposure);
     g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
+    g_gfx.tuning.environment.rotationDegrees = SliderToFloat(g_gfx.environmentRotation);
     g_gfx.tuning.rayTracing.reflectionDenoiseAlpha = SliderToFloat(g_gfx.rtReflectionDenoise);
     g_gfx.tuning.rayTracing.reflectionCompositionStrength = SliderToFloat(g_gfx.rtReflectionStrength);
     g_gfx.tuning.rayTracing.reflectionRoughnessThreshold = SliderToFloat(g_gfx.rtReflectionRoughness);
@@ -486,6 +489,7 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.iblSpecular, g_gfx.tuning.environment.specularIntensity);
     SetSliderFromFloat(g_gfx.backgroundExposure, g_gfx.tuning.environment.backgroundExposure);
     SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
+    SetSliderFromFloat(g_gfx.environmentRotation, g_gfx.tuning.environment.rotationDegrees);
     SetSliderFromFloat(g_gfx.rtReflectionDenoise, g_gfx.tuning.rayTracing.reflectionDenoiseAlpha);
     SetSliderFromFloat(g_gfx.rtReflectionStrength, g_gfx.tuning.rayTracing.reflectionCompositionStrength);
     SetSliderFromFloat(g_gfx.rtReflectionRoughness, g_gfx.tuning.rayTracing.reflectionRoughnessThreshold);
@@ -804,6 +808,7 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_IBL_SPECULAR, L"IBL Specular", g_gfx.iblSpecular, 0.0f, 3.0f);
             makeSlider(IDC_GFX_BACKGROUND_EXPOSURE, L"Background Exposure", g_gfx.backgroundExposure, 0.0f, 4.0f);
             makeSlider(IDC_GFX_BACKGROUND_BLUR, L"Background Blur", g_gfx.backgroundBlur, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_ENV_ROTATION, L"Environment Rotation", g_gfx.environmentRotation, 0.0f, 359.0f);
             {
                 const int buttonWidth = (width - margin * 2 - 18) / 4;
                 makeButton(IDC_GFX_ENV_NEXT, L"Next Env", margin, y, buttonWidth);

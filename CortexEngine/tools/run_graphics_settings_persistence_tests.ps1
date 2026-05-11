@@ -52,7 +52,8 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "specular_intensity": 0.9,
     "background_visible": true,
     "background_exposure": 1.23,
-    "background_blur": 0.37
+    "background_blur": 0.37,
+    "rotation_degrees": 213.0
   },
   "ray_tracing": {
     "enabled": false,
@@ -212,11 +213,15 @@ if ($validRun.exit_code -ne 0) {
     }
     $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur
+    $environmentRotation = [double]$report.frame_contract.environment.rotation_degrees
     if ([Math]::Abs($backgroundExposure - 1.23) -gt 0.03) {
         Add-Failure "valid settings background exposure was $backgroundExposure, expected 1.23"
     }
     if ([Math]::Abs($backgroundBlur - 0.37) -gt 0.03) {
         Add-Failure "valid settings background blur was $backgroundBlur, expected 0.37"
+    }
+    if ([Math]::Abs($environmentRotation - 213.0) -gt 0.5) {
+        Add-Failure "valid settings environment rotation was $environmentRotation, expected 213.0"
     }
     $ssaoRadius = [double]$report.frame_contract.lighting.ssao_radius
     $ssaoBias = [double]$report.frame_contract.lighting.ssao_bias

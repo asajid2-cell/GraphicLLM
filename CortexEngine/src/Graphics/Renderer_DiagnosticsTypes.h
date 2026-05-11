@@ -197,6 +197,7 @@ struct RendererFeatureState {
     bool backgroundVisible = true;
     float backgroundExposure = 1.0f;
     float backgroundBlur = 0.0f;
+    float environmentRotationDegrees = 0.0f;
     float godRayIntensity = 0.0f;
     float areaLightSizeScale = 1.0f;
     float sunIntensity = 0.0f;

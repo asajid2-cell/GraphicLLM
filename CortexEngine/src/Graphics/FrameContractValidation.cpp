@@ -107,6 +107,10 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.environment.backgroundBlur > 1.0f) {
         warn("environment_background_blur_out_of_range");
     }
+    if (contract.environment.rotationDegrees < 0.0f ||
+        contract.environment.rotationDegrees >= 360.0f) {
+        warn("environment_rotation_out_of_range");
+    }
 
     if (!contract.features.voxelBackendEnabled) {
         requireResource("depth", true, "core_depth_contract");

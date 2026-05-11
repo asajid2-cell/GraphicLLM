@@ -213,7 +213,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_rtDenoiseState.reflectionSignalScale);
     frameData.cinematicParams = glm::vec4(
         static_cast<float>(m_postProcessState.ToneMapperMode()),
-        0.0f,
+        glm::radians(m_environmentState.rotationDegrees),
         0.0f,
         0.0f);
 

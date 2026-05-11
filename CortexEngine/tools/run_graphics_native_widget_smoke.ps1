@@ -57,6 +57,7 @@ $CBN_SELCHANGE = 1
 $IDC_GFX_RENDER_SCALE = 9010
 $IDC_GFX_ENV_SELECT = 9211
 $IDC_GFX_ENV_REAPPLY = 9212
+$IDC_GFX_ENV_ROTATION = 9068
 $IDC_GFX_SSR_STRENGTH = 9045
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_WATER_ROUGHNESS = 9046
@@ -174,6 +175,7 @@ try {
         Set-Trackbar $window $IDC_GFX_PARTICLE_BLOOM 57
         Set-Trackbar $window $IDC_GFX_PARTICLE_SOFT_DEPTH 42
         Set-Trackbar $window $IDC_GFX_PARTICLE_WIND 48
+        Set-Trackbar $window $IDC_GFX_ENV_ROTATION 68
         Set-Trackbar $window $IDC_GFX_RT_REFL_STRENGTH 62
         Set-Trackbar $window $IDC_GFX_MOTION_BLUR 29
         Set-Trackbar $window $IDC_GFX_DOF 31
@@ -227,6 +229,7 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.14 0.06
     Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.42 0.06
     Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.96 0.06
+    Assert-Near "environment_rotation_degrees" ([double]$fc.environment.rotation_degrees) 244.0 5.0
     Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.62 0.05
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.29 0.05
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.31 0.05

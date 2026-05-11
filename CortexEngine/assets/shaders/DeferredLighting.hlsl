@@ -55,7 +55,7 @@ cbuffer PerFrameData : register(b0) {
     float4 g_CascadeSplits;                // x,y,z = split depths in view space, w = far plane
     float4 g_ShadowParams;                 // x=bias, y=pcfRadius(texels), z=enabled, w=pcssEnabled
     float4 g_EnvParams;                    // x=diffuse IBL, y=specular IBL, z=IBL enabled, w unused
-    float4 g_ShadowInvSizeAndSpecMaxMip;   // xy = 1/shadowMapDim, z = specular max mip, w unused
+    float4 g_ShadowInvSizeAndSpecMaxMip;   // xy = 1/shadowMapDim, z = specular max mip, w = environment rotation radians
     float4 g_ProjectionParams;             // x=proj11, y=proj22, z=nearZ, w=farZ
     uint4  g_ScreenAndCluster;             // x=width, y=height, z=clusterCountX, w=clusterCountY
     uint4  g_ClusterParams;                // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
@@ -86,9 +86,16 @@ float2 DirectionToLatLong(float3 dir)
     return uv;
 }
 
+float3 RotateEnvironmentDirection(float3 dir)
+{
+    float s, c;
+    sincos(g_ShadowInvSizeAndSpecMaxMip.w, s, c);
+    return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
+}
+
 float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex, float mipLevel)
 {
-    float2 uv = DirectionToLatLong(dir);
+    float2 uv = DirectionToLatLong(RotateEnvironmentDirection(dir));
 #ifdef ENABLE_BINDLESS
     if (diffuseIndex != INVALID_BINDLESS_INDEX) {
         Texture2D<float4> tex = ResourceDescriptorHeap[diffuseIndex];
@@ -100,7 +107,7 @@ float3 SampleEnvDiffuse(float3 dir, uint diffuseIndex, float mipLevel)
 
 float3 SampleEnvSpecular(float3 dir, float mipLevel, uint specularIndex)
 {
-    float2 uv = DirectionToLatLong(dir);
+    float2 uv = DirectionToLatLong(RotateEnvironmentDirection(dir));
 #ifdef ENABLE_BINDLESS
     if (specularIndex != INVALID_BINDLESS_INDEX) {
         Texture2D<float4> tex = ResourceDescriptorHeap[specularIndex];

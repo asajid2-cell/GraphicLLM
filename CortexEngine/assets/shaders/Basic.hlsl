@@ -95,6 +95,8 @@ cbuffer FrameConstants : register(b1)
     uint4  g_ClusterParams;      // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
     uint4  g_ClusterSRVIndices;  // x=localLights, y=clusterRanges, z=clusterIndices, w unused
     float4 g_ProjectionParams;   // x=proj11, y=proj22, z=nearZ, w=farZ
+    // x = tone-mapper mode, y = environment rotation radians, z/w reserved
+    float4 g_CinematicParams;
 };
 
 cbuffer ShadowConstants : register(b3)
@@ -441,6 +443,13 @@ float2 DirectionToLatLong(float3 dir)
     uv.x = 0.5f + phi / (2.0f * PI);   // wrap around [0,1]
     uv.y = 0.5f - theta / PI;          // +Y up -> v decreasing
     return uv;
+}
+
+float3 RotateEnvironmentDirection(float3 dir)
+{
+    float s, c;
+    sincos(g_CinematicParams.y, s, c);
+    return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
 }
 
 float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius, uint cascadeIndex)
@@ -1352,14 +1361,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         // separately convolved irradiance maps. Use the highest mip as a
         // low-frequency irradiance approximation so diffuse IBL does not
         // project sharp HDRI room details onto every matte surface.
-        float2 envUV = DirectionToLatLong(N);
+        float2 envUV = DirectionToLatLong(RotateEnvironmentDirection(N));
         float3 irradiance = g_EnvDiffuse.SampleLevel(g_Sampler, envUV, maxMip).rgb;
 
         float3 kd = (1.0f - metallic) * (1.0f - FresnelSchlickRoughness(NdotV, F0, roughness));
         diffuseIBL = irradiance * kd * albedo;
 
         float3 R = reflect(-V, N);
-        float2 specUV = DirectionToLatLong(R);
+        float2 specUV = DirectionToLatLong(RotateEnvironmentDirection(R));
         float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, roughness * maxMip).rgb;
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
@@ -1776,7 +1785,7 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
     {
         // DirectionToLatLong debug: visualize env UVs as color
         float3 N = normalize(normal);
-        float2 uv = DirectionToLatLong(N);
+        float2 uv = DirectionToLatLong(RotateEnvironmentDirection(N));
         return MakePSOutput(float4(uv.x, uv.y, 0.0f, 1.0f), normal, roughness);
     }
     else if (debugView == 17)
@@ -2108,7 +2117,7 @@ float4 SkyboxPS(SkyboxVSOutput input) : SV_TARGET
     // Proper 3D environment sampling: convert the world-space direction to
     // lat-long UVs for the equirectangular panorama so the background rotates
     // correctly with the camera.
-    float2 skyUV = DirectionToLatLong(dir);
+    float2 skyUV = DirectionToLatLong(RotateEnvironmentDirection(dir));
     float backgroundMip = saturate(g_AmbientColor.w) * 8.0f;
     float3 color = g_EnvSpecular.SampleLevel(g_Sampler, skyUV, backgroundMip).rgb *
                    g_EnvParams.y * g_EnvParams.w;

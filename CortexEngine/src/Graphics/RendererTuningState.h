@@ -40,6 +40,7 @@ struct RendererEnvironmentTuning {
     bool backgroundVisible = true;
     float backgroundExposure = 1.0f;
     float backgroundBlur = 0.0f;
+    float rotationDegrees = 0.0f;
 };
 
 struct RendererRayTracingTuning {

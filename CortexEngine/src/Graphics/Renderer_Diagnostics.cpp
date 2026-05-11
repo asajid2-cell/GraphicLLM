@@ -87,6 +87,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.backgroundVisible = m_environmentState.backgroundVisible;
     state.backgroundExposure = m_environmentState.backgroundExposure;
     state.backgroundBlur = m_environmentState.backgroundBlur;
+    state.environmentRotationDegrees = m_environmentState.rotationDegrees;
     state.godRayIntensity = m_postProcessState.godRayIntensity;
     state.areaLightSizeScale = m_lightingState.areaLightSizeScale;
     state.sunIntensity = m_lightingState.directionalIntensity;

@@ -87,6 +87,8 @@ Assert-Contains $ui "LoadEnvironmentManifest" "GraphicsSettingsWindow does not p
 Assert-Contains $ui "ApplySelectedEnvironmentFromGraphicsUI" "GraphicsSettingsWindow does not route environment dropdown selection."
 Assert-Contains $ui "ApplyEnvironmentPresetControl" "GraphicsSettingsWindow does not apply selected environment presets."
 Assert-Contains $ui "IDC_GFX_ENV_REAPPLY" "GraphicsSettingsWindow does not expose explicit environment reapply/reload control."
+Assert-Contains $ui "IDC_GFX_ENV_ROTATION" "GraphicsSettingsWindow does not expose environment rotation control."
+Assert-Contains $ui "environment.rotationDegrees" "GraphicsSettingsWindow does not sync environment rotation state."
 Assert-Contains $ui "RendererLightingRigControl.h" "GraphicsSettingsWindow does not include lighting rig controls."
 Assert-Contains $ui "IDC_GFX_RIG_STUDIO" "GraphicsSettingsWindow does not expose studio lighting rig control."
 Assert-Contains $ui "IDC_GFX_RIG_WAREHOUSE" "GraphicsSettingsWindow does not expose top-down lighting rig control."

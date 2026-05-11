@@ -43,7 +43,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "specular_intensity": 0.44,
     "background_visible": true,
     "background_exposure": 0.72,
-    "background_blur": 0.36
+    "background_blur": 0.36,
+    "rotation_degrees": 137.0
   },
   "lighting": {
     "exposure": 1.31,
@@ -165,6 +166,7 @@ if ($exitCode -ne 0) {
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.19 0.03
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
+    Assert-Near "environment_rotation_degrees" ([double]$fc.environment.rotation_degrees) 137.0 0.5
     Assert-Near "ssao_radius" ([double]$fc.lighting.ssao_radius) 0.37 0.04
     Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.04 0.01
     Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 0.31 0.04

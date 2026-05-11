@@ -38,37 +38,42 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_193615_690_146580_bb588849
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_194418_433_142380_7e925eba
 ```
 
 Key evidence from that run:
 
 - Release build: passed.
-- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.00695`,
-  `high_motion=0.005245`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.263`, `disocclusion=0.00686`,
+  `high_motion=0.005227`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.703`,
+  `camera=reflection_closeup`, `gpu_ms=3.041`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.621/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.846/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`.
+- Descriptor/memory stress: `persistent_descriptors=988/1024`,
+  `staging=78/128`, `transient_budget=81920`, `transient_delta=0`,
+  `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`,
+  `write_mb=107.75/128`, `rt_signal_avg=0.0225`,
+  `rt_history_avg=0.0314`.
 - Render-graph transient matrix: aliasing on/off and bloom-transients-off rows
   passed; aliasing-on saved 262144 bytes with 2 alias barriers, aliasing-off
   reported 0 aliased resources/barriers/saved bytes, and bloom-transients-off
   reported 0 final transient resources with validation still run.
 - Phase 3 visual matrix: temporal validation, RT showcase, material lab,
   glass/water courtyard, effects showcase, and IBL gallery passed.
-- Renderer ownership, full renderer ownership audit, fatal error, advanced
-  graphics catalog, effects gallery, environment manifest, IBL gallery, budget
-  profile matrix, and voxel backend gates passed.
+- Renderer ownership, full renderer ownership audit, descriptor/memory stress,
+  fatal error, advanced graphics catalog, effects gallery, environment
+  manifest, IBL gallery, budget profile matrix, and voxel backend gates passed.
 - New focused gates passed in release validation: temporal camera cut,
-  render-graph transient matrix, full renderer ownership audit, graphics UI
-  interaction, screenshot negative gates, particle-disabled zero-cost, Phase 3
-  fallback matrix, and RT firefly/outlier.
+  render-graph transient matrix, full renderer ownership audit,
+  descriptor/memory stress, graphics UI interaction, screenshot negative gates,
+  particle-disabled zero-cost, Phase 3 fallback matrix, and RT firefly/outlier.
 
 Recent git history relevant to the audit:
 
@@ -128,6 +133,7 @@ long file/function lists in every row.
 |---|---|---|
 | `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release and runs all listed checks below. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
+| `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
 | `tools/run_temporal_validation_smoke.ps1` | runtime | Temporal-scene gate for temporal mask, motion vectors, histories, budget, visual capture. |
 | `tools/run_temporal_camera_cut_validation.ps1` | runtime | RT Showcase camera-bookmark jump gate that verifies RT shadow/reflection/GI histories report `camera_cut`, reseed, and remain resource-valid. |
 | `tools/run_render_graph_transient_matrix.ps1` | runtime wrapper | RT Showcase matrix for render-graph transient validation, aliasing on/off behavior, bloom-transient disable mode, and descriptor delta stability. |
@@ -225,14 +231,14 @@ of `phase2.md`.
 | P2-SYS-09 | Explicit camera-cut invalidation coverage. | DONE_VERIFIED | `src/Core/Engine.cpp::Engine::Initialize`, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants`, SRC-TEMPORAL | `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Targeted run passed: frames=53, cut_frame=20, camera=`reflection_closeup`, `rt_reflection_reset=camera_cut`, `invalidated_frame=20`, RT shadow/reflection/GI histories reseeded and resource-valid. | None for RT history camera-cut coverage. TAA-specific camera-cut policy can be separately tightened if needed. |
 | P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; historical debug captures | Runtime VB path passes; some debug views historically verified. | Local reflection probes/probe blending are not implemented as a validated feature. |
 | P2-SYS-11 | GPU culling and HZB diagnostics are visible and budgeted. | DONE_VERIFIED | `Renderer_GPUDriven.cpp`, `Renderer_GPUCulling*.cpp`, `Renderer_HZB*.cpp`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase reports GPU culling and HZB logs; smoke budget passed. | More occlusion-correctness scene tests could be added. |
-| P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` | Memory/descriptor budgets passed; render-graph transient matrix now validates aliasing on/off and bloom-transient disabled behavior. | Dedicated descriptor/memory stress scene remains incomplete; energy budgeting is still not a distinct runtime gate. |
+| P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. | Energy budgeting is still not a distinct runtime gate. |
 | P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1` | RT showcase, material lab, glass/water courtyard, effects showcase pass. | Outdoor/sunset beach and local reflection-probe validation are not complete. |
 | P2-SYS-14 | Visual validation captures compare luma, saturation, edge stability, temporal stability. | PARTIAL | smoke scripts, `FrameContractJson.cpp`, visual baseline scripts | `tools/run_release_validation.ps1` | Luma/saturation/nonblack/temporal diff checks pass in current smokes. | No full image-diff golden comparison; edge stability is limited. |
 | P2-SYS-15 | Single script runs the Phase 2 validation suite. | PARTIAL | `tools/run_release_validation.ps1` | `tools/run_release_validation.ps1` | Current one-command release gate passed. | `tools/run_phase2_validation.ps1` named in `phase2.md` does not exist; current script is broader and Phase 3-influenced. |
 | P2-SYS-16 | `rt_showcase` final renderer scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase runtime passed with visual validation and RT signal. | Subjective polish can continue. |
 | P2-SYS-17 | `material_gallery` / material lab scene. | PARTIAL | SRC-SCENES | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material Lab passed. | Name differs from plan; current scene is `material_lab`, not a fully exhaustive gallery. |
 | P2-SYS-18 | `temporal_validation` scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation passed. | Add camera-cut and more motion edge cases. |
-| P2-SYS-19 | `stress_memory` / descriptor stress scene. | NOT_STARTED | none found | none found | No dedicated scene/script found. | Add memory/descriptor stress scene and validation. Current budget matrix is not equivalent. |
+| P2-SYS-19 | `stress_memory` / descriptor stress scene. | DONE_VERIFIED | `tools/run_descriptor_memory_stress_scene.ps1`, SRC-BUDGET, SRC-RT | `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Runtime stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_budget=81920`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`, `write_mb=107.75/128`, raw/history RT signal nonzero. | None for the historical descriptor/memory stress gate; broader energy accounting remains separate. |
 | P2-SYS-20 | `sunset_beach` final visual target scene / eventual outdoor scenes. | DEFERRED_BY_USER_ONLY | none found in current validated path | none | User direction de-scoped infinite/outdoor/world work from main path. | Only revive if user explicitly wants outdoor/world scene work. |
 
 ## Ordered Implementation Passes And Later Phase 2 Pass Log
@@ -252,8 +258,8 @@ foundation or contract rather than the full broad feature.
 | P2-ORDER-04 | Pass 4: Render Graph Migration | PARTIAL | SRC-RENDERGRAPH | `tools/run_release_validation.ps1` | Many passes graph-owned; not every manual/fallback path is eliminated. |
 | P2-ORDER-05 | Pass 5: Material Model Unification | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Runtime material coverage passed. |
 | P2-ORDER-06 | Pass 6: RT Scheduler And Denoising | DONE_VERIFIED | SRC-RT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT readiness and raw/history signal passed. |
-| P2-ORDER-07 | Pass 7: Temporal Manager | PARTIAL | SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Core manager/mask/stats done; explicit camera-cut coverage still missing. |
-| P2-ORDER-08 | Pass 8: Budget Profiles | PARTIAL | SRC-BUDGET | `tools/run_budget_profile_matrix.ps1 -NoBuild` | Budget matrix passes; stress-memory scene and full transient matrix missing. |
+| P2-ORDER-07 | Pass 7: Temporal Manager | PARTIAL | SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Core manager/mask/stats done; camera-cut RT history invalidation coverage passed. | Broader visual ghosting claims remain quality-sensitive and not fully golden-tested. |
+| P2-ORDER-08 | Pass 8: Budget Profiles | PARTIAL | SRC-BUDGET | `tools/run_budget_profile_matrix.ps1 -NoBuild`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` | Budget matrix, descriptor/memory stress, and render-graph transient matrix pass. | Energy budgeting and all possible hardware pressure profiles are not distinct gates. |
 | P2-ORDER-09 | Pass 9: Visual Demo Maturity | PARTIAL | SRC-SCENES, SRC-DOCS | `tools/run_release_validation.ps1` | Public scenes pass, but visual maturity is subjective and outdoor/sunset target is missing/deferred. |
 | P2-08AK | Pass 8AK - Visibility Buffer Graph Module | DONE_VERIFIED | SRC-RENDERGRAPH, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | VB graph path active in RT showcase. |
 | P2-08AL | Pass 8AL - Visibility Buffer Legacy Graph Boundary | DONE_UNVERIFIED | SRC-RENDERGRAPH, SRC-VB | historical `phase2.md` evidence | Current gate does not isolate legacy boundary behavior. |
@@ -388,7 +394,7 @@ These items remain after the audit and should not be collapsed into
 | REM-01 | Full render-graph ownership for every pass/resource and removal of all temporary legacy manual-barrier/fallback paths. | PARTIAL | Major passes are graph-owned, but `phase2.md` explicitly treats full ownership as the ideal; code still has fallback/manual paths. |
 | REM-02 | Exhaustive renderer state ownership audit, beyond selected ownership manifest checks. | DONE_VERIFIED | `tools/run_renderer_full_ownership_audit.ps1` passed with 48/48 renderer members covered and no loose GPU resources/descriptors in `Renderer.h`; selected ownership manifest gate also passed. |
 | REM-03 | Camera-cut temporal invalidation validation. | DONE_VERIFIED | `tools/run_temporal_camera_cut_validation.ps1` is wired into release validation and passed, verifying RT shadow/reflection/GI history invalidation on the configured camera cut. |
-| REM-04 | Stress-memory / descriptor stress scene. | NOT_STARTED | Budget matrix exists but is not a stress scene. |
+| REM-04 | Stress-memory / descriptor stress scene. | DONE_VERIFIED | `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` passed with 988/1024 persistent descriptors, 78/128 staging descriptors, zero transient descriptor delta, and memory/write budgets within limits. |
 | REM-05 | Full render-graph transient alias validation matrix. | DONE_VERIFIED | `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` passed and is wired into release validation. |
 | REM-06 | Local reflection probes and probe blending validation. | NOT_STARTED | Listed in visual-quality work; no source/runtime gate found. |
 | REM-07 | Outdoor/sunset beach final visual target. | DEFERRED_BY_USER_ONLY | User direction previously moved Cortex away from infinite/outdoor/world work. Not done. |
@@ -602,7 +608,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, particle-disabled, RT outlier, camera-cut, render-graph transient matrix, and full ownership audit gates now exist and pass individually. | Descriptor stress, visual probe/golden comparison, and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, particle-disabled, RT outlier, camera-cut, render-graph transient matrix, full ownership audit, and descriptor/memory stress gates now exist and pass individually. | Visual probe/golden comparison and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -620,7 +626,7 @@ definition of done in `phase3.md`.
 | P3-REM-10 | Full cinematic post stack: DOF, motion blur, tone mapper/color-grade presets. | PARTIAL | Bloom/vignette/lens dirt foundations only. |
 | P3-REM-11 | Volumetric/atmospheric polish beyond current fog/god-ray settings. | PARTIAL | Current scenes pass, but advanced atmosphere pass is not complete. |
 | P3-REM-12 | Lighting rig selection from UI and commands. | PARTIAL | Scene/validation rigs work; UI/LLM command selection is incomplete. |
-| P3-REM-13 | Pass-owned resource bundles for every new persistent GPU resource. | PARTIAL | Selected boundaries pass; exhaustive ownership remains incomplete. |
+| P3-REM-13 | Pass-owned resource bundles for every new persistent GPU resource. | PARTIAL | Selected boundaries and exhaustive renderer-member ownership pass; deeper per-pass resource extraction remains incomplete. |
 | P3-REM-14 | Public release packaging with setup/install validation outside local smoke scripts. | PARTIAL | README/release gate exists; end-user package flow is not fully tested. |
 
 ## Completion Gate
@@ -638,17 +644,17 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 2. Add and pass missing focused gates:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_descriptor_memory_stress_scene.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
    ```
 
-   These two scripts still do not currently exist; their absence is part of
+   This script still does not currently exist; its absence is part of
    the remaining work.
 
 3. Keep the added Phase 3 focused gates passing:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_descriptor_memory_stress_scene.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_transient_matrix.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_phase3_fallback_matrix.ps1
@@ -660,7 +666,8 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and
    passed individually after the fallback-reporting, camera-cut, render-graph
-   transient, and full renderer ownership checkpoints.
+   transient, full renderer ownership, and descriptor/memory stress
+   checkpoints.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

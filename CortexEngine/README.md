@@ -54,6 +54,7 @@ The gate builds Release, then runs the current public renderer suite:
 - graphics settings persistence, graphics UI contract/runtime interaction, HUD mode, material editor, and preset contracts,
 - public showcase scene, material lab, glass/water courtyard, effects showcase, visual baseline, and screenshot negative checks,
 - Phase 3 visual matrix, IBL gallery, and fallback matrix validation,
+- descriptor/memory stress scene for the historical persistent-descriptor budget,
 - renderer ownership/full ownership audit, fatal error, environment manifest, advanced graphics catalog, and effects gallery contracts,
 - particle-disabled zero-cost and RT reflection firefly/outlier gates,
 - RT budget profile matrix and voxel backend smoke.

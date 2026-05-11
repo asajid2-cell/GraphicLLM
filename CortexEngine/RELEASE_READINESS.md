@@ -25,6 +25,7 @@ The current verified local gate covers:
 - Material Lab, Glass and Water Courtyard, Effects Showcase, visual baseline
   smokes, and screenshot negative gates,
 - Phase 3 visual matrix,
+- descriptor/memory stress for the historical persistent-descriptor ceiling,
 - renderer ownership, full ownership audit, and fatal error contracts,
 - advanced graphics catalog and effects gallery contracts,
 - environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
@@ -43,16 +44,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.271`, `warnings=0`,
+- temporal validation: `gpu_ms=1.263`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.621/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.846/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`;
+- descriptor/memory stress: `persistent_descriptors=988/1024`,
+  `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`,
+  `estimated_mb=190.52/256`;
 - render-graph transient matrix: aliasing-on, aliasing-off, and bloom-transients-off rows passed;
 - temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, HUD, preset, material editor,
   showcase, ownership, fatal error,
@@ -66,12 +70,12 @@ Result:
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=19.685`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=17.591`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_193615_690_146580_bb588849
+CortexEngine/build/bin/logs/runs/release_validation_20260510_194418_433_142380_7e925eba
 ```
 
 ## Renderer Scope

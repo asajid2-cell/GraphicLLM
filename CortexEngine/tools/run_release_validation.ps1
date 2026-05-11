@@ -130,6 +130,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "descriptor_memory_stress" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_descriptor_memory_stress_scene.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "render_graph_transient_matrix" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -5,8 +5,25 @@
 #include <string>
 #include "Graphics/Renderer_ConstantBuffer.h"
 #include "RHI/DescriptorHeap.h"
+#include "Utils/Result.h"
 
 namespace Cortex::Graphics {
+
+inline D3D12_HEAP_PROPERTIES RTDefaultHeapProperties() {
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+    return heapProps;
+}
+
+inline D3D12_HEAP_PROPERTIES RTReadbackHeapProperties() {
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    return heapProps;
+}
 
 struct RTRuntimeState {
     bool supported = false;
@@ -91,6 +108,79 @@ struct RTReflectionSignalStatsState {
         std::array<bool, kFrameCount> readbackPending{};
         std::array<uint64_t, kFrameCount> sampleFrame{};
 
+        [[nodiscard]] Result<void> CreateStatsResources(ID3D12Device* device,
+                                                        DescriptorHeapManager* descriptorManager,
+                                                        UINT64 statsBytes,
+                                                        UINT statsWords,
+                                                        const char* label) {
+            if (!device || !descriptorManager || statsBytes == 0 || statsWords == 0) {
+                return Result<void>::Err("Renderer not initialized for RT reflection signal stats resources");
+            }
+
+            ResetResources();
+
+            D3D12_RESOURCE_DESC statsDesc{};
+            statsDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            statsDesc.Width = statsBytes;
+            statsDesc.Height = 1;
+            statsDesc.DepthOrArraySize = 1;
+            statsDesc.MipLevels = 1;
+            statsDesc.Format = DXGI_FORMAT_UNKNOWN;
+            statsDesc.SampleDesc.Count = 1;
+            statsDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            statsDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+            const auto heapProps = RTDefaultHeapProperties();
+            HRESULT hr = device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &statsDesc,
+                D3D12_RESOURCE_STATE_COMMON,
+                nullptr,
+                IID_PPV_ARGS(&statsBuffer));
+            if (FAILED(hr)) {
+                ResetResources();
+                return Result<void>::Err(std::string("Failed to create ") + label + " stats buffer");
+            }
+
+            if (!statsUAV.IsValid()) {
+                auto statsUavResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (statsUavResult.IsErr()) {
+                    ResetResources();
+                    return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                             " stats UAV: " + statsUavResult.Error());
+                }
+                statsUAV = statsUavResult.Value();
+            }
+
+            D3D12_UNORDERED_ACCESS_VIEW_DESC statsUavDesc{};
+            statsUavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            statsUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            statsUavDesc.Buffer.NumElements = statsWords;
+            statsUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+            device->CreateUnorderedAccessView(statsBuffer.Get(), nullptr, &statsUavDesc, statsUAV.cpu);
+
+            const auto readbackHeap = RTReadbackHeapProperties();
+            D3D12_RESOURCE_DESC readbackDesc = statsDesc;
+            readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            for (auto& readbackBuffer : readback) {
+                hr = device->CreateCommittedResource(
+                    &readbackHeap,
+                    D3D12_HEAP_FLAG_NONE,
+                    &readbackDesc,
+                    D3D12_RESOURCE_STATE_COPY_DEST,
+                    nullptr,
+                    IID_PPV_ARGS(&readbackBuffer));
+                if (FAILED(hr)) {
+                    ResetResources();
+                    return Result<void>::Err(std::string("Failed to create ") + label +
+                                             " stats readback buffer");
+                }
+            }
+
+            return Result<void>::Ok();
+        }
+
         void ResetResources() {
             statsBuffer.Reset();
             for (auto& readbackBuffer : readback) {
@@ -145,6 +235,36 @@ struct RTReflectionSignalStatsState {
         historyResources.ResetResources();
         ResetFrame();
         ResetMetrics();
+    }
+
+    [[nodiscard]] Result<void> CreateStatsResources(ID3D12Device* device,
+                                                    DescriptorHeapManager* descriptorManager,
+                                                    UINT64 statsBytes,
+                                                    UINT statsWords) {
+        ResetResources();
+        auto rawResult = rawResources.CreateStatsResources(
+            device,
+            descriptorManager,
+            statsBytes,
+            statsWords,
+            "RT reflection signal");
+        if (rawResult.IsErr()) {
+            ResetResources();
+            return rawResult;
+        }
+
+        auto historyResult = historyResources.CreateStatsResources(
+            device,
+            descriptorManager,
+            statsBytes,
+            statsWords,
+            "RT reflection history signal");
+        if (historyResult.IsErr()) {
+            ResetResources();
+            return historyResult;
+        }
+
+        return Result<void>::Ok();
     }
 };
 

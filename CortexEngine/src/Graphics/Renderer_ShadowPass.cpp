@@ -77,7 +77,10 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             }
             if (desired && desired != currentPipeline) {
                 currentPipeline = desired;
-                m_commandResources.graphicsList->SetPipelineState(currentPipeline->GetPipelineState());
+                if (!MeshDrawPass::SwitchPipelineState(m_commandResources.graphicsList.Get(),
+                                                       currentPipeline->GetPipelineState())) {
+                    continue;
+                }
             }
 
             ObjectConstants objectData = {};

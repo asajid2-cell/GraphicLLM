@@ -32,6 +32,8 @@ struct DrawResult {
 };
 
 [[nodiscard]] bool BindPipelineState(const PipelineStateContext& context);
+[[nodiscard]] bool SwitchPipelineState(ID3D12GraphicsCommandList* commandList,
+                                       ID3D12PipelineState* pipelineState);
 [[nodiscard]] bool BindObjectMaterial(const ObjectMaterialContext& context);
 [[nodiscard]] DrawResult DrawIndexedMesh(ID3D12GraphicsCommandList* commandList,
                                          const Cortex::Scene::MeshData& mesh);

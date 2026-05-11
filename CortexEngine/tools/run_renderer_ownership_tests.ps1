@@ -33,6 +33,7 @@ $rendererRtState = Get-Content $rendererRtStatePath -Raw
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
+$backBufferPresentPassPath = Join-Path $root "src/Graphics/Passes/BackBufferPresentPass.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -234,6 +235,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "end_frame_shader_resource_transitions missing Renderer_FrameEnd.cpp"
+        }
+    }
+
+    if ($id -eq "back_buffer_present_transition") {
+        if (Test-Path $backBufferPresentPassPath) {
+            $backBufferPresentPass = Get-Content $backBufferPresentPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::BackBufferPresentPass", "VisualCaptureResult", "PresentContext", "TransitionBackBufferForPresent", "CreateCommittedResource", "CopyTextureRegion", "ResourceBarrier", "D3D12_RESOURCE_STATE_COPY_SOURCE", "D3D12_RESOURCE_STATE_PRESENT")) {
+                if ($backBufferPresentPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "back_buffer_present_transition missing BackBufferPresentPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "back_buffer_present_transition missing BackBufferPresentPass.cpp"
+        }
+        if (Test-Path $frameEndPath) {
+            $frameEnd = Get-Content $frameEndPath -Raw
+            if ($frameEnd.IndexOf("BackBufferPresentPass::TransitionBackBufferForPresent", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "back_buffer_present_transition missing routed present transition call in Renderer_FrameEnd.cpp"
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "CopyTextureRegion", "D3D12_RESOURCE_STATE_COPY_SOURCE", "D3D12_RESOURCE_STATE_PRESENT")) {
+                if ($frameEnd.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "back_buffer_present_transition still has direct backbuffer present/capture mechanics in Renderer_FrameEnd.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "back_buffer_present_transition missing Renderer_FrameEnd.cpp"
         }
     }
 

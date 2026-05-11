@@ -2,6 +2,7 @@
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
+#include "Graphics/Passes/BackBufferPresentPass.h"
 #include "Graphics/Passes/EndFrameShaderResourcePass.h"
 #include "Graphics/Passes/RTHistoryCopyPass.h"
 #include <spdlog/spdlog.h>
@@ -231,10 +232,7 @@ void Renderer::EndFrame() {
     // Transition back buffer to present state if it was used as a render
     // target this frame. When post-process or voxel paths are disabled, the
     // swap-chain buffer may remain in PRESENT state for the entire frame.
-    Microsoft::WRL::ComPtr<ID3D12Resource> visualCaptureReadback;
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT visualCaptureFootprint{};
-    uint32_t visualCaptureWidth = 0;
-    uint32_t visualCaptureHeight = 0;
+    BackBufferPresentPass::VisualCaptureResult visualCapture{};
     std::filesystem::path visualCapturePath;
     const bool captureVisualValidation =
         std::getenv("CORTEX_CAPTURE_VISUAL_VALIDATION") != nullptr &&
@@ -247,88 +245,18 @@ void Renderer::EndFrame() {
         m_services.device->GetDevice();
 
     if (m_frameLifecycle.backBufferUsedAsRTThisFrame) {
-        ID3D12Resource* backBuffer = m_services.window->GetCurrentBackBuffer();
         if (captureVisualValidation) {
-            const D3D12_RESOURCE_DESC backBufferDesc = backBuffer->GetDesc();
-            visualCaptureWidth = static_cast<uint32_t>(backBufferDesc.Width);
-            visualCaptureHeight = backBufferDesc.Height;
-
-            UINT numRows = 0;
-            UINT64 rowSizeBytes = 0;
-            UINT64 totalBytes = 0;
-            m_services.device->GetDevice()->GetCopyableFootprints(
-                &backBufferDesc,
-                0,
-                1,
-                0,
-                &visualCaptureFootprint,
-                &numRows,
-                &rowSizeBytes,
-                &totalBytes);
-
-            D3D12_HEAP_PROPERTIES readbackHeap{};
-            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-            D3D12_RESOURCE_DESC readbackDesc{};
-            readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            readbackDesc.Width = totalBytes;
-            readbackDesc.Height = 1;
-            readbackDesc.DepthOrArraySize = 1;
-            readbackDesc.MipLevels = 1;
-            readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
-            readbackDesc.SampleDesc.Count = 1;
-            readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-            const HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-                &readbackHeap,
-                D3D12_HEAP_FLAG_NONE,
-                &readbackDesc,
-                D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr,
-                IID_PPV_ARGS(&visualCaptureReadback));
-            if (FAILED(hr)) {
-                visualCaptureReadback.Reset();
-                spdlog::warn("Visual validation capture: failed to create readback buffer");
-            } else {
-                D3D12_RESOURCE_BARRIER copyBarrier{};
-                copyBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                copyBarrier.Transition.pResource = backBuffer;
-                copyBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-                copyBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                copyBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandResources.graphicsList->ResourceBarrier(1, &copyBarrier);
-
-                D3D12_TEXTURE_COPY_LOCATION src{};
-                src.pResource = backBuffer;
-                src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                src.SubresourceIndex = 0;
-
-                D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = visualCaptureReadback.Get();
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                dst.PlacedFootprint = visualCaptureFootprint;
-
-                m_commandResources.graphicsList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-                visualCapturePath = GetRendererLogDirectory() / "visual_validation_rt_showcase.bmp";
-
-                D3D12_RESOURCE_BARRIER presentBarrier{};
-                presentBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                presentBarrier.Transition.pResource = backBuffer;
-                presentBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                presentBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-                presentBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandResources.graphicsList->ResourceBarrier(1, &presentBarrier);
-            }
+            visualCapturePath = GetRendererLogDirectory() / "visual_validation_rt_showcase.bmp";
         }
-
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = backBuffer;
-        barrier.Transition.StateBefore = visualCaptureReadback ? D3D12_RESOURCE_STATE_PRESENT : D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        if (!visualCaptureReadback) {
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
+        BackBufferPresentPass::PresentContext presentContext{};
+        presentContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        presentContext.commandList = m_commandResources.graphicsList.Get();
+        presentContext.backBuffer = m_services.window->GetCurrentBackBuffer();
+        presentContext.backBufferUsedAsRenderTarget = m_frameLifecycle.backBufferUsedAsRTThisFrame;
+        presentContext.captureVisualValidation = captureVisualValidation;
+        presentContext.visualCapture = &visualCapture;
+        if (!BackBufferPresentPass::TransitionBackBufferForPresent(presentContext) && captureVisualValidation) {
+            spdlog::warn("Visual validation capture: failed to create readback buffer");
         }
     }
 
@@ -341,14 +269,14 @@ void Renderer::EndFrame() {
     m_services.commandQueue->ExecuteCommandList(m_commandResources.graphicsList.Get());
     Debug::GPUProfiler::Get().NotifyFrameSubmitted();
 
-    if (visualCaptureReadback) {
+    if (visualCapture.readback) {
         m_services.commandQueue->Flush();
         WriteBackBufferBMP(
             visualCapturePath,
-            visualCaptureReadback.Get(),
-            visualCaptureFootprint,
-            visualCaptureWidth,
-            visualCaptureHeight);
+            visualCapture.readback.Get(),
+            visualCapture.footprint,
+            visualCapture.width,
+            visualCapture.height);
         m_frameLifecycle.visualValidationCaptured = true;
     }
 

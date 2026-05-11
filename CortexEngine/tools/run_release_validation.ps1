@@ -2,7 +2,7 @@ param(
     [switch]$NoBuild,
     [int]$TemporalSmokeFrames = 140,
     [int]$RTSmokeFrames = 240,
-    [int]$IBLGalleryMaxEnvironments = 3,
+    [int]$IBLGalleryMaxEnvironments = 0,
     [int]$BudgetTemporalRuns = 1,
     [int]$BudgetMaxParallel = 1,
     [int]$VoxelSmokeFrames = 120,

@@ -854,10 +854,23 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         spdlog::info("Startup environment preset applied: '{}'", config.initialEnvironmentPreset);
     }
 
+    if (const char* startupFocusTarget = std::getenv("CORTEX_FOCUS_TARGET")) {
+        if (startupFocusTarget[0] != '\0') {
+            SetFocusTarget(startupFocusTarget);
+            spdlog::info("Startup focus target set to '{}'", startupFocusTarget);
+        }
+    }
+
     if (const char* openGraphicsSettings = std::getenv("CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP")) {
         if (openGraphicsSettings[0] != '\0' && openGraphicsSettings[0] != '0') {
             UI::GraphicsSettingsWindow::SetVisible(true);
             spdlog::info("Graphics settings window opened by startup automation");
+        }
+    }
+    if (const char* openSceneEditor = std::getenv("CORTEX_OPEN_SCENE_EDITOR_ON_STARTUP")) {
+        if (openSceneEditor[0] != '\0' && openSceneEditor[0] != '0') {
+            UI::SceneEditorWindow::SetVisible(true);
+            spdlog::info("Scene editor window opened by startup automation");
         }
     }
 
@@ -1910,8 +1923,34 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
     };
     report["ui_state"] = {
         {"graphics_settings_open", UI::GraphicsSettingsWindow::IsVisible()},
+        {"scene_editor_open", UI::SceneEditorWindow::IsVisible()},
         {"debug_menu_open", UI::DebugMenu::IsVisible()},
         {"settings_overlay_open", m_settingsOverlayVisible}
+    };
+    json focusedMaterial = nullptr;
+    if (m_registry && !m_focusTargetName.empty()) {
+        auto view = m_registry->View<Scene::TagComponent, Scene::RenderableComponent>();
+        for (auto entity : view) {
+            const auto& tag = view.get<Scene::TagComponent>(entity);
+            if (tag.tag != m_focusTargetName) {
+                continue;
+            }
+            const auto& renderable = view.get<Scene::RenderableComponent>(entity);
+            focusedMaterial = {
+                {"tag", tag.tag},
+                {"preset", renderable.presetName},
+                {"metallic", renderable.metallic},
+                {"roughness", renderable.roughness},
+                {"alpha", renderable.albedoColor.a},
+                {"transmission", renderable.transmissionFactor},
+                {"emissive_strength", renderable.emissiveStrength}
+            };
+            break;
+        }
+    }
+    report["editor_state"] = {
+        {"focus_target", m_focusTargetName},
+        {"focused_material", focusedMaterial}
     };
     report["health_warnings"] = std::move(health);
 

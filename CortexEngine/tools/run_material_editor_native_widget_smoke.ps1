@@ -57,6 +57,12 @@ $TB_ENDTRACK = 8
 $IDC_SE_FOCUSED_MAT_PRESET = 3204
 $IDC_SE_FOCUSED_MET_SLIDER = 3206
 $IDC_SE_FOCUSED_ROUGH_SLIDER = 3208
+$IDC_SE_FOCUSED_CLEARCOAT_SLIDER = 3215
+$IDC_SE_FOCUSED_COAT_ROUGH_SLIDER = 3217
+$IDC_SE_FOCUSED_TRANSMISSION_SLIDER = 3219
+$IDC_SE_FOCUSED_EMISSIVE_SLIDER = 3221
+$IDC_SE_FOCUSED_SHEEN_SLIDER = 3223
+$IDC_SE_FOCUSED_SUBSURFACE_SLIDER = 3225
 $IDC_SE_APPLY_MATERIAL = 3211
 
 $focusTarget = "MaterialLab_PlasticSphere"
@@ -156,9 +162,15 @@ try {
     if ($window -eq [IntPtr]::Zero) {
         Add-Failure "Cortex Scene Editor native window did not appear for process $($process.Id)."
     } else {
-        Set-ComboSelection $window $IDC_SE_FOCUSED_MAT_PRESET 1
+        Set-ComboSelection $window $IDC_SE_FOCUSED_MAT_PRESET 11
         Set-Trackbar $window $IDC_SE_FOCUSED_MET_SLIDER 88
         Set-Trackbar $window $IDC_SE_FOCUSED_ROUGH_SLIDER 23
+        Set-Trackbar $window $IDC_SE_FOCUSED_CLEARCOAT_SLIDER 72
+        Set-Trackbar $window $IDC_SE_FOCUSED_COAT_ROUGH_SLIDER 18
+        Set-Trackbar $window $IDC_SE_FOCUSED_TRANSMISSION_SLIDER 52
+        Set-Trackbar $window $IDC_SE_FOCUSED_EMISSIVE_SLIDER 40
+        Set-Trackbar $window $IDC_SE_FOCUSED_SHEEN_SLIDER 31
+        Set-Trackbar $window $IDC_SE_FOCUSED_SUBSURFACE_SLIDER 27
         Click-Control $window $IDC_SE_APPLY_MATERIAL
     }
 
@@ -202,11 +214,17 @@ if (-not (Test-Path $reportPath)) {
         if ([string]$mat.tag -ne $focusTarget) {
             Add-Failure "focused material tag was '$($mat.tag)', expected $focusTarget"
         }
-        if ([string]$mat.preset -ne "chrome") {
-            Add-Failure "focused material preset was '$($mat.preset)', expected chrome"
+        if ([string]$mat.preset -ne "glass") {
+            Add-Failure "focused material preset was '$($mat.preset)', expected glass"
         }
-        Assert-Near "focused material metallic" ([double]$mat.metallic) 0.88 0.04
+        Assert-Near "focused material metallic" ([double]$mat.metallic) 0.0 0.04
         Assert-Near "focused material roughness" ([double]$mat.roughness) 0.23 0.04
+        Assert-Near "focused material clearcoat" ([double]$mat.clearcoat) 0.72 0.04
+        Assert-Near "focused material clearcoat_roughness" ([double]$mat.clearcoat_roughness) 0.18 0.04
+        Assert-Near "focused material transmission" ([double]$mat.transmission) 0.52 0.04
+        Assert-Near "focused material emissive_strength" ([double]$mat.emissive_strength) 6.4 0.18
+        Assert-Near "focused material sheen" ([double]$mat.sheen) 0.31 0.04
+        Assert-Near "focused material subsurface" ([double]$mat.subsurface) 0.27 0.04
     }
 }
 

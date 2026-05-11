@@ -1943,6 +1943,10 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
                 {"roughness", renderable.roughness},
                 {"alpha", renderable.albedoColor.a},
                 {"transmission", renderable.transmissionFactor},
+                {"clearcoat", renderable.clearcoatFactor},
+                {"clearcoat_roughness", renderable.clearcoatRoughnessFactor},
+                {"sheen", renderable.sheenWeight},
+                {"subsurface", renderable.subsurfaceWrap},
                 {"emissive_strength", renderable.emissiveStrength}
             };
             break;

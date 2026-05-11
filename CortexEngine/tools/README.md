@@ -136,11 +136,12 @@ The HUD mode contract verifies the Phase 3 clean-HUD modes, F7 cycling, and
 `--hud` / `CORTEX_HUD_MODE` automation path; it runs short off/full-debug cases
 and checks the generated frame report.
 The material editor contract verifies the focused-entity material preset
-dropdown, metallic/roughness sliders, validation status, and
-`ModifyMaterialCommand` apply path.
+dropdown, metallic/roughness sliders, advanced material sliders, validation
+status, and `ModifyMaterialCommand` apply path.
 The material editor native-widget smoke opens the actual Win32 scene editor,
-sets a startup focus target, drives the focused material combo/sliders/apply
-button, and verifies the focused material in the shutdown frame report.
+sets a startup focus target, drives the focused material combo/basic and
+advanced sliders/apply button, and verifies the focused material in the
+shutdown frame report.
 The conductor-energy contract verifies forward/deferred shader energy split
 invariants and reruns Material Lab to prove full-metal conductors remain present
 without overbright visual statistics.

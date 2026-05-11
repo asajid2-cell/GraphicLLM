@@ -102,6 +102,8 @@ MaterialModel MaterialResolver::ResolveRenderable(
     model.specularColorFactor = glm::clamp(renderable.specularColorFactor, glm::vec3(0.0f), glm::vec3(1.0f));
     model.clearcoatFactor = 0.0f;
     model.clearcoatRoughnessFactor = 0.2f;
+    model.sheenWeight = glm::clamp(renderable.sheenWeight, 0.0f, 1.0f);
+    model.subsurfaceWrap = glm::clamp(renderable.subsurfaceWrap, 0.0f, 1.0f);
     model.alphaMode = static_cast<MaterialAlphaMode>(renderable.alphaMode);
     model.alphaCutoff = glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f);
     model.doubleSided = renderable.doubleSided;
@@ -135,8 +137,12 @@ MaterialModel MaterialResolver::ResolveRenderable(
         model.materialType = preset.materialType;
         model.clearcoatFactor = preset.clearcoatFactor;
         model.clearcoatRoughnessFactor = preset.clearcoatRoughnessFactor;
-        model.sheenWeight = preset.sheenWeight;
-        model.subsurfaceWrap = preset.subsurfaceWrap;
+        if (model.sheenWeight <= kDefaultEpsilon) {
+            model.sheenWeight = preset.sheenWeight;
+        }
+        if (model.subsurfaceWrap <= kDefaultEpsilon) {
+            model.subsurfaceWrap = preset.subsurfaceWrap;
+        }
         ApplyPresetDefaults(model, preset);
     }
 

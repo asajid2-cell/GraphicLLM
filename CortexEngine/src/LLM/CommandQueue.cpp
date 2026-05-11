@@ -952,6 +952,43 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
         summary << "ao ";
         touched = true;
     }
+    if (cmd->setTransmission) {
+        renderable.transmissionFactor = SaturateScalar(cmd->transmission);
+        if (renderable.transmissionFactor > 0.001f) {
+            renderable.metallic = 0.0f;
+        }
+        summary << "transmission ";
+        touched = true;
+    }
+    if (cmd->setClearcoat) {
+        renderable.clearcoatFactor = SaturateScalar(cmd->clearcoat);
+        summary << "clearcoat ";
+        touched = true;
+    }
+    if (cmd->setClearcoatRoughness) {
+        renderable.clearcoatRoughnessFactor = SaturateScalar(cmd->clearcoatRoughness);
+        summary << "clearcoat_roughness ";
+        touched = true;
+    }
+    if (cmd->setSheen) {
+        renderable.sheenWeight = SaturateScalar(cmd->sheen);
+        summary << "sheen ";
+        touched = true;
+    }
+    if (cmd->setSubsurface) {
+        renderable.subsurfaceWrap = SaturateScalar(cmd->subsurface);
+        summary << "subsurface ";
+        touched = true;
+    }
+    if (cmd->setEmissiveStrength) {
+        renderable.emissiveStrength = std::clamp(cmd->emissiveStrength, 0.0f, 16.0f);
+        if (renderable.emissiveStrength > 1.0f &&
+            glm::length2(renderable.emissiveColor) < 1.0e-6f) {
+            renderable.emissiveColor = glm::max(glm::vec3(renderable.albedoColor), glm::vec3(0.05f));
+        }
+        summary << "emissive_strength ";
+        touched = true;
+    }
 
     if (touched) {
         PushStatus(true, summary.str());

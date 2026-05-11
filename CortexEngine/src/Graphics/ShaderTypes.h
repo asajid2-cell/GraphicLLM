@@ -158,6 +158,8 @@ struct FrameConstants {
     glm::vec4 projectionParams;                // x=proj11, y=proj22, z=nearZ, w=farZ (for cluster Z slicing)
       // x = tone-mapper mode, y = environment rotation radians, z = RT GI strength, w = RT GI ray distance
       glm::vec4 cinematicParams;
+      // x = authored DOF focus distance, y = authored aperture, z/w reserved
+      glm::vec4 cinematicDofParams;
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer

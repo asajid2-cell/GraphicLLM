@@ -77,6 +77,8 @@ $IDC_GFX_AREA_LIGHT = 9015
 $IDC_GFX_SHADOW_BIAS = 9071
 $IDC_GFX_SHADOW_PCF = 9072
 $IDC_GFX_CASCADE_LAMBDA = 9073
+$IDC_GFX_DOF_FOCUS_DISTANCE = 9074
+$IDC_GFX_DOF_APERTURE = 9075
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -237,6 +239,8 @@ try {
         Set-Trackbar $window $IDC_GFX_RT_GI_DISTANCE 58
         Set-Trackbar $window $IDC_GFX_MOTION_BLUR 29
         Set-Trackbar $window $IDC_GFX_DOF 31
+        Set-Trackbar $window $IDC_GFX_DOF_FOCUS_DISTANCE 18
+        Set-Trackbar $window $IDC_GFX_DOF_APERTURE 55
         Click-Control $window $IDC_GFX_GRADE_COOL_MOON
         Click-Control $window $IDC_GFX_TONE_PUNCHY
         Click-Control $window $IDC_GFX_RIG_LANTERNS
@@ -327,6 +331,8 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "rt_gi_ray_distance" ([double]$fc.ray_tracing.rt_gi_tuning.ray_distance) 11.8 0.5
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.29 0.05
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.31 0.05
+    Assert-Near "dof_focus_distance" ([double]$fc.cinematic_post.dof_focus_distance) 18.08 0.6
+    Assert-Near "dof_aperture" ([double]$fc.cinematic_post.dof_aperture) 4.4 0.2
     if ([string]$fc.cinematic_post.color_grade_preset -ne "cool_moon") {
         Add-Failure "color_grade_preset was '$($fc.cinematic_post.color_grade_preset)', expected cool_moon"
     }

@@ -116,7 +116,9 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "vignette": 0.27,
     "lens_dirt": 0.21,
     "motion_blur": 0.22,
-    "depth_of_field": 0.34
+    "depth_of_field": 0.34,
+    "dof_focus_distance": 22.0,
+    "dof_aperture": 4.4
   }
 }
 '@ | Set-Content -Encoding UTF8 $settingsPath
@@ -221,6 +223,8 @@ if ($exitCode -ne 0) {
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.22 0.03
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.34 0.03
+    Assert-Near "dof_focus_distance" ([double]$fc.cinematic_post.dof_focus_distance) 22.0 0.3
+    Assert-Near "dof_aperture" ([double]$fc.cinematic_post.dof_aperture) 4.4 0.12
     if ([string]$fc.cinematic_post.tone_mapper_preset -ne "filmic_soft") {
         Add-Failure "tone_mapper_preset was '$($fc.cinematic_post.tone_mapper_preset)', expected filmic_soft"
     }

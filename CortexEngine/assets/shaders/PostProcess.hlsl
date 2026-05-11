@@ -73,6 +73,8 @@ cbuffer FrameConstants : register(b1)
     float4   g_ProjectionParams;
     // x = tone-mapper mode (0=ACES, 1=Reinhard, 2=soft filmic, 3=punchy)
     float4   g_CinematicParams;
+    // x = authored DOF focus distance, y = authored aperture, z/w reserved
+    float4   g_CinematicDofParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -1308,10 +1310,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Lightweight auto-focus depth of field. The focus plane follows the
-    // center of the frame; sky/clear depth falls back to a mid-distance focus
-    // so public scenes can use a subtle cinematic look without needing per-shot
-    // focus authoring yet.
+    // Lightweight depth of field. Authored focus/aperture controls override the
+    // center auto-focus fallback used by older showcase profiles.
     float depthOfFieldAmount = saturate(g_PostGradeParams.w);
     if (depthOfFieldAmount > 0.001f)
     {
@@ -1319,16 +1319,21 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float pixelDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
         if (pixelDepth < 1.0f - 1e-4f)
         {
-            float3 focusWorld = ReconstructWorldPosition(float2(0.5f, 0.5f), min(centerFocusDepth, 0.995f));
-            float focusDistance = length(focusWorld - g_CameraPosition.xyz);
-            if (centerFocusDepth >= 1.0f - 1e-4f)
+            float focusDistance = clamp(g_CinematicDofParams.x, 0.1f, 100.0f);
+            if (focusDistance <= 0.11f)
             {
-                focusDistance = 18.0f;
+                float3 focusWorld = ReconstructWorldPosition(float2(0.5f, 0.5f), min(centerFocusDepth, 0.995f));
+                focusDistance = length(focusWorld - g_CameraPosition.xyz);
+                if (centerFocusDepth >= 1.0f - 1e-4f)
+                {
+                    focusDistance = 18.0f;
+                }
             }
 
             float3 pixelWorld = ReconstructWorldPosition(uv, pixelDepth);
             float pixelDistance = length(pixelWorld - g_CameraPosition.xyz);
-            float focusBand = max(focusDistance * 0.35f, 2.0f);
+            float aperture = saturate(g_CinematicDofParams.y / 8.0f);
+            float focusBand = max(focusDistance * lerp(0.45f, 0.14f, aperture), 0.35f);
             float coc = saturate(abs(pixelDistance - focusDistance) / focusBand) * depthOfFieldAmount;
 
             if (coc > 0.001f)

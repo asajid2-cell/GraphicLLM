@@ -360,6 +360,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.lensDirt = m_postProcessState.EffectiveLensDirt();
     contract.cinematicPost.motionBlur = m_postProcessState.EffectiveMotionBlur();
     contract.cinematicPost.depthOfField = m_postProcessState.EffectiveDepthOfField();
+    contract.cinematicPost.dofFocusDistance = m_postProcessState.dofFocusDistance;
+    contract.cinematicPost.dofAperture = m_postProcessState.dofAperture;
     contract.cinematicPost.warm = m_postProcessState.warm;
     contract.cinematicPost.cool = m_postProcessState.cool;
     contract.cinematicPost.godRayIntensity = m_postProcessState.godRayIntensity;

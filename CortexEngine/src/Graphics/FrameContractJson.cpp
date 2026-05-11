@@ -320,6 +320,8 @@ json FrameContractToJson(const FrameContract& contract) {
             {"lens_dirt", contract.cinematicPost.lensDirt},
             {"motion_blur", contract.cinematicPost.motionBlur},
             {"depth_of_field", contract.cinematicPost.depthOfField},
+            {"dof_focus_distance", contract.cinematicPost.dofFocusDistance},
+            {"dof_aperture", contract.cinematicPost.dofAperture},
             {"warm", contract.cinematicPost.warm},
             {"cool", contract.cinematicPost.cool},
             {"god_ray_intensity", contract.cinematicPost.godRayIntensity}

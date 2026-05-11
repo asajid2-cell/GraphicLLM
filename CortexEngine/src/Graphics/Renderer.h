@@ -213,7 +213,10 @@ public:
     void SetColorGradePreset(const std::string& preset);
     void SetCinematicPostEnabled(bool enabled);
     void SetCinematicPost(float vignette, float lensDirt);
-    void SetCinematicPostEffects(float motionBlur, float depthOfField);
+    void SetCinematicPostEffects(float motionBlur,
+                                 float depthOfField,
+                                 float dofFocusDistance = 18.0f,
+                                 float dofAperture = 0.0f);
     void SetSSAOEnabled(bool enabled);
     void SetSSAOParams(float radius, float bias, float intensity);
     void SetSSRParams(float maxDistance, float thickness, float strength);

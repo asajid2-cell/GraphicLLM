@@ -75,6 +75,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_SHADOW_BIAS = 9071,
     IDC_GFX_SHADOW_PCF = 9072,
     IDC_GFX_CASCADE_LAMBDA = 9073,
+    IDC_GFX_DOF_FOCUS_DISTANCE = 9074,
+    IDC_GFX_DOF_APERTURE = 9075,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -193,6 +195,8 @@ struct GraphicsSettingsState {
     SliderBinding lensDirt;
     SliderBinding motionBlur;
     SliderBinding depthOfField;
+    SliderBinding dofFocusDistance;
+    SliderBinding dofAperture;
     SliderBinding particleDensity;
     SliderBinding particleQuality;
     SliderBinding particleBloom;
@@ -562,6 +566,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.cinematicPost.lensDirt = SliderToFloat(g_gfx.lensDirt);
     g_gfx.tuning.cinematicPost.motionBlur = SliderToFloat(g_gfx.motionBlur);
     g_gfx.tuning.cinematicPost.depthOfField = SliderToFloat(g_gfx.depthOfField);
+    g_gfx.tuning.cinematicPost.dofFocusDistance = SliderToFloat(g_gfx.dofFocusDistance);
+    g_gfx.tuning.cinematicPost.dofAperture = SliderToFloat(g_gfx.dofAperture);
     g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
     g_gfx.tuning.particles.qualityScale = SliderToFloat(g_gfx.particleQuality);
     g_gfx.tuning.particles.bloomContribution = SliderToFloat(g_gfx.particleBloom);
@@ -681,6 +687,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.lensDirt, g_gfx.tuning.cinematicPost.lensDirt);
     SetSliderFromFloat(g_gfx.motionBlur, g_gfx.tuning.cinematicPost.motionBlur);
     SetSliderFromFloat(g_gfx.depthOfField, g_gfx.tuning.cinematicPost.depthOfField);
+    SetSliderFromFloat(g_gfx.dofFocusDistance, g_gfx.tuning.cinematicPost.dofFocusDistance);
+    SetSliderFromFloat(g_gfx.dofAperture, g_gfx.tuning.cinematicPost.dofAperture);
     SetSliderFromFloat(g_gfx.particleDensity, g_gfx.tuning.particles.densityScale);
     SetSliderFromFloat(g_gfx.particleQuality, g_gfx.tuning.particles.qualityScale);
     SetSliderFromFloat(g_gfx.particleBloom, g_gfx.tuning.particles.bloomContribution);
@@ -1050,6 +1058,8 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
             makeSlider(IDC_GFX_MOTION_BLUR, L"Motion Blur", g_gfx.motionBlur, 0.0f, 1.0f);
             makeSlider(IDC_GFX_DOF, L"Depth of Field", g_gfx.depthOfField, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_DOF_FOCUS_DISTANCE, L"DOF Focus Distance", g_gfx.dofFocusDistance, 0.1f, 100.0f);
+            makeSlider(IDC_GFX_DOF_APERTURE, L"DOF Aperture", g_gfx.dofAperture, 0.0f, 8.0f);
             {
                 const int buttonWidth = (width - margin * 2 - 12) / 3;
                 makeButton(IDC_GFX_BOOKMARK_HERO, L"Hero View", margin, y, buttonWidth);

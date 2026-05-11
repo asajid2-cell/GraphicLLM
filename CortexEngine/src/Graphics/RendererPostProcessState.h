@@ -21,6 +21,8 @@ struct RendererPostProcessState {
     float lensDirt = 0.0f;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
+    float dofFocusDistance = 18.0f;
+    float dofAperture = 0.0f;
     std::string colorGradePreset = "neutral";
     std::string toneMapperPreset = "aces";
 

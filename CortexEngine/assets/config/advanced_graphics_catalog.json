@@ -58,7 +58,7 @@
         "src/Graphics/Renderer_Bloom.cpp",
         "assets/shaders/PostProcess.hlsl"
       ],
-      "validated_features": ["bloom_threshold", "soft_knee", "vignette", "lens_dirt", "motion_blur", "depth_of_field", "tone_mapper_presets", "color_grade_presets", "preset_serialization", "frame_contract_stats"],
+      "validated_features": ["bloom_threshold", "soft_knee", "vignette", "lens_dirt", "motion_blur", "depth_of_field", "dof_focus_distance", "dof_aperture", "tone_mapper_presets", "color_grade_presets", "preset_serialization", "frame_contract_stats"],
       "validation_contracts": ["graphics_preset", "effects_gallery", "phase3_visual_matrix"],
       "first_validation_scene": "effects_showcase",
       "future_extensions": ["per-shot_focus_distance"]

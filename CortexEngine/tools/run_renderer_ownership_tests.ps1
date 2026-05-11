@@ -799,7 +799,7 @@ foreach ($target in $doc.targets) {
             Add-Failure "screen_space_resources missing RendererSSRState.h"
         } else {
             $ssrState = Get-Content $ssrStatePath -Raw
-            foreach ($required in @("struct SSRControls", "struct SSRResources", "struct SSRDescriptorTables", "struct SSRFrameState", "SSRControls controls", "SSRResources resources", "SSRDescriptorTables descriptors", "SSRFrameState frame")) {
+            foreach ($required in @("struct SSRControls", "struct SSRResources", "struct SSRDescriptorTables", "struct SSRFrameState", "SSRControls controls", "SSRResources resources", "SSRDescriptorTables descriptors", "SSRFrameState frame", "CreateTarget", "CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
                 if ($ssrState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "screen_space_resources missing SSR ownership marker in RendererSSRState.h: $required"
                 }
@@ -833,6 +833,19 @@ foreach ($target in $doc.targets) {
                     Add-Failure "screen_space_resources still uses flat SSR state access in Renderer_SSRPass.cpp: $oldFlatAccess"
                 }
             }
+        }
+        if (Test-Path $hdrTargetsPath) {
+            $hdrTargets = Get-Content $hdrTargetsPath -Raw
+            if ($hdrTargets.IndexOf("m_ssrResources.resources.CreateTarget", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "screen_space_resources SSR target creation does not route through SSRResources::CreateTarget"
+            }
+            foreach ($directSSRCreate in @("IID_PPV_ARGS(&m_ssrResources.resources.color)")) {
+                if ($hdrTargets.IndexOf($directSSRCreate, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "screen_space_resources still creates SSR target directly in Renderer_HDRTargets.cpp: $directSSRCreate"
+                }
+            }
+        } else {
+            Add-Failure "screen_space_resources missing Renderer_HDRTargets.cpp"
         }
     }
 

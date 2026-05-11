@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 
 namespace Cortex::Graphics {
 
@@ -18,6 +19,7 @@ struct RendererPostProcessState {
     float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
+    std::string colorGradePreset = "neutral";
 
     [[nodiscard]] float EffectiveVignette() const {
         return cinematicEnabled ? std::clamp(vignette, 0.0f, 1.0f) : 0.0f;

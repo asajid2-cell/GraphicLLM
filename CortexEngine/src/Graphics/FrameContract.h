@@ -339,6 +339,7 @@ struct FrameContract {
         float bloomMaxContribution = 4.0f;
         float contrast = 1.0f;
         float saturation = 1.0f;
+        std::string colorGradePreset = "neutral";
         float vignette = 0.0f;
         float lensDirt = 0.0f;
         float warm = 0.0f;

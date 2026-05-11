@@ -61,6 +61,7 @@ void Renderer::SetColorGrade(float warm, float cool) {
     }
     m_postProcessState.warm = clampedWarm;
     m_postProcessState.cool = clampedCool;
+    m_postProcessState.colorGradePreset = "custom";
     spdlog::info("Color grade warm/cool set to ({}, {})",
                  m_postProcessState.warm,
                  m_postProcessState.cool);
@@ -76,9 +77,19 @@ void Renderer::SetToneGrade(float contrast, float saturation) {
 
     m_postProcessState.contrast = clampedContrast;
     m_postProcessState.saturation = clampedSaturation;
+    m_postProcessState.colorGradePreset = "custom";
     spdlog::info("Tone grade contrast/saturation set to ({}, {})",
                  m_postProcessState.contrast,
                  m_postProcessState.saturation);
+}
+
+void Renderer::SetColorGradePreset(const std::string& preset) {
+    const std::string id = preset.empty() ? "custom" : preset;
+    if (m_postProcessState.colorGradePreset == id) {
+        return;
+    }
+    m_postProcessState.colorGradePreset = id;
+    spdlog::info("Color grade preset set to '{}'", m_postProcessState.colorGradePreset);
 }
 
 void Renderer::SetCinematicPostEnabled(bool enabled) {

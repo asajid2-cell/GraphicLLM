@@ -709,6 +709,9 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.cinematicPost.lensDirt > 1.0f) {
         warn("cinematic_post_params_out_of_range");
     }
+    if (contract.cinematicPost.colorGradePreset.empty()) {
+        warn("cinematic_post_color_grade_preset_missing");
+    }
     if (contract.cinematicPost.bloomExecuted && !passExecuted("Bloom")) {
         warn("cinematic_post_bloom_executed_without_pass_record");
     }

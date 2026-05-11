@@ -5,6 +5,46 @@
 
 namespace Cortex::Graphics::MeshDrawPass {
 
+bool BindPipelineState(const PipelineStateContext& context) {
+    if (!context.commandList || !context.rootSignature || !context.pipelineState) {
+        return false;
+    }
+
+    if (context.cbvSrvUavHeap) {
+        ID3D12DescriptorHeap* heaps[] = { context.cbvSrvUavHeap };
+        context.commandList->SetDescriptorHeaps(1, heaps);
+    }
+
+    context.commandList->SetGraphicsRootSignature(context.rootSignature);
+    context.commandList->SetPipelineState(context.pipelineState);
+
+    if (context.frameConstants != 0) {
+        context.commandList->SetGraphicsRootConstantBufferView(1, context.frameConstants);
+    }
+
+    if (context.shadowEnvironmentTable.IsValid()) {
+        context.commandList->SetGraphicsRootDescriptorTable(4, context.shadowEnvironmentTable.gpu);
+    }
+
+    context.commandList->IASetPrimitiveTopology(context.topology);
+    return true;
+}
+
+bool BindObjectMaterial(const ObjectMaterialContext& context) {
+    if (!context.commandList || context.objectConstants == 0) {
+        return false;
+    }
+
+    context.commandList->SetGraphicsRootConstantBufferView(0, context.objectConstants);
+    if (context.materialConstants != 0) {
+        context.commandList->SetGraphicsRootConstantBufferView(2, context.materialConstants);
+    }
+    if (context.materialTable.IsValid()) {
+        context.commandList->SetGraphicsRootDescriptorTable(3, context.materialTable.gpu);
+    }
+    return true;
+}
+
 DrawResult DrawIndexedMesh(ID3D12GraphicsCommandList* commandList,
                            const Cortex::Scene::MeshData& mesh) {
     DrawResult result{};

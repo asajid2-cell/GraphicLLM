@@ -35,18 +35,19 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         snapshot = &localSnapshot;
     }
 
-    // Root signature + descriptor heap for optional alpha-tested shadow draws.
-    // When bindless is enabled the root signature is HEAP_DIRECTLY_INDEXED, so
-    // the CBV/SRV/UAV heap must be bound before setting the root signature.
-    if (m_services.descriptorManager) {
-        ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-        m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    }
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     DX12Pipeline* currentPipeline = m_pipelineState.shadow.get();
-    if (currentPipeline) {
-        m_commandResources.graphicsList->SetPipelineState(currentPipeline->GetPipelineState());
+    if (!currentPipeline) {
+        return;
+    }
+    MeshDrawPass::PipelineStateContext pipelineContext{};
+    pipelineContext.commandList = m_commandResources.graphicsList.Get();
+    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    pipelineContext.pipelineState = currentPipeline->GetPipelineState();
+    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
+        return;
     }
 
     auto drawShadowCasters = [&]() {
@@ -92,8 +93,9 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             objectData.normalMatrix = sceneEntry.normalMatrix;
 
             D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
-            m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objectCB);
 
+            D3D12_GPU_VIRTUAL_ADDRESS materialCB = 0;
+            DescriptorHandle materialTable{};
             if (alphaTest && (m_pipelineState.shadowAlpha || m_pipelineState.shadowAlphaDoubleSided)) {
                 EnsureMaterialTextures(renderable);
                 const MaterialTextureFallbacks materialFallbacks{
@@ -106,13 +108,21 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 MaterialConstants materialData = MaterialResolver::BuildMaterialConstants(materialModel);
                 FillMaterialTextureIndices(renderable, materialData);
 
-                D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
-                m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(2, materialCB);
+                materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
 
                 // Descriptor tables are warmed via PrewarmMaterialDescriptors().
                 if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
-                    m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+                    materialTable = renderable.textures.gpuState->descriptors[0];
                 }
+            }
+
+            MeshDrawPass::ObjectMaterialContext materialContext{};
+            materialContext.commandList = m_commandResources.graphicsList.Get();
+            materialContext.objectConstants = objectCB;
+            materialContext.materialConstants = materialCB;
+            materialContext.materialTable = materialTable;
+            if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
+                continue;
             }
 
             const auto drawResult =

@@ -115,20 +115,18 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
     FullscreenPass::SetViewportAndScissor(m_commandResources.graphicsList.Get(),
                                           m_mainTargets.hdr.resources.color.Get());
 
-    // Root signature, pipeline, descriptor heap, and primitive topology for
-    // main geometry were already set in PrepareMainPass. We rebind the
-    // transparent pipeline and frame constants to be explicit.
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.transparent->GetPipelineState());
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(4, m_environmentState.shadowAndEnvDescriptors[0].gpu);
+    MeshDrawPass::PipelineStateContext pipelineContext{};
+    pipelineContext.commandList = m_commandResources.graphicsList.Get();
+    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    pipelineContext.pipelineState = m_pipelineState.transparent->GetPipelineState();
+    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    pipelineContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    pipelineContext.shadowEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
+    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
+        return;
     }
-
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     for (const auto& draw : drawList) {
         const RendererSceneRenderable& entry = snapshot->entries[draw.entryIndex];
@@ -186,17 +184,20 @@ void Renderer::RenderTransparent(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS materialCB =
             m_constantBuffers.material.AllocateAndWrite(materialData);
 
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objectCB);
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(2, materialCB);
-
         // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState ||
             !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;
         }
 
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(
-            3, renderable.textures.gpuState->descriptors[0].gpu);
+        MeshDrawPass::ObjectMaterialContext materialContext{};
+        materialContext.commandList = m_commandResources.graphicsList.Get();
+        materialContext.objectConstants = objectCB;
+        materialContext.materialConstants = materialCB;
+        materialContext.materialTable = renderable.textures.gpuState->descriptors[0];
+        if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
+            continue;
+        }
 
         const auto drawResult =
             MeshDrawPass::DrawIndexedMesh(m_commandResources.graphicsList.Get(), *renderable.mesh);

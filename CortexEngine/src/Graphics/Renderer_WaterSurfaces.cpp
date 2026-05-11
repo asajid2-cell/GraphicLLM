@@ -47,17 +47,18 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
     FullscreenPass::SetViewportAndScissor(m_commandResources.graphicsList.Get(),
                                           m_mainTargets.hdr.resources.color.Get());
 
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.waterOverlay->GetPipelineState());
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(4, m_environmentState.shadowAndEnvDescriptors[0].gpu);
+    MeshDrawPass::PipelineStateContext pipelineContext{};
+    pipelineContext.commandList = m_commandResources.graphicsList.Get();
+    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    pipelineContext.pipelineState = m_pipelineState.waterOverlay->GetPipelineState();
+    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    pipelineContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    pipelineContext.shadowEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
+    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
+        return;
     }
-
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_constantBuffers.frameCPU.viewProjectionNoJitter);
 
@@ -108,13 +109,20 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
 
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objectCB);
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(2, materialCB);
-
+        DescriptorHandle materialTable{};
         if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
-            m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+            materialTable = renderable.textures.gpuState->descriptors[0];
         } else if (m_materialFallbacks.descriptorTable[0].IsValid()) {
-            m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, m_materialFallbacks.descriptorTable[0].gpu);
+            materialTable = m_materialFallbacks.descriptorTable[0];
+        }
+
+        MeshDrawPass::ObjectMaterialContext materialContext{};
+        materialContext.commandList = m_commandResources.graphicsList.Get();
+        materialContext.objectConstants = objectCB;
+        materialContext.materialConstants = materialCB;
+        materialContext.materialTable = materialTable;
+        if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
+            continue;
         }
 
         const auto drawResult =

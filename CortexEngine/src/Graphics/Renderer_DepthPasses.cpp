@@ -25,21 +25,18 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Bind root signature and depth-only pipeline. Alpha-tested depth draws
-    // sample material textures, so bind the shader-visible heap before any
-    // optional descriptor-table access.
-    if (m_services.descriptorManager) {
-        ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-        m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
+    MeshDrawPass::PipelineStateContext pipelineContext{};
+    pipelineContext.commandList = m_commandResources.graphicsList.Get();
+    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    pipelineContext.pipelineState = m_pipelineState.depthOnly->GetPipelineState();
+    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    pipelineContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
+        return;
     }
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.depthOnly->GetPipelineState());
     DX12Pipeline* currentDepthPipeline = m_pipelineState.depthOnly.get();
-
-    // Frame constants (b1)
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     RendererSceneSnapshot localSnapshot{};
     const RendererSceneSnapshot* snapshot = &m_framePlanning.sceneSnapshot;
@@ -98,8 +95,9 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB =
             m_constantBuffers.object.AllocateAndWrite(objectData);
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objectCB);
 
+        D3D12_GPU_VIRTUAL_ADDRESS materialCB = 0;
+        DescriptorHandle materialTable{};
         if (IsAlphaTestedDepthClass(depthClass)) {
             EnsureMaterialTextures(renderable);
 
@@ -113,12 +111,20 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
             MaterialConstants materialData = MaterialResolver::BuildMaterialConstants(materialModel);
             FillMaterialTextureIndices(renderable, materialData);
 
-            D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
-            m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(2, materialCB);
+            materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
 
             if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
-                m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+                materialTable = renderable.textures.gpuState->descriptors[0];
             }
+        }
+
+        MeshDrawPass::ObjectMaterialContext materialContext{};
+        materialContext.commandList = m_commandResources.graphicsList.Get();
+        materialContext.objectConstants = objectCB;
+        materialContext.materialConstants = materialCB;
+        materialContext.materialTable = materialTable;
+        if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
+            continue;
         }
 
         const auto drawResult =

@@ -794,6 +794,29 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       validation
       `temporal_validation_20260511_104142_361_87848_d2f11213`
       passed.
+    - The current mesh pipeline/material-binding checkpoint moves shared
+      root-signature binding, descriptor-heap binding, frame/environment
+      descriptor binding, primitive-topology setup, object/material constant
+      binding, and material descriptor-table binding for forward, transparent,
+      overlay, water, depth-prepass, and shadow mesh paths into
+      `MeshDrawPass::BindPipelineState` and
+      `MeshDrawPass::BindObjectMaterial`. Renderer pass files still own
+      visibility, sorting, material policy, target setup, and depth/shadow
+      pipeline switching, but no longer perform direct shared root/material
+      binding for root slots 0, 2, 3, or 4. Release rebuild passed, renderer
+      ownership tests passed with `targets=36`, renderer full ownership audit
+      passed with `renderer_members=48 expected_members=48`, Material Lab
+      passed at `material_lab_20260511_125708_927_99988_7b86f077`,
+      Glass Water Courtyard passed at
+      `glass_water_courtyard_20260511_125708_943_98280_1ee3450c`, Effects
+      Showcase passed at `effects_showcase_20260511_125708_927_97308_fca15706`,
+      temporal validation passed at
+      `temporal_validation_20260511_125719_079_99004_3f911aee`, and RT
+      showcase passed at `rt_showcase_20260511_125719_099_95184_fee7560d`.
+      The broader ownership rows remain `PARTIAL` because depth/shadow pipeline
+      switching, indirect rendering state setup, resource creation/upload paths,
+      render-graph declaration completeness, and the GPU particle public runtime
+      remain outside this checkpoint.
     - The current bloom-draw checkpoint routes legacy bloom fullscreen
       triangle submission through `FullscreenPass::DrawTriangle`; Release
       rebuild, renderer ownership/full audit, effects showcase

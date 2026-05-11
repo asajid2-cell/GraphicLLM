@@ -105,6 +105,7 @@ $framePhasesMainPath = Join-Path $root "src/Graphics/Renderer_FramePhases_Main.c
 $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/VisibilityBufferResourcePass.cpp"
 $visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
 $visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
+$indirectRenderingPath = Join-Path $root "src/Graphics/Renderer_IndirectRendering.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
@@ -1035,6 +1036,32 @@ foreach ($target in $doc.targets) {
             } else {
                 Add-Failure "visibility_buffer_resource_transitions missing $($pathInfo.Label)"
             }
+        }
+    }
+
+    if ($id -eq "indirect_rendering_resource_transitions") {
+        if (Test-Path $visibilityBufferResourcePassPath) {
+            $visibilityBufferResourcePass = Get-Content $visibilityBufferResourcePassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::VisibilityBufferResourcePass", "PrepareHZBForCulling", "EnsureStateIncludes", "ResourceBarrier", "D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE")) {
+                if ($visibilityBufferResourcePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "indirect_rendering_resource_transitions missing shared HZB culling marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "indirect_rendering_resource_transitions missing VisibilityBufferResourcePass.cpp"
+        }
+        if (Test-Path $indirectRenderingPath) {
+            $indirectRendering = Get-Content $indirectRenderingPath -Raw
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier")) {
+                if ($indirectRendering.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "indirect_rendering_resource_transitions still performs resource transition directly in Renderer_IndirectRendering.cpp: $directCall"
+                }
+            }
+            if ($indirectRendering.IndexOf("VisibilityBufferResourcePass::PrepareHZBForCulling", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "indirect_rendering_resource_transitions missing routed HZB culling resource call in Renderer_IndirectRendering.cpp"
+            }
+        } else {
+            Add-Failure "indirect_rendering_resource_transitions missing Renderer_IndirectRendering.cpp"
         }
     }
 

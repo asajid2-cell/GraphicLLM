@@ -133,6 +133,14 @@ D3D12_GPU_VIRTUAL_ADDRESS Renderer::ResolveVisibilityBufferCullMask(uint32_t deb
     if (freezeCulling) {
         useHzbOcclusion = false;
     }
+    if (useHzbOcclusion && m_hzbResources.resources.texture) {
+        const bool hzbReady = VisibilityBufferResourcePass::PrepareHZBForCulling(
+            m_commandResources.graphicsList.Get(),
+            {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState});
+        if (!hzbReady) {
+            useHzbOcclusion = false;
+        }
+    }
     m_visibilityBufferState.hzbOcclusionUsedThisFrame = useHzbOcclusion;
 
     m_services.gpuCulling->SetHZBForOcclusion(
@@ -146,16 +154,6 @@ D3D12_GPU_VIRTUAL_ADDRESS Renderer::ResolveVisibilityBufferCullMask(uint32_t deb
         m_hzbResources.capture.captureNearPlane,
         m_hzbResources.capture.captureFarPlane,
         useHzbOcclusion);
-
-    if (useHzbOcclusion && m_hzbResources.resources.texture) {
-        const bool hzbReady = VisibilityBufferResourcePass::PrepareHZBForCulling(
-            m_commandResources.graphicsList.Get(),
-            {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState});
-        if (!hzbReady) {
-            useHzbOcclusion = false;
-            m_visibilityBufferState.hzbOcclusionUsedThisFrame = false;
-        }
-    }
 
     static bool s_debugCullingEnv = (std::getenv("CORTEX_DEBUG_CULLING") != nullptr);
     m_services.gpuCulling->SetDebugEnabled(s_debugCullingEnv);

@@ -2,6 +2,7 @@
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/VisibilityBufferResourcePass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -251,6 +252,14 @@ namespace Cortex::Graphics {
         if (freezeCulling) {
             useHzbOcclusion = false;
         }
+        if (useHzbOcclusion && m_hzbResources.resources.texture) {
+            const bool hzbReady = VisibilityBufferResourcePass::PrepareHZBForCulling(
+                m_commandResources.graphicsList.Get(),
+                {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState});
+            if (!hzbReady) {
+                useHzbOcclusion = false;
+            }
+        }
         m_gpuCullingState.hzbOcclusionUsedThisFrame = useHzbOcclusion;
 
         m_services.gpuCulling->SetHZBForOcclusion(
@@ -266,18 +275,6 @@ namespace Cortex::Graphics {
             useHzbOcclusion);
 
         {
-            // Ensure the HZB resource is in an SRV-readable state for compute.
-            if (useHzbOcclusion &&
-                (m_hzbResources.resources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
-                barrier.Transition.StateBefore = m_hzbResources.resources.resourceState;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-                m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            }
 
             auto cullResult = m_services.gpuCulling->DispatchCulling(
                 m_commandResources.graphicsList.Get(),

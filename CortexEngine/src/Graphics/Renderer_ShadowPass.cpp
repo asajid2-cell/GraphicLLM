@@ -1,30 +1,12 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 
-#include "Graphics/MaterialModel.h"
-#include "Graphics/MaterialState.h"
-#include "Graphics/Passes/MeshDrawPass.h"
-#include "Graphics/Passes/ShadowTargetPass.h"
-#include "Graphics/RenderableClassification.h"
-#include "Graphics/RendererGeometryUtils.h"
+#include "Graphics/Passes/ShadowPass.h"
 #include "Scene/ECS_Registry.h"
-#include "Scene/Components.h"
-
-#include <algorithm>
 
 namespace Cortex::Graphics {
 
 void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     if (!registry || !m_shadowResources.resources.map || !m_pipelineState.shadow) {
-        return;
-    }
-
-    ShadowTargetPass::TransitionContext shadowTarget{};
-    shadowTarget.commandList = m_commandResources.graphicsList.Get();
-    shadowTarget.shadowMap = m_shadowResources.resources.map.Get();
-    shadowTarget.resourceState = &m_shadowResources.resources.resourceState;
-    shadowTarget.initializedForEditor = &m_shadowResources.resources.initializedForEditor;
-    shadowTarget.skipTransitions = m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions;
-    if (!ShadowTargetPass::TransitionToDepthWrite(shadowTarget)) {
         return;
     }
 
@@ -35,173 +17,51 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         snapshot = &localSnapshot;
     }
 
-    DX12Pipeline* currentPipeline = m_pipelineState.shadow.get();
-    if (!currentPipeline) {
-        return;
-    }
-    MeshDrawPass::PipelineStateContext pipelineContext{};
-    pipelineContext.commandList = m_commandResources.graphicsList.Get();
-    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
-    pipelineContext.pipelineState = currentPipeline->GetPipelineState();
-    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+    ShadowPass::DrawContext draw{};
+    draw.target.commandList = m_commandResources.graphicsList.Get();
+    draw.target.shadowMap = m_shadowResources.resources.map.Get();
+    draw.target.resourceState = &m_shadowResources.resources.resourceState;
+    draw.target.initializedForEditor = &m_shadowResources.resources.initializedForEditor;
+    draw.target.skipTransitions = m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions;
+    draw.dsvs = std::span<const DescriptorHandle>(m_shadowResources.resources.dsvs.data(),
+                                                  m_shadowResources.resources.dsvs.size());
+    draw.viewport = m_shadowResources.raster.viewport;
+    draw.scissor = m_shadowResources.raster.scissor;
+    draw.pipeline.commandList = m_commandResources.graphicsList.Get();
+    draw.pipeline.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    draw.pipeline.cbvSrvUavHeap = m_services.descriptorManager
         ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
         : nullptr;
-    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
-        return;
-    }
-
-    auto drawShadowCasters = [&]() {
-        for (uint32_t entryIndex : snapshot->depthWritingIndices) {
-            if (entryIndex >= snapshot->entries.size()) {
-                continue;
-            }
-
-            const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
-            auto& renderable = *sceneEntry.renderable;
-            const RenderableDepthClass depthClass = sceneEntry.depthClass;
-            if (!sceneEntry.hasGpuBuffers) {
-                continue;
-            }
-
-            const bool alphaTest = IsAlphaTestedDepthClass(depthClass);
-            const bool doubleSided = IsDoubleSidedDepthClass(depthClass);
-
-            DX12Pipeline* desired = m_pipelineState.shadow.get();
-            if (alphaTest) {
-                desired = doubleSided ? m_pipelineState.shadowAlphaDoubleSided.get() : m_pipelineState.shadowAlpha.get();
-            } else {
-                desired = doubleSided ? m_pipelineState.shadowDoubleSided.get() : m_pipelineState.shadow.get();
-            }
-            if (!desired) {
-                desired = m_pipelineState.shadow.get();
-            }
-            if (desired && desired != currentPipeline) {
-                currentPipeline = desired;
-                if (!MeshDrawPass::SwitchPipelineState(m_commandResources.graphicsList.Get(),
-                                                       currentPipeline->GetPipelineState())) {
-                    continue;
-                }
-            }
-
-            ObjectConstants objectData = {};
-            glm::mat4 modelMatrix = sceneEntry.worldMatrix;
-            const uint32_t stableKey = static_cast<uint32_t>(sceneEntry.entity);
-            if (renderable.mesh && !renderable.mesh->hasBounds) {
-                renderable.mesh->UpdateBounds();
-            }
-            const AutoDepthSeparation sep =
-                ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
-            ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
-            objectData.modelMatrix = modelMatrix;
-            objectData.normalMatrix = sceneEntry.normalMatrix;
-
-            D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
-
-            D3D12_GPU_VIRTUAL_ADDRESS materialCB = 0;
-            DescriptorHandle materialTable{};
-            if (alphaTest && (m_pipelineState.shadowAlpha || m_pipelineState.shadowAlphaDoubleSided)) {
-                EnsureMaterialTextures(renderable);
-                const MaterialTextureFallbacks materialFallbacks{
-                    m_materialFallbacks.albedo.get(),
-                    m_materialFallbacks.normal.get(),
-                    m_materialFallbacks.metallic.get(),
-                    m_materialFallbacks.roughness.get()
-                };
-                const MaterialModel materialModel = MaterialResolver::ResolveRenderable(renderable, materialFallbacks);
-                MaterialConstants materialData = MaterialResolver::BuildMaterialConstants(materialModel);
-                FillMaterialTextureIndices(renderable, materialData);
-
-                materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
-
-                // Descriptor tables are warmed via PrewarmMaterialDescriptors().
-                if (renderable.textures.gpuState && renderable.textures.gpuState->descriptors[0].IsValid()) {
-                    materialTable = renderable.textures.gpuState->descriptors[0];
-                }
-            }
-
-            MeshDrawPass::ObjectMaterialContext materialContext{};
-            materialContext.commandList = m_commandResources.graphicsList.Get();
-            materialContext.objectConstants = objectCB;
-            materialContext.materialConstants = materialCB;
-            materialContext.materialTable = materialTable;
-            if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
-                continue;
-            }
-
-            const auto drawResult =
-                MeshDrawPass::DrawIndexedMesh(m_commandResources.graphicsList.Get(), *renderable.mesh);
-            if (drawResult.submitted) {
-                ++m_frameDiagnostics.contract.drawCounts.shadowDraws;
-            }
-        }
+    draw.shadow = m_pipelineState.shadow.get();
+    draw.shadowDoubleSided = m_pipelineState.shadowDoubleSided.get();
+    draw.shadowAlpha = m_pipelineState.shadowAlpha.get();
+    draw.shadowAlphaDoubleSided = m_pipelineState.shadowAlphaDoubleSided.get();
+    draw.snapshot = snapshot;
+    draw.objectConstants = &m_constantBuffers.object;
+    draw.materialConstants = &m_constantBuffers.material;
+    draw.shadowConstants = &m_constantBuffers.shadow;
+    draw.frameConstants = m_constantBuffers.currentFrameGPU;
+    draw.materialFallbacks = {
+        m_materialFallbacks.albedo.get(),
+        m_materialFallbacks.normal.get(),
+        m_materialFallbacks.metallic.get(),
+        m_materialFallbacks.roughness.get()
     };
+    draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.shadowDraws;
+    draw.cascadeCount = kShadowCascadeCount;
+    draw.maxShadowedLocalLights = kMaxShadowedLocalLights;
+    draw.shadowArraySize = kShadowArraySize;
+    draw.localShadowHasShadow = m_localShadowState.hasShadow;
+    draw.localShadowCount = m_localShadowState.count;
+    draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
+        EnsureMaterialTextures(renderable);
+    };
+    draw.fillMaterialTextureIndices =
+        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
+            FillMaterialTextureIndices(renderable, materialData);
+        };
 
-    for (uint32_t cascadeIndex = 0; cascadeIndex < kShadowCascadeCount; ++cascadeIndex) {
-        // Update shadow constants with current cascade index. Use a
-        // per-cascade slice in the constant buffer so each cascade
-        // sees the correct index even though all draws share a single
-        // command list and execution happens later on the GPU.
-        ShadowConstants shadowData{};
-        shadowData.cascadeIndex = glm::uvec4(cascadeIndex, 0u, 0u, 0u);
-        D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_constantBuffers.shadow.AllocateAndWrite(shadowData);
-
-        MeshDrawPass::ShadowConstantsContext shadowConstantsContext{};
-        shadowConstantsContext.commandList = m_commandResources.graphicsList.Get();
-        shadowConstantsContext.frameConstants = m_constantBuffers.currentFrameGPU;
-        shadowConstantsContext.shadowConstants = shadowCB;
-        if (!MeshDrawPass::BindShadowConstants(shadowConstantsContext)) {
-            continue;
-        }
-
-        ShadowTargetPass::SliceContext sliceContext{};
-        sliceContext.commandList = m_commandResources.graphicsList.Get();
-        sliceContext.dsv = m_shadowResources.resources.dsvs[cascadeIndex];
-        sliceContext.viewport = m_shadowResources.raster.viewport;
-        sliceContext.scissor = m_shadowResources.raster.scissor;
-        if (!ShadowTargetPass::BindAndClearSlice(sliceContext)) {
-            continue;
-        }
-
-        drawShadowCasters();
-    }
-
-    // Optional local light shadows rendered into atlas slices after the
-    // cascades, using the view-projection matrices prepared in
-    // UpdateFrameConstants.
-    if (m_localShadowState.hasShadow && m_localShadowState.count > 0) {
-        uint32_t maxLocal = std::min(m_localShadowState.count, kMaxShadowedLocalLights);
-        for (uint32_t i = 0; i < maxLocal; ++i) {
-            uint32_t slice = kShadowCascadeCount + i;
-            if (slice >= kShadowArraySize) {
-                break;
-            }
-
-            ShadowConstants shadowData{};
-            shadowData.cascadeIndex = glm::uvec4(slice, 0u, 0u, 0u);
-            D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_constantBuffers.shadow.AllocateAndWrite(shadowData);
-
-            MeshDrawPass::ShadowConstantsContext shadowConstantsContext{};
-            shadowConstantsContext.commandList = m_commandResources.graphicsList.Get();
-            shadowConstantsContext.frameConstants = m_constantBuffers.currentFrameGPU;
-            shadowConstantsContext.shadowConstants = shadowCB;
-            if (!MeshDrawPass::BindShadowConstants(shadowConstantsContext)) {
-                continue;
-            }
-
-            ShadowTargetPass::SliceContext sliceContext{};
-            sliceContext.commandList = m_commandResources.graphicsList.Get();
-            sliceContext.dsv = m_shadowResources.resources.dsvs[slice];
-            sliceContext.viewport = m_shadowResources.raster.viewport;
-            sliceContext.scissor = m_shadowResources.raster.scissor;
-            if (!ShadowTargetPass::BindAndClearSlice(sliceContext)) {
-                continue;
-            }
-
-            drawShadowCasters();
-        }
-    }
-
-    (void)ShadowTargetPass::TransitionToShaderResource(shadowTarget);
+    (void)ShadowPass::Draw(draw);
 }
 
 } // namespace Cortex::Graphics

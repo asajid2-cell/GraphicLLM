@@ -119,6 +119,7 @@ $shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
 $shadowResourcesPath = Join-Path $root "src/Graphics/Renderer_ShadowResources.cpp"
 $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 $shadowTargetPassPath = Join-Path $root "src/Graphics/Passes/ShadowTargetPass.cpp"
+$shadowPassOwnerPath = Join-Path $root "src/Graphics/Passes/ShadowPass.cpp"
 $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
@@ -1224,16 +1225,21 @@ foreach ($target in $doc.targets) {
         } else {
             Add-Failure "shadow_resources missing ShadowTargetPass.cpp"
         }
+        if (Test-Path $shadowPassOwnerPath) {
+            $shadowOwnerSource = Get-Content $shadowPassOwnerPath -Raw
+            foreach ($requiredRoute in @("ShadowTargetPass::TransitionToDepthWrite", "ShadowTargetPass::BindAndClearSlice", "ShadowTargetPass::TransitionToShaderResource")) {
+                if ($shadowOwnerSource.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "shadow_resources missing routed shadow target call in ShadowPass.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "shadow_resources missing ShadowPass.cpp"
+        }
         if (Test-Path $shadowPassPath) {
             $shadowPassSource = Get-Content $shadowPassPath -Raw
             foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
                 if ($shadowPassSource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "shadow_resources still performs shadow target setup directly in Renderer_ShadowPass.cpp: $directCall"
-                }
-            }
-            foreach ($requiredRoute in @("ShadowTargetPass::TransitionToDepthWrite", "ShadowTargetPass::BindAndClearSlice", "ShadowTargetPass::TransitionToShaderResource")) {
-                if ($shadowPassSource.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
-                    Add-Failure "shadow_resources missing routed shadow target call in Renderer_ShadowPass.cpp: $requiredRoute"
                 }
             }
         }
@@ -1743,7 +1749,7 @@ foreach ($target in $doc.targets) {
             [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
             [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
             [pscustomobject]@{ Path = $depthPrepassPassPath; Label = "DepthPrepass.cpp" },
-            [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
+            [pscustomobject]@{ Path = $shadowPassOwnerPath; Label = "ShadowPass.cpp" }
         )) {
             if (Test-Path $pathInfo.Path) {
                 $meshSource = Get-Content $pathInfo.Path -Raw
@@ -1776,7 +1782,7 @@ foreach ($target in $doc.targets) {
             [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
             [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
             [pscustomobject]@{ Path = $depthPrepassPassPath; Label = "DepthPrepass.cpp" },
-            [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
+            [pscustomobject]@{ Path = $shadowPassOwnerPath; Label = "ShadowPass.cpp" }
         )) {
             if (Test-Path $pathInfo.Path) {
                 $meshSource = Get-Content $pathInfo.Path -Raw
@@ -1821,18 +1827,18 @@ foreach ($target in $doc.targets) {
             Add-Failure "mesh_auxiliary_constant_binding missing Renderer_ForwardPass.cpp"
         }
 
-        if (Test-Path $shadowDrawPassPath) {
-            $shadowSource = Get-Content $shadowDrawPassPath -Raw
+        if (Test-Path $shadowPassOwnerPath) {
+            $shadowSource = Get-Content $shadowPassOwnerPath -Raw
             if ($shadowSource.IndexOf("MeshDrawPass::BindShadowConstants", [StringComparison]::Ordinal) -lt 0) {
-                Add-Failure "mesh_auxiliary_constant_binding missing shadow constant route in Renderer_ShadowPass.cpp"
+                Add-Failure "mesh_auxiliary_constant_binding missing shadow constant route in ShadowPass.cpp"
             }
             foreach ($directShadowBinding in @("SetGraphicsRootConstantBufferView(1", "SetGraphicsRootConstantBufferView(5")) {
                 if ($shadowSource.IndexOf($directShadowBinding, [StringComparison]::Ordinal) -ge 0) {
-                    Add-Failure "mesh_auxiliary_constant_binding still binds shadow constants directly in Renderer_ShadowPass.cpp: $directShadowBinding"
+                    Add-Failure "mesh_auxiliary_constant_binding still binds shadow constants directly in ShadowPass.cpp: $directShadowBinding"
                 }
             }
         } else {
-            Add-Failure "mesh_auxiliary_constant_binding missing Renderer_ShadowPass.cpp"
+            Add-Failure "mesh_auxiliary_constant_binding missing ShadowPass.cpp"
         }
     }
 

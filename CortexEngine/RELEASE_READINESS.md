@@ -30,6 +30,7 @@ The current verified local gate covers:
 - graphics settings persistence, unified graphics UI contracts, and runtime
   graphics settings application,
 - deterministic LLM/Architect renderer-command runtime smoke,
+- positive Dreamer startup/runtime texture-generation smoke,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
 - Material Lab, conductor-energy, vegetation-state, reflection-probe, Glass and
   Water Courtyard, Effects Showcase, visual baseline smokes, and screenshot negative gates,
@@ -68,12 +69,12 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.339`, `warnings=0`,
+- temporal validation: `gpu_ms=1.332`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=3.075`;
-- RT showcase: `gpu_ms=2.576/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=3.072`;
+- RT showcase: `gpu_ms=2.429/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -108,12 +109,12 @@ Result:
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=17.38`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=16.939`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_225538_029_30096_0680d674
+CortexEngine/build/bin/logs/runs/release_validation_20260510_230440_532_7652_2bb99479
 ```
 
 ## Renderer Scope
@@ -137,9 +138,10 @@ infinite-world engine. The validated path emphasizes:
 
 - Validation numbers are hardware dependent. The latest local run used an
   NVIDIA GeForce RTX 3070 Ti.
-- The Dreamer texture-generation service is optional. Smoke tests run with
-  `--no-dreamer`; normal startup honors the configuration and can use the CPU
-  procedural fallback when no TensorRT engines are present.
+- The Dreamer texture-generation service is optional. Most scene smokes run with
+  `--no-dreamer`, and the release gate also includes a positive Dreamer runtime
+  test that uses deterministic Architect mock input and the CPU procedural
+  fallback when TensorRT runtime support is unavailable.
 - The voxel backend is a smoke-tested experimental backend, not the primary
   renderer path.
 - Future effects work should extend the validated Phase 3 foundations rather

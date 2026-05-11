@@ -254,6 +254,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "dreamer_positive_runtime" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_dreamer_positive_runtime_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "hud_mode_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

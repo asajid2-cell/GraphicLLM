@@ -8,7 +8,6 @@
 #include <spdlog/spdlog.h>
 
 #include <span>
-#include <string>
 
 namespace Cortex::Graphics {
 
@@ -55,13 +54,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     }
 
     bool stageFailed = false;
-    std::string stageError;
-    auto failStage = [&](const char* stage) {
-        if (!stageFailed) {
-            stageError = stage ? stage : "ssr_graph_stage_failed";
-        }
-        stageFailed = true;
-    };
+    const char* stageError = nullptr;
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle hdrHandle =
@@ -78,7 +71,8 @@ Renderer::ExecuteSSRInRenderGraph() {
     ssrContext.depth = depthHandle;
     ssrContext.normalRoughness = normalHandle;
     ssrContext.ssr = ssrHandle;
-    ssrContext.failStage = failStage;
+    ssrContext.status.failed = &stageFailed;
+    ssrContext.status.stage = &stageError;
     ssrContext.prepare.commandList = m_commandResources.graphicsList.Get();
     ssrContext.prepare.skipTransitions = true;
     ssrContext.prepare.ssrTarget = {
@@ -125,7 +119,11 @@ Renderer::ExecuteSSRInRenderGraph() {
         result.fallbackReason = execResult.Error();
     } else if (stageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "ssr_graph_stage_failed: " + stageError;
+        result.fallbackReason = "ssr_graph_stage_failed";
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
+        }
     } else {
         m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);

@@ -179,6 +179,7 @@ Assert-Contains "SSAOPass.cpp" $ssao "builder.Read(context.ssao, RGResourceUsage
 Assert-Contains "SSAOPass.cpp" $ssao "DispatchCompute(context.compute)"
 Assert-Contains "SSAOPass.cpp" $ssao "DrawGraphics(context.graphics)"
 Assert-NotContains "SSAOPass.h" $ssaoHeader "std::function<bool()> execute"
+Assert-NotContains "SSAOPass.h" $ssaoHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphSSAO.cpp" $rendererSSAO "RenderSSAO();"
 Assert-NotContains "Renderer_RenderGraphSSAO.cpp" $rendererSSAO "RenderSSAOAsync();"
 
@@ -192,6 +193,7 @@ Assert-Contains "SSRPass.cpp" $ssr "builder.Write(context.ssr, RGResourceUsage::
 Assert-Contains "SSRPass.cpp" $ssr "PrepareTargets(context.prepare)"
 Assert-Contains "SSRPass.cpp" $ssr "Draw(context.draw)"
 Assert-NotContains "SSRPass.h" $ssrHeader "std::function<bool()> execute"
+Assert-NotContains "SSRPass.h" $ssrHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphSSR.cpp" $rendererSSR "RenderSSR();"
 
 $taa = Read-Text "src/Graphics/Passes/TAAPass.cpp"

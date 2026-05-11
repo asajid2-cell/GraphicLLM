@@ -5,12 +5,16 @@
 #include "Graphics/RHI/DescriptorHeap.h"
 
 #include <cstdint>
-#include <functional>
 #include <span>
 
 namespace Cortex::Graphics::SSRPass {
 
 constexpr uint32_t kDescriptorSlots = 10;
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct DrawContext {
     ID3D12Device* device = nullptr;
@@ -53,7 +57,7 @@ struct GraphContext {
     RGResourceHandle ssr;
     PrepareContext prepare;
     DrawContext draw;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool PrepareTargets(const PrepareContext& context);

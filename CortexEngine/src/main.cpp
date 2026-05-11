@@ -800,20 +800,37 @@ int main(int argc, char* argv[]) {
         //   --no-llm                 : disable Architect entirely
         //   CORTEX_DISABLE_LLM=1     : same as --no-llm
         //   --llm-model=<path.gguf>  : force a specific model file
+        //   --llm-mock               : enable Architect in deterministic mock mode
+        //   --architect-command-json=<json>
+        //                            : queue one startup Architect command block
         //   --no-dreamer             : disable Dreamer texture pipeline
         //   CORTEX_DISABLE_DREAMER=1 : same as --no-dreamer
         //   --backend=voxel          : select experimental voxel backend
         //   --smoke-frames=<n>       : exit after n rendered frames
         //   --exit-after-visual-validation : exit after validation capture
+        bool forceLLMMock = false;
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             spdlog::info("Command line arg[{}]: '{}'", i, arg);
             if (arg == "--no-llm") {
                 config.enableLLM = false;
                 spdlog::info("  -> LLM disabled via --no-llm");
+            } else if (arg == "--llm-mock") {
+                config.enableLLM = true;
+                config.llmConfig.modelPath.clear();
+                forceLLMMock = true;
+                spdlog::info("  -> LLM forced to mock mode");
             } else if (arg.rfind("--llm-model=", 0) == 0) {
                 config.enableLLM = true;
                 config.llmConfig.modelPath = arg.substr(std::string("--llm-model=").size());
+            } else if (arg == "--architect-command-json" && i + 1 < argc) {
+                config.startupArchitectCommandJson = argv[++i];
+                config.enableLLM = true;
+                spdlog::info("  -> Startup Architect command JSON configured");
+            } else if (arg.rfind("--architect-command-json=", 0) == 0) {
+                config.startupArchitectCommandJson = arg.substr(std::string("--architect-command-json=").size());
+                config.enableLLM = true;
+                spdlog::info("  -> Startup Architect command JSON configured");
             } else if (arg == "--no-dreamer") {
                 config.enableDreamer = false;
                 spdlog::info("  -> Dreamer disabled via --no-dreamer");
@@ -838,6 +855,18 @@ int main(int argc, char* argv[]) {
             if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
                 config.enableLLM = false;
             }
+        }
+        if (const char* envMock = std::getenv("CORTEX_LLM_MOCK")) {
+            std::string value = envMock;
+            if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+                config.enableLLM = true;
+                config.llmConfig.modelPath.clear();
+                forceLLMMock = true;
+            }
+        }
+        if (const char* envArchitectJson = std::getenv("CORTEX_ARCHITECT_COMMAND_JSON")) {
+            config.startupArchitectCommandJson = envArchitectJson;
+            config.enableLLM = true;
         }
         if (const char* envDisableDreamer = std::getenv("CORTEX_DISABLE_DREAMER")) {
             std::string value = envDisableDreamer;
@@ -901,7 +930,7 @@ int main(int argc, char* argv[]) {
             "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
         };
 
-        if (config.enableLLM && config.llmConfig.modelPath.empty()) {
+        if (config.enableLLM && config.llmConfig.modelPath.empty() && !forceLLMMock) {
             fs::path modelPath;
             for (const char* name : kPreferredModels) {
                 fs::path candidateExe  = modelsDirExe  / name;

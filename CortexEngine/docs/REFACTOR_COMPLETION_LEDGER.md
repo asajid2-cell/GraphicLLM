@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_212145_379_150620_04ddc79a
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_222325_143_21408_3e2c3084
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.253`, `disocclusion=0.006853`,
-  `high_motion=0.005225`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.531`, `disocclusion=0.007485`,
+  `high_motion=0.005249`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.877`,
+  `camera=reflection_closeup`, `gpu_ms=6.274`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.638/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.333/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -99,8 +99,12 @@ Key evidence from that run:
   visibility-buffer transition contract,
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
-  negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, and RT
-  firefly/outlier.
+  negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, RT
+  firefly/outlier, and LLM renderer command routing.
+- LLM renderer command smoke: deterministic mock Architect startup command
+  applied exposure `1.35`, disabled shadows, enabled fog with density `0.031`,
+  set water amplitude `0.07`, and selected `studio_three_point` lighting rig
+  with frame-contract source `renderer_rig`.
 
 Recent git history relevant to the audit:
 
@@ -374,8 +378,8 @@ foundation or contract rather than the full broad feature.
 | P2-11T | Pass 11T - Keyboard Debug Renderer Controls | DONE_VERIFIED | `src/Core/Engine_Input.cpp`, `src/Core/Engine_UI.cpp` | `tools/run_hud_mode_contract_tests.ps1 -NoBuild` | HUD/F7/CLI contract passed. |
 | P2-11U | Pass 11U - Renderer Control Facade Split | DONE_VERIFIED | `RendererControlApplier*.cpp`, `RendererTuningState.cpp` | `tools/run_graphics_preset_tests.ps1 -NoBuild -RuntimeSmoke` | Preset/control path passed. |
 | P2-11V | Pass 11V - Core Debug and Backend Controls | DONE_VERIFIED | `Engine_Input.cpp`, `Renderer_Voxel.cpp` | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Voxel backend smoke passed. |
-| P2-11W | Pass 11W - LLM Renderer Command Control Routing | DONE_UNVERIFIED | AI/LLM command routing files, renderer control appliers | no current LLM smoke in release gate | Release smokes run with `--no-llm`. Need LLM-command test if this remains a release claim. |
-| P2-11X | Pass 11X - Lighting-Rig Command Boundary | PARTIAL | `RendererLightingRigControl.cpp`, SRC-SCENES | `tools/run_release_validation.ps1` | Scene lighting rigs are runtime validated; command routing itself is not. |
+| P2-11W | Pass 11W - LLM Renderer Command Control Routing | DONE_VERIFIED | `src/Core/Engine.cpp::Update`, `src/main.cpp`, `LLM::CommandParser::ParseJSON`, `LLM::CommandQueue::ExecuteModifyRenderer`, `LLM::ApplyModifyRendererCommand`, renderer control appliers | `tools/run_llm_renderer_command_smoke.ps1`; `tools/run_release_validation.ps1` | Targeted smoke passed: startup Architect command queued, `modify_renderer` applied `exposure=1.35`, `shadows=off`, fog, water amplitude, and frame contract state. | None for current deterministic routing gate. |
+| P2-11X | Pass 11X - Lighting-Rig Command Boundary | DONE_VERIFIED | `RendererLightingRigControl.cpp`, `LLM::ApplyModifyRendererCommand`, SRC-SCENES | `tools/run_llm_renderer_command_smoke.ps1`; `tools/run_release_validation.ps1` | LLM command route applies `lighting_rig=studio_three_point`; frame contract reports `rig_id=studio_three_point` and `rig_source=renderer_rig`. Scene lighting rigs remain validated by visual/showcase gates. | None for current command boundary. |
 | P2-11Y | Pass 11Y - Shared Material Preset Resolution | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material lab passed; material editor contract reuses registry. |
 | P2-11Z | Pass 11Z - Resolved Material Frame Contract | DONE_VERIFIED | SRC-MATERIAL, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1` | RT showcase material counts and issues pass. |
 | P2-11AA | Pass 11AA - Resolved Surface Classification | DONE_VERIFIED | `SurfaceClassification.h`, SRC-MATERIAL | `tools/run_material_lab_smoke.ps1` | Material Lab checks surface coverage. |
@@ -436,7 +440,7 @@ These items remain after the audit and should not be collapsed into
 | REM-07 | Outdoor/sunset beach final visual target. | DEFERRED_BY_USER_ONLY | User direction previously moved Cortex away from infinite/outdoor/world work. Not done. |
 | REM-08 | Full GPU particle system as public path. | PARTIAL | Effects showcase validates ECS billboard particles; GPU particle path remains future/experimental. |
 | REM-09 | Full cinematic post stack including DOF, motion blur, and color-grade presets. | PARTIAL | Current release validates bloom threshold/soft knee/vignette/lens dirt foundations. |
-| REM-10 | LLM renderer command routing runtime test. | DONE_UNVERIFIED | Release smokes run with `--no-llm`; command routing needs its own test if still claimed. |
+| REM-10 | LLM renderer command routing runtime test. | DONE_VERIFIED | `tools/run_llm_renderer_command_smoke.ps1` runs Architect in deterministic mock mode and verifies `modify_renderer` side effects in runtime logs and the frame contract. |
 | REM-11 | Positive Dreamer startup/runtime test. | DONE_UNVERIFIED | Release smokes run with `--no-dreamer`; optional path is not exercised. |
 | REM-12 | Full golden-image visual baseline comparisons. | PARTIAL | Visual probe validation now runs all public baseline cases and checks captured BMP structure, but committed golden-image diff comparisons remain intentionally absent. |
 
@@ -661,7 +665,7 @@ definition of done in `phase3.md`.
 | P3-REM-09 | Particle effect descriptor library for dust, sparks, embers, mist, rain, snow, fallback texture. | PARTIAL | Fire/smoke foundations are validated only. |
 | P3-REM-10 | Full cinematic post stack: DOF, motion blur, tone mapper/color-grade presets. | PARTIAL | Bloom/vignette/lens dirt foundations only. |
 | P3-REM-11 | Volumetric/atmospheric polish beyond current fog/god-ray settings. | PARTIAL | Current scenes pass, but advanced atmosphere pass is not complete. |
-| P3-REM-12 | Lighting rig selection from UI and commands. | PARTIAL | Scene/validation rigs work; UI/LLM command selection is incomplete. |
+| P3-REM-12 | Lighting rig selection from UI and commands. | PARTIAL | Scene/validation rigs and LLM command selection now work and are runtime-tested; native UI rig selection remains incomplete. |
 | P3-REM-13 | Pass-owned resource bundles for every new persistent GPU resource. | PARTIAL | Selected boundaries and exhaustive renderer-member ownership pass; deeper per-pass resource extraction remains incomplete. |
 | P3-REM-14 | Public release packaging with setup/install validation outside local smoke scripts. | PARTIAL | README/release gate exists; end-user package flow is not fully tested. |
 
@@ -689,6 +693,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visibility_buffer_transition_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_debug_primitive_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
    ```
 
    No focused gate script is currently missing from this section.
@@ -723,7 +728,6 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    - full Phase 3 graphics slider inventory;
    - full cinematic post stack;
    - particle effect library beyond fire/smoke;
-   - LLM renderer command routing runtime validation;
    - positive Dreamer startup/runtime validation.
 
 5. Only after the missing gates exist and pass should the status move from

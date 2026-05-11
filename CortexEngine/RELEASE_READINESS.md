@@ -29,6 +29,7 @@ The current verified local gate covers:
 - render-graph transient alias/no-alias matrix,
 - graphics settings persistence, unified graphics UI contracts, and runtime
   graphics settings application,
+- deterministic LLM/Architect renderer-command runtime smoke,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
 - Material Lab, Glass and Water Courtyard, Effects Showcase, visual baseline
   smokes, and screenshot negative gates,
@@ -67,12 +68,12 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.253`, `warnings=0`,
+- temporal validation: `gpu_ms=1.531`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=2.877`;
-- RT showcase: `gpu_ms=1.638/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=6.274`;
+- RT showcase: `gpu_ms=2.333/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -85,7 +86,10 @@ Result:
 - visual probe: 4/4 public baseline cases passed; minimum edge ratio
   `0.0066`, maximum pure dominant-color ratio `0.0066`;
 - render-graph transient matrix: aliasing-on, aliasing-off, and bloom-transients-off rows passed;
-- temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, HUD, preset, material editor,
+- LLM renderer command smoke: passed; deterministic Architect command applied
+  `exposure=1.35`, `shadows=False`, `fog_density=0.031`, and
+  `studio_three_point/renderer_rig`;
+- temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, LLM renderer command, HUD, preset, material editor,
   showcase, ownership, fatal error,
   environment manifest, advanced graphics catalog, and effects gallery contracts passed;
 - renderer full ownership audit: 48/48 `Renderer` members are named
@@ -97,12 +101,12 @@ Result:
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=16.821`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=16.082`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_212145_379_150620_04ddc79a
+CortexEngine/build/bin/logs/runs/release_validation_20260510_222325_143_21408_3e2c3084
 ```
 
 ## Renderer Scope

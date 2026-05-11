@@ -425,6 +425,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_maxFrames = config.maxFrames;
     m_exitAfterVisualValidationCapture = config.exitAfterVisualValidationCapture;
     m_hudMode = config.initialHudMode;
+    m_startupArchitectCommandJson = config.startupArchitectCommandJson;
+    m_startupArchitectCommandSubmitted = false;
     if (const auto cutFrame = ReadOptionalEnvUInt64("CORTEX_CAMERA_CUT_FRAME")) {
         if (*cutFrame > 0) {
             m_cameraCutAutomationFrame = *cutFrame;
@@ -1050,6 +1052,19 @@ void Engine::Update(float deltaTime) {
     // Pump LLM callbacks on the main thread to avoid cross-thread scene mutations
     if (m_llmService) {
         m_llmService->PumpCallbacks();
+    }
+
+    if (!m_startupArchitectCommandSubmitted &&
+        !m_startupArchitectCommandJson.empty() &&
+        m_commandQueue) {
+        m_startupArchitectCommandSubmitted = true;
+        auto commands = LLM::CommandParser::ParseJSON(m_startupArchitectCommandJson, GetFocusTarget());
+        if (commands.empty()) {
+            spdlog::warn("[Architect] Startup command JSON parsed 0 commands");
+        } else {
+            m_commandQueue->PushBatch(commands);
+            spdlog::info("[Architect] Queued {} startup Architect command(s)", commands.size());
+        }
     }
 
     // Phase 2: Execute pending LLM commands

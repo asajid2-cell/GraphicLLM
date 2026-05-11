@@ -83,6 +83,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_SUN_COLOR_G = 9220,
     IDC_GFX_SUN_COLOR_B = 9221,
     IDC_GFX_FOG_START = 9222,
+    IDC_GFX_MOTION_BLUR_ENABLED = 9223,
+    IDC_GFX_DOF_ENABLED = 9224,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -232,6 +234,8 @@ struct GraphicsSettingsState {
     HWND chkFog = nullptr;
     HWND chkParticles = nullptr;
     HWND chkCinematicPost = nullptr;
+    HWND chkMotionBlur = nullptr;
+    HWND chkDepthOfField = nullptr;
     HWND cmbQualityPreset = nullptr;
     HWND cmbEnvironmentBudget = nullptr;
     HWND cmbEnvironment = nullptr;
@@ -605,6 +609,8 @@ void SyncStateFromToggles() {
     g_gfx.tuning.atmosphere.fogEnabled = GetCheckbox(g_gfx.chkFog);
     g_gfx.tuning.particles.enabled = GetCheckbox(g_gfx.chkParticles);
     g_gfx.tuning.cinematicPost.enabled = GetCheckbox(g_gfx.chkCinematicPost);
+    g_gfx.tuning.cinematicPost.motionBlurEnabled = GetCheckbox(g_gfx.chkMotionBlur);
+    g_gfx.tuning.cinematicPost.depthOfFieldEnabled = GetCheckbox(g_gfx.chkDepthOfField);
 }
 
 void SyncStateFromSliders() {
@@ -813,6 +819,8 @@ void RefreshControlsFromRenderer() {
     SetCheckbox(g_gfx.chkFog, g_gfx.tuning.atmosphere.fogEnabled);
     SetCheckbox(g_gfx.chkParticles, g_gfx.tuning.particles.enabled);
     SetCheckbox(g_gfx.chkCinematicPost, g_gfx.tuning.cinematicPost.enabled);
+    SetCheckbox(g_gfx.chkMotionBlur, g_gfx.tuning.cinematicPost.motionBlurEnabled);
+    SetCheckbox(g_gfx.chkDepthOfField, g_gfx.tuning.cinematicPost.depthOfFieldEnabled);
     SyncQualityPresetComboFromRenderer();
     SyncEnvironmentComboFromRenderer();
 }
@@ -1166,7 +1174,9 @@ void RegisterGraphicsSettingsClass() {
             }
             makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
+            g_gfx.chkMotionBlur = makeCheckbox(IDC_GFX_MOTION_BLUR_ENABLED, L"Motion Blur Enabled");
             makeSlider(IDC_GFX_MOTION_BLUR, L"Motion Blur", g_gfx.motionBlur, 0.0f, 1.0f);
+            g_gfx.chkDepthOfField = makeCheckbox(IDC_GFX_DOF_ENABLED, L"Depth of Field Enabled");
             makeSlider(IDC_GFX_DOF, L"Depth of Field", g_gfx.depthOfField, 0.0f, 1.0f);
             makeSlider(IDC_GFX_DOF_FOCUS_DISTANCE, L"DOF Focus Distance", g_gfx.dofFocusDistance, 0.1f, 100.0f);
             makeSlider(IDC_GFX_DOF_APERTURE, L"DOF Aperture", g_gfx.dofAperture, 0.0f, 8.0f);

@@ -216,7 +216,9 @@ public:
     void SetCinematicPostEffects(float motionBlur,
                                  float depthOfField,
                                  float dofFocusDistance = 18.0f,
-                                 float dofAperture = 0.0f);
+                                 float dofAperture = 0.0f,
+                                 bool motionBlurEnabled = true,
+                                 bool depthOfFieldEnabled = true);
     void SetSSAOEnabled(bool enabled);
     void SetSSAOParams(float radius, float bias, float intensity);
     void SetSSRParams(float maxDistance, float thickness, float strength);

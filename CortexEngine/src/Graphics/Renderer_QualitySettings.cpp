@@ -133,7 +133,9 @@ void Renderer::SetCinematicPost(float vignette, float lensDirt) {
 void Renderer::SetCinematicPostEffects(float motionBlur,
                                        float depthOfField,
                                        float dofFocusDistance,
-                                       float dofAperture) {
+                                       float dofAperture,
+                                       bool motionBlurEnabled,
+                                       bool depthOfFieldEnabled) {
     const float clampedMotionBlur = glm::clamp(motionBlur, 0.0f, 1.0f);
     const float clampedDepthOfField = glm::clamp(depthOfField, 0.0f, 1.0f);
     const float clampedFocusDistance = glm::clamp(dofFocusDistance, 0.1f, 100.0f);
@@ -141,17 +143,23 @@ void Renderer::SetCinematicPostEffects(float motionBlur,
     if (std::abs(clampedMotionBlur - m_postProcessState.motionBlur) < 1e-3f &&
         std::abs(clampedDepthOfField - m_postProcessState.depthOfField) < 1e-3f &&
         std::abs(clampedFocusDistance - m_postProcessState.dofFocusDistance) < 1e-3f &&
-        std::abs(clampedAperture - m_postProcessState.dofAperture) < 1e-3f) {
+        std::abs(clampedAperture - m_postProcessState.dofAperture) < 1e-3f &&
+        motionBlurEnabled == m_postProcessState.motionBlurEnabled &&
+        depthOfFieldEnabled == m_postProcessState.depthOfFieldEnabled) {
         return;
     }
 
     m_postProcessState.motionBlur = clampedMotionBlur;
+    m_postProcessState.motionBlurEnabled = motionBlurEnabled;
     m_postProcessState.depthOfField = clampedDepthOfField;
+    m_postProcessState.depthOfFieldEnabled = depthOfFieldEnabled;
     m_postProcessState.dofFocusDistance = clampedFocusDistance;
     m_postProcessState.dofAperture = clampedAperture;
-    spdlog::info("Cinematic post effects set to motion_blur={} depth_of_field={} focus_distance={} aperture={}",
+    spdlog::info("Cinematic post effects set to motion_blur={} motion_blur_enabled={} depth_of_field={} depth_of_field_enabled={} focus_distance={} aperture={}",
                  m_postProcessState.motionBlur,
+                 m_postProcessState.motionBlurEnabled,
                  m_postProcessState.depthOfField,
+                 m_postProcessState.depthOfFieldEnabled,
                  m_postProcessState.dofFocusDistance,
                  m_postProcessState.dofAperture);
 }

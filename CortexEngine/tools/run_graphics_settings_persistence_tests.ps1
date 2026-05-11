@@ -123,6 +123,8 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "saturation": 1.34,
     "vignette": 0.31,
     "lens_dirt": 0.22,
+    "motion_blur_enabled": true,
+    "depth_of_field_enabled": true,
     "motion_blur": 0.26,
     "depth_of_field": 0.38,
     "dof_focus_distance": 12.5,
@@ -339,6 +341,12 @@ if ($validRun.exit_code -ne 0) {
     }
     if ($toneMapperPreset -ne "punchy") {
         Add-Failure "valid settings tone mapper preset was '$toneMapperPreset', expected punchy"
+    }
+    if (-not [bool]$report.frame_contract.cinematic_post.motion_blur_enabled) {
+        Add-Failure "valid settings motion blur toggle was not enabled"
+    }
+    if (-not [bool]$report.frame_contract.cinematic_post.depth_of_field_enabled) {
+        Add-Failure "valid settings depth-of-field toggle was not enabled"
     }
     if ([Math]::Abs($warm - 0.32) -gt 0.03) {
         Add-Failure "valid settings warm color grade was $warm, expected 0.32"

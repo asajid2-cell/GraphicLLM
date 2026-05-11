@@ -365,6 +365,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.toneMapperPreset = m_postProcessState.toneMapperPreset;
     contract.cinematicPost.vignette = m_postProcessState.EffectiveVignette();
     contract.cinematicPost.lensDirt = m_postProcessState.EffectiveLensDirt();
+    contract.cinematicPost.motionBlurEnabled = m_postProcessState.motionBlurEnabled;
+    contract.cinematicPost.depthOfFieldEnabled = m_postProcessState.depthOfFieldEnabled;
     contract.cinematicPost.motionBlur = m_postProcessState.EffectiveMotionBlur();
     contract.cinematicPost.depthOfField = m_postProcessState.EffectiveDepthOfField();
     contract.cinematicPost.dofFocusDistance = m_postProcessState.dofFocusDistance;

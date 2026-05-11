@@ -58,11 +58,13 @@ void Renderer::RunRenderGraphTransientValidation() {
     const RenderGraphValidationPass::TransientValidationViews views = viewsResult.Value();
 
     bool stageFailed = false;
-    auto failStage = [&](const char* reason) {
-        if (!stageFailed) {
-            m_frameDiagnostics.contract.contract.warnings.push_back(reason ? reason : "rg_transient_validation_failed");
+    bool stageWarningRecorded = false;
+    const char* stageFailure = nullptr;
+    auto recordStageFailureWarning = [&]() {
+        if (stageFailed && !stageWarningRecorded) {
+            m_frameDiagnostics.contract.contract.warnings.push_back(stageFailure ? stageFailure : "rg_transient_validation_failed");
+            stageWarningRecorded = true;
         }
-        stageFailed = true;
     };
 
     const RGResourceDesc transientDesc = RGResourceDesc::Texture2D(
@@ -87,9 +89,11 @@ void Renderer::RunRenderGraphTransientValidation() {
     validationContext.passB.srv = views.srvB;
     validationContext.passB.clearColor = {0.35f, 0.15f, 0.05f, 1.0f};
     validationContext.passB.descriptorFailureReason = "rg_transient_validation_b_descriptor_failed";
-    validationContext.failStage = failStage;
+    validationContext.status.failed = &stageFailed;
+    validationContext.status.stage = &stageFailure;
 
     if (!RenderGraphValidationPass::AddTransientValidation(*m_services.renderGraph, validationContext)) {
+        recordStageFailureWarning();
         ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
         RecordFramePass("RGTransientValidation",
                         true,
@@ -110,6 +114,7 @@ void Renderer::RunRenderGraphTransientValidation() {
         ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
         m_frameDiagnostics.contract.contract.warnings.push_back("rg_transient_validation_execute_failed:" + execResult.Error());
     } else if (stageFailed) {
+        recordStageFailureWarning();
         ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
     }
     RecordFramePass("RGTransientValidation",

@@ -5,9 +5,13 @@
 #include "Utils/Result.h"
 
 #include <array>
-#include <functional>
 
 namespace Cortex::Graphics::RenderGraphValidationPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct TransientValidationViews {
     DescriptorHandle rtvA;
@@ -29,7 +33,7 @@ struct TransientValidationContext {
     RGResourceDesc transientDesc;
     TransientValidationTarget passA;
     TransientValidationTarget passB;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] Result<TransientValidationViews> CreateTransientValidationViews(DescriptorHeapManager* descriptorManager);

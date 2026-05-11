@@ -9,8 +9,11 @@ namespace Cortex::Graphics::RenderGraphValidationPass {
 namespace {
 
 void Fail(const TransientValidationContext& context, const char* reason) {
-    if (context.failStage) {
-        context.failStage(reason);
+    if (context.status.failed) {
+        *context.status.failed = true;
+    }
+    if (context.status.stage && !*context.status.stage) {
+        *context.status.stage = reason ? reason : "rg_transient_validation_failed";
     }
 }
 

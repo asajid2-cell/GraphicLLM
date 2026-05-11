@@ -49,6 +49,7 @@ powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validati
 The gate builds Release, then runs the current public renderer suite:
 
 - temporal validation and full RT showcase smokes,
+- temporal camera-cut history invalidation smoke,
 - graphics settings persistence, graphics UI contract/runtime interaction, HUD mode, material editor, and preset contracts,
 - public showcase scene, material lab, glass/water courtyard, effects showcase, visual baseline, and screenshot negative checks,
 - Phase 3 visual matrix, IBL gallery, and fallback matrix validation,

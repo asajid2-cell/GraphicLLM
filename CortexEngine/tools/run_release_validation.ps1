@@ -109,6 +109,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "temporal_camera_cut" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_temporal_camera_cut_validation.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "rt_showcase" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

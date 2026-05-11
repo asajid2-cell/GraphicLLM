@@ -124,6 +124,22 @@ namespace {
                normalized != "no";
     }
 
+    std::optional<uint64_t> ReadOptionalEnvUInt64(const char* name) {
+        const char* raw = std::getenv(name);
+        if (!raw || *raw == '\0') {
+            return std::nullopt;
+        }
+
+        char* end = nullptr;
+        const unsigned long long parsed = std::strtoull(raw, &end, 10);
+        if (end == raw || (end && *end != '\0')) {
+            spdlog::warn("Ignoring invalid {} value '{}'; expected an unsigned integer", name, raw);
+            return std::nullopt;
+        }
+
+        return static_cast<uint64_t>(parsed);
+    }
+
     bool InitialPresetUsesRTShowcase(const std::string& preset) {
         if (preset.empty()) {
             return true;
@@ -409,6 +425,20 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_maxFrames = config.maxFrames;
     m_exitAfterVisualValidationCapture = config.exitAfterVisualValidationCapture;
     m_hudMode = config.initialHudMode;
+    if (const auto cutFrame = ReadOptionalEnvUInt64("CORTEX_CAMERA_CUT_FRAME")) {
+        if (*cutFrame > 0) {
+            m_cameraCutAutomationFrame = *cutFrame;
+            if (const char* bookmark = std::getenv("CORTEX_CAMERA_CUT_BOOKMARK")) {
+                m_cameraCutAutomationBookmark = bookmark;
+            }
+            if (m_cameraCutAutomationBookmark.empty()) {
+                m_cameraCutAutomationBookmark = "reflection_closeup";
+            }
+            spdlog::info("Smoke automation: camera cut at frame {} to bookmark '{}'",
+                         static_cast<unsigned long long>(m_cameraCutAutomationFrame),
+                         m_cameraCutAutomationBookmark);
+        }
+    }
     if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture) {
         spdlog::info("Smoke automation: maxFrames={} exitAfterVisualValidationCapture={}",
                      static_cast<unsigned long long>(m_maxFrames),
@@ -1232,6 +1262,21 @@ void Engine::Update(float deltaTime) {
         }
         if (rig != Graphics::Renderer::LightingRig::Custom && m_registry) {
             Graphics::ApplyLightingRigControl(*m_renderer, rig, m_registry.get());
+        }
+    }
+
+    if (!m_cameraCutAutomationApplied &&
+        m_cameraCutAutomationFrame > 0 &&
+        m_totalFrameCount >= m_cameraCutAutomationFrame) {
+        m_cameraCutAutomationApplied = true;
+        if (ApplyShowcaseCameraBookmark(m_cameraCutAutomationBookmark)) {
+            spdlog::info("Smoke automation applied camera cut at frame {} to bookmark '{}'",
+                         static_cast<unsigned long long>(m_totalFrameCount),
+                         m_cameraCutAutomationBookmark);
+        } else {
+            spdlog::warn("Smoke automation camera cut bookmark '{}' was not found at frame {}",
+                         m_cameraCutAutomationBookmark,
+                         static_cast<unsigned long long>(m_totalFrameCount));
         }
     }
 

@@ -79,6 +79,11 @@ $IDC_GFX_SHADOW_PCF = 9072
 $IDC_GFX_CASCADE_LAMBDA = 9073
 $IDC_GFX_DOF_FOCUS_DISTANCE = 9074
 $IDC_GFX_DOF_APERTURE = 9075
+$IDC_GFX_SUN_AZIMUTH = 9076
+$IDC_GFX_SUN_ELEVATION = 9077
+$IDC_GFX_SUN_COLOR_R = 9078
+$IDC_GFX_SUN_COLOR_G = 9079
+$IDC_GFX_SUN_COLOR_B = 9080
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -245,6 +250,11 @@ try {
         Click-Control $window $IDC_GFX_TONE_PUNCHY
         Click-Control $window $IDC_GFX_RIG_LANTERNS
         Set-Trackbar $window $IDC_GFX_SUN 42
+        Set-Trackbar $window $IDC_GFX_SUN_AZIMUTH 37
+        Set-Trackbar $window $IDC_GFX_SUN_ELEVATION 72
+        Set-Trackbar $window $IDC_GFX_SUN_COLOR_R 60
+        Set-Trackbar $window $IDC_GFX_SUN_COLOR_G 42
+        Set-Trackbar $window $IDC_GFX_SUN_COLOR_B 28
         Set-Trackbar $window $IDC_GFX_AREA_LIGHT 64
         Select-ComboIndex $window $IDC_GFX_ENV_SELECT 4
         Click-Control $window $IDC_GFX_ENV_REAPPLY
@@ -297,6 +307,12 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "exposure" ([double]$fc.lighting.exposure) 1.93 0.12
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.48 0.08
     Assert-Near "sun_intensity" ([double]$fc.lighting.sun_intensity) 8.4 0.4
+    Assert-Near "sun_direction_x" ([double]$fc.lighting.sun_direction[0]) 0.57 0.06
+    Assert-Near "sun_direction_y" ([double]$fc.lighting.sun_direction[1]) 0.63 0.06
+    Assert-Near "sun_direction_z" ([double]$fc.lighting.sun_direction[2]) -0.53 0.06
+    Assert-Near "sun_color_r" ([double]$fc.lighting.sun_color[0]) 1.2 0.08
+    Assert-Near "sun_color_g" ([double]$fc.lighting.sun_color[1]) 0.84 0.08
+    Assert-Near "sun_color_b" ([double]$fc.lighting.sun_color[2]) 0.56 0.08
     Assert-Near "god_ray_intensity" ([double]$fc.lighting.god_ray_intensity) 1.65 0.10
     Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.37 0.08
     Assert-Near "shadow_bias" ([double]$fc.lighting.shadow_bias) 0.0046 0.001

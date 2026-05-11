@@ -24,6 +24,11 @@ struct RendererLightingTuning {
     float warm = 0.0f;
     float cool = 0.0f;
     float sunIntensity = 5.0f;
+    float sunAzimuthDegrees = 59.0f;
+    float sunElevationDegrees = 58.0f;
+    float sunColorR = 1.0f;
+    float sunColorG = 1.0f;
+    float sunColorB = 1.0f;
     float godRayIntensity = 0.0f;
     float areaLightSizeScale = 1.0f;
     float shadowBias = 0.001f;

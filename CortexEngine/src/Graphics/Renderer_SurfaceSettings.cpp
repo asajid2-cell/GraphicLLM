@@ -31,6 +31,14 @@ float Renderer::GetWaterSteepness() const {
     return GetWaterState().steepness;
 }
 
+float Renderer::GetWaterRoughness() const {
+    return GetWaterState().roughness;
+}
+
+float Renderer::GetWaterFresnelStrength() const {
+    return GetWaterState().fresnelStrength;
+}
+
 glm::vec2 Renderer::GetWaterPrimaryDir() const {
     return GetWaterState().primaryDirection;
 }
@@ -48,6 +56,11 @@ void Renderer::SetWaterParams(float levelY, float amplitude, float waveLength, f
     m_waterState.primaryDirection = glm::normalize(dir);
     m_waterState.secondaryAmplitude = glm::max(0.0f, secondaryAmplitude);
     m_waterState.steepness = glm::clamp(steepness, 0.0f, 1.0f);
+}
+
+void Renderer::SetWaterOptics(float roughness, float fresnelStrength) {
+    m_waterState.roughness = glm::clamp(roughness, 0.01f, 1.0f);
+    m_waterState.fresnelStrength = glm::clamp(fresnelStrength, 0.0f, 3.0f);
 }
 
 float Renderer::SampleWaterHeightAt(const glm::vec2& worldXZ) const {

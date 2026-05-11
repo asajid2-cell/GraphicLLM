@@ -678,7 +678,11 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.water.secondaryAmplitude < 0.0f ||
         contract.water.secondaryAmplitude > 2.0f ||
         contract.water.steepness < 0.0f ||
-        contract.water.steepness > 1.0f) {
+        contract.water.steepness > 1.0f ||
+        contract.water.roughness < 0.01f ||
+        contract.water.roughness > 1.0f ||
+        contract.water.fresnelStrength < 0.0f ||
+        contract.water.fresnelStrength > 3.0f) {
         warn("water_params_out_of_range");
     }
     if (contract.cinematicPost.bloomThreshold < 0.1f ||

@@ -306,6 +306,8 @@ struct FrameContract {
         float waveSpeed = 0.0f;
         float secondaryAmplitude = 0.0f;
         float steepness = 0.0f;
+        float roughness = 0.03f;
+        float fresnelStrength = 1.0f;
     };
 
     struct VegetationInfo {

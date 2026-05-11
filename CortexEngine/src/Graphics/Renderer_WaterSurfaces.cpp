@@ -118,11 +118,13 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         MaterialConstants materialData{};
         materialData.albedo    = renderable.albedoColor;
         materialData.metallic  = 0.0f;
-        materialData.roughness = glm::clamp(renderable.roughness, 0.0f, 1.0f);
+        materialData.roughness = glm::clamp(m_waterState.roughness, 0.01f, 1.0f);
         materialData.ao        = glm::clamp(renderable.ao, 0.0f, 1.0f);
         materialData._pad0     = 0.0f;
         materialData.mapFlags  = glm::uvec4(0u);
         materialData.mapFlags2 = glm::uvec4(0u);
+        materialData.specularParams =
+            glm::vec4(glm::clamp(m_waterState.fresnelStrength, 0.0f, 3.0f), 0.0f, 0.0f, 0.0f);
 
         ObjectConstants objectData{};
         objectData.modelMatrix  = entry.worldMatrix;

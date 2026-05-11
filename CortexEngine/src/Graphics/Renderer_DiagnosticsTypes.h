@@ -216,6 +216,8 @@ struct RendererWaterState {
     float waveSpeed = 1.0f;
     float secondaryAmplitude = 0.1f;
     float steepness = 0.6f;
+    float roughness = 0.03f;
+    float fresnelStrength = 1.0f;
     glm::vec2 primaryDirection{1.0f, 0.0f};
 };
 

@@ -58,6 +58,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_SSR_DISTANCE = 9043,
     IDC_GFX_SSR_THICKNESS = 9044,
     IDC_GFX_SSR_STRENGTH = 9045,
+    IDC_GFX_WATER_ROUGHNESS = 9046,
+    IDC_GFX_WATER_FRESNEL = 9047,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -135,6 +137,8 @@ struct GraphicsSettingsState {
     SliderBinding waterLength;
     SliderBinding waterSpeed;
     SliderBinding waterSecondary;
+    SliderBinding waterRoughness;
+    SliderBinding waterFresnel;
     SliderBinding bloomThreshold;
     SliderBinding bloomKnee;
     SliderBinding vignette;
@@ -258,6 +262,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.water.waveLength = SliderToFloat(g_gfx.waterLength);
     g_gfx.tuning.water.waveSpeed = SliderToFloat(g_gfx.waterSpeed);
     g_gfx.tuning.water.secondaryAmplitude = SliderToFloat(g_gfx.waterSecondary);
+    g_gfx.tuning.water.roughness = SliderToFloat(g_gfx.waterRoughness);
+    g_gfx.tuning.water.fresnelStrength = SliderToFloat(g_gfx.waterFresnel);
     g_gfx.tuning.cinematicPost.bloomThreshold = SliderToFloat(g_gfx.bloomThreshold);
     g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
     g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
@@ -322,6 +328,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.waterLength, g_gfx.tuning.water.waveLength);
     SetSliderFromFloat(g_gfx.waterSpeed, g_gfx.tuning.water.waveSpeed);
     SetSliderFromFloat(g_gfx.waterSecondary, g_gfx.tuning.water.secondaryAmplitude);
+    SetSliderFromFloat(g_gfx.waterRoughness, g_gfx.tuning.water.roughness);
+    SetSliderFromFloat(g_gfx.waterFresnel, g_gfx.tuning.water.fresnelStrength);
     SetSliderFromFloat(g_gfx.bloomThreshold, g_gfx.tuning.cinematicPost.bloomThreshold);
     SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
     SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
@@ -616,6 +624,8 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_WATER_LENGTH, L"Water Wavelength", g_gfx.waterLength, 0.1f, 100.0f);
             makeSlider(IDC_GFX_WATER_SPEED, L"Water Speed", g_gfx.waterSpeed, 0.0f, 20.0f);
             makeSlider(IDC_GFX_WATER_SECONDARY, L"Water Secondary", g_gfx.waterSecondary, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_WATER_ROUGHNESS, L"Water Roughness", g_gfx.waterRoughness, 0.01f, 1.0f);
+            makeSlider(IDC_GFX_WATER_FRESNEL, L"Water Fresnel", g_gfx.waterFresnel, 0.0f, 3.0f);
             g_gfx.chkCinematicPost = makeCheckbox(IDC_GFX_CINEMATIC_POST, L"Cinematic Post");
             makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);

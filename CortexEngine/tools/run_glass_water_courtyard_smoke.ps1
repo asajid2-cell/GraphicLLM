@@ -174,6 +174,12 @@ if ($failures.Count -eq 0) {
         if ([double]$water.secondary_amplitude -lt 0.0 -or [double]$water.secondary_amplitude -gt 2.0) {
             Add-Failure "water secondary amplitude is $($water.secondary_amplitude), expected [0, 2]"
         }
+        if ([double]$water.roughness -lt 0.01 -or [double]$water.roughness -gt 1.0) {
+            Add-Failure "water roughness is $($water.roughness), expected [0.01, 1]"
+        }
+        if ([double]$water.fresnel_strength -lt 0.0 -or [double]$water.fresnel_strength -gt 3.0) {
+            Add-Failure "water Fresnel strength is $($water.fresnel_strength), expected [0, 3]"
+        }
     }
     $waterPass = Get-FrameContractPass $report "Water"
     if ($null -eq $waterPass) {

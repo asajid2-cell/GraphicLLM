@@ -315,6 +315,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.water.waveSpeed = m_waterState.waveSpeed;
     contract.water.secondaryAmplitude = m_waterState.secondaryAmplitude;
     contract.water.steepness = m_waterState.steepness;
+    contract.water.roughness = m_waterState.roughness;
+    contract.water.fresnelStrength = m_waterState.fresnelStrength;
 
     contract.vegetation.enabled = m_vegetationState.enabled;
     contract.vegetation.meshPipelineReady = static_cast<bool>(m_vegetationState.meshPipeline);

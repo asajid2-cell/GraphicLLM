@@ -82,7 +82,9 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "wave_amplitude": 0.16,
     "wave_length": 9.25,
     "wave_speed": 1.35,
-    "secondary_amplitude": 0.06
+    "secondary_amplitude": 0.06,
+    "roughness": 0.21,
+    "fresnel_strength": 1.62
   },
   "particles": {
     "enabled": true,
@@ -171,6 +173,8 @@ if ($exitCode -ne 0) {
         Assert-Near "water_wave_length" ([double]$fc.water.wave_length) 9.25 0.08
         Assert-Near "water_wave_speed" ([double]$fc.water.wave_speed) 1.35 0.04
         Assert-Near "water_secondary_amplitude" ([double]$fc.water.secondary_amplitude) 0.06 0.03
+        Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.21 0.03
+        Assert-Near "water_fresnel_strength" ([double]$fc.water.fresnel_strength) 1.62 0.04
     }
     Assert-Near "warm_color_grade" ([double]$fc.cinematic_post.warm) 0.36 0.03
     Assert-Near "cool_color_grade" ([double]$fc.cinematic_post.cool) -0.14 0.03

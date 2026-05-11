@@ -83,7 +83,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "wave_amplitude": 0.19,
     "wave_length": 11.5,
     "wave_speed": 1.7,
-    "secondary_amplitude": 0.08
+    "secondary_amplitude": 0.08,
+    "roughness": 0.18,
+    "fresnel_strength": 1.45
   },
   "particles": {
     "enabled": false,
@@ -236,6 +238,12 @@ if ($validRun.exit_code -ne 0) {
         }
         if ([Math]::Abs(([double]$water.secondary_amplitude) - 0.08) -gt 0.03) {
             Add-Failure "valid settings water secondary amplitude was $($water.secondary_amplitude), expected 0.08"
+        }
+        if ([Math]::Abs(([double]$water.roughness) - 0.18) -gt 0.03) {
+            Add-Failure "valid settings water roughness was $($water.roughness), expected 0.18"
+        }
+        if ([Math]::Abs(([double]$water.fresnel_strength) - 1.45) -gt 0.04) {
+            Add-Failure "valid settings water Fresnel strength was $($water.fresnel_strength), expected 1.45"
         }
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette

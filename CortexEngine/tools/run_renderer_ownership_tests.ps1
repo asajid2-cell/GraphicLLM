@@ -463,7 +463,7 @@ foreach ($target in $doc.targets) {
             Add-Failure "postprocess_resources missing RendererBloomState.h"
         } else {
             $bloomState = Get-Content $bloomStatePath -Raw
-            foreach ($required in @("struct BloomPassControls", "struct BloomPyramidResources", "struct BloomDescriptorTables", "BloomPassControls controls", "BloomPyramidResources<BloomLevels> resources", "BloomDescriptorTables<BloomDescriptorSlots> descriptors")) {
+            foreach ($required in @("struct BloomPassControls", "struct BloomPyramidResources", "struct BloomDescriptorTables", "BloomPassControls controls", "BloomPyramidResources<BloomLevels> resources", "BloomDescriptorTables<BloomDescriptorSlots> descriptors", "CreateTargets", "CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
                 if ($bloomState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "postprocess_resources missing bloom ownership marker in RendererBloomState.h: $required"
                 }
@@ -481,6 +481,14 @@ foreach ($target in $doc.targets) {
             }
             if ($bloomRenderer.IndexOf("DrawInstanced", [StringComparison]::Ordinal) -ge 0) {
                 Add-Failure "postprocess_resources still submits fullscreen bloom draws directly in Renderer_Bloom.cpp"
+            }
+            if ($bloomRenderer.IndexOf("m_bloomResources.resources.CreateTargets", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "postprocess_resources bloom renderer does not route resource creation through BloomPyramidResources::CreateTargets"
+            }
+            foreach ($rendererOwnedBloomResourceCall in @("CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($bloomRenderer.IndexOf($rendererOwnedBloomResourceCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "postprocess_resources still owns bloom GPU resource/descriptor work in Renderer_Bloom.cpp: $rendererOwnedBloomResourceCall"
+                }
             }
         } else {
             Add-Failure "postprocess_resources missing Renderer_Bloom.cpp"

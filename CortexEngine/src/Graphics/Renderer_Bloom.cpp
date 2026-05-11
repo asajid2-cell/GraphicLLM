@@ -28,114 +28,15 @@ Result<void> Renderer::CreateBloomResources() {
         m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0,
         fullWidth,
         fullHeight);
-    m_bloomResources.resources.activeLevels = std::clamp<uint32_t>(budget.bloomLevels, 1u, kBloomLevels);
-
-    // Reset existing bloom resources. Descriptor slots remain valid and are
-    // rewritten below, which keeps adaptive render-scale changes from leaking
-    // RTV/SRV descriptors.
-    for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-        m_bloomResources.resources.texA[level].Reset();
-        m_bloomResources.resources.texB[level].Reset();
-        m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_COMMON;
-        m_bloomResources.resources.resourceState[level][1] = D3D12_RESOURCE_STATE_COMMON;
+    auto result = m_bloomResources.resources.CreateTargets(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        fullWidth,
+        fullHeight,
+        budget.bloomLevels);
+    if (result.IsErr()) {
+        return result;
     }
-
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    // Build a small bloom pyramid: level 0 = 1/2, level 1 = 1/4, level 2 = 1/8, ...
-    for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-        const UINT div = 1u << (level + 1); // 2, 4, 8, ...
-        const UINT width  = std::max<UINT>(1, fullWidth  / div);
-        const UINT height = std::max<UINT>(1, fullHeight / div);
-
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Width = width;
-        desc.Height = height;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        // Bloom only needs HDR RGB; R11G11B10_FLOAT cuts memory and bandwidth
-        // in half compared to RGBA16F while preserving sufficient range.
-        desc.Format = DXGI_FORMAT_R11G11B10_FLOAT;
-        desc.SampleDesc.Count = 1;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-        D3D12_CLEAR_VALUE clearValue = {};
-        clearValue.Format = desc.Format;
-        clearValue.Color[0] = 0.0f;
-        clearValue.Color[1] = 0.0f;
-        clearValue.Color[2] = 0.0f;
-        clearValue.Color[3] = 0.0f;
-
-        for (uint32_t ping = 0; ping < 2; ++ping) {
-            ComPtr<ID3D12Resource>& tex = (ping == 0) ? m_bloomResources.resources.texA[level] : m_bloomResources.resources.texB[level];
-
-            HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
-                &desc,
-                D3D12_RESOURCE_STATE_RENDER_TARGET,
-                &clearValue,
-                IID_PPV_ARGS(&tex)
-            );
-
-            if (FAILED(hr)) {
-                return Result<void>::Err("Failed to create bloom render target");
-            }
-
-            m_bloomResources.resources.resourceState[level][ping] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-            // RTV for this bloom target
-            if (!m_bloomResources.resources.rtv[level][ping].IsValid()) {
-                auto rtvResult = m_services.descriptorManager->AllocateRTV();
-                if (rtvResult.IsErr()) {
-                    return Result<void>::Err("Failed to allocate RTV for bloom target: " + rtvResult.Error());
-                }
-                m_bloomResources.resources.rtv[level][ping] = rtvResult.Value();
-            }
-
-            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-            rtvDesc.Format = desc.Format;
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-            m_services.device->GetDevice()->CreateRenderTargetView(
-                tex.Get(),
-                &rtvDesc,
-                m_bloomResources.resources.rtv[level][ping].cpu
-            );
-
-            // SRV for sampling this bloom target - use staging heap (copied in post-process)
-            if (!m_bloomResources.resources.srv[level][ping].IsValid()) {
-                auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-                if (srvResult.IsErr()) {
-                    return Result<void>::Err("Failed to allocate staging SRV for bloom target: " + srvResult.Error());
-                }
-                m_bloomResources.resources.srv[level][ping] = srvResult.Value();
-            }
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = desc.Format;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            m_services.device->GetDevice()->CreateShaderResourceView(
-                tex.Get(),
-                &srvDesc,
-                m_bloomResources.resources.srv[level][ping].cpu
-            );
-        }
-    }
-
-    // By convention, use the quarter-resolution level (level 1) A texture as the
-    // final combined bloom SRV; if only one level is active, fall back to level 0.
-    const uint32_t combinedLevel = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
-    m_bloomResources.resources.combinedSrv = m_bloomResources.resources.srv[combinedLevel][0];
 
     spdlog::info("Bloom pyramid created: base {}x{}, levels={}", fullWidth, fullHeight, m_bloomResources.resources.activeLevels);
     return Result<void>::Ok();

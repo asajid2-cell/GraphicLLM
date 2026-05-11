@@ -16,6 +16,7 @@ validation suite:
 - temporal validation smoke,
 - temporal camera-cut history invalidation smoke,
 - full RT showcase smoke,
+- visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
@@ -72,6 +73,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_temporal_camera_cut_validation.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_vb_debug_views.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_render_graph_transient_matrix.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_effects_gallery_tests.ps1 -NoBuild
@@ -105,6 +107,10 @@ resource-valid in the final frame contract.
 The render-graph transient matrix reruns RT Showcase with the graph transient
 validation pass enabled, then compares aliasing-on, aliasing-off, and
 bloom-transients-disabled modes through frame-contract render-graph counters.
+
+The VB debug view validation reruns RT Showcase through targeted visibility
+buffer debug modes for depth and material albedo, then checks that each capture
+uses the requested debug view and produces non-empty image statistics.
 
 The descriptor/memory stress scene reruns the descriptor-heavy RT showcase path
 and asserts the historical 1024 persistent-descriptor ceiling, staging budget,

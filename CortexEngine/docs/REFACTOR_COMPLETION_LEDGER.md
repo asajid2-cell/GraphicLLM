@@ -38,24 +38,29 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_195119_906_147724_445f0c19
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_200157_300_149036_7f109ace
 ```
 
 Key evidence from that run:
 
 - Release build: passed.
-- Temporal validation: `gpu_ms=1.240`, `disocclusion=0.006891`,
-  `high_motion=0.005233`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.759`, `disocclusion=0.006592`,
+  `high_motion=0.005155`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=3.160`,
+  `camera=reflection_closeup`, `gpu_ms=2.820`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.644/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.637/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`.
+  `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
+  `temporal_diff=mean=0.017/2.5 changed=0.001/0.08`,
+  `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
+- VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
+  luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
+  colorful `0.251`, luma `148.49`.
 - Descriptor/memory stress: `persistent_descriptors=988/1024`,
   `staging=78/128`, `transient_budget=81920`, `transient_delta=0`,
   `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`,
@@ -63,20 +68,21 @@ Key evidence from that run:
   `rt_history_avg=0.0314`.
 - Visual probe: all four public baseline cases passed; minimum observed
   edge count was 6060 pixels, minimum edge ratio was 0.0066, maximum pure
-  dominant-color ratio was 0.0066, and maximum average-channel share was 0.375.
+  dominant-color ratio was 0.0066, and maximum configured dominant-color
+  threshold was 0.120.
 - Render-graph transient matrix: aliasing on/off and bloom-transients-off rows
   passed; aliasing-on saved 262144 bytes with 2 alias barriers, aliasing-off
   reported 0 aliased resources/barriers/saved bytes, and bloom-transients-off
   reported 0 final transient resources with validation still run.
 - Phase 3 visual matrix: temporal validation, RT showcase, material lab,
   glass/water courtyard, effects showcase, and IBL gallery passed.
-- Renderer ownership, full renderer ownership audit, descriptor/memory stress,
-  visual probe, fatal error, advanced graphics catalog, effects gallery,
+- Renderer ownership, full renderer ownership audit, VB debug views,
+  descriptor/memory stress, visual probe, fatal error, advanced graphics catalog, effects gallery,
   environment manifest, IBL gallery, budget profile matrix, and voxel backend
   gates passed.
 - New focused gates passed in release validation: temporal camera cut,
   render-graph transient matrix, full renderer ownership audit,
-  descriptor/memory stress, visual probe, graphics UI interaction, screenshot
+  descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, and RT
   firefly/outlier.
 
@@ -136,8 +142,9 @@ long file/function lists in every row.
 
 | Script | Runtime or static | Current role |
 |---|---|---|
-| `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release and runs all listed checks below. |
+| `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release, runs all listed checks below, and treats top-level `failed:` sentinel output as a failed step. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
+| `tools/run_vb_debug_views.ps1` | runtime wrapper | RT Showcase debug-view matrix for visibility-buffer depth and material-albedo debug captures. |
 | `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
 | `tools/run_visual_probe_validation.ps1` | runtime | Runs every public visual baseline case and probes captured BMPs for edge structure and dominant-color failure modes in addition to baseline metric tolerances. |
 | `tools/run_temporal_validation_smoke.ps1` | runtime | Temporal-scene gate for temporal mask, motion vectors, histories, budget, visual capture. |
@@ -201,7 +208,7 @@ of `phase2.md`.
 | P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_UNVERIFIED | SRC-VB, SRC-RENDERGRAPH | Historical targeted VB debug captures in `phase2.md` | Historical evidence only in `phase2.md`; latest release gate does not enumerate each transition skip mode. | Add static/runtime test for skip-control use under graph-owned resources. |
 | P2-PASS-04H | Pass 4H - Visibility Buffer Internal Graph Nodes | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp` records `VBClear`, `VBVisibility`, `VBMaterialResolve`, `VBDeferredLighting` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes through VB path with frame contract pass records. | Debug path/fallback still not exhaustively tested. |
 | P2-PASS-04I | Pass 4I - VB Lighting Graph Resources And Subpass Records | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | Current frame contract checks pass; VB initialization log includes clustered light/BRDF LUT pipelines. | No separate assertion in top-level output for every VB subpass name. |
-| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_UNVERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | Historical targeted debug view 34/35 captures in `phase2.md` | Latest release gate uses surface debug view 41, not the whole debug sweep. | Add current `run_vb_debug_views.ps1` or include targeted debug views in release matrix. |
+| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_200210_921_145464_04478908`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
 | P2-PASS-04K | Pass 4K - VB Graph Helper And Motion Vector Graph Adapter | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBufferHelpers.h::VisibilityBufferGraphResources`, `Renderer_RenderGraphMotionVectors.cpp::Renderer::ExecuteMotionVectorsInRenderGraph` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with `object_motion=0.0731`, `visible=7`, `warnings=0`. | Add explicit report of camera-only fallback absence for more scenes. |
 | P2-PASS-04L | Pass 4L - TAA And SSAO Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphTAA.cpp::Renderer::ExecuteTAAInRenderGraph`, `Renderer_RenderGraphSSAO.cpp::Renderer::ExecuteSSAOInRenderGraph` | `tools/run_release_validation.ps1` | Temporal and RT showcase smokes pass with TAA/SSAO enabled. | No dedicated SSAO visual comparison. |
 | P2-PASS-04M | Pass 4M - SSR Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphSSR.cpp::Renderer::ExecuteSSRInRenderGraph` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase smoke passes with SSR enabled in feature set. | SSR visual correctness is not deeply measured beyond luma/scene gates. |
@@ -235,7 +242,7 @@ of `phase2.md`.
 | P2-SYS-07 | RT scheduler, denoising, low-memory behavior, and diagnostics. | DONE_VERIFIED | SRC-RT | `tools/run_release_validation.ps1` | RT showcase plus budget matrix passed with raw/history signal and readiness. | Quality tuning remains future work. |
 | P2-SYS-08 | Temporal filters expose invalidation/reprojection and do not hide ghosting. | PARTIAL | SRC-TEMPORAL, SRC-RT | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with temporal mask stats. Camera-cut gate passed and proves RT histories invalidate/reseed on a large camera jump. | "Never hide popping/create ghost silhouettes" is a visual-quality claim; current validation is necessary but not sufficient. |
 | P2-SYS-09 | Explicit camera-cut invalidation coverage. | DONE_VERIFIED | `src/Core/Engine.cpp::Engine::Initialize`, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants`, SRC-TEMPORAL | `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Targeted run passed: frames=53, cut_frame=20, camera=`reflection_closeup`, `rt_reflection_reset=camera_cut`, `invalidated_frame=20`, RT shadow/reflection/GI histories reseeded and resource-valid. | None for RT history camera-cut coverage. TAA-specific camera-cut policy can be separately tightened if needed. |
-| P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; historical debug captures | Runtime VB path passes; some debug views historically verified. | Local reflection probes/probe blending are not implemented as a validated feature. |
+| P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_vb_debug_views.ps1 -NoBuild` | Runtime VB path passes. Targeted VB debug gate passed for depth view 34 and material-albedo view 35 with non-empty image statistics. | Local reflection probes/probe blending are not implemented as a validated feature. |
 | P2-SYS-11 | GPU culling and HZB diagnostics are visible and budgeted. | DONE_VERIFIED | `Renderer_GPUDriven.cpp`, `Renderer_GPUCulling*.cpp`, `Renderer_HZB*.cpp`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase reports GPU culling and HZB logs; smoke budget passed. | More occlusion-correctness scene tests could be added. |
 | P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. | Energy budgeting is still not a distinct runtime gate. |
 | P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1` | RT showcase, material lab, glass/water courtyard, effects showcase pass. | Outdoor/sunset beach and local reflection-probe validation are not complete. |
@@ -614,7 +621,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, render-graph transient matrix, full ownership audit, and descriptor/memory stress gates now exist and pass individually. | Full committed golden-image comparison and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -661,6 +668,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_descriptor_memory_stress_scene.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_vb_debug_views.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_transient_matrix.ps1
@@ -673,8 +681,8 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and
    passed individually after the fallback-reporting, camera-cut, render-graph
-   transient, full renderer ownership, descriptor/memory stress, and visual probe
-   checkpoints.
+   transient, full renderer ownership, descriptor/memory stress, VB debug view,
+   and visual probe checkpoints.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

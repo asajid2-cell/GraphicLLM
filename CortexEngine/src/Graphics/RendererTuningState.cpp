@@ -77,7 +77,9 @@ json ToJson(const RendererTuningState& state) {
             {"wave_amplitude", state.water.waveAmplitude},
             {"wave_length", state.water.waveLength},
             {"wave_speed", state.water.waveSpeed},
-            {"secondary_amplitude", state.water.secondaryAmplitude}
+            {"secondary_amplitude", state.water.secondaryAmplitude},
+            {"roughness", state.water.roughness},
+            {"fresnel_strength", state.water.fresnelStrength}
         }},
         {"particles", {
             {"enabled", state.particles.enabled},
@@ -171,6 +173,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(w, "wave_length", state.water.waveLength);
         ReadValue(w, "wave_speed", state.water.waveSpeed);
         ReadValue(w, "secondary_amplitude", state.water.secondaryAmplitude);
+        ReadValue(w, "roughness", state.water.roughness);
+        ReadValue(w, "fresnel_strength", state.water.fresnelStrength);
     }
     if (root.contains("particles") && root.at("particles").is_object()) {
         const auto& p = root.at("particles");
@@ -318,6 +322,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.water.waveLength = water.waveLength;
     state.water.waveSpeed = water.waveSpeed;
     state.water.secondaryAmplitude = water.secondaryAmplitude;
+    state.water.roughness = water.roughness;
+    state.water.fresnelStrength = water.fresnelStrength;
 
     state.particles.enabled = features.particlesEnabled;
     state.particles.densityScale = features.particleDensityScale;
@@ -369,6 +375,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.water.waveLength = std::clamp(state.water.waveLength, 0.1f, 100.0f);
     state.water.waveSpeed = std::clamp(state.water.waveSpeed, 0.0f, 20.0f);
     state.water.secondaryAmplitude = std::clamp(state.water.secondaryAmplitude, 0.0f, 2.0f);
+    state.water.roughness = std::clamp(state.water.roughness, 0.01f, 1.0f);
+    state.water.fresnelStrength = std::clamp(state.water.fresnelStrength, 0.0f, 3.0f);
 
     state.particles.densityScale = std::clamp(state.particles.densityScale, 0.0f, 2.0f);
 
@@ -444,6 +452,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.water.waveLength,
                            state.water.waveSpeed,
                            state.water.secondaryAmplitude);
+    ApplyWaterOpticsControl(renderer, state.water.roughness, state.water.fresnelStrength);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::Particles, state.particles.enabled);
     renderer.SetParticleDensityScale(state.particles.densityScale);
     ApplyBloomShapeControl(renderer,

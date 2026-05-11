@@ -243,6 +243,7 @@ public:
     void SetWaterParams(float levelY, float amplitude, float waveLength, float speed,
                         float dirX = 1.0f, float dirZ = 0.0f, float secondaryAmplitude = 0.0f,
                         float steepness = 0.6f);
+    void SetWaterOptics(float roughness, float fresnelStrength);
     // Sample the procedural water height at a given world-space XZ position.
     // This mirrors the wave function used in Water.hlsl so buoyancy and
     // other CPU-side systems can stay in sync with the GPU water surface.
@@ -253,6 +254,8 @@ public:
     [[nodiscard]] float GetWaterWaveSpeed() const;
     [[nodiscard]] float GetWaterSecondaryAmplitude() const;
     [[nodiscard]] float GetWaterSteepness() const;
+    [[nodiscard]] float GetWaterRoughness() const;
+    [[nodiscard]] float GetWaterFresnelStrength() const;
     [[nodiscard]] glm::vec2 GetWaterPrimaryDir() const;
 
     void SetGodRayIntensity(float intensity);

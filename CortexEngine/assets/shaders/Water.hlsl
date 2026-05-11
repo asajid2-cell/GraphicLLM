@@ -60,7 +60,13 @@ cbuffer MaterialConstants : register(b2)
     float  g_Metallic;
     float  g_Roughness;
     float  g_AO;
+    float  g_MaterialPad0;
+    uint4  g_TextureIndices;
     uint4  g_MapFlags;
+    uint4  g_TextureIndices2;
+    uint4  g_MapFlags2;
+    float4 g_EmissiveFactorStrength;
+    float4 g_ExtraParams;
     float4 g_FractalParams0;
     float4 g_FractalParams1;
     float4 g_FractalParams2;
@@ -219,7 +225,12 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float3 deepColor  = float3(0.01f, 0.03f, 0.06f);
     float3 baseColor  = lerp(deepColor, g_Albedo.rgb, 0.4f);
 
-    float3 F0 = lerp(float3(0.02f, 0.02f, 0.02f), baseColor, metallic);
+    float fresnelStrength = clamp(g_SpecularParams.x, 0.0f, 3.0f);
+    if (fresnelStrength <= 0.0f)
+    {
+        fresnelStrength = 1.0f;
+    }
+    float3 F0 = lerp(float3(0.02f, 0.02f, 0.02f) * fresnelStrength, baseColor, metallic);
 
     // Simple directional light 0 as sun when available.
     float3 L = float3(0.0f, 1.0f, 0.0f);

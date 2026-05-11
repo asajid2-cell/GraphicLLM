@@ -78,6 +78,7 @@ void ApplyWaterStateControl(Renderer& renderer,
                             float waveLength,
                             float waveSpeed,
                             float secondaryAmplitude);
+void ApplyWaterOpticsControl(Renderer& renderer, float roughness, float fresnelStrength);
 void ApplyFogDensityControl(Renderer& renderer, float density);
 void ApplyFogParamsControl(Renderer& renderer, float density, float height, float falloff);
 void ApplyAreaLightSizeControl(Renderer& renderer, float scale);

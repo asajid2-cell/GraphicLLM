@@ -268,7 +268,9 @@ json FrameContractToJson(const FrameContract& contract) {
             {"wave_length", contract.water.waveLength},
             {"wave_speed", contract.water.waveSpeed},
             {"secondary_amplitude", contract.water.secondaryAmplitude},
-            {"steepness", contract.water.steepness}
+            {"steepness", contract.water.steepness},
+            {"roughness", contract.water.roughness},
+            {"fresnel_strength", contract.water.fresnelStrength}
         }},
         {"vegetation", {
             {"enabled", contract.vegetation.enabled},

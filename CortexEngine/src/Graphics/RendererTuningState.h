@@ -75,6 +75,8 @@ struct RendererWaterTuning {
     float waveLength = 8.0f;
     float waveSpeed = 1.0f;
     float secondaryAmplitude = 0.1f;
+    float roughness = 0.03f;
+    float fresnelStrength = 1.0f;
 };
 
 struct RendererParticleTuning {

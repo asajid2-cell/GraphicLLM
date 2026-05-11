@@ -268,6 +268,11 @@ void ApplyWaterStateControl(Renderer& renderer,
         water.steepness);
 }
 
+void ApplyWaterOpticsControl(Renderer& renderer, float roughness, float fresnelStrength) {
+    renderer.SetWaterOptics(std::clamp(roughness, 0.01f, 1.0f),
+                            std::clamp(fresnelStrength, 0.0f, 3.0f));
+}
+
 void ApplyFogDensityControl(Renderer& renderer, float density) {
     const auto features = renderer.GetFeatureState();
     renderer.SetFogParams(std::clamp(density, 0.0f, 0.1f),

@@ -219,7 +219,10 @@ Result<void> DX12Pipeline::Initialize(
 
     HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create graphics pipeline state");
+        std::ostringstream err;
+        err << "Failed to create graphics pipeline state (hr=0x"
+            << std::hex << std::uppercase << static_cast<uint32_t>(hr) << ")";
+        return Result<void>::Err(err.str());
     }
 
     spdlog::info("Pipeline state created successfully");

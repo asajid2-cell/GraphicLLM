@@ -198,6 +198,8 @@ Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "CopyTAAIntermedia
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "CopyHDRToTAAHistory(true)"
 
 $vb = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
+$vbHeader = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.h"
+$rendererVB = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
 foreach ($marker in @(
     "builder.Write(resources.visibility, RGResourceUsage::UnorderedAccess)",
     "builder.Write(resources.visibility, RGResourceUsage::RenderTarget)",
@@ -209,6 +211,12 @@ foreach ($marker in @(
 )) {
     Assert-Contains "VisibilityBufferGraphPass.cpp" $vb $marker
 }
+Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "Clear(context.clear)"
+Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "RasterizeVisibility(context.visibility)"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clear"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> visibility"
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ClearVisibilityBuffer("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RasterizeVisibilityBuffer("
 
 if ($failures.Count -gt 0) {
     Write-Host "Render graph declaration contract tests failed:" -ForegroundColor Red

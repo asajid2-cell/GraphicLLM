@@ -1,8 +1,12 @@
 #pragma once
 
 #include "Graphics/RenderGraph.h"
+#include "Graphics/VisibilityBuffer.h"
 
+#include <cstdint>
 #include <functional>
+#include <string>
+#include <vector>
 
 namespace Cortex::Graphics::VisibilityBufferGraphPass {
 
@@ -25,6 +29,34 @@ struct ResourceHandles {
     RGResourceHandle debugSource;
 };
 
+struct StageFailureContext {
+    bool* failed = nullptr;
+    std::string* stage = nullptr;
+    std::string* error = nullptr;
+};
+
+struct ClearContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    StageFailureContext failure;
+};
+
+struct VisibilityContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ID3D12Resource* depthBuffer = nullptr;
+    D3D12_CPU_DESCRIPTOR_HANDLE depthDSV{};
+    const glm::mat4* viewProjection = nullptr;
+    const std::vector<VisibilityBufferRenderer::VBMeshDrawInfo>* meshDraws = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS cullMaskAddress = 0;
+    D3D12_RESOURCE_STATES* depthState = nullptr;
+    uint32_t instanceCount = 0;
+    uint32_t* contractInstances = nullptr;
+    uint32_t* contractMeshes = nullptr;
+    uint32_t* contractDrawBatches = nullptr;
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -34,8 +66,8 @@ struct GraphContext {
     bool debugGBuffer = false;
     bool brdfGraphOwned = false;
     bool clusterGraphOwned = false;
-    std::function<void()> clear;
-    std::function<void()> visibility;
+    ClearContext clear;
+    VisibilityContext visibility;
     std::function<void()> materialResolve;
     std::function<void()> debugBlit;
     std::function<void()> brdfLut;
@@ -44,6 +76,8 @@ struct GraphContext {
     std::function<void(const char*)> failStage;
 };
 
+[[nodiscard]] bool Clear(const ClearContext& context);
+[[nodiscard]] bool RasterizeVisibility(const VisibilityContext& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

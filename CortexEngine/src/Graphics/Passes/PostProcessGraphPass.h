@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Graphics/Passes/PostProcessPass.h"
+#include "Graphics/Passes/RTReflectionDebugClearPass.h"
 #include "Graphics/RenderGraph.h"
 
 #include <functional>
@@ -29,10 +31,13 @@ struct ResourceHandles {
 struct ExecuteContext {
     bool useBloomOverride = false;
     RGResourceHandle bloom;
-    std::function<void(ID3D12Resource*)> renderWithBloomOverride;
-    std::function<void()> renderDefault;
+    PostProcessPass::DescriptorUpdateContext descriptorUpdate;
+    PostProcessPass::DrawContext draw;
+    bool* backBufferUsedAsRenderTarget = nullptr;
+    bool runRtReflectionDebugClear = false;
+    RTReflectionDebugClearPass::ClearContext rtReflectionDebugClear;
     std::function<void(const char*)> failBloomStage;
-    std::function<void()> markRan;
+    bool* ranPostProcess = nullptr;
 };
 
 struct GraphContext {

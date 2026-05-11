@@ -13,8 +13,10 @@ void Fail(const GraphContext& context, const char* stage) {
 [[nodiscard]] bool IsUsable(const GraphContext& context) {
     return context.resources.hdr.IsValid() &&
            context.resources.backBuffer.IsValid() &&
-           (static_cast<bool>(context.execute.renderDefault) ||
-            static_cast<bool>(context.execute.renderWithBloomOverride));
+           context.execute.descriptorUpdate.device &&
+           !context.execute.descriptorUpdate.srvTable.empty() &&
+           context.execute.draw.commandList &&
+           context.execute.draw.pipeline;
 }
 
 } // namespace
@@ -48,6 +50,11 @@ void Declare(RGPassBuilder& builder, const ResourceHandles& resources) {
 }
 
 void Execute(const RenderGraph& graph, const ExecuteContext& context) {
+    if (context.backBufferUsedAsRenderTarget) {
+        *context.backBufferUsedAsRenderTarget = true;
+    }
+
+    PostProcessPass::DescriptorUpdateContext descriptorUpdate = context.descriptorUpdate;
     if (context.useBloomOverride && context.bloom.IsValid()) {
         ID3D12Resource* bloomOverride = graph.GetResource(context.bloom);
         if (!bloomOverride) {
@@ -56,15 +63,29 @@ void Execute(const RenderGraph& graph, const ExecuteContext& context) {
             }
             return;
         }
-        if (context.renderWithBloomOverride) {
-            context.renderWithBloomOverride(bloomOverride);
-        }
-    } else if (context.renderDefault) {
-        context.renderDefault();
+        descriptorUpdate.bloomOverride = bloomOverride;
     }
 
-    if (context.markRan) {
-        context.markRan();
+    if (context.runRtReflectionDebugClear) {
+        (void)RTReflectionDebugClearPass::ClearForDebugView(context.rtReflectionDebugClear);
+    }
+
+    if (!PostProcessPass::UpdateDescriptorTable(descriptorUpdate)) {
+        if (context.failBloomStage) {
+            context.failBloomStage("post_process_descriptor_table");
+        }
+        return;
+    }
+
+    if (!PostProcessPass::Draw(context.draw)) {
+        if (context.failBloomStage) {
+            context.failBloomStage("post_process_draw");
+        }
+        return;
+    }
+
+    if (context.ranPostProcess) {
+        *context.ranPostProcess = true;
     }
 }
 

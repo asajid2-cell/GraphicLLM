@@ -1,9 +1,11 @@
 ﻿#include "Renderer.h"
 
 #include "Passes/DescriptorTable.h"
+#include "Passes/PostProcessPass.h"
 
 #include <spdlog/spdlog.h>
 
+#include <span>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -333,55 +335,15 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         return;
     }
 
-    auto& table = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
-    auto writeOrNull = [&](size_t slot,
-                           ID3D12Resource* resource,
-                           DXGI_FORMAT fmt,
-                           uint32_t mipLevels = 1) {
-        if (slot >= table.size() || !table[slot].IsValid()) {
-            return;
-        }
-
-        DescriptorTable::WriteTexture2DSRV(device, table[slot], nullptr, fmt, mipLevels);
-        if (resource) DescriptorTable::WriteTexture2DSRV(device, table[slot], resource, fmt, mipLevels);
-    };
-
-    // Must match PostProcess.hlsl bindings.
-    writeOrNull(0, m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-    ID3D12Resource* bloomRes = nullptr;
-    if (m_bloomResources.controls.intensity > 0.0f) {
-        bloomRes = m_bloomResources.resources.postProcessOverride
-            ? m_bloomResources.resources.postProcessOverride
-            : ((m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get());
-    }
-    writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
-
-    writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
-    writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
-
     ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
-    writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-    if (m_debugViewState.mode == 32u && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0) {
-        writeOrNull(6, m_hzbResources.resources.texture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbResources.resources.mipCount);
-    } else {
-        writeOrNull(6, m_ssrResources.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    }
-
-    writeOrNull(7, m_temporalScreenState.velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
-    writeOrNull(8, m_rtReflectionTargets.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(9, m_rtReflectionTargets.history.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* emissiveMetallicRes = nullptr;
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
         emissiveMetallicRes = m_services.visibilityBuffer->GetEmissiveMetallicBuffer();
     }
-    writeOrNull(10, emissiveMetallicRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* materialExt1Res = nullptr;
     ID3D12Resource* materialExt2Res = nullptr;
@@ -389,8 +351,32 @@ void Renderer::UpdatePostProcessDescriptorTable() {
         materialExt1Res = m_services.visibilityBuffer->GetMaterialExt1Buffer();
         materialExt2Res = m_services.visibilityBuffer->GetMaterialExt2Buffer();
     }
-    writeOrNull(11, materialExt1Res, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(12, materialExt2Res, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+    auto& table = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    PostProcessPass::DescriptorUpdateContext context{};
+    context.device = device;
+    context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
+    context.hdr = m_mainTargets.hdr.resources.color.Get();
+    context.bloomIntensity = m_bloomResources.controls.intensity;
+    context.bloomOverride = m_bloomResources.resources.postProcessOverride;
+    context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
+        ? m_bloomResources.resources.texA[1].Get()
+        : m_bloomResources.resources.texA[0].Get();
+    context.ssao = m_ssaoResources.resources.texture.Get();
+    context.history = m_temporalScreenState.historyColor.Get();
+    context.depth = m_depthResources.resources.buffer.Get();
+    context.normalRoughness = normalRes;
+    context.hzb = m_hzbResources.resources.texture.Get();
+    context.hzbMipCount = m_hzbResources.resources.mipCount;
+    context.wantsHzbDebug = (m_debugViewState.mode == 32u);
+    context.ssr = m_ssrResources.resources.color.Get();
+    context.velocity = m_temporalScreenState.velocityBuffer.Get();
+    context.rtReflection = m_rtReflectionTargets.color.Get();
+    context.rtReflectionHistory = m_rtReflectionTargets.history.Get();
+    context.emissiveMetallic = emissiveMetallicRes;
+    context.materialExt1 = materialExt1Res;
+    context.materialExt2 = materialExt2Res;
+    (void)PostProcessPass::UpdateDescriptorTable(context);
 }
 
 } // namespace Cortex::Graphics

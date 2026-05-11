@@ -31,8 +31,8 @@ The current verified local gate covers:
   graphics settings application,
 - deterministic LLM/Architect renderer-command runtime smoke,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
-- Material Lab, Glass and Water Courtyard, Effects Showcase, visual baseline
-  smokes, and screenshot negative gates,
+- Material Lab, conductor-energy, Glass and Water Courtyard, Effects Showcase,
+  visual baseline smokes, and screenshot negative gates,
 - visual probe validation across all public baseline cases,
 - Phase 3 visual matrix,
 - descriptor/memory stress for the historical persistent-descriptor ceiling,
@@ -68,12 +68,12 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.531`, `warnings=0`,
+- temporal validation: `gpu_ms=1.271`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=6.274`;
-- RT showcase: `gpu_ms=2.333/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=2.477`;
+- RT showcase: `gpu_ms=2.279/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -89,6 +89,8 @@ Result:
 - LLM renderer command smoke: passed; deterministic Architect command applied
   `exposure=1.35`, `shadows=False`, `fog_density=0.031`, and
   `studio_three_point/renderer_rig`;
+- conductor energy contract: passed; forward/deferred energy split present,
+  full conductors preserved in Material Lab, and overbright visual stats bounded;
 - temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, LLM renderer command, HUD, preset, material editor,
   showcase, ownership, fatal error,
   environment manifest, advanced graphics catalog, and effects gallery contracts passed;
@@ -101,12 +103,12 @@ Result:
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=16.082`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=17.649`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_222325_143_21408_3e2c3084
+CortexEngine/build/bin/logs/runs/release_validation_20260510_223141_744_28020_32263227
 ```
 
 ## Renderer Scope

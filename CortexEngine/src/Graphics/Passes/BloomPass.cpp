@@ -62,6 +62,135 @@ bool BindAndClearTarget(const TargetContext& context) {
     return true;
 }
 
+bool TransitionResource(ID3D12GraphicsCommandList* commandList,
+                        const ResourceStateRef& resource,
+                        D3D12_RESOURCE_STATES desiredState,
+                        bool skipTransitions,
+                        D3D12_RESOURCE_BARRIER* barriers,
+                        UINT& barrierCount) {
+    if (!commandList || !resource.resource || !resource.state) {
+        return false;
+    }
+
+    if (!skipTransitions && *resource.state != desiredState) {
+        D3D12_RESOURCE_BARRIER& barrier = barriers[barrierCount++];
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource.resource;
+        barrier.Transition.StateBefore = *resource.state;
+        barrier.Transition.StateAfter = desiredState;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    }
+    *resource.state = desiredState;
+    return true;
+}
+
+bool PrepareSourceToRenderTarget(const StageTransitionContext& context) {
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    UINT barrierCount = 0;
+
+    if (!TransitionResource(context.commandList,
+                            context.source,
+                            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                            context.skipTransitions,
+                            barriers,
+                            barrierCount) ||
+        !TransitionResource(context.commandList,
+                            context.target,
+                            D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            context.skipTransitions,
+                            barriers,
+                            barrierCount)) {
+        return false;
+    }
+
+    if (!context.skipTransitions && barrierCount > 0) {
+        context.commandList->ResourceBarrier(barrierCount, barriers);
+    }
+    return true;
+}
+
+bool TransitionToShaderResource(ID3D12GraphicsCommandList* commandList,
+                                const ResourceStateRef& resource,
+                                bool skipTransitions) {
+    D3D12_RESOURCE_BARRIER barrier = {};
+    UINT barrierCount = 0;
+    if (!TransitionResource(commandList,
+                            resource,
+                            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                            skipTransitions,
+                            &barrier,
+                            barrierCount)) {
+        return false;
+    }
+
+    if (!skipTransitions && barrierCount > 0) {
+        commandList->ResourceBarrier(1, &barrier);
+    }
+    return true;
+}
+
+bool PrepareCompositeTargets(const CompositeTransitionContext& context) {
+    if (!context.commandList || context.sources.size() > 8) {
+        return false;
+    }
+
+    D3D12_RESOURCE_BARRIER barriers[9] = {};
+    UINT barrierCount = 0;
+    for (const ResourceStateRef& source : context.sources) {
+        if (!source.resource) {
+            continue;
+        }
+        if (!TransitionResource(context.commandList,
+                                source,
+                                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                                context.skipTransitions,
+                                barriers,
+                                barrierCount)) {
+            return false;
+        }
+    }
+
+    if (!TransitionResource(context.commandList,
+                            context.target,
+                            D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            context.skipTransitions,
+                            barriers,
+                            barrierCount)) {
+        return false;
+    }
+
+    if (!context.skipTransitions && barrierCount > 0) {
+        context.commandList->ResourceBarrier(barrierCount, barriers);
+    }
+    return true;
+}
+
+bool CopyCompositeToCombined(const CopyContext& context) {
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    UINT barrierCount = 0;
+    if (!TransitionResource(context.commandList,
+                            context.source,
+                            D3D12_RESOURCE_STATE_COPY_SOURCE,
+                            context.skipTransitions,
+                            barriers,
+                            barrierCount) ||
+        !TransitionResource(context.commandList,
+                            context.target,
+                            D3D12_RESOURCE_STATE_COPY_DEST,
+                            context.skipTransitions,
+                            barriers,
+                            barrierCount)) {
+        return false;
+    }
+
+    if (!context.skipTransitions && barrierCount > 0) {
+        context.commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    context.commandList->CopyResource(context.target.resource, context.source.resource);
+    return TransitionToShaderResource(context.commandList, context.target, context.skipTransitions);
+}
+
 bool PrepareFullscreenState(const FullscreenContext& context) {
     return FullscreenPass::BindGraphicsState({
         context.commandList,

@@ -27,6 +27,32 @@ struct TargetContext {
     DescriptorHandle targetRtv{};
 };
 
+struct ResourceStateRef {
+    ID3D12Resource* resource = nullptr;
+    D3D12_RESOURCE_STATES* state = nullptr;
+};
+
+struct StageTransitionContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ResourceStateRef source{};
+    ResourceStateRef target{};
+    bool skipTransitions = false;
+};
+
+struct CompositeTransitionContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    std::span<ResourceStateRef> sources{};
+    ResourceStateRef target{};
+    bool skipTransitions = false;
+};
+
+struct CopyContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ResourceStateRef source{};
+    ResourceStateRef target{};
+    bool skipTransitions = false;
+};
+
 [[nodiscard]] uint32_t BaseDownsampleSlot();
 [[nodiscard]] uint32_t DownsampleChainSlot(uint32_t level);
 [[nodiscard]] uint32_t BlurHSlot(uint32_t level, uint32_t stageLevels);
@@ -37,6 +63,12 @@ struct TargetContext {
 
 void SetFullscreenViewport(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource);
 [[nodiscard]] bool BindAndClearTarget(const TargetContext& context);
+[[nodiscard]] bool PrepareSourceToRenderTarget(const StageTransitionContext& context);
+[[nodiscard]] bool TransitionToShaderResource(ID3D12GraphicsCommandList* commandList,
+                                              const ResourceStateRef& resource,
+                                              bool skipTransitions);
+[[nodiscard]] bool PrepareCompositeTargets(const CompositeTransitionContext& context);
+[[nodiscard]] bool CopyCompositeToCombined(const CopyContext& context);
 
 [[nodiscard]] bool PrepareFullscreenState(const FullscreenContext& context);
 [[nodiscard]] bool BindGraphTexture(const FullscreenContext& context,

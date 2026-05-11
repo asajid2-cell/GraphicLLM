@@ -953,6 +953,24 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because bloom transition/copy
       mechanics, HZB, RT, temporal, graph orchestration, and other renderer pass
       mechanics still live in renderer orchestration files.
+    - The current bloom stage-transition checkpoint moves per-stage source/RTV
+      resource transitions, final bloom shader-resource transitions, composite
+      target preparation, and the composite-to-combined copy into
+      `BloomPass::PrepareSourceToRenderTarget`,
+      `BloomPass::TransitionToShaderResource`,
+      `BloomPass::PrepareCompositeTargets`, and
+      `BloomPass::CopyCompositeToCombined`. `Renderer_Bloom.cpp` still owns
+      stage ordering plus source/target selection and now has no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`, or `CopyResource` calls.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=26`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, Effects Showcase passed at
+      `effects_showcase_20260511_120821_924_88260_0bf4035b`, Effects Gallery
+      passed at `effects_gallery_20260511_120827_393_98236_4e3a20b9`, and RT
+      showcase passed at `rt_showcase_20260511_120833_659_97464_0f6c2f17`.
+      The broader ownership rows remain `PARTIAL` because HZB, RT, temporal,
+      graph orchestration, and other renderer pass mechanics still live in
+      renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

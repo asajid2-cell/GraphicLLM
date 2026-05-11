@@ -228,35 +228,15 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
     if (!m_mainTargets.hdr.resources.color || !m_bloomResources.resources.texA[0]) {
         return false;
     }
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER barriers[2] = {};
-        UINT barrierCount = 0;
-
-        if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_bloomResources.resources.resourceState[0][0] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[0].Get();
-            barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[0][0];
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (barrierCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-        }
+    if (!BloomPass::PrepareSourceToRenderTarget({
+            m_commandResources.graphicsList.Get(),
+            {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state},
+            {m_bloomResources.resources.texA[0].Get(), &m_bloomResources.resources.resourceState[0][0]},
+            skipTransitions,
+        })) {
+        return false;
     }
 
-    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    m_bloomResources.resources.resourceState[0][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[0].Get(), m_bloomResources.resources.rtv[0][0]})) {
         return false;
     }
@@ -275,35 +255,15 @@ bool Renderer::RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions) 
     if (level == 0 || level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texA[level - 1]) {
         return false;
     }
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER barriers[2] = {};
-        UINT barrierCount = 0;
-
-        if (m_bloomResources.resources.resourceState[level - 1][0] != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[level - 1].Get();
-            barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level - 1][0];
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (m_bloomResources.resources.resourceState[level][0] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[level].Get();
-            barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][0];
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (barrierCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-        }
+    if (!BloomPass::PrepareSourceToRenderTarget({
+            m_commandResources.graphicsList.Get(),
+            {m_bloomResources.resources.texA[level - 1].Get(), &m_bloomResources.resources.resourceState[level - 1][0]},
+            {m_bloomResources.resources.texA[level].Get(), &m_bloomResources.resources.resourceState[level][0]},
+            skipTransitions,
+        })) {
+        return false;
     }
 
-    m_bloomResources.resources.resourceState[level - 1][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get(), m_bloomResources.resources.rtv[level][0]})) {
         return false;
     }
@@ -323,35 +283,15 @@ bool Renderer::RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions) {
     if (level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texB[level]) {
         return false;
     }
-    if (!skipTransitions) {
-            D3D12_RESOURCE_BARRIER barriers[2] = {};
-            UINT barrierCount = 0;
-
-            if (m_bloomResources.resources.resourceState[level][0] != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-                barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[level].Get();
-                barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][0];
-                barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                ++barrierCount;
-            }
-
-            if (m_bloomResources.resources.resourceState[level][1] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-                barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texB[level].Get();
-                barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][1];
-                barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-                barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                ++barrierCount;
-            }
-
-            if (barrierCount > 0) {
-                m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-            }
+    if (!BloomPass::PrepareSourceToRenderTarget({
+            m_commandResources.graphicsList.Get(),
+            {m_bloomResources.resources.texA[level].Get(), &m_bloomResources.resources.resourceState[level][0]},
+            {m_bloomResources.resources.texB[level].Get(), &m_bloomResources.resources.resourceState[level][1]},
+            skipTransitions,
+        })) {
+        return false;
     }
 
-    m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    m_bloomResources.resources.resourceState[level][1] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texB[level].Get(), m_bloomResources.resources.rtv[level][1]})) {
         return false;
     }
@@ -371,35 +311,15 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
     if (level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texB[level]) {
         return false;
     }
-    if (!skipTransitions) {
-            D3D12_RESOURCE_BARRIER barriers[2] = {};
-            UINT barrierCount = 0;
-
-            if (m_bloomResources.resources.resourceState[level][1] != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-                barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texB[level].Get();
-                barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][1];
-                barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                ++barrierCount;
-            }
-
-            if (m_bloomResources.resources.resourceState[level][0] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-                barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[level].Get();
-                barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][0];
-                barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-                barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                ++barrierCount;
-            }
-
-            if (barrierCount > 0) {
-                m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-            }
+    if (!BloomPass::PrepareSourceToRenderTarget({
+            m_commandResources.graphicsList.Get(),
+            {m_bloomResources.resources.texB[level].Get(), &m_bloomResources.resources.resourceState[level][1]},
+            {m_bloomResources.resources.texA[level].Get(), &m_bloomResources.resources.resourceState[level][0]},
+            skipTransitions,
+        })) {
+        return false;
     }
 
-    m_bloomResources.resources.resourceState[level][1] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get(), m_bloomResources.resources.rtv[level][0]})) {
         return false;
     }
@@ -413,15 +333,10 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
 
     FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
 
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER finalBarrier = {};
-        finalBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        finalBarrier.Transition.pResource = m_bloomResources.resources.texA[level].Get();
-        finalBarrier.Transition.StateBefore = m_bloomResources.resources.resourceState[level][0];
-        finalBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        finalBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &finalBarrier);
-        m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (!BloomPass::TransitionToShaderResource(m_commandResources.graphicsList.Get(),
+                                               {m_bloomResources.resources.texA[level].Get(), &m_bloomResources.resources.resourceState[level][0]},
+                                               skipTransitions)) {
+        return false;
     }
 
     return true;
@@ -432,41 +347,20 @@ bool Renderer::RenderBloomComposite(bool skipTransitions) {
     if (!m_bloomResources.resources.texA[baseLevel] || !m_bloomResources.resources.texB[baseLevel]) {
         return false;
     }
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER barriers[kBloomLevels + 1] = {};
-        UINT barrierCount = 0;
 
-        for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-            if (m_bloomResources.resources.texA[level] && m_bloomResources.resources.resourceState[level][0] != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-                barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texA[level].Get();
-                barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[level][0];
-                barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                ++barrierCount;
-            }
-        }
-
-        if (m_bloomResources.resources.resourceState[baseLevel][1] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_bloomResources.resources.texB[baseLevel].Get();
-            barriers[barrierCount].Transition.StateBefore = m_bloomResources.resources.resourceState[baseLevel][1];
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-
-        if (barrierCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-        }
-    }
-
+    BloomPass::ResourceStateRef sourceRefs[kBloomLevels] = {};
     for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-        if (m_bloomResources.resources.texA[level]) {
-            m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
+        sourceRefs[level] = {m_bloomResources.resources.texA[level].Get(), &m_bloomResources.resources.resourceState[level][0]};
     }
-    m_bloomResources.resources.resourceState[baseLevel][1] = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if (!BloomPass::PrepareCompositeTargets({
+            m_commandResources.graphicsList.Get(),
+            std::span<BloomPass::ResourceStateRef>(sourceRefs, m_bloomResources.resources.activeLevels),
+            {m_bloomResources.resources.texB[baseLevel].Get(), &m_bloomResources.resources.resourceState[baseLevel][1]},
+            skipTransitions,
+        })) {
+        return false;
+    }
+
     if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texB[baseLevel].Get(), m_bloomResources.resources.rtv[baseLevel][1]})) {
         return false;
     }
@@ -496,49 +390,12 @@ bool Renderer::CopyBloomCompositeToCombined(bool skipTransitions) {
         return false;
     }
 
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER copyBarriers[2] = {};
-        UINT copyCount = 0;
-
-        if (m_bloomResources.resources.resourceState[baseLevel][1] != D3D12_RESOURCE_STATE_COPY_SOURCE) {
-            copyBarriers[copyCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            copyBarriers[copyCount].Transition.pResource = m_bloomResources.resources.texB[baseLevel].Get();
-            copyBarriers[copyCount].Transition.StateBefore = m_bloomResources.resources.resourceState[baseLevel][1];
-            copyBarriers[copyCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-            copyBarriers[copyCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++copyCount;
-        }
-
-        if (m_bloomResources.resources.resourceState[baseLevel][0] != D3D12_RESOURCE_STATE_COPY_DEST) {
-            copyBarriers[copyCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            copyBarriers[copyCount].Transition.pResource = m_bloomResources.resources.texA[baseLevel].Get();
-            copyBarriers[copyCount].Transition.StateBefore = m_bloomResources.resources.resourceState[baseLevel][0];
-            copyBarriers[copyCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-            copyBarriers[copyCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++copyCount;
-        }
-
-        if (copyCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(copyCount, copyBarriers);
-        }
-    }
-
-    m_bloomResources.resources.resourceState[baseLevel][1] = D3D12_RESOURCE_STATE_COPY_SOURCE;
-    m_bloomResources.resources.resourceState[baseLevel][0] = D3D12_RESOURCE_STATE_COPY_DEST;
-    m_commandResources.graphicsList->CopyResource(m_bloomResources.resources.texA[baseLevel].Get(), m_bloomResources.resources.texB[baseLevel].Get());
-
-    if (!skipTransitions) {
-        D3D12_RESOURCE_BARRIER finalBarrier = {};
-        finalBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        finalBarrier.Transition.pResource = m_bloomResources.resources.texA[baseLevel].Get();
-        finalBarrier.Transition.StateBefore = m_bloomResources.resources.resourceState[baseLevel][0];
-        finalBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        finalBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &finalBarrier);
-        m_bloomResources.resources.resourceState[baseLevel][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    return true;
+    return BloomPass::CopyCompositeToCombined({
+        m_commandResources.graphicsList.Get(),
+        {m_bloomResources.resources.texB[baseLevel].Get(), &m_bloomResources.resources.resourceState[baseLevel][1]},
+        {m_bloomResources.resources.texA[baseLevel].Get(), &m_bloomResources.resources.resourceState[baseLevel][0]},
+        skipTransitions,
+    });
 }
 
 void Renderer::RenderBloom() {

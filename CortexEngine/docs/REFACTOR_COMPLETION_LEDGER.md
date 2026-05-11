@@ -757,6 +757,28 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    transient, full renderer ownership, descriptor/memory stress, lighting-energy,
    VB debug view, and visual probe checkpoints.
 
+   Recent ownership checkpoints:
+
+   - `9f71c4a` moved public particle instance/quad buffer allocation, upload,
+     and vertex-buffer view creation into `ParticleRenderResources`; Release
+     rebuild, renderer ownership/full audit, effects gallery
+     `effects_gallery_20260511_101129_725_91916_21cc4c83`, effects showcase
+     `effects_showcase_20260511_101129_734_89376_3dc73769`, and GPU particle
+     contract tests passed. The public GPU particle path remains incomplete
+     because runtime simulation/sort/render still report false.
+   - `1054cdc` moved particle render-target barriers, pipeline binding, and
+     draw submission into `ParticleBillboardPass`; Release rebuild, renderer
+     ownership/full audit, effects gallery
+     `effects_gallery_20260511_101833_643_92584_271f436d`, effects showcase
+     `effects_showcase_20260511_101833_638_93028_20bd533f`, and GPU particle
+     contract tests passed.
+   - The current checkpoint moves shared HDR/depth target transitions and binding for
+     water, transparent, and overlay passes into `ForwardTargetBindingPass`;
+     Release rebuild, renderer ownership/full audit, glass/water courtyard
+     `glass_water_courtyard_20260511_102340_840_92924_c79adf2d`, Material Lab
+     `material_lab_20260511_102340_867_83768_b0d0d5a9`, and effects showcase
+     `effects_showcase_20260511_102340_851_91340_72aff482` passed.
+
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:
 

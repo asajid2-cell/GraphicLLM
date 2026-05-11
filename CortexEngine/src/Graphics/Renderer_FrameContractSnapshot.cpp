@@ -402,10 +402,20 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.executed = m_particleState.frameExecuted;
     contract.particles.publicRuntimePath = featurePlan.runParticles;
     contract.particles.gpuParticlePublicPath = false;
+    contract.particles.cpuSimulationPath = featurePlan.runParticles;
+    contract.particles.gpuSimulationPath = false;
+    contract.particles.gpuSortPath = false;
+    contract.particles.gpuDrawPath = featurePlan.runParticles;
     contract.particles.simulationBudgetTracked = featurePlan.runParticles;
     contract.particles.runtimeBackend = featurePlan.runParticles
-        ? "ecs_billboard_instanced"
-        : (m_particleState.enabledForScene ? "ecs_billboard_idle" : "disabled");
+        ? "ecs_cpu_sim_dx12_instanced_billboard"
+        : (m_particleState.enabledForScene ? "ecs_cpu_sim_idle" : "disabled");
+    contract.particles.simulationBackend = featurePlan.runParticles
+        ? "ecs_cpu"
+        : (m_particleState.enabledForScene ? "ecs_cpu_idle" : "disabled");
+    contract.particles.renderBackend = featurePlan.runParticles
+        ? "dx12_instanced_billboard"
+        : (m_particleState.enabledForScene ? "dx12_instanced_billboard_idle" : "disabled");
     contract.particles.instanceMapFailed = m_particleState.instanceMapFailed;
     contract.particles.capped = m_particleState.frameCapped;
     contract.particles.densityScale = m_particleState.densityScale;

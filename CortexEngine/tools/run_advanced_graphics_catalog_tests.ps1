@@ -154,6 +154,9 @@ if ($systems.ContainsKey("particles")) {
         "density_scale",
         "frame_contract_stats",
         "runtime_backend_stats",
+        "backend_stage_stats",
+        "cpu_simulation_backend",
+        "dx12_instanced_draw_backend",
         "simulation_budget_stats",
         "budgeted_zero_cost_disabled_path",
         "procedural_billboard_fallback")) {

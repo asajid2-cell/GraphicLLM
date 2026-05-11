@@ -706,6 +706,21 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.particles.planned && contract.particles.runtimeBackend.empty()) {
         warn("particle_runtime_backend_missing");
     }
+    if (contract.particles.planned && contract.particles.simulationBackend.empty()) {
+        warn("particle_simulation_backend_missing");
+    }
+    if (contract.particles.planned && contract.particles.renderBackend.empty()) {
+        warn("particle_render_backend_missing");
+    }
+    if (contract.particles.planned && !contract.particles.gpuDrawPath) {
+        warn("particle_gpu_draw_path_missing");
+    }
+    if (contract.particles.gpuParticlePublicPath &&
+        (!contract.particles.gpuSimulationPath ||
+         !contract.particles.gpuSortPath ||
+         !contract.particles.gpuDrawPath)) {
+        warn("particle_gpu_public_path_incomplete");
+    }
     if (contract.particles.effectPreset != "gallery_mix" &&
         contract.particles.emitterCount > 0 &&
         contract.particles.presetMismatchedEmitters > 0) {

@@ -106,7 +106,7 @@
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",
-      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, fullscreen draw submission, temporal-screen resources, and cinematic post controls are held in named state/pass helpers and validated through ownership, graphics presets, and effects showcase frame-contract reporting",
+      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, fullscreen draw submission, temporal-screen resources, and cinematic post controls are held in named state/pass helpers and validated through ownership, graphics presets, and effects showcase frame-contract reporting. BloomPyramidResources::CreateTargets owns persistent bloom texture, RTV, and SRV creation; Renderer_Bloom.cpp only supplies dimensions, budgeted level count, and services",
       "validated_contracts": ["graphics_preset", "effects_gallery", "effects_showcase", "phase3_visual_matrix"],
       "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h", "Renderer_Bloom.cpp", "Passes/FullscreenPass.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],

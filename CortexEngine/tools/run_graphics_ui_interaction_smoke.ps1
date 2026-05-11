@@ -48,6 +48,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
   "lighting": {
     "exposure": 1.31,
     "bloom_intensity": 0.19,
+    "warm": 0.36,
+    "cool": -0.14,
     "sun_intensity": 4.4,
     "god_ray_intensity": 0.17,
     "area_light_size_scale": 1.42
@@ -139,6 +141,8 @@ if ($exitCode -ne 0) {
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
+    Assert-Near "warm_color_grade" ([double]$fc.cinematic_post.warm) 0.36 0.03
+    Assert-Near "cool_color_grade" ([double]$fc.cinematic_post.cool) -0.14 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
     if ($null -eq $fc.ray_tracing.rt_reflection_tuning) {

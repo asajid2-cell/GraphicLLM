@@ -39,6 +39,8 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   "lighting": {
     "exposure": 1.37,
     "bloom_intensity": 0.18,
+    "warm": 0.42,
+    "cool": -0.18,
     "sun_intensity": 3.5,
     "god_ray_intensity": 0.0
   },
@@ -169,8 +171,16 @@ if ($validRun.exit_code -ne 0) {
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
+    $warm = [double]$report.frame_contract.cinematic_post.warm
+    $cool = [double]$report.frame_contract.cinematic_post.cool
     if (-not [bool]$report.frame_contract.cinematic_post.enabled) {
         Add-Failure "valid settings cinematic post was not enabled"
+    }
+    if ([Math]::Abs($warm - 0.42) -gt 0.03) {
+        Add-Failure "valid settings warm color grade was $warm, expected 0.42"
+    }
+    if ([Math]::Abs($cool + 0.18) -gt 0.03) {
+        Add-Failure "valid settings cool color grade was $cool, expected -0.18"
     }
     if ([Math]::Abs($vignette - 0.31) -gt 0.02) {
         Add-Failure "valid settings vignette was $vignette, expected 0.31"

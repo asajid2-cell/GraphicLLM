@@ -100,6 +100,7 @@ if ($failures.Count -eq 0) {
     $materials = $report.frame_contract.materials
     $renderables = $report.frame_contract.renderables
     $drawCounts = $report.frame_contract.draw_counts
+    $water = $report.frame_contract.water
     $rt = $report.frame_contract.ray_tracing
 
     if ([string]$report.scene -ne "glass_water_courtyard") {
@@ -157,6 +158,22 @@ if ($failures.Count -eq 0) {
     }
     if ([int]$drawCounts.water_draws -lt 1) {
         Add-Failure "water draw count is $($drawCounts.water_draws), expected >= 1"
+    }
+    if ($null -eq $water) {
+        Add-Failure "water contract section is missing"
+    } else {
+        if ([double]$water.wave_amplitude -le 0.0 -or [double]$water.wave_amplitude -gt 2.0) {
+            Add-Failure "water wave amplitude is $($water.wave_amplitude), expected (0, 2]"
+        }
+        if ([double]$water.wave_length -lt 0.1 -or [double]$water.wave_length -gt 100.0) {
+            Add-Failure "water wavelength is $($water.wave_length), expected [0.1, 100]"
+        }
+        if ([double]$water.wave_speed -le 0.0 -or [double]$water.wave_speed -gt 20.0) {
+            Add-Failure "water speed is $($water.wave_speed), expected (0, 20]"
+        }
+        if ([double]$water.secondary_amplitude -lt 0.0 -or [double]$water.secondary_amplitude -gt 2.0) {
+            Add-Failure "water secondary amplitude is $($water.secondary_amplitude), expected [0, 2]"
+        }
     }
     $waterPass = Get-FrameContractPass $report "Water"
     if ($null -eq $waterPass) {

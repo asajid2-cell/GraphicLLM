@@ -655,6 +655,18 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.particles.instanceMapFailed) {
         warn("particle_instance_map_failed");
     }
+    if (contract.water.waveAmplitude < 0.0f ||
+        contract.water.waveAmplitude > 2.0f ||
+        contract.water.waveLength < 0.1f ||
+        contract.water.waveLength > 100.0f ||
+        contract.water.waveSpeed < 0.0f ||
+        contract.water.waveSpeed > 20.0f ||
+        contract.water.secondaryAmplitude < 0.0f ||
+        contract.water.secondaryAmplitude > 2.0f ||
+        contract.water.steepness < 0.0f ||
+        contract.water.steepness > 1.0f) {
+        warn("water_params_out_of_range");
+    }
     if (contract.cinematicPost.bloomThreshold < 0.1f ||
         contract.cinematicPost.bloomThreshold > 10.0f ||
         contract.cinematicPost.bloomSoftKnee < 0.0f ||

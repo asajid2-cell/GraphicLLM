@@ -301,6 +301,13 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.instanceCapacity = m_particleState.instanceCapacity;
     contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
 
+    contract.water.levelY = m_waterState.levelY;
+    contract.water.waveAmplitude = m_waterState.waveAmplitude;
+    contract.water.waveLength = m_waterState.waveLength;
+    contract.water.waveSpeed = m_waterState.waveSpeed;
+    contract.water.secondaryAmplitude = m_waterState.secondaryAmplitude;
+    contract.water.steepness = m_waterState.steepness;
+
     contract.vegetation.enabled = m_vegetationState.enabled;
     contract.vegetation.meshPipelineReady = static_cast<bool>(m_vegetationState.meshPipeline);
     contract.vegetation.billboardPipelineReady = static_cast<bool>(m_vegetationState.billboardPipeline);

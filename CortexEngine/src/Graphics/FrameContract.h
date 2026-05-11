@@ -288,6 +288,15 @@ struct FrameContract {
         uint64_t instanceBufferBytes = 0;
     };
 
+    struct WaterInfo {
+        float levelY = 0.0f;
+        float waveAmplitude = 0.0f;
+        float waveLength = 8.0f;
+        float waveSpeed = 0.0f;
+        float secondaryAmplitude = 0.0f;
+        float steepness = 0.0f;
+    };
+
     struct VegetationInfo {
         bool enabled = false;
         bool meshPipelineReady = false;
@@ -572,6 +581,7 @@ struct FrameContract {
     LightingInfo lighting;
     CullingInfo culling;
     ParticleInfo particles;
+    WaterInfo water;
     VegetationInfo vegetation;
     CinematicPostInfo cinematicPost;
     MotionVectorInfo motionVectors;

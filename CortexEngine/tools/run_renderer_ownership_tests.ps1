@@ -81,6 +81,7 @@ $ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
 $ssrPassPath = Join-Path $root "src/Graphics/Passes/SSRPass.cpp"
 $hzbStatePath = Join-Path $root "src/Graphics/RendererHZBState.h"
 $hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
+$hzbPassPath = Join-Path $root "src/Graphics/Passes/HZBPass.cpp"
 $shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
 $shadowResourcesPath = Join-Path $root "src/Graphics/Renderer_ShadowResources.cpp"
 $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
@@ -660,6 +661,32 @@ foreach ($target in $doc.targets) {
                     Add-Failure "hzb_resources still uses flat HZB state access in Renderer_HZB.cpp: $oldFlatAccess"
                 }
             }
+        }
+    }
+
+    if ($id -eq "hzb_compute_build") {
+        if (Test-Path $hzbPassPath) {
+            $hzbPass = Get-Content $hzbPassPath -Raw
+            foreach ($required in @("BuildContext", "BuildFromDepth", "ResourceStateRef", "TransitionResource", "TransitionHZBMipToShaderResource", "SetComputeRootSignature", "SetComputeRootDescriptorTable", "SetPipelineState", "Dispatch", "ResourceBarrier")) {
+                if ($hzbPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "hzb_compute_build missing HZBPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "hzb_compute_build missing HZBPass.cpp"
+        }
+        if (Test-Path $hzbRendererPath) {
+            $hzbRenderer = Get-Content $hzbRendererPath -Raw
+            if ($hzbRenderer.IndexOf("HZBPass::BuildFromDepth", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "hzb_compute_build missing routed HZB build call in Renderer_HZB.cpp"
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "SetComputeRootSignature", "SetComputeRootDescriptorTable", "Dispatch(")) {
+                if ($hzbRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "hzb_compute_build still has direct HZB build mechanics in Renderer_HZB.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "hzb_compute_build missing Renderer_HZB.cpp"
         }
     }
 

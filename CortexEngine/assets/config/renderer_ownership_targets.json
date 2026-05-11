@@ -183,6 +183,16 @@
       "future_extension": "Keep future HZB culling/debug expansion inside the resources/descriptors/debug/capture bundles before adding renderer orchestration"
     },
     {
+      "id": "hzb_compute_build",
+      "owner": "HZB depth build compute pass",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_HZB.cpp still owns HZB resource/descriptor creation and capture metadata, but depth/HZB resource transitions, compute root and pipeline binding, descriptor-table binding, mip dispatch, and per-mip shader-resource finalization are owned by HZBPass::BuildFromDepth",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/HZBPass.h", "Passes/HZBPass.cpp", "Renderer_HZB.cpp"],
+      "renderer_state_members": ["m_hzbResources", "m_depthResources", "m_commandResources", "m_pipelineState"],
+      "future_extension": "Keep future legacy HZB compute build mechanics in HZBPass or replace them with fully declarative render-graph resource declarations"
+    },
+    {
       "id": "shadow_resources",
       "owner": "Shadow maps",
       "status": "release_boundary_validated",

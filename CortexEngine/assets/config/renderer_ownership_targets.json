@@ -193,6 +193,16 @@
       "future_extension": "Keep future temporal-mask resource barriers and readback-copy mechanics in TemporalRejectionMask or declarative render-graph resource declarations"
     },
     {
+      "id": "temporal_mask_resources",
+      "owner": "Temporal rejection mask persistent resources",
+      "status": "release_boundary_validated",
+      "release_boundary": "TemporalMaskPassState owns temporal rejection mask texture, SRV/UAV, stats UAV buffer, stats UAV descriptor, and per-frame stats readback allocation; Renderer_TemporalResources.cpp only validates renderer services/dimensions, resets frame-contract diagnostics, delegates creation, and logs the target size",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererTemporalState.h", "Renderer_TemporalResources.cpp"],
+      "renderer_state_members": ["m_temporalMaskState", "m_frameDiagnostics"],
+      "future_extension": "Keep future temporal-mask persistent resource or descriptor creation in TemporalMaskPassState or a narrower temporal-mask resource bundle instead of reintroducing direct descriptor/resource creation in Renderer_TemporalResources.cpp"
+    },
+    {
       "id": "motion_vector_target_transitions",
       "owner": "Motion-vector velocity/depth targets",
       "status": "release_boundary_validated",

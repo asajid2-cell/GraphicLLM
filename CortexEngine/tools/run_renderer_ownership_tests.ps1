@@ -78,6 +78,8 @@ $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
+$temporalStatePath = Join-Path $root "src/Graphics/RendererTemporalState.h"
+$temporalResourcesPath = Join-Path $root "src/Graphics/Renderer_TemporalResources.cpp"
 $taaCopyPassPath = Join-Path $root "src/Graphics/Passes/TAACopyPass.cpp"
 $taaExecutionPath = Join-Path $root "src/Graphics/Renderer_TAAExecution.cpp"
 $temporalMaskPath = Join-Path $root "src/Graphics/TemporalRejectionMask.cpp"
@@ -740,6 +742,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "temporal_mask_resource_transitions missing Renderer_TemporalMaskPass.cpp"
+        }
+    }
+
+    if ($id -eq "temporal_mask_resources") {
+        if (Test-Path $temporalStatePath) {
+            $temporalState = Get-Content $temporalStatePath -Raw
+            foreach ($required in @("TemporalMaskDefaultHeapProperties", "TemporalMaskReadbackHeapProperties", "TemporalMaskPassState", "CreateResources", "CreateCommittedResource", "CreateShaderResourceView", "CreateUnorderedAccessView", "statsReadback")) {
+                if ($temporalState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "temporal_mask_resources missing RendererTemporalState.h marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "temporal_mask_resources missing RendererTemporalState.h"
+        }
+        if (Test-Path $temporalResourcesPath) {
+            $temporalResources = Get-Content $temporalResourcesPath -Raw
+            foreach ($route in @("m_temporalMaskState.CreateResources", "m_frameDiagnostics.contract.temporalMask = {}", "Temporal rejection mask created")) {
+                if ($temporalResources.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "temporal_mask_resources missing delegated resource creation in Renderer_TemporalResources.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "CreateShaderResourceView", "CreateUnorderedAccessView", "AllocateStagingCBV_SRV_UAV", "D3D12_RESOURCE_DESC")) {
+                if ($temporalResources.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "temporal_mask_resources still has direct temporal-mask resource creation in Renderer_TemporalResources.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "temporal_mask_resources missing Renderer_TemporalResources.cpp"
         }
     }
 

@@ -70,7 +70,12 @@ $IDC_GFX_SSR_DISTANCE = 9043
 $IDC_GFX_SSR_THICKNESS = 9044
 $IDC_GFX_SSR_STRENGTH = 9045
 $IDC_GFX_FOG_HEIGHT = 9040
+$IDC_GFX_WATER_WAVE = 9021
+$IDC_GFX_WATER_LENGTH = 9037
+$IDC_GFX_WATER_SPEED = 9038
+$IDC_GFX_WATER_SECONDARY = 9039
 $IDC_GFX_WATER_ROUGHNESS = 9046
+$IDC_GFX_WATER_FRESNEL = 9047
 $IDC_GFX_PARTICLE_DENSITY = 9028
 $IDC_GFX_PARTICLE_QUALITY = 9064
 $IDC_GFX_PARTICLE_BLOOM = 9065
@@ -196,7 +201,12 @@ try {
         Set-Trackbar $window $IDC_GFX_SSAO_BIAS 63
         Set-Trackbar $window $IDC_GFX_SSAO_INTENSITY 39
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
+        Set-Trackbar $window $IDC_GFX_WATER_WAVE 37
+        Set-Trackbar $window $IDC_GFX_WATER_LENGTH 44
+        Set-Trackbar $window $IDC_GFX_WATER_SPEED 31
+        Set-Trackbar $window $IDC_GFX_WATER_SECONDARY 29
         Set-Trackbar $window $IDC_GFX_WATER_ROUGHNESS 41
+        Set-Trackbar $window $IDC_GFX_WATER_FRESNEL 46
         Set-Trackbar $window $IDC_GFX_PARTICLE_DENSITY 61
         Set-Trackbar $window $IDC_GFX_PARTICLE_QUALITY 66
         Set-Trackbar $window $IDC_GFX_PARTICLE_BLOOM 57
@@ -261,7 +271,12 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.063 0.01
     Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 1.95 0.12
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
+    Assert-Near "water_wave_amplitude" ([double]$fc.water.wave_amplitude) 0.74 0.06
+    Assert-Near "water_wave_length" ([double]$fc.water.wave_length) 44.1 0.8
+    Assert-Near "water_wave_speed" ([double]$fc.water.wave_speed) 6.2 0.3
+    Assert-Near "water_secondary_amplitude" ([double]$fc.water.secondary_amplitude) 0.58 0.06
     Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.416 0.05
+    Assert-Near "water_fresnel_strength" ([double]$fc.water.fresnel_strength) 1.38 0.08
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 1.22 0.05
     Assert-Near "particle_quality" ([double]$fc.particles.quality_scale) 1.405 0.06
     Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.14 0.06

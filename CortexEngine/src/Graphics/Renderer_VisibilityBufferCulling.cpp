@@ -125,8 +125,8 @@ D3D12_GPU_VIRTUAL_ADDRESS Renderer::ResolveVisibilityBufferCullMask(uint32_t deb
 
     bool useHzbOcclusion = false;
     if (!s_disableHzb &&
-        m_hzbResources.valid && m_hzbResources.captureValid && m_hzbResources.texture && m_hzbResources.mipCount > 0 &&
-        (m_hzbResources.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter)) {
+        m_hzbResources.resources.valid && m_hzbResources.capture.captureValid && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0 &&
+        (m_hzbResources.capture.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter)) {
         useHzbOcclusion = true;
     }
     if (freezeCulling) {
@@ -135,28 +135,28 @@ D3D12_GPU_VIRTUAL_ADDRESS Renderer::ResolveVisibilityBufferCullMask(uint32_t deb
     m_visibilityBufferState.hzbOcclusionUsedThisFrame = useHzbOcclusion;
 
     m_services.gpuCulling->SetHZBForOcclusion(
-        useHzbOcclusion ? m_hzbResources.texture.Get() : nullptr,
-        m_hzbResources.width,
-        m_hzbResources.height,
-        m_hzbResources.mipCount,
-        m_hzbResources.captureViewMatrix,
-        m_hzbResources.captureViewProjMatrix,
-        m_hzbResources.captureCameraPosWS,
-        m_hzbResources.captureNearPlane,
-        m_hzbResources.captureFarPlane,
+        useHzbOcclusion ? m_hzbResources.resources.texture.Get() : nullptr,
+        m_hzbResources.resources.width,
+        m_hzbResources.resources.height,
+        m_hzbResources.resources.mipCount,
+        m_hzbResources.capture.captureViewMatrix,
+        m_hzbResources.capture.captureViewProjMatrix,
+        m_hzbResources.capture.captureCameraPosWS,
+        m_hzbResources.capture.captureNearPlane,
+        m_hzbResources.capture.captureFarPlane,
         useHzbOcclusion);
 
     if (useHzbOcclusion &&
-        m_hzbResources.texture &&
-        (m_hzbResources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
+        m_hzbResources.resources.texture &&
+        (m_hzbResources.resources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hzbResources.texture.Get();
-        barrier.Transition.StateBefore = m_hzbResources.resourceState;
+        barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
+        barrier.Transition.StateBefore = m_hzbResources.resources.resourceState;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_hzbResources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     }
 
     static bool s_debugCullingEnv = (std::getenv("CORTEX_DEBUG_CULLING") != nullptr);

@@ -55,17 +55,17 @@ void Renderer::RenderPostProcess() {
 
     // HZB debug view reuses slot t6; ensure the pyramid is pixel-shader readable.
     const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
-    if (wantsHzbDebug && m_hzbResources.texture) {
+    if (wantsHzbDebug && m_hzbResources.resources.texture) {
         const D3D12_RESOURCE_STATES desired =
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        if (m_hzbResources.resourceState != desired) {
+        if (m_hzbResources.resources.resourceState != desired) {
             barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_hzbResources.texture.Get();
-            barriers[barrierCount].Transition.StateBefore = m_hzbResources.resourceState;
+            barriers[barrierCount].Transition.pResource = m_hzbResources.resources.texture.Get();
+            barriers[barrierCount].Transition.StateBefore = m_hzbResources.resources.resourceState;
             barriers[barrierCount].Transition.StateAfter = desired;
             barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++barrierCount;
-            m_hzbResources.resourceState = desired;
+            m_hzbResources.resources.resourceState = desired;
         }
     }
 

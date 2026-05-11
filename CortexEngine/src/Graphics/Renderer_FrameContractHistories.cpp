@@ -230,18 +230,18 @@ void Renderer::UpdateFrameContractHistories() {
         m_gpuCullingState.freeze || (std::getenv("CORTEX_GPUCULL_FREEZE") != nullptr);
     m_frameDiagnostics.contract.contract.culling.visibilityBufferPlanned = m_visibilityBufferState.plannedThisFrame;
     m_frameDiagnostics.contract.contract.culling.visibilityBufferRendered = m_visibilityBufferState.renderedThisFrame;
-    m_frameDiagnostics.contract.contract.culling.hzbResourceValid = m_hzbResources.texture != nullptr;
-    m_frameDiagnostics.contract.contract.culling.hzbValid = m_hzbResources.valid;
-    m_frameDiagnostics.contract.contract.culling.hzbCaptureValid = m_hzbResources.captureValid;
+    m_frameDiagnostics.contract.contract.culling.hzbResourceValid = m_hzbResources.resources.texture != nullptr;
+    m_frameDiagnostics.contract.contract.culling.hzbValid = m_hzbResources.resources.valid;
+    m_frameDiagnostics.contract.contract.culling.hzbCaptureValid = m_hzbResources.capture.captureValid;
     m_frameDiagnostics.contract.contract.culling.hzbOcclusionUsedByVisibilityBuffer = m_visibilityBufferState.hzbOcclusionUsedThisFrame;
     m_frameDiagnostics.contract.contract.culling.hzbOcclusionUsedByGpuCulling = m_gpuCullingState.hzbOcclusionUsedThisFrame;
-    m_frameDiagnostics.contract.contract.culling.hzbWidth = m_hzbResources.width;
-    m_frameDiagnostics.contract.contract.culling.hzbHeight = m_hzbResources.height;
-    m_frameDiagnostics.contract.contract.culling.hzbMipCount = m_hzbResources.mipCount;
-    m_frameDiagnostics.contract.contract.culling.hzbCaptureFrame = m_hzbResources.captureFrameCounter;
+    m_frameDiagnostics.contract.contract.culling.hzbWidth = m_hzbResources.resources.width;
+    m_frameDiagnostics.contract.contract.culling.hzbHeight = m_hzbResources.resources.height;
+    m_frameDiagnostics.contract.contract.culling.hzbMipCount = m_hzbResources.resources.mipCount;
+    m_frameDiagnostics.contract.contract.culling.hzbCaptureFrame = m_hzbResources.capture.captureFrameCounter;
     m_frameDiagnostics.contract.contract.culling.hzbAgeFrames =
-        (m_hzbResources.captureValid && m_frameLifecycle.renderFrameCounter >= m_hzbResources.captureFrameCounter)
-            ? (m_frameLifecycle.renderFrameCounter - m_hzbResources.captureFrameCounter)
+        (m_hzbResources.capture.captureValid && m_frameLifecycle.renderFrameCounter >= m_hzbResources.capture.captureFrameCounter)
+            ? (m_frameLifecycle.renderFrameCounter - m_hzbResources.capture.captureFrameCounter)
             : 0;
     if (m_services.gpuCulling) {
         const auto stats = m_services.gpuCulling->GetDebugStats();

@@ -56,6 +56,8 @@ $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
 $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
 $ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
+$hzbStatePath = Join-Path $root "src/Graphics/RendererHZBState.h"
+$hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -236,6 +238,32 @@ foreach ($target in $doc.targets) {
             foreach ($oldFlatAccess in @("m_ssrResources.enabled", "m_ssrResources.color", "m_ssrResources.resourceState", "m_ssrResources.srvTables")) {
                 if ($ssrRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "screen_space_resources still uses flat SSR state access in Renderer_SSRPass.cpp: $oldFlatAccess"
+                }
+            }
+        }
+    }
+
+    if ($id -eq "hzb_resources") {
+        if (-not (Test-Path $hzbStatePath)) {
+            Add-Failure "hzb_resources missing RendererHZBState.h"
+        } else {
+            $hzbState = Get-Content $hzbStatePath -Raw
+            foreach ($required in @("struct HZBResources", "struct HZBDescriptorTables", "struct HZBDebugControls", "struct HZBCaptureState", "HZBResources resources", "HZBDescriptorTables descriptors", "HZBDebugControls debug", "HZBCaptureState capture")) {
+                if ($hzbState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "hzb_resources missing ownership marker in RendererHZBState.h: $required"
+                }
+            }
+            foreach ($oldField in @("ComPtr<ID3D12Resource> texture", "DescriptorHandle fullSRV", "dispatchTablesValid = false;", "uint32_t debugMip", "bool captureValid")) {
+                if ($hzbState -match "struct HZBPassState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "hzb_resources still exposes loose HZB state field in HZBPassState: $oldField"
+                }
+            }
+        }
+        if (Test-Path $hzbRendererPath) {
+            $hzbRenderer = Get-Content $hzbRendererPath -Raw
+            foreach ($oldFlatAccess in @("m_hzbResources.texture", "m_hzbResources.fullSRV", "m_hzbResources.dispatchTablesValid", "m_hzbResources.captureValid", "m_hzbResources.debugMip")) {
+                if ($hzbRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "hzb_resources still uses flat HZB state access in Renderer_HZB.cpp: $oldFlatAccess"
                 }
             }
         }

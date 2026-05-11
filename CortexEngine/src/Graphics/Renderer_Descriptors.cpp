@@ -377,8 +377,8 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     }
     writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    if (m_debugViewState.mode == 32u && m_hzbResources.texture && m_hzbResources.mipCount > 0) {
-        writeOrNull(6, m_hzbResources.texture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbResources.mipCount);
+    if (m_debugViewState.mode == 32u && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0) {
+        writeOrNull(6, m_hzbResources.resources.texture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbResources.resources.mipCount);
     } else {
         writeOrNull(6, m_ssrResources.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     }

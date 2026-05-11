@@ -389,6 +389,7 @@ struct LauncherState {
     HWND hwnd = nullptr;
     HFONT font = nullptr;
     HWND comboScene = nullptr;
+    HWND comboGraphicsPreset = nullptr;
     HWND comboQuality = nullptr;
     HWND chkRT = nullptr;
     HWND chkLLM = nullptr;
@@ -410,6 +411,7 @@ enum LauncherControlId : int {
     IDC_LAUNCH_DREAMER  = 2005,
     IDC_LAUNCH_RASTER   = 2006,
     IDC_LAUNCH_VOXEL    = 2007,
+    IDC_LAUNCH_GRAPHICS_PRESET = 2008,
     IDC_LAUNCH_OK       = 2010,
     IDC_LAUNCH_CANCEL   = 2011,
     IDC_LAUNCH_EDITOR   = 2012,
@@ -507,6 +509,18 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         SendMessageW(state->comboScene, CB_SETCURSEL, 0, 0);
         y += labelH + rowGap * 2;
 
+        // Graphics preset selection
+        makeLabel(L"Graphics preset", y);
+        state->comboGraphicsPreset = makeCombo(IDC_LAUNCH_GRAPHICS_PRESET, y);
+        SendMessageW(state->comboGraphicsPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Release Showcase"));
+        SendMessageW(state->comboGraphicsPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Safe Startup"));
+        int selectedGraphicsPreset = 0;
+        if (state->config && state->config->initialGraphicsPreset == "safe_startup") {
+            selectedGraphicsPreset = 1;
+        }
+        SendMessageW(state->comboGraphicsPreset, CB_SETCURSEL, selectedGraphicsPreset, 0);
+        y += labelH + rowGap * 2;
+
         // Quality mode
         makeLabel(L"Quality mode", y);
         state->comboQuality = makeCombo(IDC_LAUNCH_QUALITY, y);
@@ -579,6 +593,10 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 case 5: state->config->initialScenePreset = "dragon";      break;
                 case 6: state->config->initialScenePreset = "god_rays";    break;
                 }
+                // Graphics preset
+                int selGraphicsPreset = static_cast<int>(SendMessageW(state->comboGraphicsPreset, CB_GETCURSEL, 0, 0));
+                state->config->initialGraphicsPreset =
+                    (selGraphicsPreset == 1) ? "safe_startup" : "release_showcase";
                 // Quality
                 int selQuality = static_cast<int>(SendMessageW(state->comboQuality, CB_GETCURSEL, 0, 0));
                 state->config->qualityMode =

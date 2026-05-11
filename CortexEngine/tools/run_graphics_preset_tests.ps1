@@ -38,6 +38,8 @@ if (-not (Test-Path $PresetPath)) {
 
 $raw = Get-Content $PresetPath -Raw
 $presetDoc = $raw | ConvertFrom-Json
+$mainPath = Join-Path $root "src/main.cpp"
+$main = if (Test-Path $mainPath) { Get-Content $mainPath -Raw } else { "" }
 
 if ([int]$presetDoc.schema -ne 1) {
     Add-Failure "graphics preset schema must be 1"
@@ -99,6 +101,17 @@ foreach ($preset in $presetDoc.presets) {
 
 if (-not $defaultFound) {
     Add-Failure "default preset '$($presetDoc.default)' is not present"
+}
+
+foreach ($launcherToken in @(
+    "IDC_LAUNCH_GRAPHICS_PRESET",
+    "comboGraphicsPreset",
+    "initialGraphicsPreset",
+    "release_showcase",
+    "safe_startup")) {
+    if ($main.IndexOf($launcherToken, [StringComparison]::Ordinal) -lt 0) {
+        Add-Failure "launcher graphics preset contract missing '$launcherToken'"
+    }
 }
 
 $roundTripPath = Join-Path ([System.IO.Path]::GetTempPath()) ("cortex_graphics_presets_roundtrip_{0}.json" -f ([Guid]::NewGuid().ToString("N")))

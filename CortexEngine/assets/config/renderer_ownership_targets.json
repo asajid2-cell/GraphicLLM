@@ -266,11 +266,11 @@
       "id": "depth_resources",
       "owner": "Depth target",
       "status": "release_boundary_validated",
-      "release_boundary": "Depth buffer resource state and DSV/SRV descriptors are split into pass-owned nested bundles and validated by ownership plus temporal/RT runtime paths that sample and write depth",
+      "release_boundary": "Depth buffer resource state and DSV/SRV descriptors are split into pass-owned nested bundles. DepthPrepassTargetPass::CreateResources owns the depth texture, DSV/read-only DSV, and SRV creation; Renderer_DepthTarget.cpp only supplies size, render scale, services, and the device-removed callback. Ownership plus temporal/RT runtime paths validate depth write and sampling behavior",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
-      "target_files": ["RendererDepthState.h"],
+      "target_files": ["RendererDepthState.h", "Passes/DepthPrepassTargetPass.h", "Passes/DepthPrepassTargetPass.cpp", "Renderer_DepthTarget.cpp"],
       "renderer_state_members": ["m_depthResources"],
-      "future_extension": "Keep future depth pyramid, read-only DSV, and depth sampling expansion inside resources/descriptors or an explicitly named depth pass state before adding renderer orchestration"
+      "future_extension": "Keep future depth pyramid, read-only DSV, and depth sampling expansion inside resources/descriptors and DepthPrepassTargetPass resource helpers before adding renderer orchestration"
     },
     {
       "id": "depth_prepass_target_submission",

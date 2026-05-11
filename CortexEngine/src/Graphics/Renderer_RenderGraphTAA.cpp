@@ -23,24 +23,18 @@ Renderer::ExecuteTAAInRenderGraph() {
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_mainTargets.hdr.resources.color) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_taa_prerequisites_missing";
-        RenderTAA();
-        result.executed = true;
         return result;
     }
 
     if (!m_temporalAAState.enabled || !m_pipelineState.taa || !m_temporalScreenState.taaIntermediate || !m_services.window) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_taa_feature_disabled_or_resources_missing";
-        RenderTAA();
-        result.executed = true;
         return result;
     }
 
     if (!m_temporalScreenState.historyColor || !m_temporalScreenState.historySRV.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_taa_history_missing";
-        RenderTAA();
-        result.executed = true;
         return result;
     }
 
@@ -170,10 +164,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("TAA RG: {} (falling back to legacy path)", result.fallbackReason);
-        RenderTAA();
-        result.executed = true;
+        spdlog::warn("TAA RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;

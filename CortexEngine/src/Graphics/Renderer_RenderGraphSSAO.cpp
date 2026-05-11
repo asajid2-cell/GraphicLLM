@@ -20,20 +20,12 @@ Renderer::ExecuteSSAOInRenderGraph() {
         !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_prerequisites_missing";
-        if (useComputeSSAO) {
-            RenderSSAOAsync();
-        } else {
-            RenderSSAO();
-        }
-        result.executed = true;
         return result;
     }
 
     if (useComputeSSAO && !m_ssaoResources.resources.uav.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_uav_missing";
-        RenderSSAOAsync();
-        result.executed = true;
         return result;
     }
 
@@ -89,15 +81,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("SSAO RG: {} (falling back to legacy path)", result.fallbackReason);
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions, false);
-        if (useComputeSSAO) {
-            RenderSSAOAsync();
-        } else {
-            RenderSSAO();
-        }
-        result.executed = true;
+        spdlog::warn("SSAO RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;

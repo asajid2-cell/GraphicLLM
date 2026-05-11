@@ -1,6 +1,7 @@
-﻿#include "Renderer.h"
+#include "Renderer.h"
 #include "Core/Window.h"
 #include "Passes/BloomPass.h"
+#include "Passes/FullscreenPass.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 
@@ -268,7 +269,7 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+    FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
     return true;
 }
 
@@ -318,7 +319,7 @@ bool Renderer::RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions) 
         return false;
     }
 
-    m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+    FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
     return true;
 }
 
@@ -368,7 +369,7 @@ bool Renderer::RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+    FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
     return true;
 }
 
@@ -418,7 +419,7 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+    FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
 
     if (!skipTransitions) {
         D3D12_RESOURCE_BARRIER finalBarrier = {};
@@ -493,7 +494,7 @@ bool Renderer::RenderBloomComposite(bool skipTransitions) {
             return false;
         }
 
-        m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+        FullscreenPass::DrawTriangle(m_commandResources.graphicsList.Get());
     }
 
     return true;

@@ -226,6 +226,24 @@ json FrameContractToJson(const FrameContract& contract) {
             {"total_light_intensity", contract.lighting.totalLightIntensity},
             {"max_light_intensity", contract.lighting.maxLightIntensity}
         }},
+        {"atmosphere", {
+            {"enabled", contract.atmosphere.enabled},
+            {"fog_enabled", contract.atmosphere.fogEnabled},
+            {"height_fog_enabled", contract.atmosphere.heightFogEnabled},
+            {"depth_aware_fog", contract.atmosphere.depthAwareFog},
+            {"environment_matched_fog", contract.atmosphere.environmentMatchedFog},
+            {"god_rays_enabled", contract.atmosphere.godRaysEnabled},
+            {"volumetric_shafts_enabled", contract.atmosphere.volumetricShaftsEnabled},
+            {"depth_aware_shafts", contract.atmosphere.depthAwareShafts},
+            {"post_process_applied", contract.atmosphere.postProcessApplied},
+            {"fog_color_source", contract.atmosphere.fogColorSource},
+            {"shaft_occlusion_source", contract.atmosphere.shaftOcclusionSource},
+            {"fog_density", contract.atmosphere.fogDensity},
+            {"fog_start_distance", contract.atmosphere.fogStartDistance},
+            {"fog_height", contract.atmosphere.fogHeight},
+            {"fog_falloff", contract.atmosphere.fogFalloff},
+            {"god_ray_intensity", contract.atmosphere.godRayIntensity}
+        }},
         {"screen_space", {
             {"ssr_enabled", contract.screenSpace.ssrEnabled},
             {"ssr_max_distance", contract.screenSpace.ssrMaxDistance},

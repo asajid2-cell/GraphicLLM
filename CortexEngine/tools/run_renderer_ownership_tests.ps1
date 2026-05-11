@@ -943,7 +943,7 @@ foreach ($target in $doc.targets) {
             Add-Failure "shadow_resources missing RendererShadowState.h"
         } else {
             $shadowState = Get-Content $shadowStatePath -Raw
-            foreach ($required in @("struct ShadowMapResources", "struct ShadowMapRasterState", "struct ShadowMapControls", "struct ShadowMapPassState", "ShadowMapResources<ShadowArraySize> resources", "ShadowMapRasterState raster", "ShadowMapControls<ShadowCascadeCount> controls")) {
+            foreach ($required in @("struct ShadowMapResources", "struct ShadowMapRasterState", "struct ShadowMapControls", "struct ShadowMapPassState", "ShadowMapResources<ShadowArraySize> resources", "ShadowMapRasterState raster", "ShadowMapControls<ShadowCascadeCount> controls", "CreateMap", "CreateCommittedResource", "CreateDepthStencilView", "CreateShaderResourceView", "AllocateDSV", "AllocateStagingCBV_SRV_UAV")) {
                 if ($shadowState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "shadow_resources missing ownership marker in RendererShadowState.h: $required"
                 }
@@ -966,6 +966,19 @@ foreach ($target in $doc.targets) {
                     }
                 }
             }
+        }
+        if (Test-Path $shadowResourcesPath) {
+            $shadowResourcesSource = Get-Content $shadowResourcesPath -Raw
+            if ($shadowResourcesSource.IndexOf("m_shadowResources.resources.CreateMap", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "shadow_resources missing routed shadow map creation in Renderer_ShadowResources.cpp"
+            }
+            foreach ($directResourceCall in @("CreateCommittedResource", "CreateDepthStencilView", "CreateShaderResourceView", "AllocateDSV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($shadowResourcesSource.IndexOf($directResourceCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "shadow_resources still creates shadow-map resources directly in Renderer_ShadowResources.cpp: $directResourceCall"
+                }
+            }
+        } else {
+            Add-Failure "shadow_resources missing Renderer_ShadowResources.cpp"
         }
         if (Test-Path $shadowTargetPassPath) {
             $shadowTargetPass = Get-Content $shadowTargetPassPath -Raw

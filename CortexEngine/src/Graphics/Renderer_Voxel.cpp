@@ -6,8 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
-#include <cstring>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -298,95 +296,7 @@ Result<void> Renderer::UploadVoxelGridToGPU() {
     }
 
     ID3D12Device* device = m_services.device->GetDevice();
-    if (!device) {
-        return Result<void>::Err("UploadVoxelGridToGPU: device is null");
-    }
-
-    const UINT64 byteSize = static_cast<UINT64>(m_voxelState.gridCPU.size() * sizeof(uint32_t));
-
-    // Create or resize the upload buffer backing the voxel grid.
-    bool recreate = false;
-    if (!m_voxelState.gridBuffer) {
-        recreate = true;
-    } else {
-        auto desc = m_voxelState.gridBuffer->GetDesc();
-        if (desc.Width < byteSize) {
-            recreate = true;
-        }
-    }
-
-    if (recreate) {
-        m_voxelState.gridBuffer.Reset();
-
-        D3D12_HEAP_PROPERTIES heapProps{};
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC desc{};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = byteSize;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        HRESULT hr = device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&m_voxelState.gridBuffer));
-
-        if (FAILED(hr)) {
-            char buf[64];
-            sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
-            return Result<void>::Err(std::string("Failed to create voxel grid buffer (hr=") + buf + ")");
-        }
-
-        // Allocate a persistent SRV slot the first time we create the buffer.
-        if (!m_voxelState.gridSRV.IsValid() && m_services.descriptorManager) {
-            auto srvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (srvResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate SRV for voxel grid: " + srvResult.Error());
-            }
-            m_voxelState.gridSRV = srvResult.Value();
-        }
-
-        if (m_voxelState.gridSRV.IsValid()) {
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = static_cast<UINT>(m_voxelState.gridCPU.size());
-            srvDesc.Buffer.StructureByteStride = sizeof(uint32_t);
-            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-
-            device->CreateShaderResourceView(m_voxelState.gridBuffer.Get(), &srvDesc, m_voxelState.gridSRV.cpu);
-        }
-    }
-
-    // Upload the CPU voxel data into the buffer.
-    void* mapped = nullptr;
-    D3D12_RANGE readRange{0, 0};
-    HRESULT mapHr = m_voxelState.gridBuffer->Map(0, &readRange, &mapped);
-    if (FAILED(mapHr) || !mapped) {
-        char buf[64];
-        sprintf_s(buf, "0x%08X", static_cast<unsigned int>(mapHr));
-        return Result<void>::Err(std::string("Failed to map voxel grid buffer (hr=") + buf + ")");
-    }
-
-    memcpy(mapped, m_voxelState.gridCPU.data(), static_cast<size_t>(byteSize));
-    m_voxelState.gridBuffer->Unmap(0, nullptr);
-
-    return Result<void>::Ok();
+    return m_voxelState.UploadGridToGPU(device, m_services.descriptorManager.get());
 }
 
 // =============================================================================

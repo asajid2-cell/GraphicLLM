@@ -13,6 +13,16 @@
       "future_extension": "Move future voxel fullscreen/backend draw submission into VoxelPass before expanding the experimental backend"
     },
     {
+      "id": "voxel_grid_resources",
+      "owner": "Voxel backend",
+      "status": "release_boundary_validated",
+      "release_boundary": "VoxelRenderState owns voxel grid upload-buffer allocation, persistent SRV allocation/update, and map/copy/unmap upload mechanics; Renderer_Voxel.cpp owns scene voxelization policy and delegates GPU upload through VoxelRenderState::UploadGridToGPU",
+      "validated_contracts": ["renderer_ownership", "voxel_backend"],
+      "target_files": ["RendererVoxelState.h", "Renderer_Voxel.cpp"],
+      "renderer_state_members": ["m_voxelState"],
+      "future_extension": "Keep future voxel grid resource creation, descriptor writes, and CPU-to-GPU upload mechanics inside VoxelRenderState or a dedicated voxel resource pass"
+    },
+    {
       "id": "minimal_frame_submission",
       "owner": "Minimal debug frame",
       "status": "release_boundary_validated",

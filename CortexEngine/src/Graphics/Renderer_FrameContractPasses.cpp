@@ -180,6 +180,28 @@ void Renderer::RecordFramePass(const char* name,
         m_frameDiagnostics.contract.contract.cinematicPost.postProcessPlanned = planned;
         m_frameDiagnostics.contract.contract.cinematicPost.postProcessExecuted = executed;
     }
+    if (record.name == "Bloom" ||
+        record.name == "PostProcess" ||
+        (record.name == "RenderGraphEndFrame" &&
+         !m_frameDiagnostics.contract.contract.cinematicPost.budgetTracked)) {
+        auto& post = m_frameDiagnostics.contract.contract.cinematicPost;
+        post.budgetTracked = true;
+        post.estimatedWriteMB += record.estimatedWriteMB;
+        if (record.fullScreen) {
+            ++post.fullScreenPasses;
+        }
+        if ((post.resolutionClass.empty() ||
+             post.resolutionClass == "unknown" ||
+             post.resolutionClass == "none" ||
+             post.resolutionClass == "untracked") &&
+            !record.resolutionClass.empty()) {
+            post.resolutionClass = record.resolutionClass;
+        }
+        post.motionBlurBudgeted = post.budgetTracked && post.motionBlurEnabled && post.motionBlur > 0.0f;
+        post.depthOfFieldBudgeted = post.budgetTracked && post.depthOfFieldEnabled && post.depthOfField > 0.0f;
+        post.vignetteBudgeted = post.budgetTracked && post.vignette > 0.0f;
+        post.lensDirtBudgeted = post.budgetTracked && post.lensDirt > 0.0f;
+    }
 
     m_frameDiagnostics.contract.passRecords.push_back(std::move(record));
 }

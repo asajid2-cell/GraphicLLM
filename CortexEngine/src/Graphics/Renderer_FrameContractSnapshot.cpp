@@ -9,6 +9,7 @@
 #include "Scene/ECS_Registry.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -64,6 +65,73 @@ void ApplyBudgetPlanToContract(FrameContract::BudgetInfo& info, const RendererBu
     info.rtResolutionScale = plan.rtResolutionScale;
     info.reflectionUpdateCadence = plan.reflectionUpdateCadence;
     info.giUpdateCadence = plan.giUpdateCadence;
+}
+
+bool IsCinematicPostPass(const FrameContract::PassRecord& pass) {
+    return pass.name == "PostProcess" ||
+           pass.name == "Bloom" ||
+           pass.name == "RenderGraphEndFrame";
+}
+
+void FinalizeCinematicPostBudget(FrameContract& contract) {
+    auto& post = contract.cinematicPost;
+
+    post.estimatedWriteMB = 0.0;
+    post.fullScreenPasses = 0;
+    post.budgetTracked = false;
+    post.resolutionClass = "none";
+
+    bool hasDetailedPostPass = false;
+    for (const auto& pass : contract.passes) {
+        if (pass.name == "PostProcess" || pass.name == "Bloom") {
+            hasDetailedPostPass = true;
+            break;
+        }
+    }
+
+    for (const auto& pass : contract.passes) {
+        if (!IsCinematicPostPass(pass)) {
+            continue;
+        }
+        if (pass.name == "RenderGraphEndFrame" && hasDetailedPostPass) {
+            continue;
+        }
+        post.budgetTracked = true;
+        post.estimatedWriteMB += pass.estimatedWriteMB;
+        if (pass.fullScreen) {
+            ++post.fullScreenPasses;
+        }
+        if (post.resolutionClass == "none" && !pass.resolutionClass.empty()) {
+            post.resolutionClass = pass.resolutionClass;
+        }
+    }
+
+    if (post.postProcessPlanned && post.resolutionClass == "none") {
+        post.resolutionClass = "untracked";
+    }
+
+    post.activeEffectCount = 0;
+    auto countActive = [&post](bool active) {
+        if (active) {
+            ++post.activeEffectCount;
+        }
+    };
+
+    const bool bloomActive = (post.bloomPlanned || post.bloomExecuted) && post.bloomIntensity > 0.0f;
+    countActive(bloomActive);
+    countActive(post.vignette > 0.0f);
+    countActive(post.lensDirt > 0.0f);
+    countActive(post.motionBlurEnabled && post.motionBlur > 0.0f);
+    countActive(post.depthOfFieldEnabled && post.depthOfField > 0.0f);
+    countActive(std::abs(post.contrast - 1.0f) > 0.001f);
+    countActive(std::abs(post.saturation - 1.0f) > 0.001f);
+    countActive(std::abs(post.warm) > 0.001f || std::abs(post.cool) > 0.001f);
+    countActive(post.godRayIntensity > 0.0f);
+
+    post.motionBlurBudgeted = post.budgetTracked && post.motionBlurEnabled && post.motionBlur > 0.0f;
+    post.depthOfFieldBudgeted = post.budgetTracked && post.depthOfFieldEnabled && post.depthOfField > 0.0f;
+    post.vignetteBudgeted = post.budgetTracked && post.vignette > 0.0f;
+    post.lensDirtBudgeted = post.budgetTracked && post.lensDirt > 0.0f;
 }
 
 } // namespace
@@ -486,6 +554,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
             ++contract.renderGraph.passRecords;
         }
     }
+    FinalizeCinematicPostBudget(contract);
 
     m_frameDiagnostics.contract.contract = std::move(contract);
     UpdateFrameContractHistories();

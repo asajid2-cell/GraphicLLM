@@ -138,6 +138,28 @@ if ($null -eq $cinematicPost) {
     if (-not [bool]$cinematicPost.post_process_executed) {
         Add-Failure "cinematic_post.post_process_executed is false"
     }
+    if (-not [bool]$cinematicPost.budget_tracked) {
+        Add-Failure "cinematic_post.budget_tracked is false"
+    }
+    if ($null -eq $cinematicPost.PSObject.Properties["estimated_write_mb"] -or
+        [double]$cinematicPost.estimated_write_mb -le 0.0) {
+        Add-Failure "cinematic_post.estimated_write_mb is not positive"
+    }
+    if ($null -eq $cinematicPost.PSObject.Properties["full_screen_passes"] -or
+        [int]$cinematicPost.full_screen_passes -lt 1) {
+        Add-Failure "cinematic_post.full_screen_passes is not tracked"
+    }
+    if ($null -eq $cinematicPost.PSObject.Properties["active_effect_count"] -or
+        [int]$cinematicPost.active_effect_count -lt 4) {
+        Add-Failure "cinematic_post.active_effect_count is too low"
+    }
+    foreach ($field in @("motion_blur_budgeted", "depth_of_field_budgeted", "vignette_budgeted", "lens_dirt_budgeted")) {
+        if ($null -eq $cinematicPost.PSObject.Properties[$field]) {
+            Add-Failure "cinematic_post.$field is missing"
+        } elseif (-not [bool]$cinematicPost.PSObject.Properties[$field].Value) {
+            Add-Failure "cinematic_post.$field is false"
+        }
+    }
     if ($null -eq $cinematicPost.vignette) {
         Add-Failure "cinematic_post.vignette is missing"
     }

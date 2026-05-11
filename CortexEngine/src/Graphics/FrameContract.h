@@ -354,6 +354,15 @@ struct FrameContract {
         bool postProcessExecuted = false;
         bool bloomPlanned = false;
         bool bloomExecuted = false;
+        bool budgetTracked = false;
+        double estimatedWriteMB = 0.0;
+        uint32_t fullScreenPasses = 0;
+        uint32_t activeEffectCount = 0;
+        bool motionBlurBudgeted = false;
+        bool depthOfFieldBudgeted = false;
+        bool vignetteBudgeted = false;
+        bool lensDirtBudgeted = false;
+        std::string resolutionClass = "unknown";
         float bloomIntensity = 0.0f;
         float bloomThreshold = 1.0f;
         float bloomSoftKnee = 0.5f;

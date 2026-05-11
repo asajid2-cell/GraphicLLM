@@ -32,6 +32,7 @@ if (-not (Test-Path $rendererRtStatePath)) {
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
+$endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -207,6 +208,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_history_copy missing Renderer_FrameEnd.cpp"
+        }
+    }
+
+    if ($id -eq "end_frame_shader_resource_transitions") {
+        if (Test-Path $endFrameShaderResourcePassPath) {
+            $endFrameShaderResourcePass = Get-Content $endFrameShaderResourcePassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::EndFrameShaderResourcePass", "TransitionTarget", "TransitionContext", "TransitionToPixelShaderResources", "ResourceBarrier", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+                if ($endFrameShaderResourcePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "end_frame_shader_resource_transitions missing EndFrameShaderResourcePass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "end_frame_shader_resource_transitions missing EndFrameShaderResourcePass.cpp"
+        }
+        if (Test-Path $frameEndPath) {
+            $frameEnd = Get-Content $frameEndPath -Raw
+            if ($frameEnd.IndexOf("EndFrameShaderResourcePass::TransitionToPixelShaderResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "end_frame_shader_resource_transitions missing routed transition call in Renderer_FrameEnd.cpp"
+            }
+            foreach ($removedLocal in @("ppBarriers", "ppCount")) {
+                if ($frameEnd.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "end_frame_shader_resource_transitions still has hand-built post-process barrier batch in Renderer_FrameEnd.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "end_frame_shader_resource_transitions missing Renderer_FrameEnd.cpp"
         }
     }
 

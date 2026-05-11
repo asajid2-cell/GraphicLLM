@@ -43,6 +43,16 @@
       "future_extension": "Keep future RT temporal copy mechanics in RTHistoryCopyPass or an adjacent RT history pass helper instead of duplicating barrier/copy code in Renderer_FrameEnd.cpp"
     },
     {
+      "id": "end_frame_shader_resource_transitions",
+      "owner": "End-frame shader-resource state",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_FrameEnd.cpp still schedules end-frame cleanup, but the batched transition of SSAO, SSR, velocity, TAA intermediate, RT reflection color, and normal/roughness targets back to pixel-shader-resource state is owned by EndFrameShaderResourcePass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/EndFrameShaderResourcePass.h", "Passes/EndFrameShaderResourcePass.cpp", "Renderer_FrameEnd.cpp"],
+      "renderer_state_members": ["m_ssaoResources", "m_ssrResources", "m_temporalScreenState", "m_rtReflectionTargets", "m_mainTargets"],
+      "future_extension": "Keep future shared end-frame shader-resource cleanup in EndFrameShaderResourcePass instead of adding hand-built resource-barrier batches in Renderer_FrameEnd.cpp"
+    },
+    {
       "id": "environment_resources",
       "owner": "Environment/IBL",
       "status": "release_boundary_validated",

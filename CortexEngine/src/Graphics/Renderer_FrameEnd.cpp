@@ -2,6 +2,7 @@
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
+#include "Graphics/Passes/EndFrameShaderResourcePass.h"
 #include "Graphics/Passes/RTHistoryCopyPass.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -205,72 +206,19 @@ void Renderer::EndFrame() {
     // observe them left in RENDER_TARGET / UNORDERED_ACCESS when Present is
     // called, even if the main post-process resolve was skipped.
     {
-        D3D12_RESOURCE_BARRIER ppBarriers[8] = {};
-        UINT ppCount = 0;
-
-        if (m_ssaoResources.resources.texture && m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_ssaoResources.resources.texture.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_ssaoResources.resources.resourceState;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-        if (m_ssrResources.resources.color && m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_ssrResources.resources.color.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-        if (m_temporalScreenState.velocityBuffer && m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_temporalScreenState.velocityBuffer.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_temporalScreenState.velocityState;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-        if (m_temporalScreenState.taaIntermediate && m_temporalScreenState.taaIntermediateState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_temporalScreenState.taaIntermediate.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_temporalScreenState.taaIntermediateState;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-    if (m_rtReflectionTargets.color && m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        ppBarriers[ppCount].Transition.pResource = m_rtReflectionTargets.color.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_rtReflectionTargets.colorState;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
-            ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++ppCount;
-            m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-
-        if (ppCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(ppCount, ppBarriers);
-        }
+        const EndFrameShaderResourcePass::TransitionTarget targets[] = {
+            {m_ssaoResources.resources.texture.Get(), &m_ssaoResources.resources.resourceState},
+            {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState},
+            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
+            {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState},
+            {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState},
+            {m_mainTargets.normalRoughness.resources.texture.Get(), &m_mainTargets.normalRoughness.resources.state},
+        };
+        EndFrameShaderResourcePass::TransitionContext transitionContext{};
+        transitionContext.commandList = m_commandResources.graphicsList.Get();
+        transitionContext.targets = targets;
+        transitionContext.targetCount = sizeof(targets) / sizeof(targets[0]);
+        (void)EndFrameShaderResourcePass::TransitionToPixelShaderResources(transitionContext);
     }
 
     // Close GPU timing before automation-only readback/present transitions.

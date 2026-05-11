@@ -142,66 +142,20 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0;
         vbGraphContext.materialResolve.depthState = &m_depthResources.resources.resourceState;
         vbGraphContext.materialResolve.failure = vbFailure;
-        vbGraphContext.debugBlit = [&]() {
-            if (vbStageFailed) return;
-
-            m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            if (debugVisibility) {
-                states.visibility = kVBShaderResourceState;
-            } else if (debugGBuffer) {
-                switch (vbDebugView) {
-                    case kVBDebugGBufferNormal:
-                        states.normalRoughness = kVBShaderResourceState;
-                        break;
-                    case kVBDebugGBufferEmissive:
-                        states.emissiveMetallic = kVBShaderResourceState;
-                        break;
-                    case kVBDebugGBufferExt0:
-                        states.materialExt0 = kVBShaderResourceState;
-                        break;
-                    case kVBDebugGBufferExt1:
-                        states.materialExt1 = kVBShaderResourceState;
-                        break;
-                    case kVBDebugGBufferExt2:
-                        states.materialExt2 = kVBShaderResourceState;
-                        break;
-                    default:
-                        states.albedo = kVBShaderResourceState;
-                        break;
-                }
-            }
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-            if (debugDepth) {
-                m_depthResources.resources.resourceState = kDepthSampleState;
-            }
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.debugBlit = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-
-            Result<void> debugResult = Result<void>::Ok();
-            if (debugVisibility) {
-                debugResult = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(
-                    m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu);
-            } else if (debugDepth) {
-                debugResult = m_services.visibilityBuffer->DebugBlitDepthToHDR(
-                    m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu, m_depthResources.resources.buffer.Get());
-            } else if (debugGBuffer) {
-                debugResult = m_services.visibilityBuffer->DebugBlitGBufferToHDR(
-                    m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu, SelectVBGBufferDebugBuffer(vbDebugView));
-            }
-
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (debugResult.IsErr()) {
-                markStageFailure("debug_blit", debugResult.Error());
-                return;
-            }
-
-            m_visibilityBufferState.renderedThisFrame = true;
-            m_visibilityBufferState.debugOverrideThisFrame = true;
-        };
+        vbGraphContext.debugBlit.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.debugBlit.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.debugBlit.hdrTarget = m_mainTargets.hdr.resources.color.Get();
+        vbGraphContext.debugBlit.hdrRTV = m_mainTargets.hdr.descriptors.rtv.cpu;
+        vbGraphContext.debugBlit.depthBuffer = m_depthResources.resources.buffer.Get();
+        vbGraphContext.debugBlit.debugVisibility = debugVisibility;
+        vbGraphContext.debugBlit.debugDepth = debugDepth;
+        vbGraphContext.debugBlit.debugGBuffer = debugGBuffer;
+        vbGraphContext.debugBlit.gbufferSource = SelectVBGBufferDebugBuffer(vbDebugView);
+        vbGraphContext.debugBlit.hdrState = &m_mainTargets.hdr.resources.state;
+        vbGraphContext.debugBlit.depthState = &m_depthResources.resources.resourceState;
+        vbGraphContext.debugBlit.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
+        vbGraphContext.debugBlit.debugOverrideThisFrame = &m_visibilityBufferState.debugOverrideThisFrame;
+        vbGraphContext.debugBlit.failure = vbFailure;
         vbGraphContext.brdfLut = [&]() {
             if (vbStageFailed) return;
 

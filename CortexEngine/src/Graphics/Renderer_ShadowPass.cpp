@@ -2,6 +2,7 @@
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/MeshDrawPass.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -127,21 +128,11 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
                 }
             }
 
-            D3D12_VERTEX_BUFFER_VIEW vbv = {};
-            vbv.BufferLocation = renderable.mesh->gpuBuffers->vertexBuffer->GetGPUVirtualAddress();
-            vbv.SizeInBytes = static_cast<UINT>(renderable.mesh->positions.size() * sizeof(Vertex));
-            vbv.StrideInBytes = sizeof(Vertex);
-
-            D3D12_INDEX_BUFFER_VIEW ibv = {};
-            ibv.BufferLocation = renderable.mesh->gpuBuffers->indexBuffer->GetGPUVirtualAddress();
-            ibv.SizeInBytes = static_cast<UINT>(renderable.mesh->indices.size() * sizeof(uint32_t));
-            ibv.Format = DXGI_FORMAT_R32_UINT;
-
-            m_commandResources.graphicsList->IASetVertexBuffers(0, 1, &vbv);
-            m_commandResources.graphicsList->IASetIndexBuffer(&ibv);
-
-            m_commandResources.graphicsList->DrawIndexedInstanced(static_cast<UINT>(renderable.mesh->indices.size()), 1, 0, 0, 0);
-            ++m_frameDiagnostics.contract.drawCounts.shadowDraws;
+            const auto drawResult =
+                MeshDrawPass::DrawIndexedMesh(m_commandResources.graphicsList.Get(), *renderable.mesh);
+            if (drawResult.submitted) {
+                ++m_frameDiagnostics.contract.drawCounts.shadowDraws;
+            }
         }
     };
 

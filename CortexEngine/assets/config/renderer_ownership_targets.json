@@ -84,11 +84,11 @@
     },
     {
       "id": "mesh_draw_submission",
-      "owner": "Forward mesh draw submission",
+      "owner": "Shared indexed mesh draw submission",
       "status": "release_boundary_validated",
-      "release_boundary": "Forward, transparent, overlay, and water passes keep material and descriptor setup local, but shared vertex/index binding and DrawIndexedInstanced submission are owned by MeshDrawPass",
-      "validated_contracts": ["renderer_ownership", "material_lab", "glass_water_courtyard", "effects_showcase"],
-      "target_files": ["Passes/MeshDrawPass.h", "Renderer_ForwardPass.cpp", "Renderer_TransparentGeometry.cpp", "Renderer_OverlayGeometry.cpp", "Renderer_WaterSurfaces.cpp"],
+      "release_boundary": "Forward, transparent, overlay, water, depth prepass, and shadow passes keep material, target, and pipeline setup local, but shared vertex/index binding and DrawIndexedInstanced submission are owned by MeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "material_lab", "glass_water_courtyard", "effects_showcase", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/MeshDrawPass.h", "Renderer_ForwardPass.cpp", "Renderer_TransparentGeometry.cpp", "Renderer_OverlayGeometry.cpp", "Renderer_WaterSurfaces.cpp", "Renderer_DepthPasses.cpp", "Renderer_ShadowPass.cpp"],
       "renderer_state_members": ["m_commandResources", "m_pipelineState"],
       "future_extension": "Move more pipeline/pass state into dedicated pass helpers before adding new forward-like draw paths"
     },

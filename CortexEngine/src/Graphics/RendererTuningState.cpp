@@ -268,6 +268,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.lighting.exposure = quality.exposure;
     state.lighting.bloomIntensity = quality.bloomIntensity;
+    state.lighting.warm = post.warm;
+    state.lighting.cool = post.cool;
     state.lighting.sunIntensity = features.sunIntensity;
     state.lighting.godRayIntensity = features.godRayIntensity;
     state.lighting.areaLightSizeScale = features.areaLightSizeScale;

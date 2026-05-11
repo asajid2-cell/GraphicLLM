@@ -47,6 +47,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_RIG_LANTERNS = 9032,
     IDC_GFX_RT_REFL_DENOISE = 9033,
     IDC_GFX_RT_REFL_STRENGTH = 9034,
+    IDC_GFX_WARM = 9035,
+    IDC_GFX_COOL = 9036,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -100,6 +102,8 @@ struct GraphicsSettingsState {
     SliderBinding renderScale;
     SliderBinding exposure;
     SliderBinding bloom;
+    SliderBinding warm;
+    SliderBinding cool;
     SliderBinding sun;
     SliderBinding godRays;
     SliderBinding areaLight;
@@ -212,6 +216,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.quality.renderScale = SliderToFloat(g_gfx.renderScale);
     g_gfx.tuning.lighting.exposure = SliderToFloat(g_gfx.exposure);
     g_gfx.tuning.lighting.bloomIntensity = SliderToFloat(g_gfx.bloom);
+    g_gfx.tuning.lighting.warm = SliderToFloat(g_gfx.warm);
+    g_gfx.tuning.lighting.cool = SliderToFloat(g_gfx.cool);
     g_gfx.tuning.lighting.sunIntensity = SliderToFloat(g_gfx.sun);
     g_gfx.tuning.lighting.godRayIntensity = SliderToFloat(g_gfx.godRays);
     g_gfx.tuning.lighting.areaLightSizeScale = SliderToFloat(g_gfx.areaLight);
@@ -265,6 +271,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.renderScale, g_gfx.tuning.quality.renderScale);
     SetSliderFromFloat(g_gfx.exposure, g_gfx.tuning.lighting.exposure);
     SetSliderFromFloat(g_gfx.bloom, g_gfx.tuning.lighting.bloomIntensity);
+    SetSliderFromFloat(g_gfx.warm, g_gfx.tuning.lighting.warm);
+    SetSliderFromFloat(g_gfx.cool, g_gfx.tuning.lighting.cool);
     SetSliderFromFloat(g_gfx.sun, g_gfx.tuning.lighting.sunIntensity);
     SetSliderFromFloat(g_gfx.godRays, g_gfx.tuning.lighting.godRayIntensity);
     SetSliderFromFloat(g_gfx.areaLight, g_gfx.tuning.lighting.areaLightSizeScale);
@@ -520,6 +528,8 @@ void RegisterGraphicsSettingsClass() {
             makeSection(L"Lighting");
             makeSlider(IDC_GFX_EXPOSURE, L"Exposure", g_gfx.exposure, 0.05f, 5.0f);
             makeSlider(IDC_GFX_BLOOM, L"Bloom", g_gfx.bloom, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_WARM, L"Warm Grade", g_gfx.warm, -1.0f, 1.0f);
+            makeSlider(IDC_GFX_COOL, L"Cool Grade", g_gfx.cool, -1.0f, 1.0f);
             makeSlider(IDC_GFX_SUN, L"Sun Intensity", g_gfx.sun, 0.0f, 20.0f);
             makeSlider(IDC_GFX_GOD_RAYS, L"God Rays", g_gfx.godRays, 0.0f, 3.0f);
             makeSlider(IDC_GFX_AREA_LIGHT, L"Area Light Size", g_gfx.areaLight, 0.25f, 2.0f);

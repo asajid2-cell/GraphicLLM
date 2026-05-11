@@ -64,6 +64,9 @@ cbuffer FrameConstants : register(b1)
     float4   g_SSRParams;
     // x = contrast, y = saturation, z/w reserved
     float4   g_PostGradeParams;
+    // x = RT reflection roughness threshold, y = history max blend,
+    // z = firefly clamp max luma, w = signal scale
+    float4   g_RTReflectionParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -560,12 +563,12 @@ float ReflectionLuma(float3 color)
     return dot(color, lumaWeights);
 }
 
-float3 SoftLimitReflectionLuma(float3 color)
+float3 SoftLimitReflectionLuma(float3 color, float maxLumaOverride)
 {
     color = SanitizeHDRColor(color);
 
-    const float  kneeLuma    = 4.0f;
-    const float  maxLuma     = 16.0f;
+    const float maxLuma = clamp(maxLumaOverride, 4.0f, 32.0f);
+    const float kneeLuma = max(1.0f, maxLuma * 0.25f);
 
     float luma = ReflectionLuma(color);
     if (!isfinite(luma) || luma <= 1e-5f || luma <= kneeLuma)
@@ -918,6 +921,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float rtReflectionCompositionStrength = (float)((postFxFlags >> 5u) & 7u) * (1.0f / 7.0f);
     float lensDirtAmount = (float)((postFxFlags >> 8u) & 255u) * (1.0f / 255.0f);
     float rtReflectionDenoiseAlpha = max((float)((postFxFlags >> 16u) & 255u) * (1.0f / 255.0f), 0.02f);
+    float rtReflectionRoughnessThreshold = clamp(g_RTReflectionParams.x, 0.05f, 1.0f);
+    float rtReflectionHistoryMaxBlend = clamp(g_RTReflectionParams.y, 0.0f, 0.5f);
+    float rtReflectionFireflyClampLuma = clamp(g_RTReflectionParams.z, 4.0f, 32.0f);
+    float rtReflectionSignalScale = clamp(g_RTReflectionParams.w, 0.0f, 2.0f);
     uint depthW, depthH;
     g_Depth.GetDimensions(depthW, depthH);
     uint2 depthDim = uint2(max(depthW, 1u), max(depthH, 1u));
@@ -1020,7 +1027,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     // Limit extremely bright SSR highlights to avoid harsh color pops when
     // the ray marches across very hot pixels in the environment or scene.
-    float3 ssrColor = SoftLimitReflectionLuma(ssrSample.rgb);
+    float3 ssrColor = SoftLimitReflectionLuma(ssrSample.rgb, rtReflectionFireflyClampLuma);
 
     // Base reflection strength from roughness (shared by SSR and RT). This
     // roughly tracks the specular lobe so glossy surfaces get stronger
@@ -1079,7 +1086,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
         float  rtValid = saturate(rtCenter4.a);
         // Limit extreme RT reflection luma so very hot env texels do not
         // overpower the underlying BRDF/IBL term.
-        rtRefl = SoftLimitReflectionLuma(rtRefl);
+        rtRefl = SoftLimitReflectionLuma(rtRefl, rtReflectionFireflyClampLuma);
 
         // Small 5-tap cross filter in screen space over the RT reflection
         // buffer to reduce aliasing/fizzing from single-sample DXR. This is
@@ -1101,7 +1108,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
         {
             float2 sampleUV = saturate(uv + offsets[i]);
             float4 sampleRT4 = SampleRtReflectionEdgeAware(sampleUV, rtDim, depthDim, centerDepth, centerN);
-            float3 sampleRT = SoftLimitReflectionLuma(sampleRT4.rgb);
+            float3 sampleRT = SoftLimitReflectionLuma(sampleRT4.rgb, rtReflectionFireflyClampLuma);
             float  sampleValid = saturate(sampleRT4.a);
 
             // Bilateral weights: keep RT reflections from bleeding across depth/normal edges.
@@ -1118,7 +1125,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
             total += w;
         }
 
-        rtRefl = SoftLimitReflectionLuma(accum / max(total, 1e-4f));
+        rtRefl = SoftLimitReflectionLuma(accum / max(total, 1e-4f), rtReflectionFireflyClampLuma);
 
         // If the RT reflection buffer has no meaningful signal, treat it as
         // unavailable so it does not pull reflections toward black (this can
@@ -1140,7 +1147,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
             float2 historyUV = saturate(uv + vel + g_TAAParams.xy);
 
             float4 rtHist4 = g_RTReflectionHistory.Sample(g_Sampler, historyUV);
-            float3 rtHist = SoftLimitReflectionLuma(rtHist4.rgb);
+            float3 rtHist = SoftLimitReflectionLuma(rtHist4.rgb, rtReflectionFireflyClampLuma);
             float  histValid = saturate(rtHist4.a);
 
             float3 diff = abs(rtRefl - rtHist);
@@ -1166,9 +1173,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
             historyWeight *= lerp(1.0f, 0.0f, saturate(maxDiffHist * 4.0f));
             historyWeight *= 1.0f - smoothstep(0.12f, 0.55f, lumaNorm);
             historyWeight *= 1.0f - smoothstep(0.15f, 1.0f, lumaDelta);
+            historyWeight = min(historyWeight, rtReflectionHistoryMaxBlend);
 
-            rtRefl = SoftLimitReflectionLuma(lerp(rtRefl, rtHist, historyWeight));
+            rtRefl = SoftLimitReflectionLuma(lerp(rtRefl, rtHist, historyWeight), rtReflectionFireflyClampLuma);
         }
+
+        rtRefl = SoftLimitReflectionLuma(rtRefl * rtReflectionSignalScale, rtReflectionFireflyClampLuma);
     }
 
     // Prefer SSR whenever it is confident; let RT take over only when SSR
@@ -1177,7 +1187,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float  effectiveSSRConfidence = (wSSR > 1e-5f) ? ssrWeightRaw : 0.0f;
     float  rawRTWeight = 1.0f - effectiveSSRConfidence;
     rawRTWeight *= rawRTWeight;
-    float smoothSurface = isMirrorClass ? 1.0f : (1.0f - smoothstep(0.18f, 0.50f, roughness));
+    float roughnessFadeStart = max(0.02f, rtReflectionRoughnessThreshold * 0.36f);
+    float smoothSurface = isMirrorClass ? 1.0f : (1.0f - smoothstep(roughnessFadeStart, rtReflectionRoughnessThreshold, roughness));
     float rtGloss = gloss * smoothSurface;
     if (isWaterClass || isPolishedConductor) {
         rtGloss = max(rtGloss, saturate(1.0f - roughness) * 0.75f);

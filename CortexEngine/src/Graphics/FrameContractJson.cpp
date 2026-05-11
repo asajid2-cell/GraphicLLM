@@ -383,9 +383,17 @@ json FrameContractToJson(const FrameContract& contract) {
             {"gi_denoise_alpha", contract.rayTracing.giDenoiseAlpha},
             {"reflection_requested_denoise_alpha", contract.rayTracing.reflectionRequestedDenoiseAlpha},
             {"reflection_composition_strength", contract.rayTracing.reflectionCompositionStrength},
+            {"reflection_roughness_threshold", contract.rayTracing.reflectionRoughnessThreshold},
+            {"reflection_history_max_blend", contract.rayTracing.reflectionHistoryMaxBlend},
+            {"reflection_firefly_clamp_luma", contract.rayTracing.reflectionFireflyClampLuma},
+            {"reflection_signal_scale", contract.rayTracing.reflectionSignalScale},
             {"rt_reflection_tuning", {
                 {"denoise_alpha", contract.rayTracing.reflectionRequestedDenoiseAlpha},
                 {"composition_strength", contract.rayTracing.reflectionCompositionStrength},
+                {"roughness_threshold", contract.rayTracing.reflectionRoughnessThreshold},
+                {"history_max_blend", contract.rayTracing.reflectionHistoryMaxBlend},
+                {"firefly_clamp_luma", contract.rayTracing.reflectionFireflyClampLuma},
+                {"signal_scale", contract.rayTracing.reflectionSignalScale},
                 {"shader_packed", true}
             }},
             {"budget_profile", contract.rayTracing.budgetProfile},

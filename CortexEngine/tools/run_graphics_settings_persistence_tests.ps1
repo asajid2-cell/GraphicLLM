@@ -59,7 +59,11 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "reflections": false,
     "gi": false,
     "reflection_denoise_alpha": 0.41,
-    "reflection_composition_strength": 0.62
+    "reflection_composition_strength": 0.62,
+    "reflection_roughness_threshold": 0.44,
+    "reflection_history_max_blend": 0.18,
+    "reflection_firefly_clamp_luma": 12.5,
+    "reflection_signal_scale": 1.27
   },
   "screen_space": {
     "ssao": true,
@@ -178,6 +182,18 @@ if ($validRun.exit_code -ne 0) {
         }
         if ([Math]::Abs(([double]$rtTuning.composition_strength) - 0.62) -gt 0.03) {
             Add-Failure "valid settings RT reflection composition strength was $($rtTuning.composition_strength), expected 0.62"
+        }
+        if ([Math]::Abs(([double]$rtTuning.roughness_threshold) - 0.44) -gt 0.03) {
+            Add-Failure "valid settings RT reflection roughness threshold was $($rtTuning.roughness_threshold), expected 0.44"
+        }
+        if ([Math]::Abs(([double]$rtTuning.history_max_blend) - 0.18) -gt 0.03) {
+            Add-Failure "valid settings RT reflection history max blend was $($rtTuning.history_max_blend), expected 0.18"
+        }
+        if ([Math]::Abs(([double]$rtTuning.firefly_clamp_luma) - 12.5) -gt 0.3) {
+            Add-Failure "valid settings RT reflection firefly clamp luma was $($rtTuning.firefly_clamp_luma), expected 12.5"
+        }
+        if ([Math]::Abs(([double]$rtTuning.signal_scale) - 1.27) -gt 0.03) {
+            Add-Failure "valid settings RT reflection signal scale was $($rtTuning.signal_scale), expected 1.27"
         }
     }
     $backgroundExposure = [double]$report.frame_contract.environment.background_exposure

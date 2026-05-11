@@ -145,6 +145,9 @@ struct FrameConstants {
     glm::vec4 ssrParams;
     // x = contrast, y = saturation, z/w reserved
     glm::vec4 postGradeParams;
+    // x = RT reflection roughness threshold, y = history max blend,
+    // z = firefly clamp max luma, w = signal scale
+    glm::vec4 rtReflectionParams;
 
     // Clustered lighting data used by the VB deferred path and forward+ transparency.
     // SRV indices refer to the global shader-visible CBV/SRV/UAV heap

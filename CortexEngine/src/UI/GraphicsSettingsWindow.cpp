@@ -47,6 +47,10 @@ enum ControlIdGraphics : int {
     IDC_GFX_RIG_LANTERNS = 9032,
     IDC_GFX_RT_REFL_DENOISE = 9033,
     IDC_GFX_RT_REFL_STRENGTH = 9034,
+    IDC_GFX_RT_REFL_ROUGHNESS = 9050,
+    IDC_GFX_RT_REFL_HISTORY_CLAMP = 9051,
+    IDC_GFX_RT_REFL_FIREFLY = 9052,
+    IDC_GFX_RT_REFL_SCALE = 9053,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -126,6 +130,10 @@ struct GraphicsSettingsState {
     SliderBinding backgroundBlur;
     SliderBinding rtReflectionDenoise;
     SliderBinding rtReflectionStrength;
+    SliderBinding rtReflectionRoughness;
+    SliderBinding rtReflectionHistoryClamp;
+    SliderBinding rtReflectionFirefly;
+    SliderBinding rtReflectionScale;
     SliderBinding ssrDistance;
     SliderBinding ssrThickness;
     SliderBinding ssrStrength;
@@ -253,6 +261,10 @@ void SyncStateFromSliders() {
     g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
     g_gfx.tuning.rayTracing.reflectionDenoiseAlpha = SliderToFloat(g_gfx.rtReflectionDenoise);
     g_gfx.tuning.rayTracing.reflectionCompositionStrength = SliderToFloat(g_gfx.rtReflectionStrength);
+    g_gfx.tuning.rayTracing.reflectionRoughnessThreshold = SliderToFloat(g_gfx.rtReflectionRoughness);
+    g_gfx.tuning.rayTracing.reflectionHistoryMaxBlend = SliderToFloat(g_gfx.rtReflectionHistoryClamp);
+    g_gfx.tuning.rayTracing.reflectionFireflyClampLuma = SliderToFloat(g_gfx.rtReflectionFirefly);
+    g_gfx.tuning.rayTracing.reflectionSignalScale = SliderToFloat(g_gfx.rtReflectionScale);
     g_gfx.tuning.screenSpace.ssrMaxDistance = SliderToFloat(g_gfx.ssrDistance);
     g_gfx.tuning.screenSpace.ssrThickness = SliderToFloat(g_gfx.ssrThickness);
     g_gfx.tuning.screenSpace.ssrStrength = SliderToFloat(g_gfx.ssrStrength);
@@ -321,6 +333,10 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
     SetSliderFromFloat(g_gfx.rtReflectionDenoise, g_gfx.tuning.rayTracing.reflectionDenoiseAlpha);
     SetSliderFromFloat(g_gfx.rtReflectionStrength, g_gfx.tuning.rayTracing.reflectionCompositionStrength);
+    SetSliderFromFloat(g_gfx.rtReflectionRoughness, g_gfx.tuning.rayTracing.reflectionRoughnessThreshold);
+    SetSliderFromFloat(g_gfx.rtReflectionHistoryClamp, g_gfx.tuning.rayTracing.reflectionHistoryMaxBlend);
+    SetSliderFromFloat(g_gfx.rtReflectionFirefly, g_gfx.tuning.rayTracing.reflectionFireflyClampLuma);
+    SetSliderFromFloat(g_gfx.rtReflectionScale, g_gfx.tuning.rayTracing.reflectionSignalScale);
     SetSliderFromFloat(g_gfx.ssrDistance, g_gfx.tuning.screenSpace.ssrMaxDistance);
     SetSliderFromFloat(g_gfx.ssrThickness, g_gfx.tuning.screenSpace.ssrThickness);
     SetSliderFromFloat(g_gfx.ssrStrength, g_gfx.tuning.screenSpace.ssrStrength);
@@ -570,6 +586,10 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkRTGI = makeCheckbox(IDC_GFX_RT_GI, L"RT GI");
             makeSlider(IDC_GFX_RT_REFL_DENOISE, L"Reflection Denoise", g_gfx.rtReflectionDenoise, 0.02f, 1.0f);
             makeSlider(IDC_GFX_RT_REFL_STRENGTH, L"Reflection Strength", g_gfx.rtReflectionStrength, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_RT_REFL_ROUGHNESS, L"Reflection Roughness", g_gfx.rtReflectionRoughness, 0.05f, 1.0f);
+            makeSlider(IDC_GFX_RT_REFL_HISTORY_CLAMP, L"History Clamp", g_gfx.rtReflectionHistoryClamp, 0.0f, 0.5f);
+            makeSlider(IDC_GFX_RT_REFL_FIREFLY, L"Firefly Clamp", g_gfx.rtReflectionFirefly, 4.0f, 32.0f);
+            makeSlider(IDC_GFX_RT_REFL_SCALE, L"Reflection Scale", g_gfx.rtReflectionScale, 0.0f, 2.0f);
             g_gfx.txtRTScheduler = makeStaticWithHeight(
                 IDC_GFX_RT_SCHEDULER,
                 L"RT Scheduler: --",

@@ -67,6 +67,22 @@ float Renderer::GetRTReflectionCompositionStrength() const {
     return m_rtDenoiseState.reflectionCompositionStrength;
 }
 
+float Renderer::GetRTReflectionRoughnessThreshold() const {
+    return m_rtDenoiseState.reflectionRoughnessThreshold;
+}
+
+float Renderer::GetRTReflectionHistoryMaxBlend() const {
+    return m_rtDenoiseState.reflectionHistoryMaxBlend;
+}
+
+float Renderer::GetRTReflectionFireflyClampLuma() const {
+    return m_rtDenoiseState.reflectionFireflyClampLuma;
+}
+
+float Renderer::GetRTReflectionSignalScale() const {
+    return m_rtDenoiseState.reflectionSignalScale;
+}
+
 bool Renderer::IsRayTracingSupported() const {
     return GetRayTracingState().supported;
 }
@@ -263,24 +279,50 @@ void Renderer::SetRTGIEnabled(bool enabled) {
     InvalidateRTGIHistory(enabled ? "feature_enabled" : "feature_disabled");
 }
 
-void Renderer::SetRTReflectionTuning(float denoiseAlpha, float compositionStrength) {
+void Renderer::SetRTReflectionTuning(float denoiseAlpha,
+                                     float compositionStrength,
+                                     float roughnessThreshold,
+                                     float historyMaxBlend,
+                                     float fireflyClampLuma,
+                                     float signalScale) {
     const float alpha = std::clamp(denoiseAlpha, 0.02f, 1.0f);
     const float strength = std::clamp(compositionStrength, 0.0f, 1.0f);
+    const float roughness = std::clamp(roughnessThreshold, 0.05f, 1.0f);
+    const float historyBlend = std::clamp(historyMaxBlend, 0.0f, 0.5f);
+    const float fireflyClamp = std::clamp(fireflyClampLuma, 4.0f, 32.0f);
+    const float scale = std::clamp(signalScale, 0.0f, 2.0f);
     const bool alphaChanged = std::abs(alpha - m_rtDenoiseState.reflectionHistoryAlpha) > 1e-4f;
     const bool strengthChanged = std::abs(strength - m_rtDenoiseState.reflectionCompositionStrength) > 1e-4f;
-    if (!alphaChanged && !strengthChanged) {
+    const bool roughnessChanged = std::abs(roughness - m_rtDenoiseState.reflectionRoughnessThreshold) > 1e-4f;
+    const bool historyBlendChanged = std::abs(historyBlend - m_rtDenoiseState.reflectionHistoryMaxBlend) > 1e-4f;
+    const bool fireflyChanged = std::abs(fireflyClamp - m_rtDenoiseState.reflectionFireflyClampLuma) > 1e-4f;
+    const bool scaleChanged = std::abs(scale - m_rtDenoiseState.reflectionSignalScale) > 1e-4f;
+    if (!alphaChanged &&
+        !strengthChanged &&
+        !roughnessChanged &&
+        !historyBlendChanged &&
+        !fireflyChanged &&
+        !scaleChanged) {
         return;
     }
 
     m_rtDenoiseState.reflectionHistoryAlpha = alpha;
     m_rtDenoiseState.reflectionAlpha = alpha;
     m_rtDenoiseState.reflectionCompositionStrength = strength;
-    if (alphaChanged) {
+    m_rtDenoiseState.reflectionRoughnessThreshold = roughness;
+    m_rtDenoiseState.reflectionHistoryMaxBlend = historyBlend;
+    m_rtDenoiseState.reflectionFireflyClampLuma = fireflyClamp;
+    m_rtDenoiseState.reflectionSignalScale = scale;
+    if (alphaChanged || roughnessChanged || historyBlendChanged || fireflyChanged || scaleChanged) {
         InvalidateRTReflectionHistory("tuning_changed");
     }
-    spdlog::info("RT reflection tuning: denoiseAlpha={} compositionStrength={}",
+    spdlog::info("RT reflection tuning: denoiseAlpha={} compositionStrength={} roughnessThreshold={} historyMaxBlend={} fireflyClampLuma={} signalScale={}",
                  m_rtDenoiseState.reflectionHistoryAlpha,
-                 m_rtDenoiseState.reflectionCompositionStrength);
+                 m_rtDenoiseState.reflectionCompositionStrength,
+                 m_rtDenoiseState.reflectionRoughnessThreshold,
+                 m_rtDenoiseState.reflectionHistoryMaxBlend,
+                 m_rtDenoiseState.reflectionFireflyClampLuma,
+                 m_rtDenoiseState.reflectionSignalScale);
 }
 
 } // namespace Cortex::Graphics

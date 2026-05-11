@@ -462,6 +462,10 @@ struct FrameContract {
         float giDenoiseAlpha = 1.0f;
         float reflectionRequestedDenoiseAlpha = 0.28f;
         float reflectionCompositionStrength = 1.0f;
+        float reflectionRoughnessThreshold = 0.50f;
+        float reflectionHistoryMaxBlend = 0.25f;
+        float reflectionFireflyClampLuma = 16.0f;
+        float reflectionSignalScale = 1.0f;
         std::string budgetProfile;
         std::string schedulerDisabledReason;
         uint32_t schedulerTLASCandidates = 0;

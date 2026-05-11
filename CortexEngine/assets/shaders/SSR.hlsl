@@ -44,6 +44,9 @@ cbuffer FrameConstants : register(b1)
     float4   g_SSRParams;
     // x = contrast, y = saturation, z/w reserved
     float4   g_PostGradeParams;
+    // x = RT reflection roughness threshold, y = history max blend,
+    // z = firefly clamp max luma, w = signal scale
+    float4   g_RTReflectionParams;
 };
 
 Texture2D g_SceneColor        : register(t0);

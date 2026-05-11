@@ -85,6 +85,9 @@ cbuffer FrameConstants : register(b1)
     float4 g_SSRParams;
     // x = contrast, y = saturation, z/w reserved
     float4 g_PostGradeParams;
+    // x = RT reflection roughness threshold, y = history max blend,
+    // z = firefly clamp max luma, w = signal scale
+    float4 g_RTReflectionParams;
 
     // Clustered lighting parameters for forward+ transparency (populated by the VB path).
     // SRV indices refer to the global shader-visible CBV/SRV/UAV heap.

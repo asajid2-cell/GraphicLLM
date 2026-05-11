@@ -206,6 +206,11 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_postProcessState.saturation,
         0.0f,
         0.0f);
+    frameData.rtReflectionParams = glm::vec4(
+        m_rtDenoiseState.reflectionRoughnessThreshold,
+        m_rtDenoiseState.reflectionHistoryMaxBlend,
+        m_rtDenoiseState.reflectionFireflyClampLuma,
+        m_rtDenoiseState.reflectionSignalScale);
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

@@ -169,8 +169,19 @@ bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle) {
     return enabled;
 }
 
-void ApplyRTReflectionTuningControl(Renderer& renderer, float denoiseAlpha, float compositionStrength) {
-    renderer.SetRTReflectionTuning(denoiseAlpha, compositionStrength);
+void ApplyRTReflectionTuningControl(Renderer& renderer,
+                                    float denoiseAlpha,
+                                    float compositionStrength,
+                                    float roughnessThreshold,
+                                    float historyMaxBlend,
+                                    float fireflyClampLuma,
+                                    float signalScale) {
+    renderer.SetRTReflectionTuning(std::clamp(denoiseAlpha, 0.02f, 1.0f),
+                                   std::clamp(compositionStrength, 0.0f, 1.0f),
+                                   std::clamp(roughnessThreshold, 0.05f, 1.0f),
+                                   std::clamp(historyMaxBlend, 0.0f, 0.5f),
+                                   std::clamp(fireflyClampLuma, 4.0f, 32.0f),
+                                   std::clamp(signalScale, 0.0f, 2.0f));
 }
 
 void ApplyShadowBiasControl(Renderer& renderer, float bias) {

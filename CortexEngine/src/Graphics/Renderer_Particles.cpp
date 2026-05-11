@@ -25,14 +25,22 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     // an emitter accidentally spawns an excessive number of particles.
     static constexpr uint32_t kMaxParticleInstances = 4096;
     const float densityScale = std::clamp(m_particleState.densityScale, 0.0f, 2.0f);
+    const float qualityScale = std::clamp(m_particleState.qualityScale, 0.25f, 2.0f);
+    const float bloomContribution = std::clamp(m_particleState.bloomContribution, 0.0f, 2.0f);
+    const float softDepthFade = std::clamp(m_particleState.softDepthFade, 0.0f, 1.0f);
+    const float windInfluence = std::clamp(m_particleState.windInfluence, 0.0f, 2.0f);
     m_particleState.frameDensityScale = densityScale;
+    m_particleState.frameQualityScale = qualityScale;
+    m_particleState.frameBloomContribution = bloomContribution;
+    m_particleState.frameSoftDepthFade = softDepthFade;
+    m_particleState.frameWindInfluence = windInfluence;
     if (densityScale <= 0.0f) {
         m_particleState.frameMaxInstances = 0;
         return;
     }
 
     const uint32_t scaledMaxInstances = static_cast<uint32_t>(
-        std::clamp(densityScale * static_cast<float>(kMaxParticleInstances),
+        std::clamp(densityScale * qualityScale * static_cast<float>(kMaxParticleInstances),
                    1.0f,
                    static_cast<float>(kMaxParticleInstances * 2u)));
     m_particleState.frameMaxInstances = scaledMaxInstances;
@@ -88,8 +96,16 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
 
             ParticleInstance inst{};
             inst.position = emitter.localSpace ? (emitterWorldPos + p.position) : p.position;
+            if (windInfluence > 0.0f) {
+                const float ageT = (p.lifetime > 0.0f) ? std::clamp(p.age / p.lifetime, 0.0f, 1.0f) : 0.0f;
+                inst.position += glm::vec3(windInfluence * ageT * 0.22f, 0.0f, windInfluence * ageT * 0.08f);
+            }
             inst.size     = p.size;
             inst.color    = p.color;
+            inst.color.r *= bloomContribution;
+            inst.color.g *= bloomContribution;
+            inst.color.b *= bloomContribution;
+            inst.color.a *= std::clamp(1.0f - softDepthFade * 0.18f, 0.55f, 1.0f);
 
             if (!SphereIntersectsFrustumCPU(frustum, inst.position, glm::max(0.01f, inst.size))) {
                 ++m_particleState.frameFrustumCulled;

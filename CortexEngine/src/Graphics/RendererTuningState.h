@@ -86,6 +86,10 @@ struct RendererWaterTuning {
 struct RendererParticleTuning {
     bool enabled = true;
     float densityScale = 1.0f;
+    float qualityScale = 1.0f;
+    float bloomContribution = 1.0f;
+    float softDepthFade = 0.5f;
+    float windInfluence = 0.0f;
 };
 
 struct RendererCinematicPostTuning {

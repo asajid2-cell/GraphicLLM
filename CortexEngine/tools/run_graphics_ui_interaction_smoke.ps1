@@ -92,7 +92,11 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
   },
   "particles": {
     "enabled": true,
-    "density_scale": 0.43
+    "density_scale": 0.43,
+    "quality_scale": 1.38,
+    "bloom_contribution": 1.42,
+    "soft_depth_fade": 0.44,
+    "wind_influence": 0.66
   },
   "cinematic_post": {
     "enabled": true,
@@ -174,6 +178,10 @@ if ($exitCode -ne 0) {
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 3.5 0.08
     Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 0.55 0.04
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
+    Assert-Near "particle_quality" ([double]$fc.particles.quality_scale) 1.38 0.04
+    Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.42 0.04
+    Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.44 0.04
+    Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.66 0.04
     if ($null -eq $fc.water) {
         Add-Failure "water contract section was missing"
     } else {

@@ -301,6 +301,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.instanceMapFailed = m_particleState.instanceMapFailed;
     contract.particles.capped = m_particleState.frameCapped;
     contract.particles.densityScale = m_particleState.densityScale;
+    contract.particles.qualityScale = m_particleState.qualityScale;
+    contract.particles.bloomContribution = m_particleState.bloomContribution;
+    contract.particles.softDepthFade = m_particleState.softDepthFade;
+    contract.particles.windInfluence = m_particleState.windInfluence;
     contract.particles.emitterCount = m_particleState.frameEmitterCount;
     contract.particles.liveParticles = m_particleState.frameLiveParticles;
     contract.particles.submittedInstances = m_particleState.frameSubmittedInstances;

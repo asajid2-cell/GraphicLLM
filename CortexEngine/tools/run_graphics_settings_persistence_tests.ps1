@@ -93,7 +93,11 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "particles": {
     "enabled": false,
-    "density_scale": 0.43
+    "density_scale": 0.43,
+    "quality_scale": 0.82,
+    "bloom_contribution": 1.31,
+    "soft_depth_fade": 0.47,
+    "wind_influence": 0.58
   },
   "cinematic_post": {
     "enabled": true,
@@ -117,6 +121,12 @@ $failures = New-Object System.Collections.Generic.List[string]
 
 function Add-Failure([string]$Message) {
     $script:failures.Add($Message)
+}
+
+function Assert-Near([string]$Name, [double]$Actual, [double]$Expected, [double]$Tolerance) {
+    if ([Math]::Abs($Actual - $Expected) -gt $Tolerance) {
+        Add-Failure "valid settings $Name was $Actual, expected $Expected +/- $Tolerance"
+    }
 }
 
 function Invoke-SettingsSmoke([string]$Name, [string]$SettingsPath) {
@@ -315,6 +325,10 @@ if ($validRun.exit_code -ne 0) {
     if ([Math]::Abs($particleDensity - 0.43) -gt 0.02) {
         Add-Failure "valid settings particle density was $particleDensity, expected 0.43"
     }
+    Assert-Near "particle_quality" ([double]$report.frame_contract.particles.quality_scale) 0.82 0.03
+    Assert-Near "particle_bloom" ([double]$report.frame_contract.particles.bloom_contribution) 1.31 0.03
+    Assert-Near "particle_soft_depth" ([double]$report.frame_contract.particles.soft_depth_fade) 0.47 0.03
+    Assert-Near "particle_wind" ([double]$report.frame_contract.particles.wind_influence) 0.58 0.03
 }
 
 $corruptRun = Invoke-SettingsSmoke "corrupt_settings" $corruptPath

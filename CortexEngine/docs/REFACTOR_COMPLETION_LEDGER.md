@@ -742,6 +742,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_particle_disabled_zero_cost.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_rt_firefly_outlier_scene.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_rt_overbright_clamp_scene.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_package_contract_tests.ps1
    ```
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and

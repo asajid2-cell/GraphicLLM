@@ -46,6 +46,9 @@ if ($main.IndexOf("--hud", [StringComparison]::Ordinal) -lt 0 -or
     $main.IndexOf("CORTEX_HUD_MODE", [StringComparison]::Ordinal) -lt 0) {
     Add-Failure "main.cpp does not expose HUD mode CLI/env configuration."
 }
+if ($engineHeader.IndexOf("initialHudMode = EngineHudMode::Off", [StringComparison]::Ordinal) -lt 0) {
+    Add-Failure "EngineConfig default HUD mode is not public-capture clean/off."
+}
 
 $exeWorkingDir = Split-Path -Parent $exe
 
@@ -92,8 +95,73 @@ function Invoke-HudCase([string]$Mode, [bool]$ExpectedVisible) {
     if ([bool]$report.hud.visible -ne $ExpectedVisible) {
         Add-Failure "HUD mode '$Mode' visible=$($report.hud.visible), expected $ExpectedVisible"
     }
+    if (-not [bool]$report.hud.debug_available) {
+        Add-Failure "HUD mode '$Mode' did not report debug_available=true"
+    }
+    $expectedClean = -not $ExpectedVisible
+    if ([bool]$report.hud.public_capture_clean -ne $expectedClean) {
+        Add-Failure "HUD mode '$Mode' public_capture_clean=$($report.hud.public_capture_clean), expected $expectedClean"
+    }
+    $expectedOverlayCount = if ($ExpectedVisible) { 1 } else { 0 }
+    if ([int]$report.hud.overlay_count -ne $expectedOverlayCount) {
+        Add-Failure "HUD mode '$Mode' overlay_count=$($report.hud.overlay_count), expected $expectedOverlayCount"
+    }
 }
 
+function Invoke-HudDefaultCase() {
+    $caseLogDir = Join-Path $script:LogDir "default"
+    New-Item -ItemType Directory -Force -Path $caseLogDir | Out-Null
+
+    $env:CORTEX_LOG_DIR = $caseLogDir
+    $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
+
+    Push-Location $script:exeWorkingDir
+    try {
+        $output = & $script:exe `
+            "--scene" "rt_showcase" `
+            "--mode=default" `
+            "--no-llm" `
+            "--no-dreamer" `
+            "--no-launcher" `
+            "--smoke-frames=3" 2>&1
+        $exitCode = $LASTEXITCODE
+        $output | Set-Content -Encoding UTF8 (Join-Path $caseLogDir "engine_stdout.txt")
+    } finally {
+        Pop-Location
+        Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
+        Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
+    }
+
+    if ($exitCode -ne 0) {
+        Add-Failure "HUD default runtime failed with exit code $exitCode. logs=$caseLogDir"
+        return
+    }
+
+    $reportPath = Join-Path $caseLogDir "frame_report_shutdown.json"
+    if (-not (Test-Path $reportPath)) {
+        Add-Failure "HUD default did not write frame_report_shutdown.json. logs=$caseLogDir"
+        return
+    }
+
+    $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+    if ([string]$report.hud.mode -ne "off") {
+        Add-Failure "HUD default reported '$($report.hud.mode)', expected off"
+    }
+    if ([bool]$report.hud.visible) {
+        Add-Failure "HUD default visible was true"
+    }
+    if (-not [bool]$report.hud.public_capture_clean) {
+        Add-Failure "HUD default did not report public_capture_clean=true"
+    }
+    if (-not [bool]$report.hud.debug_available) {
+        Add-Failure "HUD default did not report debug_available=true"
+    }
+    if ([int]$report.hud.overlay_count -ne 0) {
+        Add-Failure "HUD default overlay_count was $($report.hud.overlay_count), expected 0"
+    }
+}
+
+Invoke-HudDefaultCase
 Invoke-HudCase "off" $false
 Invoke-HudCase "full_debug" $true
 

@@ -1937,16 +1937,30 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         {"total_frames", m_totalFrameCount},
         {"exit_after_visual_validation_capture", m_exitAfterVisualValidationCapture}
     };
+    const bool hudVisible = m_hudMode != EngineHudMode::Off;
+    const bool settingsOverlayOpen = m_settingsOverlayVisible;
+    const bool debugMenuOpen = UI::DebugMenu::IsVisible();
+    const bool graphicsSettingsOpen = UI::GraphicsSettingsWindow::IsVisible();
+    const bool sceneEditorOpen = UI::SceneEditorWindow::IsVisible();
+    const uint32_t overlayCount =
+        (hudVisible ? 1u : 0u) +
+        (settingsOverlayOpen ? 1u : 0u) +
+        (debugMenuOpen ? 1u : 0u) +
+        (graphicsSettingsOpen ? 1u : 0u) +
+        (sceneEditorOpen ? 1u : 0u);
     report["hud"] = {
         {"mode", HudModeName(m_hudMode)},
-        {"visible", m_hudMode != EngineHudMode::Off},
-        {"overlay_forced", m_settingsOverlayVisible || UI::DebugMenu::IsVisible()}
+        {"visible", hudVisible},
+        {"overlay_forced", settingsOverlayOpen || debugMenuOpen},
+        {"debug_available", true},
+        {"public_capture_clean", overlayCount == 0},
+        {"overlay_count", overlayCount}
     };
     report["ui_state"] = {
-        {"graphics_settings_open", UI::GraphicsSettingsWindow::IsVisible()},
-        {"scene_editor_open", UI::SceneEditorWindow::IsVisible()},
-        {"debug_menu_open", UI::DebugMenu::IsVisible()},
-        {"settings_overlay_open", m_settingsOverlayVisible}
+        {"graphics_settings_open", graphicsSettingsOpen},
+        {"scene_editor_open", sceneEditorOpen},
+        {"debug_menu_open", debugMenuOpen},
+        {"settings_overlay_open", settingsOverlayOpen}
     };
     json focusedMaterial = nullptr;
     if (m_registry && !m_focusTargetName.empty()) {

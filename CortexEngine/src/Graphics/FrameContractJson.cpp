@@ -261,8 +261,12 @@ json FrameContractToJson(const FrameContract& contract) {
             {"enabled", contract.particles.enabled},
             {"planned", contract.particles.planned},
             {"executed", contract.particles.executed},
+            {"public_runtime_path", contract.particles.publicRuntimePath},
+            {"gpu_particle_public_path", contract.particles.gpuParticlePublicPath},
+            {"simulation_budget_tracked", contract.particles.simulationBudgetTracked},
             {"instance_map_failed", contract.particles.instanceMapFailed},
             {"capped", contract.particles.capped},
+            {"runtime_backend", contract.particles.runtimeBackend},
             {"density_scale", contract.particles.densityScale},
             {"quality_scale", contract.particles.qualityScale},
             {"bloom_contribution", contract.particles.bloomContribution},
@@ -276,8 +280,11 @@ json FrameContractToJson(const FrameContract& contract) {
             {"submitted_instances", contract.particles.submittedInstances},
             {"frustum_culled", contract.particles.frustumCulled},
             {"max_instances", contract.particles.maxInstances},
+            {"simulation_budget_particles", contract.particles.simulationBudgetParticles},
             {"instance_capacity", contract.particles.instanceCapacity},
-            {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
+            {"instance_buffer_bytes", contract.particles.instanceBufferBytes},
+            {"simulation_budget_bytes", contract.particles.simulationBudgetBytes},
+            {"upload_bytes_this_frame", contract.particles.uploadBytesThisFrame}
         }},
         {"water", {
             {"level_y", contract.water.levelY},

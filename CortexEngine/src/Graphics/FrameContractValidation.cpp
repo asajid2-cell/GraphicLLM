@@ -695,6 +695,15 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.particles.instanceMapFailed) {
         warn("particle_instance_map_failed");
     }
+    if (contract.particles.planned && !contract.particles.publicRuntimePath) {
+        warn("particle_public_runtime_path_missing");
+    }
+    if (contract.particles.planned && !contract.particles.simulationBudgetTracked) {
+        warn("particle_simulation_budget_untracked");
+    }
+    if (contract.particles.planned && contract.particles.runtimeBackend.empty()) {
+        warn("particle_runtime_backend_missing");
+    }
     if (contract.particles.effectPreset != "gallery_mix" &&
         contract.particles.emitterCount > 0 &&
         contract.particles.presetMismatchedEmitters > 0) {

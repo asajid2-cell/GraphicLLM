@@ -301,8 +301,12 @@ struct FrameContract {
         bool enabled = false;
         bool planned = false;
         bool executed = false;
+        bool publicRuntimePath = false;
+        bool gpuParticlePublicPath = false;
+        bool simulationBudgetTracked = false;
         bool instanceMapFailed = false;
         bool capped = false;
+        std::string runtimeBackend = "disabled";
         float densityScale = 1.0f;
         float qualityScale = 1.0f;
         float bloomContribution = 1.0f;
@@ -316,8 +320,11 @@ struct FrameContract {
         uint32_t submittedInstances = 0;
         uint32_t frustumCulled = 0;
         uint32_t maxInstances = 0;
+        uint32_t simulationBudgetParticles = 0;
         uint32_t instanceCapacity = 0;
         uint64_t instanceBufferBytes = 0;
+        uint64_t simulationBudgetBytes = 0;
+        uint64_t uploadBytesThisFrame = 0;
     };
 
     struct WaterInfo {

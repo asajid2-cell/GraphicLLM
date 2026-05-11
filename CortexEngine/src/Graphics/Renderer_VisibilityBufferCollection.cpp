@@ -214,39 +214,14 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
             return;
         }
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
-        rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
-        rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        rawSrv.Buffer.FirstElement = 0;
-        rawSrv.Buffer.StructureByteStride = 0;
-        rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-
-        const UINT64 vbBytes = gpu.vertexBuffer->GetDesc().Width;
-        const UINT64 ibBytes = gpu.indexBuffer->GetDesc().Width;
-
-        auto vbSrvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-        auto ibSrvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-        if (vbSrvResult.IsErr() || ibSrvResult.IsErr()) {
-            spdlog::warn("VB: failed to allocate persistent mesh SRVs (vb={}, ib={})",
-                         vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok",
-                         ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok");
+        auto srvResult = MeshUploadResourceState::EnsureRawSRVs(
+            m_services.device->GetDevice(),
+            m_services.descriptorManager.get(),
+            gpu);
+        if (srvResult.IsErr()) {
+            spdlog::warn("VB: {}", srvResult.Error());
             return;
         }
-
-        DescriptorHandle vbSrv = vbSrvResult.Value();
-        DescriptorHandle ibSrv = ibSrvResult.Value();
-
-        rawSrv.Buffer.NumElements = static_cast<UINT>(vbBytes / 4u);
-        m_services.device->GetDevice()->CreateShaderResourceView(gpu.vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
-
-        rawSrv.Buffer.NumElements = static_cast<UINT>(ibBytes / 4u);
-        m_services.device->GetDevice()->CreateShaderResourceView(gpu.indexBuffer.Get(), &rawSrv, ibSrv.cpu);
-
-        gpu.vbRawSRVIndex = vbSrv.index;
-        gpu.ibRawSRVIndex = ibSrv.index;
-        gpu.vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
-        gpu.indexFormat = 0u; // R32_UINT
     };
 
     // Counters for debugging missing geometry

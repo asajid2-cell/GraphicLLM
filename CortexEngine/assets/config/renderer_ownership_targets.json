@@ -463,6 +463,16 @@
       "future_extension": "Keep future mesh buffer allocation, staging writes, and bindless raw SRV creation inside MeshUploadResourceState or a dedicated upload service before expanding mesh streaming"
     },
     {
+      "id": "visibility_buffer_mesh_srvs",
+      "owner": "Visibility buffer",
+      "status": "release_boundary_validated",
+      "release_boundary": "Visibility-buffer collection may request missing bindless raw mesh SRVs for older or externally supplied MeshBuffers, but raw VB/IB SRV descriptor allocation and view creation are owned by MeshUploadResourceState::EnsureRawSRVs",
+      "validated_contracts": ["renderer_ownership", "vb_debug_views", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererUploadState.h", "Renderer_VisibilityBufferCollection.cpp"],
+      "renderer_state_members": ["m_visibilityBufferState", "m_services"],
+      "future_extension": "Keep future visibility-buffer mesh descriptor repair paths routed through MeshUploadResourceState or a dedicated mesh-resource publication helper"
+    },
+    {
       "id": "vegetation_instance_resources",
       "owner": "Vegetation",
       "status": "release_boundary_validated",

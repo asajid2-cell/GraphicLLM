@@ -97,7 +97,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "quality_scale": 1.38,
     "bloom_contribution": 1.42,
     "soft_depth_fade": 0.44,
-    "wind_influence": 0.66
+    "wind_influence": 0.66,
+    "effect_preset": "embers"
   },
   "cinematic_post": {
     "enabled": true,
@@ -184,6 +185,12 @@ if ($exitCode -ne 0) {
     Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.42 0.04
     Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.44 0.04
     Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.66 0.04
+    if ([string]$fc.particles.effect_preset -ne "embers") {
+        Add-Failure "particle effect preset was '$($fc.particles.effect_preset)', expected embers"
+    }
+    if ([int]$fc.particles.preset_mismatched_emitters -ne 0) {
+        Add-Failure "particle preset mismatch count was $($fc.particles.preset_mismatched_emitters), expected 0"
+    }
     if ($null -eq $fc.water) {
         Add-Failure "water contract section was missing"
     } else {

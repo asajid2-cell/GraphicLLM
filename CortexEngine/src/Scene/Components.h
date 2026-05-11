@@ -332,6 +332,8 @@ enum class ParticleEmitterType : uint32_t {
 
 struct ParticleEmitterComponent {
     ParticleEmitterType type = ParticleEmitterType::Smoke;
+    std::string effectPresetId = "smoke";
+    std::string defaultEffectPresetId = "smoke";
     float rate = 20.0f;           // particles per second
     float lifetime = 3.0f;        // seconds
     glm::vec3 initialVelocity{0.0f, 1.0f, 0.0f};

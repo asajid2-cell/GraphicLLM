@@ -306,6 +306,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.bloomContribution = m_particleState.bloomContribution;
     contract.particles.softDepthFade = m_particleState.softDepthFade;
     contract.particles.windInfluence = m_particleState.windInfluence;
+    contract.particles.effectPreset = m_particleState.effectPreset;
+    contract.particles.presetMatchedEmitters = m_particleState.framePresetMatchedEmitters;
+    contract.particles.presetMismatchedEmitters = m_particleState.framePresetMismatchedEmitters;
     contract.particles.emitterCount = m_particleState.frameEmitterCount;
     contract.particles.liveParticles = m_particleState.frameLiveParticles;
     contract.particles.submittedInstances = m_particleState.frameSubmittedInstances;

@@ -7,6 +7,7 @@
 #include "Graphics/EnvironmentManifest.h"
 #include "Graphics/RendererLightingRigControl.h"
 #include "Graphics/RendererTuningState.h"
+#include "Scene/ParticleEffectLibrary.h"
 
 #include <commctrl.h>
 
@@ -114,6 +115,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_BOOKMARK_MATERIALS = 9210,
     IDC_GFX_ENV_SELECT = 9211,
     IDC_GFX_ENV_REAPPLY = 9212,
+    IDC_GFX_PARTICLE_EFFECT_SELECT = 9213,
 };
 
 struct SliderBinding {
@@ -200,7 +202,9 @@ struct GraphicsSettingsState {
     HWND chkParticles = nullptr;
     HWND chkCinematicPost = nullptr;
     HWND cmbEnvironment = nullptr;
+    HWND cmbParticleEffect = nullptr;
     std::vector<std::string> environmentIds;
+    std::vector<std::string> particleEffectIds;
 
     int contentHeight = 0;
     int scrollPos = 0;
@@ -321,6 +325,70 @@ void SyncEnvironmentComboFromRenderer() {
     }
 }
 
+void LoadParticleEffectOptions() {
+    g_gfx.particleEffectIds.clear();
+    if (!g_gfx.cmbParticleEffect) {
+        return;
+    }
+
+    SendMessageW(g_gfx.cmbParticleEffect, CB_RESETCONTENT, 0, 0);
+    g_gfx.particleEffectIds.push_back("gallery_mix");
+    SendMessageW(g_gfx.cmbParticleEffect, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Gallery Mix"));
+
+    for (const auto& descriptor : Scene::GetParticleEffectDescriptors()) {
+        g_gfx.particleEffectIds.emplace_back(descriptor.id);
+        const std::string label = std::string(descriptor.displayName) + " (" + std::string(descriptor.id) + ")";
+        const std::wstring wideLabel = ToWide(label);
+        SendMessageW(g_gfx.cmbParticleEffect, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideLabel.c_str()));
+    }
+
+    SendMessageW(g_gfx.cmbParticleEffect, CB_SETCURSEL, 0, 0);
+}
+
+void SyncParticleEffectComboFromRenderer() {
+    if (!g_gfx.cmbParticleEffect || g_gfx.particleEffectIds.empty()) {
+        return;
+    }
+
+    const std::string active = g_gfx.tuning.particles.effectPreset.empty()
+        ? "gallery_mix"
+        : g_gfx.tuning.particles.effectPreset;
+    for (size_t i = 0; i < g_gfx.particleEffectIds.size(); ++i) {
+        if (g_gfx.particleEffectIds[i] == active) {
+            SendMessageW(g_gfx.cmbParticleEffect, CB_SETCURSEL, static_cast<WPARAM>(i), 0);
+            return;
+        }
+    }
+    SendMessageW(g_gfx.cmbParticleEffect, CB_SETCURSEL, 0, 0);
+}
+
+void SyncSelectedParticleEffectToState() {
+    if (!g_gfx.cmbParticleEffect || g_gfx.particleEffectIds.empty()) {
+        return;
+    }
+    const int selected = static_cast<int>(SendMessageW(g_gfx.cmbParticleEffect, CB_GETCURSEL, 0, 0));
+    if (selected >= 0 && static_cast<size_t>(selected) < g_gfx.particleEffectIds.size()) {
+        g_gfx.tuning.particles.effectPreset = g_gfx.particleEffectIds[static_cast<size_t>(selected)];
+    }
+}
+
+void ApplySelectedParticleEffectFromGraphicsUI() {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    auto* engine = Cortex::ServiceLocator::GetEngine();
+    if (!renderer || renderer->IsDeviceRemoved() || !engine || !g_gfx.cmbParticleEffect) {
+        return;
+    }
+
+    SyncStateFromToggles();
+    SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
+    g_gfx.tuning.quality.dirtyFromUI = true;
+    Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    engine->ApplyParticleEffectPresetToScene(g_gfx.tuning.particles.effectPreset);
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+    SyncParticleEffectComboFromRenderer();
+}
+
 void ApplySelectedEnvironmentFromGraphicsUI(bool loadAllFirst = false) {
     auto* renderer = Cortex::ServiceLocator::GetRenderer();
     if (!renderer || renderer->IsDeviceRemoved() || !g_gfx.cmbEnvironment) {
@@ -334,6 +402,7 @@ void ApplySelectedEnvironmentFromGraphicsUI(bool loadAllFirst = false) {
 
     SyncStateFromToggles();
     SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
     g_gfx.tuning.environment.environmentId = g_gfx.environmentIds[static_cast<size_t>(selected)];
     g_gfx.tuning.quality.dirtyFromUI = true;
 
@@ -425,11 +494,15 @@ void ApplyTuningState(bool markColorGradeCustom = false) {
     }
     SyncStateFromToggles();
     SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
     if (markColorGradeCustom) {
         g_gfx.tuning.cinematicPost.colorGradePreset = "custom";
     }
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    if (auto* engine = Cortex::ServiceLocator::GetEngine()) {
+        engine->ApplyParticleEffectPresetToScene(g_gfx.tuning.particles.effectPreset);
+    }
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
 }
 
@@ -450,6 +523,7 @@ void ApplyColorGradePresetFromGraphicsUI(const char* preset) {
     }
     SyncStateFromToggles();
     SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
     g_gfx.tuning.cinematicPost.colorGradePreset = preset ? preset : "neutral";
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
@@ -463,6 +537,7 @@ void ApplyToneMapperPresetFromGraphicsUI(const char* preset) {
     }
     SyncStateFromToggles();
     SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
     g_gfx.tuning.cinematicPost.toneMapperPreset = preset ? preset : "aces";
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
@@ -524,6 +599,7 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.particleBloom, g_gfx.tuning.particles.bloomContribution);
     SetSliderFromFloat(g_gfx.particleSoftDepth, g_gfx.tuning.particles.softDepthFade);
     SetSliderFromFloat(g_gfx.particleWind, g_gfx.tuning.particles.windInfluence);
+    SyncParticleEffectComboFromRenderer();
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -835,6 +911,8 @@ void RegisterGraphicsSettingsClass() {
 
             makeSection(L"Showcase Effects");
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
+            g_gfx.cmbParticleEffect = makeCombo(IDC_GFX_PARTICLE_EFFECT_SELECT, L"Particle Effect");
+            LoadParticleEffectOptions();
             makeSlider(IDC_GFX_PARTICLE_DENSITY, L"Particle Density", g_gfx.particleDensity, 0.0f, 2.0f);
             makeSlider(IDC_GFX_PARTICLE_QUALITY, L"Particle Quality", g_gfx.particleQuality, 0.25f, 2.0f);
             makeSlider(IDC_GFX_PARTICLE_BLOOM, L"Particle Bloom", g_gfx.particleBloom, 0.0f, 2.0f);
@@ -977,6 +1055,12 @@ void RegisterGraphicsSettingsClass() {
                 RefreshHealthLabels();
                 return 0;
             }
+            if (LOWORD(wParam) == IDC_GFX_PARTICLE_EFFECT_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
+                ApplySelectedParticleEffectFromGraphicsUI();
+                RefreshControlsFromRenderer();
+                RefreshHealthLabels();
+                return 0;
+            }
             if (HIWORD(wParam) != BN_CLICKED) {
                 break;
             }
@@ -1066,6 +1150,7 @@ void RegisterGraphicsSettingsClass() {
             case IDC_GFX_SAVE: {
                 SyncStateFromToggles();
                 SyncStateFromSliders();
+                SyncSelectedParticleEffectToState();
                 std::string error;
                 const auto path = Graphics::GetDefaultRendererTuningStatePath();
                 if (Graphics::SaveRendererTuningStateFile(path, g_gfx.tuning, &error)) {
@@ -1083,6 +1168,9 @@ void RegisterGraphicsSettingsClass() {
                     &error);
                 if (loaded) {
                     Graphics::ApplyRendererTuningState(*renderer, *loaded);
+                    if (auto* engine = Cortex::ServiceLocator::GetEngine()) {
+                        engine->ApplyParticleEffectPresetToScene(loaded->particles.effectPreset);
+                    }
                     SetWindowTextW(g_gfx.txtWarning, L"Settings loaded from user/graphics_settings.json");
                 } else {
                     const std::wstring status = error.empty()

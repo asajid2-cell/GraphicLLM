@@ -175,6 +175,7 @@ bool ApplyParticleEffectDescriptor(std::string_view id, ParticleEmitterComponent
         return false;
     }
     emitter = descriptor->emitter;
+    emitter.effectPresetId = std::string(id);
     return true;
 }
 

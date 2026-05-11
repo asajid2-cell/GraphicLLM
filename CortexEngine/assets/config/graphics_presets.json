@@ -50,7 +50,8 @@
         "quality": "balanced",
         "bloom_contribution": 1.1,
         "soft_depth_fade": 0.45,
-        "wind_influence": 0.25
+        "wind_influence": 0.25,
+        "effect_preset": "gallery_mix"
       },
       "cinematic_post": {
         "enabled": true,
@@ -112,7 +113,8 @@
         "quality": "low",
         "bloom_contribution": 0.75,
         "soft_depth_fade": 0.25,
-        "wind_influence": 0.0
+        "wind_influence": 0.0,
+        "effect_preset": "gallery_mix"
       },
       "cinematic_post": {
         "enabled": false,

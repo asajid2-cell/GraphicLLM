@@ -153,6 +153,14 @@ void Renderer::SetParticleTuning(float qualityScale,
     m_particleState.windInfluence = std::clamp(windInfluence, 0.0f, 2.0f);
 }
 
+void Renderer::SetParticleEffectPreset(const std::string& presetId) {
+    m_particleState.effectPreset = presetId.empty() ? "gallery_mix" : presetId;
+}
+
+const std::string& Renderer::GetParticleEffectPreset() const {
+    return m_particleState.effectPreset;
+}
+
 void Renderer::SetSSREnabled(bool enabled) {
     if (m_ssrResources.enabled == enabled) {
         return;

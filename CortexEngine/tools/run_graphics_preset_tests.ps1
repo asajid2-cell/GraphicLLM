@@ -80,6 +80,9 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.particles.bloom_contribution" ([double]$preset.particles.bloom_contribution) 0.0 2.0
     Assert-Range "$id.particles.soft_depth_fade" ([double]$preset.particles.soft_depth_fade) 0.0 1.0
     Assert-Range "$id.particles.wind_influence" ([double]$preset.particles.wind_influence) 0.0 2.0
+    if ([string]::IsNullOrWhiteSpace([string]$preset.particles.effect_preset)) {
+        Add-Failure "$id.particles.effect_preset is missing"
+    }
     Assert-Range "$id.cinematic_post.bloom_threshold" ([double]$preset.cinematic_post.bloom_threshold) 0.1 10.0
     Assert-Range "$id.cinematic_post.bloom_soft_knee" ([double]$preset.cinematic_post.bloom_soft_knee) 0.0 1.0
     Assert-Range "$id.cinematic_post.vignette" ([double]$preset.cinematic_post.vignette) 0.0 1.0

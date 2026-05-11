@@ -195,113 +195,31 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
 
     // Store final geometry in DEFAULT heap memory. A short-lived upload heap
     // stages the CPU data, then the copy queue transfers it into GPU-local
-    // buffers. This is the mature renderer path: better bandwidth, lower CPU
-    // memory pressure, and less energy wasted reading vertex/index data from
-    // CPU-visible memory every frame.
-    D3D12_HEAP_PROPERTIES defaultHeap = {};
-    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
-    defaultHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    defaultHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    defaultHeap.CreationNodeMask = 1;
-    defaultHeap.VisibleNodeMask = 1;
-
-    D3D12_HEAP_PROPERTIES uploadHeap = {};
-    uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-    uploadHeap.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    uploadHeap.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    uploadHeap.CreationNodeMask = 1;
-    uploadHeap.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC vbDesc = {};
-    vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    vbDesc.Width = vbSize;
-    vbDesc.Height = 1;
-    vbDesc.DepthOrArraySize = 1;
-    vbDesc.MipLevels = 1;
-    vbDesc.Format = DXGI_FORMAT_UNKNOWN;
-    vbDesc.SampleDesc.Count = 1;
-    vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    D3D12_RESOURCE_DESC ibDesc = vbDesc;
-    ibDesc.Width = ibSize;
-
-    auto gpuBuffers = std::make_shared<MeshBuffers>();
-
-    ComPtr<ID3D12Resource> vertexBuffer;
-    HRESULT hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &vbDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&vertexBuffer)
-    );
-    if (FAILED(hr)) {
-        spdlog::error(
-            "CreateCommittedResource for vertex buffer failed: hr=0x{:08X}, vbSize={}, vertices={}",
-            static_cast<unsigned int>(hr),
-            vbSize,
-            vertices.size());
-
-        CORTEX_REPORT_DEVICE_REMOVED("UploadMesh_CreateVertexBuffer", hr);
-        return Result<void>::Err("Failed to create default-heap vertex buffer");
+    // buffers. Resource allocation, staging writes, and raw SRV creation live
+    // in the upload resource state; this function keeps mesh policy and queueing.
+    auto resourceResult = MeshUploadResourceState::CreateResources(
+        device,
+        m_services.descriptorManager.get(),
+        vertices,
+        mesh->indices);
+    if (resourceResult.IsErr()) {
+        const auto& error = resourceResult.Error();
+        if (FAILED(error.hr) && error.deviceRemovedContext) {
+            CORTEX_REPORT_DEVICE_REMOVED(error.deviceRemovedContext, error.hr);
+        }
+        if (FAILED(error.hr)) {
+            spdlog::error("{}: hr=0x{:08X}, vbSize={}, vertices={}",
+                          error.message,
+                          static_cast<unsigned int>(error.hr),
+                          vbSize,
+                          vertices.size());
+        }
+        return Result<void>::Err(error.message);
     }
-
-    ComPtr<ID3D12Resource> indexBuffer;
-    hr = device->CreateCommittedResource(
-        &defaultHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &ibDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&indexBuffer)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create default-heap index buffer");
+    auto uploadResources = std::move(resourceResult).Value();
+    if (!uploadResources.descriptorWarning.empty()) {
+        spdlog::warn("{}", uploadResources.descriptorWarning);
     }
-
-    ComPtr<ID3D12Resource> vertexUpload;
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &vbDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&vertexUpload)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create staging vertex upload buffer");
-    }
-
-    ComPtr<ID3D12Resource> indexUpload;
-    hr = device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &ibDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&indexUpload)
-    );
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create staging index upload buffer");
-    }
-
-    // Copy CPU data into staging buffers, then transfer to GPU-local buffers.
-    D3D12_RANGE readRange = { 0, 0 };
-    void* mappedData = nullptr;
-    hr = vertexUpload->Map(0, &readRange, &mappedData);
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map staging vertex buffer");
-    }
-    memcpy(mappedData, vertices.data(), vbSize);
-    vertexUpload->Unmap(0, nullptr);
-
-    hr = indexUpload->Map(0, &readRange, &mappedData);
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to map staging index buffer");
-    }
-    memcpy(mappedData, mesh->indices.data(), ibSize);
-    indexUpload->Unmap(0, nullptr);
 
     const uint32_t uploadIndex = m_uploadCommands.allocatorIndex++ % UploadCommandPoolState::kPoolSize;
     if (!m_uploadCommands.commandAllocators[uploadIndex] || !m_uploadCommands.commandLists[uploadIndex]) {
@@ -313,14 +231,14 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         }
     }
 
-    hr = MeshUploadCopyPass::RecordBufferCopies({
+    HRESULT hr = MeshUploadCopyPass::RecordBufferCopies({
         m_uploadCommands.commandAllocators[uploadIndex].Get(),
         m_uploadCommands.commandLists[uploadIndex].Get(),
-        vertexBuffer.Get(),
-        vertexUpload.Get(),
+        uploadResources.gpuBuffers->vertexBuffer.Get(),
+        uploadResources.vertexUpload.Get(),
         vbSize,
-        indexBuffer.Get(),
-        indexUpload.Get(),
+        uploadResources.gpuBuffers->indexBuffer.Get(),
+        uploadResources.indexUpload.Get(),
         ibSize,
     });
     if (FAILED(hr)) {
@@ -335,45 +253,6 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     }
     m_uploadCommands.fences[uploadIndex] = 0;
 
-    // Store GPU buffers with lifetime tied to mesh
-    gpuBuffers->vertexBuffer = vertexBuffer;
-    gpuBuffers->indexBuffer = indexBuffer;
-
-    // Register raw SRVs for bindless access (VB resolve / VB motion vectors).
-    // These occupy persistent slots in the shader-visible CBV/SRV/UAV heap so
-    // per-frame resolve does not need to synthesize SRVs.
-    if (m_services.descriptorManager) {
-        D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
-        rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
-        rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        rawSrv.Buffer.FirstElement = 0;
-        rawSrv.Buffer.StructureByteStride = 0;
-        rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-
-        auto vbSrvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-        auto ibSrvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-        if (vbSrvResult.IsOk() && ibSrvResult.IsOk()) {
-            DescriptorHandle vbSrv = vbSrvResult.Value();
-            DescriptorHandle ibSrv = ibSrvResult.Value();
-
-            rawSrv.Buffer.NumElements = static_cast<UINT>(vbSize / 4u);
-            device->CreateShaderResourceView(vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
-
-            rawSrv.Buffer.NumElements = static_cast<UINT>(ibSize / 4u);
-            device->CreateShaderResourceView(indexBuffer.Get(), &rawSrv, ibSrv.cpu);
-
-            gpuBuffers->vbRawSRVIndex = vbSrv.index;
-            gpuBuffers->ibRawSRVIndex = ibSrv.index;
-            gpuBuffers->vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
-            gpuBuffers->indexFormat = 0u; // R32_UINT
-        } else {
-            spdlog::warn("UploadMesh: failed to allocate persistent SRVs for VB resolve (vb={}, ib={})",
-                         vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok",
-                         ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok");
-        }
-    }
-
     // CRITICAL: If mesh already has GPU buffers (e.g., re-upload), defer deletion
     // of old buffers to prevent D3D12 Error 921 (OBJECT_DELETED_WHILE_STILL_IN_USE).
     // Simple assignment would immediately release old buffers which may still be
@@ -381,7 +260,7 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
     if (mesh->gpuBuffers) {
         DeferMeshBuffersDeletion(mesh->gpuBuffers);
     }
-    mesh->gpuBuffers = gpuBuffers;
+    mesh->gpuBuffers = uploadResources.gpuBuffers;
 
     // Register approximate geometry footprint in the asset registry so the
     // memory inspector can surface heavy meshes, and cache the mapping from

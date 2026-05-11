@@ -150,6 +150,38 @@ $summary = [ordered]@{
 }
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 (Join-Path $LogDir "ibl_asset_policy_summary.json")
 
+$authoringTool = Join-Path $PSScriptRoot "prepare_ibl_runtime_assets.ps1"
+if (-not (Test-Path $authoringTool)) {
+    Add-Failure "IBL authoring tool missing: $authoringTool"
+} else {
+    $authoringLogDir = Join-Path $LogDir "authoring_plan"
+    $authoringOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $authoringTool -ManifestPath $ManifestPath -LogDir $authoringLogDir 2>&1
+    $authoringExit = $LASTEXITCODE
+    $authoringOutput | Set-Content -Encoding UTF8 (Join-Path $LogDir "ibl_authoring_stdout.txt")
+    if ($authoringExit -ne 0) {
+        Add-Failure "IBL authoring plan failed with exit code $authoringExit"
+    }
+    $authoringPlanPath = Join-Path $authoringLogDir "ibl_authoring_plan.json"
+    if (-not (Test-Path $authoringPlanPath)) {
+        Add-Failure "IBL authoring plan did not write ibl_authoring_plan.json"
+    } else {
+        $plan = Get-Content $authoringPlanPath -Raw | ConvertFrom-Json
+        if ([string]$plan.schema -ne "cortex.ibl_authoring_plan.v1") {
+            Add-Failure "IBL authoring plan schema was '$($plan.schema)'"
+        }
+        if ([bool]$plan.downloads_allowed) {
+            Add-Failure "IBL authoring plan allowed downloads"
+        }
+        if ($null -eq $plan.environments -or $plan.environments.Count -lt $manifest.environments.Count) {
+            Add-Failure "IBL authoring plan does not cover all manifest environments"
+        }
+        $fallbackPlan = $plan.environments | Where-Object { [string]$_.id -eq [string]$manifest.fallback } | Select-Object -First 1
+        if ($null -eq $fallbackPlan -or [string]$fallbackPlan.status -ne "procedural") {
+            Add-Failure "IBL authoring plan does not preserve procedural fallback status"
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "IBL asset policy tests failed:" -ForegroundColor Red
     foreach ($failure in $failures) {

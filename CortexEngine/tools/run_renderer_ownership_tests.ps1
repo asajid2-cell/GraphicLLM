@@ -36,6 +36,8 @@ $rtDenoiserPath = Join-Path $root "src/Graphics/RTDenoiser.cpp"
 $rtDenoiseRendererPath = Join-Path $root "src/Graphics/Renderer_RTDenoise.cpp"
 $rtReflectionDispatchPassPath = Join-Path $root "src/Graphics/Passes/RTReflectionDispatchPass.cpp"
 $rtReflectionRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflections.cpp"
+$rtShadowsGIPassPath = Join-Path $root "src/Graphics/Passes/RTShadowsGIPass.cpp"
+$rtShadowsGIRendererPath = Join-Path $root "src/Graphics/Renderer_RTShadowsGI.cpp"
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
@@ -310,6 +312,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_reflection_dispatch_resources missing Renderer_RTReflections.cpp"
+        }
+    }
+
+    if ($id -eq "rt_shadow_gi_dispatch_resources") {
+        if (Test-Path $rtShadowsGIPassPath) {
+            $rtShadowsGIPass = Get-Content $rtShadowsGIPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::RTShadowsGIPass", "PrepareShadowInputs", "PrepareGIOutput", "TransitionResource", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "kDepthSampleState")) {
+                if ($rtShadowsGIPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_shadow_gi_dispatch_resources missing RTShadowsGIPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_shadow_gi_dispatch_resources missing RTShadowsGIPass.cpp"
+        }
+        if (Test-Path $rtShadowsGIRendererPath) {
+            $rtShadowsGIRenderer = Get-Content $rtShadowsGIRendererPath -Raw
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS")) {
+                if ($rtShadowsGIRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_shadow_gi_dispatch_resources still owns shadow/GI resource mechanics in Renderer_RTShadowsGI.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("RTShadowsGIPass::PrepareShadowInputs", "RTShadowsGIPass::PrepareGIOutput")) {
+                if ($rtShadowsGIRenderer.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_shadow_gi_dispatch_resources missing routed shadow/GI resource call in Renderer_RTShadowsGI.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "rt_shadow_gi_dispatch_resources missing Renderer_RTShadowsGI.cpp"
         }
     }
 

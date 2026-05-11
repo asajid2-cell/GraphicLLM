@@ -63,6 +63,16 @@
       "future_extension": "Keep future RT reflection dispatch resource-state and debug-clear mechanics in RTReflectionDispatchPass or declarative render-graph declarations instead of adding direct barriers to Renderer_RTReflections.cpp"
     },
     {
+      "id": "rt_shadow_gi_dispatch_resources",
+      "owner": "RT shadows/GI",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_RTShadowsGI.cpp still owns TLAS build policy, shadow/GI dispatch gating, environment descriptor selection, and dispatch sizing, but DXR depth readability plus shadow-mask and GI-output UAV transitions are owned by RTShadowsGIPass",
+      "validated_contracts": ["renderer_ownership", "rt_showcase", "temporal_validation"],
+      "target_files": ["Passes/RTShadowsGIPass.h", "Passes/RTShadowsGIPass.cpp", "Renderer_RTShadowsGI.cpp"],
+      "renderer_state_members": ["m_depthResources", "m_rtShadowTargets", "m_rtGITargets", "m_framePlanning", "m_environmentState"],
+      "future_extension": "Keep future RT shadow/GI resource-state mechanics in RTShadowsGIPass or declarative render-graph declarations instead of adding direct barriers to Renderer_RTShadowsGI.cpp"
+    },
+    {
       "id": "end_frame_shader_resource_transitions",
       "owner": "End-frame shader-resource state",
       "status": "release_boundary_validated",

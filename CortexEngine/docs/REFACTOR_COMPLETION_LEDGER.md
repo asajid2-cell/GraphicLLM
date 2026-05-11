@@ -1072,8 +1072,25 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       showcase passed at `rt_showcase_20260511_123407_860_99856_40a3535e`
       with reflection dispatch ready and valid raw/history signal metrics.
       The broader ownership rows remain `PARTIAL` because RT shadow/GI dispatch
-      mechanics, visibility-buffer internals, graph orchestration, and other
-      renderer pass mechanics still need extraction.
+      mechanics still needed the same ownership treatment at that checkpoint,
+      and visibility-buffer internals, graph orchestration, and other renderer
+      pass mechanics still needed extraction.
+    - The current RT shadow/GI dispatch checkpoint moves DXR depth readability,
+      RT shadow-mask UAV transition, and RT GI-output UAV transition mechanics
+      into `RTShadowsGIPass`. `Renderer_RTShadowsGI.cpp` still owns TLAS build
+      policy, shadow/GI dispatch gating, environment descriptor selection, and
+      GI dispatch sizing, and now has no direct `D3D12_RESOURCE_BARRIER`,
+      `ResourceBarrier`, or `D3D12_RESOURCE_STATE_UNORDERED_ACCESS` calls.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=32`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_123917_207_100000_85f0a852`, and RT
+      showcase passed at `rt_showcase_20260511_123917_232_96628_2480901f`
+      with RT reflections/GI enabled, dispatch readiness true, and valid
+      raw/history reflection signal metrics. The broader ownership rows remain
+      `PARTIAL` because visibility-buffer internals, graph orchestration, GPU
+      particle public runtime, and other renderer pass mechanics still need
+      extraction or implementation.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

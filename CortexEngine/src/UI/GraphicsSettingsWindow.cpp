@@ -4,6 +4,7 @@
 #include "Core/ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RendererControlApplier.h"
+#include "Graphics/RendererLightingRigControl.h"
 #include "Graphics/RendererTuningState.h"
 
 #include <commctrl.h>
@@ -40,6 +41,10 @@ enum ControlIdGraphics : int {
     IDC_GFX_BACKGROUND_EXPOSURE = 9026,
     IDC_GFX_BACKGROUND_BLUR = 9027,
     IDC_GFX_PARTICLE_DENSITY = 9028,
+    IDC_GFX_RIG_STUDIO = 9029,
+    IDC_GFX_RIG_WAREHOUSE = 9030,
+    IDC_GFX_RIG_SIDE = 9031,
+    IDC_GFX_RIG_LANTERNS = 9032,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -230,6 +235,16 @@ void ApplyTuningState() {
     SyncStateFromSliders();
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+}
+
+void ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig rig) {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    auto* engine = Cortex::ServiceLocator::GetEngine();
+    if (!renderer || renderer->IsDeviceRemoved() || !engine) {
+        return;
+    }
+    Graphics::ApplyLightingRigControl(*renderer, rig, engine->GetRegistry());
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
 }
 
@@ -498,6 +513,14 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_SUN, L"Sun Intensity", g_gfx.sun, 0.0f, 20.0f);
             makeSlider(IDC_GFX_GOD_RAYS, L"God Rays", g_gfx.godRays, 0.0f, 3.0f);
             makeSlider(IDC_GFX_AREA_LIGHT, L"Area Light Size", g_gfx.areaLight, 0.25f, 2.0f);
+            {
+                const int buttonWidth = (width - margin * 2 - 18) / 4;
+                makeButton(IDC_GFX_RIG_STUDIO, L"Studio", margin, y, buttonWidth);
+                makeButton(IDC_GFX_RIG_WAREHOUSE, L"Top Down", margin + buttonWidth + 6, y, buttonWidth);
+                makeButton(IDC_GFX_RIG_SIDE, L"Side", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                makeButton(IDC_GFX_RIG_LANTERNS, L"Lanterns", margin + (buttonWidth + 6) * 3, y, buttonWidth);
+                y += 24 + rowGap;
+            }
 
             makeSection(L"Environment / IBL");
             g_gfx.chkIBL = makeCheckbox(IDC_GFX_IBL, L"IBL Enabled");
@@ -653,6 +676,18 @@ void RegisterGraphicsSettingsClass() {
                 break;
             case IDC_GFX_ENV_ALL:
                 Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 64);
+                break;
+            case IDC_GFX_RIG_STUDIO:
+                ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig::StudioThreePoint);
+                break;
+            case IDC_GFX_RIG_WAREHOUSE:
+                ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig::TopDownWarehouse);
+                break;
+            case IDC_GFX_RIG_SIDE:
+                ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig::HorrorSideLight);
+                break;
+            case IDC_GFX_RIG_LANTERNS:
+                ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig::StreetLanterns);
                 break;
             case IDC_GFX_BOOKMARK_HERO:
             case IDC_GFX_BOOKMARK_REFLECTION:

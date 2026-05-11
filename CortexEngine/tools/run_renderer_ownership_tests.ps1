@@ -67,6 +67,7 @@ if (-not (Test-Path $environmentStatePath)) {
 $environmentState = Get-Content $environmentStatePath -Raw
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
+$bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 $taaCopyPassPath = Join-Path $root "src/Graphics/Passes/TAACopyPass.cpp"
 $taaExecutionPath = Join-Path $root "src/Graphics/Renderer_TAAExecution.cpp"
@@ -386,6 +387,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "postprocess_target_transitions missing Renderer_PostProcess.cpp"
+        }
+    }
+
+    if ($id -eq "bloom_target_binding") {
+        if (Test-Path $bloomPassPath) {
+            $bloomPass = Get-Content $bloomPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::BloomPass", "TargetContext", "BindAndClearTarget", "SetFullscreenViewport", "OMSetRenderTargets", "ClearRenderTargetView")) {
+                if ($bloomPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "bloom_target_binding missing BloomPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "bloom_target_binding missing BloomPass.cpp"
+        }
+        if (Test-Path $bloomRendererPath) {
+            $bloomRenderer = Get-Content $bloomRendererPath -Raw
+            if ($bloomRenderer.IndexOf("BloomPass::BindAndClearTarget", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "bloom_target_binding missing routed target binding call in Renderer_Bloom.cpp"
+            }
+            foreach ($removedLocal in @("OMSetRenderTargets", "ClearRenderTargetView", "SetFullscreenViewport")) {
+                if ($bloomRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "bloom_target_binding still has direct bloom target bind/clear mechanics in Renderer_Bloom.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "bloom_target_binding missing Renderer_Bloom.cpp"
         }
     }
 

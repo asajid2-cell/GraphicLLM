@@ -228,9 +228,6 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
     if (!m_mainTargets.hdr.resources.color || !m_bloomResources.resources.texA[0]) {
         return false;
     }
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    BloomPass::SetFullscreenViewport(m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[0].Get());
-
     if (!skipTransitions) {
         D3D12_RESOURCE_BARRIER barriers[2] = {};
         UINT barrierCount = 0;
@@ -260,8 +257,9 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
 
     m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_bloomResources.resources.resourceState[0][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[0][0].cpu, FALSE, nullptr);
-    m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[0][0].cpu, clearColor, 0, nullptr);
+    if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[0].Get(), m_bloomResources.resources.rtv[0][0]})) {
+        return false;
+    }
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomDownsample->GetPipelineState());
 
@@ -277,9 +275,6 @@ bool Renderer::RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions) 
     if (level == 0 || level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texA[level - 1]) {
         return false;
     }
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    BloomPass::SetFullscreenViewport(m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get());
-
     if (!skipTransitions) {
         D3D12_RESOURCE_BARRIER barriers[2] = {};
         UINT barrierCount = 0;
@@ -309,8 +304,9 @@ bool Renderer::RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions) 
 
     m_bloomResources.resources.resourceState[level - 1][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[level][0].cpu, FALSE, nullptr);
-    m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[level][0].cpu, clearColor, 0, nullptr);
+    if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get(), m_bloomResources.resources.rtv[level][0]})) {
+        return false;
+    }
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomDownsample->GetPipelineState());
 
@@ -327,9 +323,6 @@ bool Renderer::RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions) {
     if (level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texB[level]) {
         return false;
     }
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    BloomPass::SetFullscreenViewport(m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get());
-
     if (!skipTransitions) {
             D3D12_RESOURCE_BARRIER barriers[2] = {};
             UINT barrierCount = 0;
@@ -359,8 +352,9 @@ bool Renderer::RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions) {
 
     m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_bloomResources.resources.resourceState[level][1] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[level][1].cpu, FALSE, nullptr);
-    m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[level][1].cpu, clearColor, 0, nullptr);
+    if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texB[level].Get(), m_bloomResources.resources.rtv[level][1]})) {
+        return false;
+    }
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomBlurH->GetPipelineState());
 
@@ -377,9 +371,6 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
     if (level >= m_bloomResources.resources.activeLevels || !m_bloomResources.resources.texA[level] || !m_bloomResources.resources.texB[level]) {
         return false;
     }
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    BloomPass::SetFullscreenViewport(m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get());
-
     if (!skipTransitions) {
             D3D12_RESOURCE_BARRIER barriers[2] = {};
             UINT barrierCount = 0;
@@ -409,8 +400,9 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
 
     m_bloomResources.resources.resourceState[level][1] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_bloomResources.resources.resourceState[level][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[level][0].cpu, FALSE, nullptr);
-    m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[level][0].cpu, clearColor, 0, nullptr);
+    if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texA[level].Get(), m_bloomResources.resources.rtv[level][0]})) {
+        return false;
+    }
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomBlurV->GetPipelineState());
 
@@ -440,9 +432,6 @@ bool Renderer::RenderBloomComposite(bool skipTransitions) {
     if (!m_bloomResources.resources.texA[baseLevel] || !m_bloomResources.resources.texB[baseLevel]) {
         return false;
     }
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    BloomPass::SetFullscreenViewport(m_commandResources.graphicsList.Get(), m_bloomResources.resources.texB[baseLevel].Get());
-
     if (!skipTransitions) {
         D3D12_RESOURCE_BARRIER barriers[kBloomLevels + 1] = {};
         UINT barrierCount = 0;
@@ -478,8 +467,9 @@ bool Renderer::RenderBloomComposite(bool skipTransitions) {
         }
     }
     m_bloomResources.resources.resourceState[baseLevel][1] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[baseLevel][1].cpu, FALSE, nullptr);
-    m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[baseLevel][1].cpu, clearColor, 0, nullptr);
+    if (!BloomPass::BindAndClearTarget({m_commandResources.graphicsList.Get(), m_bloomResources.resources.texB[baseLevel].Get(), m_bloomResources.resources.rtv[baseLevel][1]})) {
+        return false;
+    }
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomComposite->GetPipelineState());
 

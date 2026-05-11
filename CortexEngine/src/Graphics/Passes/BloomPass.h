@@ -21,6 +21,12 @@ struct FullscreenContext {
     bool srvTableValid = false;
 };
 
+struct TargetContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ID3D12Resource* target = nullptr;
+    DescriptorHandle targetRtv{};
+};
+
 [[nodiscard]] uint32_t BaseDownsampleSlot();
 [[nodiscard]] uint32_t DownsampleChainSlot(uint32_t level);
 [[nodiscard]] uint32_t BlurHSlot(uint32_t level, uint32_t stageLevels);
@@ -30,6 +36,7 @@ struct FullscreenContext {
 [[nodiscard]] RGResourceDesc MakeTextureDesc(ID3D12Resource* resource, const std::string& name);
 
 void SetFullscreenViewport(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource);
+[[nodiscard]] bool BindAndClearTarget(const TargetContext& context);
 
 [[nodiscard]] bool PrepareFullscreenState(const FullscreenContext& context);
 [[nodiscard]] bool BindGraphTexture(const FullscreenContext& context,

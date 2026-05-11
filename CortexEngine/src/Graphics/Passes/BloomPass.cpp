@@ -49,6 +49,19 @@ void SetFullscreenViewport(ID3D12GraphicsCommandList* commandList, ID3D12Resourc
     FullscreenPass::SetViewportAndScissor(commandList, resource);
 }
 
+bool BindAndClearTarget(const TargetContext& context) {
+    if (!context.commandList || !context.target || !context.targetRtv.IsValid()) {
+        return false;
+    }
+
+    SetFullscreenViewport(context.commandList, context.target);
+    context.commandList->OMSetRenderTargets(1, &context.targetRtv.cpu, FALSE, nullptr);
+
+    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    context.commandList->ClearRenderTargetView(context.targetRtv.cpu, clearColor, 0, nullptr);
+    return true;
+}
+
 bool PrepareFullscreenState(const FullscreenContext& context) {
     return FullscreenPass::BindGraphicsState({
         context.commandList,
@@ -138,10 +151,9 @@ bool RenderFullscreen(const FullscreenContext& context,
         return false;
     }
 
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    SetFullscreenViewport(context.commandList, target);
-    context.commandList->OMSetRenderTargets(1, &targetRtv.cpu, FALSE, nullptr);
-    context.commandList->ClearRenderTargetView(targetRtv.cpu, clearColor, 0, nullptr);
+    if (!BindAndClearTarget({context.commandList, target, targetRtv})) {
+        return false;
+    }
     context.commandList->SetPipelineState(pipeline->GetPipelineState());
 
     if (!BindGraphTexture(context, source, label, sourceSlot)) {
@@ -177,10 +189,9 @@ bool RenderComposite(const FullscreenContext& context,
         return false;
     }
 
-    const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    SetFullscreenViewport(context.commandList, target);
-    context.commandList->OMSetRenderTargets(1, &targetRtv.cpu, FALSE, nullptr);
-    context.commandList->ClearRenderTargetView(targetRtv.cpu, clearColor, 0, nullptr);
+    if (!BindAndClearTarget({context.commandList, target, targetRtv})) {
+        return false;
+    }
     context.commandList->SetPipelineState(pipeline->GetPipelineState());
 
     const uint32_t clampedLevels = std::min<uint32_t>(activeLevels, static_cast<uint32_t>(bloomSources.size()));

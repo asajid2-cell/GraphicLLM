@@ -397,9 +397,9 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         contract.culling.visible = stats.visible;
     }
 
-    contract.particles.enabled = m_particleState.enabledForScene;
+    contract.particles.enabled = m_particleState.controls.enabledForScene;
     contract.particles.planned = featurePlan.runParticles;
-    contract.particles.executed = m_particleState.frameExecuted;
+    contract.particles.executed = m_particleState.frame.frameExecuted;
     contract.particles.publicRuntimePath = featurePlan.runParticles;
     contract.particles.gpuParticlePublicPath = false;
     contract.particles.cpuSimulationPath = featurePlan.runParticles;
@@ -409,35 +409,35 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.simulationBudgetTracked = featurePlan.runParticles;
     contract.particles.runtimeBackend = featurePlan.runParticles
         ? "ecs_cpu_sim_dx12_instanced_billboard"
-        : (m_particleState.enabledForScene ? "ecs_cpu_sim_idle" : "disabled");
+        : (m_particleState.controls.enabledForScene ? "ecs_cpu_sim_idle" : "disabled");
     contract.particles.simulationBackend = featurePlan.runParticles
         ? "ecs_cpu"
-        : (m_particleState.enabledForScene ? "ecs_cpu_idle" : "disabled");
+        : (m_particleState.controls.enabledForScene ? "ecs_cpu_idle" : "disabled");
     contract.particles.renderBackend = featurePlan.runParticles
         ? "dx12_instanced_billboard"
-        : (m_particleState.enabledForScene ? "dx12_instanced_billboard_idle" : "disabled");
+        : (m_particleState.controls.enabledForScene ? "dx12_instanced_billboard_idle" : "disabled");
     contract.particles.instanceMapFailed = m_particleState.instanceMapFailed;
-    contract.particles.capped = m_particleState.frameCapped;
-    contract.particles.densityScale = m_particleState.densityScale;
-    contract.particles.qualityScale = m_particleState.qualityScale;
-    contract.particles.bloomContribution = m_particleState.bloomContribution;
-    contract.particles.softDepthFade = m_particleState.softDepthFade;
-    contract.particles.windInfluence = m_particleState.windInfluence;
-    contract.particles.effectPreset = m_particleState.effectPreset;
-    contract.particles.presetMatchedEmitters = m_particleState.framePresetMatchedEmitters;
-    contract.particles.presetMismatchedEmitters = m_particleState.framePresetMismatchedEmitters;
-    contract.particles.emitterCount = m_particleState.frameEmitterCount;
-    contract.particles.liveParticles = m_particleState.frameLiveParticles;
-    contract.particles.submittedInstances = m_particleState.frameSubmittedInstances;
-    contract.particles.frustumCulled = m_particleState.frameFrustumCulled;
-    contract.particles.maxInstances = m_particleState.frameMaxInstances;
-    contract.particles.simulationBudgetParticles = m_particleState.frameMaxInstances;
-    contract.particles.instanceCapacity = m_particleState.instanceCapacity;
-    contract.particles.instanceBufferBytes = m_particleState.InstanceBufferBytes();
+    contract.particles.capped = m_particleState.frame.frameCapped;
+    contract.particles.densityScale = m_particleState.controls.densityScale;
+    contract.particles.qualityScale = m_particleState.controls.qualityScale;
+    contract.particles.bloomContribution = m_particleState.controls.bloomContribution;
+    contract.particles.softDepthFade = m_particleState.controls.softDepthFade;
+    contract.particles.windInfluence = m_particleState.controls.windInfluence;
+    contract.particles.effectPreset = m_particleState.controls.effectPreset;
+    contract.particles.presetMatchedEmitters = m_particleState.frame.framePresetMatchedEmitters;
+    contract.particles.presetMismatchedEmitters = m_particleState.frame.framePresetMismatchedEmitters;
+    contract.particles.emitterCount = m_particleState.frame.frameEmitterCount;
+    contract.particles.liveParticles = m_particleState.frame.frameLiveParticles;
+    contract.particles.submittedInstances = m_particleState.frame.frameSubmittedInstances;
+    contract.particles.frustumCulled = m_particleState.frame.frameFrustumCulled;
+    contract.particles.maxInstances = m_particleState.frame.frameMaxInstances;
+    contract.particles.simulationBudgetParticles = m_particleState.frame.frameMaxInstances;
+    contract.particles.instanceCapacity = m_particleState.resources.instanceCapacity;
+    contract.particles.instanceBufferBytes = m_particleState.resources.InstanceBufferBytes();
     contract.particles.simulationBudgetBytes =
-        static_cast<uint64_t>(m_particleState.frameMaxInstances) * sizeof(ParticleInstance);
+        static_cast<uint64_t>(m_particleState.frame.frameMaxInstances) * sizeof(ParticleInstance);
     contract.particles.uploadBytesThisFrame =
-        static_cast<uint64_t>(m_particleState.frameSubmittedInstances) * sizeof(ParticleInstance);
+        static_cast<uint64_t>(m_particleState.frame.frameSubmittedInstances) * sizeof(ParticleInstance);
 
     contract.water.levelY = m_waterState.levelY;
     contract.water.waveAmplitude = m_waterState.waveAmplitude;

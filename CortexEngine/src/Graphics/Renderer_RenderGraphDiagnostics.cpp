@@ -1,6 +1,5 @@
 #include "Renderer.h"
 
-#include "Passes/DescriptorTable.h"
 #include "Passes/RenderGraphValidationPass.h"
 #include "RenderGraph.h"
 #include <algorithm>
@@ -51,27 +50,12 @@ void Renderer::RunRenderGraphTransientValidation() {
         return;
     }
 
-    DescriptorHandle rtvA;
-    DescriptorHandle rtvB;
-    DescriptorHandle srvA;
-    DescriptorHandle srvB;
-    auto viewsAResult = DescriptorTable::EnsureColorTargetViewHandles(
-        m_services.descriptorManager.get(), rtvA, srvA, "RG transient validation A");
-    auto viewsBResult = DescriptorTable::EnsureColorTargetViewHandles(
-        m_services.descriptorManager.get(), rtvB, srvB, "RG transient validation B");
-    if (viewsAResult.IsErr() || viewsBResult.IsErr()) {
+    auto viewsResult = RenderGraphValidationPass::CreateTransientValidationViews(m_services.descriptorManager.get());
+    if (viewsResult.IsErr()) {
         m_frameDiagnostics.contract.contract.warnings.push_back("rg_transient_validation_descriptor_allocation_failed");
         return;
     }
-
-    auto createViews = [&](ID3D12Resource* resource, DescriptorHandle rtv, DescriptorHandle srv) -> bool {
-        return DescriptorTable::WriteTexture2DRTVAndSRV(
-            m_services.device->GetDevice(),
-            resource,
-            rtv,
-            srv,
-            DXGI_FORMAT_R8G8B8A8_UNORM);
-    };
+    const RenderGraphValidationPass::TransientValidationViews views = viewsResult.Value();
 
     bool stageFailed = false;
     auto failStage = [&](const char* reason) {
@@ -91,24 +75,18 @@ void Renderer::RunRenderGraphTransientValidation() {
     m_services.renderGraph->BeginFrame();
     RenderGraphValidationPass::TransientValidationContext validationContext{};
     validationContext.transientDesc = transientDesc;
-    validationContext.passA = [&](ID3D12GraphicsCommandList* commandList, const RenderGraph& graph, RGResourceHandle transient) {
-        ID3D12Resource* resource = graph.GetResource(transient);
-        if (!createViews(resource, rtvA, srvA)) {
-            failStage("rg_transient_validation_a_descriptor_failed");
-            return;
-        }
-        const float color[4] = {0.05f, 0.15f, 0.35f, 1.0f};
-        commandList->ClearRenderTargetView(rtvA.cpu, color, 0, nullptr);
-    };
-    validationContext.passB = [&](ID3D12GraphicsCommandList* commandList, const RenderGraph& graph, RGResourceHandle transient) {
-        ID3D12Resource* resource = graph.GetResource(transient);
-        if (!createViews(resource, rtvB, srvB)) {
-            failStage("rg_transient_validation_b_descriptor_failed");
-            return;
-        }
-        const float color[4] = {0.35f, 0.15f, 0.05f, 1.0f};
-        commandList->ClearRenderTargetView(rtvB.cpu, color, 0, nullptr);
-    };
+    validationContext.passA.device = m_services.device->GetDevice();
+    validationContext.passA.descriptorManager = m_services.descriptorManager.get();
+    validationContext.passA.rtv = views.rtvA;
+    validationContext.passA.srv = views.srvA;
+    validationContext.passA.clearColor = {0.05f, 0.15f, 0.35f, 1.0f};
+    validationContext.passA.descriptorFailureReason = "rg_transient_validation_a_descriptor_failed";
+    validationContext.passB.device = m_services.device->GetDevice();
+    validationContext.passB.descriptorManager = m_services.descriptorManager.get();
+    validationContext.passB.rtv = views.rtvB;
+    validationContext.passB.srv = views.srvB;
+    validationContext.passB.clearColor = {0.35f, 0.15f, 0.05f, 1.0f};
+    validationContext.passB.descriptorFailureReason = "rg_transient_validation_b_descriptor_failed";
     validationContext.failStage = failStage;
 
     if (!RenderGraphValidationPass::AddTransientValidation(*m_services.renderGraph, validationContext)) {

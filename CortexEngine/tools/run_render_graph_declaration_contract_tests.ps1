@@ -110,9 +110,16 @@ Assert-Contains "MotionVectorPass.cpp" $motion "builder.Write(context.velocity, 
 Assert-Contains "MotionVectorPass.cpp" $motion "builder.Read(context.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead)"
 
 $post = Read-Text "src/Graphics/Passes/PostProcessGraphPass.cpp"
+$postHeader = Read-Text "src/Graphics/Passes/PostProcessGraphPass.h"
+$rendererEndFrame = Read-Text "src/Graphics/Renderer_RenderGraphEndFrame.cpp"
 Assert-Contains "PostProcessGraphPass.cpp" $post "void Declare(RGPassBuilder& builder, const ResourceHandles& resources)"
 Assert-Contains "PostProcessGraphPass.cpp" $post "builder.Read(resources.hdr, RGResourceUsage::ShaderResource)"
 Assert-Contains "PostProcessGraphPass.cpp" $post "builder.Write(resources.backBuffer, RGResourceUsage::RenderTarget)"
+Assert-Contains "PostProcessGraphPass.cpp" $post "PostProcessPass::UpdateDescriptorTable"
+Assert-Contains "PostProcessGraphPass.cpp" $post "PostProcessPass::Draw"
+Assert-NotContains "PostProcessGraphPass.h" $postHeader "renderWithBloomOverride"
+Assert-NotContains "PostProcessGraphPass.h" $postHeader "renderDefault"
+Assert-NotContains "Renderer_RenderGraphEndFrame.cpp" $rendererEndFrame "RenderPostProcess();"
 
 $validation = Read-Text "src/Graphics/Passes/RenderGraphValidationPass.cpp"
 Assert-Contains "RenderGraphValidationPass.cpp" $validation "RenderGraphValidationPass"

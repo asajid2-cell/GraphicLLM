@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <glm/geometric.hpp>
+#include <span>
 #include <utility>
 
 namespace Cortex::Graphics {
@@ -80,6 +81,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     std::string bloomStageError;
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
     bool hasVBPostStates = false;
+    ID3D12Resource* postNormalResource = nullptr;
+    ID3D12Resource* postEmissiveMetallicResource = nullptr;
+    ID3D12Resource* postMaterialExt1Resource = nullptr;
+    ID3D12Resource* postMaterialExt2Resource = nullptr;
 
     auto failBloomStage = [&](const char* stage) {
         if (!bloomStageFailed) {
@@ -201,25 +206,29 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
                 normalState = vbPostInitialStates.normalRoughness;
             }
+            postNormalResource = normalRes;
             if (normalRes) {
                 normalHandle = m_services.renderGraph->ImportResource(normalRes, normalState, "NormalRoughness");
             }
         }
         if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetEmissiveMetallicBuffer()) {
+            postEmissiveMetallicResource = m_services.visibilityBuffer->GetEmissiveMetallicBuffer();
             emissiveMetallicHandle = m_services.renderGraph->ImportResource(
-                m_services.visibilityBuffer->GetEmissiveMetallicBuffer(),
+                postEmissiveMetallicResource,
                 vbPostInitialStates.emissiveMetallic,
                 "EmissiveMetallic");
         }
         if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt1Buffer()) {
+            postMaterialExt1Resource = m_services.visibilityBuffer->GetMaterialExt1Buffer();
             materialExt1Handle = m_services.renderGraph->ImportResource(
-                m_services.visibilityBuffer->GetMaterialExt1Buffer(),
+                postMaterialExt1Resource,
                 vbPostInitialStates.materialExt1,
                 "MaterialExt1");
         }
         if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetMaterialExt2Buffer()) {
+            postMaterialExt2Resource = m_services.visibilityBuffer->GetMaterialExt2Buffer();
             materialExt2Handle = m_services.renderGraph->ImportResource(
-                m_services.visibilityBuffer->GetMaterialExt2Buffer(),
+                postMaterialExt2Resource,
                 vbPostInitialStates.materialExt2,
                 "MaterialExt2_SurfaceClass");
         }
@@ -270,19 +279,72 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         PostProcessGraphPass::ExecuteContext executeContext{};
         executeContext.useBloomOverride = wantsFusedBloomThisFrame && bloomHandle.IsValid();
         executeContext.bloom = bloomHandle;
-        executeContext.renderWithBloomOverride = [&](ID3D12Resource* bloomOverride) {
-            ScopedRenderPassValue<ID3D12Resource*> bloomOverrideScope(m_bloomResources.resources.postProcessOverride, bloomOverride);
-            ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.postProcessSkipTransitions, true);
-            RenderPostProcess();
-        };
-        executeContext.renderDefault = [&]() {
-            ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.postProcessSkipTransitions, true);
-            RenderPostProcess();
-        };
+        auto& postTable = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+        executeContext.descriptorUpdate.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        executeContext.descriptorUpdate.srvTable = std::span<DescriptorHandle>(postTable.data(), postTable.size());
+        executeContext.descriptorUpdate.hdr = m_mainTargets.hdr.resources.color.Get();
+        executeContext.descriptorUpdate.bloomIntensity = m_bloomResources.controls.intensity;
+        executeContext.descriptorUpdate.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
+            ? m_bloomResources.resources.texA[1].Get()
+            : m_bloomResources.resources.texA[0].Get();
+        executeContext.descriptorUpdate.ssao = m_ssaoResources.resources.texture.Get();
+        executeContext.descriptorUpdate.history = m_temporalScreenState.historyColor.Get();
+        executeContext.descriptorUpdate.depth = m_depthResources.resources.buffer.Get();
+        executeContext.descriptorUpdate.normalRoughness = postNormalResource;
+        executeContext.descriptorUpdate.hzb = m_hzbResources.resources.texture.Get();
+        executeContext.descriptorUpdate.hzbMipCount = m_hzbResources.resources.mipCount;
+        executeContext.descriptorUpdate.wantsHzbDebug = wantsHzbDebug;
+        executeContext.descriptorUpdate.ssr = m_ssrResources.resources.color.Get();
+        executeContext.descriptorUpdate.velocity = m_temporalScreenState.velocityBuffer.Get();
+        executeContext.descriptorUpdate.rtReflection = m_rtReflectionTargets.color.Get();
+        executeContext.descriptorUpdate.rtReflectionHistory = m_rtReflectionTargets.history.Get();
+        executeContext.descriptorUpdate.emissiveMetallic = postEmissiveMetallicResource;
+        executeContext.descriptorUpdate.materialExt1 = postMaterialExt1Resource;
+        executeContext.descriptorUpdate.materialExt2 = postMaterialExt2Resource;
+        executeContext.draw.commandList = m_commandResources.graphicsList.Get();
+        executeContext.draw.descriptorManager = m_services.descriptorManager.get();
+        executeContext.draw.rootSignature = m_pipelineState.rootSignature.get();
+        executeContext.draw.frameConstants = m_constantBuffers.currentFrameGPU;
+        executeContext.draw.pipeline = m_pipelineState.postProcess.get();
+        executeContext.draw.width = m_services.window->GetWidth();
+        executeContext.draw.height = m_services.window->GetHeight();
+        executeContext.draw.targetRtv = m_services.window->GetCurrentRTV();
+        executeContext.draw.srvTable = std::span<DescriptorHandle>(postTable.data(), postTable.size());
+        executeContext.draw.shadowAndEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
+        executeContext.backBufferUsedAsRenderTarget = &m_frameLifecycle.backBufferUsedAsRTThisFrame;
+        if (m_rtReflectionTargets.color) {
+            static bool s_checkedRtReflPostClear = false;
+            static int s_rtReflPostClearMode = 0;
+            if (!s_checkedRtReflPostClear) {
+                s_checkedRtReflPostClear = true;
+                if (const char* mode = std::getenv("CORTEX_RTREFL_CLEAR")) {
+                    s_rtReflPostClearMode = std::atoi(mode);
+                    if (s_rtReflPostClearMode != 0) {
+                        spdlog::warn("Renderer: CORTEX_RTREFL_CLEAR={} set; post-process graph will clear RT reflection buffer for debug view validation",
+                                     s_rtReflPostClearMode);
+                    }
+                }
+            }
+            const bool rtReflDebugView =
+                (m_debugViewState.mode == 20u || m_debugViewState.mode == 30u || m_debugViewState.mode == 31u);
+            executeContext.runRtReflectionDebugClear =
+                rtReflDebugView && s_rtReflPostClearMode != 0 && m_services.descriptorManager &&
+                m_services.device && m_rtReflectionTargets.uav.IsValid() &&
+                m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount].IsValid();
+            if (executeContext.runRtReflectionDebugClear) {
+                executeContext.rtReflectionDebugClear.commandList = m_commandResources.graphicsList.Get();
+                executeContext.rtReflectionDebugClear.device = m_services.device->GetDevice();
+                executeContext.rtReflectionDebugClear.descriptorHeap = m_services.descriptorManager->GetCBV_SRV_UAV_Heap();
+                executeContext.rtReflectionDebugClear.reflectionColor = m_rtReflectionTargets.color.Get();
+                executeContext.rtReflectionDebugClear.reflectionState = &m_rtReflectionTargets.colorState;
+                executeContext.rtReflectionDebugClear.shaderVisibleUav =
+                    m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
+                executeContext.rtReflectionDebugClear.cpuUav = m_rtReflectionTargets.uav;
+                executeContext.rtReflectionDebugClear.clearMode = s_rtReflPostClearMode;
+            }
+        }
         executeContext.failBloomStage = failBloomStage;
-        executeContext.markRan = [&]() {
-            result.ranPostProcess = true;
-        };
+        executeContext.ranPostProcess = &result.ranPostProcess;
 
         PostProcessGraphPass::GraphContext postProcessContext{};
         postProcessContext.resources = postProcessResources;

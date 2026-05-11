@@ -536,49 +536,9 @@ Result<void> Renderer::CreateBreadcrumbBuffer() {
     if (!m_services.device || !m_services.device->GetDevice()) {
         return Result<void>::Err("Renderer not initialized for breadcrumb buffer creation");
     }
-    if (m_breadcrumbs.buffer) {
-        return Result<void>::Ok();
-    }
-
-    D3D12_HEAP_PROPERTIES heapProps{};
-    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width = sizeof(uint32_t);
-    desc.Height = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_UNKNOWN;
-    desc.SampleDesc.Count = 1;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr,
-        IID_PPV_ARGS(&m_breadcrumbs.buffer));
-
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create GPU breadcrumb buffer");
-    }
-
-    hr = m_breadcrumbs.buffer->Map(0, nullptr, reinterpret_cast<void**>(&m_breadcrumbs.mappedValue));
-    if (FAILED(hr)) {
-        m_breadcrumbs.buffer.Reset();
-        m_breadcrumbs.mappedValue = nullptr;
-        return Result<void>::Err("Failed to map GPU breadcrumb buffer");
-    }
-
-    if (m_breadcrumbs.mappedValue) {
-        *m_breadcrumbs.mappedValue = static_cast<uint32_t>(GpuMarker::None);
+    auto result = m_breadcrumbs.CreateBuffer(m_services.device->GetDevice());
+    if (result.IsErr()) {
+        return result;
     }
 
     spdlog::info("GPU breadcrumb buffer initialized for device-removed diagnostics");
@@ -586,19 +546,6 @@ Result<void> Renderer::CreateBreadcrumbBuffer() {
 }
 
 void Renderer::WriteBreadcrumb(GpuMarker marker) {
-    if (!m_breadcrumbs.buffer || !m_commandResources.graphicsList) {
-        return;
-    }
-
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> list4;
-    if (FAILED(m_commandResources.graphicsList.As(&list4)) || !list4) {
-        return;
-    }
-
-    D3D12_WRITEBUFFERIMMEDIATE_PARAMETER param{};
-    param.Dest = m_breadcrumbs.buffer->GetGPUVirtualAddress();
-    param.Value = static_cast<uint32_t>(marker);
-
-    list4->WriteBufferImmediate(1, &param, nullptr);
+    m_breadcrumbs.Write(m_commandResources.graphicsList.Get(), marker);
 }
 } // namespace Cortex::Graphics

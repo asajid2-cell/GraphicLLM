@@ -56,6 +56,21 @@ function Assert-Bookmark([object]$Bookmark, [string]$SceneId) {
     }
 }
 
+function Get-ValidationBookmark([object]$Scene) {
+    foreach ($bookmark in $Scene.camera_bookmarks) {
+        if ([bool]$bookmark.validation) {
+            return $bookmark
+        }
+    }
+    $requiredId = [string]$Scene.required_bookmarks[0]
+    foreach ($bookmark in $Scene.camera_bookmarks) {
+        if ([string]$bookmark.id -eq $requiredId) {
+            return $bookmark
+        }
+    }
+    return $Scene.camera_bookmarks[0]
+}
+
 if (-not (Test-Path $ShowcasePath)) {
     throw "Showcase scene config not found: $ShowcasePath"
 }
@@ -127,50 +142,69 @@ if ($RuntimeSmoke -and $failures.Count -eq 0) {
     if (-not (Test-Path $exe)) {
         Add-Failure "CortexEngine executable not found at $exe. Build Release first or run with -NoBuild."
     } else {
-        New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-        $env:CORTEX_LOG_DIR = $LogDir
-        $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
+        foreach ($scene in $doc.scenes) {
+            $sceneId = [string]$scene.id
+            $implemented = ([string]$scene.current_status) -match "implemented|public"
+            if (-not $implemented) {
+                continue
+            }
 
-        Push-Location (Split-Path -Parent $exe)
-        try {
-            $output = & $exe `
-                "--scene" "rt_showcase" `
-                "--camera-bookmark" "hero" `
-                "--mode=default" `
-                "--no-llm" `
-                "--no-dreamer" `
-                "--no-launcher" `
-                "--smoke-frames=$SmokeFrames" 2>&1
-            $exitCode = $LASTEXITCODE
-            $output | Set-Content -Encoding UTF8 (Join-Path $LogDir "engine_stdout.txt")
-        } finally {
-            Pop-Location
-            Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
-            Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
-        }
+            $bookmark = Get-ValidationBookmark $scene
+            $bookmarkId = [string]$bookmark.id
+            $caseLogDir = Join-Path $LogDir $sceneId
+            New-Item -ItemType Directory -Force -Path $caseLogDir | Out-Null
+            $env:CORTEX_LOG_DIR = $caseLogDir
+            $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
 
-        $reportPath = Join-Path $LogDir "frame_report_last.json"
-        if (-not (Test-Path $reportPath)) {
-            $reportPath = Join-Path $LogDir "frame_report_shutdown.json"
-        }
+            Push-Location (Split-Path -Parent $exe)
+            try {
+                $output = & $exe `
+                    "--scene" $sceneId `
+                    "--camera-bookmark" $bookmarkId `
+                    "--environment" ([string]$scene.default_environment) `
+                    "--mode=default" `
+                    "--no-llm" `
+                    "--no-dreamer" `
+                    "--no-launcher" `
+                    "--smoke-frames=$SmokeFrames" 2>&1
+                $exitCode = $LASTEXITCODE
+                $output | Set-Content -Encoding UTF8 (Join-Path $caseLogDir "engine_stdout.txt")
+            } finally {
+                Pop-Location
+                Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue
+                Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue
+            }
 
-        if ($exitCode -ne 0) {
-            Add-Failure "runtime showcase bookmark smoke failed with exit code $exitCode. logs=$LogDir"
-        } elseif (-not (Test-Path $reportPath)) {
-            Add-Failure "runtime showcase bookmark smoke did not write a frame report. logs=$LogDir"
-        } else {
+            $reportPath = Join-Path $caseLogDir "frame_report_last.json"
+            if (-not (Test-Path $reportPath)) {
+                $reportPath = Join-Path $caseLogDir "frame_report_shutdown.json"
+            }
+
+            if ($exitCode -ne 0) {
+                Add-Failure "runtime showcase '$sceneId' failed with exit code $exitCode. logs=$caseLogDir"
+                continue
+            }
+            if (-not (Test-Path $reportPath)) {
+                Add-Failure "runtime showcase '$sceneId' did not write a frame report. logs=$caseLogDir"
+                continue
+            }
+
             $report = Get-Content $reportPath -Raw | ConvertFrom-Json
-            if ([string]$report.scene -ne "rt_showcase") {
-                Add-Failure "runtime scene was '$($report.scene)', expected rt_showcase"
+            if ([string]$report.scene -ne $sceneId) {
+                Add-Failure "runtime scene was '$($report.scene)', expected $sceneId"
             }
-            if ([string]$report.camera.bookmark -ne "hero") {
-                Add-Failure "runtime camera bookmark was '$($report.camera.bookmark)', expected hero"
+            if ([string]$report.camera.bookmark -ne $bookmarkId) {
+                Add-Failure "$sceneId runtime camera bookmark was '$($report.camera.bookmark)', expected $bookmarkId"
             }
-            $dx = [Math]::Abs([double]$report.camera.position.x - (-14.0))
-            $dy = [Math]::Abs([double]$report.camera.position.y - 2.05)
-            $dz = [Math]::Abs([double]$report.camera.position.z - (-6.8))
+            if ([string]$report.frame_contract.environment.active -ne [string]$scene.default_environment) {
+                Add-Failure "$sceneId runtime environment was '$($report.frame_contract.environment.active)', expected '$($scene.default_environment)'"
+            }
+
+            $dx = [Math]::Abs([double]$report.camera.position.x - [double]$bookmark.position[0])
+            $dy = [Math]::Abs([double]$report.camera.position.y - [double]$bookmark.position[1])
+            $dz = [Math]::Abs([double]$report.camera.position.z - [double]$bookmark.position[2])
             if (($dx + $dy + $dz) -gt 0.02) {
-                Add-Failure "runtime camera hero position drifted: x=$($report.camera.position.x) y=$($report.camera.position.y) z=$($report.camera.position.z)"
+                Add-Failure "$sceneId runtime camera '$bookmarkId' position drifted: x=$($report.camera.position.x) y=$($report.camera.position.y) z=$($report.camera.position.z)"
             }
         }
     }

@@ -39,109 +39,14 @@ Result<void> Renderer::CreateSSAOResources() {
     const UINT width = std::max<UINT>(1, fullWidth / ssaoDivisor);
     const UINT height = std::max<UINT>(1, fullHeight / ssaoDivisor);
 
-    // Release existing target (descriptor handles remain valid and are reused)
-    m_ssaoResources.resources.texture.Reset();
-
-    D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = width;
-    desc.Height = height;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_R8_UNORM;
-    desc.SampleDesc.Count = 1;
-    // Allow both RTV (graphics SSAO) and UAV (compute SSAO) access
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    D3D12_CLEAR_VALUE clearValue = {};
-    clearValue.Format = DXGI_FORMAT_R8_UNORM;
-    // AO of 1.0 means no occlusion
-    clearValue.Color[0] = 1.0f;
-    clearValue.Color[1] = 1.0f;
-    clearValue.Color[2] = 1.0f;
-    clearValue.Color[3] = 1.0f;
-
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        &clearValue,
-        IID_PPV_ARGS(&m_ssaoResources.resources.texture)
-    );
-
-    if (FAILED(hr)) {
-        return Result<void>::Err("Failed to create SSAO render target");
+    auto result = m_ssaoResources.resources.CreateTarget(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (result.IsErr()) {
+        return result;
     }
-
-    m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-    // RTV
-    if (!m_ssaoResources.resources.rtv.IsValid()) {
-        auto rtvResult = m_services.descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate RTV for SSAO target: " + rtvResult.Error());
-        }
-        m_ssaoResources.resources.rtv = rtvResult.Value();
-    }
-
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = DXGI_FORMAT_R8_UNORM;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-    m_services.device->GetDevice()->CreateRenderTargetView(
-        m_ssaoResources.resources.texture.Get(),
-        &rtvDesc,
-        m_ssaoResources.resources.rtv.cpu
-    );
-
-    // SRV - use staging heap for persistent SSAO SRV (copied in post-process)
-    if (!m_ssaoResources.resources.srv.IsValid()) {
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate staging SRV for SSAO target: " + srvResult.Error());
-        }
-        m_ssaoResources.resources.srv = srvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = DXGI_FORMAT_R8_UNORM;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_ssaoResources.resources.texture.Get(),
-        &srvDesc,
-        m_ssaoResources.resources.srv.cpu
-    );
-
-    // UAV for async compute SSAO
-    if (!m_ssaoResources.resources.uav.IsValid()) {
-        auto uavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (uavResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate UAV for SSAO target: " + uavResult.Error());
-        }
-        m_ssaoResources.resources.uav = uavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-    uavDesc.Format = DXGI_FORMAT_R8_UNORM;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_ssaoResources.resources.texture.Get(),
-        nullptr,
-        &uavDesc,
-        m_ssaoResources.resources.uav.cpu
-    );
 
     spdlog::info("SSAO target created: {}x{}", width, height);
     return Result<void>::Ok();

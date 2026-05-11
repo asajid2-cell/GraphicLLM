@@ -223,6 +223,12 @@ void ApplySSAOParamsControl(Renderer& renderer, float radius, float bias, float 
                            std::clamp(intensity, 0.0f, 5.0f));
 }
 
+void ApplySSRParamsControl(Renderer& renderer, float maxDistance, float thickness, float strength) {
+    renderer.SetSSRParams(std::clamp(maxDistance, 1.0f, 120.0f),
+                          std::clamp(thickness, 0.005f, 1.0f),
+                          std::clamp(strength, 0.0f, 1.0f));
+}
+
 void ApplyGodRayIntensityControl(Renderer& renderer, float intensity) {
     renderer.SetGodRayIntensity(std::clamp(intensity, 0.0f, 3.0f));
 }

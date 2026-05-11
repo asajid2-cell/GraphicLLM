@@ -178,6 +178,9 @@ struct RendererFeatureState {
     bool iblEnabled = false;
     bool iblLimitEnabled = false;
     bool ssrEnabled = false;
+    float ssrMaxDistance = 30.0f;
+    float ssrThickness = 0.20f;
+    float ssrStrength = 1.0f;
     bool fogEnabled = false;
     bool particlesEnabled = false;
     float particleDensityScale = 1.0f;

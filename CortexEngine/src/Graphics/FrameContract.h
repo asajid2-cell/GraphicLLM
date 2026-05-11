@@ -250,6 +250,17 @@ struct FrameContract {
         float maxLightIntensity = 0.0f;
     };
 
+    struct ScreenSpaceInfo {
+        bool ssrEnabled = false;
+        float ssrMaxDistance = 30.0f;
+        float ssrThickness = 0.20f;
+        float ssrStrength = 1.0f;
+        bool ssaoEnabled = false;
+        float ssaoRadius = 0.0f;
+        float ssaoBias = 0.0f;
+        float ssaoIntensity = 0.0f;
+    };
+
     struct CullingInfo {
         bool gpuCullingEnabled = false;
         bool cullingFrozen = false;
@@ -579,6 +590,7 @@ struct FrameContract {
     RenderableClasses renderables;
     MaterialStats materials;
     LightingInfo lighting;
+    ScreenSpaceInfo screenSpace;
     CullingInfo culling;
     ParticleInfo particles;
     WaterInfo water;

@@ -59,7 +59,10 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "ssao_radius": 0.37,
     "ssao_bias": 0.04,
     "ssao_intensity": 0.31,
-    "ssr": false
+    "ssr": true,
+    "ssr_max_distance": 38.0,
+    "ssr_thickness": 0.18,
+    "ssr_strength": 0.64
   },
   "ray_tracing": {
     "enabled": false,
@@ -150,6 +153,13 @@ if ($exitCode -ne 0) {
     Assert-Near "ssao_radius" ([double]$fc.lighting.ssao_radius) 0.37 0.04
     Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.04 0.01
     Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 0.31 0.04
+    if ($null -eq $fc.screen_space) {
+        Add-Failure "screen_space contract section was missing"
+    } else {
+        Assert-Near "ssr_max_distance" ([double]$fc.screen_space.ssr_max_distance) 38.0 0.5
+        Assert-Near "ssr_thickness" ([double]$fc.screen_space.ssr_thickness) 0.18 0.02
+        Assert-Near "ssr_strength" ([double]$fc.screen_space.ssr_strength) 0.64 0.03
+    }
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 3.5 0.08
     Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 0.55 0.04
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
@@ -173,7 +183,7 @@ if ($exitCode -ne 0) {
         Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.58 0.03
     }
     if ([bool]$fc.features.ray_tracing_enabled) { Add-Failure "ray tracing remained enabled despite settings" }
-    if ([bool]$fc.features.ssr_enabled) { Add-Failure "SSR remained enabled despite settings" }
+    if (-not [bool]$fc.features.ssr_enabled) { Add-Failure "SSR was not enabled despite settings" }
     if (-not [bool]$fc.features.ssao_enabled) { Add-Failure "SSAO was not enabled despite settings" }
 }
 

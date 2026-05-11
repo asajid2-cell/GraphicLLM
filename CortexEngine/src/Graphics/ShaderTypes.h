@@ -140,6 +140,9 @@ struct FrameConstants {
     //               z = secondary amplitude, w = steepness (0..1)
     glm::vec4 waterParams0;
     glm::vec4 waterParams1;
+    // x = SSR max ray distance, y = SSR view-space thickness,
+    // z = SSR composition strength, w = reserved
+    glm::vec4 ssrParams;
 
     // Clustered lighting data used by the VB deferred path and forward+ transparency.
     // SRV indices refer to the global shader-visible CBV/SRV/UAV heap

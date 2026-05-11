@@ -61,6 +61,9 @@ json ToJson(const RendererTuningState& state) {
             {"ssao_bias", state.screenSpace.ssaoBias},
             {"ssao_intensity", state.screenSpace.ssaoIntensity},
             {"ssr", state.screenSpace.ssrEnabled},
+            {"ssr_max_distance", state.screenSpace.ssrMaxDistance},
+            {"ssr_thickness", state.screenSpace.ssrThickness},
+            {"ssr_strength", state.screenSpace.ssrStrength},
             {"pcss", state.screenSpace.pcssEnabled}
         }},
         {"atmosphere", {
@@ -149,6 +152,9 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(ss, "ssao_bias", state.screenSpace.ssaoBias);
         ReadValue(ss, "ssao_intensity", state.screenSpace.ssaoIntensity);
         ReadValue(ss, "ssr", state.screenSpace.ssrEnabled);
+        ReadValue(ss, "ssr_max_distance", state.screenSpace.ssrMaxDistance);
+        ReadValue(ss, "ssr_thickness", state.screenSpace.ssrThickness);
+        ReadValue(ss, "ssr_strength", state.screenSpace.ssrStrength);
         ReadValue(ss, "pcss", state.screenSpace.pcssEnabled);
     }
     if (root.contains("atmosphere") && root.at("atmosphere").is_object()) {
@@ -297,6 +303,9 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.screenSpace.ssaoBias = features.ssaoBias;
     state.screenSpace.ssaoIntensity = features.ssaoIntensity;
     state.screenSpace.ssrEnabled = features.ssrEnabled;
+    state.screenSpace.ssrMaxDistance = features.ssrMaxDistance;
+    state.screenSpace.ssrThickness = features.ssrThickness;
+    state.screenSpace.ssrStrength = features.ssrStrength;
     state.screenSpace.pcssEnabled = features.pcssEnabled;
 
     state.atmosphere.fogEnabled = features.fogEnabled;
@@ -348,6 +357,9 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.screenSpace.ssaoRadius = std::clamp(state.screenSpace.ssaoRadius, 0.01f, 5.0f);
     state.screenSpace.ssaoBias = std::clamp(state.screenSpace.ssaoBias, 0.0f, 1.0f);
     state.screenSpace.ssaoIntensity = std::clamp(state.screenSpace.ssaoIntensity, 0.0f, 5.0f);
+    state.screenSpace.ssrMaxDistance = std::clamp(state.screenSpace.ssrMaxDistance, 1.0f, 120.0f);
+    state.screenSpace.ssrThickness = std::clamp(state.screenSpace.ssrThickness, 0.005f, 1.0f);
+    state.screenSpace.ssrStrength = std::clamp(state.screenSpace.ssrStrength, 0.0f, 1.0f);
 
     state.atmosphere.fogDensity = std::clamp(state.atmosphere.fogDensity, 0.0f, 0.1f);
     state.atmosphere.fogHeight = std::clamp(state.atmosphere.fogHeight, -100.0f, 100.0f);
@@ -414,6 +426,10 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.screenSpace.ssaoBias,
                            state.screenSpace.ssaoIntensity);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::SSR, state.screenSpace.ssrEnabled);
+    ApplySSRParamsControl(renderer,
+                          state.screenSpace.ssrMaxDistance,
+                          state.screenSpace.ssrThickness,
+                          state.screenSpace.ssrStrength);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::PCSS, state.screenSpace.pcssEnabled);
 
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::Fog, state.atmosphere.fogEnabled);

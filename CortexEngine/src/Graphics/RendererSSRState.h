@@ -15,6 +15,9 @@ struct SSRPassState {
     bool srvTableValid = false;
     bool enabled = true;
     bool activeThisFrame = false;
+    float maxDistance = 30.0f;
+    float thickness = 0.20f;
+    float strength = 1.0f;
 
     void ResetResources() {
         color.Reset();

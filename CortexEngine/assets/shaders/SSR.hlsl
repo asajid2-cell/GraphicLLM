@@ -39,6 +39,9 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_InvViewProjMatrix;
     float4   g_WaterParams0;
     float4   g_WaterParams1;
+    // x = SSR max ray distance, y = SSR view-space thickness,
+    // z = SSR composition strength, w = reserved
+    float4   g_SSRParams;
 };
 
 Texture2D g_SceneColor        : register(t0);
@@ -140,7 +143,7 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     float3 viewDir = mul((float3x3)g_ViewMatrix, R);
     float  originZ = viewPos.z;
 
-    float maxDistance = 30.0f;
+    float maxDistance = max(g_SSRParams.x, 1.0f);
     int   maxSteps    = 64;
     float stepSize    = maxDistance / maxSteps;
 
@@ -148,7 +151,9 @@ float4 SSRPS(VSOutput input) : SV_TARGET
     // surfaces to avoid early self-hits that can look like a nested "inner
     // copy" on chrome spheres, but relax it on rough surfaces to keep SSR
     // from disappearing entirely.
-    float thicknessVS = lerp(0.03f, 0.20f, roughness);
+    float thicknessMax = max(g_SSRParams.y, 0.005f);
+    float thicknessMin = max(thicknessMax * 0.15f, 0.005f);
+    float thicknessVS = lerp(thicknessMin, thicknessMax, roughness);
 
     float3 hitColor = 0.0f;
     bool   hit      = false;
@@ -247,5 +252,6 @@ float4 SSRPS(VSOutput input) : SV_TARGET
         hitColor *= (kMaxHitIntensity / maxChannel);
     }
 
-    return float4(hitColor, reflectionWeight);
+    float ssrStrength = saturate(g_SSRParams.z);
+    return float4(hitColor * ssrStrength, reflectionWeight * ssrStrength);
 }

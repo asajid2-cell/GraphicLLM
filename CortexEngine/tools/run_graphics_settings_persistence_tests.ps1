@@ -67,6 +67,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "ssao_bias": 0.055,
     "ssao_intensity": 0.48,
     "ssr": true,
+    "ssr_max_distance": 42.0,
+    "ssr_thickness": 0.24,
+    "ssr_strength": 0.67,
     "pcss": true
   },
   "atmosphere": {
@@ -184,6 +187,20 @@ if ($validRun.exit_code -ne 0) {
     $ssaoRadius = [double]$report.frame_contract.lighting.ssao_radius
     $ssaoBias = [double]$report.frame_contract.lighting.ssao_bias
     $ssaoIntensity = [double]$report.frame_contract.lighting.ssao_intensity
+    $screenSpace = $report.frame_contract.screen_space
+    if ($null -eq $screenSpace) {
+        Add-Failure "valid settings frame contract did not include screen_space"
+    } else {
+        if ([Math]::Abs(([double]$screenSpace.ssr_max_distance) - 42.0) -gt 0.5) {
+            Add-Failure "valid settings SSR max distance was $($screenSpace.ssr_max_distance), expected 42.0"
+        }
+        if ([Math]::Abs(([double]$screenSpace.ssr_thickness) - 0.24) -gt 0.02) {
+            Add-Failure "valid settings SSR thickness was $($screenSpace.ssr_thickness), expected 0.24"
+        }
+        if ([Math]::Abs(([double]$screenSpace.ssr_strength) - 0.67) -gt 0.03) {
+            Add-Failure "valid settings SSR strength was $($screenSpace.ssr_strength), expected 0.67"
+        }
+    }
     if ([Math]::Abs($ssaoRadius - 0.42) -gt 0.04) {
         Add-Failure "valid settings SSAO radius was $ssaoRadius, expected 0.42"
     }

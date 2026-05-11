@@ -68,6 +68,9 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.iblEnabled = m_environmentState.enabled;
     state.iblLimitEnabled = m_environmentState.limitEnabled;
     state.ssrEnabled = m_ssrResources.enabled;
+    state.ssrMaxDistance = m_ssrResources.maxDistance;
+    state.ssrThickness = m_ssrResources.thickness;
+    state.ssrStrength = m_ssrResources.strength;
     state.fogEnabled = m_fogState.enabled;
     state.particlesEnabled = m_particleState.enabledForScene;
     state.particleDensityScale = m_particleState.densityScale;

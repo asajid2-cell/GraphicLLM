@@ -68,6 +68,7 @@ void ApplyBackgroundPresentationControl(Renderer& renderer, bool visible, float 
 void ApplyColorGradeControl(Renderer& renderer, float warm, float cool);
 void ApplyCinematicPostControl(Renderer& renderer, float vignette, float lensDirt);
 void ApplySSAOParamsControl(Renderer& renderer, float radius, float bias, float intensity);
+void ApplySSRParamsControl(Renderer& renderer, float maxDistance, float thickness, float strength);
 void ApplyGodRayIntensityControl(Renderer& renderer, float intensity);
 void ApplySafeLightingRigControl(Renderer& renderer, bool enabled);
 void ApplyWaterSteepnessControl(Renderer& renderer, float steepness);

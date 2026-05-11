@@ -135,6 +135,26 @@ void Renderer::SetSSREnabled(bool enabled) {
     spdlog::info("SSR {}", m_ssrResources.enabled ? "ENABLED" : "DISABLED");
 }
 
+void Renderer::SetSSRParams(float maxDistance, float thickness, float strength) {
+    const float d = std::clamp(maxDistance, 1.0f, 120.0f);
+    const float t = std::clamp(thickness, 0.005f, 1.0f);
+    const float s = std::clamp(strength, 0.0f, 1.0f);
+
+    if (std::abs(d - m_ssrResources.maxDistance) < 1e-3f &&
+        std::abs(t - m_ssrResources.thickness) < 1e-4f &&
+        std::abs(s - m_ssrResources.strength) < 1e-3f) {
+        return;
+    }
+
+    m_ssrResources.maxDistance = d;
+    m_ssrResources.thickness = t;
+    m_ssrResources.strength = s;
+    spdlog::info("SSR params set to max_distance={}, thickness={}, strength={}",
+                 m_ssrResources.maxDistance,
+                 m_ssrResources.thickness,
+                 m_ssrResources.strength);
+}
+
 void Renderer::ToggleSSR() {
     SetSSREnabled(!m_ssrResources.enabled);
 }

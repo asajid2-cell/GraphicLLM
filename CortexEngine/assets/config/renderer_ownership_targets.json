@@ -206,9 +206,9 @@
       "id": "screen_space_resources",
       "owner": "SSAO and SSR",
       "status": "release_boundary_validated",
-      "release_boundary": "SSAO and SSR controls, persistent render targets, descriptor tables, and per-frame flags are held in nested pass-owned state bundles and validated by ownership, screen-space UI/runtime smokes, and RT/temporal showcase paths. SSAOResources::CreateTarget owns persistent SSAO texture, RTV, SRV, and UAV creation; Renderer_SSAO.cpp only supplies dimensions and services",
+      "release_boundary": "SSAO and SSR controls, persistent render targets, descriptor tables, and per-frame flags are held in nested pass-owned state bundles and validated by ownership, screen-space UI/runtime smokes, and RT/temporal showcase paths. SSAOResources::CreateTarget owns persistent SSAO texture, RTV, SRV, and UAV creation; Renderer_SSAO.cpp only supplies dimensions and services. SSRResources::CreateTarget owns persistent SSR texture, RTV, and SRV creation; Renderer_HDRTargets.cpp only supplies dimensions, services, and dependent-target orchestration",
       "validated_contracts": ["renderer_ownership", "graphics_preset", "rt_showcase", "temporal_validation"],
-      "target_files": ["RendererSSAOState.h", "RendererSSRState.h"],
+      "target_files": ["RendererSSAOState.h", "RendererSSRState.h", "Renderer_HDRTargets.cpp"],
       "renderer_state_members": ["m_ssaoResources", "m_ssrResources"],
       "future_extension": "Keep additional screen-space effects in explicit controls/resources/descriptors/frame bundles before adding renderer orchestration"
     },

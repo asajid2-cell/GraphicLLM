@@ -48,19 +48,6 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", normalRoughnessResult.Error());
     }
 
-    D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = width;
-    desc.Height = height;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    desc.SampleDesc.Count = 1;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-    const auto heapProps = MainTargetDefaultHeapProperties();
-    HRESULT hr = S_OK;
-
     InvalidateTAAHistory("resource_recreated");
     auto historyResult = m_temporalScreenState.CreateHistoryColor(
         m_services.device->GetDevice(),
@@ -80,70 +67,13 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", taaIntermediateResult.Error());
     }
 
-    // (Re)create SSR color buffer (matches HDR resolution/format)
-    m_ssrResources.resources.color.Reset();
-    m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_COMMON;
-
-    D3D12_RESOURCE_DESC ssrDesc = desc;
-    ssrDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-    D3D12_CLEAR_VALUE ssrClear = {};
-    ssrClear.Format = ssrDesc.Format;
-    ssrClear.Color[0] = 0.0f;
-    ssrClear.Color[1] = 0.0f;
-    ssrClear.Color[2] = 0.0f;
-    ssrClear.Color[3] = 0.0f;
-
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &ssrDesc,
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        &ssrClear,
-        IID_PPV_ARGS(&m_ssrResources.resources.color)
-    );
-
-    if (FAILED(hr)) {
-        spdlog::warn("Failed to create SSR color buffer");
-    } else {
-        m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-        auto ssrRtvResult = m_services.descriptorManager->AllocateRTV();
-        if (ssrRtvResult.IsErr()) {
-            spdlog::warn("Failed to allocate RTV for SSR buffer: {}", ssrRtvResult.Error());
-        } else {
-            m_ssrResources.resources.rtv = ssrRtvResult.Value();
-
-            D3D12_RENDER_TARGET_VIEW_DESC ssrRtvDesc = {};
-            ssrRtvDesc.Format = ssrDesc.Format;
-            ssrRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-            m_services.device->GetDevice()->CreateRenderTargetView(
-                m_ssrResources.resources.color.Get(),
-                &ssrRtvDesc,
-                m_ssrResources.resources.rtv.cpu
-            );
-        }
-
-        // Use staging heap for persistent SSR SRV (copied in post-process)
-        auto ssrSrvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (ssrSrvResult.IsErr()) {
-            spdlog::warn("Failed to allocate staging SRV for SSR buffer: {}", ssrSrvResult.Error());
-        } else {
-            m_ssrResources.resources.srv = ssrSrvResult.Value();
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC ssrSrvDesc = {};
-            ssrSrvDesc.Format = ssrDesc.Format;
-            ssrSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            ssrSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            ssrSrvDesc.Texture2D.MipLevels = 1;
-
-            m_services.device->GetDevice()->CreateShaderResourceView(
-                m_ssrResources.resources.color.Get(),
-                &ssrSrvDesc,
-                m_ssrResources.resources.srv.cpu
-            );
-        }
+    auto ssrResult = m_ssrResources.resources.CreateTarget(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (ssrResult.IsErr()) {
+        spdlog::warn("{}", ssrResult.Error());
     }
 
     auto velocityResult = m_temporalScreenState.CreateVelocityBuffer(

@@ -61,7 +61,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     }
 
     bool stageFailed = false;
-    std::string stageError;
+    const char* stageError = nullptr;
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
@@ -104,15 +104,13 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     graphContext.dispatch.dispatch.srvTable = m_temporalMaskState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
     graphContext.dispatch.dispatch.uavTable = m_temporalMaskState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
     graphContext.dispatch.builtThisFrame = &m_temporalMaskState.builtThisFrame;
-    graphContext.failStage = [&](const char* stage) {
-        stageFailed = true;
-        stageError = stage ? stage : "unknown";
-    };
+    graphContext.status.failed = &stageFailed;
+    graphContext.status.stage = &stageError;
 
     const RGResourceHandle temporalMaskResult = TemporalRejectionMask::AddToGraph(*m_services.renderGraph, graphContext);
     if (!temporalMaskResult.IsValid()) {
         stageFailed = true;
-        if (stageError.empty()) {
+        if (!stageError) {
             stageError = "temporal_mask_graph_contract";
         }
     }
@@ -126,8 +124,9 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     } else if (stageFailed) {
         result.fallbackUsed = true;
         result.fallbackReason = "temporal_mask_graph_stage_failed";
-        if (!stageError.empty()) {
-            result.fallbackReason += ": " + stageError;
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
         }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);

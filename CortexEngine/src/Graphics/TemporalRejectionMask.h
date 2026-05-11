@@ -6,7 +6,6 @@
 #include "Graphics/RHI/DX12Pipeline.h"
 #include "Utils/Result.h"
 
-#include <functional>
 #include <memory>
 
 namespace Cortex::Graphics {
@@ -44,6 +43,11 @@ public:
     struct ResourceStateRef {
         ID3D12Resource* resource = nullptr;
         D3D12_RESOURCE_STATES* state = nullptr;
+    };
+
+    struct GraphStatus {
+        bool* failed = nullptr;
+        const char** stage = nullptr;
     };
 
     struct PrepareResourcesContext {
@@ -88,7 +92,7 @@ public:
         RGResourceHandle velocity;
         RGResourceHandle mask;
         DispatchExecutionContext dispatch;
-        std::function<void(const char*)> failStage;
+        GraphStatus status;
     };
 
     Result<void> Initialize(ID3D12Device* device, ID3D12RootSignature* rootSignature);

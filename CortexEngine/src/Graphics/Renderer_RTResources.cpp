@@ -148,83 +148,15 @@ Result<void> Renderer::CreateRTReflectionResources() {
     const UINT width = std::min(halfWidth, budgetWidth);
     const UINT height = std::min(halfHeight, budgetHeight);
 
-    D3D12_HEAP_PROPERTIES heapProps{};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    m_rtReflectionTargets.color.Reset();
-    m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_COMMON;
     m_rtReflectionSignalState.ResetResources();
-    m_rtReflectionTargets.history.Reset();
-    m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_COMMON;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = width;
-    desc.Height = height;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        nullptr,
-        IID_PPV_ARGS(&m_rtReflectionTargets.color));
-    if (FAILED(hr)) {
-        m_rtReflectionTargets.color.Reset();
-        return Result<void>::Err("Failed to create RT reflection color buffer");
+    auto targetResult = m_rtReflectionTargets.CreateResources(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (targetResult.IsErr()) {
+        return targetResult;
     }
-
-    m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
-    if (!m_rtReflectionTargets.srv.IsValid()) {
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            return Result<void>::Err("Failed to allocate staging SRV for RT reflection buffer: " + srvResult.Error());
-        }
-        m_rtReflectionTargets.srv = srvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = desc.Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_rtReflectionTargets.color.Get(),
-        &srvDesc,
-        m_rtReflectionTargets.srv.cpu);
-
-    if (!m_rtReflectionTargets.uav.IsValid()) {
-        auto uavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (uavResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            return Result<void>::Err("Failed to allocate staging UAV for RT reflection buffer: " + uavResult.Error());
-        }
-        m_rtReflectionTargets.uav = uavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-    uavDesc.Format = desc.Format;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtReflectionTargets.color.Get(),
-        nullptr,
-        &uavDesc,
-        m_rtReflectionTargets.uav.cpu);
 
     auto signalStatsResult = m_rtReflectionSignalState.CreateStatsResources(
         m_services.device->GetDevice(),
@@ -232,64 +164,9 @@ Result<void> Renderer::CreateRTReflectionResources() {
         RTReflectionSignalStats::kStatsBytes,
         RTReflectionSignalStats::kStatsWords);
     if (signalStatsResult.IsErr()) {
-        m_rtReflectionTargets.color.Reset();
+        m_rtReflectionTargets.ResetResources();
         return signalStatsResult;
     }
-
-    ComPtr<ID3D12Resource> reflHistory;
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        nullptr,
-        IID_PPV_ARGS(&reflHistory));
-    if (FAILED(hr)) {
-        m_rtReflectionTargets.color.Reset();
-        return Result<void>::Err("Failed to create RT reflection history buffer");
-    }
-    m_rtReflectionTargets.history = reflHistory;
-    m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-    if (!m_rtReflectionTargets.historySRV.IsValid()) {
-        auto reflHistorySrvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (reflHistorySrvResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionTargets.history.Reset();
-            return Result<void>::Err("Failed to allocate staging SRV for RT reflection history buffer: " + reflHistorySrvResult.Error());
-        }
-        m_rtReflectionTargets.historySRV = reflHistorySrvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC reflHistorySrvDesc{};
-    reflHistorySrvDesc.Format = desc.Format;
-    reflHistorySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    reflHistorySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    reflHistorySrvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_rtReflectionTargets.history.Get(),
-        &reflHistorySrvDesc,
-        m_rtReflectionTargets.historySRV.cpu);
-
-    if (!m_rtReflectionTargets.historyUAV.IsValid()) {
-        auto reflHistoryUavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (reflHistoryUavResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionTargets.history.Reset();
-            return Result<void>::Err("Failed to allocate staging UAV for RT reflection history buffer: " + reflHistoryUavResult.Error());
-        }
-        m_rtReflectionTargets.historyUAV = reflHistoryUavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC reflHistoryUavDesc{};
-    reflHistoryUavDesc.Format = desc.Format;
-    reflHistoryUavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtReflectionTargets.history.Get(),
-        nullptr,
-        &reflHistoryUavDesc,
-        m_rtReflectionTargets.historyUAV.cpu);
 
     InvalidateRTReflectionHistory("resource_recreated");
 

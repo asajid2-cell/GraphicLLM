@@ -320,6 +320,35 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "rt_reflection_targets") {
+        foreach ($required in @("struct RTReflectionTargetState", "CreateResources", "CreateCommittedResource", "AllocateStagingCBV_SRV_UAV", "CreateShaderResourceView", "CreateUnorderedAccessView", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+            if ($rendererRtState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_reflection_targets missing RendererRTState marker: $required"
+            }
+        }
+        if (Test-Path $rtResourcesPath) {
+            $rtResources = Get-Content $rtResourcesPath -Raw
+            if ($rtResources.IndexOf("m_rtReflectionTargets.CreateResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_reflection_targets missing RTReflectionTargetState::CreateResources delegation in Renderer_RTResources.cpp"
+            }
+            foreach ($removedLocal in @(
+                "m_rtReflectionTargets.color.Reset",
+                "m_rtReflectionTargets.history.Reset",
+                "IID_PPV_ARGS(&m_rtReflectionTargets.color",
+                "IID_PPV_ARGS(&m_rtReflectionTargets.history",
+                "m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS",
+                "m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE",
+                "m_rtReflectionTargets.uav =",
+                "m_rtReflectionTargets.historyUAV =")) {
+                if ($rtResources.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_reflection_targets still has direct RT reflection target resource/view mechanics in Renderer_RTResources.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_targets missing Renderer_RTResources.cpp"
+        }
+    }
+
     if ($id -eq "diagnostic_breadcrumb_state") {
         if (Test-Path $breadcrumbStatePath) {
             $breadcrumbState = Get-Content $breadcrumbStatePath -Raw

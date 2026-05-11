@@ -67,10 +67,18 @@ The gate builds Release, then runs the current public renderer suite:
 - descriptor/memory stress scene for the historical persistent-descriptor budget,
 - renderer ownership/full ownership audit, fatal error, environment manifest, advanced graphics catalog, and effects gallery contracts,
 - particle-disabled zero-cost and RT reflection firefly/outlier gates,
+- release package manifest/contract checks for the public-review payload,
 - RT budget profile matrix and voxel backend smoke.
 
 Use `-NoBuild` only when `build/bin/CortexEngine.exe` is already current.
 Each step writes isolated logs under `build/bin/logs/runs`.
+
+To validate just the public-review package manifest against an existing Release
+build, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_contract_tests.ps1 -NoBuild
+```
 
 ---
 

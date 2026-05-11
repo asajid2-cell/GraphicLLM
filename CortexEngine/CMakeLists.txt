@@ -145,6 +145,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp
+    src/Graphics/Passes/MeshDrawPass.cpp
     src/Graphics/Passes/MotionVectorPass.cpp
     src/Graphics/Passes/ParticleBillboardPass.cpp
     src/Graphics/Passes/PostProcessGraphPass.cpp

@@ -52,6 +52,7 @@ The gate builds Release, then runs the current public renderer suite:
 - build entrypoint contract for the scripted CMake rebuild path,
 - repository hygiene checks for whitespace and generated artifacts,
 - source-list contract checks for CMake renderer split coverage,
+- render-graph boundary contract checks,
 - temporal camera-cut history invalidation smoke,
 - visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,

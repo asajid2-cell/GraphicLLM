@@ -41,6 +41,31 @@ public:
         DescriptorHandle uavTable;
     };
 
+    struct ResourceStateRef {
+        ID3D12Resource* resource = nullptr;
+        D3D12_RESOURCE_STATES* state = nullptr;
+    };
+
+    struct PrepareResourcesContext {
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ResourceStateRef depth;
+        ResourceStateRef normalRoughness;
+        ResourceStateRef velocity;
+        ResourceStateRef output;
+        D3D12_RESOURCE_STATES depthSampleState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        D3D12_RESOURCE_STATES shaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        bool skipTransitions = false;
+    };
+
+    struct StatsResourcesContext {
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ResourceStateRef mask;
+        ResourceStateRef statsBuffer;
+        ID3D12Resource* statsReadback = nullptr;
+        D3D12_RESOURCE_STATES shaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        uint64_t copyBytes = 0;
+    };
+
     struct GraphContext {
         RGResourceHandle depth;
         RGResourceHandle normalRoughness;
@@ -60,6 +85,13 @@ public:
                                      ID3D12Device* device,
                                      DescriptorHeapManager* descriptorManager,
                                      const StatsDispatchDesc& desc) const;
+    [[nodiscard]] static bool PrepareDispatchResources(const PrepareResourcesContext& context);
+    [[nodiscard]] static bool FinalizeDispatchResources(ID3D12GraphicsCommandList* commandList,
+                                                        const ResourceStateRef& output,
+                                                        D3D12_RESOURCE_STATES shaderResourceState,
+                                                        bool skipTransitions);
+    [[nodiscard]] static bool PrepareStatsResources(const StatsResourcesContext& context);
+    [[nodiscard]] static bool FinalizeStatsReadback(const StatsResourcesContext& context);
     [[nodiscard]] static RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context);
 
 private:

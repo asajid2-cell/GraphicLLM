@@ -40,40 +40,20 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     constexpr D3D12_RESOURCE_STATES kSrvState =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-    auto transition = [&](ID3D12Resource* resource,
-                          D3D12_RESOURCE_STATES& state,
-                          D3D12_RESOURCE_STATES desired) {
-        if (!resource || state == desired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = state;
-        barrier.Transition.StateAfter = desired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        state = desired;
-    };
-
-    if (!skipTransitions) {
-        transition(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, kDepthSampleState);
-        transition(normalResource, *normalState, kSrvState);
-        if (usingVBNormal && m_services.visibilityBuffer) {
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
-        }
-        transition(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, kSrvState);
-        transition(m_temporalMaskState.texture.Get(),
-                   m_temporalMaskState.resourceState,
-                   D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    } else {
-        m_depthResources.resources.resourceState = kDepthSampleState;
-        *normalState = kSrvState;
-        if (usingVBNormal && m_services.visibilityBuffer) {
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
-        }
-        m_temporalScreenState.velocityState = kSrvState;
-        m_temporalMaskState.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    if (!TemporalRejectionMask::PrepareDispatchResources({
+            m_commandResources.graphicsList.Get(),
+            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
+            {normalResource, normalState},
+            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            kDepthSampleState,
+            kSrvState,
+            skipTransitions,
+        })) {
+        return;
+    }
+    if (usingVBNormal && m_services.visibilityBuffer) {
+        m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
     }
 
     uint32_t width = 0;
@@ -108,12 +88,12 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
         return;
     }
 
-    D3D12_RESOURCE_BARRIER uavBarrier{};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = m_temporalMaskState.texture.Get();
-    m_commandResources.graphicsList->ResourceBarrier(1, &uavBarrier);
-    if (!skipTransitions) {
-        transition(m_temporalMaskState.texture.Get(), m_temporalMaskState.resourceState, kSrvState);
+    if (!TemporalRejectionMask::FinalizeDispatchResources(
+            m_commandResources.graphicsList.Get(),
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            kSrvState,
+            skipTransitions)) {
+        return;
     }
     m_temporalMaskState.builtThisFrame = true;
     if (!renderGraphOwned) {
@@ -157,26 +137,16 @@ void Renderer::CaptureTemporalRejectionMaskStats() {
     constexpr D3D12_RESOURCE_STATES kSrvState =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-    auto transition = [&](ID3D12Resource* resource,
-                          D3D12_RESOURCE_STATES& state,
-                          D3D12_RESOURCE_STATES desired) {
-        if (!resource || state == desired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = state;
-        barrier.Transition.StateAfter = desired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        state = desired;
-    };
-
-    transition(m_temporalMaskState.texture.Get(), m_temporalMaskState.resourceState, kSrvState);
-    transition(m_temporalMaskState.statsBuffer.Get(),
-               m_temporalMaskState.statsState,
-               D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    if (!TemporalRejectionMask::PrepareStatsResources({
+            m_commandResources.graphicsList.Get(),
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            {m_temporalMaskState.statsBuffer.Get(), &m_temporalMaskState.statsState},
+            m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex].Get(),
+            kSrvState,
+            32,
+        })) {
+        return;
+    }
 
     TemporalRejectionMask::StatsDispatchDesc statsDesc{};
     statsDesc.width = width;
@@ -197,20 +167,16 @@ void Renderer::CaptureTemporalRejectionMaskStats() {
         return;
     }
 
-    D3D12_RESOURCE_BARRIER statsUavBarrier{};
-    statsUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    statsUavBarrier.UAV.pResource = m_temporalMaskState.statsBuffer.Get();
-    m_commandResources.graphicsList->ResourceBarrier(1, &statsUavBarrier);
-
-    transition(m_temporalMaskState.statsBuffer.Get(),
-               m_temporalMaskState.statsState,
-               D3D12_RESOURCE_STATE_COPY_SOURCE);
-    m_commandResources.graphicsList->CopyBufferRegion(
-        m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex].Get(),
-        0,
-        m_temporalMaskState.statsBuffer.Get(),
-        0,
-        32);
+    if (!TemporalRejectionMask::FinalizeStatsReadback({
+            m_commandResources.graphicsList.Get(),
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            {m_temporalMaskState.statsBuffer.Get(), &m_temporalMaskState.statsState},
+            m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex].Get(),
+            kSrvState,
+            32,
+        })) {
+        return;
+    }
 
     m_temporalMaskState.statsReadbackPending[m_frameRuntime.frameIndex] = true;
     m_temporalMaskState.statsSampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;

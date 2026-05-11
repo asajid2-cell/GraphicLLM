@@ -36,6 +36,40 @@ bool IsValidStatsDispatch(const TemporalRejectionMask::StatsDispatchDesc& desc) 
            desc.uavTable.IsValid();
 }
 
+bool TransitionResource(ID3D12GraphicsCommandList* commandList,
+                        const TemporalRejectionMask::ResourceStateRef& resource,
+                        D3D12_RESOURCE_STATES desired,
+                        bool skipTransitions) {
+    if (!resource.resource) {
+        return true;
+    }
+    if (!commandList || !resource.state) {
+        return false;
+    }
+
+    if (!skipTransitions && *resource.state != desired) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = resource.resource;
+        barrier.Transition.StateBefore = *resource.state;
+        barrier.Transition.StateAfter = desired;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+    }
+    *resource.state = desired;
+    return true;
+}
+
+void InsertUAVBarrier(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource) {
+    if (!commandList) {
+        return;
+    }
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    barrier.UAV.pResource = resource;
+    commandList->ResourceBarrier(1, &barrier);
+}
+
 void Fail(const TemporalRejectionMask::GraphContext& context, const char* stage) {
     if (context.failStage) {
         context.failStage(stage);
@@ -194,6 +228,24 @@ bool TemporalRejectionMask::Dispatch(ID3D12GraphicsCommandList* cmdList,
     return true;
 }
 
+bool TemporalRejectionMask::PrepareDispatchResources(const PrepareResourcesContext& context) {
+    return TransitionResource(context.commandList, context.depth, context.depthSampleState, context.skipTransitions) &&
+           TransitionResource(context.commandList, context.normalRoughness, context.shaderResourceState, context.skipTransitions) &&
+           TransitionResource(context.commandList, context.velocity, context.shaderResourceState, context.skipTransitions) &&
+           TransitionResource(context.commandList, context.output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, context.skipTransitions);
+}
+
+bool TemporalRejectionMask::FinalizeDispatchResources(ID3D12GraphicsCommandList* commandList,
+                                                      const ResourceStateRef& output,
+                                                      D3D12_RESOURCE_STATES shaderResourceState,
+                                                      bool skipTransitions) {
+    if (!output.resource || !output.state) {
+        return false;
+    }
+    InsertUAVBarrier(commandList, output.resource);
+    return TransitionResource(commandList, output, shaderResourceState, skipTransitions);
+}
+
 bool TemporalRejectionMask::DispatchStats(ID3D12GraphicsCommandList* cmdList,
                                           ID3D12Device* device,
                                           DescriptorHeapManager* descriptorManager,
@@ -243,6 +295,31 @@ bool TemporalRejectionMask::DispatchStats(ID3D12GraphicsCommandList* cmdList,
 
     cmdList->SetPipelineState(m_statsReducePipeline->GetPipelineState());
     cmdList->Dispatch((desc.width + 7u) / 8u, (desc.height + 7u) / 8u, 1);
+    return true;
+}
+
+bool TemporalRejectionMask::PrepareStatsResources(const StatsResourcesContext& context) {
+    return TransitionResource(context.commandList, context.mask, context.shaderResourceState, false) &&
+           TransitionResource(context.commandList, context.statsBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, false);
+}
+
+bool TemporalRejectionMask::FinalizeStatsReadback(const StatsResourcesContext& context) {
+    if (!context.commandList || !context.statsBuffer.resource || !context.statsReadback || !context.statsBuffer.state ||
+        context.copyBytes == 0) {
+        return false;
+    }
+
+    InsertUAVBarrier(context.commandList, context.statsBuffer.resource);
+    if (!TransitionResource(context.commandList, context.statsBuffer, D3D12_RESOURCE_STATE_COPY_SOURCE, false)) {
+        return false;
+    }
+
+    context.commandList->CopyBufferRegion(
+        context.statsReadback,
+        0,
+        context.statsBuffer.resource,
+        0,
+        context.copyBytes);
     return true;
 }
 

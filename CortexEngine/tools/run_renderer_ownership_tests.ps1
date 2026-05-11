@@ -1269,7 +1269,7 @@ foreach ($target in $doc.targets) {
             Add-Failure "main_target_resources missing RendererMainTargetState.h"
         } else {
             $mainTargetState = Get-Content $mainTargetStatePath -Raw
-            foreach ($required in @("struct HDRRenderTargetResources", "struct HDRRenderTargetDescriptors", "struct GBufferNormalRoughnessResources", "struct GBufferNormalRoughnessDescriptors", "struct HDRRenderTargetState", "struct GBufferNormalRoughnessTargetState", "HDRRenderTargetState hdr", "GBufferNormalRoughnessTargetState normalRoughness")) {
+            foreach ($required in @("struct HDRRenderTargetResources", "struct HDRRenderTargetDescriptors", "struct GBufferNormalRoughnessResources", "struct GBufferNormalRoughnessDescriptors", "struct HDRRenderTargetState", "struct GBufferNormalRoughnessTargetState", "HDRRenderTargetState hdr", "GBufferNormalRoughnessTargetState normalRoughness", "CreateTarget", "CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
                 if ($mainTargetState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "main_target_resources missing ownership marker in RendererMainTargetState.h: $required"
                 }
@@ -1292,6 +1292,21 @@ foreach ($target in $doc.targets) {
                     }
                 }
             }
+        }
+        if (Test-Path $hdrTargetsPath) {
+            $hdrTargetsSource = Get-Content $hdrTargetsPath -Raw
+            foreach ($requiredRoute in @("m_mainTargets.hdr.CreateTarget", "m_mainTargets.normalRoughness.CreateTarget")) {
+                if ($hdrTargetsSource.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing routed target creation in Renderer_HDRTargets.cpp: $requiredRoute"
+                }
+            }
+            foreach ($directMainTargetCreate in @("IID_PPV_ARGS(&m_mainTargets.hdr.resources.color)", "IID_PPV_ARGS(&m_mainTargets.normalRoughness.resources.texture)")) {
+                if ($hdrTargetsSource.IndexOf($directMainTargetCreate, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "main_target_resources still creates main target resources directly in Renderer_HDRTargets.cpp: $directMainTargetCreate"
+                }
+            }
+        } else {
+            Add-Failure "main_target_resources missing Renderer_HDRTargets.cpp"
         }
         if (Test-Path $mainPassTargetPassPath) {
             $mainPassTargetPass = Get-Content $mainPassTargetPassPath -Raw

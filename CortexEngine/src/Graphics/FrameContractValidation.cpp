@@ -579,7 +579,9 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     }
 
     const auto& d = contract.draws;
-    if (depthWriting > 0 && d.depthPrepassDraws == 0 && !contract.features.voxelBackendEnabled) {
+    const bool depthPrepassExpected =
+        contract.features.rayTracingEnabled && !contract.features.voxelBackendEnabled;
+    if (depthPrepassExpected && depthWriting > 0 && d.depthPrepassDraws == 0) {
         warn("depth_writing_renderables_but_no_depth_prepass_draws");
     }
     if (d.depthPrepassDraws > depthWriting) {

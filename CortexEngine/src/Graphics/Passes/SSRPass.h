@@ -51,7 +51,8 @@ struct GraphContext {
     RGResourceHandle depth;
     RGResourceHandle normalRoughness;
     RGResourceHandle ssr;
-    std::function<bool()> execute;
+    PrepareContext prepare;
+    DrawContext draw;
     std::function<void(const char*)> failStage;
 };
 

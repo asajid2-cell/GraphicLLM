@@ -7,6 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <span>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -26,6 +27,11 @@ Renderer::ExecuteSSAOInRenderGraph() {
     if (useComputeSSAO && !m_ssaoResources.resources.uav.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_uav_missing";
+        return result;
+    }
+    if (!m_ssaoResources.descriptors.descriptorTablesValid) {
+        result.fallbackUsed = true;
+        result.fallbackReason = "render_graph_ssao_descriptor_tables_missing";
         return result;
     }
 
@@ -49,19 +55,51 @@ Renderer::ExecuteSSAOInRenderGraph() {
     ssaoContext.ssao = ssaoHandle;
     ssaoContext.useCompute = useComputeSSAO;
     ssaoContext.failStage = failStage;
-    ssaoContext.execute = [&]() {
-        m_depthResources.resources.resourceState = kDepthSampleState;
-        m_ssaoResources.resources.resourceState = useComputeSSAO
-            ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-            : D3D12_RESOURCE_STATE_RENDER_TARGET;
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions, true);
-        if (useComputeSSAO) {
-            RenderSSAOAsync();
-        } else {
-            RenderSSAO();
-        }
-        return static_cast<bool>(m_ssaoResources.resources.texture);
+    ssaoContext.prepare.commandList = m_commandResources.graphicsList.Get();
+    ssaoContext.prepare.skipTransitions = true;
+    ssaoContext.prepare.depth = {
+        m_depthResources.resources.buffer.Get(),
+        &m_depthResources.resources.resourceState,
+        kDepthSampleState,
     };
+    ssaoContext.prepare.target = {
+        m_ssaoResources.resources.texture.Get(),
+        &m_ssaoResources.resources.resourceState,
+        useComputeSSAO ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_RENDER_TARGET,
+    };
+    auto& ssaoSrvTable = m_ssaoResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    if (useComputeSSAO) {
+        const bool compactRoot = m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
+        ID3D12RootSignature* ssaoRootSignature =
+            compactRoot ? m_pipelineState.singleSrvUavComputeRootSignature.Get() : m_pipelineState.computeRootSignature->GetRootSignature();
+        const uint32_t srvTableSize = compactRoot ? 1u : 10u;
+        const uint32_t uavTableSize = compactRoot ? 1u : 4u;
+        auto& ssaoUavTable = m_ssaoResources.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount];
+        ssaoContext.compute.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        ssaoContext.compute.commandList = m_commandResources.graphicsList.Get();
+        ssaoContext.compute.descriptorManager = m_services.descriptorManager.get();
+        ssaoContext.compute.rootSignature = ssaoRootSignature;
+        ssaoContext.compute.frameConstants = m_constantBuffers.currentFrameGPU;
+        ssaoContext.compute.pipeline = m_pipelineState.ssaoCompute.get();
+        ssaoContext.compute.frameConstantsRoot = compactRoot ? 0u : 1u;
+        ssaoContext.compute.srvTableRoot = compactRoot ? 1u : 3u;
+        ssaoContext.compute.uavTableRoot = compactRoot ? 2u : 6u;
+        ssaoContext.compute.target = m_ssaoResources.resources.texture.Get();
+        ssaoContext.compute.depth = m_depthResources.resources.buffer.Get();
+        ssaoContext.compute.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), srvTableSize);
+        ssaoContext.compute.uavTable = std::span<DescriptorHandle>(ssaoUavTable.data(), uavTableSize);
+    } else {
+        ssaoContext.graphics.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        ssaoContext.graphics.commandList = m_commandResources.graphicsList.Get();
+        ssaoContext.graphics.descriptorManager = m_services.descriptorManager.get();
+        ssaoContext.graphics.rootSignature = m_pipelineState.rootSignature.get();
+        ssaoContext.graphics.frameConstants = m_constantBuffers.currentFrameGPU;
+        ssaoContext.graphics.pipeline = m_pipelineState.ssao.get();
+        ssaoContext.graphics.target = m_ssaoResources.resources.texture.Get();
+        ssaoContext.graphics.targetRtv = m_ssaoResources.resources.rtv;
+        ssaoContext.graphics.depth = m_depthResources.resources.buffer.Get();
+        ssaoContext.graphics.srvTable = std::span<DescriptorHandle>(ssaoSrvTable.data(), ssaoSrvTable.size());
+    }
     (void)SSAOPass::AddToGraph(*m_services.renderGraph, ssaoContext);
 
     const auto execResult = m_services.renderGraph->Execute(m_commandResources.graphicsList.Get());

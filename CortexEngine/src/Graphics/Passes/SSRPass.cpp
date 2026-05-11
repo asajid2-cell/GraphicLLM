@@ -18,7 +18,8 @@ void Fail(const GraphContext& context, const char* stage) {
            context.depth.IsValid() &&
            context.normalRoughness.IsValid() &&
            context.ssr.IsValid() &&
-           static_cast<bool>(context.execute);
+           context.prepare.commandList &&
+           static_cast<bool>(context.draw.pipeline);
 }
 
 } // namespace
@@ -135,7 +136,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
             builder.Write(context.ssr, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.execute || !context.execute()) {
+            if (!PrepareTargets(context.prepare) || !Draw(context.draw)) {
                 Fail(context, "ssr_execute");
             }
         });

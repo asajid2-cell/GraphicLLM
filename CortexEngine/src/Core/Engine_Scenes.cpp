@@ -125,6 +125,7 @@ void Engine::RebuildScene(ScenePreset preset) {
         }
         break;
     case ScenePreset::RTShowcase:
+    case ScenePreset::IBLGallery:
     case ScenePreset::GodRays: // currently shares layout with RTShowcase
     default:
         BuildRTShowcaseScene();
@@ -155,6 +156,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::CornellBox:        presetName = "Cornell Box"; break;
     case ScenePreset::DragonOverWater:   presetName = "Dragon Over Water Studio"; break;
     case ScenePreset::RTShowcase:        presetName = "RT Showcase Gallery"; break;
+    case ScenePreset::IBLGallery:        presetName = "IBL Gallery"; break;
     case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
     case ScenePreset::GlassWaterCourtyard:presetName = "Glass and Water Courtyard"; break;
     case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
@@ -3079,7 +3081,8 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     if (m_currentScenePreset == ScenePreset::CornellBox) {
         pos = glm::vec3(0.0f, 1.6f, -3.0f);
         target = glm::vec3(0.0f, 1.2f, 0.0f);
-    } else if (m_currentScenePreset == ScenePreset::RTShowcase) {
+    } else if (m_currentScenePreset == ScenePreset::RTShowcase ||
+               m_currentScenePreset == ScenePreset::IBLGallery) {
         pos = glm::vec3(-14.0f, 2.05f, -6.8f);
         target = glm::vec3(-14.0f, 1.05f, 0.25f);
     } else if (m_currentScenePreset == ScenePreset::MaterialLab) {

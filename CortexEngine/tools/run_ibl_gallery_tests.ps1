@@ -81,7 +81,7 @@ foreach ($candidate in $candidates) {
     Push-Location $exeWorkingDir
     try {
         $output = & $exe `
-            "--scene" "rt_showcase" `
+            "--scene" "ibl_gallery" `
             "--environment" $candidate.id `
             "--mode=default" `
             "--no-llm" `
@@ -100,6 +100,9 @@ foreach ($candidate in $candidates) {
     }
 
     $reportPath = Join-Path $caseLogDir "frame_report_last.json"
+    if (-not (Test-Path $reportPath)) {
+        $reportPath = Join-Path $caseLogDir "frame_report_shutdown.json"
+    }
     $row = [ordered]@{
         id = $candidate.id
         exit_code = $exitCode
@@ -127,6 +130,9 @@ foreach ($candidate in $candidates) {
     }
 
     $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+    if ([string]$report.scene -ne "ibl_gallery") {
+        Add-Failure "IBL '$($candidate.id)' runtime scene is '$($report.scene)', expected ibl_gallery"
+    }
     $envContract = $report.frame_contract.environment
     $row.active = [string]$envContract.active
     $row.budget_class = [string]$envContract.budget_class

@@ -77,6 +77,35 @@
       "polish_gaps": []
     },
     {
+      "id": "ibl_gallery",
+      "display_name": "IBL Gallery",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
+      "default_environment": "warm_gallery",
+      "default_lighting_rig": "rt_showcase_gallery",
+      "required_bookmarks": ["hero", "environment_sweep"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "IBL validation hero",
+          "position": [-14.0, 2.05, -6.8],
+          "target": [-14.0, 1.05, 0.25],
+          "fov": 56.0,
+          "validation": true
+        },
+        {
+          "id": "environment_sweep",
+          "label": "Reflection and background sweep",
+          "position": [-10.6, 2.65, -7.25],
+          "target": [-15.9, 1.45, -0.5],
+          "fov": 54.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["environment_manifest", "ibl_budget_class", "background_capture", "reflection_response"],
+      "polish_gaps": []
+    },
+    {
       "id": "glass_water_courtyard",
       "display_name": "Glass and Water Courtyard",
       "current_status": "public_showcase_validated",

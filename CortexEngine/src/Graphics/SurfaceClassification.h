@@ -44,13 +44,13 @@ enum class SurfaceClass : uint32_t {
         glm::dot(material.emissiveColor, glm::vec3(0.2126f, 0.7152f, 0.0722f)) *
         std::max(material.emissiveStrength, 0.0f);
 
+    if (SurfacePresetContains(material, "water")) {
+        return SurfaceClass::Water;
+    }
     if (material.transmissionFactor > 0.01f ||
         SurfaceMaterialTypeNear(material, 1.0f) ||
         SurfacePresetContains(material, "glass")) {
         return SurfaceClass::Glass;
-    }
-    if (SurfacePresetContains(material, "water")) {
-        return SurfaceClass::Water;
     }
     if (SurfaceMaterialTypeNear(material, 2.0f) ||
         SurfacePresetContains(material, "mirror")) {
@@ -91,11 +91,11 @@ enum class SurfaceClass : uint32_t {
 }
 
 [[nodiscard]] inline SurfaceClass ClassifySurface(const Scene::RenderableComponent& renderable) {
-    if (renderable.transmissionFactor > 0.01f || SurfacePresetContains(renderable, "glass")) {
-        return SurfaceClass::Glass;
-    }
     if (SurfacePresetContains(renderable, "water")) {
         return SurfaceClass::Water;
+    }
+    if (renderable.transmissionFactor > 0.01f || SurfacePresetContains(renderable, "glass")) {
+        return SurfaceClass::Glass;
     }
     if (SurfacePresetContains(renderable, "mirror")) {
         return SurfaceClass::Mirror;

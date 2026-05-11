@@ -150,7 +150,8 @@ namespace {
         std::transform(normalized.begin(), normalized.end(), normalized.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return normalized == "rt" || normalized == "rtshowcase" ||
-               normalized == "rt_showcase" || normalized == "material_lab" ||
+               normalized == "rt_showcase" || normalized == "ibl_gallery" ||
+               normalized == "iblgallery" || normalized == "material_lab" ||
                normalized == "materiallab" || normalized == "material_gallery" ||
                normalized == "materialgallery" || normalized == "effects_showcase" ||
                normalized == "effectsshowcase" || normalized == "effects" ||
@@ -532,6 +533,8 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::CornellBox;
         } else if (sceneLower == "rt" || sceneLower == "rtshowcase" || sceneLower == "rt_showcase") {
             m_currentScenePreset = ScenePreset::RTShowcase;
+        } else if (sceneLower == "ibl_gallery" || sceneLower == "iblgallery" || sceneLower == "ibl") {
+            m_currentScenePreset = ScenePreset::IBLGallery;
         } else if (sceneLower == "material_lab" || sceneLower == "materiallab" ||
                    sceneLower == "material_gallery" || sceneLower == "materialgallery" ||
                    sceneLower == "materials") {
@@ -771,6 +774,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
 
         dbg = LoadDebugMenuStateOrDefault(dbg);
         if ((m_currentScenePreset == ScenePreset::RTShowcase ||
+             m_currentScenePreset == ScenePreset::IBLGallery ||
              m_currentScenePreset == ScenePreset::TemporalValidation) &&
             rt.supported) {
             // RTShowcase is the canonical feature-measurement scene. Do not let
@@ -997,6 +1001,9 @@ void Engine::ToggleScenePreset() {
     ScenePreset next;
     switch (m_currentScenePreset) {
     case ScenePreset::RTShowcase:
+        next = ScenePreset::IBLGallery;
+        break;
+    case ScenePreset::IBLGallery:
         next = ScenePreset::CornellBox;
         break;
     case ScenePreset::CornellBox:
@@ -1651,6 +1658,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::CornellBox: return "cornell_box";
         case ScenePreset::DragonOverWater: return "dragon_over_water";
         case ScenePreset::RTShowcase: return "rt_showcase";
+        case ScenePreset::IBLGallery: return "ibl_gallery";
         case ScenePreset::MaterialLab: return "material_lab";
         case ScenePreset::GlassWaterCourtyard: return "glass_water_courtyard";
         case ScenePreset::EffectsShowcase: return "effects_showcase";
@@ -2028,6 +2036,7 @@ void Engine::InitializeScene() {
     case ScenePreset::CornellBox:
     case ScenePreset::DragonOverWater:
     case ScenePreset::RTShowcase:
+    case ScenePreset::IBLGallery:
     case ScenePreset::MaterialLab:
     case ScenePreset::GlassWaterCourtyard:
     case ScenePreset::EffectsShowcase:

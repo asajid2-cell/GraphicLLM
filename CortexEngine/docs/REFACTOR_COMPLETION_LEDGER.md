@@ -38,25 +38,28 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_200157_300_149036_7f109ace
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_200725_214_152168_21d385a0
 ```
 
 Key evidence from that run:
 
 - Release build: passed.
-- Temporal validation: `gpu_ms=1.759`, `disocclusion=0.006592`,
-  `high_motion=0.005155`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Build entrypoint contract: passed; rebuild uses `vswhere`/`VsDevCmd.bat`
+  plus `cmake --build`, release validation calls `rebuild.ps1`, and raw Ninja
+  is not used by rebuild/release.
+- Temporal validation: `gpu_ms=2.688`, `disocclusion=0.006658`,
+  `high_motion=0.005176`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.820`,
+  `camera=reflection_closeup`, `gpu_ms=2.799`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.637/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.632/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.017/2.5 changed=0.001/0.08`,
+  `temporal_diff=mean=0.022/2.5 changed=0.001/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
@@ -143,6 +146,7 @@ long file/function lists in every row.
 | Script | Runtime or static | Current role |
 |---|---|---|
 | `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release, runs all listed checks below, and treats top-level `failed:` sentinel output as a failed step. |
+| `tools/run_build_entrypoint_contract_tests.ps1` | static/contract | Checks that rebuild/release validation use `rebuild.ps1` and `cmake --build`, with VS environment import guards, instead of raw Ninja invocation. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
 | `tools/run_vb_debug_views.ps1` | runtime wrapper | RT Showcase debug-view matrix for visibility-buffer depth and material-albedo debug captures. |
 | `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
@@ -183,7 +187,7 @@ long file/function lists in every row.
 | P2-GLOBAL-01 | Keep RT, visibility buffer, GPU culling, HZB, TAA, SSR, SSAO, bloom, IBL, fog, god-rays, water, transparency, particles, and eventual outdoor scenes first-class. | PARTIAL | SRC-RENDER-ORCH, SRC-RENDERGRAPH, SRC-VB, SRC-RT, SRC-TEMPORAL, SRC-BUDGET, SRC-SCENES | `tools/run_release_validation.ps1` | RT/VB/GPU culling/HZB/TAA/SSR/SSAO/bloom/IBL/fog/water/transparency are exercised by RT showcase and temporal/material/glass/effects smokes. Particles are covered in effects showcase. | Outdoor scenes are not implemented as a Phase 2 runtime gate. Particles are public ECS billboard path, not full GPU particle maturity. Treat "first-class eventual outdoor scenes" as not complete. |
 | P2-GLOBAL-02 | Make the renderer correct, measurable, budgeted, and cleanly owned. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-STATE, SRC-RENDERGRAPH | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Full release gate passed; selected ownership gate passed; full ownership audit passed with 48/48 renderer members covered by named state/service aggregates. | Renderer still orchestrates many cross-cutting systems. "Cleanly owned" remains broad and should not be marked complete until pass/function ownership is reduced further or explicitly scoped. |
 | P2-SNAPSHOT-01 | Current build state is reproducible through checked-in rebuild script. | DONE_VERIFIED | `rebuild.ps1`, `tools/run_release_validation.ps1`, SRC-DOCS | `tools/run_release_validation.ps1` | `build_release` step passed in latest release run. | None for current local machine; still hardware/toolchain dependent. |
-| P2-SNAPSHOT-02 | Raw Ninja should not be used from an unprepared shell. | DONE_UNVERIFIED | SRC-DOCS | documentation inspection | `phase2.md` documents the caveat; scripts call `rebuild.ps1`. | Could add a script-level guard or README warning if this must be enforced. |
+| P2-SNAPSHOT-02 | Raw Ninja should not be used from an unprepared shell. | DONE_VERIFIED | `rebuild.ps1`, `setup.ps1`, `tools/run_release_validation.ps1`, `BUILD.md` | `tools/run_build_entrypoint_contract_tests.ps1`; release gate | Targeted contract passed: `rebuild.ps1` imports the Visual Studio environment through `vswhere`/`VsDevCmd.bat`, uses `cmake --build`, release validation calls `rebuild.ps1`, and neither rebuild nor release validation invokes raw Ninja directly. | None for the current scripted build entrypoint contract. |
 | P2-SNAPSHOT-03 | Bloom transient validation passes in alias/no-alias modes and bloom transients are default-on. | DONE_VERIFIED | SRC-RENDERGRAPH, `Renderer_RenderGraphBloom.cpp::Renderer::ExecuteBloomInRenderGraph`, `Renderer_RenderGraphEndFrame.cpp::Renderer::ExecuteEndFrameInRenderGraph`, `Renderer_RenderGraphDiagnostics.cpp::Renderer::RunRenderGraphTransientValidation` | `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; release gate | Focused matrix passed: aliasing-on transients=6, aliased=2, barriers=2, saved=262144; aliasing-off transients=6, aliased=0, barriers=0, saved=0; bloom-transients-off transients=0 and `transient_validation_ran=true`. | None for alias/no-alias bloom-transient coverage. |
 
 ## Progress Ledger Passes From `phase2.md`
@@ -208,7 +212,7 @@ of `phase2.md`.
 | P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_UNVERIFIED | SRC-VB, SRC-RENDERGRAPH | Historical targeted VB debug captures in `phase2.md` | Historical evidence only in `phase2.md`; latest release gate does not enumerate each transition skip mode. | Add static/runtime test for skip-control use under graph-owned resources. |
 | P2-PASS-04H | Pass 4H - Visibility Buffer Internal Graph Nodes | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp` records `VBClear`, `VBVisibility`, `VBMaterialResolve`, `VBDeferredLighting` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes through VB path with frame contract pass records. | Debug path/fallback still not exhaustively tested. |
 | P2-PASS-04I | Pass 4I - VB Lighting Graph Resources And Subpass Records | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | Current frame contract checks pass; VB initialization log includes clustered light/BRDF LUT pipelines. | No separate assertion in top-level output for every VB subpass name. |
-| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_200210_921_145464_04478908`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
+| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_200738_852_149808_7c3054ba`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
 | P2-PASS-04K | Pass 4K - VB Graph Helper And Motion Vector Graph Adapter | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBufferHelpers.h::VisibilityBufferGraphResources`, `Renderer_RenderGraphMotionVectors.cpp::Renderer::ExecuteMotionVectorsInRenderGraph` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with `object_motion=0.0731`, `visible=7`, `warnings=0`. | Add explicit report of camera-only fallback absence for more scenes. |
 | P2-PASS-04L | Pass 4L - TAA And SSAO Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphTAA.cpp::Renderer::ExecuteTAAInRenderGraph`, `Renderer_RenderGraphSSAO.cpp::Renderer::ExecuteSSAOInRenderGraph` | `tools/run_release_validation.ps1` | Temporal and RT showcase smokes pass with TAA/SSAO enabled. | No dedicated SSAO visual comparison. |
 | P2-PASS-04M | Pass 4M - SSR Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphSSR.cpp::Renderer::ExecuteSSRInRenderGraph` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase smoke passes with SSR enabled in feature set. | SSR visual correctness is not deeply measured beyond luma/scene gates. |
@@ -659,6 +663,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_build_entrypoint_contract_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

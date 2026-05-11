@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -98,7 +98,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         // a shadow-map slice index when using local light shadows.
         float shadowIndex = -1.0f;
 
-        if (m_shadowResources.enabled &&
+        if (m_shadowResources.controls.enabled &&
             lightComp.castsShadows &&
             type == Scene::LightType::Spot)
         {
@@ -175,8 +175,8 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         float si = static_cast<float>(i + 1) / static_cast<float>(cascadeCount);
         float logSplit = camNear * std::pow(camFar / camNear, si);
         float linSplit = camNear + (camFar - camNear) * si;
-        splits[i] = m_shadowResources.cascadeSplitLambda * logSplit +
-                    (1.0f - m_shadowResources.cascadeSplitLambda) * linSplit;
+        splits[i] = m_shadowResources.controls.cascadeSplitLambda * logSplit +
+                    (1.0f - m_shadowResources.controls.cascadeSplitLambda) * linSplit;
         m_shadowCascadeState.cascadeSplits[i] = splits[i];
     }
 
@@ -232,8 +232,8 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
         extent.y *= 1.1f;
 
         // Texel snapping to reduce shimmering (per-cascade resolution scaling)
-        float effectiveResX = m_shadowResources.mapSize * m_shadowResources.cascadeResolutionScale[cascadeIndex];
-        float effectiveResY = m_shadowResources.mapSize * m_shadowResources.cascadeResolutionScale[cascadeIndex];
+        float effectiveResX = m_shadowResources.controls.mapSize * m_shadowResources.controls.cascadeResolutionScale[cascadeIndex];
+        float effectiveResY = m_shadowResources.controls.mapSize * m_shadowResources.controls.cascadeResolutionScale[cascadeIndex];
         float texelSizeX = (extent.x * 2.0f) / std::max(effectiveResX, 1.0f);
         float texelSizeY = (extent.y * 2.0f) / std::max(effectiveResY, 1.0f);
         if (texelSizeX > 0.0f) {
@@ -330,10 +330,10 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
     }
 
     frameData.shadowParams = glm::vec4(
-        m_shadowResources.bias,
-        m_shadowResources.pcfRadius,
-        m_shadowResources.enabled ? 1.0f : 0.0f,
-        m_shadowResources.pcssEnabled ? 1.0f : 0.0f);
+        m_shadowResources.controls.bias,
+        m_shadowResources.controls.pcfRadius,
+        m_shadowResources.controls.enabled ? 1.0f : 0.0f,
+        m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
 
 }
 

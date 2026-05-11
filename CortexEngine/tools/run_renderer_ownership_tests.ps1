@@ -58,6 +58,9 @@ $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
 $ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
 $hzbStatePath = Join-Path $root "src/Graphics/RendererHZBState.h"
 $hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
+$shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
+$shadowResourcesPath = Join-Path $root "src/Graphics/Renderer_ShadowResources.cpp"
+$shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -264,6 +267,37 @@ foreach ($target in $doc.targets) {
             foreach ($oldFlatAccess in @("m_hzbResources.texture", "m_hzbResources.fullSRV", "m_hzbResources.dispatchTablesValid", "m_hzbResources.captureValid", "m_hzbResources.debugMip")) {
                 if ($hzbRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "hzb_resources still uses flat HZB state access in Renderer_HZB.cpp: $oldFlatAccess"
+                }
+            }
+        }
+    }
+
+    if ($id -eq "shadow_resources") {
+        if (-not (Test-Path $shadowStatePath)) {
+            Add-Failure "shadow_resources missing RendererShadowState.h"
+        } else {
+            $shadowState = Get-Content $shadowStatePath -Raw
+            foreach ($required in @("struct ShadowMapResources", "struct ShadowMapRasterState", "struct ShadowMapControls", "struct ShadowMapPassState", "ShadowMapResources<ShadowArraySize> resources", "ShadowMapRasterState raster", "ShadowMapControls<ShadowCascadeCount> controls")) {
+                if ($shadowState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "shadow_resources missing ownership marker in RendererShadowState.h: $required"
+                }
+            }
+            foreach ($oldField in @("ComPtr<ID3D12Resource> map", "DescriptorHandle srv", "D3D12_VIEWPORT viewport", "D3D12_RECT scissor", "bool enabled", "float mapSize", "float bias")) {
+                if ($shadowState -match "struct ShadowMapPassState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "shadow_resources still exposes loose shadow state field in ShadowMapPassState: $oldField"
+                }
+            }
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $shadowResourcesPath; Label = "Renderer_ShadowResources.cpp" },
+            [pscustomobject]@{ Path = $shadowPassPath; Label = "Renderer_ShadowPass.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $shadowSource = Get-Content $pathInfo.Path -Raw
+                foreach ($oldFlatAccess in @("m_shadowResources.map", "m_shadowResources.dsvs", "m_shadowResources.srv", "m_shadowResources.resourceState", "m_shadowResources.initializedForEditor", "m_shadowResources.viewport", "m_shadowResources.scissor", "m_shadowResources.enabled", "m_shadowResources.mapSize", "m_shadowResources.bias")) {
+                    if ($shadowSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "shadow_resources still uses flat shadow state access in $($pathInfo.Label): $oldFlatAccess"
+                    }
                 }
             }
         }

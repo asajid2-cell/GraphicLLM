@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "RenderGraph.h"
 #include "Debug/GPUProfiler.h"
 #include "Core/Window.h"
@@ -89,7 +89,7 @@ void Renderer::Shutdown() {
     m_materialFallbacks.ResetResources();
     m_assetRuntime.textureCache.clear();
     m_depthResources.buffer.Reset();
-    m_shadowResources.map.Reset();
+    m_shadowResources.resources.map.Reset();
     m_mainTargets.hdrColor.Reset();
     m_ssaoResources.resources.texture.Reset();
     m_commandResources.graphicsList.Reset();

@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include <algorithm>
 #include <cmath>
@@ -124,7 +124,7 @@ void Renderer::SetTAAEnabled(bool enabled) {
 }
 
 void Renderer::SetPCSS(bool enabled) {
-    m_shadowResources.pcssEnabled = enabled;
+    m_shadowResources.controls.pcssEnabled = enabled;
 }
 
 void Renderer::SetFXAAEnabled(bool enabled) {

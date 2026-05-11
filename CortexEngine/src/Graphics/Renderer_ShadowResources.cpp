@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "BudgetPlanner.h"
 #include <spdlog/spdlog.h>
@@ -15,8 +15,8 @@ Result<void> Renderer::CreateShadowMapResources() {
         m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0,
         m_services.window ? std::max(1u, m_services.window->GetWidth()) : 0,
         m_services.window ? std::max(1u, m_services.window->GetHeight()) : 0);
-    m_shadowResources.mapSize = static_cast<float>(std::max(1u, budget.shadowMapSize));
-    const UINT shadowDim = static_cast<UINT>(m_shadowResources.mapSize);
+    m_shadowResources.controls.mapSize = static_cast<float>(std::max(1u, budget.shadowMapSize));
+    const UINT shadowDim = static_cast<UINT>(m_shadowResources.controls.mapSize);
 
     D3D12_RESOURCE_DESC shadowDesc = {};
     shadowDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -45,21 +45,21 @@ Result<void> Renderer::CreateShadowMapResources() {
         &shadowDesc,
         D3D12_RESOURCE_STATE_DEPTH_WRITE,
         &clearValue,
-        IID_PPV_ARGS(&m_shadowResources.map)
+        IID_PPV_ARGS(&m_shadowResources.resources.map)
     );
 
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to create shadow map resource");
     }
 
-    m_shadowResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    m_shadowResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     for (uint32_t i = 0; i < kShadowArraySize; ++i) {
         auto dsvResult = m_services.descriptorManager->AllocateDSV();
         if (dsvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate DSV for shadow cascade: " + dsvResult.Error());
         }
-        m_shadowResources.dsvs[i] = dsvResult.Value();
+        m_shadowResources.resources.dsvs[i] = dsvResult.Value();
 
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
         dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -70,9 +70,9 @@ Result<void> Renderer::CreateShadowMapResources() {
         dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
         m_services.device->GetDevice()->CreateDepthStencilView(
-            m_shadowResources.map.Get(),
+            m_shadowResources.resources.map.Get(),
             &dsvDesc,
-            m_shadowResources.dsvs[i].cpu
+            m_shadowResources.resources.dsvs[i].cpu
         );
     }
 
@@ -80,7 +80,7 @@ Result<void> Renderer::CreateShadowMapResources() {
     if (srvResult.IsErr()) {
         return Result<void>::Err("Failed to allocate staging SRV for shadow map: " + srvResult.Error());
     }
-    m_shadowResources.srv = srvResult.Value();
+    m_shadowResources.resources.srv = srvResult.Value();
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
@@ -92,22 +92,22 @@ Result<void> Renderer::CreateShadowMapResources() {
     srvDesc.Texture2DArray.ArraySize = kShadowArraySize;
 
     m_services.device->GetDevice()->CreateShaderResourceView(
-        m_shadowResources.map.Get(),
+        m_shadowResources.resources.map.Get(),
         &srvDesc,
-        m_shadowResources.srv.cpu
+        m_shadowResources.resources.srv.cpu
     );
 
-    m_shadowResources.viewport.TopLeftX = 0.0f;
-    m_shadowResources.viewport.TopLeftY = 0.0f;
-    m_shadowResources.viewport.Width = static_cast<float>(shadowDim);
-    m_shadowResources.viewport.Height = static_cast<float>(shadowDim);
-    m_shadowResources.viewport.MinDepth = 0.0f;
-    m_shadowResources.viewport.MaxDepth = 1.0f;
+    m_shadowResources.raster.viewport.TopLeftX = 0.0f;
+    m_shadowResources.raster.viewport.TopLeftY = 0.0f;
+    m_shadowResources.raster.viewport.Width = static_cast<float>(shadowDim);
+    m_shadowResources.raster.viewport.Height = static_cast<float>(shadowDim);
+    m_shadowResources.raster.viewport.MinDepth = 0.0f;
+    m_shadowResources.raster.viewport.MaxDepth = 1.0f;
 
-    m_shadowResources.scissor.left = 0;
-    m_shadowResources.scissor.top = 0;
-    m_shadowResources.scissor.right = static_cast<LONG>(shadowDim);
-    m_shadowResources.scissor.bottom = static_cast<LONG>(shadowDim);
+    m_shadowResources.raster.scissor.left = 0;
+    m_shadowResources.raster.scissor.top = 0;
+    m_shadowResources.raster.scissor.right = static_cast<LONG>(shadowDim);
+    m_shadowResources.raster.scissor.bottom = static_cast<LONG>(shadowDim);
 
     spdlog::info("Shadow map created ({}x{})", shadowDim, shadowDim);
 
@@ -119,27 +119,27 @@ void Renderer::RecreateShadowMapResourcesForCurrentSize() {
     if (!m_services.device || !m_services.descriptorManager) {
         return;
     }
-    if (!m_shadowResources.map) {
+    if (!m_shadowResources.resources.map) {
         return;
     }
 
-    D3D12_RESOURCE_DESC currentDesc = m_shadowResources.map->GetDesc();
-    const UINT desiredDim = static_cast<UINT>(m_shadowResources.mapSize);
+    D3D12_RESOURCE_DESC currentDesc = m_shadowResources.resources.map->GetDesc();
+    const UINT desiredDim = static_cast<UINT>(m_shadowResources.controls.mapSize);
 
     if (currentDesc.Width <= desiredDim && currentDesc.Height <= desiredDim) {
         return;
     }
 
-    m_shadowResources.map.Reset();
-    m_shadowResources.srv = {};
-    for (auto& dsv : m_shadowResources.dsvs) {
+    m_shadowResources.resources.map.Reset();
+    m_shadowResources.resources.srv = {};
+    for (auto& dsv : m_shadowResources.resources.dsvs) {
         dsv = {};
     }
 
     auto result = CreateShadowMapResources();
     if (result.IsErr()) {
         spdlog::warn("Renderer: failed to recreate shadow map at safe size: {}", result.Error());
-        m_shadowResources.enabled = false;
+        m_shadowResources.controls.enabled = false;
     }
 }
 

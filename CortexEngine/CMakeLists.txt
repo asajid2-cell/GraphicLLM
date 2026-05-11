@@ -160,6 +160,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/PostProcessPass.cpp
     src/Graphics/Passes/RenderGraphValidationPass.cpp
     src/Graphics/Passes/RTReflectionDebugClearPass.cpp
+    src/Graphics/Passes/RTReflectionDispatchPass.cpp
     src/Graphics/Passes/RTHistoryCopyPass.cpp
     src/Graphics/Passes/ShadowPass.cpp
     src/Graphics/Passes/ShadowTargetPass.cpp
@@ -411,6 +412,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/RenderPassScope.h
     src/Graphics/Passes/RenderGraphValidationPass.h
     src/Graphics/Passes/RTReflectionDebugClearPass.h
+    src/Graphics/Passes/RTReflectionDispatchPass.h
     src/Graphics/Passes/RTHistoryCopyPass.h
     src/Graphics/Passes/ShadowPass.h
     src/Graphics/Passes/ShadowTargetPass.h

@@ -53,6 +53,16 @@
       "future_extension": "Keep future RT denoise resource-state mechanics in RTDenoiser or declarative render-graph declarations instead of rebuilding direct barriers in Renderer_RTDenoise.cpp"
     },
     {
+      "id": "rt_reflection_dispatch_resources",
+      "owner": "RT reflections",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_RTReflections.cpp still owns reflection readiness, source selection, dispatch sizing, environment-table refresh, and DXR dispatch policy, but depth/normal/output transitions, optional dispatch debug clear, environment non-pixel readability, and final UAV visibility barriers are owned by RTReflectionDispatchPass",
+      "validated_contracts": ["renderer_ownership", "rt_showcase", "temporal_validation"],
+      "target_files": ["Passes/RTReflectionDispatchPass.h", "Passes/RTReflectionDispatchPass.cpp", "Renderer_RTReflections.cpp"],
+      "renderer_state_members": ["m_rtReflectionTargets", "m_rtReflectionReadiness", "m_depthResources", "m_mainTargets", "m_environmentState"],
+      "future_extension": "Keep future RT reflection dispatch resource-state and debug-clear mechanics in RTReflectionDispatchPass or declarative render-graph declarations instead of adding direct barriers to Renderer_RTReflections.cpp"
+    },
+    {
       "id": "end_frame_shader_resource_transitions",
       "owner": "End-frame shader-resource state",
       "status": "release_boundary_validated",

@@ -1056,6 +1056,24 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       rows remain `PARTIAL` because RT reflection/shadow/GI dispatch mechanics,
       visibility-buffer internals, graph orchestration, and other renderer pass
       mechanics still need extraction.
+    - The current RT reflection dispatch checkpoint moves depth/normal/output
+      transitions, optional dispatch debug clear, environment non-pixel
+      readability, and final reflection-output UAV visibility barriers into
+      `RTReflectionDispatchPass`. `Renderer_RTReflections.cpp` still owns
+      reflection readiness, source selection, dispatch sizing,
+      environment-table refresh, and DXR dispatch policy, and now has no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`,
+      `D3D12_RESOURCE_STATE_UNORDERED_ACCESS`, or
+      `ClearUnorderedAccessViewFloat` calls. Release rebuild passed, renderer
+      ownership tests passed with `targets=31`, renderer full ownership audit
+      passed with `renderer_members=48 expected_members=48`, temporal
+      validation passed at
+      `temporal_validation_20260511_123408_009_100316_a5f6c425`, and RT
+      showcase passed at `rt_showcase_20260511_123407_860_99856_40a3535e`
+      with reflection dispatch ready and valid raw/history signal metrics.
+      The broader ownership rows remain `PARTIAL` because RT shadow/GI dispatch
+      mechanics, visibility-buffer internals, graph orchestration, and other
+      renderer pass mechanics still need extraction.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

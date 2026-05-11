@@ -34,6 +34,8 @@ $rtReflectionSignalStatsPath = Join-Path $root "src/Graphics/RTReflectionSignalS
 $rtReflectionSignalStatsRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflectionSignalStats.cpp"
 $rtDenoiserPath = Join-Path $root "src/Graphics/RTDenoiser.cpp"
 $rtDenoiseRendererPath = Join-Path $root "src/Graphics/Renderer_RTDenoise.cpp"
+$rtReflectionDispatchPassPath = Join-Path $root "src/Graphics/Passes/RTReflectionDispatchPass.cpp"
+$rtReflectionRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflections.cpp"
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
@@ -280,6 +282,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_denoise_resource_transitions missing Renderer_RTDenoise.cpp"
+        }
+    }
+
+    if ($id -eq "rt_reflection_dispatch_resources") {
+        if (Test-Path $rtReflectionDispatchPassPath) {
+            $rtReflectionDispatchPass = Get-Content $rtReflectionDispatchPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::RTReflectionDispatchPass", "PrepareInputsAndOutput", "ClearOutputForDebugView", "EnsureTextureNonPixelReadable", "FinalizeOutputWrites", "TransitionResource", "InsertUAVBarrier", "ResourceBarrier", "ClearUnorderedAccessViewFloat")) {
+                if ($rtReflectionDispatchPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_reflection_dispatch_resources missing RTReflectionDispatchPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_dispatch_resources missing RTReflectionDispatchPass.cpp"
+        }
+        if (Test-Path $rtReflectionRendererPath) {
+            $rtReflectionRenderer = Get-Content $rtReflectionRendererPath -Raw
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "ClearUnorderedAccessViewFloat")) {
+                if ($rtReflectionRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_reflection_dispatch_resources still owns reflection dispatch resource mechanics in Renderer_RTReflections.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("RTReflectionDispatchPass::PrepareInputsAndOutput", "RTReflectionDispatchPass::ClearOutputForDebugView", "RTReflectionDispatchPass::EnsureTextureNonPixelReadable", "RTReflectionDispatchPass::FinalizeOutputWrites")) {
+                if ($rtReflectionRenderer.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_reflection_dispatch_resources missing routed reflection dispatch call in Renderer_RTReflections.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_dispatch_resources missing Renderer_RTReflections.cpp"
         }
     }
 

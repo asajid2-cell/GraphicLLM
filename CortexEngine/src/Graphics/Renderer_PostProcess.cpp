@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 
+#include "Passes/PostProcessTargetPass.h"
 #include "Passes/PostProcessPass.h"
 
 #include <cstdlib>
@@ -16,116 +17,29 @@ void Renderer::RenderPostProcess() {
         // RenderGraph is responsible for resource transitions in this mode.
         m_frameLifecycle.backBufferUsedAsRTThisFrame = true;
     } else {
-    // Transition all post-process input resources to PIXEL_SHADER_RESOURCE and back buffer to RENDER_TARGET.
-    // We need to transition: HDR, SSAO, SSR, velocity, TAA intermediate, and RT reflection buffers
-    // that will be sampled by the post-process shader.
-    D3D12_RESOURCE_BARRIER barriers[11] = {};
-    UINT barrierCount = 0;
-
-    if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    if (m_ssaoResources.resources.texture && m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssaoResources.resources.texture.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssaoResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // Transition SSR color buffer (used as t6 in post-process shader)
-    if (m_ssrResources.resources.color && m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssrResources.resources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // HZB debug view reuses slot t6; ensure the pyramid is pixel-shader readable.
-    const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
-    if (wantsHzbDebug && m_hzbResources.resources.texture) {
-        const D3D12_RESOURCE_STATES desired =
+        const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
+        const D3D12_RESOURCE_STATES hzbDebugState =
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        if (m_hzbResources.resources.resourceState != desired) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_hzbResources.resources.texture.Get();
-            barriers[barrierCount].Transition.StateBefore = m_hzbResources.resources.resourceState;
-            barriers[barrierCount].Transition.StateAfter = desired;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-            m_hzbResources.resources.resourceState = desired;
+        const PostProcessTargetPass::ResourceStateRef shaderResources[] = {
+            {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_ssaoResources.resources.texture.Get(), &m_ssaoResources.resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {wantsHzbDebug ? m_hzbResources.resources.texture.Get() : nullptr, &m_hzbResources.resources.resourceState, hzbDebugState},
+            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_temporalScreenState.taaIntermediate.Get(), &m_temporalScreenState.taaIntermediateState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+            {m_rtReflectionTargets.history.Get(), &m_rtReflectionTargets.historyState, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE},
+        };
+        PostProcessTargetPass::PrepareContext prepareContext{};
+        prepareContext.commandList = m_commandResources.graphicsList.Get();
+        prepareContext.shaderResources = shaderResources;
+        prepareContext.shaderResourceCount = sizeof(shaderResources) / sizeof(shaderResources[0]);
+        prepareContext.backBuffer = m_services.window->GetCurrentBackBuffer();
+        prepareContext.backBufferUsedAsRenderTarget = &m_frameLifecycle.backBufferUsedAsRTThisFrame;
+        if (!PostProcessTargetPass::PrepareInputsAndBackBuffer(prepareContext)) {
+            spdlog::error("RenderPostProcess: target transition failed");
+            return;
         }
-    }
-
-    // Transition velocity buffer (used as t7 in post-process shader)
-    if (m_temporalScreenState.velocityBuffer && m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_temporalScreenState.velocityBuffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.velocityState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // Transition TAA intermediate buffer (may be sampled in post-process for debugging/effects)
-    if (m_temporalScreenState.taaIntermediate && m_temporalScreenState.taaIntermediateState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_temporalScreenState.taaIntermediate.Get();
-        barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.taaIntermediateState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // Transition RT reflection buffer (used as t8 in post-process shader)
-    if (m_rtReflectionTargets.color && m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_rtReflectionTargets.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_rtReflectionTargets.colorState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // Transition RT reflection history buffer (used as t9 in post-process shader)
-    if (m_rtReflectionTargets.history && m_rtReflectionTargets.historyState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_rtReflectionTargets.history.Get();
-        barriers[barrierCount].Transition.StateBefore = m_rtReflectionTargets.historyState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-
-    // Transition back buffer to render target for post-process output
-    // Note: PRESENT and COMMON states are equivalent (both 0x0) in D3D12
-    barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barriers[barrierCount].Transition.pResource = m_services.window->GetCurrentBackBuffer();
-    barriers[barrierCount].Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    ++barrierCount;
-    m_frameLifecycle.backBufferUsedAsRTThisFrame = true;
-
-    if (barrierCount > 0) {
-        m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-    }
     }
 
     // Optional diagnostic clear for RT reflections: this runs even when the DXR

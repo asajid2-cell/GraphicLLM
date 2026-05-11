@@ -91,6 +91,7 @@ $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
 $mainPassTargetPassPath = Join-Path $root "src/Graphics/Passes/MainPassTargetPass.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
+$postProcessTargetPassPath = Join-Path $root "src/Graphics/Passes/PostProcessTargetPass.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
 $forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
@@ -354,6 +355,32 @@ foreach ($target in $doc.targets) {
             if ($postState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "postprocess_resources missing post-state ownership marker in RendererPostProcessState.h: $required"
             }
+        }
+    }
+
+    if ($id -eq "postprocess_target_transitions") {
+        if (Test-Path $postProcessTargetPassPath) {
+            $postProcessTargetPass = Get-Content $postProcessTargetPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::PostProcessTargetPass", "ResourceStateRef", "PrepareContext", "PrepareInputsAndBackBuffer", "ResourceBarrier", "D3D12_RESOURCE_STATE_RENDER_TARGET", "D3D12_RESOURCE_STATE_PRESENT")) {
+                if ($postProcessTargetPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_target_transitions missing PostProcessTargetPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "postprocess_target_transitions missing PostProcessTargetPass.cpp"
+        }
+        if (Test-Path $postProcessPath) {
+            $postProcess = Get-Content $postProcessPath -Raw
+            if ($postProcess.IndexOf("PostProcessTargetPass::PrepareInputsAndBackBuffer", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "postprocess_target_transitions missing routed post-process target transition call in Renderer_PostProcess.cpp"
+            }
+            foreach ($removedLocal in @("barriers[", "barrierCount", "D3D12_RESOURCE_STATE_PRESENT")) {
+                if ($postProcess.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "postprocess_target_transitions still has regular post-process target barrier mechanics in Renderer_PostProcess.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "postprocess_target_transitions missing Renderer_PostProcess.cpp"
         }
     }
 

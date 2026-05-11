@@ -25,7 +25,7 @@ void Renderer::PopulateFrameLightingAndShadows(FrameConstants& frameData,
     const float camFar = cameraState.farPlane;
     const float fovY = cameraState.fovY;
     // Time/exposure and lighting state (w = bloom intensity, disabled if bloom SRV missing)
-    float bloom = (m_bloomResources.combinedSrv.IsValid() ? m_bloomResources.intensity : 0.0f);
+    float bloom = (m_bloomResources.resources.combinedSrv.IsValid() ? m_bloomResources.controls.intensity : 0.0f);
     frameData.timeAndExposure = glm::vec4(m_frameRuntime.totalTime, deltaTime, m_qualityRuntimeState.exposure, bloom);
 
     glm::vec3 ambient = m_lightingState.ambientColor * m_lightingState.ambientIntensity;

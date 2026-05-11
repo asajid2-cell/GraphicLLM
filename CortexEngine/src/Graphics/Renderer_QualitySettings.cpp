@@ -26,29 +26,29 @@ float Renderer::GetBloomIntensity() const {
 
 void Renderer::SetBloomIntensity(float intensity) {
     float clamped = glm::clamp(intensity, 0.0f, 5.0f);
-    if (std::abs(clamped - m_bloomResources.intensity) < 1e-6f) {
+    if (std::abs(clamped - m_bloomResources.controls.intensity) < 1e-6f) {
         return;
     }
-    m_bloomResources.intensity = clamped;
-    spdlog::info("Renderer bloom intensity set to {}", m_bloomResources.intensity);
+    m_bloomResources.controls.intensity = clamped;
+    spdlog::info("Renderer bloom intensity set to {}", m_bloomResources.controls.intensity);
 }
 
 void Renderer::SetBloomShape(float threshold, float softKnee, float maxContribution) {
     const float clampedThreshold = glm::clamp(threshold, 0.1f, 10.0f);
     const float clampedSoftKnee = glm::clamp(softKnee, 0.0f, 1.0f);
     const float clampedMaxContribution = glm::clamp(maxContribution, 0.0f, 16.0f);
-    if (std::abs(clampedThreshold - m_bloomResources.threshold) < 1e-4f &&
-        std::abs(clampedSoftKnee - m_bloomResources.softKnee) < 1e-4f &&
-        std::abs(clampedMaxContribution - m_bloomResources.maxContribution) < 1e-4f) {
+    if (std::abs(clampedThreshold - m_bloomResources.controls.threshold) < 1e-4f &&
+        std::abs(clampedSoftKnee - m_bloomResources.controls.softKnee) < 1e-4f &&
+        std::abs(clampedMaxContribution - m_bloomResources.controls.maxContribution) < 1e-4f) {
         return;
     }
-    m_bloomResources.threshold = clampedThreshold;
-    m_bloomResources.softKnee = clampedSoftKnee;
-    m_bloomResources.maxContribution = clampedMaxContribution;
+    m_bloomResources.controls.threshold = clampedThreshold;
+    m_bloomResources.controls.softKnee = clampedSoftKnee;
+    m_bloomResources.controls.maxContribution = clampedMaxContribution;
     spdlog::info("Renderer bloom shape set to threshold={} soft_knee={} max={}",
-                 m_bloomResources.threshold,
-                 m_bloomResources.softKnee,
-                 m_bloomResources.maxContribution);
+                 m_bloomResources.controls.threshold,
+                 m_bloomResources.controls.softKnee,
+                 m_bloomResources.controls.maxContribution);
 }
 
 void Renderer::SetColorGrade(float warm, float cool) {

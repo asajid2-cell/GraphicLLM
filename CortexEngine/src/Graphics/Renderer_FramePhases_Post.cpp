@@ -93,9 +93,9 @@ void Renderer::ExecutePostProcessingFramePhase(const FrameExecutionContext& fram
         m_pipelineState.bloomBlurV &&
         m_pipelineState.bloomComposite &&
         m_mainTargets.hdrSRV.IsValid() &&
-        m_bloomResources.intensity > 0.0f &&
-        m_bloomResources.texA[0] &&
-        m_bloomResources.texB[0];
+        m_bloomResources.controls.intensity > 0.0f &&
+        m_bloomResources.resources.texA[0] &&
+        m_bloomResources.resources.texB[0];
 
     {
         const auto tBloomStart = clock::now();

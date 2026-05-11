@@ -143,8 +143,14 @@ Assert-Contains "RenderGraphValidationPass.cpp" $validation "builder.Write(*tran
 Assert-Contains "RenderGraphValidationPass.cpp" $validation "builder.Write(*transientB, RGResourceUsage::RenderTarget)"
 
 $shadow = Read-Text "src/Graphics/Passes/ShadowPass.cpp"
+$shadowHeader = Read-Text "src/Graphics/Passes/ShadowPass.h"
 Assert-Contains "ShadowPass.cpp" $shadow "builder.Write(context.shadowMap, RGResourceUsage::DepthStencilWrite)"
 Assert-Contains "ShadowPass.cpp" $shadow "builder.Read(context.shadowMap, RGResourceUsage::ShaderResource)"
+Assert-Contains "ShadowPass.cpp" $shadow "Draw(context.draw)"
+Assert-Contains "ShadowPass.cpp" $shadow "ShadowTargetPass::TransitionToDepthWrite(context.target)"
+Assert-Contains "ShadowPass.cpp" $shadow "ShadowTargetPass::BindAndClearSlice(sliceContext)"
+Assert-NotContains "ShadowPass.h" $shadowHeader "std::function<bool()> execute"
+Assert-NotContains "Renderer_RenderGraphDepthShadow.cpp" $rendererDepthShadow "RenderShadowPass(registry)"
 
 $ssao = Read-Text "src/Graphics/Passes/SSAOPass.cpp"
 $ssaoHeader = Read-Text "src/Graphics/Passes/SSAOPass.h"

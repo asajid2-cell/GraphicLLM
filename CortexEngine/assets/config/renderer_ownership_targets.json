@@ -323,6 +323,16 @@
       "future_extension": "Move more pipeline/pass state into dedicated pass helpers before adding new forward-like draw paths"
     },
     {
+      "id": "mesh_pipeline_material_binding",
+      "owner": "Shared mesh pipeline/material binding",
+      "status": "release_boundary_validated",
+      "release_boundary": "Forward, transparent, overlay, water, depth-prepass, and shadow mesh passes keep visibility/material-policy decisions in renderer orchestration, but shared root-signature binding, descriptor-heap binding, frame/environment binding, primitive topology setup, object/material constant binding, and material descriptor-table binding are owned by MeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "material_lab", "glass_water_courtyard", "effects_showcase", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/MeshDrawPass.h", "Passes/MeshDrawPass.cpp", "Renderer_ForwardPass.cpp", "Renderer_TransparentGeometry.cpp", "Renderer_OverlayGeometry.cpp", "Renderer_WaterSurfaces.cpp", "Renderer_DepthPasses.cpp", "Renderer_ShadowPass.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_pipelineState", "m_environmentState", "m_materialFallbacks"],
+      "future_extension": "Keep future repeated mesh root/material descriptor binding in MeshDrawPass or a more specific mesh-pass helper instead of reintroducing direct root/table binding to renderer pass loops"
+    },
+    {
       "id": "mesh_upload_copy_submission",
       "owner": "Mesh upload",
       "status": "release_boundary_validated",

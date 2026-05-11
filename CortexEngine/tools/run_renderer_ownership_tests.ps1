@@ -1184,6 +1184,44 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "mesh_pipeline_material_binding") {
+        if (Test-Path $meshDrawPassPath) {
+            $meshDrawPass = Get-Content $meshDrawPassPath -Raw
+            foreach ($required in @("PipelineStateContext", "ObjectMaterialContext", "BindPipelineState", "BindObjectMaterial", "SetGraphicsRootSignature", "SetDescriptorHeaps", "SetGraphicsRootConstantBufferView(1", "SetGraphicsRootDescriptorTable(4", "IASetPrimitiveTopology", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "SetGraphicsRootDescriptorTable(3")) {
+                if ($meshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_pipeline_material_binding missing MeshDrawPass binding marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "mesh_pipeline_material_binding missing MeshDrawPass.cpp"
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $forwardPassPath; Label = "Renderer_ForwardPass.cpp" },
+            [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
+            [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
+            [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
+            [pscustomobject]@{ Path = $depthPassPath; Label = "Renderer_DepthPasses.cpp" },
+            [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $meshSource = Get-Content $pathInfo.Path -Raw
+                foreach ($directBindingCall in @("SetGraphicsRootSignature", "SetDescriptorHeaps", "SetGraphicsRootDescriptorTable(3", "SetGraphicsRootDescriptorTable(4", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "IASetPrimitiveTopology")) {
+                    if ($meshSource.IndexOf($directBindingCall, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "mesh_pipeline_material_binding still performs shared mesh root/material binding directly in $($pathInfo.Label): $directBindingCall"
+                    }
+                }
+                if ($meshSource.IndexOf("MeshDrawPass::BindPipelineState", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_pipeline_material_binding missing MeshDrawPass::BindPipelineState in $($pathInfo.Label)"
+                }
+                if ($meshSource.IndexOf("MeshDrawPass::BindObjectMaterial", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_pipeline_material_binding missing MeshDrawPass::BindObjectMaterial in $($pathInfo.Label)"
+                }
+            } else {
+                Add-Failure "mesh_pipeline_material_binding missing $($pathInfo.Label)"
+            }
+        }
+    }
+
     if ($id -eq "mesh_upload_copy_submission") {
         if (Test-Path $meshUploadCopyPassPath) {
             $meshUploadCopyPass = Get-Content $meshUploadCopyPassPath -Raw

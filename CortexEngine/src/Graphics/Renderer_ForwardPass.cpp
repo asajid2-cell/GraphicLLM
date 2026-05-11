@@ -13,17 +13,17 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderScene(Scene::ECS_Registry* registry) {
-    // Ensure graphics pipeline and root signature are bound after any compute work
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.geometry->GetPipelineState());
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    // Bind frame constants
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-
-    // Bind shadow map + environment descriptor table if available (t4-t6)
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(4, m_environmentState.shadowAndEnvDescriptors[0].gpu);
+    MeshDrawPass::PipelineStateContext pipelineContext{};
+    pipelineContext.commandList = m_commandResources.graphicsList.Get();
+    pipelineContext.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    pipelineContext.pipelineState = m_pipelineState.geometry->GetPipelineState();
+    pipelineContext.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    pipelineContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    pipelineContext.shadowEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
+    if (!MeshDrawPass::BindPipelineState(pipelineContext)) {
+        return;
     }
 
     // Bind biome materials buffer (b4) if valid
@@ -124,18 +124,19 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);
 
-        // Bind constants
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objectCB);
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(2, materialCB);
-
-        m_commandResources.graphicsList->SetPipelineState(m_pipelineState.geometry->GetPipelineState());
-        m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
         // Descriptor tables are warmed via PrewarmMaterialDescriptors().
         if (!renderable.textures.gpuState || !renderable.textures.gpuState->descriptors[0].IsValid()) {
             continue;
         }
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, renderable.textures.gpuState->descriptors[0].gpu);
+
+        MeshDrawPass::ObjectMaterialContext materialContext{};
+        materialContext.commandList = m_commandResources.graphicsList.Get();
+        materialContext.objectConstants = objectCB;
+        materialContext.materialConstants = materialCB;
+        materialContext.materialTable = renderable.textures.gpuState->descriptors[0];
+        if (!MeshDrawPass::BindObjectMaterial(materialContext)) {
+            continue;
+        }
 
         const auto drawResult =
             MeshDrawPass::DrawIndexedMesh(m_commandResources.graphicsList.Get(), *renderable.mesh);

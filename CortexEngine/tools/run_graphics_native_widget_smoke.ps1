@@ -97,6 +97,7 @@ $IDC_GFX_PARTICLE_BLOOM = 9065
 $IDC_GFX_PARTICLE_SOFT_DEPTH = 9066
 $IDC_GFX_PARTICLE_WIND = 9067
 $IDC_GFX_PARTICLE_EFFECT_SELECT = 9213
+$IDC_GFX_PARTICLE_QUALITY_SELECT = 9225
 $IDC_GFX_QUALITY_PRESET_SELECT = 9216
 $IDC_GFX_RT_REFL_STRENGTH = 9034
 $IDC_GFX_MOTION_BLUR = 9058
@@ -241,6 +242,7 @@ try {
         Set-Trackbar $window $IDC_GFX_PARTICLE_BLOOM 57
         Set-Trackbar $window $IDC_GFX_PARTICLE_SOFT_DEPTH 42
         Set-Trackbar $window $IDC_GFX_PARTICLE_WIND 48
+        Select-ComboIndex $window $IDC_GFX_PARTICLE_QUALITY_SELECT 1
         Select-ComboIndex $window $IDC_GFX_PARTICLE_EFFECT_SELECT 7
         Set-Trackbar $window $IDC_GFX_ENV_ROTATION 68
         Set-Trackbar $window $IDC_GFX_RT_REFL_STRENGTH 62
@@ -300,7 +302,7 @@ if (-not (Test-Path $reportPath)) {
     if ([string]$fc.graphics_preset.id -ne "release_showcase") {
         Add-Failure "graphics_preset.id was '$($fc.graphics_preset.id)', expected release_showcase after quality preset dropdown"
     }
-    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.70 0.04
+    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.75 0.04
     if ([bool]$fc.lighting.safe_rig_on_low_vram) {
         Add-Failure "lighting.safe_rig_on_low_vram remained true after native safe-lighting toggle"
     }
@@ -332,7 +334,7 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.416 0.05
     Assert-Near "water_fresnel_strength" ([double]$fc.water.fresnel_strength) 1.38 0.08
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 1.22 0.05
-    Assert-Near "particle_quality" ([double]$fc.particles.quality_scale) 1.405 0.06
+    Assert-Near "particle_quality" ([double]$fc.particles.quality_scale) 1.0 0.04
     Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.14 0.06
     Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.42 0.06
     Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.96 0.06

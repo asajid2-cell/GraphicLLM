@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RenderableClassification.h"
 #include "Scene/ECS_Registry.h"
@@ -119,8 +119,8 @@ void Renderer::UpdateFrameConstants(float deltaTime, Scene::ECS_Registry* regist
     // jitter and post-process texel steps line up with the actual buffers.
     float internalWidth  = static_cast<float>(m_services.window->GetWidth());
     float internalHeight = static_cast<float>(m_services.window->GetHeight());
-    if (m_mainTargets.hdrColor) {
-        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    if (m_mainTargets.hdr.resources.color) {
+        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
         internalWidth  = static_cast<float>(hdrDesc.Width);
         internalHeight = static_cast<float>(hdrDesc.Height);
     }

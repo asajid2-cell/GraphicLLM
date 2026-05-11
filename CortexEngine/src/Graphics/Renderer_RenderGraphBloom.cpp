@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
@@ -24,9 +24,9 @@ constexpr D3D12_RESOURCE_STATES kBloomGraphShaderResourceState =
 Renderer::RenderGraphPassResult
 Renderer::ExecuteBloomInRenderGraph() {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_mainTargets.hdrColor ||
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_mainTargets.hdr.resources.color ||
         !m_pipelineState.bloomDownsample || !m_pipelineState.bloomBlurH || !m_pipelineState.bloomBlurV ||
-        !m_pipelineState.bloomComposite || !m_mainTargets.hdrSRV.IsValid() || m_bloomResources.controls.intensity <= 0.0f ||
+        !m_pipelineState.bloomComposite || !m_mainTargets.hdr.descriptors.srv.IsValid() || m_bloomResources.controls.intensity <= 0.0f ||
         !m_bloomResources.resources.texA[0] || !m_bloomResources.resources.texB[0]) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_bloom_prerequisites_missing";
@@ -64,7 +64,7 @@ Renderer::ExecuteBloomInRenderGraph() {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle hdrHandle =
-        m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR_Bloom");
+        m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR_Bloom");
     const uint32_t baseLevel = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
     const bool useTransientBloom = (std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr);
     static bool s_loggedBloomTransientDefault = false;
@@ -225,7 +225,7 @@ Renderer::ExecuteBloomInRenderGraph() {
             failStage("bind_downsample_base");
             return false;
         }
-        m_mainTargets.hdrState = kBloomGraphShaderResourceState;
+        m_mainTargets.hdr.resources.state = kBloomGraphShaderResourceState;
         m_bloomResources.resources.resourceState[0][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
         ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.bloomSkipTransitions, true);
         return PrepareBloomPassState() && RenderBloomDownsampleBase(true);
@@ -295,7 +295,7 @@ Renderer::ExecuteBloomInRenderGraph() {
         result.fallbackUsed = true;
         result.fallbackReason = "bloom_graph_stage_failed: " + stageError;
     } else {
-        m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
+        m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         const D3D12_RESOURCE_STATES combinedState = m_services.renderGraph->GetResourceState(bloomA[baseLevel]);
         restoreBloomResources();
         m_bloomResources.resources.resourceState[baseLevel][0] = combinedState;

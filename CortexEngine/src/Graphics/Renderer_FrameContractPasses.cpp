@@ -67,8 +67,8 @@ void Renderer::RecordFramePass(const char* name,
 
         const std::string resource = resourceName;
         if (resource == "depth") return resourceBytes(m_depthResources.resources.buffer.Get());
-        if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdrColor.Get());
-        if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.gbufferNormalRoughness.Get());
+        if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdr.resources.color.Get());
+        if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.normalRoughness.resources.texture.Get());
         if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());
         if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());

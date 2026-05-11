@@ -30,11 +30,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_depthResources.descriptors.srv.IsValid() && m_hzbResources.resources.texture;
     const bool wantsRgPostThisFrame =
         inputs.runPostProcess && inputs.useRenderGraphPost && canRunRg && m_pipelineState.postProcess &&
-        m_mainTargets.hdrColor && m_services.window && m_services.window->GetCurrentBackBuffer();
+        m_mainTargets.hdr.resources.color && m_services.window && m_services.window->GetCurrentBackBuffer();
     bool wantsFusedBloomThisFrame =
         inputs.runBloom && wantsRgPostThisFrame &&
         m_pipelineState.bloomDownsample && m_pipelineState.bloomBlurH && m_pipelineState.bloomBlurV &&
-        m_pipelineState.bloomComposite && m_mainTargets.hdrSRV.IsValid() && m_bloomResources.controls.intensity > 0.0f &&
+        m_pipelineState.bloomComposite && m_mainTargets.hdr.descriptors.srv.IsValid() && m_bloomResources.controls.intensity > 0.0f &&
         m_bloomResources.resources.texA[0] && m_bloomResources.resources.texB[0];
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
@@ -115,7 +115,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     };
 
     if (wantsRgPostThisFrame) {
-        hdrHandle = m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR");
+        hdrHandle = m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR");
         if (m_temporalScreenState.historyColor) {
             historyHandle = m_services.renderGraph->ImportResource(m_temporalScreenState.historyColor.Get(), m_temporalScreenState.historyState, "TAAHistory");
         }
@@ -175,7 +175,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             bloomContext.baseLevel = baseLevel;
             bloomContext.useTransients = useFusedBloomTransients;
             bloomContext.markHdrShaderResource = [&]() {
-                m_mainTargets.hdrState = kRenderGraphShaderResourceState;
+                m_mainTargets.hdr.resources.state = kRenderGraphShaderResourceState;
             };
             bloomContext.failStage = failBloomStage;
             bloomContext.markBloomRan = [&]() {
@@ -195,8 +195,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             hasVBPostStates = true;
         }
         {
-            ID3D12Resource* normalRes = m_mainTargets.gbufferNormalRoughness.Get();
-            D3D12_RESOURCE_STATES normalState = m_mainTargets.gbufferNormalRoughnessState;
+            ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
+            D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
             if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
                 normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
                 normalState = vbPostInitialStates.normalRoughness;
@@ -353,7 +353,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     }
 
     if (wantsRgPostThisFrame) {
-        m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
+        m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         if (bloomHandle.IsValid() && !wantsFusedBloomThisFrame) {
             const uint32_t level = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
             m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
@@ -363,7 +363,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
         if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {
-            m_mainTargets.gbufferNormalRoughnessState = m_services.renderGraph->GetResourceState(normalHandle);
+            m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
         }
         if (hasVBPostStates) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();

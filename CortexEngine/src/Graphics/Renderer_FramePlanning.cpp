@@ -63,7 +63,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasTAAIntermediate = (m_temporalScreenState.taaIntermediate != nullptr);
     featureInputs.hasSSRPipeline = pipelineReadiness.ssr;
     featureInputs.hasSSRColor = (m_ssrResources.resources.color != nullptr);
-    featureInputs.hasHDRColor = (m_mainTargets.hdrColor != nullptr);
+    featureInputs.hasHDRColor = (m_mainTargets.hdr.resources.color != nullptr);
     featureInputs.hasSSAOTarget = (m_ssaoResources.resources.texture != nullptr);
     featureInputs.hasSSAOComputePipeline = pipelineReadiness.ssaoCompute;
     featureInputs.hasSSAOPipeline = pipelineReadiness.ssao;

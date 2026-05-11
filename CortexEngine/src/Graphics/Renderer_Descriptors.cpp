@@ -72,7 +72,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     };
 
     // Must match PostProcess.hlsl TAAResolvePS bindings.
-    writeOrNull(0, m_mainTargets.hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(0, m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* bloomRes = nullptr;
     if (m_bloomResources.controls.intensity > 0.0f) {
@@ -86,7 +86,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
-    ID3D12Resource* normalRes = m_mainTargets.gbufferNormalRoughness.Get();
+    ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
@@ -359,7 +359,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     };
 
     // Must match PostProcess.hlsl bindings.
-    writeOrNull(0, m_mainTargets.hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(0, m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* bloomRes = nullptr;
     if (m_bloomResources.controls.intensity > 0.0f) {
@@ -371,7 +371,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
-    ID3D12Resource* normalRes = m_mainTargets.gbufferNormalRoughness.Get();
+    ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }

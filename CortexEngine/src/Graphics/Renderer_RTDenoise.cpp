@@ -71,9 +71,9 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
         state = desired;
     };
 
-    DescriptorHandle normalSrv = m_mainTargets.gbufferNormalRoughnessSRV;
-    ID3D12Resource* normalResource = m_mainTargets.gbufferNormalRoughness.Get();
-    D3D12_RESOURCE_STATES* normalState = &m_mainTargets.gbufferNormalRoughnessState;
+    DescriptorHandle normalSrv = m_mainTargets.normalRoughness.descriptors.srv;
+    ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
+    D3D12_RESOURCE_STATES* normalState = &m_mainTargets.normalRoughness.resources.state;
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
     bool usingVBNormal = false;
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {

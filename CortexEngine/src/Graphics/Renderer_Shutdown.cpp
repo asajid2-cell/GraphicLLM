@@ -90,7 +90,7 @@ void Renderer::Shutdown() {
     m_assetRuntime.textureCache.clear();
     m_depthResources.resources.buffer.Reset();
     m_shadowResources.resources.map.Reset();
-    m_mainTargets.hdrColor.Reset();
+    m_mainTargets.hdr.resources.color.Reset();
     m_ssaoResources.resources.texture.Reset();
     m_commandResources.graphicsList.Reset();
     for (auto& allocator : m_commandResources.graphicsAllocators) {

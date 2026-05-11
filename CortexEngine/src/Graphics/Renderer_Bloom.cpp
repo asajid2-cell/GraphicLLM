@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Core/Window.h"
 #include "Passes/BloomPass.h"
 #include <spdlog/spdlog.h>
@@ -13,8 +13,8 @@ Result<void> Renderer::CreateBloomResources() {
 
     UINT fullWidth  = GetInternalRenderWidth();
     UINT fullHeight = GetInternalRenderHeight();
-    if (m_mainTargets.hdrColor) {
-        const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    if (m_mainTargets.hdr.resources.color) {
+        const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
         fullWidth = static_cast<UINT>(hdrDesc.Width);
         fullHeight = hdrDesc.Height;
     }
@@ -141,8 +141,8 @@ Result<void> Renderer::CreateBloomResources() {
 }
 
 bool Renderer::PrepareBloomPassState() {
-    if (!m_mainTargets.hdrColor || !m_pipelineState.bloomDownsample || !m_pipelineState.bloomBlurH || !m_pipelineState.bloomBlurV ||
-        !m_pipelineState.bloomComposite || !m_mainTargets.hdrSRV.IsValid()) {
+    if (!m_mainTargets.hdr.resources.color || !m_pipelineState.bloomDownsample || !m_pipelineState.bloomBlurH || !m_pipelineState.bloomBlurV ||
+        !m_pipelineState.bloomComposite || !m_mainTargets.hdr.descriptors.srv.IsValid()) {
         return false;
     }
 
@@ -224,7 +224,7 @@ bool Renderer::BindBloomPassTexture(ID3D12Resource* source, DXGI_FORMAT format, 
 }
 
 bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
-    if (!m_mainTargets.hdrColor || !m_bloomResources.resources.texA[0]) {
+    if (!m_mainTargets.hdr.resources.color || !m_bloomResources.resources.texA[0]) {
         return false;
     }
     const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -234,10 +234,10 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
         D3D12_RESOURCE_BARRIER barriers[2] = {};
         UINT barrierCount = 0;
 
-        if (m_mainTargets.hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
             barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.hdrColor.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdrState;
+            barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+            barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
             barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++barrierCount;
@@ -257,14 +257,14 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
         }
     }
 
-    m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_bloomResources.resources.resourceState[0][0] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     m_commandResources.graphicsList->OMSetRenderTargets(1, &m_bloomResources.resources.rtv[0][0].cpu, FALSE, nullptr);
     m_commandResources.graphicsList->ClearRenderTargetView(m_bloomResources.resources.rtv[0][0].cpu, clearColor, 0, nullptr);
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomDownsample->GetPipelineState());
 
-    if (!BindBloomPassTexture(m_mainTargets.hdrColor.Get(), DXGI_FORMAT_UNKNOWN, "downsample hdr", BloomPass::BaseDownsampleSlot())) {
+    if (!BindBloomPassTexture(m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_UNKNOWN, "downsample hdr", BloomPass::BaseDownsampleSlot())) {
         return false;
     }
 

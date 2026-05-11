@@ -8,11 +8,11 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderSSR() {
-    if (!m_pipelineState.ssr || !m_ssrResources.resources.color || !m_mainTargets.hdrColor || !m_depthResources.resources.buffer) {
+    if (!m_pipelineState.ssr || !m_ssrResources.resources.color || !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
         return;
     }
 
-    ID3D12Resource* normalResource = m_mainTargets.gbufferNormalRoughness.Get();
+    ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
@@ -35,10 +35,10 @@ void Renderer::RenderSSR() {
     }
 
     if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-        m_mainTargets.hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdrColor.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdrState;
+        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
@@ -46,11 +46,11 @@ void Renderer::RenderSSR() {
 
     if (!m_visibilityBufferState.renderedThisFrame) {
         if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-            m_mainTargets.gbufferNormalRoughness &&
-            m_mainTargets.gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+            m_mainTargets.normalRoughness.resources.texture &&
+            m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
             barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.gbufferNormalRoughness.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.gbufferNormalRoughnessState;
+            barriers[barrierCount].Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
+            barriers[barrierCount].Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
             barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++barrierCount;
@@ -71,9 +71,9 @@ void Renderer::RenderSSR() {
     }
 
     m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (!m_visibilityBufferState.renderedThisFrame && m_mainTargets.gbufferNormalRoughness) {
-        m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (!m_visibilityBufferState.renderedThisFrame && m_mainTargets.normalRoughness.resources.texture) {
+        m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
     m_depthResources.resources.resourceState = kDepthSampleState;
 
@@ -92,7 +92,7 @@ void Renderer::RenderSSR() {
             m_pipelineState.ssr.get(),
             m_ssrResources.resources.color.Get(),
             m_ssrResources.resources.rtv,
-            m_mainTargets.hdrColor.Get(),
+            m_mainTargets.hdr.resources.color.Get(),
             m_depthResources.resources.buffer.Get(),
             normalResource,
             std::span<DescriptorHandle>(persistentTable.data(), persistentTable.size()),

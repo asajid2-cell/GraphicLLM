@@ -30,8 +30,8 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     }
 
     bool usesVBNormal = false;
-    ID3D12Resource* normalResource = m_mainTargets.gbufferNormalRoughness.Get();
-    D3D12_RESOURCE_STATES normalState = m_mainTargets.gbufferNormalRoughnessState;
+    ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
+    D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         usesVBNormal = true;
@@ -76,7 +76,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
             states.normalRoughness = kScreenSpaceShaderResourceState;
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
         } else {
-            m_mainTargets.gbufferNormalRoughnessState = kScreenSpaceShaderResourceState;
+            m_mainTargets.normalRoughness.resources.state = kScreenSpaceShaderResourceState;
         }
 
         BuildTemporalRejectionMask(frameNormalRoughnessResource, true, true);
@@ -116,7 +116,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
             finalStates.normalRoughness = m_services.renderGraph->GetResourceState(normalHandle);
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(finalStates);
         } else {
-            m_mainTargets.gbufferNormalRoughnessState = m_services.renderGraph->GetResourceState(normalHandle);
+            m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
         }
         result.executed = true;
         CaptureTemporalRejectionMaskStats();

@@ -21,8 +21,8 @@ Result<void> Renderer::CreateSSAOResources() {
     // are bilinearly upsampled in post-process using depth-aware filtering.
     UINT fullWidth = GetInternalRenderWidth();
     UINT fullHeight = GetInternalRenderHeight();
-    if (m_mainTargets.hdrColor) {
-        const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    if (m_mainTargets.hdr.resources.color) {
+        const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
         fullWidth = static_cast<UINT>(hdrDesc.Width);
         fullHeight = hdrDesc.Height;
     }

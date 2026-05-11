@@ -51,33 +51,33 @@ void Renderer::PrepareMainPass() {
         m_rtGITargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_mainTargets.hdrColor) {
+    if (m_mainTargets.hdr.resources.color) {
         // Ensure HDR is in render target state
-        if (m_mainTargets.hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
             D3D12_RESOURCE_BARRIER barrier = {};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_mainTargets.hdrColor.Get();
-            barrier.Transition.StateBefore = m_mainTargets.hdrState;
+            barrier.Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+            barrier.Transition.StateBefore = m_mainTargets.hdr.resources.state;
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         }
-        rtvs[numRtvs++] = m_mainTargets.hdrRTV.cpu;
+        rtvs[numRtvs++] = m_mainTargets.hdr.descriptors.rtv.cpu;
 
         // Ensure G-buffer is in render target state
-        if (m_mainTargets.gbufferNormalRoughness && m_mainTargets.gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
             D3D12_RESOURCE_BARRIER gbufBarrier = {};
             gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            gbufBarrier.Transition.pResource = m_mainTargets.gbufferNormalRoughness.Get();
-            gbufBarrier.Transition.StateBefore = m_mainTargets.gbufferNormalRoughnessState;
+            gbufBarrier.Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
+            gbufBarrier.Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
             gbufBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
             gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandResources.graphicsList->ResourceBarrier(1, &gbufBarrier);
-            m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         }
-        if (m_mainTargets.gbufferNormalRoughness) {
-            rtvs[numRtvs++] = m_mainTargets.gbufferNormalRoughnessRTV.cpu;
+        if (m_mainTargets.normalRoughness.resources.texture) {
+            rtvs[numRtvs++] = m_mainTargets.normalRoughness.descriptors.rtv.cpu;
         }
     } else {
         // Fallback: render directly to back buffer
@@ -111,8 +111,8 @@ void Renderer::PrepareMainPass() {
     // using HDR (which may be supersampled relative to the window).
     D3D12_VIEWPORT viewport = {};
     D3D12_RECT scissorRect = {};
-    if (m_mainTargets.hdrColor) {
-        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    if (m_mainTargets.hdr.resources.color) {
+        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
         viewport.Width  = static_cast<float>(hdrDesc.Width);
         viewport.Height = static_cast<float>(hdrDesc.Height);
         viewport.MinDepth = 0.0f;

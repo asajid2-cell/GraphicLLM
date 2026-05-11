@@ -1,10 +1,10 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Passes/SkyboxPass.h"
 
 namespace Cortex::Graphics {
 
 void Renderer::RenderSkybox() {
-    if (!m_mainTargets.hdrColor || !m_environmentState.backgroundVisible) {
+    if (!m_mainTargets.hdr.resources.color || !m_environmentState.backgroundVisible) {
         return;
     }
 

@@ -72,7 +72,7 @@ void Renderer::ExecuteShadowFramePhase(const FrameExecutionContext& frameCtx) {
     }
     RecordFramePass("ShadowPass",
                     true,
-                    true,
+                    shadowGraphResult.executed,
                     m_frameDiagnostics.contract.drawCounts.shadowDraws - shadowDrawsBefore,
                     {"frame_constants", "renderables"},
                     {"shadow_map"},

@@ -8,6 +8,8 @@
 // Reference: "Destiny's Multithreaded Rendering Architecture" - GDC 2017
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <random>
 #include <vector>
 #include <memory>
 #include <string>
@@ -114,6 +116,7 @@ struct ParticleEmitterConfig {
 
     // Collision
     bool enableCollision = false;
+    float splashChance = 0.0f;
     float collisionBounce = 0.5f;
     float collisionFriction = 0.1f;
     float collisionLifetimeLoss = 0.2f; // Lose 20% lifetime on bounce

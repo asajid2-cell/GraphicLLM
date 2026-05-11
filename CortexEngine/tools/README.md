@@ -41,7 +41,7 @@ validation suite:
 - screenshot negative gates for black/white/saturation/edge regressions,
 - Phase 3 visual matrix summary generation,
 - renderer ownership, full ownership audit, and fatal error contract checks,
-- advanced graphics catalog and effects gallery checks,
+- advanced graphics catalog, GPU particle contract, and effects gallery checks,
 - particle-disabled zero-cost runtime check,
 - environment manifest, IBL asset policy, and IBL gallery checks,
 - Phase 3 environment/RT fallback matrix,

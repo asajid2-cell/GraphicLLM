@@ -450,6 +450,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "gpu_particle_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_gpu_particle_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "effects_gallery" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

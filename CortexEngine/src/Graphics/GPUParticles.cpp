@@ -6,6 +6,9 @@
 #include <cmath>
 #include <random>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 namespace Cortex::Graphics {
 
 static constexpr float PI = 3.14159265358979f;

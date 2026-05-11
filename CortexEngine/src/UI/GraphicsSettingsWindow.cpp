@@ -14,6 +14,7 @@
 #include <commctrl.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <string>
 #include <vector>
@@ -153,6 +154,18 @@ enum ControlIdGraphics : int {
     IDC_GFX_ENV_BUDGET_SELECT = 9214,
     IDC_GFX_ENV_RELOAD_MANIFEST = 9215,
     IDC_GFX_QUALITY_PRESET_SELECT = 9216,
+    IDC_GFX_TAB_NAV = 9240,
+};
+
+enum class GraphicsSettingsTab : size_t {
+    Overview = 0,
+    RayTracing,
+    Lighting,
+    Environment,
+    Atmosphere,
+    Effects,
+    Materials,
+    Count
 };
 
 struct SliderBinding {
@@ -175,6 +188,9 @@ struct GraphicsSettingsState {
     HWND txtWarning = nullptr;
     HWND txtRTScheduler = nullptr;
     HWND txtRasterTemporal = nullptr;
+    HWND tabNav = nullptr;
+    std::array<int, static_cast<size_t>(GraphicsSettingsTab::Count)> tabSectionY{};
+    GraphicsSettingsTab activeTab = GraphicsSettingsTab::Overview;
 
     SliderBinding renderScale;
     SliderBinding exposure;
@@ -351,6 +367,44 @@ bool GetCheckbox(HWND hwnd) {
 
 void SyncStateFromToggles();
 void SyncStateFromSliders();
+
+void ScrollGraphicsSettingsTo(int targetY) {
+    if (!g_gfx.hwnd) {
+        return;
+    }
+
+    RECT rc{};
+    GetClientRect(g_gfx.hwnd, &rc);
+    SCROLLINFO si{};
+    si.cbSize = sizeof(si);
+    si.fMask = SIF_ALL;
+    GetScrollInfo(g_gfx.hwnd, SB_VERT, &si);
+    const int maxPos = std::max(si.nMin, static_cast<int>(si.nMax - si.nPage + 1));
+    const int yPos = std::clamp(targetY, si.nMin, maxPos);
+    si.fMask = SIF_POS;
+    si.nPos = yPos;
+    SetScrollInfo(g_gfx.hwnd, SB_VERT, &si, TRUE);
+
+    const int dy = g_gfx.scrollPos - yPos;
+    if (dy != 0) {
+        ScrollWindowEx(g_gfx.hwnd, 0, dy, nullptr, nullptr, nullptr, nullptr, SW_INVALIDATE | SW_SCROLLCHILDREN);
+        g_gfx.scrollPos = yPos;
+    }
+}
+
+void ApplyGraphicsSettingsTabSelection() {
+    if (!g_gfx.tabNav) {
+        return;
+    }
+    const int selected = static_cast<int>(SendMessageW(g_gfx.tabNav, TCM_GETCURSEL, 0, 0));
+    if (selected < 0 || selected >= static_cast<int>(GraphicsSettingsTab::Count)) {
+        return;
+    }
+
+    g_gfx.activeTab = static_cast<GraphicsSettingsTab>(selected);
+    const int target = g_gfx.tabSectionY[static_cast<size_t>(g_gfx.activeTab)];
+    ScrollGraphicsSettingsTo(std::max(0, target - 8));
+}
 
 void LoadEnvironmentBudgetOptions() {
     if (!g_gfx.cmbEnvironmentBudget) {
@@ -1134,7 +1188,7 @@ void RegisterGraphicsSettingsClass() {
 
     INITCOMMONCONTROLSEX icc{};
     icc.dwSize = sizeof(icc);
-    icc.dwICC = ICC_BAR_CLASSES;
+    icc.dwICC = ICC_BAR_CLASSES | ICC_TAB_CLASSES;
     InitCommonControlsEx(&icc);
 
     WNDCLASSW wc{};
@@ -1185,6 +1239,9 @@ void RegisterGraphicsSettingsClass() {
                 y += rowGap;
                 makeStaticWithHeight(0, text, y, labelHeight);
                 y += labelHeight + 2;
+            };
+            auto markTabSection = [&](GraphicsSettingsTab tab) {
+                g_gfx.tabSectionY[static_cast<size_t>(tab)] = y;
             };
 
             auto makeSlider = [&](int id, const wchar_t* text, SliderBinding& binding, float minValue, float maxValue) {
@@ -1260,6 +1317,38 @@ void RegisterGraphicsSettingsClass() {
                 return h;
             };
 
+            g_gfx.tabNav = CreateWindowExW(0,
+                                           WC_TABCONTROLW,
+                                           L"",
+                                           WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                                           margin,
+                                           y,
+                                           width - margin * 2,
+                                           28,
+                                           hwnd,
+                                           reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_GFX_TAB_NAV)),
+                                           nullptr,
+                                           nullptr);
+            setFont(g_gfx.tabNav);
+            const wchar_t* tabLabels[] = {
+                L"Overview",
+                L"RT",
+                L"Lighting",
+                L"Environment",
+                L"Atmosphere",
+                L"Effects",
+                L"Materials",
+            };
+            for (int i = 0; i < static_cast<int>(GraphicsSettingsTab::Count); ++i) {
+                TCITEMW item{};
+                item.mask = TCIF_TEXT;
+                item.pszText = const_cast<LPWSTR>(tabLabels[i]);
+                SendMessageW(g_gfx.tabNav, TCM_INSERTITEMW, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&item));
+            }
+            SendMessageW(g_gfx.tabNav, TCM_SETCURSEL, 0, 0);
+            y += 32 + rowGap;
+
+            markTabSection(GraphicsSettingsTab::Overview);
             g_gfx.txtHealth = makeStatic(IDC_GFX_HEALTH, L"Health: --", y);
             y += labelHeight + rowGap;
             g_gfx.txtMemory = makeStatic(IDC_GFX_MEMORY, L"Budgets: --", y);
@@ -1283,6 +1372,7 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkSafeLighting = makeCheckbox(IDC_GFX_SAFE_LIGHTING, L"Safe Lighting");
 
             makeSection(L"Ray Tracing");
+            markTabSection(GraphicsSettingsTab::RayTracing);
             g_gfx.chkRT = makeCheckbox(IDC_GFX_RT, L"RT Master");
             g_gfx.chkRTReflections = makeCheckbox(IDC_GFX_RT_REFLECTIONS, L"RT Reflections");
             g_gfx.chkRTGI = makeCheckbox(IDC_GFX_RT_GI, L"RT GI");
@@ -1302,6 +1392,7 @@ void RegisterGraphicsSettingsClass() {
             y += labelHeight * 2 + rowGap;
 
             makeSection(L"Lighting");
+            markTabSection(GraphicsSettingsTab::Lighting);
             makeSlider(IDC_GFX_EXPOSURE, L"Exposure", g_gfx.exposure, 0.05f, 5.0f);
             makeSlider(IDC_GFX_BLOOM, L"Bloom", g_gfx.bloom, 0.0f, 2.0f);
             makeSlider(IDC_GFX_WARM, L"Warm Grade", g_gfx.warm, -1.0f, 1.0f);
@@ -1324,6 +1415,7 @@ void RegisterGraphicsSettingsClass() {
             }
 
             makeSection(L"Environment / IBL");
+            markTabSection(GraphicsSettingsTab::Environment);
             g_gfx.cmbEnvironmentBudget = makeCombo(IDC_GFX_ENV_BUDGET_SELECT, L"Environment Budget");
             LoadEnvironmentBudgetOptions();
             g_gfx.cmbEnvironment = makeCombo(IDC_GFX_ENV_SELECT, L"Environment");
@@ -1351,6 +1443,7 @@ void RegisterGraphicsSettingsClass() {
             }
 
             makeSection(L"Screen Space / Atmosphere");
+            markTabSection(GraphicsSettingsTab::Atmosphere);
             g_gfx.chkSSR = makeCheckbox(IDC_GFX_SSR, L"SSR");
             g_gfx.chkSSAO = makeCheckbox(IDC_GFX_SSAO, L"SSAO");
             g_gfx.chkPCSS = makeCheckbox(IDC_GFX_PCSS, L"PCSS Shadows");
@@ -1370,6 +1463,7 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_FOG_FALLOFF, L"Fog Falloff", g_gfx.fogFalloff, 0.01f, 10.0f);
 
             makeSection(L"Showcase Effects");
+            markTabSection(GraphicsSettingsTab::Effects);
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
             g_gfx.cmbParticleEffect = makeCombo(IDC_GFX_PARTICLE_EFFECT_SELECT, L"Particle Effect");
             LoadParticleEffectOptions();
@@ -1424,6 +1518,7 @@ void RegisterGraphicsSettingsClass() {
             }
 
             makeSection(L"Focused Material");
+            markTabSection(GraphicsSettingsTab::Materials);
             g_gfx.cmbMaterialPreset = makeCombo(IDC_GFX_MATERIAL_PRESET, L"Material Preset");
             LoadMaterialPresetOptions();
             makeSlider(IDC_GFX_MATERIAL_METALLIC, L"Material Metallic", g_gfx.materialMetallic, 0.0f, 1.0f);
@@ -1700,6 +1795,16 @@ void RegisterGraphicsSettingsClass() {
             RefreshControlsFromRenderer();
             RefreshHealthLabels();
             return 0;
+        }
+        case WM_NOTIFY: {
+            const auto* notify = reinterpret_cast<NMHDR*>(lParam);
+            if (notify &&
+                notify->idFrom == IDC_GFX_TAB_NAV &&
+                notify->code == TCN_SELCHANGE) {
+                ApplyGraphicsSettingsTabSelection();
+                return 0;
+            }
+            break;
         }
         case WM_CLOSE:
             GraphicsSettingsWindow::SetVisible(false);

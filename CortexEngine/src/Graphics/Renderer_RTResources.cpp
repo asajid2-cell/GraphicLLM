@@ -23,138 +23,14 @@ Result<void> Renderer::CreateRTShadowMask() {
         return Result<void>::Err("Window size is zero; cannot create RT shadow mask");
     }
 
-    D3D12_HEAP_PROPERTIES heapProps{};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    m_rtShadowTargets.mask.Reset();
-    m_rtShadowTargets.maskState = D3D12_RESOURCE_STATE_COMMON;
-
-    D3D12_RESOURCE_DESC desc{};
-    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    desc.Width = width;
-    desc.Height = height;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_R8_UNORM;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        nullptr,
-        IID_PPV_ARGS(&m_rtShadowTargets.mask));
-    if (FAILED(hr)) {
-        m_rtShadowTargets.mask.Reset();
-        return Result<void>::Err("Failed to create RT shadow mask texture");
+    auto targetResult = m_rtShadowTargets.CreateResources(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (targetResult.IsErr()) {
+        return targetResult;
     }
-
-    m_rtShadowTargets.maskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-
-    if (!m_rtShadowTargets.maskSRV.IsValid()) {
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            m_rtShadowTargets.mask.Reset();
-            return Result<void>::Err("Failed to allocate staging SRV for RT shadow mask: " + srvResult.Error());
-        }
-        m_rtShadowTargets.maskSRV = srvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = desc.Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_rtShadowTargets.mask.Get(),
-        &srvDesc,
-        m_rtShadowTargets.maskSRV.cpu);
-
-    if (!m_rtShadowTargets.maskUAV.IsValid()) {
-        auto uavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (uavResult.IsErr()) {
-            m_rtShadowTargets.mask.Reset();
-            return Result<void>::Err("Failed to allocate staging UAV for RT shadow mask: " + uavResult.Error());
-        }
-        m_rtShadowTargets.maskUAV = uavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-    uavDesc.Format = desc.Format;
-    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtShadowTargets.mask.Get(),
-        nullptr,
-        &uavDesc,
-        m_rtShadowTargets.maskUAV.cpu);
-
-    m_rtShadowTargets.history.Reset();
-    m_rtShadowTargets.historyState = D3D12_RESOURCE_STATE_COMMON;
-
-    D3D12_RESOURCE_DESC historyDesc = desc;
-    historyDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &historyDesc,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-        nullptr,
-        IID_PPV_ARGS(&m_rtShadowTargets.history));
-    if (FAILED(hr)) {
-        m_rtShadowTargets.history.Reset();
-        return Result<void>::Err("Failed to create RT shadow mask history texture");
-    }
-
-    m_rtShadowTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-    if (!m_rtShadowTargets.historySRV.IsValid()) {
-        auto historySrvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (historySrvResult.IsErr()) {
-            m_rtShadowTargets.history.Reset();
-            return Result<void>::Err("Failed to allocate staging SRV for RT shadow mask history: " + historySrvResult.Error());
-        }
-        m_rtShadowTargets.historySRV = historySrvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC historySrvDesc{};
-    historySrvDesc.Format = historyDesc.Format;
-    historySrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    historySrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    historySrvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_rtShadowTargets.history.Get(),
-        &historySrvDesc,
-        m_rtShadowTargets.historySRV.cpu);
-
-    if (!m_rtShadowTargets.historyUAV.IsValid()) {
-        auto historyUavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (historyUavResult.IsErr()) {
-            m_rtShadowTargets.history.Reset();
-            return Result<void>::Err("Failed to allocate staging UAV for RT shadow mask history: " + historyUavResult.Error());
-        }
-        m_rtShadowTargets.historyUAV = historyUavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC historyUavDesc{};
-    historyUavDesc.Format = historyDesc.Format;
-    historyUavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtShadowTargets.history.Get(),
-        nullptr,
-        &historyUavDesc,
-        m_rtShadowTargets.historyUAV.cpu);
 
     if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
         ID3D12Device* device = m_services.device->GetDevice();

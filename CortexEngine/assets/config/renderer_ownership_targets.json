@@ -551,6 +551,16 @@
       "target_files": ["RendererDebugLineState.h", "Renderer_DebugLines.cpp", "Passes/DebugLinePass.h"],
       "renderer_state_members": ["m_debugLineState", "m_debugViewState"],
       "future_extension": "Keep future debug primitive buffers and draw submission in debug state/pass helpers instead of adding loose Renderer resources"
+    },
+    {
+      "id": "renderer_orchestration_mechanics_boundary",
+      "owner": "Renderer orchestration boundary",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_*.cpp files may choose policy, prepare frame data, and delegate to services/pass helpers, but direct D3D12 resource/view allocation, descriptor allocation, Map/Unmap, resource barriers, target binding, pipeline/root binding, viewport/scissor setup, and draw/indirect submission are release-forbidden at the renderer boundary",
+      "validated_contracts": ["renderer_ownership"],
+      "target_files": ["Renderer_RenderOrchestration.cpp", "Passes/DescriptorTable.cpp", "Passes/ReadbackBuffer.cpp", "Passes/MeshDrawPass.cpp", "Passes/ParticleBillboardPass.cpp", "Passes/MainPassTargetPass.cpp", "Passes/PostProcessTargetPass.cpp", "Passes/BackBufferPresentPass.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_services"],
+      "future_extension": "If a future renderer module needs low-level GPU mechanics, introduce or extend a pass/state/service helper and add that helper to this boundary instead of adding the mechanics to Renderer_*.cpp"
     }
   ]
 }

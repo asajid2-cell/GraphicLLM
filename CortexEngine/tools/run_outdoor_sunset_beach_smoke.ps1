@@ -92,6 +92,7 @@ if ($failures.Count -eq 0) {
     $drawCounts = $report.frame_contract.draw_counts
     $water = $report.frame_contract.water
     $rt = $report.frame_contract.ray_tracing
+    $atmosphere = $report.frame_contract.atmosphere
 
     if ([string]$report.scene -ne "outdoor_sunset_beach") {
         Add-Failure "expected outdoor_sunset_beach scene but report scene was '$($report.scene)'"
@@ -116,6 +117,28 @@ if ($failures.Count -eq 0) {
     }
     if (-not [bool]$report.frame_contract.executed_features.fog_enabled) {
         Add-Failure "fog is not enabled"
+    }
+    if ($null -eq $atmosphere) {
+        Add-Failure "atmosphere contract section is missing"
+    } else {
+        if (-not [bool]$atmosphere.enabled -or -not [bool]$atmosphere.fog_enabled) {
+            Add-Failure "atmosphere fog is not active"
+        }
+        if (-not [bool]$atmosphere.height_fog_enabled -or -not [bool]$atmosphere.depth_aware_fog) {
+            Add-Failure "atmosphere height/depth-aware fog is not active"
+        }
+        if (-not [bool]$atmosphere.environment_matched_fog -or
+            [string]$atmosphere.fog_color_source -ne "ambient_sun_environment") {
+            Add-Failure "atmosphere fog is not environment-matched"
+        }
+        if (-not [bool]$atmosphere.volumetric_shafts_enabled -or
+            -not [bool]$atmosphere.depth_aware_shafts -or
+            [string]$atmosphere.shaft_occlusion_source -ne "scene_depth_radial_samples") {
+            Add-Failure "depth-aware volumetric shaft contract is not active"
+        }
+        if ([double]$atmosphere.fog_density -le 0.0 -or [double]$atmosphere.god_ray_intensity -le 0.0) {
+            Add-Failure "atmosphere density/god-ray intensity is not positive"
+        }
     }
     if (-not [bool]$rt.reflection_dispatch_ready) {
         Add-Failure "RT reflection dispatch is not ready: $($rt.reflection_dispatch_reason)"

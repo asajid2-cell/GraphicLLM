@@ -264,6 +264,25 @@ struct FrameContract {
         float maxLightIntensity = 0.0f;
     };
 
+    struct AtmosphereInfo {
+        bool enabled = false;
+        bool fogEnabled = false;
+        bool heightFogEnabled = false;
+        bool depthAwareFog = false;
+        bool environmentMatchedFog = false;
+        bool godRaysEnabled = false;
+        bool volumetricShaftsEnabled = false;
+        bool depthAwareShafts = false;
+        bool postProcessApplied = false;
+        std::string fogColorSource = "none";
+        std::string shaftOcclusionSource = "none";
+        float fogDensity = 0.0f;
+        float fogStartDistance = 0.0f;
+        float fogHeight = 0.0f;
+        float fogFalloff = 0.0f;
+        float godRayIntensity = 0.0f;
+    };
+
     struct ScreenSpaceInfo {
         bool ssrEnabled = false;
         float ssrMaxDistance = 30.0f;
@@ -645,6 +664,7 @@ struct FrameContract {
     RenderableClasses renderables;
     MaterialStats materials;
     LightingInfo lighting;
+    AtmosphereInfo atmosphere;
     ScreenSpaceInfo screenSpace;
     CullingInfo culling;
     ParticleInfo particles;

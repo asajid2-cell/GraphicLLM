@@ -1386,6 +1386,23 @@ float4 PSMain(VSOutput input) : SV_TARGET
             fog = saturate(fog);
 
             float3 fogColor = g_AmbientColor.rgb;
+            if (g_LightCount.x > 0)
+            {
+                Light sun = g_Lights[0];
+                uint sunType = (uint)sun.position_type.w;
+                if (sunType == 0) // LIGHT_TYPE_DIRECTIONAL
+                {
+                    float3 viewDirWS = normalize(worldPos - camPos);
+                    float3 sunDirWS = -normalize(sun.direction_cosInner.xyz);
+                    float sunFacing = saturate(dot(viewDirWS, sunDirWS));
+                    float3 sunRadiance = max(sun.color_range.rgb, 0.0f.xxx);
+                    float sunMax = max(max(sunRadiance.r, sunRadiance.g), sunRadiance.b);
+                    float3 sunTint = (sunMax > 1e-3f) ? (sunRadiance / sunMax) : max(g_AmbientColor.rgb, 0.0f.xxx);
+                    float horizonScatter = saturate(1.0f - abs(viewDirWS.y));
+                    float environmentScatter = saturate(sunFacing * horizonScatter * (0.20f + g_ColorGrade.z * 0.30f));
+                    fogColor = lerp(fogColor, sunTint, environmentScatter);
+                }
+            }
             hdrBlurred = lerp(hdrBlurred, fogColor, fog);
         }
     }

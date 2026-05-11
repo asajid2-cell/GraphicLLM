@@ -266,6 +266,30 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         }
     }
 
+    const bool atmosphereFogActive = m_fogState.enabled && m_fogState.density > 0.0f;
+    const bool atmosphereHasSun = contract.lighting.lightCount > 0 && contract.lighting.sunIntensity > 0.0f;
+    const bool atmosphereGodRaysActive =
+        atmosphereFogActive && atmosphereHasSun && m_postProcessState.godRayIntensity > 0.0f;
+    contract.atmosphere.enabled = atmosphereFogActive || atmosphereGodRaysActive;
+    contract.atmosphere.fogEnabled = atmosphereFogActive;
+    contract.atmosphere.heightFogEnabled = atmosphereFogActive && m_fogState.falloff > 0.0f;
+    contract.atmosphere.depthAwareFog = atmosphereFogActive;
+    contract.atmosphere.environmentMatchedFog = atmosphereFogActive && atmosphereHasSun && m_environmentState.enabled;
+    contract.atmosphere.godRaysEnabled = atmosphereGodRaysActive;
+    contract.atmosphere.volumetricShaftsEnabled = atmosphereGodRaysActive;
+    contract.atmosphere.depthAwareShafts = atmosphereGodRaysActive;
+    contract.atmosphere.postProcessApplied = contract.atmosphere.enabled && contract.renderWidth > 0 && contract.renderHeight > 0;
+    contract.atmosphere.fogColorSource =
+        contract.atmosphere.environmentMatchedFog ? "ambient_sun_environment" :
+        (atmosphereFogActive ? "ambient_environment" : "none");
+    contract.atmosphere.shaftOcclusionSource =
+        atmosphereGodRaysActive ? "scene_depth_radial_samples" : "none";
+    contract.atmosphere.fogDensity = m_fogState.density;
+    contract.atmosphere.fogStartDistance = m_fogState.startDistance;
+    contract.atmosphere.fogHeight = m_fogState.height;
+    contract.atmosphere.fogFalloff = m_fogState.falloff;
+    contract.atmosphere.godRayIntensity = m_postProcessState.godRayIntensity;
+
     auto addResource = [&](const char* name, ID3D12Resource* resource, uint32_t expectedWidth, uint32_t expectedHeight) {
         FrameContract::ResourceInfo info{};
         info.name = name ? name : "";

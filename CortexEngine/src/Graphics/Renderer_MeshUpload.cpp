@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Graphics/Passes/MeshUploadCopyPass.h"
 #include "Scene/Components.h"
 
 #include <algorithm>
@@ -312,13 +313,18 @@ Result<void> Renderer::UploadMesh(std::shared_ptr<Scene::MeshData> mesh) {
         }
     }
 
-    m_uploadCommands.commandAllocators[uploadIndex]->Reset();
-    m_uploadCommands.commandLists[uploadIndex]->Reset(m_uploadCommands.commandAllocators[uploadIndex].Get(), nullptr);
-    m_uploadCommands.commandLists[uploadIndex]->CopyBufferRegion(vertexBuffer.Get(), 0, vertexUpload.Get(), 0, vbSize);
-    m_uploadCommands.commandLists[uploadIndex]->CopyBufferRegion(indexBuffer.Get(), 0, indexUpload.Get(), 0, ibSize);
-    hr = m_uploadCommands.commandLists[uploadIndex]->Close();
+    hr = MeshUploadCopyPass::RecordBufferCopies({
+        m_uploadCommands.commandAllocators[uploadIndex].Get(),
+        m_uploadCommands.commandLists[uploadIndex].Get(),
+        vertexBuffer.Get(),
+        vertexUpload.Get(),
+        vbSize,
+        indexBuffer.Get(),
+        indexUpload.Get(),
+        ibSize,
+    });
     if (FAILED(hr)) {
-        return Result<void>::Err("Failed to close mesh upload command list");
+        return Result<void>::Err("Failed to record mesh upload command list");
     }
 
     m_services.uploadQueue->ExecuteCommandList(m_uploadCommands.commandLists[uploadIndex].Get());

@@ -115,6 +115,8 @@ $postProcessTargetPassPath = Join-Path $root "src/Graphics/Passes/PostProcessTar
 $rtReflectionDebugClearPassPath = Join-Path $root "src/Graphics/Passes/RTReflectionDebugClearPass.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
+$meshUploadCopyPassPath = Join-Path $root "src/Graphics/Passes/MeshUploadCopyPass.cpp"
+$meshUploadRendererPath = Join-Path $root "src/Graphics/Renderer_MeshUpload.cpp"
 $forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
 $depthPassPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $shadowDrawPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
@@ -1179,6 +1181,32 @@ foreach ($target in $doc.targets) {
                     Add-Failure "mesh_draw_submission missing MeshDrawPass::DrawIndexedMesh in $($pathInfo.Label)"
                 }
             }
+        }
+    }
+
+    if ($id -eq "mesh_upload_copy_submission") {
+        if (Test-Path $meshUploadCopyPassPath) {
+            $meshUploadCopyPass = Get-Content $meshUploadCopyPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::MeshUploadCopyPass", "CopyContext", "RecordBufferCopies", "Reset", "CopyBufferRegion", "Close")) {
+                if ($meshUploadCopyPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_upload_copy_submission missing MeshUploadCopyPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "mesh_upload_copy_submission missing MeshUploadCopyPass.cpp"
+        }
+        if (Test-Path $meshUploadRendererPath) {
+            $meshUploadRenderer = Get-Content $meshUploadRendererPath -Raw
+            foreach ($directCall in @("CopyBufferRegion")) {
+                if ($meshUploadRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "mesh_upload_copy_submission still records buffer copies directly in Renderer_MeshUpload.cpp: $directCall"
+                }
+            }
+            if ($meshUploadRenderer.IndexOf("MeshUploadCopyPass::RecordBufferCopies", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "mesh_upload_copy_submission missing MeshUploadCopyPass::RecordBufferCopies in Renderer_MeshUpload.cpp"
+            }
+        } else {
+            Add-Failure "mesh_upload_copy_submission missing Renderer_MeshUpload.cpp"
         }
     }
 

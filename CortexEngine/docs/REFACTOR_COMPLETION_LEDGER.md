@@ -1121,9 +1121,26 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       `temporal_validation_20260511_124503_489_100528_0acaaa3f`, and RT
       showcase passed at `rt_showcase_20260511_124503_502_100364_b0ec5581`.
       The broader ownership rows remain `PARTIAL` because mesh-upload copy
-      mechanics, visibility-buffer graph orchestration, GPU particle public
-      runtime, and other renderer pass mechanics still need extraction or
-      implementation.
+      mechanics still needed extraction at that checkpoint, and
+      visibility-buffer graph orchestration, GPU particle public runtime, and
+      other renderer pass mechanics still need extraction or implementation.
+    - The current mesh-upload copy checkpoint moves upload command
+      allocator/list reset, vertex/index `CopyBufferRegion` commands, and
+      command-list close into `MeshUploadCopyPass`. `Renderer_MeshUpload.cpp`
+      still owns mesh validation, tangent generation, buffer allocation,
+      staging map/write/unmap, descriptor registration, upload queue/fence
+      policy, asset accounting, and BLAS scheduling, and now has no direct
+      `CopyBufferRegion` calls. Release rebuild passed, renderer ownership
+      tests passed with `targets=35`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_124802_306_94932_e7a3b94c`, and RT
+      showcase passed at `rt_showcase_20260511_124802_354_101332_44471f48`.
+      A renderer-file direct mechanics scan now finds no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`, `CopyResource`, or
+      `CopyBufferRegion` calls under `Renderer_*.cpp`. The broader ownership
+      rows remain `PARTIAL` because visibility-buffer graph orchestration, GPU
+      particle public runtime, and other renderer pass mechanics still need
+      extraction or implementation.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

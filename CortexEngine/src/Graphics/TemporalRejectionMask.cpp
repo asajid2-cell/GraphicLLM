@@ -81,7 +81,12 @@ bool IsValidGraphContext(const TemporalRejectionMask::GraphContext& context) {
            context.normalRoughness.IsValid() &&
            context.velocity.IsValid() &&
            context.mask.IsValid() &&
-           static_cast<bool>(context.dispatch);
+           context.dispatch.pass &&
+           context.dispatch.pass->IsReady() &&
+           context.dispatch.device &&
+           context.dispatch.descriptorManager &&
+           context.dispatch.builtThisFrame &&
+           IsValidDispatch(context.dispatch.dispatch);
 }
 
 DXGI_FORMAT SrvFormatForResource(ID3D12Resource* resource, DXGI_FORMAT fallback = DXGI_FORMAT_R8G8B8A8_UNORM) {
@@ -246,6 +251,49 @@ bool TemporalRejectionMask::FinalizeDispatchResources(ID3D12GraphicsCommandList*
     return TransitionResource(commandList, output, shaderResourceState, skipTransitions);
 }
 
+bool TemporalRejectionMask::ExecuteDispatch(const DispatchExecutionContext& context) {
+    if (context.builtThisFrame) {
+        *context.builtThisFrame = false;
+    }
+    if (!context.pass || !context.pass->IsReady() || !context.commandList || !context.device ||
+        !context.descriptorManager || !context.builtThisFrame || !IsValidDispatch(context.dispatch)) {
+        return false;
+    }
+
+    if (!PrepareDispatchResources({
+            context.commandList,
+            context.depth,
+            context.normalRoughness,
+            context.velocity,
+            context.output,
+            context.depthSampleState,
+            context.shaderResourceState,
+            context.skipTransitions,
+        })) {
+        return false;
+    }
+
+    const bool executed = context.pass->Dispatch(
+        context.commandList,
+        context.device,
+        context.descriptorManager,
+        context.dispatch);
+    if (!executed) {
+        return false;
+    }
+
+    if (!FinalizeDispatchResources(
+            context.commandList,
+            context.output,
+            context.shaderResourceState,
+            context.skipTransitions)) {
+        return false;
+    }
+
+    *context.builtThisFrame = true;
+    return true;
+}
+
 bool TemporalRejectionMask::DispatchStats(ID3D12GraphicsCommandList* cmdList,
                                           ID3D12Device* device,
                                           DescriptorHeapManager* descriptorManager,
@@ -338,8 +386,10 @@ RGResourceHandle TemporalRejectionMask::AddToGraph(RenderGraph& graph, const Gra
             builder.Read(context.velocity, RGResourceUsage::ShaderResource);
             builder.Write(context.mask, RGResourceUsage::UnorderedAccess);
         },
-        [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.dispatch || !context.dispatch()) {
+        [context](ID3D12GraphicsCommandList* commandList, const RenderGraph&) {
+            auto dispatch = context.dispatch;
+            dispatch.commandList = commandList;
+            if (!ExecuteDispatch(dispatch)) {
                 Fail(context, "temporal_mask_dispatch");
             }
         });

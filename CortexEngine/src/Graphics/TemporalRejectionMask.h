@@ -66,12 +66,28 @@ public:
         uint64_t copyBytes = 0;
     };
 
+    struct DispatchExecutionContext {
+        const TemporalRejectionMask* pass = nullptr;
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ID3D12Device* device = nullptr;
+        DescriptorHeapManager* descriptorManager = nullptr;
+        ResourceStateRef depth;
+        ResourceStateRef normalRoughness;
+        ResourceStateRef velocity;
+        ResourceStateRef output;
+        D3D12_RESOURCE_STATES depthSampleState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        D3D12_RESOURCE_STATES shaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        bool skipTransitions = false;
+        DispatchDesc dispatch;
+        bool* builtThisFrame = nullptr;
+    };
+
     struct GraphContext {
         RGResourceHandle depth;
         RGResourceHandle normalRoughness;
         RGResourceHandle velocity;
         RGResourceHandle mask;
-        std::function<bool()> dispatch;
+        DispatchExecutionContext dispatch;
         std::function<void(const char*)> failStage;
     };
 
@@ -90,6 +106,7 @@ public:
                                                         const ResourceStateRef& output,
                                                         D3D12_RESOURCE_STATES shaderResourceState,
                                                         bool skipTransitions);
+    [[nodiscard]] static bool ExecuteDispatch(const DispatchExecutionContext& context);
     [[nodiscard]] static bool PrepareStatsResources(const StatsResourcesContext& context);
     [[nodiscard]] static bool FinalizeStatsReadback(const StatsResourcesContext& context);
     [[nodiscard]] static RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context);

@@ -9,9 +9,12 @@
 #include "Graphics/Passes/DepthPrepassTargetPass.h"
 #include "Graphics/Passes/MeshDrawPass.h"
 
-#include <functional>
-
 namespace Cortex::Graphics::DepthPrepass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct DrawContext {
     DepthPrepassTargetPass::BindContext target;
@@ -30,7 +33,7 @@ struct DrawContext {
 struct GraphContext {
     RGResourceHandle depth;
     DrawContext draw;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool Draw(const DrawContext& context);

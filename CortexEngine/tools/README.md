@@ -28,7 +28,7 @@ validation suite:
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
 - LLM/Architect renderer-command runtime smoke,
-- graphics preset, showcase scene, material editor, conductor-energy, vegetation-state, and visual baseline contracts,
+- graphics preset, showcase scene, material editor, conductor-energy, vegetation-state, reflection-probe, and visual baseline contracts,
 - descriptor/memory stress scene for the old 1024 persistent-descriptor ceiling,
 - visual probe validation across all public baseline cases,
 - screenshot negative gates for black/white/saturation/edge regressions,
@@ -83,6 +83,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_conductor_energy_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_vegetation_state_contract_tests.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_reflection_probe_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_repo_hygiene_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_source_list_contract_tests.ps1
@@ -125,6 +126,9 @@ without overbright visual statistics.
 The vegetation-state contract verifies the extracted vegetation state bundle,
 frame-contract reporting, and the explicitly dormant public draw path after
 world/outdoor vegetation rendering was deferred.
+The reflection-probe contract verifies RT Showcase local reflection probe
+components, VB deferred probe upload/binding, frame-contract reporting, and
+debug view 42 probe-weight capture.
 
 The build entrypoint contract verifies that local rebuilds and release
 validation use `rebuild.ps1` / `cmake --build`, with Visual Studio environment

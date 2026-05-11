@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_224040_143_21668_073062a0
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_225538_029_30096_0680d674
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.183`, `disocclusion=0.006834`,
-  `high_motion=0.00522`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.339`, `disocclusion=0.006647`,
+  `high_motion=0.005173`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.805`,
+  `camera=reflection_closeup`, `gpu_ms=3.075`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.636/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.576/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -100,8 +100,8 @@ Key evidence from that run:
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, RT
-  firefly/outlier, LLM renderer command routing, conductor energy, and
-  vegetation state.
+  firefly/outlier, LLM renderer command routing, conductor energy, vegetation
+  state, and local reflection probes.
 - LLM renderer command smoke: deterministic mock Architect startup command
   applied exposure `1.35`, disabled shadows, enabled fog with density `0.031`,
   set water amplitude `0.07`, and selected `studio_three_point` lighting rig
@@ -113,6 +113,9 @@ Key evidence from that run:
 - Vegetation state contract: extracted state bundle, renderer ownership audit
   coverage, frame-contract serialization, and dormant public draw pipeline
   reporting passed in the latest release gate.
+- Local reflection probe contract: RT Showcase declares two local probes, VB
+  deferred lighting uploads/binds them, the frame contract reports two uploaded
+  probes with zero skips, and debug view 42 captures non-empty probe weights.
 
 Recent git history relevant to the audit:
 
@@ -180,6 +183,7 @@ long file/function lists in every row.
 | `tools/run_editor_frame_contract_tests.ps1` | static/contract | Checks editor renderer hook declarations/delegation and the explicit `EngineEditorMode` frame sequence. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
 | `tools/run_vb_debug_views.ps1` | runtime wrapper | RT Showcase debug-view matrix for visibility-buffer depth and material-albedo debug captures. |
+| `tools/run_reflection_probe_contract_tests.ps1` | runtime/static | RT Showcase local reflection probe gate for scene probe components, VB deferred probe upload/binding, frame-contract reporting, and debug view 42 probe-weight capture. |
 | `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
 | `tools/run_visual_probe_validation.ps1` | runtime | Runs every public visual baseline case and probes captured BMPs for edge structure and dominant-color failure modes in addition to baseline metric tolerances. |
 | `tools/run_temporal_validation_smoke.ps1` | runtime | Temporal-scene gate for temporal mask, motion vectors, histories, budget, visual capture. |
@@ -277,10 +281,10 @@ of `phase2.md`.
 | P2-SYS-07 | RT scheduler, denoising, low-memory behavior, and diagnostics. | DONE_VERIFIED | SRC-RT | `tools/run_release_validation.ps1` | RT showcase plus budget matrix passed with raw/history signal and readiness. | Quality tuning remains future work. |
 | P2-SYS-08 | Temporal filters expose invalidation/reprojection and do not hide ghosting. | PARTIAL | SRC-TEMPORAL, SRC-RT | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with temporal mask stats. Camera-cut gate passed and proves RT histories invalidate/reseed on a large camera jump. | "Never hide popping/create ghost silhouettes" is a visual-quality claim; current validation is necessary but not sufficient. |
 | P2-SYS-09 | Explicit camera-cut invalidation coverage. | DONE_VERIFIED | `src/Core/Engine.cpp::Engine::Initialize`, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants`, SRC-TEMPORAL | `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Targeted run passed: frames=53, cut_frame=20, camera=`reflection_closeup`, `rt_reflection_reset=camera_cut`, `invalidated_frame=20`, RT shadow/reflection/GI histories reseeded and resource-valid. | None for RT history camera-cut coverage. TAA-specific camera-cut policy can be separately tightened if needed. |
-| P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_vb_debug_views.ps1 -NoBuild` | Runtime VB path passes. Targeted VB debug gate passed for depth view 34 and material-albedo view 35 with non-empty image statistics. | Local reflection probes/probe blending are not implemented as a validated feature. |
+| P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_vb_debug_views.ps1 -NoBuild`; `tools/run_reflection_probe_contract_tests.ps1 -NoBuild` | Runtime VB path passes. Targeted VB debug gate passed for depth view 34 and material-albedo view 35 with non-empty image statistics. Local reflection probe gate passed with two RT Showcase probes uploaded, zero skips, a valid probe table, and non-empty probe-weight debug capture. | Broad VB "correctness" is still smoke/contract based rather than exhaustive visual equivalence for every deferred-lighting input. |
 | P2-SYS-11 | GPU culling and HZB diagnostics are visible and budgeted. | DONE_VERIFIED | `Renderer_GPUDriven.cpp`, `Renderer_GPUCulling*.cpp`, `Renderer_HZB*.cpp`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase reports GPU culling and HZB logs; smoke budget passed. | More occlusion-correctness scene tests could be added. |
 | P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. | Energy budgeting is still not a distinct runtime gate. |
-| P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1` | RT showcase, material lab, glass/water courtyard, effects showcase pass. | Outdoor/sunset beach and local reflection-probe validation are not complete. |
+| P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1`; `tools/run_reflection_probe_contract_tests.ps1 -NoBuild` | RT showcase, material lab, glass/water courtyard, effects showcase, and local reflection-probe validation pass. | Outdoor/sunset beach remains deferred by user direction. |
 | P2-SYS-14 | Visual validation captures compare luma, saturation, edge stability, temporal stability. | PARTIAL | smoke scripts, `FrameContractJson.cpp`, visual baseline scripts | `tools/run_release_validation.ps1`; `tools/run_visual_probe_validation.ps1 -NoBuild` | Luma/saturation/nonblack/temporal diff checks pass in current smokes. Visual probe passed all four public baseline cases with edge/dominant-color BMP checks. | No full image-diff golden comparison; temporal stability remains metric-smoke based. |
 | P2-SYS-15 | Single script runs the Phase 2 validation suite. | PARTIAL | `tools/run_release_validation.ps1` | `tools/run_release_validation.ps1` | Current one-command release gate passed. | `tools/run_phase2_validation.ps1` named in `phase2.md` does not exist; current script is broader and Phase 3-influenced. |
 | P2-SYS-16 | `rt_showcase` final renderer scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase runtime passed with visual validation and RT signal. | Subjective polish can continue. |
@@ -444,7 +448,7 @@ These items remain after the audit and should not be collapsed into
 | REM-03 | Camera-cut temporal invalidation validation. | DONE_VERIFIED | `tools/run_temporal_camera_cut_validation.ps1` is wired into release validation and passed, verifying RT shadow/reflection/GI history invalidation on the configured camera cut. |
 | REM-04 | Stress-memory / descriptor stress scene. | DONE_VERIFIED | `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` passed with 988/1024 persistent descriptors, 78/128 staging descriptors, zero transient descriptor delta, and memory/write budgets within limits. |
 | REM-05 | Full render-graph transient alias validation matrix. | DONE_VERIFIED | `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` passed and is wired into release validation. |
-| REM-06 | Local reflection probes and probe blending validation. | NOT_STARTED | Listed in visual-quality work; no source/runtime gate found. |
+| REM-06 | Local reflection probes and probe blending validation. | DONE_VERIFIED | `Scene::ReflectionProbeComponent`, `Engine_Scenes.cpp`, `Renderer_VisibilityBufferDeferredLighting.cpp`, `VisibilityBuffer_Uploads.cpp`, `VisibilityBuffer.h`, `DeferredLighting.hlsl`, frame-contract environment fields, `tools/run_reflection_probe_contract_tests.ps1` | Targeted gate passed after implementation: RT Showcase declares `RTGallery_LocalProbe_Left` and `RTGallery_LocalProbe_Right`; VB deferred lighting collects `ReflectionProbeComponent`, uploads `VBReflectionProbe` data, binds `reflectionProbeParams`, and shader debug view 42 captures probe weights. Runtime evidence: `local_reflection_probe_count=2`, `local_reflection_probe_skipped=0`, `local_reflection_probe_table_valid=true`. |
 | REM-07 | Outdoor/sunset beach final visual target. | DEFERRED_BY_USER_ONLY | User direction previously moved Cortex away from infinite/outdoor/world work. Not done. |
 | REM-08 | Full GPU particle system as public path. | PARTIAL | Effects showcase validates ECS billboard particles; GPU particle path remains future/experimental. |
 | REM-09 | Full cinematic post stack including DOF, motion blur, and color-grade presets. | PARTIAL | Current release validates bloom threshold/soft knee/vignette/lens dirt foundations. |
@@ -704,6 +708,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_conductor_energy_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_vegetation_state_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_reflection_probe_contract_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

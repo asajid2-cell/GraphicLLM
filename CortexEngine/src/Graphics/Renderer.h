@@ -695,6 +695,8 @@ private:
                                                                   bool& completedPath);
     struct VisibilityBufferDeferredLightingInputs {
         std::vector<Light> localLights;
+        std::vector<VBReflectionProbe> reflectionProbes;
+        uint32_t skippedReflectionProbes = 0;
         VisibilityBufferRenderer::DeferredLightingParams params{};
         ID3D12Resource* envDiffuseResource = nullptr;
         ID3D12Resource* envSpecularResource = nullptr;

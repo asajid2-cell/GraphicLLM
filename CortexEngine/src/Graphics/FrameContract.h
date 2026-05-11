@@ -87,6 +87,9 @@ struct FrameContract {
         uint32_t activeHeight = 0;
         uint32_t maxRuntimeDimension = 0;
         uint64_t residentBytes = 0;
+        uint32_t localReflectionProbeCount = 0;
+        uint32_t localReflectionProbeSkipped = 0;
+        bool localReflectionProbeTableValid = false;
     };
 
     struct GraphicsPresetInfo {

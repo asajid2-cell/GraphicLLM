@@ -122,6 +122,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.pendingCount = health.pendingEnvironments;
     contract.environment.residentLimit = m_framePlanning.budgetPlan.iblResidentEnvironmentLimit;
     contract.environment.residentBytes = health.environmentBytes;
+    contract.environment.localReflectionProbeCount =
+        static_cast<uint32_t>(m_visibilityBufferState.reflectionProbes.size());
+    contract.environment.localReflectionProbeSkipped = m_visibilityBufferState.reflectionProbeSkipped;
+    contract.environment.localReflectionProbeTableValid = m_visibilityBufferState.reflectionProbeTableValid;
     if (const auto* env = m_environmentState.ActiveEnvironment()) {
         contract.environment.runtimePath = env->path;
         contract.environment.budgetClass = env->budgetClass;

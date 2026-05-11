@@ -18,6 +18,7 @@ validation suite:
 - repository hygiene checks for whitespace and generated artifacts,
 - source-list contract checks for CMake renderer split coverage,
 - render-graph boundary contract checks,
+- visibility-buffer transition-skip ownership checks,
 - debug primitive ownership contract checks,
 - editor frame path contract checks,
 - temporal camera-cut history invalidation smoke,
@@ -82,6 +83,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tes
 powershell -ExecutionPolicy Bypass -File tools/run_repo_hygiene_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_source_list_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_render_graph_boundary_contract_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_visibility_buffer_transition_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_debug_primitive_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_editor_frame_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_temporal_camera_cut_validation.ps1 -NoBuild
@@ -129,6 +131,10 @@ matrix still exercises its environment controls, that the validation module is
 wired through `RenderGraphValidationPass`, and that visibility-buffer staged and
 legacy graph boundaries still expose their expected graph passes and fallback
 accounting.
+
+The visibility-buffer transition contract verifies that graph-owned VB stages
+use the `VisibilityBufferRenderer` resource-state snapshot and transition-skip
+controls consistently, then write final states back from the render graph.
 
 The debug primitive ownership contract verifies that debug-line storage and GPU
 resources live in `RendererDebugLineState`, while `Renderer` exposes only the

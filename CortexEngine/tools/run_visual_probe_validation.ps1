@@ -227,3 +227,4 @@ foreach ($row in $caseSummaries) {
         $row.id, $row.scene, $row.gpu_frame_ms, $row.avg_luma, $row.edge_pixels, $row.edge_ratio, $row.pure_dominant_ratio)
 }
 Write-Host "  logs=$LogDir"
+exit 0

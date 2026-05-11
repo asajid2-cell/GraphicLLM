@@ -323,6 +323,16 @@
       "future_extension": "Keep future indirect root/descriptor binding and ExecuteIndirect mechanics in IndirectMeshDrawPass or a more specific GPU-driven pass helper instead of reintroducing direct command-list submission to Renderer_IndirectRendering.cpp"
     },
     {
+      "id": "frame_descriptor_heap_binding",
+      "owner": "Frame descriptor heap binding",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_FrameBegin.cpp and Renderer_GPUDriven.cpp still decide when frame startup and standalone GPU-culling dispatch need a shader-visible CBV/SRV/UAV heap, but the actual descriptor-heap command-list binding is owned by DescriptorTable",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/DescriptorTable.h", "Passes/DescriptorTable.cpp", "Renderer_FrameBegin.cpp", "Renderer_GPUDriven.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_services"],
+      "future_extension": "Keep future shared descriptor-heap binding in DescriptorTable or specific pass helpers instead of adding direct SetDescriptorHeaps calls to renderer orchestration files"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

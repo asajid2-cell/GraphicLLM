@@ -2,6 +2,17 @@
 
 namespace Cortex::Graphics::DescriptorTable {
 
+bool BindCBVSRVUAVHeap(ID3D12GraphicsCommandList* commandList,
+                       DescriptorHeapManager* descriptorManager) {
+    if (!commandList || !descriptorManager) {
+        return false;
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { descriptorManager->GetCBV_SRV_UAV_Heap() };
+    commandList->SetDescriptorHeaps(1, heaps);
+    return true;
+}
+
 bool WriteTexture2DSRV(ID3D12Device* device,
                        DescriptorHandle handle,
                        ID3D12Resource* resource,

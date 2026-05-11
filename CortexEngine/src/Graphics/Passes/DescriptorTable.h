@@ -7,6 +7,9 @@
 
 namespace Cortex::Graphics::DescriptorTable {
 
+[[nodiscard]] bool BindCBVSRVUAVHeap(ID3D12GraphicsCommandList* commandList,
+                                     DescriptorHeapManager* descriptorManager);
+
 bool WriteTexture2DSRV(ID3D12Device* device,
                        DescriptorHandle handle,
                        ID3D12Resource* resource,

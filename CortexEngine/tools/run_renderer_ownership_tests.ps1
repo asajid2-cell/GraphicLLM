@@ -42,6 +42,7 @@ $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
 $backBufferPresentPassPath = Join-Path $root "src/Graphics/Passes/BackBufferPresentPass.cpp"
+$descriptorTablePassPath = Join-Path $root "src/Graphics/Passes/DescriptorTable.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -106,6 +107,8 @@ $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/Visibil
 $visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
 $visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
 $indirectRenderingPath = Join-Path $root "src/Graphics/Renderer_IndirectRendering.cpp"
+$frameBeginPath = Join-Path $root "src/Graphics/Renderer_FrameBegin.cpp"
+$gpuDrivenPath = Join-Path $root "src/Graphics/Renderer_GPUDriven.cpp"
 $indirectMeshDrawPassPath = Join-Path $root "src/Graphics/Passes/IndirectMeshDrawPass.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
@@ -1122,6 +1125,36 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "indirect_rendering_submission missing Renderer_IndirectRendering.cpp"
+        }
+    }
+
+    if ($id -eq "frame_descriptor_heap_binding") {
+        if (Test-Path $descriptorTablePassPath) {
+            $descriptorTablePass = Get-Content $descriptorTablePassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::DescriptorTable", "BindCBVSRVUAVHeap", "GetCBV_SRV_UAV_Heap", "SetDescriptorHeaps")) {
+                if ($descriptorTablePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "frame_descriptor_heap_binding missing DescriptorTable heap-binding marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "frame_descriptor_heap_binding missing DescriptorTable.cpp"
+        }
+
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $frameBeginPath; Label = "Renderer_FrameBegin.cpp" },
+            [pscustomobject]@{ Path = $gpuDrivenPath; Label = "Renderer_GPUDriven.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $source = Get-Content $pathInfo.Path -Raw
+                if ($source.IndexOf("DescriptorTable::BindCBVSRVUAVHeap", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "frame_descriptor_heap_binding missing routed descriptor heap binding in $($pathInfo.Label)"
+                }
+                if ($source.IndexOf("SetDescriptorHeaps(", [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "frame_descriptor_heap_binding still performs direct descriptor heap binding in $($pathInfo.Label)"
+                }
+            } else {
+                Add-Failure "frame_descriptor_heap_binding missing $($pathInfo.Label)"
+            }
         }
     }
 

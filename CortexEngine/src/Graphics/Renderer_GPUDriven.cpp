@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Graphics/Passes/DescriptorTable.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -127,10 +128,9 @@ void Renderer::DispatchGPUCulling() {
     }
 
     // Dispatch culling compute shader
-    if (m_services.descriptorManager) {
-        ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-        m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    }
+    (void)DescriptorTable::BindCBVSRVUAVHeap(
+        m_commandResources.graphicsList.Get(),
+        m_services.descriptorManager.get());
     auto cullResult = m_services.gpuCulling->DispatchCulling(
         m_commandResources.graphicsList.Get(),
         m_constantBuffers.frameCPU.viewProjectionNoJitter,

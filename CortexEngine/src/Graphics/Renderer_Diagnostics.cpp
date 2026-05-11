@@ -62,6 +62,9 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
     state.pcssEnabled = m_shadowResources.pcssEnabled;
     state.ssaoEnabled = m_ssaoResources.enabled;
+    state.ssaoRadius = m_ssaoResources.radius;
+    state.ssaoBias = m_ssaoResources.bias;
+    state.ssaoIntensity = m_ssaoResources.intensity;
     state.iblEnabled = m_environmentState.enabled;
     state.iblLimitEnabled = m_environmentState.limitEnabled;
     state.ssrEnabled = m_ssrResources.enabled;

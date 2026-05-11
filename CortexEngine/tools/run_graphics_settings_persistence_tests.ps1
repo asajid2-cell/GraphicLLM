@@ -63,6 +63,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "screen_space": {
     "ssao": true,
+    "ssao_radius": 0.42,
+    "ssao_bias": 0.055,
+    "ssao_intensity": 0.48,
     "ssr": true,
     "pcss": true
   },
@@ -177,6 +180,18 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($backgroundBlur - 0.37) -gt 0.03) {
         Add-Failure "valid settings background blur was $backgroundBlur, expected 0.37"
+    }
+    $ssaoRadius = [double]$report.frame_contract.lighting.ssao_radius
+    $ssaoBias = [double]$report.frame_contract.lighting.ssao_bias
+    $ssaoIntensity = [double]$report.frame_contract.lighting.ssao_intensity
+    if ([Math]::Abs($ssaoRadius - 0.42) -gt 0.04) {
+        Add-Failure "valid settings SSAO radius was $ssaoRadius, expected 0.42"
+    }
+    if ([Math]::Abs($ssaoBias - 0.055) -gt 0.01) {
+        Add-Failure "valid settings SSAO bias was $ssaoBias, expected 0.055"
+    }
+    if ([Math]::Abs($ssaoIntensity - 0.48) -gt 0.04) {
+        Add-Failure "valid settings SSAO intensity was $ssaoIntensity, expected 0.48"
     }
     $fogHeight = [double]$report.frame_contract.lighting.fog_height
     $fogFalloff = [double]$report.frame_contract.lighting.fog_falloff

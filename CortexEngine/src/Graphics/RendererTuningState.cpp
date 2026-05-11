@@ -293,9 +293,9 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.rayTracing.reflectionCompositionStrength = rt.reflectionCompositionStrength;
 
     state.screenSpace.ssaoEnabled = features.ssaoEnabled;
-    state.screenSpace.ssaoRadius = 1.5f;
-    state.screenSpace.ssaoBias = 0.02f;
-    state.screenSpace.ssaoIntensity = 1.0f;
+    state.screenSpace.ssaoRadius = features.ssaoRadius;
+    state.screenSpace.ssaoBias = features.ssaoBias;
+    state.screenSpace.ssaoIntensity = features.ssaoIntensity;
     state.screenSpace.ssrEnabled = features.ssrEnabled;
     state.screenSpace.pcssEnabled = features.pcssEnabled;
 

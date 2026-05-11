@@ -172,6 +172,9 @@ struct RendererFeatureState {
     bool fxaaEnabled = false;
     bool pcssEnabled = false;
     bool ssaoEnabled = false;
+    float ssaoRadius = 0.25f;
+    float ssaoBias = 0.03f;
+    float ssaoIntensity = 0.35f;
     bool iblEnabled = false;
     bool iblLimitEnabled = false;
     bool ssrEnabled = false;

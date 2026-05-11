@@ -92,6 +92,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps
 powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_material_editor_native_widget_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_conductor_energy_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_lighting_energy_budget_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_vegetation_state_contract_tests.ps1 -NoBuild
@@ -137,6 +138,9 @@ and checks the generated frame report.
 The material editor contract verifies the focused-entity material preset
 dropdown, metallic/roughness sliders, validation status, and
 `ModifyMaterialCommand` apply path.
+The material editor native-widget smoke opens the actual Win32 scene editor,
+sets a startup focus target, drives the focused material combo/sliders/apply
+button, and verifies the focused material in the shutdown frame report.
 The conductor-energy contract verifies forward/deferred shader energy split
 invariants and reruns Material Lab to prove full-metal conductors remain present
 without overbright visual statistics.

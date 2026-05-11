@@ -135,6 +135,7 @@ $transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeo
 $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
 $voxelPassPath = Join-Path $root "src/Graphics/Passes/VoxelPass.cpp"
 $voxelRendererPath = Join-Path $root "src/Graphics/Renderer_Voxel.cpp"
+$voxelStatePath = Join-Path $root "src/Graphics/RendererVoxelState.h"
 $minimalFramePassPath = Join-Path $root "src/Graphics/Passes/MinimalFramePass.cpp"
 $framePlanningPath = Join-Path $root "src/Graphics/Renderer_FramePlanning.cpp"
 
@@ -1631,6 +1632,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "voxel_pass_submission missing Renderer_Voxel.cpp"
+        }
+    }
+
+    if ($id -eq "voxel_grid_resources") {
+        if (Test-Path $voxelStatePath) {
+            $voxelState = Get-Content $voxelStatePath -Raw
+            foreach ($required in @("struct VoxelRenderState", "UploadGridToGPU", "CreateCommittedResource", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "Map(0", "Unmap(0", "D3D12_HEAP_TYPE_UPLOAD")) {
+                if ($voxelState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "voxel_grid_resources missing RendererVoxelState.h marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "voxel_grid_resources missing RendererVoxelState.h"
+        }
+        if (Test-Path $voxelRendererPath) {
+            $voxelRenderer = Get-Content $voxelRendererPath -Raw
+            if ($voxelRenderer.IndexOf("m_voxelState.UploadGridToGPU", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "voxel_grid_resources missing VoxelRenderState::UploadGridToGPU delegation in Renderer_Voxel.cpp"
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "Map(0", "Unmap(0", "D3D12_HEAP_TYPE_UPLOAD")) {
+                if ($voxelRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "voxel_grid_resources still has direct voxel grid resource/upload mechanics in Renderer_Voxel.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "voxel_grid_resources missing Renderer_Voxel.cpp"
         }
     }
 

@@ -26,6 +26,12 @@ struct ObjectMaterialContext {
     DescriptorHandle materialTable{};
 };
 
+struct ShadowConstantsContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS shadowConstants = 0;
+};
+
 struct DrawResult {
     bool submitted = false;
     UINT indexCount = 0;
@@ -34,6 +40,9 @@ struct DrawResult {
 [[nodiscard]] bool BindPipelineState(const PipelineStateContext& context);
 [[nodiscard]] bool SwitchPipelineState(ID3D12GraphicsCommandList* commandList,
                                        ID3D12PipelineState* pipelineState);
+[[nodiscard]] bool BindBiomeMaterialConstants(ID3D12GraphicsCommandList* commandList,
+                                              D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialConstants);
+[[nodiscard]] bool BindShadowConstants(const ShadowConstantsContext& context);
 [[nodiscard]] bool BindObjectMaterial(const ObjectMaterialContext& context);
 [[nodiscard]] DrawResult DrawIndexedMesh(ID3D12GraphicsCommandList* commandList,
                                          const Cortex::Scene::MeshData& mesh);

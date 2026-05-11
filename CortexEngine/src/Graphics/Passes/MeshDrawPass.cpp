@@ -39,6 +39,26 @@ bool SwitchPipelineState(ID3D12GraphicsCommandList* commandList,
     return true;
 }
 
+bool BindBiomeMaterialConstants(ID3D12GraphicsCommandList* commandList,
+                                D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialConstants) {
+    if (!commandList || biomeMaterialConstants == 0) {
+        return false;
+    }
+
+    commandList->SetGraphicsRootConstantBufferView(7, biomeMaterialConstants);
+    return true;
+}
+
+bool BindShadowConstants(const ShadowConstantsContext& context) {
+    if (!context.commandList || context.frameConstants == 0 || context.shadowConstants == 0) {
+        return false;
+    }
+
+    context.commandList->SetGraphicsRootConstantBufferView(1, context.frameConstants);
+    context.commandList->SetGraphicsRootConstantBufferView(5, context.shadowConstants);
+    return true;
+}
+
 bool BindObjectMaterial(const ObjectMaterialContext& context) {
     if (!context.commandList || context.objectConstants == 0) {
         return false;

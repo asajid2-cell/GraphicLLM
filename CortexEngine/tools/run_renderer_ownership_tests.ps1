@@ -1313,6 +1313,45 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "mesh_auxiliary_constant_binding") {
+        if (Test-Path $meshDrawPassPath) {
+            $meshDrawPass = Get-Content $meshDrawPassPath -Raw
+            foreach ($required in @("ShadowConstantsContext", "BindBiomeMaterialConstants", "BindShadowConstants", "SetGraphicsRootConstantBufferView(7", "SetGraphicsRootConstantBufferView(5")) {
+                if ($meshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_auxiliary_constant_binding missing MeshDrawPass auxiliary constant marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "mesh_auxiliary_constant_binding missing MeshDrawPass.cpp"
+        }
+
+        if (Test-Path $forwardPassPath) {
+            $forwardSource = Get-Content $forwardPassPath -Raw
+            if ($forwardSource.IndexOf("MeshDrawPass::BindBiomeMaterialConstants", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "mesh_auxiliary_constant_binding missing biome constant route in Renderer_ForwardPass.cpp"
+            }
+            if ($forwardSource.IndexOf("SetGraphicsRootConstantBufferView(7", [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "mesh_auxiliary_constant_binding still binds biome constants directly in Renderer_ForwardPass.cpp"
+            }
+        } else {
+            Add-Failure "mesh_auxiliary_constant_binding missing Renderer_ForwardPass.cpp"
+        }
+
+        if (Test-Path $shadowDrawPassPath) {
+            $shadowSource = Get-Content $shadowDrawPassPath -Raw
+            if ($shadowSource.IndexOf("MeshDrawPass::BindShadowConstants", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "mesh_auxiliary_constant_binding missing shadow constant route in Renderer_ShadowPass.cpp"
+            }
+            foreach ($directShadowBinding in @("SetGraphicsRootConstantBufferView(1", "SetGraphicsRootConstantBufferView(5")) {
+                if ($shadowSource.IndexOf($directShadowBinding, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "mesh_auxiliary_constant_binding still binds shadow constants directly in Renderer_ShadowPass.cpp: $directShadowBinding"
+                }
+            }
+        } else {
+            Add-Failure "mesh_auxiliary_constant_binding missing Renderer_ShadowPass.cpp"
+        }
+    }
+
     if ($id -eq "mesh_upload_copy_submission") {
         if (Test-Path $meshUploadCopyPassPath) {
             $meshUploadCopyPass = Get-Content $meshUploadCopyPassPath -Raw

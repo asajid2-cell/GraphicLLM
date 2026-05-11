@@ -28,7 +28,9 @@ void Renderer::RenderScene(Scene::ECS_Registry* registry) {
 
     // Bind biome materials buffer (b4) if valid
     if (m_constantBuffers.biomeMaterialsValid) {
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(7, m_constantBuffers.biomeMaterials.gpuAddress);
+        (void)MeshDrawPass::BindBiomeMaterialConstants(
+            m_commandResources.graphicsList.Get(),
+            m_constantBuffers.biomeMaterials.gpuAddress);
     }
 
     RendererSceneSnapshot fallbackSnapshot{};

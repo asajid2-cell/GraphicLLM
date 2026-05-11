@@ -118,13 +118,13 @@ cbuffer MaterialConstants : register(b2)
     uint4 g_TextureIndices2; // x: occlusion, y: emissive, z/w unused
     uint4 g_MapFlags2;       // x: occlusion, y: emissive, z/w unused
     float4 g_EmissiveFactorStrength; // rgb emissive factor, w emissive strength
-    float4 g_ExtraParams;            // x occlusion strength, y normal scale, z/w reserved
+    float4 g_ExtraParams;            // x occlusion strength, y normal scale, z anisotropy, w wetness
     float4 g_FractalParams0; // x=amplitude, y=frequency, z=octaves, w=useFractalNormal
     float4 g_FractalParams1; // x=coordMode (0=UV,1=worldXZ), y=scaleX, z=scaleZ, w=reserved
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
     // x = clear-coat weight, y = clear-coat roughness, z/w reserved.
     float4 g_CoatParams;
-    // x = transmission factor, y = IOR, z/w reserved
+    // x = transmission factor, y = IOR, z = emissive bloom boost, w reserved
     float4 g_TransmissionParams;
     // rgb = specular color factor (linear), w = specular factor
     float4 g_SpecularParams;
@@ -765,14 +765,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         clearCoatRoughness = saturate(ccr);
     }
 
-    float anisotropy = 0.0f;
+    float anisotropy = saturate(g_ExtraParams.z);
     if (anisoMetalFlag)
     {
-        anisotropy = 0.7f;
+        anisotropy = max(anisotropy, 0.7f);
     }
     else if (anisoWoodFlag)
     {
-        anisotropy = 0.5f;
+        anisotropy = max(anisotropy, 0.5f);
     }
 
     // Reconstruct tangent and bitangent in world space for anisotropic
@@ -833,6 +833,13 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     }
     float baseRoughness = max(roughness, minBaseRoughness);
     roughness = saturate(baseRoughness + roughnessFromVariance);
+    float wetness = saturate(g_ExtraParams.w);
+    if (wetness > 0.001f)
+    {
+        roughness = lerp(roughness, min(roughness, 0.06f), wetness);
+        clearCoatWeight = saturate(max(clearCoatWeight, wetness * 0.85f));
+        clearCoatRoughness = lerp(clearCoatRoughness, min(clearCoatRoughness, 0.12f), wetness);
+    }
     ao = saturate(ao);
 
     // Dielectric F0 from IOR (KHR_materials_ior), modulated by KHR_materials_specular.
@@ -1941,7 +1948,7 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         float materialType    = g_FractalParams1.w;
         bool  anisoMetalFlag  = (materialType > 5.5f && materialType < 6.5f);
         bool  anisoWoodFlag   = (materialType > 6.5f && materialType < 7.5f);
-        float anisotropy      = anisoMetalFlag ? 0.7f : (anisoWoodFlag ? 0.5f : 0.0f);
+        float anisotropy      = max(saturate(g_ExtraParams.z), anisoMetalFlag ? 0.7f : (anisoWoodFlag ? 0.5f : 0.0f));
 
         // Reconstruct tangent in world space from the interpolated normal and
         // tangent attributes; this mirrors the work done in CalculateLighting
@@ -1966,6 +1973,8 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         emissive *= emTex.Sample(g_Sampler, input.texCoord).rgb;
     }
 #endif
+    float emissiveBloomBoost = saturate(g_TransmissionParams.z);
+    emissive *= (1.0f + emissiveBloomBoost * 2.0f);
     color += emissive;
     float explicitEmissiveLuminance = dot(emissive, float3(0.2126f, 0.7152f, 0.0722f));
 

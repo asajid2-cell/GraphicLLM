@@ -59,6 +59,12 @@ enum ControlIdEditor : int {
     IDC_SE_FOCUSED_SHEEN_SLIDER = 3223,
     IDC_SE_FOCUSED_SUBSURFACE_LABEL = 3224,
     IDC_SE_FOCUSED_SUBSURFACE_SLIDER = 3225,
+    IDC_SE_FOCUSED_ANISOTROPY_LABEL = 3226,
+    IDC_SE_FOCUSED_ANISOTROPY_SLIDER = 3227,
+    IDC_SE_FOCUSED_WETNESS_LABEL = 3228,
+    IDC_SE_FOCUSED_WETNESS_SLIDER = 3229,
+    IDC_SE_FOCUSED_EMISSIVE_BLOOM_LABEL = 3230,
+    IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER = 3231,
 };
 
 struct SceneEditorState {
@@ -90,6 +96,9 @@ struct SceneEditorState {
     HWND sliderFocusedEmissiveStrength = nullptr;
     HWND sliderFocusedSheen = nullptr;
     HWND sliderFocusedSubsurface = nullptr;
+    HWND sliderFocusedAnisotropy = nullptr;
+    HWND sliderFocusedWetness = nullptr;
+    HWND sliderFocusedEmissiveBloom = nullptr;
     HWND sliderFocusedScale = nullptr;
     HWND btnApplyMaterial = nullptr;
     HWND btnApplyScale = nullptr;
@@ -218,6 +227,9 @@ void RefreshMaterialValidationStatus() {
     const float coatRoughness = Slider01ToFloat(g_ed.sliderFocusedClearcoatRoughness, 0.0f, 1.0f);
     const float sheen = Slider01ToFloat(g_ed.sliderFocusedSheen, 0.0f, 1.0f);
     const float subsurface = Slider01ToFloat(g_ed.sliderFocusedSubsurface, 0.0f, 1.0f);
+    const float anisotropy = Slider01ToFloat(g_ed.sliderFocusedAnisotropy, 0.0f, 1.0f);
+    const float wetness = Slider01ToFloat(g_ed.sliderFocusedWetness, 0.0f, 1.0f);
+    const float emissiveBloom = Slider01ToFloat(g_ed.sliderFocusedEmissiveBloom, 0.0f, 1.0f);
     const float emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     const Graphics::MaterialPresetInfo info = Graphics::MaterialPresetRegistry::Resolve(preset);
 
@@ -239,6 +251,12 @@ void RefreshMaterialValidationStatus() {
         status = L"Material validation: warning - sheen usually belongs on dielectric cloth";
     } else if (subsurface > 0.4f && transmission > 0.2f) {
         status = L"Material validation: warning - subsurface and transmission overlap";
+    } else if (wetness > 0.6f && roughness > 0.7f) {
+        status = L"Material validation: warning - wetness will override high roughness";
+    } else if (anisotropy > 0.6f && metallic < 0.2f && sheen < 0.2f) {
+        status = L"Material validation: warning - anisotropy is clearest on metals or fabric";
+    } else if (emissiveBloom > 0.2f && emissiveStrength <= 1.0f) {
+        status = L"Material validation: warning - bloom needs emissive strength above 1";
     } else if (emissiveStrength > 8.0f && preset.empty()) {
         status = L"Material validation: warning - high emissive strength without emissive preset";
     }
@@ -377,6 +395,12 @@ void ApplyMaterialToFocusedFromUI() {
     cmd->sheen = Slider01ToFloat(g_ed.sliderFocusedSheen, 0.0f, 1.0f);
     cmd->setSubsurface = true;
     cmd->subsurface = Slider01ToFloat(g_ed.sliderFocusedSubsurface, 0.0f, 1.0f);
+    cmd->setAnisotropy = true;
+    cmd->anisotropy = Slider01ToFloat(g_ed.sliderFocusedAnisotropy, 0.0f, 1.0f);
+    cmd->setWetness = true;
+    cmd->wetness = Slider01ToFloat(g_ed.sliderFocusedWetness, 0.0f, 1.0f);
+    cmd->setEmissiveBloom = true;
+    cmd->emissiveBloom = Slider01ToFloat(g_ed.sliderFocusedEmissiveBloom, 0.0f, 1.0f);
     cmd->setEmissiveStrength = true;
     cmd->emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     cmd->setAO = false;
@@ -628,6 +652,18 @@ void RegisterSceneEditorClass() {
 
             makeLabel(L"Subsurface", y);
             g_ed.sliderFocusedSubsurface = makeSlider(IDC_SE_FOCUSED_SUBSURFACE_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Anisotropy", y);
+            g_ed.sliderFocusedAnisotropy = makeSlider(IDC_SE_FOCUSED_ANISOTROPY_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Wetness", y);
+            g_ed.sliderFocusedWetness = makeSlider(IDC_SE_FOCUSED_WETNESS_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Emissive Bloom", y);
+            g_ed.sliderFocusedEmissiveBloom = makeSlider(IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER, y);
             y += sliderHeight + rowGap;
 
             makeLabel(L"Uniform Scale", y);

@@ -73,11 +73,11 @@ struct VBMaterialConstants {
     uint4 textureIndices; // bindless indices: albedo, normal, metallic, roughness
     uint4 textureIndices2; // bindless indices: occlusion, emissive, unused, unused
     float4 emissiveFactorStrength; // rgb emissive factor, w emissive strength
-    float4 extraParams;            // x occlusion strength, y normal scale, z/w reserved
+    float4 extraParams;            // x occlusion strength, y normal scale, z anisotropy, w wetness
     // x = clear-coat weight, y = clear-coat roughness, z = sheen weight, w = SSS wrap
     float4 coatParams;
     // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
-    // x = transmission factor (0..1), y = IOR (>= 1), z/w reserved.
+    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w reserved.
     float4 transmissionParams;
     // Specular extension (KHR_materials_specular).
     // rgb = specular color factor (linear), w = specular factor.
@@ -473,7 +473,9 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         ao = mat.ao;
         float occlusionStrength = saturate(mat.extraParams.x);
         float normalScale = max(mat.extraParams.y, 0.0f);
+        float wetnessFactor = saturate(mat.extraParams.w);
         emissive = max(mat.emissiveFactorStrength.rgb, 0.0f) * max(mat.emissiveFactorStrength.w, 0.0f);
+        emissive *= (1.0f + saturate(mat.transmissionParams.z) * 2.0f);
         clearCoatWeight = saturate(mat.coatParams.x);
         clearCoatRoughness = saturate(mat.coatParams.y);
         sheenWeight = saturate(mat.coatParams.z);
@@ -628,6 +630,11 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
 
         clearCoatWeight = saturate(clearCoatWeight);
         clearCoatRoughness = saturate(clearCoatRoughness);
+        if (wetnessFactor > 0.001f) {
+            roughness = lerp(roughness, min(roughness, 0.06f), wetnessFactor);
+            clearCoatWeight = saturate(max(clearCoatWeight, wetnessFactor * 0.85f));
+            clearCoatRoughness = lerp(clearCoatRoughness, min(clearCoatRoughness, 0.12f), wetnessFactor);
+        }
         transmission = saturate(transmission);
         specularFactor = saturate(specularFactor);
         specularColor = saturate(specularColor);

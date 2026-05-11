@@ -104,6 +104,9 @@ MaterialModel MaterialResolver::ResolveRenderable(
     model.clearcoatRoughnessFactor = 0.2f;
     model.sheenWeight = glm::clamp(renderable.sheenWeight, 0.0f, 1.0f);
     model.subsurfaceWrap = glm::clamp(renderable.subsurfaceWrap, 0.0f, 1.0f);
+    model.anisotropyStrength = glm::clamp(renderable.anisotropyStrength, 0.0f, 1.0f);
+    model.wetnessFactor = glm::clamp(renderable.wetnessFactor, 0.0f, 1.0f);
+    model.emissiveBloomFactor = glm::clamp(renderable.emissiveBloomFactor, 0.0f, 1.0f);
     model.alphaMode = static_cast<MaterialAlphaMode>(renderable.alphaMode);
     model.alphaCutoff = glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f);
     model.doubleSided = renderable.doubleSided;
@@ -195,14 +198,22 @@ MaterialConstants MaterialResolver::BuildMaterialConstants(const MaterialModel& 
         0u,
         0u);
     material.emissiveFactorStrength = glm::vec4(model.emissiveColor, model.emissiveStrength);
-    material.extraParams = glm::vec4(model.occlusionStrength, model.normalScale, 0.0f, 0.0f);
+    material.extraParams = glm::vec4(
+        model.occlusionStrength,
+        model.normalScale,
+        model.anisotropyStrength,
+        model.wetnessFactor);
     material.fractalParams1.w = model.materialType;
     material.coatParams = glm::vec4(
         model.clearcoatFactor,
         model.clearcoatRoughnessFactor,
         model.sheenWeight,
         model.subsurfaceWrap);
-    material.transmissionParams = glm::vec4(model.transmissionFactor, model.ior, 0.0f, 0.0f);
+    material.transmissionParams = glm::vec4(
+        model.transmissionFactor,
+        model.ior,
+        model.emissiveBloomFactor,
+        0.0f);
     material.specularParams = glm::vec4(model.specularColorFactor, model.specularFactor);
     return material;
 }
@@ -224,13 +235,21 @@ VBMaterialConstants MaterialResolver::BuildVBMaterialConstants(
     material.textureIndices3 = textureIndices3;
     material.textureIndices4 = textureIndices4;
     material.emissiveFactorStrength = glm::vec4(model.emissiveColor, model.emissiveStrength);
-    material.extraParams = glm::vec4(model.occlusionStrength, model.normalScale, 0.0f, 0.0f);
+    material.extraParams = glm::vec4(
+        model.occlusionStrength,
+        model.normalScale,
+        model.anisotropyStrength,
+        model.wetnessFactor);
     material.coatParams = glm::vec4(
         model.clearcoatFactor,
         model.clearcoatRoughnessFactor,
         model.sheenWeight,
         model.subsurfaceWrap);
-    material.transmissionParams = glm::vec4(model.transmissionFactor, model.ior, 0.0f, 0.0f);
+    material.transmissionParams = glm::vec4(
+        model.transmissionFactor,
+        model.ior,
+        model.emissiveBloomFactor,
+        0.0f);
     material.specularParams = glm::vec4(model.specularColorFactor, model.specularFactor);
     material.alphaCutoff = model.alphaCutoff;
     material.alphaMode = static_cast<uint32_t>(model.alphaMode);

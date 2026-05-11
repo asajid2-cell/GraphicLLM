@@ -980,6 +980,21 @@ void CommandQueue::ExecuteModifyMaterial(ModifyMaterialCommand* cmd, Scene::ECS_
         summary << "subsurface ";
         touched = true;
     }
+    if (cmd->setAnisotropy) {
+        renderable.anisotropyStrength = SaturateScalar(cmd->anisotropy);
+        summary << "anisotropy ";
+        touched = true;
+    }
+    if (cmd->setWetness) {
+        renderable.wetnessFactor = SaturateScalar(cmd->wetness);
+        summary << "wetness ";
+        touched = true;
+    }
+    if (cmd->setEmissiveBloom) {
+        renderable.emissiveBloomFactor = SaturateScalar(cmd->emissiveBloom);
+        summary << "emissive_bloom ";
+        touched = true;
+    }
     if (cmd->setEmissiveStrength) {
         renderable.emissiveStrength = std::clamp(cmd->emissiveStrength, 0.0f, 16.0f);
         if (renderable.emissiveStrength > 1.0f &&

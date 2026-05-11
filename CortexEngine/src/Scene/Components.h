@@ -209,6 +209,9 @@ struct RenderableComponent {
      float clearcoatRoughnessFactor = 0.0f;    // clearcoat roughness (0..1)
      float sheenWeight = 0.0f;                 // cloth/velvet grazing highlight weight
      float subsurfaceWrap = 0.0f;              // cheap wrap-lighting approximation for skin/wax
+     float anisotropyStrength = 0.0f;          // elongated highlight strength (0..1)
+     float wetnessFactor = 0.0f;               // wet surface response: lower roughness + clearcoat (0..1)
+     float emissiveBloomFactor = 0.0f;         // extra emissive boost for bloom authoring (0..1)
 
      enum class AlphaMode : uint32_t {
          Opaque = 0,

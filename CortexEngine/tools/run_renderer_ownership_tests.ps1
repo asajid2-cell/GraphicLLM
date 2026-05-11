@@ -875,6 +875,24 @@ foreach ($target in $doc.targets) {
                     Add-Failure "hzb_resources still uses flat HZB state access in Renderer_HZB.cpp: $oldFlatAccess"
                 }
             }
+            if ($hzbRenderer.IndexOf("HZBPass::CreateResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "hzb_resources missing routed HZB resource creation in Renderer_HZB.cpp"
+            }
+            foreach ($directResourceCall in @("CreateCommittedResource", "CreateShaderResourceView", "CreateUnorderedAccessView", "CopyDescriptorsSimple", "AllocateStagingCBV_SRV_UAV", "AllocateCBV_SRV_UAV", "DeferredGPUDeletionQueue")) {
+                if ($hzbRenderer.IndexOf($directResourceCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "hzb_resources still creates HZB resources/descriptors directly in Renderer_HZB.cpp: $directResourceCall"
+                }
+            }
+        }
+        if (Test-Path $hzbPassPath) {
+            $hzbPass = Get-Content $hzbPassPath -Raw
+            foreach ($required in @("ResourceCreateContext", "CreateResources", "CreateCommittedResource", "CreateShaderResourceView", "CreateUnorderedAccessView", "CopyDescriptorsSimple", "DeferredGPUDeletionQueue", "AllocateStagingCBV_SRV_UAV", "AllocateCBV_SRV_UAV")) {
+                if ($hzbPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "hzb_resources missing HZBPass resource creation marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "hzb_resources missing HZBPass.cpp"
         }
     }
 

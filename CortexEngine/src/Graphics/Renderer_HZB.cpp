@@ -3,218 +3,22 @@
 #include "Passes/HZBPass.h"
 #include "RenderGraph.h"
 #include <spdlog/spdlog.h>
-#include <algorithm>
 #include <span>
-#include <utility>
 
 namespace Cortex::Graphics {
-
-namespace {
-
-uint32_t CalcHZBMipCount(uint32_t width, uint32_t height) {
-    width = std::max(1u, width);
-    height = std::max(1u, height);
-
-    // D3D12 mip-chain sizing uses floor division each level:
-    //   next = max(1, current / 2).
-    // The maximum mip count is therefore based on the largest dimension.
-    uint32_t maxDim = std::max(width, height);
-    uint32_t mipCount = 1;
-    while (maxDim > 1u) {
-        maxDim >>= 1u;
-        ++mipCount;
-    }
-    return mipCount;
-}
-
-} // namespace
 
 Result<void> Renderer::CreateHZBResources() {
     if (!m_services.device || !m_services.descriptorManager || !m_depthResources.resources.buffer) {
         return Result<void>::Err("CreateHZBResources: renderer not initialized or depth buffer missing");
     }
 
-    const D3D12_RESOURCE_DESC depthDesc = m_depthResources.resources.buffer->GetDesc();
-    const uint32_t width = std::max<uint32_t>(1u, static_cast<uint32_t>(depthDesc.Width));
-    const uint32_t height = std::max<uint32_t>(1u, depthDesc.Height);
-    const uint32_t mipCount = CalcHZBMipCount(width, height);
-
-    if (m_hzbResources.resources.texture && m_hzbResources.resources.width == width && m_hzbResources.resources.height == height && m_hzbResources.resources.mipCount == mipCount &&
-        m_hzbResources.descriptors.dispatchTablesValid) {
-        return Result<void>::Ok();
-    }
-
-    // Defer deletion of old HZB texture; it may still be referenced by in-flight command lists.
-    if (m_hzbResources.resources.texture) {
-        DeferredGPUDeletionQueue::Instance().QueueResource(std::move(m_hzbResources.resources.texture));
-    }
-    m_hzbResources.resources.fullSRV = {};
-    m_hzbResources.descriptors.mipSRVStaging.clear();
-    m_hzbResources.descriptors.mipUAVStaging.clear();
-    m_hzbResources.descriptors.dispatchTablesValid = false;
-    for (auto& table : m_hzbResources.descriptors.dispatchSrvTables) {
-        table.clear();
-    }
-    for (auto& table : m_hzbResources.descriptors.dispatchUavTables) {
-        table.clear();
-    }
-    m_hzbResources.resources.width = width;
-    m_hzbResources.resources.height = height;
-    m_hzbResources.resources.mipCount = mipCount;
-    m_hzbResources.debug.debugMip = 0;
-    m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_COMMON;
-    m_hzbResources.resources.valid = false;
-    m_hzbResources.capture.captureValid = false;
-    m_hzbResources.capture.captureFrameCounter = 0;
-
-    D3D12_RESOURCE_DESC hzbDesc{};
-    hzbDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    hzbDesc.Alignment = 0;
-    hzbDesc.Width = width;
-    hzbDesc.Height = height;
-    hzbDesc.DepthOrArraySize = 1;
-    hzbDesc.MipLevels = static_cast<UINT16>(mipCount);
-    hzbDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    hzbDesc.SampleDesc.Count = 1;
-    hzbDesc.SampleDesc.Quality = 0;
-    hzbDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    hzbDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    D3D12_HEAP_PROPERTIES heapProps{};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &hzbDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&m_hzbResources.resources.texture)
-    );
-
-    if (FAILED(hr)) {
-        m_hzbResources.resources.texture.Reset();
-        return Result<void>::Err("CreateHZBResources: failed to create HZB texture");
-    }
-
-    m_hzbResources.resources.texture->SetName(L"HZBTexture");
-
-    m_hzbResources.descriptors.mipSRVStaging.reserve(mipCount);
-    m_hzbResources.descriptors.mipUAVStaging.reserve(mipCount);
-
-    for (uint32_t mip = 0; mip < mipCount; ++mip) {
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            return Result<void>::Err("CreateHZBResources: failed to allocate staging SRV: " + srvResult.Error());
-        }
-        auto uavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (uavResult.IsErr()) {
-            return Result<void>::Err("CreateHZBResources: failed to allocate staging UAV: " + uavResult.Error());
-        }
-
-        DescriptorHandle srvHandle = srvResult.Value();
-        DescriptorHandle uavHandle = uavResult.Value();
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MostDetailedMip = mip;
-        srvDesc.Texture2D.MipLevels = 1;
-        srvDesc.Texture2D.PlaneSlice = 0;
-        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-        m_services.device->GetDevice()->CreateShaderResourceView(
-            m_hzbResources.resources.texture.Get(),
-            &srvDesc,
-            srvHandle.cpu
-        );
-
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-        uavDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        uavDesc.Texture2D.MipSlice = mip;
-        uavDesc.Texture2D.PlaneSlice = 0;
-
-        m_services.device->GetDevice()->CreateUnorderedAccessView(
-            m_hzbResources.resources.texture.Get(),
-            nullptr,
-            &uavDesc,
-            uavHandle.cpu
-        );
-
-        m_hzbResources.descriptors.mipSRVStaging.push_back(srvHandle);
-        m_hzbResources.descriptors.mipUAVStaging.push_back(uavHandle);
-    }
-
-    // Create a full-mip SRV for debug visualizations and shaders that choose a mip level.
-    {
-        auto fullSrvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (fullSrvResult.IsErr()) {
-            return Result<void>::Err("CreateHZBResources: failed to allocate full-mip SRV: " + fullSrvResult.Error());
-        }
-        m_hzbResources.resources.fullSRV = fullSrvResult.Value();
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC fullDesc{};
-        fullDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        fullDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        fullDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        fullDesc.Texture2D.MostDetailedMip = 0;
-        fullDesc.Texture2D.MipLevels = static_cast<UINT>(mipCount);
-        fullDesc.Texture2D.PlaneSlice = 0;
-        fullDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-        m_services.device->GetDevice()->CreateShaderResourceView(
-            m_hzbResources.resources.texture.Get(),
-            &fullDesc,
-            m_hzbResources.resources.fullSRV.cpu
-        );
-    }
-
-    for (uint32_t frame = 0; frame < kFrameCount; ++frame) {
-        m_hzbResources.descriptors.dispatchSrvTables[frame].resize(mipCount);
-        m_hzbResources.descriptors.dispatchUavTables[frame].resize(mipCount);
-        for (uint32_t mip = 0; mip < mipCount; ++mip) {
-            auto srvResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (srvResult.IsErr()) {
-                return Result<void>::Err("CreateHZBResources: failed to allocate shader-visible HZB SRV: " +
-                                         srvResult.Error());
-            }
-            auto uavResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (uavResult.IsErr()) {
-                return Result<void>::Err("CreateHZBResources: failed to allocate shader-visible HZB UAV: " +
-                                         uavResult.Error());
-            }
-
-            m_hzbResources.descriptors.dispatchSrvTables[frame][mip] = srvResult.Value();
-            m_hzbResources.descriptors.dispatchUavTables[frame][mip] = uavResult.Value();
-
-            const DescriptorHandle sourceSrv = (mip == 0) ? m_depthResources.descriptors.srv : m_hzbResources.descriptors.mipSRVStaging[mip - 1];
-            const DescriptorHandle sourceUav = m_hzbResources.descriptors.mipUAVStaging[mip];
-            if (!sourceSrv.IsValid() || !sourceUav.IsValid()) {
-                return Result<void>::Err("CreateHZBResources: invalid source descriptor while building HZB dispatch tables");
-            }
-
-            m_services.device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                m_hzbResources.descriptors.dispatchSrvTables[frame][mip].cpu,
-                sourceSrv.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            m_services.device->GetDevice()->CopyDescriptorsSimple(
-                1,
-                m_hzbResources.descriptors.dispatchUavTables[frame][mip].cpu,
-                sourceUav.cpu,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        }
-    }
-    m_hzbResources.descriptors.dispatchTablesValid = true;
-
-    spdlog::info("HZB resources created: {}x{}, mips={}", width, height, mipCount);
-    return Result<void>::Ok();
+    return HZBPass::CreateResources({
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        m_depthResources.resources.buffer.Get(),
+        m_depthResources.descriptors.srv,
+        &m_hzbResources
+    });
 }
 
 void Renderer::BuildHZBFromDepth() {

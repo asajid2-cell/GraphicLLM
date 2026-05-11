@@ -7,7 +7,6 @@
 #include <spdlog/spdlog.h>
 
 #include <span>
-#include <string>
 
 namespace Cortex::Graphics {
 
@@ -45,13 +44,7 @@ Renderer::ExecuteTAAInRenderGraph() {
     }
 
     bool stageFailed = false;
-    std::string stageError;
-    auto failStage = [&](const char* stage) {
-        if (!stageFailed) {
-            stageError = stage;
-        }
-        stageFailed = true;
-    };
+    const char* stageError = nullptr;
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle hdrHandle =
@@ -103,7 +96,8 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.depth = depthHandle;
     taaContext.normalRoughness = normalHandle;
     taaContext.seedOnly = seedOnly;
-    taaContext.failStage = failStage;
+    taaContext.status.failed = &stageFailed;
+    taaContext.status.stage = &stageError;
     taaContext.seedHistory.commandList = m_commandResources.graphicsList.Get();
     taaContext.seedHistory.hdrColor = {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state};
     taaContext.seedHistory.historyColor = {m_temporalScreenState.historyColor.Get(), &m_temporalScreenState.historyState};
@@ -165,7 +159,11 @@ Renderer::ExecuteTAAInRenderGraph() {
         result.fallbackReason = execResult.Error();
     } else if (stageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "taa_graph_stage_failed: " + stageError;
+        result.fallbackReason = "taa_graph_stage_failed";
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
+        }
     } else {
         m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);

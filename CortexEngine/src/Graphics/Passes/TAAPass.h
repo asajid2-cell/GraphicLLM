@@ -5,10 +5,14 @@
 #include "Graphics/RHI/DX12Pipeline.h"
 #include "Graphics/RHI/DescriptorHeap.h"
 
-#include <functional>
 #include <span>
 
 namespace Cortex::Graphics::TAAPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct ResolveContext {
     ID3D12GraphicsCommandList* commandList = nullptr;
@@ -53,7 +57,7 @@ struct GraphContext {
     ResolveContext resolve;
     TAACopyPass::IntermediateCopyContext copyToHDR;
     TAACopyPass::HistoryCopyContext copyToHistory;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool UpdateResolveDescriptorTable(const DescriptorUpdateContext& context);

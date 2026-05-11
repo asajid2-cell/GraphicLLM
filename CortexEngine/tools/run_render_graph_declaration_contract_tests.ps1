@@ -209,6 +209,7 @@ Assert-Contains "TAAPass.cpp" $taa "UpdateResolveDescriptorTable(context.resolve
 Assert-Contains "TAAPass.cpp" $taa "TAACopyPass::CopyIntermediateToHdr(context.copyToHDR)"
 Assert-NotContains "TAAPass.h" $taaHeader "std::function<bool()> seedHistory"
 Assert-NotContains "TAAPass.h" $taaHeader "std::function<bool()> resolve"
+Assert-NotContains "TAAPass.h" $taaHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "SeedTAAHistory(true)"
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "ResolveTAAIntermediate(true)"
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "CopyTAAIntermediateToHDR(true)"

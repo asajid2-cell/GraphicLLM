@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 
+#include "Graphics/Passes/RTReflectionDispatchPass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 
@@ -60,31 +61,17 @@ void Renderer::RenderRayTracedReflections() {
         return;
     }
 
-    // Ensure the depth buffer is in a readable state for the DXR pass.
-    // Depth resources should include DEPTH_READ when sampled as SRVs.
-    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
-        D3D12_RESOURCE_BARRIER depthBarrier{};
-        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        depthBarrier.Transition.StateAfter = kDepthSampleState;
-        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resources.resourceState = kDepthSampleState;
-    }
-
-    constexpr D3D12_RESOURCE_STATES kSrvNonPixel =
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
     DescriptorHandle normalSrv = m_mainTargets.normalRoughness.descriptors.srv;
     DescriptorHandle materialExt2Srv{};
     ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
+    D3D12_RESOURCE_STATES* normalState = &m_mainTargets.normalRoughness.resources.state;
     ID3D12Resource* materialExt2Resource = nullptr;
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
         const DescriptorHandle& vbNormal = m_services.visibilityBuffer->GetNormalRoughnessSRVHandle();
         if (vbNormal.IsValid()) {
             normalSrv = vbNormal;
             normalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+            normalState = nullptr;
         }
         const DescriptorHandle& vbMaterialExt2 = m_services.visibilityBuffer->GetMaterialExt2SRVHandle();
         if (vbMaterialExt2.IsValid()) {
@@ -97,21 +84,6 @@ void Renderer::RenderRayTracedReflections() {
     m_rtReflectionReadiness.hasMaterialExt2 =
         materialExt2Resource != nullptr && materialExt2Srv.IsValid();
 
-    // Ensure the current frame's normal/roughness target is readable. The VB
-    // path leaves its G-buffer in a combined SRV state after deferred lighting.
-    if (!m_visibilityBufferState.renderedThisFrame) {
-        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != kSrvNonPixel) {
-            D3D12_RESOURCE_BARRIER gbufBarrier{};
-            gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            gbufBarrier.Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
-            gbufBarrier.Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
-            gbufBarrier.Transition.StateAfter = kSrvNonPixel;
-            gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            rtCmdList->ResourceBarrier(1, &gbufBarrier);
-            m_mainTargets.normalRoughness.resources.state = kSrvNonPixel;
-        }
-    }
-
     if (!m_depthResources.descriptors.srv.IsValid() || !normalSrv.IsValid()) {
         setReflectionReadinessReason(!m_depthResources.descriptors.srv.IsValid()
             ? "depth_srv_missing"
@@ -119,15 +91,15 @@ void Renderer::RenderRayTracedReflections() {
         return;
     }
 
-    if (m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-        D3D12_RESOURCE_BARRIER reflBarrier{};
-        reflBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        reflBarrier.Transition.pResource = m_rtReflectionTargets.color.Get();
-        reflBarrier.Transition.StateBefore = m_rtReflectionTargets.colorState;
-        reflBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        reflBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &reflBarrier);
-        m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    RTReflectionDispatchPass::PrepareContext prepareContext{};
+    prepareContext.commandList = rtCmdList.Get();
+    prepareContext.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
+    prepareContext.normalRoughness = {normalResource, normalState};
+    prepareContext.reflectionOutput = {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState};
+    prepareContext.transitionNormal = !m_visibilityBufferState.renderedThisFrame;
+    if (!RTReflectionDispatchPass::PrepareInputsAndOutput(prepareContext)) {
+        setReflectionReadinessReason("reflection_resource_transition_failed");
+        return;
     }
 
     static bool s_checkedRtReflDebug = false;
@@ -156,67 +128,26 @@ void Renderer::RenderRayTracedReflections() {
     if (rtReflDebugView && s_rtReflClearMode != 0 && m_services.descriptorManager && m_services.device && m_rtReflectionTargets.uav.IsValid()) {
         DescriptorHandle clearUav = m_rtReflectionTargets.dispatchClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
         if (clearUav.IsValid()) {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-            uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            m_services.device->GetDevice()->CreateUnorderedAccessView(
-                m_rtReflectionTargets.color.Get(),
-                nullptr,
-                &uavDesc,
-                clearUav.cpu);
-
-            ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-            rtCmdList->SetDescriptorHeaps(1, heaps);
-
-            const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f };
-            const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f };
-            const float* clear = (s_rtReflClearMode == 2) ? magenta : black;
-            // ClearUnorderedAccessView requires a CPU-visible, CPU-readable descriptor handle.
-            // Use the persistent staging UAV as the CPU handle and the persistent shader-visible
-            // descriptor as the GPU handle.
-            rtCmdList->ClearUnorderedAccessViewFloat(
-                clearUav.gpu,
-                m_rtReflectionTargets.uav.cpu,
-                m_rtReflectionTargets.color.Get(),
-                clear,
-                0,
-                nullptr);
-
-            D3D12_RESOURCE_BARRIER clearBarrier{};
-            clearBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            clearBarrier.UAV.pResource = m_rtReflectionTargets.color.Get();
-            rtCmdList->ResourceBarrier(1, &clearBarrier);
+            RTReflectionDispatchPass::DebugClearContext clearContext{};
+            clearContext.commandList = rtCmdList.Get();
+            clearContext.device = m_services.device->GetDevice();
+            clearContext.descriptorHeap = m_services.descriptorManager->GetCBV_SRV_UAV_Heap();
+            clearContext.reflectionOutput = {m_rtReflectionTargets.color.Get(), &m_rtReflectionTargets.colorState};
+            clearContext.shaderVisibleUav = clearUav;
+            clearContext.cpuUav = m_rtReflectionTargets.uav;
+            clearContext.clearMode = s_rtReflClearMode;
+            if (!RTReflectionDispatchPass::ClearOutputForDebugView(clearContext)) {
+                setReflectionReadinessReason("reflection_debug_clear_failed");
+                return;
+            }
         } else {
             spdlog::warn("Renderer: RT reflection dispatch debug clear requested before persistent UAV descriptors were initialized");
         }
     }
 
-    // RT dispatch samples the environment textures via "compute" access, so
-    // environment maps must be readable as NON_PIXEL shader resources. The
-    // raster path typically leaves them in PIXEL_SHADER_RESOURCE only.
-    auto ensureTextureNonPixelReadable = [&](const std::shared_ptr<DX12Texture>& tex) {
-        if (!tex || !tex->GetResource()) {
-            return;
-        }
-        constexpr D3D12_RESOURCE_STATES kDesired =
-            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        const D3D12_RESOURCE_STATES current = tex->GetCurrentState();
-        if ((current & kDesired) == kDesired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = tex->GetResource();
-        barrier.Transition.StateBefore = current;
-        barrier.Transition.StateAfter = kDesired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &barrier);
-        tex->SetState(kDesired);
-    };
-
     if (const EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
-        ensureTextureNonPixelReadable(env->diffuseIrradiance);
-        ensureTextureNonPixelReadable(env->specularPrefiltered);
+        RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->diffuseIrradiance);
+        RTReflectionDispatchPass::EnsureTextureNonPixelReadable(rtCmdList.Get(), env->specularPrefiltered);
     }
 
     // Ensure the descriptor table (space1, t0-t6) is up to date before DXR
@@ -269,11 +200,10 @@ void Renderer::RenderRayTracedReflections() {
         setReflectionReadinessReason("debug_skip_dxr");
     }
 
-    // Ensure UAV writes are visible before post-process samples the SRV.
-    D3D12_RESOURCE_BARRIER uavBarrier{};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = m_rtReflectionTargets.color.Get();
-    rtCmdList->ResourceBarrier(1, &uavBarrier);
+    if (!RTReflectionDispatchPass::FinalizeOutputWrites(rtCmdList.Get(), m_rtReflectionTargets.color.Get())) {
+        setReflectionReadinessReason("reflection_output_finalize_failed");
+        return;
+    }
 
     m_frameLifecycle.rtReflectionWrittenThisFrame = true;
     if (m_rtReflectionReadiness.reason.empty()) {

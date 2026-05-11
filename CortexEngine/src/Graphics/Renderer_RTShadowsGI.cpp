@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 
+#include "Graphics/Passes/RTShadowsGIPass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 
@@ -23,30 +24,11 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Ensure the depth buffer is in a readable state for the DXR passes.
-    // Depth resources should include DEPTH_READ when sampled as SRVs.
-    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
-        D3D12_RESOURCE_BARRIER depthBarrier{};
-        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        depthBarrier.Transition.StateAfter = kDepthSampleState;
-        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resources.resourceState = kDepthSampleState;
-    }
-
-    // Ensure the RT shadow mask is ready for UAV writes before the DXR pass.
-    if (m_rtShadowTargets.mask && m_rtShadowTargets.maskState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_rtShadowTargets.mask.Get();
-        barrier.Transition.StateBefore = m_rtShadowTargets.maskState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        rtCmdList->ResourceBarrier(1, &barrier);
-        m_rtShadowTargets.maskState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    }
+    const bool rtShadowInputsReady = RTShadowsGIPass::PrepareShadowInputs({
+        rtCmdList.Get(),
+        {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
+        {m_rtShadowTargets.mask.Get(), &m_rtShadowTargets.maskState},
+    });
 
     // Set the current frame index so BLAS builds can track when they were
     // recorded. This is used by ReleaseScratchBuffers() to ensure scratch
@@ -86,7 +68,10 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 
     // Dispatch the DXR sun-shadow pass when depth and mask descriptors are ready.
-    if (m_framePlanning.rtPlan.dispatchShadows && m_depthResources.descriptors.srv.IsValid() && m_rtShadowTargets.maskUAV.IsValid()) {
+    if (rtShadowInputsReady &&
+        m_framePlanning.rtPlan.dispatchShadows &&
+        m_depthResources.descriptors.srv.IsValid() &&
+        m_rtShadowTargets.maskUAV.IsValid()) {
         DescriptorHandle envTable = m_environmentState.shadowAndEnvDescriptors[0];
             m_services.rayTracingContext->DispatchRayTracing(
                 rtCmdList.Get(),
@@ -106,18 +91,14 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     // pass is optional and disabled by default; DispatchGI is a no-op if the
     // GI pipeline is not available.
     if (m_framePlanning.rtPlan.dispatchGI && m_rtGITargets.color && m_rtGITargets.uav.IsValid()) {
-        if (m_rtGITargets.colorState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-            D3D12_RESOURCE_BARRIER giBarrier{};
-            giBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            giBarrier.Transition.pResource = m_rtGITargets.color.Get();
-            giBarrier.Transition.StateBefore = m_rtGITargets.colorState;
-            giBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            giBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            rtCmdList->ResourceBarrier(1, &giBarrier);
-            m_rtGITargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        }
+        const bool rtGIOutputReady = RTShadowsGIPass::PrepareGIOutput({
+            rtCmdList.Get(),
+            {m_rtGITargets.color.Get(), &m_rtGITargets.colorState},
+        });
 
-        if (m_depthResources.descriptors.srv.IsValid() && m_services.rayTracingContext->HasGIPipeline()) {
+        if (rtGIOutputReady &&
+            m_depthResources.descriptors.srv.IsValid() &&
+            m_services.rayTracingContext->HasGIPipeline()) {
             DescriptorHandle envTable = m_environmentState.shadowAndEnvDescriptors[0];
             D3D12_RESOURCE_DESC giDesc = m_rtGITargets.color->GetDesc();
             const uint32_t giW = m_framePlanning.rtPlan.budget.giWidth > 0

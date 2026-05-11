@@ -60,6 +60,7 @@ The gate builds Release, then runs the current public renderer suite:
 - visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,
 - graphics settings persistence, graphics UI contract/runtime interaction, HUD mode, material editor, and preset contracts,
+- LLM/Architect renderer-command runtime smoke,
 - public showcase scene, material lab, glass/water courtyard, effects showcase, visual baseline, and screenshot negative checks,
 - visual probe validation across all public baseline cases,
 - Phase 3 visual matrix, IBL gallery, and fallback matrix validation,

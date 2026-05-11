@@ -27,6 +27,7 @@ validation suite:
 - render-graph transient alias/no-alias matrix,
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
+- LLM/Architect renderer-command runtime smoke,
 - graphics preset, showcase scene, material editor, and visual baseline contracts,
 - descriptor/memory stress scene for the old 1024 persistent-descriptor ceiling,
 - visual probe validation across all public baseline cases,
@@ -77,6 +78,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
@@ -106,6 +108,9 @@ matrix wraps temporal validation, RT showcase, Material Lab, Glass and Water
 Courtyard, Effects Showcase, and the IBL gallery, then writes JSON and Markdown
 summaries under `build/bin/logs/runs`. Add new public scenes to this matrix only
 after their camera, lighting, and IBL choices are stable enough to avoid churn.
+The LLM renderer-command smoke runs Architect in deterministic mock mode, queues
+a startup `modify_renderer` command, and verifies the renderer applier updates
+exposure, shadows, fog, water, and lighting-rig state in the frame contract.
 The HUD mode contract verifies the Phase 3 clean-HUD modes, F7 cycling, and
 `--hud` / `CORTEX_HUD_MODE` automation path; it runs short off/full-debug cases
 and checks the generated frame report.

@@ -81,6 +81,7 @@ struct EngineConfig {
     std::string initialGraphicsPreset;
     std::string initialCameraBookmark;
     EngineHudMode initialHudMode = EngineHudMode::RendererHealth;
+    std::string startupArchitectCommandJson;
 
     // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
     // interactive behavior. exitAfterVisualValidationCapture exits once the
@@ -254,6 +255,8 @@ private:
     bool m_exitAfterVisualValidationCapture = false;
     bool m_cameraCutAutomationApplied = false;
     std::string m_cameraCutAutomationBookmark;
+    bool m_startupArchitectCommandSubmitted = false;
+    std::string m_startupArchitectCommandJson;
 
     // HUD / debug overlay
     void RenderHUD();

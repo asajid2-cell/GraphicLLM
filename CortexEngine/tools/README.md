@@ -20,6 +20,7 @@ validation suite:
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
 - graphics preset, showcase scene, material editor, and visual baseline contracts,
+- descriptor/memory stress scene for the old 1024 persistent-descriptor ceiling,
 - screenshot negative gates for black/white/saturation/edge regressions,
 - Phase 3 visual matrix summary generation,
 - renderer ownership, full ownership audit, and fatal error contract checks,
@@ -74,6 +75,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_render_graph_transient_matrix
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_visual_matrix.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_effects_gallery_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_phase3_fallback_matrix.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_descriptor_memory_stress_scene.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_particle_disabled_zero_cost.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_screenshot_negative_gates.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_rt_firefly_outlier_scene.ps1 -NoBuild
@@ -101,6 +103,10 @@ resource-valid in the final frame contract.
 The render-graph transient matrix reruns RT Showcase with the graph transient
 validation pass enabled, then compares aliasing-on, aliasing-off, and
 bloom-transients-disabled modes through frame-contract render-graph counters.
+
+The descriptor/memory stress scene reruns the descriptor-heavy RT showcase path
+and asserts the historical 1024 persistent-descriptor ceiling, staging budget,
+transient descriptor balance, render memory budgets, and raw/history RT signal.
 
 The full renderer ownership audit enumerates every `Renderer` member and
 requires it to remain a named state/service aggregate, with no loose GPU

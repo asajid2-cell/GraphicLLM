@@ -157,6 +157,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/SkyboxPass.cpp
     src/Graphics/Passes/TAAPass.cpp
     src/Graphics/Passes/VisibilityBufferGraphPass.cpp
+    src/Graphics/Passes/VoxelPass.cpp
     src/Graphics/RenderGraph.cpp
     src/Graphics/RenderGraph_Barriers.cpp
     src/Graphics/RenderGraph_Builder.cpp

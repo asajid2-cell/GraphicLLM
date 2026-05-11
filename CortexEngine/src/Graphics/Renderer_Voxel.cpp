@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Graphics/Passes/VoxelPass.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
 
@@ -55,62 +56,22 @@ void Renderer::RenderVoxel(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Transition back buffer from PRESENT to RENDER_TARGET.
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = backBuffer;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-    m_frameLifecycle.backBufferUsedAsRTThisFrame = true;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_services.window->GetCurrentRTV();
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-
-    // Clear to a bright color so we can easily confirm that the voxel path
-    // is rendering even if the shader fails to draw any geometry.
-    const float clearColor[4] = { 0.2f, 0.0f, 0.4f, 1.0f };
-    m_commandResources.graphicsList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-
-    // Viewport + scissor match the window size.
-    D3D12_VIEWPORT vp{};
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width    = static_cast<float>(m_services.window->GetWidth());
-    vp.Height   = static_cast<float>(m_services.window->GetHeight());
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-
-    D3D12_RECT scissor{};
-    scissor.left   = 0;
-    scissor.top    = 0;
-    scissor.right  = static_cast<LONG>(m_services.window->GetWidth());
-    scissor.bottom = static_cast<LONG>(m_services.window->GetHeight());
-
-    m_commandResources.graphicsList->RSSetViewports(1, &vp);
-    m_commandResources.graphicsList->RSSetScissorRects(1, &scissor);
-
-    // Root signature and descriptor heap match the main renderer so the
-    // voxel shader can read FrameConstants via the standard layout and
-    // access the dense voxel grid SRV.
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-
-    // Frame constants (b1)
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-
-    // Voxel grid SRV table (t0). If the grid failed to build or upload we
-    // still render a gradient background; the shader simply finds no hits.
-    if (m_voxelState.gridSRV.IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, m_voxelState.gridSRV.gpu);
+    VoxelPass::DrawContext drawContext{};
+    drawContext.commandList = m_commandResources.graphicsList.Get();
+    drawContext.rootSignature = m_pipelineState.rootSignature.get();
+    drawContext.pipeline = m_pipelineState.voxel.get();
+    drawContext.descriptorManager = m_services.descriptorManager.get();
+    drawContext.frameConstants = m_constantBuffers.currentFrameGPU;
+    drawContext.voxelGridSrv = m_voxelState.gridSRV;
+    drawContext.backBuffer = backBuffer;
+    drawContext.backBufferRtv = m_services.window->GetCurrentRTV();
+    drawContext.width = m_services.window->GetWidth();
+    drawContext.height = m_services.window->GetHeight();
+    if (!VoxelPass::Draw(drawContext)) {
+        spdlog::warn("RenderVoxel: voxel pass prerequisites missing; skipping draw");
+        return;
     }
-
-    // Fullscreen triangle; no vertex buffer required (SV_VertexID path).
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.voxel->GetPipelineState());
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandResources.graphicsList->DrawInstanced(3, 1, 0, 0);
+    m_frameLifecycle.backBufferUsedAsRTThisFrame = true;
 
     RecordFramePass("RenderVoxel",
                     true,

@@ -55,6 +55,7 @@ bool ApplyBloomIntensityControl(Renderer& renderer, float intensity);
 void ApplyBloomShapeControl(Renderer& renderer, float threshold, float softKnee, float maxContribution);
 void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle, bool enabled);
 bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle);
+void ApplyRTReflectionTuningControl(Renderer& renderer, float denoiseAlpha, float compositionStrength);
 void ApplyShadowBiasControl(Renderer& renderer, float bias);
 void ApplyShadowPCFRadiusControl(Renderer& renderer, float radius);
 void ApplyCascadeSplitLambdaControl(Renderer& renderer, float lambda);

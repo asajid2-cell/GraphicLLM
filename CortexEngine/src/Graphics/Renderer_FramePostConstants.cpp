@@ -108,6 +108,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     //   bit2: RT reflection history valid
     //   bit3: disable RT reflection temporal (debug)
     //   bit4: visibility-buffer path active this frame (HUD / debug)
+    //   bits 5-7: RT reflection composition strength quantized to 0..7
+    //   bits 16-23: RT reflection denoise alpha quantized to 0..255
     m_visibilityBufferState.plannedThisFrame = false;
     if (m_visibilityBufferState.enabled && m_services.visibilityBuffer && registry) {
         auto renderableView = registry->View<Scene::RenderableComponent>();
@@ -123,37 +125,43 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
             break;
         }
     }
-    uint32_t postFxFlags = 0u; 
-    static bool s_checkedRtReflPostFxEnv = false; 
-    static bool s_disableRtReflTemporal = false; 
-    if (!s_checkedRtReflPostFxEnv) { 
-        s_checkedRtReflPostFxEnv = true; 
-        if (std::getenv("CORTEX_RTREFL_DISABLE_TEMPORAL")) { 
-            s_disableRtReflTemporal = true; 
-            spdlog::warn("Renderer: CORTEX_RTREFL_DISABLE_TEMPORAL set; disabling RT reflection temporal accumulation (debug)"); 
-        } 
-    } 
+    uint32_t postFxFlags = 0u;
+    static bool s_checkedRtReflPostFxEnv = false;
+    static bool s_disableRtReflTemporal = false;
+    if (!s_checkedRtReflPostFxEnv) {
+        s_checkedRtReflPostFxEnv = true;
+        if (std::getenv("CORTEX_RTREFL_DISABLE_TEMPORAL")) {
+            s_disableRtReflTemporal = true;
+            spdlog::warn("Renderer: CORTEX_RTREFL_DISABLE_TEMPORAL set; disabling RT reflection temporal accumulation (debug)");
+        }
+    }
     if (m_ssrResources.activeThisFrame) {
-        postFxFlags |= 1u; 
-    } 
+        postFxFlags |= 1u;
+    }
     if (rtReflPipelineReady && m_rtRuntimeState.reflectionsEnabled) {
-        postFxFlags |= 2u; 
-    } 
+        postFxFlags |= 2u;
+    }
     if (rtReflPipelineReady && m_temporalHistory.manager.CanReproject(TemporalHistoryId::RTReflection)) {
-        postFxFlags |= 4u; 
-    } 
-    if (s_disableRtReflTemporal) { 
-        postFxFlags |= 8u; 
-    } 
+        postFxFlags |= 4u;
+    }
+    if (s_disableRtReflTemporal) {
+        postFxFlags |= 8u;
+    }
     if (m_visibilityBufferState.plannedThisFrame) {
         postFxFlags |= 16u;
     }
+    const uint32_t rtReflectionComposition =
+        static_cast<uint32_t>(glm::clamp(m_rtDenoiseState.reflectionCompositionStrength, 0.0f, 1.0f) * 7.0f + 0.5f);
+    const uint32_t rtReflectionAlpha =
+        static_cast<uint32_t>(glm::clamp(m_rtDenoiseState.reflectionHistoryAlpha, 0.0f, 1.0f) * 255.0f + 0.5f);
+    postFxFlags |= (rtReflectionComposition & 0x7u) << 5u;
     postFxFlags |= m_postProcessState.EncodedLensDirtByte() << 8u;
-    frameData.bloomParams = glm::vec4( 
+    postFxFlags |= (rtReflectionAlpha & 0xFFu) << 16u;
+    frameData.bloomParams = glm::vec4(
         m_bloomResources.threshold,
         m_bloomResources.softKnee,
         m_bloomResources.maxContribution,
-        static_cast<float>(postFxFlags)); 
+        static_cast<float>(postFxFlags));
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.
     // Only enable TAA in the shader once we have a valid history buffer;

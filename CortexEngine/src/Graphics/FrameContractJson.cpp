@@ -359,6 +359,13 @@ json FrameContractToJson(const FrameContract& contract) {
             {"shadow_denoise_alpha", contract.rayTracing.shadowDenoiseAlpha},
             {"reflection_denoise_alpha", contract.rayTracing.reflectionDenoiseAlpha},
             {"gi_denoise_alpha", contract.rayTracing.giDenoiseAlpha},
+            {"reflection_requested_denoise_alpha", contract.rayTracing.reflectionRequestedDenoiseAlpha},
+            {"reflection_composition_strength", contract.rayTracing.reflectionCompositionStrength},
+            {"rt_reflection_tuning", {
+                {"denoise_alpha", contract.rayTracing.reflectionRequestedDenoiseAlpha},
+                {"composition_strength", contract.rayTracing.reflectionCompositionStrength},
+                {"shader_packed", true}
+            }},
             {"budget_profile", contract.rayTracing.budgetProfile},
             {"scheduler_disabled_reason", contract.rayTracing.schedulerDisabledReason},
             {"scheduler_tlas_candidates", contract.rayTracing.schedulerTLASCandidates},

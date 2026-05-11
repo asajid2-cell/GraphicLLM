@@ -59,6 +59,14 @@ bool Renderer::GetRTGIEnabled() const {
     return GetRayTracingState().giEnabled;
 }
 
+float Renderer::GetRTReflectionDenoiseAlpha() const {
+    return m_rtDenoiseState.reflectionHistoryAlpha;
+}
+
+float Renderer::GetRTReflectionCompositionStrength() const {
+    return m_rtDenoiseState.reflectionCompositionStrength;
+}
+
 bool Renderer::IsRayTracingSupported() const {
     return GetRayTracingState().supported;
 }
@@ -233,6 +241,26 @@ void Renderer::SetRTGIEnabled(bool enabled) {
     }
     m_rtRuntimeState.giEnabled = enabled;
     InvalidateRTGIHistory(enabled ? "feature_enabled" : "feature_disabled");
+}
+
+void Renderer::SetRTReflectionTuning(float denoiseAlpha, float compositionStrength) {
+    const float alpha = std::clamp(denoiseAlpha, 0.02f, 1.0f);
+    const float strength = std::clamp(compositionStrength, 0.0f, 1.0f);
+    const bool alphaChanged = std::abs(alpha - m_rtDenoiseState.reflectionHistoryAlpha) > 1e-4f;
+    const bool strengthChanged = std::abs(strength - m_rtDenoiseState.reflectionCompositionStrength) > 1e-4f;
+    if (!alphaChanged && !strengthChanged) {
+        return;
+    }
+
+    m_rtDenoiseState.reflectionHistoryAlpha = alpha;
+    m_rtDenoiseState.reflectionAlpha = alpha;
+    m_rtDenoiseState.reflectionCompositionStrength = strength;
+    if (alphaChanged) {
+        InvalidateRTReflectionHistory("tuning_changed");
+    }
+    spdlog::info("RT reflection tuning: denoiseAlpha={} compositionStrength={}",
+                 m_rtDenoiseState.reflectionHistoryAlpha,
+                 m_rtDenoiseState.reflectionCompositionStrength);
 }
 
 } // namespace Cortex::Graphics

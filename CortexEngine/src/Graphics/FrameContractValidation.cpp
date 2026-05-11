@@ -393,6 +393,12 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         }
     }
     if (contract.rayTracing.denoiseReflections && context.rtReflectionDenoisedThisFrame) {
+        if (contract.rayTracing.reflectionRequestedDenoiseAlpha < 0.02f ||
+            contract.rayTracing.reflectionRequestedDenoiseAlpha > 1.0f ||
+            contract.rayTracing.reflectionCompositionStrength < 0.0f ||
+            contract.rayTracing.reflectionCompositionStrength > 1.0f) {
+            warn("rt_reflection_tuning_out_of_range");
+        }
         if (!contract.rayTracing.reflectionHistorySignalStatsCaptured) {
             warn("rt_reflection_history_without_signal_stats");
         }

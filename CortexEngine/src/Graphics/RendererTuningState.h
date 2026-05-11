@@ -46,6 +46,8 @@ struct RendererRayTracingTuning {
     bool enabled = true;
     bool reflectionsEnabled = true;
     bool giEnabled = false;
+    float reflectionDenoiseAlpha = 0.28f;
+    float reflectionCompositionStrength = 1.0f;
 };
 
 struct RendererScreenSpaceTuning {

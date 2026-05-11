@@ -360,6 +360,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.rayTracing.shadowDenoiseAlpha = m_rtDenoiseState.shadowAlpha;
     contract.rayTracing.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionAlpha;
     contract.rayTracing.giDenoiseAlpha = m_rtDenoiseState.giAlpha;
+    contract.rayTracing.reflectionRequestedDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
+    contract.rayTracing.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
     contract.rayTracing.reflectionDispatchReady = m_rtReflectionReadiness.ready;
     contract.rayTracing.reflectionHasPipeline = m_rtReflectionReadiness.hasPipeline;
     contract.rayTracing.reflectionHasTLAS = m_rtReflectionReadiness.hasTLAS;

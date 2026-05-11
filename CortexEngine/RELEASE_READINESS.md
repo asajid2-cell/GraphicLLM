@@ -70,16 +70,19 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.267`, `warnings=0`,
+- temporal validation: `gpu_ms=1.638`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=3.291`;
-- RT showcase: `gpu_ms=2.022/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=2.998`;
+- RT showcase: `gpu_ms=1.646/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `temporal_diff=mean=0.009/2.5 changed=0.000/0.08`;
+  `transient_delta=0`, `temporal_diff=mean=0.012/2.5 changed=0.000/0.08`;
+- RT reflection tuning: frame contract reports shader-packed denoise alpha and
+  composition strength, and graphics settings persistence/interaction smokes
+  verify round-trip application;
 - VB debug views: depth view 34 and material-albedo view 35 passed with
   nonblack ratio `0.851` for both captures;
 - descriptor/memory stress: `persistent_descriptors=988/1024`,
@@ -114,19 +117,19 @@ Result:
   Gallery, and fallback matrix rows;
 - particle effect library: passed; public ECS effects cover fire, smoke, dust,
   sparks, embers, mist, rain, snow, and procedural billboard fallback, with
-  Effects Gallery reporting `emitters=8` and `particles=77`;
+  Effects Gallery reporting `emitters=8` and `particles=70`;
 - IBL asset policy passed with five runtime assets under budget-class caps;
 - IBL gallery passed all five enabled runtime environments:
   `studio`, `warm_gallery`, `sunset_courtyard`, `cool_overcast`,
   `night_city`;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=16.423`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=22.627`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_235833_231_38436_cedd6bec
+CortexEngine/build/bin/logs/runs/release_validation_20260511_002324_075_33920_28d7fa20
 ```
 
 ## Renderer Scope

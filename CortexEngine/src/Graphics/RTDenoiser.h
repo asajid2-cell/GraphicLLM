@@ -39,6 +39,7 @@ public:
         ID3D12Resource* temporalMaskResource = nullptr;
         DescriptorHandle srvTable;
         DescriptorHandle uavTable;
+        float accumulationAlpha = -1.0f;
     };
 
     struct DispatchResult {
@@ -61,7 +62,7 @@ public:
 
 private:
     [[nodiscard]] ID3D12PipelineState* SelectPipeline(Signal signal, bool historyValid) const;
-    [[nodiscard]] float AlphaForSignal(Signal signal, bool historyValid) const;
+    [[nodiscard]] float AlphaForSignal(Signal signal, bool historyValid, float overrideAlpha = -1.0f) const;
 
     ID3D12RootSignature* m_rootSignature = nullptr;
     std::unique_ptr<DX12ComputePipeline> m_shadowSeedPipeline;

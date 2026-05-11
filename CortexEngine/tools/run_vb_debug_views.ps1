@@ -119,3 +119,4 @@ foreach ($row in $summaries) {
         $row.name, $row.debug_view, $row.nonblack_ratio, $row.colorful_ratio, $row.avg_luma)
 }
 Write-Host "  logs=$activeLogDir"
+exit 0

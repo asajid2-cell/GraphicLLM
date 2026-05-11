@@ -115,6 +115,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "saturation": 1.28,
     "vignette": 0.27,
     "lens_dirt": 0.21,
+    "motion_blur_enabled": true,
+    "depth_of_field_enabled": true,
     "motion_blur": 0.22,
     "depth_of_field": 0.34,
     "dof_focus_distance": 22.0,
@@ -221,6 +223,12 @@ if ($exitCode -ne 0) {
     Assert-Near "saturation" ([double]$fc.cinematic_post.saturation) 1.28 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
+    if (-not [bool]$fc.cinematic_post.motion_blur_enabled) {
+        Add-Failure "motion_blur_enabled was not true"
+    }
+    if (-not [bool]$fc.cinematic_post.depth_of_field_enabled) {
+        Add-Failure "depth_of_field_enabled was not true"
+    }
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.22 0.03
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.34 0.03
     Assert-Near "dof_focus_distance" ([double]$fc.cinematic_post.dof_focus_distance) 22.0 0.3

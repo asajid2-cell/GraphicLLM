@@ -112,6 +112,8 @@ struct RendererCinematicPostTuning {
     float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
+    bool motionBlurEnabled = true;
+    bool depthOfFieldEnabled = true;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
     float dofFocusDistance = 18.0f;

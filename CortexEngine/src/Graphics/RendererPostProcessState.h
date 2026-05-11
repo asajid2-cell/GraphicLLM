@@ -19,6 +19,8 @@ struct RendererPostProcessState {
     float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
+    bool motionBlurEnabled = true;
+    bool depthOfFieldEnabled = true;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
     float dofFocusDistance = 18.0f;
@@ -35,11 +37,11 @@ struct RendererPostProcessState {
     }
 
     [[nodiscard]] float EffectiveMotionBlur() const {
-        return cinematicEnabled ? std::clamp(motionBlur, 0.0f, 1.0f) : 0.0f;
+        return (cinematicEnabled && motionBlurEnabled) ? std::clamp(motionBlur, 0.0f, 1.0f) : 0.0f;
     }
 
     [[nodiscard]] float EffectiveDepthOfField() const {
-        return cinematicEnabled ? std::clamp(depthOfField, 0.0f, 1.0f) : 0.0f;
+        return (cinematicEnabled && depthOfFieldEnabled) ? std::clamp(depthOfField, 0.0f, 1.0f) : 0.0f;
     }
 
     [[nodiscard]] uint32_t ToneMapperMode() const {

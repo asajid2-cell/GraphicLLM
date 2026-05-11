@@ -321,6 +321,8 @@ json FrameContractToJson(const FrameContract& contract) {
             {"tone_mapper_preset", contract.cinematicPost.toneMapperPreset},
             {"vignette", contract.cinematicPost.vignette},
             {"lens_dirt", contract.cinematicPost.lensDirt},
+            {"motion_blur_enabled", contract.cinematicPost.motionBlurEnabled},
+            {"depth_of_field_enabled", contract.cinematicPost.depthOfFieldEnabled},
             {"motion_blur", contract.cinematicPost.motionBlur},
             {"depth_of_field", contract.cinematicPost.depthOfField},
             {"dof_focus_distance", contract.cinematicPost.dofFocusDistance},

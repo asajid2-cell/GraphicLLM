@@ -161,6 +161,8 @@ json ToJson(const RendererTuningState& state) {
             {"saturation", state.cinematicPost.saturation},
             {"vignette", state.cinematicPost.vignette},
             {"lens_dirt", state.cinematicPost.lensDirt},
+            {"motion_blur_enabled", state.cinematicPost.motionBlurEnabled},
+            {"depth_of_field_enabled", state.cinematicPost.depthOfFieldEnabled},
             {"motion_blur", state.cinematicPost.motionBlur},
             {"depth_of_field", state.cinematicPost.depthOfField},
             {"dof_focus_distance", state.cinematicPost.dofFocusDistance},
@@ -344,6 +346,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(c, "saturation", state.cinematicPost.saturation);
         ReadValue(c, "vignette", state.cinematicPost.vignette);
         ReadValue(c, "lens_dirt", state.cinematicPost.lensDirt);
+        ReadValue(c, "motion_blur_enabled", state.cinematicPost.motionBlurEnabled);
+        ReadValue(c, "depth_of_field_enabled", state.cinematicPost.depthOfFieldEnabled);
         ReadValue(c, "motion_blur", state.cinematicPost.motionBlur);
         ReadValue(c, "depth_of_field", state.cinematicPost.depthOfField);
         ReadValue(c, "dof_focus_distance", state.cinematicPost.dofFocusDistance);
@@ -538,6 +542,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.cinematicPost.enabled = post.cinematicEnabled;
     state.cinematicPost.vignette = post.vignette;
     state.cinematicPost.lensDirt = post.lensDirt;
+    state.cinematicPost.motionBlurEnabled = post.motionBlurEnabled;
+    state.cinematicPost.depthOfFieldEnabled = post.depthOfFieldEnabled;
     state.cinematicPost.motionBlur = post.motionBlur;
     state.cinematicPost.depthOfField = post.depthOfField;
     state.cinematicPost.dofFocusDistance = post.dofFocusDistance;
@@ -738,7 +744,9 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     renderer.SetCinematicPostEffects(state.cinematicPost.motionBlur,
                                      state.cinematicPost.depthOfField,
                                      state.cinematicPost.dofFocusDistance,
-                                     state.cinematicPost.dofAperture);
+                                     state.cinematicPost.dofAperture,
+                                     state.cinematicPost.motionBlurEnabled,
+                                     state.cinematicPost.depthOfFieldEnabled);
 }
 
 std::filesystem::path GetDefaultRendererTuningStatePath() {

@@ -101,6 +101,8 @@ $IDC_GFX_QUALITY_PRESET_SELECT = 9216
 $IDC_GFX_RT_REFL_STRENGTH = 9034
 $IDC_GFX_MOTION_BLUR = 9058
 $IDC_GFX_DOF = 9059
+$IDC_GFX_MOTION_BLUR_ENABLED = 9223
+$IDC_GFX_DOF_ENABLED = 9224
 $IDC_GFX_GRADE_COOL_MOON = 9056
 $IDC_GFX_TONE_PUNCHY = 9063
 $IDC_GFX_RIG_LANTERNS = 9032
@@ -248,6 +250,8 @@ try {
         Set-Trackbar $window $IDC_GFX_DOF 31
         Set-Trackbar $window $IDC_GFX_DOF_FOCUS_DISTANCE 18
         Set-Trackbar $window $IDC_GFX_DOF_APERTURE 55
+        Set-CheckboxState $window $IDC_GFX_MOTION_BLUR_ENABLED $false
+        Set-CheckboxState $window $IDC_GFX_DOF_ENABLED $false
         Click-Control $window $IDC_GFX_GRADE_COOL_MOON
         Click-Control $window $IDC_GFX_TONE_PUNCHY
         Click-Control $window $IDC_GFX_RIG_LANTERNS
@@ -345,8 +349,14 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.62 0.05
     Assert-Near "rt_gi_strength" ([double]$fc.ray_tracing.rt_gi_tuning.strength) 0.46 0.05
     Assert-Near "rt_gi_ray_distance" ([double]$fc.ray_tracing.rt_gi_tuning.ray_distance) 11.8 0.5
-    Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.29 0.05
-    Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.31 0.05
+    if ([bool]$fc.cinematic_post.motion_blur_enabled) {
+        Add-Failure "motion_blur_enabled remained true after native toggle"
+    }
+    if ([bool]$fc.cinematic_post.depth_of_field_enabled) {
+        Add-Failure "depth_of_field_enabled remained true after native toggle"
+    }
+    Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.0 0.01
+    Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.0 0.01
     Assert-Near "dof_focus_distance" ([double]$fc.cinematic_post.dof_focus_distance) 18.08 0.6
     Assert-Near "dof_aperture" ([double]$fc.cinematic_post.dof_aperture) 4.4 0.2
     if ([string]$fc.cinematic_post.color_grade_preset -ne "cool_moon") {

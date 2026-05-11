@@ -1,6 +1,7 @@
 ﻿#include "Renderer.h"
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/DepthPrepassTargetPass.h"
 #include "Graphics/Passes/MeshDrawPass.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
@@ -14,42 +15,15 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Ensure depth buffer is writable for the prepass.
-    if (!m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions &&
-        m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-        D3D12_RESOURCE_BARRIER depthBarrier{};
-        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    DepthPrepassTargetPass::BindContext targetContext{};
+    targetContext.commandList = m_commandResources.graphicsList.Get();
+    targetContext.depthBuffer = m_depthResources.resources.buffer.Get();
+    targetContext.depthState = &m_depthResources.resources.resourceState;
+    targetContext.depthDsv = m_depthResources.descriptors.dsv;
+    targetContext.skipTransitions = m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions;
+    if (!DepthPrepassTargetPass::BindAndClear(targetContext)) {
+        return;
     }
-
-    // Bind depth stencil only; no color targets for this pass.
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.descriptors.dsv.cpu;
-    m_commandResources.graphicsList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
-
-    // Clear depth to far plane.
-    m_commandResources.graphicsList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-    // Set viewport and scissor to match the depth buffer.
-    const D3D12_RESOURCE_DESC depthDesc = m_depthResources.resources.buffer->GetDesc();
-    D3D12_VIEWPORT viewport{};
-    viewport.Width    = static_cast<float>(depthDesc.Width);
-    viewport.Height   = static_cast<float>(depthDesc.Height);
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-
-    D3D12_RECT scissorRect{};
-    scissorRect.left   = 0;
-    scissorRect.top    = 0;
-    scissorRect.right  = static_cast<LONG>(depthDesc.Width);
-    scissorRect.bottom = static_cast<LONG>(depthDesc.Height);
-
-    m_commandResources.graphicsList->RSSetViewports(1, &viewport);
-    m_commandResources.graphicsList->RSSetScissorRects(1, &scissorRect);
 
     // Bind root signature and depth-only pipeline. Alpha-tested depth draws
     // sample material textures, so bind the shader-visible heap before any

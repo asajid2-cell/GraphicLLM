@@ -38,15 +38,17 @@ struct StandaloneBloomContext {
     std::span<RGResourceHandle> bloomB;
     std::span<ID3D12Resource* const> bloomATemplates;
     std::span<ID3D12Resource* const> bloomBTemplates;
+    DescriptorHandle (*targetRtv)[2] = nullptr;
+    BloomPass::FullscreenContext fullscreen;
+    DX12Pipeline* downsamplePipeline = nullptr;
+    DX12Pipeline* blurHPipeline = nullptr;
+    DX12Pipeline* blurVPipeline = nullptr;
+    DX12Pipeline* compositePipeline = nullptr;
     uint32_t activeLevels = 0;
+    uint32_t stageLevels = 0;
     uint32_t baseLevel = 0;
     bool useTransients = true;
-    std::function<bool(const RenderGraph&)> renderDownsampleBase;
-    std::function<bool(uint32_t, const RenderGraph&)> renderDownsampleLevel;
-    std::function<bool(uint32_t, const RenderGraph&)> renderBlurHorizontal;
-    std::function<bool(uint32_t, const RenderGraph&)> renderBlurVertical;
-    std::function<bool(const RenderGraph&)> renderComposite;
-    std::function<bool(const RenderGraph&)> copyCombined;
+    std::function<void()> markHdrShaderResource;
     std::function<void(const char*)> failStage;
 };
 

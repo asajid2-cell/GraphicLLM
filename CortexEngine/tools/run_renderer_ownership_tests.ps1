@@ -94,6 +94,7 @@ $environmentRendererPath = Join-Path $root "src/Graphics/Renderer_Environment.cp
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $renderGraphBloomPath = Join-Path $root "src/Graphics/Renderer_RenderGraphBloom.cpp"
+$bloomGraphPassPath = Join-Path $root "src/Graphics/Passes/BloomGraphPass.cpp"
 $renderGraphDiagnosticsPath = Join-Path $root "src/Graphics/Renderer_RenderGraphDiagnostics.cpp"
 $bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
@@ -1568,26 +1569,55 @@ foreach ($target in $doc.targets) {
         } else {
             Add-Failure "render_graph_transient_views missing DescriptorTable.cpp"
         }
-        $renderGraphFiles = @(
-            @{ Path = $renderGraphBloomPath; Name = "Renderer_RenderGraphBloom.cpp" },
-            @{ Path = $renderGraphDiagnosticsPath; Name = "Renderer_RenderGraphDiagnostics.cpp" }
-        )
-        foreach ($entry in $renderGraphFiles) {
-            if (Test-Path $entry.Path) {
-                $content = Get-Content $entry.Path -Raw
-                foreach ($required in @("DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV")) {
-                    if ($content.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
-                        Add-Failure "render_graph_transient_views missing DescriptorTable route in $($entry.Name): $required"
-                    }
+        if (Test-Path $bloomPassPath) {
+            $bloomPassContent = Get-Content $bloomPassPath -Raw
+            foreach ($required in @("EnsureGraphRTV", "BindGraphTexture", "AllocateRTV", "CreateRenderTargetView", "CreateShaderResourceView")) {
+                if ($bloomPassContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "render_graph_transient_views missing BloomPass graph-view ownership marker: $required"
                 }
-                foreach ($removedLocal in @("AllocateRTV", "AllocateStagingCBV_SRV_UAV", "CreateRenderTargetView", "CreateShaderResourceView")) {
-                    if ($content.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
-                        Add-Failure "render_graph_transient_views still has direct transient view mechanics in $($entry.Name): $removedLocal"
-                    }
-                }
-            } else {
-                Add-Failure "render_graph_transient_views missing $($entry.Name)"
             }
+        } else {
+            Add-Failure "render_graph_transient_views missing BloomPass.cpp"
+        }
+        if (Test-Path $bloomGraphPassPath) {
+            $bloomGraphPassContent = Get-Content $bloomGraphPassPath -Raw
+            foreach ($required in @("context.targetRtv", "BloomPass::RenderFullscreen", "BloomPass::RenderComposite", "BloomPass::CopyCompositeToCombined")) {
+                if ($bloomGraphPassContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "render_graph_transient_views missing BloomGraphPass route: $required"
+                }
+            }
+        } else {
+            Add-Failure "render_graph_transient_views missing BloomGraphPass.cpp"
+        }
+        if (Test-Path $renderGraphBloomPath) {
+            $renderGraphBloomContent = Get-Content $renderGraphBloomPath -Raw
+            foreach ($required in @("BloomGraphPass::AddStandaloneBloom", "m_bloomResources.resources.graphRtv")) {
+                if ($renderGraphBloomContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "render_graph_transient_views missing renderer-to-pass graph-view route: $required"
+                }
+            }
+            foreach ($removedLocal in @("DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV", "AllocateRTV", "AllocateStagingCBV_SRV_UAV", "CreateRenderTargetView", "CreateShaderResourceView")) {
+                if ($renderGraphBloomContent.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "render_graph_transient_views still has direct transient view mechanics in Renderer_RenderGraphBloom.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "render_graph_transient_views missing Renderer_RenderGraphBloom.cpp"
+        }
+        if (Test-Path $renderGraphDiagnosticsPath) {
+            $diagnosticsContent = Get-Content $renderGraphDiagnosticsPath -Raw
+            foreach ($required in @("DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV")) {
+                if ($diagnosticsContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "render_graph_transient_views missing diagnostics DescriptorTable route: $required"
+                }
+            }
+            foreach ($removedLocal in @("AllocateRTV", "AllocateStagingCBV_SRV_UAV", "CreateRenderTargetView", "CreateShaderResourceView")) {
+                if ($diagnosticsContent.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "render_graph_transient_views still has direct transient view mechanics in Renderer_RenderGraphDiagnostics.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "render_graph_transient_views missing Renderer_RenderGraphDiagnostics.cpp"
         }
     }
 

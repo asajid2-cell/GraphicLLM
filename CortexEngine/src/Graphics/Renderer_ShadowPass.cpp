@@ -3,6 +3,7 @@
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
 #include "Graphics/Passes/MeshDrawPass.h"
+#include "Graphics/Passes/ShadowTargetPass.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -17,28 +18,14 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Transition shadow map to depth write.
-    // The shadow map is a texture array with kShadowArraySize slices (cascades + local
-    // lights). We must ensure ALL subresources are in DEPTH_WRITE state before any
-    // depth clears or writes occur.
-    if (!m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions) {
-        // If the tracked state indicates we need a transition, issue it.
-        // Also check m_shadowResources.resources.initializedForEditor to handle the first frame after
-        // switching to editor mode - the RenderGraph path may have left the shadow
-        // map in a different state than our tracking indicates.
-        if (m_shadowResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_shadowResources.resources.map.Get();
-            barrier.Transition.StateBefore = m_shadowResources.resources.resourceState;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_shadowResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        }
-
-        // Mark that we've successfully initialized for editor mode
-        m_shadowResources.resources.initializedForEditor = true;
+    ShadowTargetPass::TransitionContext shadowTarget{};
+    shadowTarget.commandList = m_commandResources.graphicsList.Get();
+    shadowTarget.shadowMap = m_shadowResources.resources.map.Get();
+    shadowTarget.resourceState = &m_shadowResources.resources.resourceState;
+    shadowTarget.initializedForEditor = &m_shadowResources.resources.initializedForEditor;
+    shadowTarget.skipTransitions = m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions;
+    if (!ShadowTargetPass::TransitionToDepthWrite(shadowTarget)) {
+        return;
     }
 
     RendererSceneSnapshot localSnapshot{};
@@ -150,16 +137,14 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         // Bind shadow constants (b3)
         m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
-        // Bind DSV for this cascade
-        D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowResources.resources.dsvs[cascadeIndex].cpu;
-        m_commandResources.graphicsList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
-
-        // Clear shadow depth
-        m_commandResources.graphicsList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-        // Set viewport and scissor for shadow map
-        m_commandResources.graphicsList->RSSetViewports(1, &m_shadowResources.raster.viewport);
-        m_commandResources.graphicsList->RSSetScissorRects(1, &m_shadowResources.raster.scissor);
+        ShadowTargetPass::SliceContext sliceContext{};
+        sliceContext.commandList = m_commandResources.graphicsList.Get();
+        sliceContext.dsv = m_shadowResources.resources.dsvs[cascadeIndex];
+        sliceContext.viewport = m_shadowResources.raster.viewport;
+        sliceContext.scissor = m_shadowResources.raster.scissor;
+        if (!ShadowTargetPass::BindAndClearSlice(sliceContext)) {
+            continue;
+        }
 
         drawShadowCasters();
     }
@@ -184,34 +169,20 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             // Bind shadow constants (b3)
             m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(5, shadowCB);
 
-            // Bind DSV for this local light slice
-            D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_shadowResources.resources.dsvs[slice].cpu;
-            m_commandResources.graphicsList->OMSetRenderTargets(0, nullptr, FALSE, &dsv);
-
-            // Clear shadow depth
-            m_commandResources.graphicsList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-            // Set viewport and scissor for shadow map
-            m_commandResources.graphicsList->RSSetViewports(1, &m_shadowResources.raster.viewport);
-            m_commandResources.graphicsList->RSSetScissorRects(1, &m_shadowResources.raster.scissor);
+            ShadowTargetPass::SliceContext sliceContext{};
+            sliceContext.commandList = m_commandResources.graphicsList.Get();
+            sliceContext.dsv = m_shadowResources.resources.dsvs[slice];
+            sliceContext.viewport = m_shadowResources.raster.viewport;
+            sliceContext.scissor = m_shadowResources.raster.scissor;
+            if (!ShadowTargetPass::BindAndClearSlice(sliceContext)) {
+                continue;
+            }
 
             drawShadowCasters();
         }
     }
 
-    // Transition shadow map for sampling
-    if (!m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions) {
-        if (m_shadowResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_shadowResources.resources.map.Get();
-            barrier.Transition.StateBefore = m_shadowResources.resources.resourceState;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_shadowResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        }
-    }
+    (void)ShadowTargetPass::TransitionToShaderResource(shadowTarget);
 }
 
 } // namespace Cortex::Graphics

@@ -1,6 +1,7 @@
 ﻿#include "Renderer.h"
 
 #include "Graphics/Passes/ForwardTargetBindingPass.h"
+#include "Graphics/Passes/FullscreenPass.h"
 #include "Graphics/Passes/MeshDrawPass.h"
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
@@ -44,19 +45,8 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         return;
     }
 
-    const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
-    D3D12_VIEWPORT viewport{};
-    viewport.Width = static_cast<float>(hdrDesc.Width);
-    viewport.Height = static_cast<float>(hdrDesc.Height);
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    D3D12_RECT scissorRect{};
-    scissorRect.left = 0;
-    scissorRect.top = 0;
-    scissorRect.right = static_cast<LONG>(hdrDesc.Width);
-    scissorRect.bottom = static_cast<LONG>(hdrDesc.Height);
-    m_commandResources.graphicsList->RSSetViewports(1, &viewport);
-    m_commandResources.graphicsList->RSSetScissorRects(1, &scissorRect);
+    FullscreenPass::SetViewportAndScissor(m_commandResources.graphicsList.Get(),
+                                          m_mainTargets.hdr.resources.color.Get());
 
     m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.overlay->GetPipelineState());

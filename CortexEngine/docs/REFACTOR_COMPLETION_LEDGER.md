@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_222325_143_21408_3e2c3084
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_223141_744_28020_32263227
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.531`, `disocclusion=0.007485`,
-  `high_motion=0.005249`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.007711`,
+  `high_motion=0.005352`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=6.274`,
+  `camera=reflection_closeup`, `gpu_ms=2.477`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.333/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.279/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -100,11 +100,15 @@ Key evidence from that run:
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, RT
-  firefly/outlier, and LLM renderer command routing.
+  firefly/outlier, LLM renderer command routing, and conductor energy.
 - LLM renderer command smoke: deterministic mock Architect startup command
   applied exposure `1.35`, disabled shadows, enabled fog with density `0.031`,
   set water amplitude `0.07`, and selected `studio_three_point` lighting rig
   with frame-contract source `renderer_rig`.
+- Conductor energy contract: shader invariants passed for forward/deferred
+  conductor energy split; Material Lab passed with `resolved_conductor=4`,
+  `reflection_conductor=4`, `max_metallic=1.0`, `very_bright_albedo=0`, and
+  bounded saturated/near-white ratios.
 
 Recent git history relevant to the audit:
 
@@ -383,7 +387,7 @@ foundation or contract rather than the full broad feature.
 | P2-11Y | Pass 11Y - Shared Material Preset Resolution | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material lab passed; material editor contract reuses registry. |
 | P2-11Z | Pass 11Z - Resolved Material Frame Contract | DONE_VERIFIED | SRC-MATERIAL, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1` | RT showcase material counts and issues pass. |
 | P2-11AA | Pass 11AA - Resolved Surface Classification | DONE_VERIFIED | `SurfaceClassification.h`, SRC-MATERIAL | `tools/run_material_lab_smoke.ps1` | Material Lab checks surface coverage. |
-| P2-11AB | Pass 11AB - Forward Conductor Energy Correction | DONE_UNVERIFIED | shader/material files | historical `phase2.md` evidence | Current visual gates indirectly cover overbright; no focused conductor-energy test. |
+| P2-11AB | Pass 11AB - Forward Conductor Energy Correction | DONE_VERIFIED | `assets/shaders/Basic.hlsl`, `assets/shaders/DeferredLighting.hlsl`, `assets/shaders/PBR_Lighting.hlsli`, `assets/shaders/MaterialResolve.hlsl` | `tools/run_conductor_energy_contract_tests.ps1`; `tools/run_release_validation.ps1` | Targeted gate passed: forward/deferred shader energy-split invariants present, forced metallic clamp absent, Material Lab reports `resolved_conductor=4`, `reflection_conductor=4`, `max_metallic=1.0`, `very_bright_albedo=0`, and bounded saturated/near-white ratios. | None for the current conductor energy contract. |
 | P2-11AC | Pass 11AC - Material-Aware Reflection Policy Diagnostics | DONE_VERIFIED | SRC-MATERIAL, SRC-RT, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1` | RT showcase reflection/material diagnostics pass. |
 | P2-11AD | Pass 11AD - RT Material Surface Parity Contract | DONE_VERIFIED | SRC-RT, SRC-MATERIAL | `tools/run_rt_showcase_smoke.ps1` | `rt_parity=True/0`. |
 | P2-11AE | Pass 11AE - RT Reflection Dispatch Readiness Contract | DONE_VERIFIED | `Renderer_RTReflections.cpp`, `RendererRTState.h`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1` | `rt_refl_ready=True/ready`. |
@@ -648,7 +652,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, conductor energy, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -694,6 +698,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_debug_primitive_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_conductor_energy_contract_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

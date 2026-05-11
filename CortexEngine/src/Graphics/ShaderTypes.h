@@ -143,7 +143,7 @@ struct FrameConstants {
     // x = SSR max ray distance, y = SSR view-space thickness,
     // z = SSR composition strength, w = reserved
     glm::vec4 ssrParams;
-    // x = contrast, y = saturation, z/w reserved
+    // x = contrast, y = saturation, z = motion blur, w = depth of field
     glm::vec4 postGradeParams;
     // x = RT reflection roughness threshold, y = history max blend,
     // z = firefly clamp max luma, w = signal scale

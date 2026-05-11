@@ -204,8 +204,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     frameData.postGradeParams = glm::vec4(
         m_postProcessState.contrast,
         m_postProcessState.saturation,
-        0.0f,
-        0.0f);
+        m_postProcessState.EffectiveMotionBlur(),
+        m_postProcessState.EffectiveDepthOfField());
     frameData.rtReflectionParams = glm::vec4(
         m_rtDenoiseState.reflectionRoughnessThreshold,
         m_rtDenoiseState.reflectionHistoryMaxBlend,

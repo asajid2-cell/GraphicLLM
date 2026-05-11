@@ -62,7 +62,7 @@ cbuffer FrameConstants : register(b1)
     // x = SSR max ray distance, y = SSR view-space thickness,
     // z = SSR composition strength, w = reserved
     float4   g_SSRParams;
-    // x = contrast, y = saturation, z/w reserved
+    // x = contrast, y = saturation, z = motion blur, w = depth of field
     float4   g_PostGradeParams;
     // x = RT reflection roughness threshold, y = history max blend,
     // z = firefly clamp max luma, w = signal scale
@@ -1240,16 +1240,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float3 hdrBlurred = hdrColor;
 
     // Simple motion blur based on velocity buffer (camera-only) in HDR space.
-    // Disabled by default because it can be easily confused with TAA ghosting
-    // (especially on glossy reflections) and makes temporal debugging harder.
-    if (false)
+    // This stays opt-in through cinematic post tuning so temporal validation
+    // can keep a sharp default while showcase captures can add controlled smear.
+    float motionBlurAmount = saturate(g_PostGradeParams.z);
+    if (motionBlurAmount > 0.001f)
     {
         float2 vel = g_Velocity.Sample(g_Sampler, uv).xy;
         float  speed = length(vel);
         // Keep blur radius modest to avoid sampling across large portions of
         // the screen; high-speed motion will still get some streaking, but
         // we bias towards stability over extremely strong blur.
-        float  blurStrength = saturate(speed * 4.0f);
+        float  blurStrength = saturate(speed * 4.0f) * motionBlurAmount;
 
         if (blurStrength > 0.001f)
         {
@@ -1278,6 +1279,47 @@ float4 PSMain(VSOutput input) : SV_TARGET
             }
 
             hdrBlurred = accum / max(total, 1e-4f);
+        }
+    }
+
+    // Lightweight auto-focus depth of field. The focus plane follows the
+    // center of the frame; sky/clear depth falls back to a mid-distance focus
+    // so public scenes can use a subtle cinematic look without needing per-shot
+    // focus authoring yet.
+    float depthOfFieldAmount = saturate(g_PostGradeParams.w);
+    if (depthOfFieldAmount > 0.001f)
+    {
+        float centerFocusDepth = g_Depth.SampleLevel(g_Sampler, float2(0.5f, 0.5f), 0).r;
+        float pixelDepth = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+        if (pixelDepth < 1.0f - 1e-4f)
+        {
+            float3 focusWorld = ReconstructWorldPosition(float2(0.5f, 0.5f), min(centerFocusDepth, 0.995f));
+            float focusDistance = length(focusWorld - g_CameraPosition.xyz);
+            if (centerFocusDepth >= 1.0f - 1e-4f)
+            {
+                focusDistance = 18.0f;
+            }
+
+            float3 pixelWorld = ReconstructWorldPosition(uv, pixelDepth);
+            float pixelDistance = length(pixelWorld - g_CameraPosition.xyz);
+            float focusBand = max(focusDistance * 0.35f, 2.0f);
+            float coc = saturate(abs(pixelDistance - focusDistance) / focusBand) * depthOfFieldAmount;
+
+            if (coc > 0.001f)
+            {
+                float2 texel = float2(g_PostParams.x, g_PostParams.y);
+                float radius = lerp(1.0f, 4.0f, coc);
+                float3 accum = hdrBlurred * 0.28f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius,  0.0f), 0).rgb * 0.12f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius,  0.0f), 0).rgb * 0.12f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f,  radius), 0).rgb * 0.12f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( 0.0f, -radius), 0).rgb * 0.12f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius,  radius), 0).rgb * 0.08f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius,  radius), 0).rgb * 0.08f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2( radius, -radius), 0).rgb * 0.08f;
+                accum += g_SceneColor.SampleLevel(g_Sampler, uv + texel * float2(-radius, -radius), 0).rgb * 0.08f;
+                hdrBlurred = lerp(hdrBlurred, accum, coc);
+            }
         }
     }
 

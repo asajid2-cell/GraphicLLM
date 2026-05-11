@@ -190,7 +190,7 @@ if ($systems.ContainsKey("cinematic_post")) {
     foreach ($feature in $systems["cinematic_post"].validated_features) {
         $features[[string]$feature] = $true
     }
-    foreach ($requiredPostFeature in @("bloom_threshold", "soft_knee", "vignette", "lens_dirt", "frame_contract_stats")) {
+    foreach ($requiredPostFeature in @("bloom_threshold", "soft_knee", "vignette", "lens_dirt", "motion_blur", "depth_of_field", "color_grade_presets", "frame_contract_stats")) {
         if (-not $features.ContainsKey($requiredPostFeature)) {
             Add-Failure "cinematic_post missing validated feature '$requiredPostFeature'"
         }

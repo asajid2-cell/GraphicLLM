@@ -189,6 +189,12 @@ if ($failures.Count -eq 0) {
         if ([double]$cinematicPost.lens_dirt -le 0.0) {
             Add-Failure "cinematic_post.lens_dirt is not active"
         }
+        if ([double]$cinematicPost.motion_blur -le 0.0) {
+            Add-Failure "cinematic_post.motion_blur is not active"
+        }
+        if ([double]$cinematicPost.depth_of_field -le 0.0) {
+            Add-Failure "cinematic_post.depth_of_field is not active"
+        }
     }
 
     if ([int]$materials.sampled -lt 10) {

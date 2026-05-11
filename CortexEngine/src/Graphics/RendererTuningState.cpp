@@ -97,7 +97,9 @@ json ToJson(const RendererTuningState& state) {
             {"contrast", state.cinematicPost.contrast},
             {"saturation", state.cinematicPost.saturation},
             {"vignette", state.cinematicPost.vignette},
-            {"lens_dirt", state.cinematicPost.lensDirt}
+            {"lens_dirt", state.cinematicPost.lensDirt},
+            {"motion_blur", state.cinematicPost.motionBlur},
+            {"depth_of_field", state.cinematicPost.depthOfField}
         }}
     };
 }
@@ -237,6 +239,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(c, "saturation", state.cinematicPost.saturation);
         ReadValue(c, "vignette", state.cinematicPost.vignette);
         ReadValue(c, "lens_dirt", state.cinematicPost.lensDirt);
+        ReadValue(c, "motion_blur", state.cinematicPost.motionBlur);
+        ReadValue(c, "depth_of_field", state.cinematicPost.depthOfField);
     }
 
     return ClampRendererTuningState(state);
@@ -389,6 +393,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.cinematicPost.enabled = post.cinematicEnabled;
     state.cinematicPost.vignette = post.vignette;
     state.cinematicPost.lensDirt = post.lensDirt;
+    state.cinematicPost.motionBlur = post.motionBlur;
+    state.cinematicPost.depthOfField = post.depthOfField;
 
     return ClampRendererTuningState(state);
 }
@@ -452,6 +458,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.cinematicPost.saturation = std::clamp(state.cinematicPost.saturation, 0.0f, 2.0f);
     state.cinematicPost.vignette = std::clamp(state.cinematicPost.vignette, 0.0f, 1.0f);
     state.cinematicPost.lensDirt = std::clamp(state.cinematicPost.lensDirt, 0.0f, 1.0f);
+    state.cinematicPost.motionBlur = std::clamp(state.cinematicPost.motionBlur, 0.0f, 1.0f);
+    state.cinematicPost.depthOfField = std::clamp(state.cinematicPost.depthOfField, 0.0f, 1.0f);
 
     return state;
 }
@@ -539,6 +547,8 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyCinematicPostControl(renderer,
                               state.cinematicPost.vignette,
                               state.cinematicPost.lensDirt);
+    renderer.SetCinematicPostEffects(state.cinematicPost.motionBlur,
+                                     state.cinematicPost.depthOfField);
 }
 
 std::filesystem::path GetDefaultRendererTuningStatePath() {

@@ -101,7 +101,9 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "contrast": 1.22,
     "saturation": 1.28,
     "vignette": 0.27,
-    "lens_dirt": 0.21
+    "lens_dirt": 0.21,
+    "motion_blur": 0.22,
+    "depth_of_field": 0.34
   }
 }
 '@ | Set-Content -Encoding UTF8 $settingsPath
@@ -188,6 +190,8 @@ if ($exitCode -ne 0) {
     Assert-Near "saturation" ([double]$fc.cinematic_post.saturation) 1.28 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
+    Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.22 0.03
+    Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.34 0.03
     if ($null -eq $fc.ray_tracing.rt_reflection_tuning) {
         Add-Failure "rt_reflection_tuning was missing"
     } else {

@@ -43,6 +43,7 @@ cbuffer FrameConstants : register(b1)
     // z = SSR composition strength, w = reserved
     float4   g_SSRParams;
     // x = contrast, y = saturation, z/w reserved
+    // x = contrast, y = saturation, z = motion blur, w = depth of field
     float4   g_PostGradeParams;
     // x = RT reflection roughness threshold, y = history max blend,
     // z = firefly clamp max luma, w = signal scale

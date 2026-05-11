@@ -81,6 +81,7 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.cinematic_post.bloom_soft_knee" ([double]$preset.cinematic_post.bloom_soft_knee) 0.0 1.0
     Assert-Range "$id.cinematic_post.vignette" ([double]$preset.cinematic_post.vignette) 0.0 1.0
     Assert-Range "$id.cinematic_post.motion_blur" ([double]$preset.cinematic_post.motion_blur) 0.0 1.0
+    Assert-Range "$id.cinematic_post.depth_of_field" ([double]$preset.cinematic_post.depth_of_field) 0.0 1.0
 }
 
 if (-not $defaultFound) {

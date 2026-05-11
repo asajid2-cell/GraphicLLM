@@ -83,6 +83,16 @@
       "future_extension": "Keep future color/deferred targets inside explicit resources/descriptors bundles before adding renderer orchestration"
     },
     {
+      "id": "mesh_draw_submission",
+      "owner": "Forward mesh draw submission",
+      "status": "release_boundary_validated",
+      "release_boundary": "Forward, transparent, overlay, and water passes keep material and descriptor setup local, but shared vertex/index binding and DrawIndexedInstanced submission are owned by MeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "material_lab", "glass_water_courtyard", "effects_showcase"],
+      "target_files": ["Passes/MeshDrawPass.h", "Renderer_ForwardPass.cpp", "Renderer_TransparentGeometry.cpp", "Renderer_OverlayGeometry.cpp", "Renderer_WaterSurfaces.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_pipelineState"],
+      "future_extension": "Move more pipeline/pass state into dedicated pass helpers before adding new forward-like draw paths"
+    },
+    {
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",

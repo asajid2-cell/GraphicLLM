@@ -79,6 +79,8 @@ $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
+$meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
+$forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
 $waterSurfacesPath = Join-Path $root "src/Graphics/Renderer_WaterSurfaces.cpp"
 $transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeometry.cpp"
 $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
@@ -444,6 +446,37 @@ foreach ($target in $doc.targets) {
                 }
                 if ($forwardSource.IndexOf("ForwardTargetBindingPass::BindHdrAndDepthReadOnly", [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "main_target_resources missing shared HDR/depth binding in $($pathInfo.Label)"
+                }
+            }
+        }
+    }
+
+    if ($id -eq "mesh_draw_submission") {
+        if (Test-Path $meshDrawPassPath) {
+            $meshDrawPass = Get-Content $meshDrawPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::MeshDrawPass", "DrawIndexedMesh", "IASetVertexBuffers", "IASetIndexBuffer", "DrawIndexedInstanced")) {
+                if ($meshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_draw_submission missing MeshDrawPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "mesh_draw_submission missing MeshDrawPass.cpp"
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $forwardPassPath; Label = "Renderer_ForwardPass.cpp" },
+            [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
+            [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
+            [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $meshSource = Get-Content $pathInfo.Path -Raw
+                foreach ($directDrawCall in @("IASetVertexBuffers", "IASetIndexBuffer", "DrawIndexedInstanced")) {
+                    if ($meshSource.IndexOf($directDrawCall, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "mesh_draw_submission still performs indexed mesh draw submission directly in $($pathInfo.Label): $directDrawCall"
+                    }
+                }
+                if ($meshSource.IndexOf("MeshDrawPass::DrawIndexedMesh", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_draw_submission missing MeshDrawPass::DrawIndexedMesh in $($pathInfo.Label)"
                 }
             }
         }

@@ -20,8 +20,6 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_services.visibilityBuffer || !m_depthResources.resources.buffer || !m_mainTargets.hdr.resources.color) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_visibility_buffer_prerequisites_missing";
-        RenderVisibilityBufferPath(registry);
-        result.executed = m_visibilityBufferState.renderedThisFrame;
         return result;
     }
 
@@ -416,89 +414,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         return result;
     }
 
-    m_services.renderGraph->BeginFrame();
-    const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_VB");
-    const RGResourceHandle hdrHandle =
-        m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR_VB");
-
-    RGResourceHandle shadowHandle{};
-    if (m_shadowResources.resources.map) {
-        shadowHandle = m_services.renderGraph->ImportResource(m_shadowResources.resources.map.Get(), m_shadowResources.resources.resourceState, "ShadowMap_VB");
-    }
-
-    RGResourceHandle rtShadowHandle{};
-    if (m_rtShadowTargets.mask) {
-        rtShadowHandle = m_services.renderGraph->ImportResource(m_rtShadowTargets.mask.Get(), m_rtShadowTargets.maskState, "RTShadowMask_VB");
-    }
-
-    RGResourceHandle rtGIHandle{};
-    if (m_rtGITargets.color) {
-        rtGIHandle = m_services.renderGraph->ImportResource(m_rtGITargets.color.Get(), m_rtGITargets.colorState, "RTGI_VB");
-    }
-
-    VisibilityBufferGraphPass::LegacyPathContext legacyGraphContext{};
-    legacyGraphContext.depth = depthHandle;
-    legacyGraphContext.hdr = hdrHandle;
-    legacyGraphContext.shadow = shadowHandle;
-    legacyGraphContext.rtShadow = rtShadowHandle;
-    legacyGraphContext.rtGI = rtGIHandle;
-    legacyGraphContext.execute = [&, shadowHandle, rtShadowHandle, rtGIHandle]() {
-            // The graph moves external resources into the starting states for
-            // the legacy VB path. VB-internal resources still perform their own
-            // transitions until this path is split into visibility/resolve/light
-            // graph nodes.
-            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-            m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            if (shadowHandle.IsValid()) {
-                m_shadowResources.resources.resourceState =
-                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            }
-            if (rtShadowHandle.IsValid()) {
-                m_rtShadowTargets.maskState =
-                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            }
-            if (rtGIHandle.IsValid()) {
-                m_rtGITargets.colorState =
-                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-            }
-            RenderVisibilityBufferPath(registry);
-    };
-    legacyGraphContext.failStage = [&](const char* reason) {
-        result.fallbackUsed = true;
-        result.fallbackReason = reason ? reason : "visibility_buffer_legacy_graph_contract";
-    };
-
-    if (!VisibilityBufferGraphPass::AddLegacyPath(*m_services.renderGraph, legacyGraphContext)) {
-        m_services.renderGraph->EndFrame();
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("VisibilityBuffer RG: {} (falling back to legacy barriers)", result.fallbackReason);
-        RenderVisibilityBufferPath(registry);
-        result.executed = m_visibilityBufferState.renderedThisFrame;
-        return result;
-    }
-
-    const auto execResult = m_services.renderGraph->Execute(m_commandResources.graphicsList.Get());
-    AccumulateRenderGraphExecutionStats(&result);
-    if (execResult.IsErr()) {
-        result.fallbackUsed = true;
-        result.fallbackReason = execResult.Error();
-    } else {
-        m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
-        if (shadowHandle.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
-        if (rtShadowHandle.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(rtShadowHandle);
-        if (rtGIHandle.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(rtGIHandle);
-        result.executed = m_visibilityBufferState.renderedThisFrame;
-    }
-    m_services.renderGraph->EndFrame();
-
-    if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("VisibilityBuffer RG: {} (falling back to legacy barriers)", result.fallbackReason);
-        RenderVisibilityBufferPath(registry);
-        result.executed = m_visibilityBufferState.renderedThisFrame;
-    }
-
+    result.fallbackUsed = true;
+    result.fallbackReason = "visibility_buffer_graph_resources_missing";
     return result;
 }
 

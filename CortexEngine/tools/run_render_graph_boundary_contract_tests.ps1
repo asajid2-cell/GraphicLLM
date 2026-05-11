@@ -24,6 +24,12 @@ function Assert-Matches([string]$Name, [string]$Text, [string]$Pattern) {
     }
 }
 
+function Assert-NotMatches([string]$Name, [string]$Text, [string]$Pattern) {
+    if ($Text -match $Pattern) {
+        Add-Failure "$Name still matches removed pattern: $Pattern"
+    }
+}
+
 $matrix = Read-Text "tools/run_render_graph_transient_matrix.ps1"
 $diagnostics = Read-Text "src/Graphics/Renderer_RenderGraphDiagnostics.cpp"
 $vbGraph = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
@@ -57,19 +63,24 @@ foreach ($passName in @(
     "VBVisibility",
     "VBMaterialResolve",
     "VBDebugBlit",
-    "VBDeferredLighting",
-    "VisibilityBufferPath"
+    "VBDeferredLighting"
 )) {
     Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph $passName
 }
 
 Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph "AddStagedPath"
-Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph "AddLegacyPath"
-Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph "visibility_buffer_legacy_graph_contract"
-Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "LegacyPathContext"
-Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "AddLegacyPath"
-Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "fallbackExecutions"
 Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "AccumulateRenderGraphExecutionStats"
+Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "visibility_buffer_graph_resources_missing"
+
+foreach ($removedPattern in @(
+    "AddLegacyPath",
+    "LegacyPathContext",
+    "VisibilityBufferPath",
+    "visibility_buffer_legacy_graph_contract"
+)) {
+    Assert-NotMatches "VisibilityBufferGraphPass.cpp" $vbGraph $removedPattern
+    Assert-NotMatches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary $removedPattern
+}
 
 if ($failures.Count -gt 0) {
     Write-Host "Render graph boundary contract tests failed:" -ForegroundColor Red
@@ -82,4 +93,5 @@ if ($failures.Count -gt 0) {
 Write-Host "Render graph boundary contract tests passed." -ForegroundColor Green
 Write-Host "  transient_matrix_env=covered"
 Write-Host "  transient_validation_module=covered"
-Write-Host "  vb_staged_and_legacy_boundaries=covered"
+Write-Host "  vb_staged_boundary=covered"
+Write-Host "  vb_legacy_boundary_removed=covered"

@@ -164,29 +164,4 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     return true;
 }
 
-bool AddLegacyPath(RenderGraph& graph, const LegacyPathContext& context) {
-    if (!context.depth.IsValid() || !context.hdr.IsValid() || !context.execute) {
-        if (context.failStage) {
-            context.failStage("visibility_buffer_legacy_graph_contract");
-        }
-        return false;
-    }
-
-    graph.AddPass(
-        "VisibilityBufferPath",
-        [context](RGPassBuilder& builder) {
-            builder.SetType(RGPassType::Graphics);
-            builder.Write(context.depth, RGResourceUsage::DepthStencilWrite);
-            builder.Write(context.hdr, RGResourceUsage::RenderTarget);
-            if (context.shadow.IsValid()) builder.Read(context.shadow, RGResourceUsage::ShaderResource);
-            if (context.rtShadow.IsValid()) builder.Read(context.rtShadow, RGResourceUsage::ShaderResource);
-            if (context.rtGI.IsValid()) builder.Read(context.rtGI, RGResourceUsage::ShaderResource);
-        },
-        [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            context.execute();
-        });
-
-    return true;
-}
-
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

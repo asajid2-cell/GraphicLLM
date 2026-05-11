@@ -482,13 +482,16 @@ foreach ($target in $doc.targets) {
         )) {
             if (Test-Path $pathInfo.Path) {
                 $forwardSource = Get-Content $pathInfo.Path -Raw
-                foreach ($directTargetBindingCall in @("ResourceBarrier", "OMSetRenderTargets")) {
+                foreach ($directTargetBindingCall in @("ResourceBarrier", "OMSetRenderTargets", "RSSetViewports", "RSSetScissorRects")) {
                     if ($forwardSource.IndexOf($directTargetBindingCall, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "main_target_resources still binds HDR/depth targets directly in $($pathInfo.Label): $directTargetBindingCall"
                     }
                 }
                 if ($forwardSource.IndexOf("ForwardTargetBindingPass::BindHdrAndDepthReadOnly", [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "main_target_resources missing shared HDR/depth binding in $($pathInfo.Label)"
+                }
+                if ($forwardSource.IndexOf("FullscreenPass::SetViewportAndScissor", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing shared viewport/scissor setup in $($pathInfo.Label)"
                 }
             }
         }

@@ -289,7 +289,9 @@ namespace Cortex::Graphics {
             }
         }
     } else {
-        auto prepResult = m_services.gpuCulling->PrepareAllCommandsForExecuteIndirect(m_commandResources.graphicsList.Get());
+        auto prepResult = IndirectMeshDrawPass::PrepareAllCommands(
+            m_services.gpuCulling.get(),
+            m_commandResources.graphicsList.Get());
         if (prepResult.IsErr()) {
             spdlog::warn("RenderSceneIndirect: failed to prepare all-commands buffer: {}", prepResult.Error());
             RenderScene(registry);

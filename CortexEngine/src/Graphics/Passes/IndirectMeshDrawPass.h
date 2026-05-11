@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Graphics/GPUCulling.h"
 #include "Graphics/RHI/D3D12Includes.h"
 #include "Graphics/RHI/DescriptorHeap.h"
 
@@ -30,6 +31,10 @@ struct ExecuteResult {
 };
 
 [[nodiscard]] bool RestoreGraphicsState(const RestoreGraphicsStateContext& context);
+[[nodiscard]] Result<void> ConfigureCullingRootSignature(GPUCullingPipeline* gpuCulling,
+                                                         ID3D12RootSignature* rootSignature);
+[[nodiscard]] Result<void> PrepareAllCommands(GPUCullingPipeline* gpuCulling,
+                                              ID3D12GraphicsCommandList* commandList);
 [[nodiscard]] ExecuteResult ExecuteCommands(const ExecuteContext& context);
 
 } // namespace Cortex::Graphics::IndirectMeshDrawPass

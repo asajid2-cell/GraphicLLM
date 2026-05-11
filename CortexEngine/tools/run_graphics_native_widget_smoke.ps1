@@ -27,6 +27,7 @@ if (-not (Test-Path $exe)) {
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class CortexWin32UiSmoke {
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -43,6 +44,12 @@ public static class CortexWin32UiSmoke {
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern int GetWindowTextLength(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 }
 "@
 
@@ -56,6 +63,10 @@ $BST_CHECKED = 1
 $CB_SETCURSEL = 0x014E
 $CBN_SELCHANGE = 1
 
+$IDC_GFX_HEALTH = 9001
+$IDC_GFX_MEMORY = 9002
+$IDC_GFX_WARNING = 9003
+$IDC_GFX_RT_SCHEDULER = 9004
 $IDC_GFX_RENDER_SCALE = 9010
 $IDC_GFX_SAFE_LIGHTING = 9115
 $IDC_GFX_ENV_SELECT = 9211
@@ -206,6 +217,20 @@ function Select-ComboIndex([IntPtr]$Parent, [int]$Id, [int]$Index) {
     Start-Sleep -Milliseconds 350
 }
 
+function Get-ControlText([IntPtr]$Parent, [int]$Id) {
+    $control = Get-Control $Parent $Id
+    $length = [CortexWin32UiSmoke]::GetWindowTextLength($control)
+    $builder = [System.Text.StringBuilder]::new([Math]::Max(256, $length + 1))
+    [void][CortexWin32UiSmoke]::GetWindowText($control, $builder, $builder.Capacity)
+    return $builder.ToString()
+}
+
+function Assert-TextContains([string]$Name, [string]$Text, [string]$Needle) {
+    if ($Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+        Add-Failure "$Name text '$Text' did not contain '$Needle'"
+    }
+}
+
 try {
     $window = Wait-GraphicsWindow $process 35
     if ($window -eq [IntPtr]::Zero) {
@@ -263,6 +288,22 @@ try {
         Set-Trackbar $window $IDC_GFX_AREA_LIGHT 64
         Select-ComboIndex $window $IDC_GFX_ENV_SELECT 4
         Click-Control $window $IDC_GFX_ENV_REAPPLY
+
+        Start-Sleep -Milliseconds 800
+        $healthText = Get-ControlText $window $IDC_GFX_HEALTH
+        $budgetText = Get-ControlText $window $IDC_GFX_MEMORY
+        $warningText = Get-ControlText $window $IDC_GFX_WARNING
+        $schedulerText = Get-ControlText $window $IDC_GFX_RT_SCHEDULER
+        Assert-TextContains "Health label" $healthText "FPS"
+        Assert-TextContains "Health label" $healthText "preset="
+        Assert-TextContains "Health label" $healthText "env="
+        Assert-TextContains "Health label" $healthText "RT="
+        Assert-TextContains "Budget label" $budgetText "descriptors persistent="
+        Assert-TextContains "Budget label" $budgetText "env resident="
+        Assert-TextContains "Warning label" $warningText "Warnings:"
+        Assert-TextContains "RT scheduler label" $schedulerText "RT Scheduler:"
+        Assert-TextContains "RT scheduler label" $schedulerText "TLAS"
+        Assert-TextContains "RT scheduler label" $schedulerText "reason="
     }
 
     Start-Sleep -Milliseconds 2500

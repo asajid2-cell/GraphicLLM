@@ -44,10 +44,21 @@ function Invoke-ReleaseStep([string]$Name, [string[]]$Arguments) {
             Write-Host "==> $Name retry $attempt/$maxAttempts" -ForegroundColor Yellow
         }
 
-        $output = & powershell @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
-        $output | Set-Content -Encoding UTF8 $stdoutPath
-        "" | Set-Content -Encoding UTF8 $stderrPath
+        try {
+            $child = Start-Process `
+                -FilePath "powershell.exe" `
+                -ArgumentList $Arguments `
+                -NoNewWindow `
+                -RedirectStandardOutput $stdoutPath `
+                -RedirectStandardError $stderrPath `
+                -Wait `
+                -PassThru
+            $exitCode = $child.ExitCode
+        } catch {
+            $_.Exception.Message | Set-Content -Encoding UTF8 $stdoutPath
+            "" | Set-Content -Encoding UTF8 $stderrPath
+            $exitCode = 1
+        }
 
         $elapsed = [Math]::Round(((Get-Date) - $started).TotalSeconds, 1)
         $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
@@ -91,6 +102,32 @@ function Invoke-ReleaseStep([string]$Name, [string[]]$Arguments) {
         $script:failures.Add(
             "$Name failed with exit code $lastExitCode after $maxAttempts attempt(s). logs=$lastLogDir`n$lastStderr`n$lastStdout")
     }
+}
+
+function Write-ReleaseSummary([string]$Status) {
+    $summaryPath = Join-Path $script:releaseLogDir "release_validation_summary.json"
+    $stepArray = @($script:steps.ToArray())
+    $failureArray = @($script:failures.ToArray())
+    $summary = [pscustomobject][ordered]@{
+        schema = 1
+        status = $Status
+        run_id = $script:runId
+        log_dir = $script:releaseLogDir
+        no_build = [bool]$script:NoBuild
+        temporal_smoke_frames = $script:TemporalSmokeFrames
+        rt_smoke_frames = $script:RTSmokeFrames
+        ibl_gallery_max_environments = $script:IBLGalleryMaxEnvironments
+        budget_temporal_runs = $script:BudgetTemporalRuns
+        budget_max_parallel = $script:BudgetMaxParallel
+        voxel_smoke_frames = $script:VoxelSmokeFrames
+        step_retries = $script:StepRetries
+        step_count = $script:steps.Count
+        failure_count = $script:failures.Count
+        steps = $stepArray
+        failures = $failureArray
+    }
+    $summary | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $summaryPath
+    Write-Host "summary=$summaryPath"
 }
 
 if (-not $NoBuild) {
@@ -578,6 +615,7 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -gt 0) {
+    Write-ReleaseSummary "failed"
     Write-Host "Release validation failed:" -ForegroundColor Red
     foreach ($failure in $failures) {
         Write-Host " - $failure" -ForegroundColor Red
@@ -586,6 +624,7 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
+Write-ReleaseSummary "passed"
 Write-Host "Release validation passed" -ForegroundColor Green
 Write-Host "logs=$releaseLogDir"
 foreach ($step in $steps) {

@@ -96,9 +96,8 @@ Renderer::ExecuteBloomInRenderGraph() {
     bloomContext.baseLevel = baseLevel;
     bloomContext.useTransients = useTransientBloom;
     bloomContext.failStage = failStage;
-    bloomContext.markHdrShaderResource = [&]() {
-        m_mainTargets.hdr.resources.state = kBloomGraphShaderResourceState;
-    };
+    bloomContext.hdrResourceState = &m_mainTargets.hdr.resources.state;
+    bloomContext.hdrShaderResourceState = kBloomGraphShaderResourceState;
     (void)BloomGraphPass::AddStandaloneBloom(*m_services.renderGraph, bloomContext);
 
     const auto execResult = m_services.renderGraph->Execute(m_commandResources.graphicsList.Get());

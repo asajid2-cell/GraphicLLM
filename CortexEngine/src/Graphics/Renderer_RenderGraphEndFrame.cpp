@@ -179,13 +179,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             bloomContext.stageLevels = kBloomLevels;
             bloomContext.baseLevel = baseLevel;
             bloomContext.useTransients = useFusedBloomTransients;
-            bloomContext.markHdrShaderResource = [&]() {
-                m_mainTargets.hdr.resources.state = kRenderGraphShaderResourceState;
-            };
+            bloomContext.hdrResourceState = &m_mainTargets.hdr.resources.state;
+            bloomContext.hdrShaderResourceState = kRenderGraphShaderResourceState;
             bloomContext.failStage = failBloomStage;
-            bloomContext.markBloomRan = [&]() {
-                result.ranBloom = !bloomStageFailed;
-            };
+            bloomContext.bloomRan = &result.ranBloom;
+            bloomContext.bloomStageFailed = &bloomStageFailed;
 
             bloomHandle = BloomGraphPass::AddFusedBloom(*m_services.renderGraph, bloomContext);
         } else if (m_bloomResources.controls.intensity > 0.0f) {

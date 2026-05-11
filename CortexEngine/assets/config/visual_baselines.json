@@ -444,6 +444,62 @@
                                                        204.52
                                                    ]
                                     }
+                  },
+                  {
+                      "id":  "ibl_gallery_hero_release",
+                      "scene":  "ibl_gallery",
+                      "camera_bookmark":  "hero",
+                      "environment":  "warm_gallery",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "rt_showcase_gallery",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  140
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  { "max":  16.7 },
+                                      "avg_luma":  { "min":  70.0, "max":  140.0 },
+                                      "center_avg_luma":  { "min":  70.0, "max":  150.0 },
+                                      "nonblack_ratio":  { "min":  0.95 },
+                                      "saturated_ratio":  { "max":  0.12 },
+                                      "near_white_ratio":  { "max":  0.14 },
+                                      "dark_detail_ratio":  { "max":  0.55 }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [106.73, 111.33, 130.19, 188.71, 189.7, 133, 111.98, 104.16, 113.68, 115.78, 120.79, 128.43, 130.79, 122.93, 113.89, 110.15, 117.21, 120.9, 129.04, 135.24, 138.06, 129.73, 120.94, 118.51, 116.99, 119.49, 128.51, 139.08, 134.05, 129.45, 121.8, 117.99, 85.99, 79.7, 131.75, 135.56, 150.56, 61.19, 89.47, 102.24, 40.06, 39.07, 63.39, 100.97, 52.64, 32.81, 38.7, 44.7, 47.73, 47.21, 50.97, 51.76, 51.55, 60.7, 55.7, 49.24, 92.64, 90.23, 96.89, 103.21, 102.71, 106.14, 101.42, 108.5]
+                                    }
+                  },
+                  {
+                      "id":  "outdoor_sunset_beach_hero_release",
+                      "scene":  "outdoor_sunset_beach",
+                      "camera_bookmark":  "hero",
+                      "environment":  "sunset_courtyard",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "sunset_rim",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  180
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  { "max":  16.7 },
+                                      "avg_luma":  { "min":  125.0, "max":  215.0 },
+                                      "center_avg_luma":  { "min":  115.0, "max":  215.0 },
+                                      "nonblack_ratio":  { "min":  0.95 },
+                                      "saturated_ratio":  { "max":  0.14 },
+                                      "near_white_ratio":  { "max":  0.12 },
+                                      "dark_detail_ratio":  { "max":  0.45 }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [138.4, 157.93, 163.31, 160.14, 180.57, 161.41, 175.42, 190.87, 142, 135.85, 116.49, 125.34, 107.1, 106.29, 90.98, 116.56, 79.17, 41.44, 43.31, 114.09, 113.5, 63.85, 73.75, 84.69, 77.02, 105.4, 110.56, 118.44, 124.88, 130.83, 126.92, 92.24, 201.97, 209.85, 216.53, 225.1, 224.57, 219.33, 205.99, 174.42, 219.6, 223.79, 237.52, 233.99, 238.89, 236.53, 208.5, 203.68, 224.85, 220.85, 235.25, 231.42, 228.23, 235.44, 224.31, 217.66, 226.48, 226.6, 230.56, 235.56, 235.64, 230.79, 227.41, 227.46]
+                                    }
                   }
               ]
 }

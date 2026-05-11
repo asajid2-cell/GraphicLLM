@@ -8,7 +8,7 @@
       "current_status": "public_showcase_validated",
       "target_status": "public_showcase_validated",
       "default_environment": "studio",
-      "default_lighting_rig": "studio_three_point",
+      "default_lighting_rig": "rt_showcase_gallery",
       "required_bookmarks": ["hero", "reflection_closeup"],
       "camera_bookmarks": [
         {

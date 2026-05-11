@@ -1,5 +1,6 @@
 param(
     [string]$ShowcasePath = "",
+    [string]$VisualBaselinePath = "",
     [switch]$RuntimeSmoke,
     [switch]$NoBuild,
     [int]$SmokeFrames = 90,
@@ -11,6 +12,9 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 if ([string]::IsNullOrWhiteSpace($ShowcasePath)) {
     $ShowcasePath = Join-Path $root "assets/config/showcase_scenes.json"
+}
+if ([string]::IsNullOrWhiteSpace($VisualBaselinePath)) {
+    $VisualBaselinePath = Join-Path $root "assets/config/visual_baselines.json"
 }
 if ([string]::IsNullOrWhiteSpace($LogDir)) {
     $runId = "showcase_scene_contract_{0}_{1}_{2}" -f `
@@ -74,16 +78,29 @@ function Get-ValidationBookmark([object]$Scene) {
 if (-not (Test-Path $ShowcasePath)) {
     throw "Showcase scene config not found: $ShowcasePath"
 }
+if (-not (Test-Path $VisualBaselinePath)) {
+    throw "Visual baseline config not found: $VisualBaselinePath"
+}
 
 $doc = Get-Content $ShowcasePath -Raw | ConvertFrom-Json
+$baselineDoc = Get-Content $VisualBaselinePath -Raw | ConvertFrom-Json
 if ([int]$doc.schema -ne 1) {
     Add-Failure "showcase scene schema must be 1"
+}
+if ([int]$baselineDoc.schema -ne 1) {
+    Add-Failure "visual baseline schema must be 1"
 }
 if ($null -eq $doc.scenes -or $doc.scenes.Count -lt 1) {
     Add-Failure "showcase scene list is empty"
 }
 
 $sceneIds = @{}
+$requiredBaselineByScene = @{}
+foreach ($case in $baselineDoc.cases) {
+    if ([bool]$case.required) {
+        $requiredBaselineByScene[[string]$case.scene] = $case
+    }
+}
 foreach ($scene in $doc.scenes) {
     $sceneId = [string]$scene.id
     if ([string]::IsNullOrWhiteSpace($sceneId)) {
@@ -107,12 +124,21 @@ foreach ($scene in $doc.scenes) {
     if ($null -eq $scene.required_bookmarks -or $scene.required_bookmarks.Count -lt 1) {
         Add-Failure "$sceneId required_bookmarks is empty"
     }
+    if ($null -eq $scene.required_features -or $scene.required_features.Count -lt 2) {
+        Add-Failure "$sceneId must declare at least two public renderer features"
+    }
 
     $implemented = ([string]$scene.current_status) -match "implemented|public"
     if ($implemented) {
+        if ([string]$scene.target_status -ne "public_showcase_validated") {
+            Add-Failure "$sceneId target_status must be public_showcase_validated"
+        }
         if ($null -eq $scene.camera_bookmarks -or $scene.camera_bookmarks.Count -lt 1) {
             Add-Failure "$sceneId is implemented but has no camera_bookmarks"
         } else {
+            if ($scene.camera_bookmarks.Count -lt 2) {
+                Add-Failure "$sceneId needs a hero and at least one detail/secondary public bookmark"
+            }
             $bookmarkIds = @{}
             foreach ($bookmark in $scene.camera_bookmarks) {
                 Assert-Bookmark $bookmark $sceneId
@@ -123,6 +149,21 @@ foreach ($scene in $doc.scenes) {
                 if (-not $bookmarkIds.ContainsKey($requiredId)) {
                     Add-Failure "$sceneId missing required camera bookmark '$requiredId'"
                 }
+            }
+        }
+
+        if (-not $requiredBaselineByScene.ContainsKey($sceneId)) {
+            Add-Failure "$sceneId has no required visual baseline case"
+        } else {
+            $baselineCase = $requiredBaselineByScene[$sceneId]
+            if ([string]$baselineCase.camera_bookmark -notin @($scene.required_bookmarks)) {
+                Add-Failure "$sceneId visual baseline bookmark '$($baselineCase.camera_bookmark)' is not a required bookmark"
+            }
+            if ([string]$baselineCase.environment -ne [string]$scene.default_environment) {
+                Add-Failure "$sceneId visual baseline environment '$($baselineCase.environment)' does not match default '$($scene.default_environment)'"
+            }
+            if ([string]$baselineCase.lighting_rig -ne [string]$scene.default_lighting_rig) {
+                Add-Failure "$sceneId visual baseline lighting rig '$($baselineCase.lighting_rig)' does not match default '$($scene.default_lighting_rig)'"
             }
         }
 
@@ -198,6 +239,18 @@ if ($RuntimeSmoke -and $failures.Count -eq 0) {
             }
             if ([string]$report.frame_contract.environment.active -ne [string]$scene.default_environment) {
                 Add-Failure "$sceneId runtime environment was '$($report.frame_contract.environment.active)', expected '$($scene.default_environment)'"
+            }
+            if ([string]$report.frame_contract.lighting.rig_id -ne [string]$scene.default_lighting_rig) {
+                Add-Failure "$sceneId runtime lighting rig was '$($report.frame_contract.lighting.rig_id)', expected '$($scene.default_lighting_rig)'"
+            }
+            if ($report.health_warnings.Count -ne 0) {
+                Add-Failure "$sceneId runtime health_warnings is not empty: $($report.health_warnings -join ', ')"
+            }
+            if ($report.frame_contract.warnings.Count -ne 0) {
+                Add-Failure "$sceneId runtime frame_contract warnings is not empty: $($report.frame_contract.warnings -join ', ')"
+            }
+            if ($null -ne $report.hud -and -not [bool]$report.hud.public_capture_clean) {
+                Add-Failure "$sceneId runtime HUD is not public-capture clean"
             }
 
             $dx = [Math]::Abs([double]$report.camera.position.x - [double]$bookmark.position[0])

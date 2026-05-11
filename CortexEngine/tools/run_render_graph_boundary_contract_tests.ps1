@@ -41,6 +41,8 @@ $ssaoBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSAO.cpp"
 $ssrBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSR.cpp"
 $taaBoundary = Read-Text "src/Graphics/Renderer_RenderGraphTAA.cpp"
 $temporalMaskBoundary = Read-Text "src/Graphics/Renderer_RenderGraphTemporalMask.cpp"
+$depthShadowBoundary = Read-Text "src/Graphics/Renderer_RenderGraphDepthShadow.cpp"
+$motionVectorBoundary = Read-Text "src/Graphics/Renderer_RenderGraphMotionVectors.cpp"
 
 foreach ($envName in @(
     "CORTEX_RG_TRANSIENT_VALIDATE",
@@ -78,6 +80,7 @@ foreach ($passName in @(
 Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph "AddStagedPath"
 Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "AccumulateRenderGraphExecutionStats"
 Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "visibility_buffer_graph_resources_missing"
+Assert-NotMatches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "fallbackExecutions"
 Assert-Matches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "graph path did not execute"
 Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "RenderBloom\("
 Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "falling back to legacy path"
@@ -89,7 +92,9 @@ foreach ($screenPass in @(
     @{ Name = "Renderer_RenderGraphSSAO.cpp"; Text = $ssaoBoundary },
     @{ Name = "Renderer_RenderGraphSSR.cpp"; Text = $ssrBoundary },
     @{ Name = "Renderer_RenderGraphTAA.cpp"; Text = $taaBoundary },
-    @{ Name = "Renderer_RenderGraphTemporalMask.cpp"; Text = $temporalMaskBoundary }
+    @{ Name = "Renderer_RenderGraphTemporalMask.cpp"; Text = $temporalMaskBoundary },
+    @{ Name = "Renderer_RenderGraphDepthShadow.cpp"; Text = $depthShadowBoundary },
+    @{ Name = "Renderer_RenderGraphMotionVectors.cpp"; Text = $motionVectorBoundary }
 )) {
     Assert-Matches $screenPass.Name $screenPass.Text "graph path did not execute"
     Assert-NotMatches $screenPass.Name $screenPass.Text "fallbackExecutions"
@@ -120,4 +125,4 @@ Write-Host "  transient_matrix_env=covered"
 Write-Host "  transient_validation_module=covered"
 Write-Host "  vb_staged_boundary=covered"
 Write-Host "  vb_legacy_boundary_removed=covered"
-Write-Host "  screen_space_legacy_fallbacks_removed=covered"
+Write-Host "  render_graph_legacy_fallbacks_removed=covered"

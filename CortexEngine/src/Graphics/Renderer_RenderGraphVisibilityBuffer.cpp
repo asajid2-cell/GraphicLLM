@@ -407,7 +407,6 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         m_services.renderGraph->EndFrame();
 
         if (result.fallbackUsed) {
-            ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
             spdlog::warn("VisibilityBuffer RG: {} (staged path did not complete)", result.fallbackReason);
         }
 

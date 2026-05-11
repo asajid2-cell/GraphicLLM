@@ -16,9 +16,6 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_depthResources.resources.buffer || !m_pipelineState.depthOnly) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_depth_prerequisites_missing";
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions, false);
-        RenderDepthPrepass(registry);
-        result.executed = true;
         return result;
     }
 
@@ -66,11 +63,7 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("DepthPrepass RG: {} (falling back to legacy barriers)", result.fallbackReason);
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions, false);
-        RenderDepthPrepass(registry);
-        result.executed = true;
+        spdlog::warn("DepthPrepass RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;
@@ -82,8 +75,6 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_shadowResources.resources.map) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_shadow_prerequisites_missing";
-        RenderShadowPass(registry);
-        result.executed = true;
         return result;
     }
 
@@ -131,11 +122,7 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("Shadow RG: {} (falling back to legacy barriers)", result.fallbackReason);
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.shadowPassSkipTransitions, false);
-        RenderShadowPass(registry);
-        result.executed = true;
+        spdlog::warn("Shadow RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;

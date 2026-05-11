@@ -24,10 +24,6 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_temporalScreenState.velocityBuffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_motion_vectors_prerequisites_missing";
-        RenderMotionVectors();
-        m_frameDiagnostics.contract.motionVectors.executed = true;
-        m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = true;
-        result.executed = true;
         return result;
     }
 
@@ -100,11 +96,8 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
             m_services.renderGraph->EndFrame();
             result.fallbackUsed = true;
             result.fallbackReason = "render_graph_motion_vectors_camera_prerequisites_missing";
-            RenderMotionVectors();
-            m_frameDiagnostics.contract.motionVectors.executed = true;
             m_frameDiagnostics.contract.motionVectors.visibilityBufferMotion = false;
             m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = true;
-            result.executed = true;
             return result;
         }
 
@@ -142,13 +135,9 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("MotionVectors RG: {} (falling back to legacy path)", result.fallbackReason);
-        RenderMotionVectors();
-        m_frameDiagnostics.contract.motionVectors.executed = true;
+        spdlog::warn("MotionVectors RG: {} (graph path did not execute)", result.fallbackReason);
         m_frameDiagnostics.contract.motionVectors.visibilityBufferMotion = false;
         m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = true;
-        result.executed = true;
     }
 
     return result;

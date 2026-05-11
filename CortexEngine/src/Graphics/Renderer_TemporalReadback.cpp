@@ -2,6 +2,7 @@
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
+#include "Graphics/Passes/ReadbackBuffer.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
@@ -20,18 +21,17 @@ void Renderer::UpdateTemporalRejectionMaskStatsFromReadback() {
         return;
     }
 
-    uint32_t* mapped = nullptr;
     constexpr SIZE_T kReadBytes = 5u * sizeof(uint32_t);
     const D3D12_RANGE readRange{0, kReadBytes};
-    HRESULT hr = m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex]->Map(
-        0,
-        &readRange,
-        reinterpret_cast<void**>(&mapped));
-    if (FAILED(hr) || !mapped) {
-        spdlog::warn("Temporal rejection mask stats: failed to map readback buffer");
+    auto mappedReadback = ReadbackBuffer::MapRange(
+        m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex].Get(),
+        readRange,
+        "Temporal rejection mask stats");
+    if (!mappedReadback.IsValid()) {
         m_temporalMaskState.statsReadbackPending[m_frameRuntime.frameIndex] = false;
         return;
     }
+    const uint32_t* mapped = mappedReadback.As<const uint32_t>();
 
     constexpr float kStatsScale = 256.0f;
     const uint32_t acceptedQ = mapped[0];
@@ -39,8 +39,7 @@ void Renderer::UpdateTemporalRejectionMaskStatsFromReadback() {
     const uint32_t highMotionQ = mapped[2];
     const uint32_t outOfBoundsQ = mapped[3];
     const uint32_t pixels = mapped[4];
-    const D3D12_RANGE writeRange{0, 0};
-    m_temporalMaskState.statsReadback[m_frameRuntime.frameIndex]->Unmap(0, &writeRange);
+    mappedReadback.Reset();
     m_temporalMaskState.statsReadbackPending[m_frameRuntime.frameIndex] = false;
 
     if (pixels == 0) {

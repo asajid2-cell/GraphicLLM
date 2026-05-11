@@ -4,6 +4,7 @@
 #include "Graphics/MeshBuffers.h"
 #include "Graphics/Passes/BackBufferPresentPass.h"
 #include "Graphics/Passes/EndFrameShaderResourcePass.h"
+#include "Graphics/Passes/ReadbackBuffer.h"
 #include "Graphics/Passes/RTHistoryCopyPass.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -71,18 +72,17 @@ void WriteBackBufferBMP(const std::filesystem::path& path,
         return;
     }
 
-    uint8_t* mapped = nullptr;
     const D3D12_RANGE readRange{0, static_cast<SIZE_T>(footprint.Footprint.RowPitch) * height};
-    if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&mapped))) || !mapped) {
-        spdlog::warn("Visual validation capture: failed to map readback buffer");
+    auto mappedReadback = ReadbackBuffer::MapRange(readback, readRange, "Visual validation capture");
+    if (!mappedReadback.IsValid()) {
         return;
     }
+    const uint8_t* mapped = mappedReadback.As<const uint8_t>();
 
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) {
-        readback->Unmap(0, nullptr);
         spdlog::warn("Visual validation capture: failed to open '{}'", path.string());
         return;
     }
@@ -137,8 +137,6 @@ void WriteBackBufferBMP(const std::filesystem::path& path,
         }
         out.write(reinterpret_cast<const char*>(row.data()), row.size());
     }
-
-    readback->Unmap(0, nullptr);
 }
 
 } // namespace

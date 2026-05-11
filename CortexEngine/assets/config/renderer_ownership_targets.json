@@ -433,6 +433,16 @@
       "future_extension": "Keep future persistent post-process descriptor allocation in DescriptorTable or a narrower table bundle before expanding Renderer_Descriptors.cpp"
     },
     {
+      "id": "renderer_readback_mapping",
+      "owner": "CPU readback mapping",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer files still parse visual-validation, temporal-mask, and RT reflection stats payloads, but raw readback Map/Unmap lifetime mechanics are owned by ReadbackBuffer::ScopedMap",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase", "visual_validation"],
+      "target_files": ["Passes/ReadbackBuffer.h", "Passes/ReadbackBuffer.cpp", "Renderer_FrameEnd.cpp", "Renderer_TemporalReadback.cpp", "Renderer_RTReflectionSignalStats.cpp"],
+      "renderer_state_members": ["m_temporalMaskState", "m_rtReflectionSignalState", "m_frameLifecycle"],
+      "future_extension": "Keep future CPU readback map/unmap mechanics in ReadbackBuffer or a narrower typed readback helper instead of reintroducing raw Map/Unmap in Renderer_*.cpp"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

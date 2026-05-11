@@ -12,6 +12,7 @@ struct ResourceStateRef {
 struct VelocityUAVContext {
     ID3D12GraphicsCommandList* commandList = nullptr;
     ResourceStateRef velocity;
+    bool skipTransitions = false;
 };
 
 struct CameraTargetContext {
@@ -19,6 +20,7 @@ struct CameraTargetContext {
     ResourceStateRef velocity;
     ResourceStateRef depth;
     D3D12_RESOURCE_STATES depthSampleState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    bool skipTransitions = false;
 };
 
 [[nodiscard]] bool TransitionVelocityToUnorderedAccess(const VelocityUAVContext& context);

@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <span>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -77,12 +78,30 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         }
         return true;
     };
-    graphContext.drawCameraMotion = [&]() {
-        m_depthResources.resources.resourceState = kDepthSampleState;
-        m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        RenderMotionVectors();
-        return true;
+    graphContext.cameraTarget.commandList = m_commandResources.graphicsList.Get();
+    graphContext.cameraTarget.velocity = {
+        m_temporalScreenState.velocityBuffer.Get(),
+        &m_temporalScreenState.velocityState,
     };
+    graphContext.cameraTarget.depth = {
+        m_depthResources.resources.buffer.Get(),
+        &m_depthResources.resources.resourceState,
+    };
+    graphContext.cameraTarget.depthSampleState = kDepthSampleState;
+    graphContext.cameraTarget.skipTransitions = true;
+    if (!useVisibilityBufferMotion && m_temporalScreenState.motionVectorSrvTableValid) {
+        auto& motionTable = m_temporalScreenState.motionVectorSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+        graphContext.cameraDraw.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+        graphContext.cameraDraw.commandList = m_commandResources.graphicsList.Get();
+        graphContext.cameraDraw.descriptorManager = m_services.descriptorManager.get();
+        graphContext.cameraDraw.rootSignature = m_pipelineState.rootSignature.get();
+        graphContext.cameraDraw.frameConstants = m_constantBuffers.currentFrameGPU;
+        graphContext.cameraDraw.pipeline = m_pipelineState.motionVectors.get();
+        graphContext.cameraDraw.target = m_temporalScreenState.velocityBuffer.Get();
+        graphContext.cameraDraw.targetRtv = m_temporalScreenState.velocityRTV;
+        graphContext.cameraDraw.depth = m_depthResources.resources.buffer.Get();
+        graphContext.cameraDraw.srvTable = std::span<DescriptorHandle>(motionTable.data(), motionTable.size());
+    }
     graphContext.failStage = [&](const char* stage) {
         motionStageFailed = true;
         motionStageError = stage ? stage : "unknown";
@@ -92,10 +111,12 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     if (useVisibilityBufferMotion) {
         motionResult = MotionVectorPass::AddToGraph(*m_services.renderGraph, graphContext);
     } else {
-        if (!m_depthResources.resources.buffer || !m_pipelineState.motionVectors) {
+        if (!m_depthResources.resources.buffer || !m_pipelineState.motionVectors || !m_temporalScreenState.motionVectorSrvTableValid) {
             m_services.renderGraph->EndFrame();
             result.fallbackUsed = true;
-            result.fallbackReason = "render_graph_motion_vectors_camera_prerequisites_missing";
+            result.fallbackReason = !m_temporalScreenState.motionVectorSrvTableValid
+                ? "render_graph_motion_vectors_camera_descriptor_table_missing"
+                : "render_graph_motion_vectors_camera_prerequisites_missing";
             m_frameDiagnostics.contract.motionVectors.visibilityBufferMotion = false;
             m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = true;
             return result;

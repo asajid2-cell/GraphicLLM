@@ -58,6 +58,13 @@ bool ApplyVelocityTransition(
 } // namespace
 
 bool TransitionVelocityToUnorderedAccess(const VelocityUAVContext& context) {
+    if (context.skipTransitions) {
+        if (!context.velocity.resource || !context.velocity.state) {
+            return false;
+        }
+        SetState(context.velocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        return true;
+    }
     return ApplyVelocityTransition(
         context.commandList,
         context.velocity,
@@ -65,8 +72,15 @@ bool TransitionVelocityToUnorderedAccess(const VelocityUAVContext& context) {
 }
 
 bool TransitionCameraTargets(const CameraTargetContext& context) {
-    if (!context.commandList || !context.velocity.resource || !context.velocity.state) {
+    if ((!context.skipTransitions && !context.commandList) || !context.velocity.resource || !context.velocity.state) {
         return false;
+    }
+    if (context.skipTransitions) {
+        SetState(context.velocity, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        if (context.depth.resource) {
+            SetState(context.depth, context.depthSampleState);
+        }
+        return true;
     }
 
     D3D12_RESOURCE_BARRIER barriers[2]{};

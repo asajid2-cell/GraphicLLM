@@ -122,8 +122,11 @@ Assert-Contains "MotionVectorPass.cpp" $motion "builder.Write(context.velocity, 
 Assert-Contains "MotionVectorPass.cpp" $motion "builder.Read(context.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead)"
 Assert-Contains "MotionVectorPass.cpp" $motion "MotionVectorTargetPass::TransitionCameraTargets(context.cameraTarget)"
 Assert-Contains "MotionVectorPass.cpp" $motion "Draw(context.cameraDraw)"
+Assert-Contains "MotionVectorPass.cpp" $motion "ComputeVisibilityBufferMotion(context.visibilityMotion)"
 Assert-NotContains "MotionVectorPass.h" $motionHeader "drawCameraMotion"
+Assert-NotContains "MotionVectorPass.h" $motionHeader "std::function<bool()> computeVisibilityBufferMotion"
 Assert-NotContains "Renderer_RenderGraphMotionVectors.cpp" $rendererMotion "RenderMotionVectors();"
+Assert-NotContains "Renderer_RenderGraphMotionVectors.cpp" $rendererMotion "ComputeMotionVectors("
 
 $post = Read-Text "src/Graphics/Passes/PostProcessGraphPass.cpp"
 $postHeader = Read-Text "src/Graphics/Passes/PostProcessGraphPass.h"

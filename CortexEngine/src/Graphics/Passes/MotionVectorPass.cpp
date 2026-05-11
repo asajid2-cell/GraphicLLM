@@ -18,7 +18,11 @@ void Fail(const GraphContext& context, const char* stage) {
         return false;
     }
     if (context.useVisibilityBufferMotion) {
-        return context.visibility.IsValid() && static_cast<bool>(context.computeVisibilityBufferMotion);
+        return context.visibility.IsValid() &&
+               context.visibilityMotion.renderer &&
+               context.visibilityMotion.commandList &&
+               context.visibilityMotion.velocityBuffer &&
+               context.visibilityMotion.meshDraws;
     }
     return context.depth.IsValid() &&
            context.cameraTarget.velocity.resource &&
@@ -68,6 +72,36 @@ bool Draw(const DrawContext& context) {
     return true;
 }
 
+bool ComputeVisibilityBufferMotion(const VisibilityBufferMotionContext& context) {
+    if (!context.renderer || !context.commandList || !context.velocityBuffer || !context.meshDraws) {
+        if (context.error) {
+            *context.error = "visibility-buffer motion context incomplete";
+        }
+        return false;
+    }
+
+    if (context.velocityState) {
+        *context.velocityState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.visibility = context.visibilityShaderResourceState;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto mvResult = context.renderer->ComputeMotionVectors(
+        context.commandList,
+        context.velocityBuffer,
+        *context.meshDraws,
+        context.frameConstants);
+    if (mvResult.IsErr()) {
+        if (context.error) {
+            *context.error = mvResult.Error();
+        }
+        return false;
+    }
+    return true;
+}
+
 RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
     if (!IsUsable(context)) {
         Fail(context, "motion_vectors_graph_contract");
@@ -88,7 +122,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
             const bool ok = context.useVisibilityBufferMotion
-                ? (context.computeVisibilityBufferMotion && context.computeVisibilityBufferMotion())
+                ? ComputeVisibilityBufferMotion(context.visibilityMotion)
                 : (MotionVectorTargetPass::TransitionCameraTargets(context.cameraTarget) &&
                    Draw(context.cameraDraw));
             if (!ok) {

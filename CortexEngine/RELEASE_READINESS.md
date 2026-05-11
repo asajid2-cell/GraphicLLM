@@ -32,7 +32,8 @@ The current verified local gate covers:
 - deterministic LLM/Architect renderer-command runtime smoke,
 - positive Dreamer startup/runtime texture-generation smoke,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
-- Material Lab, conductor-energy, vegetation-state, reflection-probe, Glass and
+- Material Lab, conductor-energy, lighting-energy, vegetation-state,
+  reflection-probe, Glass and
   Water Courtyard, Effects Showcase, visual baseline smokes, and screenshot negative gates,
 - visual probe validation across all public baseline cases,
 - Phase 3 visual matrix,
@@ -69,16 +70,16 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.271`, `warnings=0`,
+- temporal validation: `gpu_ms=1.398`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=2.898`;
-- RT showcase: `gpu_ms=2.025/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=2.335`;
+- RT showcase: `gpu_ms=1.617/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `temporal_diff=mean=0.017/2.5 changed=0.000/0.08`;
+  `transient_delta=0`, `temporal_diff=mean=0.023/2.5 changed=0.001/0.08`;
 - VB debug views: depth view 34 and material-albedo view 35 passed with
   nonblack ratio `0.851` for both captures;
 - descriptor/memory stress: `persistent_descriptors=988/1024`,
@@ -92,6 +93,9 @@ Result:
   `studio_three_point/renderer_rig`;
 - conductor energy contract: passed; forward/deferred energy split present,
   full conductors preserved in Material Lab, and overbright visual stats bounded;
+- lighting energy budget: passed across RT Showcase, Material Lab,
+  Glass/Water Courtyard, and Effects Showcase with bounded scene light energy,
+  exposure, bloom, near-white, and saturation metrics;
 - vegetation state contract: passed; extracted vegetation state is frame-contract
   visible and public validation scenes report dormant vegetation draw pipelines;
 - reflection probe contract: passed; RT Showcase local probes upload into VB
@@ -114,12 +118,12 @@ Result:
   `night_city`;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=19.411`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=16.061`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_233633_407_34848_41636535
+CortexEngine/build/bin/logs/runs/release_validation_20260510_234247_548_36060_1e9785fd
 ```
 
 ## Renderer Scope

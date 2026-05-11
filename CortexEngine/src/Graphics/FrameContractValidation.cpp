@@ -433,6 +433,12 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
             contract.rayTracing.reflectionSignalScale > 2.0f) {
             warn("rt_reflection_tuning_out_of_range");
         }
+        if (contract.rayTracing.giStrength < 0.0f ||
+            contract.rayTracing.giStrength > 1.0f ||
+            contract.rayTracing.giRayDistance < 0.5f ||
+            contract.rayTracing.giRayDistance > 20.0f) {
+            warn("rt_gi_tuning_out_of_range");
+        }
         if (!contract.rayTracing.reflectionHistorySignalStatsCaptured) {
             warn("rt_reflection_history_without_signal_stats");
         }

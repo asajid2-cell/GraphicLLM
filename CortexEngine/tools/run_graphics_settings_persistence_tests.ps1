@@ -64,7 +64,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "reflection_roughness_threshold": 0.44,
     "reflection_history_max_blend": 0.18,
     "reflection_firefly_clamp_luma": 12.5,
-    "reflection_signal_scale": 1.27
+    "reflection_signal_scale": 1.27,
+    "gi_strength": 0.34,
+    "gi_ray_distance": 8.5
   },
   "screen_space": {
     "ssao": true,
@@ -211,6 +213,13 @@ if ($validRun.exit_code -ne 0) {
         if ([Math]::Abs(([double]$rtTuning.signal_scale) - 1.27) -gt 0.03) {
             Add-Failure "valid settings RT reflection signal scale was $($rtTuning.signal_scale), expected 1.27"
         }
+    }
+    $rtGITuning = $report.frame_contract.ray_tracing.rt_gi_tuning
+    if ($null -eq $rtGITuning) {
+        Add-Failure "valid settings frame contract did not include rt_gi_tuning"
+    } else {
+        Assert-Near "rt_gi_strength" ([double]$rtGITuning.strength) 0.34 0.03
+        Assert-Near "rt_gi_ray_distance" ([double]$rtGITuning.ray_distance) 8.5 0.2
     }
     $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur

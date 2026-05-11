@@ -287,6 +287,7 @@ public:
                                float historyMaxBlend,
                                float fireflyClampLuma,
                                float signalScale);
+    void SetRTGITuning(float strength, float rayDistance);
     [[nodiscard]] bool GetRTReflectionsEnabled() const;
     [[nodiscard]] bool GetRTGIEnabled() const;
     [[nodiscard]] float GetRTReflectionDenoiseAlpha() const;
@@ -295,6 +296,8 @@ public:
     [[nodiscard]] float GetRTReflectionHistoryMaxBlend() const;
     [[nodiscard]] float GetRTReflectionFireflyClampLuma() const;
     [[nodiscard]] float GetRTReflectionSignalScale() const;
+    [[nodiscard]] float GetRTGIStrength() const;
+    [[nodiscard]] float GetRTGIRayDistance() const;
 
     using VRAMBreakdown = RendererVRAMBreakdown;
     using DescriptorStats = RendererDescriptorStats;

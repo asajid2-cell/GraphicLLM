@@ -412,6 +412,11 @@ json FrameContractToJson(const FrameContract& contract) {
                 {"signal_scale", contract.rayTracing.reflectionSignalScale},
                 {"shader_packed", true}
             }},
+            {"rt_gi_tuning", {
+                {"strength", contract.rayTracing.giStrength},
+                {"ray_distance", contract.rayTracing.giRayDistance},
+                {"shader_packed", true}
+            }},
             {"budget_profile", contract.rayTracing.budgetProfile},
             {"scheduler_disabled_reason", contract.rayTracing.schedulerDisabledReason},
             {"scheduler_tlas_candidates", contract.rayTracing.schedulerTLASCandidates},

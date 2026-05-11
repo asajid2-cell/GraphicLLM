@@ -36,7 +36,9 @@
       "ray_tracing": {
         "enabled": true,
         "reflections": true,
-        "gi": true
+        "gi": true,
+        "gi_strength": 0.10,
+        "gi_ray_distance": 5.0
       },
       "atmosphere": {
         "fog": true,
@@ -99,7 +101,9 @@
       "ray_tracing": {
         "enabled": false,
         "reflections": false,
-        "gi": false
+        "gi": false,
+        "gi_strength": 0.06,
+        "gi_ray_distance": 3.0
       },
       "atmosphere": {
         "fog": false,

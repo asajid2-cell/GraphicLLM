@@ -74,7 +74,9 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "reflection_roughness_threshold": 0.46,
     "reflection_history_max_blend": 0.21,
     "reflection_firefly_clamp_luma": 13.5,
-    "reflection_signal_scale": 1.18
+    "reflection_signal_scale": 1.18,
+    "gi_strength": 0.37,
+    "gi_ray_distance": 7.4
   },
   "atmosphere": {
     "fog": true,
@@ -222,6 +224,12 @@ if ($exitCode -ne 0) {
         Assert-Near "rt_reflection_history_max_blend" ([double]$fc.ray_tracing.rt_reflection_tuning.history_max_blend) 0.21 0.03
         Assert-Near "rt_reflection_firefly_clamp_luma" ([double]$fc.ray_tracing.rt_reflection_tuning.firefly_clamp_luma) 13.5 0.3
         Assert-Near "rt_reflection_signal_scale" ([double]$fc.ray_tracing.rt_reflection_tuning.signal_scale) 1.18 0.03
+    }
+    if ($null -eq $fc.ray_tracing.rt_gi_tuning) {
+        Add-Failure "rt_gi_tuning was missing"
+    } else {
+        Assert-Near "rt_gi_strength" ([double]$fc.ray_tracing.rt_gi_tuning.strength) 0.37 0.03
+        Assert-Near "rt_gi_ray_distance" ([double]$fc.ray_tracing.rt_gi_tuning.ray_distance) 7.4 0.2
     }
     if ([bool]$fc.features.ray_tracing_enabled) { Add-Failure "ray tracing remained enabled despite settings" }
     if (-not [bool]$fc.features.ssr_enabled) { Add-Failure "SSR was not enabled despite settings" }

@@ -5,19 +5,35 @@
 
 namespace Cortex::Graphics {
 
-struct DepthTargetState {
+struct DepthTargetResources {
     ComPtr<ID3D12Resource> buffer;
+    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        buffer.Reset();
+        resourceState = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct DepthTargetDescriptors {
     DescriptorHandle dsv;
     DescriptorHandle readOnlyDsv;
     DescriptorHandle srv;
-    D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COMMON;
 
-    void ResetResources() {
-        buffer.Reset();
+    void Reset() {
         dsv = {};
         readOnlyDsv = {};
         srv = {};
-        resourceState = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct DepthTargetState {
+    DepthTargetResources resources;
+    DepthTargetDescriptors descriptors;
+
+    void ResetResources() {
+        resources.Reset();
+        descriptors.Reset();
     }
 };
 

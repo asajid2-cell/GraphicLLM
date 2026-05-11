@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Core/Window.h"
 
@@ -10,18 +10,18 @@ void Renderer::PrepareMainPass() {
     // otherwise directly to back buffer.
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2] = {};
     UINT numRtvs = 0;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.dsv.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.descriptors.dsv.cpu;
 
     // Ensure depth buffer is in writable state for the main pass
-    if (m_depthResources.buffer && m_depthResources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
         D3D12_RESOURCE_BARRIER depthBarrier = {};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resourceState;
+        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
     // If the ray-traced shadow mask exists and was written by the DXR pass,

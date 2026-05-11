@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/MeshBuffers.h"
 #include <spdlog/spdlog.h>
@@ -40,14 +40,14 @@ Result<void> Renderer::CreateDepthBuffer() {
         &depthDesc,
         D3D12_RESOURCE_STATE_DEPTH_WRITE,
         &clearValue,
-        IID_PPV_ARGS(&m_depthResources.buffer)
+        IID_PPV_ARGS(&m_depthResources.resources.buffer)
     );
 
     if (FAILED(hr)) {
-        m_depthResources.buffer.Reset();
-        m_depthResources.dsv = {};
-        m_depthResources.readOnlyDsv = {};
-        m_depthResources.srv = {};
+        m_depthResources.resources.buffer.Reset();
+        m_depthResources.descriptors.dsv = {};
+        m_depthResources.descriptors.readOnlyDsv = {};
+        m_depthResources.descriptors.srv = {};
 
         CORTEX_REPORT_DEVICE_REMOVED("CreateDepthBuffer", hr);
 
@@ -60,17 +60,17 @@ Result<void> Renderer::CreateDepthBuffer() {
                                  + ", hr=" + buf + ")");
     }
 
-    m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     // Create or rewrite DSV descriptors. Resolution changes replace the
     // resource, not the descriptor slot; preserving the slot prevents heap
     // exhaustion under adaptive render-scale changes.
-    if (!m_depthResources.dsv.IsValid()) {
+    if (!m_depthResources.descriptors.dsv.IsValid()) {
         auto dsvResult = m_services.descriptorManager->AllocateDSV();
         if (dsvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate DSV: " + dsvResult.Error());
         }
-        m_depthResources.dsv = dsvResult.Value();
+        m_depthResources.descriptors.dsv = dsvResult.Value();
     }
 
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
@@ -79,38 +79,38 @@ Result<void> Renderer::CreateDepthBuffer() {
     dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 
     m_services.device->GetDevice()->CreateDepthStencilView(
-        m_depthResources.buffer.Get(),
+        m_depthResources.resources.buffer.Get(),
         &dsvDesc,
-        m_depthResources.dsv.cpu
+        m_depthResources.descriptors.dsv.cpu
     );
 
     // Create a read-only DSV so we can depth-test while the depth buffer is in
     // DEPTH_READ (e.g., after VB resolve / post passes).
-    if (!m_depthResources.readOnlyDsv.IsValid()) {
+    if (!m_depthResources.descriptors.readOnlyDsv.IsValid()) {
         auto roDsvResult = m_services.descriptorManager->AllocateDSV();
         if (roDsvResult.IsErr()) {
             spdlog::warn("Failed to allocate read-only DSV (continuing without): {}", roDsvResult.Error());
         } else {
-            m_depthResources.readOnlyDsv = roDsvResult.Value();
+            m_depthResources.descriptors.readOnlyDsv = roDsvResult.Value();
         }
     }
-    if (m_depthResources.readOnlyDsv.IsValid()) {
+    if (m_depthResources.descriptors.readOnlyDsv.IsValid()) {
         D3D12_DEPTH_STENCIL_VIEW_DESC roDesc = dsvDesc;
         roDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
         m_services.device->GetDevice()->CreateDepthStencilView(
-            m_depthResources.buffer.Get(),
+            m_depthResources.resources.buffer.Get(),
             &roDesc,
-            m_depthResources.readOnlyDsv.cpu
+            m_depthResources.descriptors.readOnlyDsv.cpu
         );
     }
 
     // Create SRV for depth sampling (SSAO) - use staging heap for persistent descriptors
-    if (!m_depthResources.srv.IsValid()) {
+    if (!m_depthResources.descriptors.srv.IsValid()) {
         auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate staging SRV for depth buffer: " + srvResult.Error());
         }
-        m_depthResources.srv = srvResult.Value();
+        m_depthResources.descriptors.srv = srvResult.Value();
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc = {};
@@ -120,9 +120,9 @@ Result<void> Renderer::CreateDepthBuffer() {
     depthSrvDesc.Texture2D.MipLevels = 1;
 
     m_services.device->GetDevice()->CreateShaderResourceView(
-        m_depthResources.buffer.Get(),
+        m_depthResources.resources.buffer.Get(),
         &depthSrvDesc,
-        m_depthResources.srv.cpu
+        m_depthResources.descriptors.srv.cpu
     );
 
     spdlog::info("Depth buffer created");

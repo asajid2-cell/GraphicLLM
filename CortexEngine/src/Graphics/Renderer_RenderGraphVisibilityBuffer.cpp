@@ -17,7 +17,7 @@ using namespace VisibilityBufferGraphDetail;
 Renderer::RenderGraphPassResult
 Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_services.visibilityBuffer || !m_depthResources.buffer || !m_mainTargets.hdrColor) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_services.visibilityBuffer || !m_depthResources.resources.buffer || !m_mainTargets.hdrColor) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_visibility_buffer_prerequisites_missing";
         RenderVisibilityBufferPath(registry);
@@ -55,8 +55,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         const VisibilityBufferGraphResources vbResources = ImportVisibilityBufferGraphResources(
             *m_services.renderGraph,
             *m_services.visibilityBuffer,
-            m_depthResources.buffer.Get(),
-            m_depthResources.resourceState,
+            m_depthResources.resources.buffer.Get(),
+            m_depthResources.resources.resourceState,
             m_mainTargets.hdrColor.Get(),
             m_mainTargets.hdrState,
             m_shadowResources.resources.map.Get(),
@@ -129,7 +129,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         };
         vbGraphContext.visibility = [&]() {
             if (vbStageFailed) return;
-            m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
             auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
             states.visibility = D3D12_RESOURCE_STATE_RENDER_TARGET;
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
@@ -140,8 +140,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_services.visibilityBuffer->SetTransitionSkipControls(controls);
             auto visResult = m_services.visibilityBuffer->RasterizeVisibilityBuffer(
                 m_commandResources.graphicsList.Get(),
-                m_depthResources.buffer.Get(),
-                m_depthResources.dsv.cpu,
+                m_depthResources.resources.buffer.Get(),
+                m_depthResources.descriptors.dsv.cpu,
                 m_constantBuffers.frameCPU.viewProjectionMatrix,
                 m_visibilityBufferState.meshDraws,
                 vbCullMaskAddress);
@@ -164,7 +164,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         };
         vbGraphContext.materialResolve = [&]() {
             if (vbStageFailed) return;
-            m_depthResources.resourceState = kDepthSampleState;
+            m_depthResources.resources.resourceState = kDepthSampleState;
 
             auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
             states.visibility = kVBShaderResourceState;
@@ -218,7 +218,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             }
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
             if (debugDepth) {
-                m_depthResources.resourceState = kDepthSampleState;
+                m_depthResources.resources.resourceState = kDepthSampleState;
             }
 
             auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
@@ -232,7 +232,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                     m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu);
             } else if (debugDepth) {
                 debugResult = m_services.visibilityBuffer->DebugBlitDepthToHDR(
-                    m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, m_depthResources.buffer.Get());
+                    m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, m_depthResources.resources.buffer.Get());
             } else if (debugGBuffer) {
                 debugResult = m_services.visibilityBuffer->DebugBlitGBufferToHDR(
                     m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, SelectVBGBufferDebugBuffer(vbDebugView));
@@ -285,7 +285,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         };
         vbGraphContext.deferredLighting = [&]() {
             if (vbStageFailed) return;
-            m_depthResources.resourceState = kDepthSampleState;
+            m_depthResources.resources.resourceState = kDepthSampleState;
             m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
             if (vbResources.shadow.IsValid()) {
                 m_shadowResources.resources.resourceState = kVBShaderResourceState;
@@ -337,7 +337,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             result.fallbackUsed = true;
             result.fallbackReason = "visibility_buffer_graph_stage_failed";
         } else {
-            m_depthResources.resourceState = m_services.renderGraph->GetResourceState(vbResources.depth);
+            m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.depth);
             m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(vbResources.hdr);
             if (vbResources.shadow.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
             if (vbResources.rtShadow.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
@@ -418,7 +418,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_VB");
+        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_VB");
     const RGResourceHandle hdrHandle =
         m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR_VB");
 
@@ -448,7 +448,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             // the legacy VB path. VB-internal resources still perform their own
             // transitions until this path is split into visibility/resolve/light
             // graph nodes.
-            m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
             m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
             if (shadowHandle.IsValid()) {
                 m_shadowResources.resources.resourceState =

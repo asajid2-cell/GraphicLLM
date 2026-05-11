@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "TemporalRejectionMask.h"
 #include "RenderGraph.h"
@@ -21,7 +21,7 @@ Renderer::RenderGraphPassResult
 Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRoughnessResource) {
     RenderGraphPassResult result{};
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_temporalMaskState.texture ||
-        !m_depthResources.buffer || !m_temporalScreenState.velocityBuffer) {
+        !m_depthResources.resources.buffer || !m_temporalScreenState.velocityBuffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_temporal_mask_prerequisites_missing";
         BuildTemporalRejectionMask(frameNormalRoughnessResource);
@@ -52,7 +52,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_TemporalMask");
+        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_TemporalMask");
     const RGResourceHandle normalHandle =
         m_services.renderGraph->ImportResource(normalResource, normalState, "NormalRoughness_TemporalMask");
     const RGResourceHandle velocityHandle =
@@ -68,7 +68,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     graphContext.velocity = velocityHandle;
     graphContext.mask = maskHandle;
     graphContext.dispatch = [&]() {
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
         m_temporalScreenState.velocityState = kScreenSpaceShaderResourceState;
         m_temporalMaskState.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         if (usesVBNormal) {
@@ -108,7 +108,7 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
             result.fallbackReason += ": " + stageError;
         }
     } else {
-        m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         m_temporalMaskState.resourceState = m_services.renderGraph->GetResourceState(maskHandle);
         if (usesVBNormal) {

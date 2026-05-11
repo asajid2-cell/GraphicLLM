@@ -13,7 +13,7 @@ namespace Cortex::Graphics {
 Renderer::RenderGraphPassResult
 Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_depthResources.buffer || !m_pipelineState.depthOnly) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_depthResources.resources.buffer || !m_pipelineState.depthOnly) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_depth_prerequisites_missing";
         ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions, false);
@@ -24,7 +24,7 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth");
+        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth");
 
     bool stageFailed = false;
     std::string stageError;
@@ -60,7 +60,7 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
             result.fallbackReason += ": " + stageError;
         }
     } else {
-        m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         result.executed = true;
     }
     m_services.renderGraph->EndFrame();

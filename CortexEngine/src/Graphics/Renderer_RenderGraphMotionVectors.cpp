@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/MotionVectorPass.h"
 #include "RenderGraph.h"
@@ -47,8 +47,8 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     const RGResourceHandle velocityHandle =
         m_services.renderGraph->ImportResource(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, "Velocity");
     RGResourceHandle depthHandle{};
-    if (!useVisibilityBufferMotion && m_depthResources.buffer) {
-        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_MotionVectors");
+    if (!useVisibilityBufferMotion && m_depthResources.resources.buffer) {
+        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_MotionVectors");
     }
 
     RGResourceHandle visibilityHandle{};
@@ -82,7 +82,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         return true;
     };
     graphContext.drawCameraMotion = [&]() {
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
         m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         RenderMotionVectors();
         return true;
@@ -96,7 +96,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     if (useVisibilityBufferMotion) {
         motionResult = MotionVectorPass::AddToGraph(*m_services.renderGraph, graphContext);
     } else {
-        if (!m_depthResources.buffer || !m_pipelineState.motionVectors) {
+        if (!m_depthResources.resources.buffer || !m_pipelineState.motionVectors) {
             m_services.renderGraph->EndFrame();
             result.fallbackUsed = true;
             result.fallbackReason = "render_graph_motion_vectors_camera_prerequisites_missing";
@@ -129,7 +129,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     } else {
         m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         if (depthHandle.IsValid()) {
-            m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+            m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         }
         if (visibilityHandle.IsValid()) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();

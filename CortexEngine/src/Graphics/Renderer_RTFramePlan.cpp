@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -72,7 +72,7 @@ void Renderer::UpdateRTFramePlan(const FrameFeaturePlan& featurePlan) {
     inputs.giFeatureRequested = m_rtRuntimeState.giEnabled;
     inputs.giPipelineReady = m_services.rayTracingContext && m_services.rayTracingContext->HasGIPipeline();
     inputs.giResourceReady = m_rtGITargets.color != nullptr && m_rtGITargets.uav.IsValid();
-    inputs.depthReady = m_depthResources.buffer != nullptr && m_depthResources.srv.IsValid();
+    inputs.depthReady = m_depthResources.resources.buffer != nullptr && m_depthResources.descriptors.srv.IsValid();
     inputs.shadowMaskReady = m_rtShadowTargets.mask != nullptr && m_rtShadowTargets.maskUAV.IsValid();
 
     m_framePlanning.rtPlan = RTScheduler::BuildFramePlan(inputs);

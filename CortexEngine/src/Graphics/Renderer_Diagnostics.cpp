@@ -320,7 +320,7 @@ void Renderer::ReportDeviceRemoved(const char* context,
         markerName,
         file ? file : "unknown",
         line,
-        rs(m_depthResources.resourceState),
+        rs(m_depthResources.resources.resourceState),
         rs(m_shadowResources.resources.resourceState),
         rs(m_mainTargets.hdrState),
         rs(m_rtShadowTargets.maskState),
@@ -473,7 +473,7 @@ void Renderer::LogDiagnostics() const {
                  m_rtRuntimeState.giEnabled);
 
     spdlog::info("Resource states: depth=0x{:X} hdr=0x{:X} ssr=0x{:X}",
-                 static_cast<uint32_t>(m_depthResources.resourceState),
+                 static_cast<uint32_t>(m_depthResources.resources.resourceState),
                  static_cast<uint32_t>(m_mainTargets.hdrState),
                  static_cast<uint32_t>(m_ssrResources.resources.resourceState));
     spdlog::info("Timings (ms): depthPrepass={:.2f} shadow={:.2f} main={:.2f}",

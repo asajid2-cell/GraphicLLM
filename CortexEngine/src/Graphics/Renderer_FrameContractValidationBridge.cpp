@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/FrameContractResources.h"
 #include "Graphics/FrameContractValidation.h"
@@ -27,7 +27,7 @@ void Renderer::ValidateFrameContract() {
     context.transparentPipelineReady = pipelineReadiness.transparent;
     context.waterOverlayPipelineReady = pipelineReadiness.waterOverlay;
     context.overlayPipelineReady = pipelineReadiness.overlay;
-    context.readOnlyDepthStencilViewReady = m_depthResources.readOnlyDsv.IsValid();
+    context.readOnlyDepthStencilViewReady = m_depthResources.descriptors.readOnlyDsv.IsValid();
     context.rtReflectionWrittenThisFrame = m_frameLifecycle.rtReflectionWrittenThisFrame;
     context.rtReflectionDenoisedThisFrame = m_rtDenoiseState.reflectionDenoisedThisFrame;
 

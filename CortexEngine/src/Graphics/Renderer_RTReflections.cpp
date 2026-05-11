@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -28,7 +28,7 @@ void Renderer::RenderRayTracedReflections() {
     m_rtReflectionReadiness.hasOutput =
         m_rtReflectionTargets.color != nullptr && m_rtReflectionTargets.uav.IsValid();
     m_rtReflectionReadiness.hasDepth =
-        m_depthResources.buffer != nullptr && m_depthResources.srv.IsValid();
+        m_depthResources.resources.buffer != nullptr && m_depthResources.descriptors.srv.IsValid();
     m_rtReflectionReadiness.hasFrameConstants =
         m_constantBuffers.currentFrameGPU != 0;
     m_rtReflectionReadiness.hasDispatchDescriptors =
@@ -62,15 +62,15 @@ void Renderer::RenderRayTracedReflections() {
 
     // Ensure the depth buffer is in a readable state for the DXR pass.
     // Depth resources should include DEPTH_READ when sampled as SRVs.
-    if (m_depthResources.buffer && m_depthResources.resourceState != kDepthSampleState) {
+    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resourceState;
+        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         depthBarrier.Transition.StateAfter = kDepthSampleState;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
 
     constexpr D3D12_RESOURCE_STATES kSrvNonPixel =
@@ -112,8 +112,8 @@ void Renderer::RenderRayTracedReflections() {
         }
     }
 
-    if (!m_depthResources.srv.IsValid() || !normalSrv.IsValid()) {
-        setReflectionReadinessReason(!m_depthResources.srv.IsValid()
+    if (!m_depthResources.descriptors.srv.IsValid() || !normalSrv.IsValid()) {
+        setReflectionReadinessReason(!m_depthResources.descriptors.srv.IsValid()
             ? "depth_srv_missing"
             : "normal_roughness_srv_missing");
         return;
@@ -255,7 +255,7 @@ void Renderer::RenderRayTracedReflections() {
     if (!(rtReflDebugView && s_rtReflSkipDispatch)) {
         m_services.rayTracingContext->DispatchReflections(
             rtCmdList.Get(),
-            m_depthResources.srv,
+            m_depthResources.descriptors.srv,
             m_rtReflectionTargets.uav,
             m_constantBuffers.currentFrameGPU,
             envTable,

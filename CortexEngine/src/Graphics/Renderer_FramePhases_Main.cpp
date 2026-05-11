@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Renderer_FramePhaseGpuScope.h"
 
 #include <chrono>
@@ -83,15 +83,15 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
     // If VB is disabled or fails to produce a lit HDR frame, fall back to the
     // existing opaque render paths for robustness.
     if (!vbEnabled || !m_visibilityBufferState.renderedThisFrame) {
-        if (vbEnabled && !m_visibilityBufferState.renderedThisFrame && m_depthResources.buffer && m_depthResources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+        if (vbEnabled && !m_visibilityBufferState.renderedThisFrame && m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
             D3D12_RESOURCE_BARRIER barrier{};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_depthResources.buffer.Get();
-            barrier.Transition.StateBefore = m_depthResources.resourceState;
+            barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+            barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         }
 
         if (featurePlan.runGpuCullingFallback) {
@@ -238,8 +238,8 @@ Renderer::MainSceneEffectsResult Renderer::ExecuteMainSceneEffectsFramePhase(con
             m_services.device &&
             m_commandResources.graphicsList &&
             m_services.descriptorManager &&
-            m_depthResources.buffer &&
-            m_depthResources.srv.IsValid()) {
+            m_depthResources.resources.buffer &&
+            m_depthResources.descriptors.srv.IsValid()) {
             auto resResult = CreateHZBResources();
             if (resResult.IsErr()) {
                 spdlog::warn("HZB RG: {}", resResult.Error());

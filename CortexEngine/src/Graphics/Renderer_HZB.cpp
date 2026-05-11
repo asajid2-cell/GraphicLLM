@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/HZBPass.h"
 #include "RenderGraph.h"
@@ -35,11 +35,11 @@ uint32_t CalcHZBMipCount(uint32_t width, uint32_t height) {
 } // namespace
 
 Result<void> Renderer::CreateHZBResources() {
-    if (!m_services.device || !m_services.descriptorManager || !m_depthResources.buffer) {
+    if (!m_services.device || !m_services.descriptorManager || !m_depthResources.resources.buffer) {
         return Result<void>::Err("CreateHZBResources: renderer not initialized or depth buffer missing");
     }
 
-    const D3D12_RESOURCE_DESC depthDesc = m_depthResources.buffer->GetDesc();
+    const D3D12_RESOURCE_DESC depthDesc = m_depthResources.resources.buffer->GetDesc();
     const uint32_t width = std::max<uint32_t>(1u, static_cast<uint32_t>(depthDesc.Width));
     const uint32_t height = std::max<uint32_t>(1u, depthDesc.Height);
     const uint32_t mipCount = CalcHZBMipCount(width, height);
@@ -198,7 +198,7 @@ Result<void> Renderer::CreateHZBResources() {
             m_hzbResources.descriptors.dispatchSrvTables[frame][mip] = srvResult.Value();
             m_hzbResources.descriptors.dispatchUavTables[frame][mip] = uavResult.Value();
 
-            const DescriptorHandle sourceSrv = (mip == 0) ? m_depthResources.srv : m_hzbResources.descriptors.mipSRVStaging[mip - 1];
+            const DescriptorHandle sourceSrv = (mip == 0) ? m_depthResources.descriptors.srv : m_hzbResources.descriptors.mipSRVStaging[mip - 1];
             const DescriptorHandle sourceUav = m_hzbResources.descriptors.mipUAVStaging[mip];
             if (!sourceSrv.IsValid() || !sourceUav.IsValid()) {
                 return Result<void>::Err("CreateHZBResources: invalid source descriptor while building HZB dispatch tables");
@@ -229,7 +229,7 @@ void Renderer::BuildHZBFromDepth() {
     if (!m_pipelineState.computeRootSignature || !m_pipelineState.hzbInit || !m_pipelineState.hzbDownsample) {
         return;
     }
-    if (!m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
+    if (!m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid()) {
         return;
     }
 
@@ -243,15 +243,15 @@ void Renderer::BuildHZBFromDepth() {
         return;
     }
 
-    if (m_depthResources.resourceState != kDepthSampleState) {
+    if (m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resourceState;
+        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
 
     if (m_hzbResources.resources.resourceState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
@@ -320,7 +320,7 @@ void Renderer::BuildHZBFromDepth() {
     };
 
     m_commandResources.graphicsList->SetPipelineState(m_pipelineState.hzbInit->GetPipelineState());
-    if (!bindSrvTableT0(m_depthResources.srv, 0)) {
+    if (!bindSrvTableT0(m_depthResources.descriptors.srv, 0)) {
         return;
     }
     if (!bindUavTableU0(m_hzbResources.descriptors.mipUAVStaging[0], 0)) {

@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Graphics/RendererGeometryUtils.h"
 
 #include <cstdint>
@@ -11,7 +11,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     m_temporalMaskState.builtThisFrame = false;
     if (!m_services.temporalRejectionMask || !m_services.temporalRejectionMask->IsReady() ||
         !m_temporalMaskState.texture || !m_temporalMaskState.uav.IsValid() ||
-        !m_depthResources.buffer || !m_depthResources.srv.IsValid() ||
+        !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid() ||
         !m_temporalScreenState.velocityBuffer || !m_temporalScreenState.velocitySRV.IsValid() ||
         !m_services.device || !m_services.descriptorManager || !m_commandResources.graphicsList ||
         !m_temporalMaskState.descriptorTablesValid) {
@@ -57,7 +57,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     };
 
     if (!skipTransitions) {
-        transition(m_depthResources.buffer.Get(), m_depthResources.resourceState, kDepthSampleState);
+        transition(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, kDepthSampleState);
         transition(normalResource, *normalState, kSrvState);
         if (usingVBNormal && m_services.visibilityBuffer) {
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
@@ -67,7 +67,7 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
                    m_temporalMaskState.resourceState,
                    D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     } else {
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
         *normalState = kSrvState;
         if (usingVBNormal && m_services.visibilityBuffer) {
             m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
@@ -88,11 +88,11 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     desc.width = width;
     desc.height = height;
     desc.frameConstants = m_constantBuffers.currentFrameGPU;
-    desc.depthSRV = m_depthResources.srv;
+    desc.depthSRV = m_depthResources.descriptors.srv;
     desc.normalRoughnessSRV = normalSrv;
     desc.velocitySRV = m_temporalScreenState.velocitySRV;
     desc.outputUAV = m_temporalMaskState.uav;
-    desc.depthResource = m_depthResources.buffer.Get();
+    desc.depthResource = m_depthResources.resources.buffer.Get();
     desc.normalRoughnessResource = normalResource;
     desc.velocityResource = m_temporalScreenState.velocityBuffer.Get();
     desc.outputResource = m_temporalMaskState.texture.Get();

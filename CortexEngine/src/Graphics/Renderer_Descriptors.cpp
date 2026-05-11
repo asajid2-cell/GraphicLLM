@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/DescriptorTable.h"
 
@@ -84,7 +84,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
 
     writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(4, m_depthResources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
+    writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
     ID3D12Resource* normalRes = m_mainTargets.gbufferNormalRoughness.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
@@ -369,7 +369,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
 
     writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(4, m_depthResources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
+    writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
     ID3D12Resource* normalRes = m_mainTargets.gbufferNormalRoughness.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {

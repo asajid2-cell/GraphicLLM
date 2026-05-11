@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/TAAPass.h"
 #include "RenderGraph.h"
@@ -67,8 +67,8 @@ Renderer::ExecuteTAAInRenderGraph() {
     }
 
     RGResourceHandle depthHandle{};
-    if (m_depthResources.buffer) {
-        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_TAA");
+    if (m_depthResources.resources.buffer) {
+        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_TAA");
     }
 
     bool usesVBNormal = false;
@@ -111,7 +111,7 @@ Renderer::ExecuteTAAInRenderGraph() {
             m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
         if (depthHandle.IsValid()) {
-            m_depthResources.resourceState = kDepthSampleState;
+            m_depthResources.resources.resourceState = kDepthSampleState;
         }
         if (normalHandle.IsValid()) {
             if (usesVBNormal) {
@@ -154,7 +154,7 @@ Renderer::ExecuteTAAInRenderGraph() {
             m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         }
         if (depthHandle.IsValid()) {
-            m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+            m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         }
         if (normalHandle.IsValid()) {
             if (usesVBNormal) {

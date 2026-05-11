@@ -61,6 +61,9 @@ $hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
 $shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
 $shadowResourcesPath = Join-Path $root "src/Graphics/Renderer_ShadowResources.cpp"
 $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
+$depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
+$depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
+$depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -297,6 +300,37 @@ foreach ($target in $doc.targets) {
                 foreach ($oldFlatAccess in @("m_shadowResources.map", "m_shadowResources.dsvs", "m_shadowResources.srv", "m_shadowResources.resourceState", "m_shadowResources.initializedForEditor", "m_shadowResources.viewport", "m_shadowResources.scissor", "m_shadowResources.enabled", "m_shadowResources.mapSize", "m_shadowResources.bias")) {
                     if ($shadowSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "shadow_resources still uses flat shadow state access in $($pathInfo.Label): $oldFlatAccess"
+                    }
+                }
+            }
+        }
+    }
+
+    if ($id -eq "depth_resources") {
+        if (-not (Test-Path $depthStatePath)) {
+            Add-Failure "depth_resources missing RendererDepthState.h"
+        } else {
+            $depthState = Get-Content $depthStatePath -Raw
+            foreach ($required in @("struct DepthTargetResources", "struct DepthTargetDescriptors", "struct DepthTargetState", "DepthTargetResources resources", "DepthTargetDescriptors descriptors")) {
+                if ($depthState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "depth_resources missing ownership marker in RendererDepthState.h: $required"
+                }
+            }
+            foreach ($oldField in @("ComPtr<ID3D12Resource> buffer", "DescriptorHandle dsv", "DescriptorHandle readOnlyDsv", "DescriptorHandle srv", "D3D12_RESOURCE_STATES resourceState")) {
+                if ($depthState -match "struct DepthTargetState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "depth_resources still exposes loose depth state field in DepthTargetState: $oldField"
+                }
+            }
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $depthTargetPath; Label = "Renderer_DepthTarget.cpp" },
+            [pscustomobject]@{ Path = $depthPassesPath; Label = "Renderer_DepthPasses.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $depthSource = Get-Content $pathInfo.Path -Raw
+                foreach ($oldFlatAccess in @("m_depthResources.buffer", "m_depthResources.dsv", "m_depthResources.readOnlyDsv", "m_depthResources.srv", "m_depthResources.resourceState")) {
+                    if ($depthSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "depth_resources still uses flat depth state access in $($pathInfo.Label): $oldFlatAccess"
                     }
                 }
             }

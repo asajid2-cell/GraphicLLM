@@ -88,7 +88,7 @@ void Renderer::Shutdown() {
 
     m_materialFallbacks.ResetResources();
     m_assetRuntime.textureCache.clear();
-    m_depthResources.buffer.Reset();
+    m_depthResources.resources.buffer.Reset();
     m_shadowResources.resources.map.Reset();
     m_mainTargets.hdrColor.Reset();
     m_ssaoResources.resources.texture.Reset();

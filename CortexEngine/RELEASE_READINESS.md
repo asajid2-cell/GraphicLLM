@@ -25,7 +25,7 @@ The current verified local gate covers:
 - Material Lab, Glass and Water Courtyard, Effects Showcase, visual baseline
   smokes, and screenshot negative gates,
 - Phase 3 visual matrix,
-- renderer ownership and fatal error contracts,
+- renderer ownership, full ownership audit, and fatal error contracts,
 - advanced graphics catalog and effects gallery contracts,
 - environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
 - particle-disabled zero-cost and RT firefly/outlier gates,
@@ -43,12 +43,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.265`, `warnings=0`,
+- temporal validation: `gpu_ms=1.271`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.622/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.621/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -57,18 +57,21 @@ Result:
 - temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, HUD, preset, material editor,
   showcase, ownership, fatal error,
   environment manifest, advanced graphics catalog, and effects gallery contracts passed;
+- renderer full ownership audit: 48/48 `Renderer` members are named
+  state/service aggregates, with no loose GPU resource/descriptors in
+  `Renderer.h`;
 - screenshot negative gates, particle-disabled zero-cost, Phase 3 fallback
   matrix, and RT firefly/outlier gates passed;
 - Phase 3 visual matrix passed across temporal validation, RT Showcase,
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=17.137`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=19.685`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_192843_875_137568_e1f06141
+CortexEngine/build/bin/logs/runs/release_validation_20260510_193615_690_146580_bb588849
 ```
 
 ## Renderer Scope

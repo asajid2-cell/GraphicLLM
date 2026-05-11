@@ -264,6 +264,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "renderer_full_ownership_audit" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_renderer_full_ownership_audit.ps1"),
+        "-LogDir", (Join-Path $releaseLogDir "renderer_full_ownership_audit_artifacts")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "fatal_error_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -31,29 +31,17 @@ void Renderer::CaptureRTReflectionSignalStats() {
         return;
     }
 
-    constexpr D3D12_RESOURCE_STATES kSrvState =
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-    auto transition = [&](ID3D12Resource* resource,
-                          D3D12_RESOURCE_STATES& state,
-                          D3D12_RESOURCE_STATES desired) {
-        if (!resource || state == desired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = state;
-        barrier.Transition.StateAfter = desired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        state = desired;
-    };
-
-    transition(m_rtReflectionTargets.color.Get(), m_rtReflectionTargets.colorState, kSrvState);
-    transition(m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
-               m_rtReflectionSignalState.rawResources.statsResourceState,
-               D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    RTReflectionSignalStats::CaptureResources captureResources{};
+    captureResources.commandList = m_commandResources.graphicsList.Get();
+    captureResources.reflectionResource = m_rtReflectionTargets.color.Get();
+    captureResources.reflectionState = &m_rtReflectionTargets.colorState;
+    captureResources.statsResource = m_rtReflectionSignalState.rawResources.statsBuffer.Get();
+    captureResources.statsState = &m_rtReflectionSignalState.rawResources.statsResourceState;
+    captureResources.readbackResource =
+        m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex].Get();
+    if (!RTReflectionSignalStats::PrepareCaptureResources(captureResources)) {
+        return;
+    }
 
     RTReflectionSignalStats::DispatchDesc desc{};
     desc.width = width;
@@ -75,20 +63,9 @@ void Renderer::CaptureRTReflectionSignalStats() {
         return;
     }
 
-    D3D12_RESOURCE_BARRIER statsUavBarrier{};
-    statsUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.rawResources.statsBuffer.Get();
-    m_commandResources.graphicsList->ResourceBarrier(1, &statsUavBarrier);
-
-    transition(m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
-               m_rtReflectionSignalState.rawResources.statsResourceState,
-               D3D12_RESOURCE_STATE_COPY_SOURCE);
-    m_commandResources.graphicsList->CopyBufferRegion(
-        m_rtReflectionSignalState.rawResources.readback[m_frameRuntime.frameIndex].Get(),
-        0,
-        m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
-        0,
-        RTReflectionSignalStats::kStatsBytes);
+    if (!RTReflectionSignalStats::FinalizeCaptureReadback(captureResources)) {
+        return;
+    }
 
     m_rtReflectionSignalState.rawResources.readbackPending[m_frameRuntime.frameIndex] = true;
     m_rtReflectionSignalState.rawResources.sampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;
@@ -126,29 +103,17 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
         return;
     }
 
-    constexpr D3D12_RESOURCE_STATES kSrvState =
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-    auto transition = [&](ID3D12Resource* resource,
-                          D3D12_RESOURCE_STATES& state,
-                          D3D12_RESOURCE_STATES desired) {
-        if (!resource || state == desired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = state;
-        barrier.Transition.StateAfter = desired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        state = desired;
-    };
-
-    transition(m_rtReflectionTargets.history.Get(), m_rtReflectionTargets.historyState, kSrvState);
-    transition(m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
-               m_rtReflectionSignalState.historyResources.statsResourceState,
-               D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    RTReflectionSignalStats::CaptureResources captureResources{};
+    captureResources.commandList = m_commandResources.graphicsList.Get();
+    captureResources.reflectionResource = m_rtReflectionTargets.history.Get();
+    captureResources.reflectionState = &m_rtReflectionTargets.historyState;
+    captureResources.statsResource = m_rtReflectionSignalState.historyResources.statsBuffer.Get();
+    captureResources.statsState = &m_rtReflectionSignalState.historyResources.statsResourceState;
+    captureResources.readbackResource =
+        m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex].Get();
+    if (!RTReflectionSignalStats::PrepareCaptureResources(captureResources)) {
+        return;
+    }
 
     RTReflectionSignalStats::DispatchDesc desc{};
     desc.width = width;
@@ -170,20 +135,9 @@ void Renderer::CaptureRTReflectionHistorySignalStats() {
         return;
     }
 
-    D3D12_RESOURCE_BARRIER statsUavBarrier{};
-    statsUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    statsUavBarrier.UAV.pResource = m_rtReflectionSignalState.historyResources.statsBuffer.Get();
-    m_commandResources.graphicsList->ResourceBarrier(1, &statsUavBarrier);
-
-    transition(m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
-               m_rtReflectionSignalState.historyResources.statsResourceState,
-               D3D12_RESOURCE_STATE_COPY_SOURCE);
-    m_commandResources.graphicsList->CopyBufferRegion(
-        m_rtReflectionSignalState.historyResources.readback[m_frameRuntime.frameIndex].Get(),
-        0,
-        m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
-        0,
-        RTReflectionSignalStats::kStatsBytes);
+    if (!RTReflectionSignalStats::FinalizeCaptureReadback(captureResources)) {
+        return;
+    }
 
     m_rtReflectionSignalState.historyResources.readbackPending[m_frameRuntime.frameIndex] = true;
     m_rtReflectionSignalState.historyResources.sampleFrame[m_frameRuntime.frameIndex] = m_frameLifecycle.renderFrameCounter;

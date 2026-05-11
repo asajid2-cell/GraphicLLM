@@ -123,6 +123,84 @@ bool RTReflectionSignalStats::IsReady() const {
            m_reduceHistoryPipeline;
 }
 
+namespace {
+
+constexpr D3D12_RESOURCE_STATES kReflectionSignalSrvState =
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+void TransitionResource(ID3D12GraphicsCommandList* cmdList,
+                        ID3D12Resource* resource,
+                        D3D12_RESOURCE_STATES& state,
+                        D3D12_RESOURCE_STATES desired) {
+    if (!cmdList || !resource || state == desired) {
+        return;
+    }
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.StateBefore = state;
+    barrier.Transition.StateAfter = desired;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+    state = desired;
+}
+
+void InsertUAVBarrier(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* resource) {
+    if (!cmdList || !resource) {
+        return;
+    }
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    barrier.UAV.pResource = resource;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
+} // namespace
+
+bool RTReflectionSignalStats::PrepareCaptureResources(const CaptureResources& resources) {
+    if (!resources.commandList ||
+        !resources.reflectionResource ||
+        !resources.reflectionState ||
+        !resources.statsResource ||
+        !resources.statsState) {
+        return false;
+    }
+
+    TransitionResource(resources.commandList,
+                       resources.reflectionResource,
+                       *resources.reflectionState,
+                       kReflectionSignalSrvState);
+    TransitionResource(resources.commandList,
+                       resources.statsResource,
+                       *resources.statsState,
+                       D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    return true;
+}
+
+bool RTReflectionSignalStats::FinalizeCaptureReadback(const CaptureResources& resources) {
+    if (!resources.commandList ||
+        !resources.statsResource ||
+        !resources.statsState ||
+        !resources.readbackResource) {
+        return false;
+    }
+
+    InsertUAVBarrier(resources.commandList, resources.statsResource);
+    TransitionResource(resources.commandList,
+                       resources.statsResource,
+                       *resources.statsState,
+                       D3D12_RESOURCE_STATE_COPY_SOURCE);
+    resources.commandList->CopyBufferRegion(
+        resources.readbackResource,
+        0,
+        resources.statsResource,
+        0,
+        RTReflectionSignalStats::kStatsBytes);
+    return true;
+}
+
 bool RTReflectionSignalStats::Dispatch(ID3D12GraphicsCommandList* cmdList,
                                        ID3D12Device* device,
                                        DescriptorHeapManager* descriptorManager,

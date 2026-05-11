@@ -1020,6 +1020,23 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because RT, graph
       orchestration, visibility-buffer internals, and other renderer pass
       mechanics still live in renderer orchestration files.
+    - The current RT reflection signal-stats checkpoint moves raw/history
+      signal-resource transitions, stats UAV barriers, and stats readback
+      copies into `RTReflectionSignalStats::PrepareCaptureResources` and
+      `RTReflectionSignalStats::FinalizeCaptureReadback`. The renderer still
+      selects raw/history targets, dispatch descriptors, and frame-contract
+      bookkeeping, but `Renderer_RTReflectionSignalStats.cpp` now has no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`, or `CopyBufferRegion` calls.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=29`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_122423_342_98400_33292a95`, and RT
+      showcase passed at `rt_showcase_20260511_122423_358_94528_2d454689`
+      with `rt_signal=0.0225/0.1424/10.3398/0.0084` and
+      `rt_hist=0.0314/0.1433/7.3008/0.0089`. The broader ownership rows remain
+      `PARTIAL` because RT denoise/reflection/shadow/GI dispatch mechanics,
+      visibility-buffer internals, graph orchestration, and other renderer pass
+      mechanics still need the same ownership treatment.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

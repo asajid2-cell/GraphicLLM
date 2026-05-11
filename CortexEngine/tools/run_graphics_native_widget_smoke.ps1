@@ -69,7 +69,10 @@ $IDC_GFX_SSAO_BIAS = 9042
 $IDC_GFX_SSR_DISTANCE = 9043
 $IDC_GFX_SSR_THICKNESS = 9044
 $IDC_GFX_SSR_STRENGTH = 9045
+$IDC_GFX_GOD_RAYS = 9014
+$IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
+$IDC_GFX_FOG_FALLOFF = 9041
 $IDC_GFX_WATER_WAVE = 9021
 $IDC_GFX_WATER_LENGTH = 9037
 $IDC_GFX_WATER_SPEED = 9038
@@ -200,7 +203,10 @@ try {
         Set-Trackbar $window $IDC_GFX_SSAO_RADIUS 52
         Set-Trackbar $window $IDC_GFX_SSAO_BIAS 63
         Set-Trackbar $window $IDC_GFX_SSAO_INTENSITY 39
+        Set-Trackbar $window $IDC_GFX_GOD_RAYS 55
+        Set-Trackbar $window $IDC_GFX_FOG_DENSITY 26
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
+        Set-Trackbar $window $IDC_GFX_FOG_FALLOFF 34
         Set-Trackbar $window $IDC_GFX_WATER_WAVE 37
         Set-Trackbar $window $IDC_GFX_WATER_LENGTH 44
         Set-Trackbar $window $IDC_GFX_WATER_SPEED 31
@@ -270,7 +276,10 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "ssao_radius" ([double]$fc.lighting.ssao_radius) 2.60 0.12
     Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.063 0.01
     Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 1.95 0.12
+    Assert-Near "god_ray_intensity" ([double]$fc.lighting.god_ray_intensity) 1.65 0.10
+    Assert-Near "fog_density" ([double]$fc.lighting.fog_density) 0.026 0.01
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
+    Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 3.41 0.20
     Assert-Near "water_wave_amplitude" ([double]$fc.water.wave_amplitude) 0.74 0.06
     Assert-Near "water_wave_length" ([double]$fc.water.wave_length) 44.1 0.8
     Assert-Near "water_wave_speed" ([double]$fc.water.wave_speed) 6.2 0.3

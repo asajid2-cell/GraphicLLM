@@ -103,6 +103,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_PARTICLES = 9112,
     IDC_GFX_BACKGROUND_VISIBLE = 9113,
     IDC_GFX_CINEMATIC_POST = 9114,
+    IDC_GFX_SAFE_LIGHTING = 9115,
 
     IDC_GFX_SAFE_PRESET = 9200,
     IDC_GFX_HERO_BASELINE = 9201,
@@ -193,6 +194,7 @@ struct GraphicsSettingsState {
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
     HWND chkGPUCulling = nullptr;
+    HWND chkSafeLighting = nullptr;
     HWND chkRT = nullptr;
     HWND chkRTReflections = nullptr;
     HWND chkRTGI = nullptr;
@@ -423,6 +425,7 @@ void SyncStateFromToggles() {
     g_gfx.tuning.quality.taaEnabled = GetCheckbox(g_gfx.chkTAA);
     g_gfx.tuning.quality.fxaaEnabled = GetCheckbox(g_gfx.chkFXAA);
     g_gfx.tuning.quality.gpuCullingEnabled = GetCheckbox(g_gfx.chkGPUCulling);
+    g_gfx.tuning.quality.safeLightingRigOnLowVRAM = GetCheckbox(g_gfx.chkSafeLighting);
 
     g_gfx.tuning.rayTracing.enabled = GetCheckbox(g_gfx.chkRT);
     g_gfx.tuning.rayTracing.reflectionsEnabled = GetCheckbox(g_gfx.chkRTReflections);
@@ -612,6 +615,7 @@ void RefreshControlsFromRenderer() {
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
     SetCheckbox(g_gfx.chkGPUCulling, g_gfx.tuning.quality.gpuCullingEnabled);
+    SetCheckbox(g_gfx.chkSafeLighting, g_gfx.tuning.quality.safeLightingRigOnLowVRAM);
     SetCheckbox(g_gfx.chkRT, g_gfx.tuning.rayTracing.enabled);
     SetCheckbox(g_gfx.chkRTReflections, g_gfx.tuning.rayTracing.reflectionsEnabled);
     SetCheckbox(g_gfx.chkRTGI, g_gfx.tuning.rayTracing.giEnabled);
@@ -847,6 +851,7 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkTAA = makeCheckbox(IDC_GFX_TAA, L"TAA");
             g_gfx.chkFXAA = makeCheckbox(IDC_GFX_FXAA, L"FXAA");
             g_gfx.chkGPUCulling = makeCheckbox(IDC_GFX_GPU_CULLING, L"GPU Culling");
+            g_gfx.chkSafeLighting = makeCheckbox(IDC_GFX_SAFE_LIGHTING, L"Safe Lighting");
 
             makeSection(L"Ray Tracing");
             g_gfx.chkRT = makeCheckbox(IDC_GFX_RT, L"RT Master");

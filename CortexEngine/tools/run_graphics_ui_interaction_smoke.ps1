@@ -34,7 +34,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "render_scale": 0.74,
     "taa": true,
     "fxaa": true,
-    "gpu_culling": true
+    "gpu_culling": true,
+    "safe_lighting_rig_on_low_vram": false
   },
   "environment": {
     "id": "studio",
@@ -165,6 +166,7 @@ if ($exitCode -ne 0) {
     if ([string]$fc.graphics_preset.id -ne "runtime_ui_smoke") { Add-Failure "graphics preset id was '$($fc.graphics_preset.id)'" }
     if (-not [bool]$fc.graphics_preset.dirty_from_ui) { Add-Failure "dirty_from_ui was false" }
     Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.74 0.03
+    if ([bool]$fc.lighting.safe_rig_on_low_vram) { Add-Failure "safe lighting rig remained enabled despite UI settings" }
     Assert-Near "exposure" ([double]$fc.lighting.exposure) 1.31 0.03
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.19 0.03
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03

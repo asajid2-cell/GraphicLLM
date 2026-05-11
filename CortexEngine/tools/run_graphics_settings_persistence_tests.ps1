@@ -188,6 +188,9 @@ if ($validRun.exit_code -ne 0) {
     if ([Math]::Abs($renderScale - 0.72) -gt 0.02) {
         Add-Failure "valid settings render scale was $renderScale, expected 0.72"
     }
+    if (-not [bool]$report.frame_contract.lighting.safe_rig_on_low_vram) {
+        Add-Failure "valid settings safe lighting rig was not enabled"
+    }
     if ([bool]$report.frame_contract.ray_tracing.enabled) {
         Add-Failure "valid settings did not disable ray tracing"
     }

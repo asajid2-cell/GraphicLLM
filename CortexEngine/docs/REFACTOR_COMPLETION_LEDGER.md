@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_203347_600_159192_fc3ab321
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_212145_379_150620_04ddc79a
 ```
 
 Key evidence from that run:
@@ -53,23 +53,25 @@ Key evidence from that run:
   renderer split sources are covered, and temporary source count is 0.
 - Render-graph boundary contract: passed; transient-validation env wiring,
   validation module integration, and VB staged/legacy graph boundaries are covered.
+- Visibility-buffer transition contract: passed; graph-owned VB stage
+  transition-skip controls, state snapshots, and final state writeback are covered.
 - Debug primitive contract: passed; debug-line state ownership and draw-contract
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.989`, `disocclusion=0.006606`,
-  `high_motion=0.005156`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.253`, `disocclusion=0.006853`,
+  `high_motion=0.005225`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.732`,
+  `camera=reflection_closeup`, `gpu_ms=2.877`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.261/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.638/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.047/2.5 changed=0.001/0.08`,
+  `temporal_diff=mean=0.017/2.5 changed=0.000/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
@@ -94,6 +96,7 @@ Key evidence from that run:
   environment manifest, IBL gallery, budget profile matrix, and voxel backend
   gates passed.
 - New focused gates passed in release validation: temporal camera cut,
+  visibility-buffer transition contract,
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, and RT
@@ -160,6 +163,7 @@ long file/function lists in every row.
 | `tools/run_repo_hygiene_tests.ps1` | static/contract | Runs `git diff --check`, verifies generated build/cache artifacts are not tracked, and checks required `.gitignore` guards. |
 | `tools/run_source_list_contract_tests.ps1` | static/contract | Checks explicit CMake source entries for existence, duplicates, renderer split coverage, and temporary/backup source names. |
 | `tools/run_render_graph_boundary_contract_tests.ps1` | static/contract | Checks transient-validation env wiring, `RenderGraphValidationPass` integration, and visibility-buffer staged/legacy graph boundary pass names/fallback accounting. |
+| `tools/run_visibility_buffer_transition_contract_tests.ps1` | static/contract | Checks `VisibilityBufferRenderer` transition-skip fields, graph-owned stage skip-control use, resource-state snapshots, and final state writeback from the render graph. |
 | `tools/run_debug_primitive_contract_tests.ps1` | static/contract | Checks debug-line state ownership, renderer API surface, and frame-contract debug draw counters. |
 | `tools/run_editor_frame_contract_tests.ps1` | static/contract | Checks editor renderer hook declarations/delegation and the explicit `EngineEditorMode` frame sequence. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
@@ -224,7 +228,7 @@ of `phase2.md`.
 | P2-PASS-04D | Pass 4D - Visibility Buffer Graph Boundary | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp::Renderer::ExecuteVisibilityBufferInRenderGraph`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase log shows VB enabled/rendered and smoke passes. | Debug/fallback combinations remain not fully covered in latest release gate. |
 | P2-PASS-04E | Pass 4E - Visibility Buffer Stage Split | DONE_VERIFIED | `Renderer_VisibilityBufferOrchestration.cpp::Renderer::RenderVisibilityBufferPath`, `Renderer_VisibilityBufferStages.cpp` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase VB path runs successfully. | No current targeted stage-level test beyond smoke. |
 | P2-PASS-04F | Pass 4F - Visibility Buffer Resource State Snapshot | DONE_VERIFIED | SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase and temporal smokes pass with VB enabled. | Specific state restore assertions are indirect. |
-| P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_UNVERIFIED | SRC-VB, SRC-RENDERGRAPH | Historical targeted VB debug captures in `phase2.md` | Historical evidence only in `phase2.md`; latest release gate does not enumerate each transition skip mode. | Add static/runtime test for skip-control use under graph-owned resources. |
+| P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_VERIFIED | `VisibilityBuffer.h::VisibilityBufferRenderer::TransitionSkipControls`, `VisibilityBuffer.h::GetTransitionSkipControls`, `VisibilityBuffer.h::SetTransitionSkipControls`, `Renderer_RenderGraphVisibilityBuffer.cpp::Renderer::ExecuteVisibilityBufferInRenderGraph`, `Renderer_RenderGraphVisibilityBufferHelpers.h::ImportVisibilityBufferGraphResources`, `VisibilityBuffer_VisibilityPass.cpp`, `VisibilityBuffer_Resolve.cpp`, `VisibilityBuffer_DebugBlit.cpp`, `VisibilityBuffer_DeferredLighting.cpp` | `tools/run_visibility_buffer_transition_contract_tests.ps1`; `tools/run_release_validation.ps1` | Targeted gate passed with `transition_skip_fields=covered`, `graph_owned_state_snapshots=covered`, `graph_final_state_writeback=covered`; release run `release_validation_20260510_212145_379_150620_04ddc79a` passed with `visibility_buffer_transition_contract`. | None for current static transition-skip ownership contract; runtime VB debug behavior remains covered by P2-PASS-04J. |
 | P2-PASS-04H | Pass 4H - Visibility Buffer Internal Graph Nodes | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp` records `VBClear`, `VBVisibility`, `VBMaterialResolve`, `VBDeferredLighting` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes through VB path with frame contract pass records. | Debug path/fallback still not exhaustively tested. |
 | P2-PASS-04I | Pass 4I - VB Lighting Graph Resources And Subpass Records | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | Current frame contract checks pass; VB initialization log includes clustered light/BRDF LUT pipelines. | No separate assertion in top-level output for every VB subpass name. |
 | P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_203407_586_156864_3da88568`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
@@ -682,6 +686,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_repo_hygiene_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_source_list_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_boundary_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visibility_buffer_transition_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_debug_primitive_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
    ```

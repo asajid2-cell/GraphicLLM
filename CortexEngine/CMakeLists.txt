@@ -221,6 +221,7 @@ set(CORTEX_SOURCES
     src/Graphics/Renderer_PostProcess.cpp
     src/Graphics/Renderer_PipelineSetup.cpp
     src/Graphics/Renderer_RootSignatureSetup.cpp
+    src/Graphics/GPUParticles.cpp
     src/Graphics/Renderer_Particles.cpp
     src/Graphics/Renderer_RTCache.cpp
     src/Graphics/Renderer_RTDenoise.cpp

@@ -37,8 +37,11 @@
         "src/Scene/ParticleEffectLibrary.h",
         "src/Scene/ParticleEffectLibrary.cpp",
         "src/Graphics/GPUParticles.h",
+        "src/Graphics/GPUParticles.cpp",
         "assets/shaders/Particles.hlsl",
+        "assets/shaders/ParticleEmit.hlsl",
         "assets/shaders/ParticleSimulate.hlsl",
+        "assets/shaders/ParticleSort.hlsl",
         "assets/shaders/ParticleRender.hlsl"
       ],
       "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "dust_motes", "sparks", "embers", "mist", "rain", "snow", "density_scale", "frame_contract_stats", "budgeted_zero_cost_disabled_path", "procedural_billboard_fallback"],

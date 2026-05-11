@@ -170,6 +170,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.areaLightSizeScale = m_lightingState.areaLightSizeScale;
     contract.lighting.shadowBias = m_shadowResources.bias;
     contract.lighting.shadowPCFRadius = m_shadowResources.pcfRadius;
+    contract.lighting.cascadeSplitLambda = m_shadowResources.cascadeSplitLambda;
 
     if (m_framePlanning.sceneSnapshot.IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
         contract.renderables = m_framePlanning.sceneSnapshot.renderables;

@@ -217,6 +217,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"area_light_size_scale", contract.lighting.areaLightSizeScale},
             {"shadow_bias", contract.lighting.shadowBias},
             {"shadow_pcf_radius", contract.lighting.shadowPCFRadius},
+            {"cascade_split_lambda", contract.lighting.cascadeSplitLambda},
             {"light_count", contract.lighting.lightCount},
             {"shadow_casting_light_count", contract.lighting.shadowCastingLightCount},
             {"total_light_intensity", contract.lighting.totalLightIntensity},

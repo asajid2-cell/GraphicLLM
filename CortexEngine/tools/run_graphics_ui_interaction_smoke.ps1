@@ -54,7 +54,10 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "cool": -0.14,
     "sun_intensity": 4.4,
     "god_ray_intensity": 0.17,
-    "area_light_size_scale": 1.42
+    "area_light_size_scale": 1.42,
+    "shadow_bias": 0.004,
+    "shadow_pcf_radius": 2.75,
+    "cascade_split_lambda": 0.61
   },
   "screen_space": {
     "ssao": true,
@@ -170,6 +173,9 @@ if ($exitCode -ne 0) {
     Assert-Near "exposure" ([double]$fc.lighting.exposure) 1.31 0.03
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.19 0.03
     Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.42 0.04
+    Assert-Near "shadow_bias" ([double]$fc.lighting.shadow_bias) 0.004 0.001
+    Assert-Near "shadow_pcf_radius" ([double]$fc.lighting.shadow_pcf_radius) 2.75 0.05
+    Assert-Near "cascade_split_lambda" ([double]$fc.lighting.cascade_split_lambda) 0.61 0.03
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
     Assert-Near "environment_rotation_degrees" ([double]$fc.environment.rotation_degrees) 137.0 0.5

@@ -42,7 +42,11 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "warm": 0.42,
     "cool": -0.18,
     "sun_intensity": 3.5,
-    "god_ray_intensity": 0.0
+    "god_ray_intensity": 0.0,
+    "area_light_size_scale": 1.0,
+    "shadow_bias": 0.006,
+    "shadow_pcf_radius": 3.25,
+    "cascade_split_lambda": 0.72
   },
   "environment": {
     "id": "studio",
@@ -228,6 +232,9 @@ if ($validRun.exit_code -ne 0) {
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur
     $environmentRotation = [double]$report.frame_contract.environment.rotation_degrees
     Assert-Near "area_light_size_scale" ([double]$report.frame_contract.lighting.area_light_size_scale) 1.0 0.04
+    Assert-Near "shadow_bias" ([double]$report.frame_contract.lighting.shadow_bias) 0.006 0.001
+    Assert-Near "shadow_pcf_radius" ([double]$report.frame_contract.lighting.shadow_pcf_radius) 3.25 0.05
+    Assert-Near "cascade_split_lambda" ([double]$report.frame_contract.lighting.cascade_split_lambda) 0.72 0.03
     if ([Math]::Abs($backgroundExposure - 1.23) -gt 0.03) {
         Add-Failure "valid settings background exposure was $backgroundExposure, expected 1.23"
     }

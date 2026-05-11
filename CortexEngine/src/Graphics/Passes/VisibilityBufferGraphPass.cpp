@@ -70,6 +70,13 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            context.meshDraws;
 }
 
+[[nodiscard]] bool IsValid(const DebugBlitContext& context) {
+    return context.renderer &&
+           context.commandList &&
+           context.hdrTarget &&
+           (context.debugVisibility || (context.debugDepth && context.depthBuffer) || context.debugGBuffer);
+}
+
 } // namespace
 
 bool Clear(const ClearContext& context) {
@@ -193,6 +200,91 @@ bool ResolveMaterials(const MaterialResolveContext& context) {
     return true;
 }
 
+bool DebugBlit(const DebugBlitContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "debug_blit", "visibility-buffer debug blit context incomplete");
+        return false;
+    }
+
+    if (context.hdrState) {
+        *context.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    if (context.debugVisibility) {
+        states.visibility = kVBShaderResourceState;
+    } else if (context.debugGBuffer) {
+        switch (context.gbufferSource) {
+            case VisibilityBufferRenderer::DebugBlitBuffer::NormalRoughness:
+                states.normalRoughness = kVBShaderResourceState;
+                break;
+            case VisibilityBufferRenderer::DebugBlitBuffer::EmissiveMetallic:
+                states.emissiveMetallic = kVBShaderResourceState;
+                break;
+            case VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt0:
+                states.materialExt0 = kVBShaderResourceState;
+                break;
+            case VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt1:
+                states.materialExt1 = kVBShaderResourceState;
+                break;
+            case VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt2:
+                states.materialExt2 = kVBShaderResourceState;
+                break;
+            case VisibilityBufferRenderer::DebugBlitBuffer::Albedo:
+            default:
+                states.albedo = kVBShaderResourceState;
+                break;
+        }
+    }
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    if (context.debugDepth && context.depthState) {
+        *context.depthState = kDepthSampleState;
+    }
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.debugBlit = true;
+    context.renderer->SetTransitionSkipControls(controls);
+
+    Result<void> debugResult = Result<void>::Ok();
+    if (context.debugVisibility) {
+        debugResult = context.renderer->DebugBlitVisibilityToHDR(
+            context.commandList,
+            context.hdrTarget,
+            context.hdrRTV);
+    } else if (context.debugDepth) {
+        debugResult = context.renderer->DebugBlitDepthToHDR(
+            context.commandList,
+            context.hdrTarget,
+            context.hdrRTV,
+            context.depthBuffer);
+    } else if (context.debugGBuffer) {
+        debugResult = context.renderer->DebugBlitGBufferToHDR(
+            context.commandList,
+            context.hdrTarget,
+            context.hdrRTV,
+            context.gbufferSource);
+    }
+
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (debugResult.IsErr()) {
+        RecordFailure(context.failure, "debug_blit", debugResult.Error());
+        return false;
+    }
+
+    if (context.renderedThisFrame) {
+        *context.renderedThisFrame = true;
+    }
+    if (context.debugOverrideThisFrame) {
+        *context.debugOverrideThisFrame = true;
+    }
+    return true;
+}
+
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
     if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
@@ -207,7 +299,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
         Fail(context, "visibility_buffer_material_resolve_contract");
         return false;
     }
-    if (context.debugPath && !context.debugBlit) {
+    if (context.debugPath && !IsValid(context.debugBlit)) {
         Fail(context, "visibility_buffer_debug_contract");
         return false;
     }
@@ -267,7 +359,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(resources.hdr, RGResourceUsage::RenderTarget);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                context.debugBlit();
+                (void)DebugBlit(context.debugBlit);
             });
     }
 

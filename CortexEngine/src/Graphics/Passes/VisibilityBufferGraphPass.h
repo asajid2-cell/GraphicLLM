@@ -69,6 +69,24 @@ struct MaterialResolveContext {
     StageFailureContext failure;
 };
 
+struct DebugBlitContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ID3D12Resource* hdrTarget = nullptr;
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV{};
+    ID3D12Resource* depthBuffer = nullptr;
+    bool debugVisibility = false;
+    bool debugDepth = false;
+    bool debugGBuffer = false;
+    VisibilityBufferRenderer::DebugBlitBuffer gbufferSource =
+        VisibilityBufferRenderer::DebugBlitBuffer::Albedo;
+    D3D12_RESOURCE_STATES* hdrState = nullptr;
+    D3D12_RESOURCE_STATES* depthState = nullptr;
+    bool* renderedThisFrame = nullptr;
+    bool* debugOverrideThisFrame = nullptr;
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -81,7 +99,7 @@ struct GraphContext {
     ClearContext clear;
     VisibilityContext visibility;
     MaterialResolveContext materialResolve;
-    std::function<void()> debugBlit;
+    DebugBlitContext debugBlit;
     std::function<void()> brdfLut;
     std::function<void()> clusteredLights;
     std::function<void()> deferredLighting;
@@ -91,6 +109,7 @@ struct GraphContext {
 [[nodiscard]] bool Clear(const ClearContext& context);
 [[nodiscard]] bool RasterizeVisibility(const VisibilityContext& context);
 [[nodiscard]] bool ResolveMaterials(const MaterialResolveContext& context);
+[[nodiscard]] bool DebugBlit(const DebugBlitContext& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

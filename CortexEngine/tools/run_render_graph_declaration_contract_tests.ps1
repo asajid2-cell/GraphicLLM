@@ -214,12 +214,17 @@ foreach ($marker in @(
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "Clear(context.clear)"
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "RasterizeVisibility(context.visibility)"
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "ResolveMaterials(context.materialResolve)"
+Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "DebugBlit(context.debugBlit)"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clear"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> visibility"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> materialResolve"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> debugBlit"
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ClearVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RasterizeVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RenderVisibilityBufferMaterialResolveStage("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "DebugBlitVisibilityToHDR("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "DebugBlitDepthToHDR("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "DebugBlitGBufferToHDR("
 
 if ($failures.Count -gt 0) {
     Write-Host "Render graph declaration contract tests failed:" -ForegroundColor Red

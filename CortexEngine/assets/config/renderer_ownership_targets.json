@@ -446,11 +446,21 @@
       "id": "mesh_upload_copy_submission",
       "owner": "Mesh upload",
       "status": "release_boundary_validated",
-      "release_boundary": "Renderer_MeshUpload.cpp still owns mesh validation, tangent generation, buffer allocation, staging-map writes, descriptor registration, queue/fence policy, and BLAS scheduling, but upload command allocator/list reset, vertex/index CopyBufferRegion commands, and command-list close are owned by MeshUploadCopyPass",
+      "release_boundary": "Renderer_MeshUpload.cpp still owns mesh validation, tangent generation, queue/fence policy, asset registry bookkeeping, and BLAS scheduling, but upload command allocator/list reset, vertex/index CopyBufferRegion commands, and command-list close are owned by MeshUploadCopyPass",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
       "target_files": ["Passes/MeshUploadCopyPass.h", "Passes/MeshUploadCopyPass.cpp", "Renderer_MeshUpload.cpp"],
       "renderer_state_members": ["m_uploadCommands", "m_services", "m_assetRuntime"],
       "future_extension": "Keep future upload command recording and copy submission mechanics in MeshUploadCopyPass or a dedicated upload service instead of adding CopyBufferRegion calls to Renderer_MeshUpload.cpp"
+    },
+    {
+      "id": "mesh_upload_resources",
+      "owner": "Mesh upload",
+      "status": "release_boundary_validated",
+      "release_boundary": "MeshUploadResourceState owns GPU-local vertex/index buffer creation, staging upload buffer creation, staging map/copy/unmap writes, and raw VB/IB SRV descriptor allocation/view creation; Renderer_MeshUpload.cpp owns mesh validation, tangent generation, upload queue/fence policy, asset registry bookkeeping, BLAS scheduling, and delegates resource creation through MeshUploadResourceState",
+      "validated_contracts": ["renderer_ownership", "material_lab", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererUploadState.h", "Renderer_MeshUpload.cpp"],
+      "renderer_state_members": ["m_uploadCommands", "m_services", "m_assetRuntime"],
+      "future_extension": "Keep future mesh buffer allocation, staging writes, and bindless raw SRV creation inside MeshUploadResourceState or a dedicated upload service before expanding mesh streaming"
     },
     {
       "id": "vegetation_instance_resources",

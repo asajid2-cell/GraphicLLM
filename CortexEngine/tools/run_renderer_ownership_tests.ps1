@@ -127,6 +127,7 @@ $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBi
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
 $meshUploadCopyPassPath = Join-Path $root "src/Graphics/Passes/MeshUploadCopyPass.cpp"
 $meshUploadRendererPath = Join-Path $root "src/Graphics/Renderer_MeshUpload.cpp"
+$uploadStatePath = Join-Path $root "src/Graphics/RendererUploadState.h"
 $forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
 $depthPassPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $shadowDrawPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
@@ -1695,6 +1696,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "mesh_upload_copy_submission missing Renderer_MeshUpload.cpp"
+        }
+    }
+
+    if ($id -eq "mesh_upload_resources") {
+        if (Test-Path $uploadStatePath) {
+            $uploadState = Get-Content $uploadStatePath -Raw
+            foreach ($required in @("struct MeshUploadResourceState", "CreateResources", "CreateCommittedResource", "D3D12_HEAP_TYPE_DEFAULT", "D3D12_HEAP_TYPE_UPLOAD", "Map(0", "Unmap(0", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "vbRawSRVIndex", "ibRawSRVIndex")) {
+                if ($uploadState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "mesh_upload_resources missing RendererUploadState marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "mesh_upload_resources missing RendererUploadState.h"
+        }
+        if (Test-Path $meshUploadRendererPath) {
+            $meshUploadRenderer = Get-Content $meshUploadRendererPath -Raw
+            if ($meshUploadRenderer.IndexOf("MeshUploadResourceState::CreateResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "mesh_upload_resources missing MeshUploadResourceState::CreateResources delegation in Renderer_MeshUpload.cpp"
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "CreateShaderResourceView", "AllocateCBV_SRV_UAV", "Map(0", "Unmap(0", "D3D12_HEAP_TYPE_DEFAULT", "D3D12_HEAP_TYPE_UPLOAD", "D3D12_SHADER_RESOURCE_VIEW_DESC")) {
+                if ($meshUploadRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "mesh_upload_resources still has direct mesh upload resource/descriptor mechanics in Renderer_MeshUpload.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "mesh_upload_resources missing Renderer_MeshUpload.cpp"
         }
     }
 

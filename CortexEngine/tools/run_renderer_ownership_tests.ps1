@@ -80,6 +80,7 @@ if (-not (Test-Path $environmentStatePath)) {
     throw "RendererEnvironmentState.h not found: $environmentStatePath"
 }
 $environmentState = Get-Content $environmentStatePath -Raw
+$environmentRendererPath = Join-Path $root "src/Graphics/Renderer_Environment.cpp"
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
@@ -941,10 +942,25 @@ foreach ($target in $doc.targets) {
     }
 
     if ($id -eq "environment_resources") {
-        foreach ($required in @("ActiveEnvironment", "ActiveEnvironmentName", "UsingFallbackEnvironment", "ResidentCount", "PendingCount")) {
+        foreach ($required in @("ActiveEnvironment", "ActiveEnvironmentName", "UsingFallbackEnvironment", "ResidentCount", "PendingCount", "struct EnvironmentDescriptorState", "AllocateShadowAndEnvironmentTable", "EnsureEnvironmentBindlessSRVs", "WriteShadowAndEnvironmentTable", "WriteNullTexture2DSRV", "CreateShaderResourceView", "AllocateCBV_SRV_UAV")) {
             if ($environmentState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "environment_resources missing state ownership marker in RendererEnvironmentState.h: $required"
             }
+        }
+        if (Test-Path $environmentRendererPath) {
+            $environmentRenderer = Get-Content $environmentRendererPath -Raw
+            foreach ($required in @("EnvironmentDescriptorState::AllocateShadowAndEnvironmentTable", "EnvironmentDescriptorState::EnsureEnvironmentBindlessSRVs", "EnvironmentDescriptorState::WriteShadowAndEnvironmentTable")) {
+                if ($environmentRenderer.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "environment_resources missing EnvironmentDescriptorState delegation in Renderer_Environment.cpp: $required"
+                }
+            }
+            foreach ($removedLocal in @("AllocateCBV_SRV_UAV", "CreateShaderResourceView", "D3D12_SHADER_RESOURCE_VIEW_DESC")) {
+                if ($environmentRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "environment_resources still has direct environment descriptor mechanics in Renderer_Environment.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "environment_resources missing Renderer_Environment.cpp"
         }
     }
 

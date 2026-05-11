@@ -29,34 +29,6 @@ struct EnvironmentLoadCandidate {
     bool defaultEnvironment = false;
 };
 
-bool WriteTexture2DSRV(ID3D12Device* device,
-                       const std::shared_ptr<DX12Texture>& texture,
-                       D3D12_CPU_DESCRIPTOR_HANDLE dst) {
-    if (!device || !texture || !texture->GetResource()) {
-        return false;
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = texture->GetFormat();
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = texture->GetMipLevels();
-    srvDesc.Texture2D.MostDetailedMip = 0;
-
-    device->CreateShaderResourceView(texture->GetResource(), &srvDesc, dst);
-    return true;
-}
-
-void WriteNullTexture2DSRV(ID3D12Device* device, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE dst) {
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = format;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    device->CreateShaderResourceView(nullptr, &srvDesc, dst);
-}
-
 } // namespace
 
 bool Renderer::IsIBLLimitEnabled() const {
@@ -279,14 +251,12 @@ Result<void> Renderer::InitializeEnvironmentMaps() {
 
     // Allocate persistent descriptors for shadow + IBL + RT mask/history + RT GI
     // (space1, t0-t6) if not already created.
-    if (!m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        for (int i = 0; i < 7; ++i) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate SRV table for shadow/environment: " + handleResult.Error());
-            }
-            m_environmentState.shadowAndEnvDescriptors[i] = handleResult.Value();
-        }
+    auto tableResult = EnvironmentDescriptorState::AllocateShadowAndEnvironmentTable(
+        m_services.descriptorManager.get(),
+        m_environmentState.shadowAndEnvDescriptors,
+        "shadow/environment");
+    if (tableResult.IsErr()) {
+        return tableResult;
     }
 
     UpdateEnvironmentDescriptorTable();
@@ -319,14 +289,12 @@ Result<void> Renderer::AddEnvironmentFromTexture(const std::shared_ptr<DX12Textu
                  env.name, tex->GetWidth(), tex->GetHeight(), tex->GetMipLevels());
 
     // Ensure descriptor table exists, then refresh bindings.
-    if (!m_environmentState.shadowAndEnvDescriptors[0].IsValid() && m_services.descriptorManager) {
-        for (int i = 0; i < 7; ++i) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate SRV table for Dreamer environment: " + handleResult.Error());
-            }
-            m_environmentState.shadowAndEnvDescriptors[i] = handleResult.Value();
-        }
+    auto tableResult = EnvironmentDescriptorState::AllocateShadowAndEnvironmentTable(
+        m_services.descriptorManager.get(),
+        m_environmentState.shadowAndEnvDescriptors,
+        "Dreamer environment");
+    if (tableResult.IsErr()) {
+        return tableResult;
     }
 
     UpdateEnvironmentDescriptorTable();
@@ -343,78 +311,26 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
 
     ID3D12Device* device = m_services.device->GetDevice();
 
-    // Slot 0 (t4): shadow map array, or a neutral placeholder if shadows are unavailable.
-    if (m_shadowResources.resources.srv.IsValid()) {
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[0].cpu,
-            m_shadowResources.resources.srv.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-    } else if (!WriteTexture2DSRV(device, m_materialFallbacks.roughness, m_environmentState.shadowAndEnvDescriptors[0].cpu)) {
-        WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, m_environmentState.shadowAndEnvDescriptors[0].cpu);
-    }
-
-    // Environment selection
-    std::shared_ptr<DX12Texture> diffuseSrc;
-    std::shared_ptr<DX12Texture> specularSrc;
-
     if (EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
-        EnsureEnvironmentBindlessSRVs(*env);
-
-        if (env->diffuseIrradiance && env->diffuseIrradiance->GetResource()) {
-            diffuseSrc = env->diffuseIrradiance;
+        auto bindlessResult = EnvironmentDescriptorState::EnsureEnvironmentBindlessSRVs(
+            device,
+            m_services.descriptorManager.get(),
+            *env,
+            m_materialFallbacks.albedo);
+        if (bindlessResult.IsErr()) {
+            spdlog::warn("{}", bindlessResult.Error());
         }
-        if (env->specularPrefiltered && env->specularPrefiltered->GetResource()) {
-            specularSrc = env->specularPrefiltered;
-        }
     }
 
-    // If no environment texture is available, fall back to placeholders when
-    // present; otherwise leave the descriptors as null SRVs.
-    if (!diffuseSrc && m_materialFallbacks.albedo && m_materialFallbacks.albedo->GetResource()) {
-        diffuseSrc = m_materialFallbacks.albedo;
-    }
-    if (!specularSrc && m_materialFallbacks.albedo && m_materialFallbacks.albedo->GetResource()) {
-        specularSrc = m_materialFallbacks.albedo;
-    }
-
-    if (!WriteTexture2DSRV(device, diffuseSrc, m_environmentState.shadowAndEnvDescriptors[1].cpu)) {
-        WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, m_environmentState.shadowAndEnvDescriptors[1].cpu);
-    }
-
-    if (!WriteTexture2DSRV(device, specularSrc, m_environmentState.shadowAndEnvDescriptors[2].cpu)) {
-        WriteNullTexture2DSRV(device, DXGI_FORMAT_R8G8B8A8_UNORM, m_environmentState.shadowAndEnvDescriptors[2].cpu);
-    }
-
-    // Optional RT shadow mask and history (t3, t4). When unavailable the
-    // PBR shader simply reads cascaded shadows.
-    if (m_rtShadowTargets.maskSRV.IsValid()) {
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[3].cpu,
-            m_rtShadowTargets.maskSRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-    }
-    if (m_rtShadowTargets.historySRV.IsValid()) {
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[4].cpu,
-            m_rtShadowTargets.historySRV.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
-        );
-    }
-
-    // Optional RT diffuse GI buffer (t5). When unavailable the PBR shader
-    // falls back to SSAO + ambient only.
-    if (m_rtGITargets.srv.IsValid()) {
-        device->CopyDescriptorsSimple(
-            1,
-            m_environmentState.shadowAndEnvDescriptors[5].cpu,
-            m_rtGITargets.srv.cpu,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    }
+    EnvironmentDescriptorTableInputs inputs;
+    inputs.shadowMapSRV = m_shadowResources.resources.srv;
+    inputs.rtShadowMaskSRV = m_rtShadowTargets.maskSRV;
+    inputs.rtShadowHistorySRV = m_rtShadowTargets.historySRV;
+    inputs.rtGISRV = m_rtGITargets.srv;
+    inputs.shadowFallback = m_materialFallbacks.roughness;
+    inputs.diffuseFallback = m_materialFallbacks.albedo;
+    inputs.specularFallback = m_materialFallbacks.albedo;
+    EnvironmentDescriptorState::WriteShadowAndEnvironmentTable(device, m_environmentState, inputs);
 }
 
 void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {
@@ -427,38 +343,13 @@ void Renderer::EnsureEnvironmentBindlessSRVs(EnvironmentMaps& env) {
         return;
     }
 
-    auto ensureHandle = [&](DescriptorHandle& handle, const char* label) -> bool {
-        if (handle.IsValid()) {
-            return true;
-        }
-        auto alloc = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-        if (alloc.IsErr()) {
-            spdlog::warn("Failed to allocate bindless environment SRV ({}): {}", label, alloc.Error());
-            return false;
-        }
-        handle = alloc.Value();
-        return true;
-    };
-
-    std::shared_ptr<DX12Texture> diffuseSrc;
-    if (env.diffuseIrradiance && env.diffuseIrradiance->GetResource()) {
-        diffuseSrc = env.diffuseIrradiance;
-    } else if (m_materialFallbacks.albedo && m_materialFallbacks.albedo->GetResource()) {
-        diffuseSrc = m_materialFallbacks.albedo;
-    }
-
-    std::shared_ptr<DX12Texture> specularSrc;
-    if (env.specularPrefiltered && env.specularPrefiltered->GetResource()) {
-        specularSrc = env.specularPrefiltered;
-    } else if (m_materialFallbacks.albedo && m_materialFallbacks.albedo->GetResource()) {
-        specularSrc = m_materialFallbacks.albedo;
-    }
-
-    if (diffuseSrc && ensureHandle(env.diffuseIrradianceSRV, "diffuse")) {
-        WriteTexture2DSRV(device, diffuseSrc, env.diffuseIrradianceSRV.cpu);
-    }
-    if (specularSrc && ensureHandle(env.specularPrefilteredSRV, "specular")) {
-        WriteTexture2DSRV(device, specularSrc, env.specularPrefilteredSRV.cpu);
+    auto result = EnvironmentDescriptorState::EnsureEnvironmentBindlessSRVs(
+        device,
+        m_services.descriptorManager.get(),
+        env,
+        m_materialFallbacks.albedo);
+    if (result.IsErr()) {
+        spdlog::warn("{}", result.Error());
     }
 }
 

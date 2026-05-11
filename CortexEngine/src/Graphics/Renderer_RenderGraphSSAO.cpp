@@ -8,7 +8,6 @@
 #include <spdlog/spdlog.h>
 
 #include <span>
-#include <string>
 
 namespace Cortex::Graphics {
 
@@ -36,13 +35,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     }
 
     bool stageFailed = false;
-    std::string stageError;
-    auto failStage = [&](const char* stage) {
-        if (!stageFailed) {
-            stageError = stage ? stage : "ssao_graph_stage_failed";
-        }
-        stageFailed = true;
-    };
+    const char* stageError = nullptr;
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
@@ -54,7 +47,8 @@ Renderer::ExecuteSSAOInRenderGraph() {
     ssaoContext.depth = depthHandle;
     ssaoContext.ssao = ssaoHandle;
     ssaoContext.useCompute = useComputeSSAO;
-    ssaoContext.failStage = failStage;
+    ssaoContext.status.failed = &stageFailed;
+    ssaoContext.status.stage = &stageError;
     ssaoContext.prepare.commandList = m_commandResources.graphicsList.Get();
     ssaoContext.prepare.skipTransitions = true;
     ssaoContext.prepare.depth = {
@@ -110,7 +104,11 @@ Renderer::ExecuteSSAOInRenderGraph() {
         result.fallbackReason = execResult.Error();
     } else if (stageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "ssao_graph_stage_failed: " + stageError;
+        result.fallbackReason = "ssao_graph_stage_failed";
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
+        }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);

@@ -5,10 +5,14 @@
 #include "Graphics/RHI/DescriptorHeap.h"
 
 #include <cstdint>
-#include <functional>
 #include <span>
 
 namespace Cortex::Graphics::SSAOPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct GraphicsContext {
     ID3D12Device* device = nullptr;
@@ -62,7 +66,7 @@ struct GraphContext {
     PrepareContext prepare;
     GraphicsContext graphics;
     ComputeContext compute;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool PrepareGraphicsTargets(const PrepareContext& context);

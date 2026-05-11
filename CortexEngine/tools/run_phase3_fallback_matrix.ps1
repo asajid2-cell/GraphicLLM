@@ -343,6 +343,26 @@ if ($null -ne $rtOff) {
     }
 }
 
+$forcedNoDxr = Invoke-FallbackCase "forced_no_dxr_runtime" (
+    @("--scene", "rt_showcase", "--graphics-preset", "release_showcase", "--environment", "studio") + $common
+) @{ "CORTEX_FORCE_DXR_UNSUPPORTED" = "1" }
+if ($null -ne $forcedNoDxr) {
+    $fc = $forcedNoDxr.frame_contract
+    if ([bool]$fc.features.ray_tracing_supported) { Add-Failure "forced_no_dxr_runtime still reported features.ray_tracing_supported=true" }
+    if ([bool]$fc.ray_tracing.supported) { Add-Failure "forced_no_dxr_runtime still reported ray_tracing.supported=true" }
+    if ([bool]$fc.features.ray_tracing_enabled) { Add-Failure "forced_no_dxr_runtime reported ray tracing enabled" }
+    if ([bool]$fc.features.rt_reflections_enabled) { Add-Failure "forced_no_dxr_runtime reported RT reflections enabled" }
+    if ([bool]$fc.ray_tracing.scheduler_enabled) { Add-Failure "forced_no_dxr_runtime still enabled the RT scheduler" }
+    if ([string]$fc.ray_tracing.scheduler_disabled_reason -ne "dxr_not_supported") {
+        Add-Failure "forced_no_dxr_runtime scheduler disabled reason was '$($fc.ray_tracing.scheduler_disabled_reason)'"
+    }
+    $stdoutPath = Join-Path (Join-Path $LogDir "forced_no_dxr_runtime") "engine_stdout.txt"
+    $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
+    if ($stdout -notmatch "CORTEX_FORCE_DXR_UNSUPPORTED") {
+        Add-Failure "forced_no_dxr_runtime stdout did not mention CORTEX_FORCE_DXR_UNSUPPORTED"
+    }
+}
+
 $rows | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 (Join-Path $LogDir "phase3_fallback_matrix_summary.json")
 
 if ($failures.Count -gt 0) {

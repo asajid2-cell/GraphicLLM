@@ -64,22 +64,30 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     m_rtRuntimeState.supported = false;
     m_rtRuntimeState.enabled = false;
     {
-        Microsoft::WRL::ComPtr<ID3D12Device5> dxrDevice;
-        HRESULT dxrHr = m_services.device->GetDevice()->QueryInterface(IID_PPV_ARGS(&dxrDevice));
-        if (SUCCEEDED(dxrHr)) {
-            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5{};
-            HRESULT featHr = dxrDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5,
-                                                            &options5,
-                                                            sizeof(options5));
-            if (SUCCEEDED(featHr) && options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-                m_rtRuntimeState.supported = true;
-                spdlog::info("DXR ray tracing supported (tier {}).",
-                             static_cast<int>(options5.RaytracingTier));
-            } else {
-                spdlog::info("DXR ray tracing not supported (feature tier not available).");
-            }
+        const bool forceNoDxr = [] {
+            const char* value = std::getenv("CORTEX_FORCE_DXR_UNSUPPORTED");
+            return value && value[0] != '\0' && value[0] != '0';
+        }();
+        if (forceNoDxr) {
+            spdlog::warn("DXR ray tracing forced unsupported via CORTEX_FORCE_DXR_UNSUPPORTED");
         } else {
-            spdlog::info("DXR ray tracing not supported (ID3D12Device5 not available).");
+            Microsoft::WRL::ComPtr<ID3D12Device5> dxrDevice;
+            HRESULT dxrHr = m_services.device->GetDevice()->QueryInterface(IID_PPV_ARGS(&dxrDevice));
+            if (SUCCEEDED(dxrHr)) {
+                D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5{};
+                HRESULT featHr = dxrDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5,
+                                                                &options5,
+                                                                sizeof(options5));
+                if (SUCCEEDED(featHr) && options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
+                    m_rtRuntimeState.supported = true;
+                    spdlog::info("DXR ray tracing supported (tier {}).",
+                                 static_cast<int>(options5.RaytracingTier));
+                } else {
+                    spdlog::info("DXR ray tracing not supported (feature tier not available).");
+                }
+            } else {
+                spdlog::info("DXR ray tracing not supported (ID3D12Device5 not available).");
+            }
         }
     }
 

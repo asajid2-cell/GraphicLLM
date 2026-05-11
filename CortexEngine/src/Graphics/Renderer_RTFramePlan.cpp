@@ -60,7 +60,8 @@ void Renderer::UpdateRTFramePlan(const FrameFeaturePlan& featurePlan) {
                                m_framePlanning.budgetPlan.rtStructureBudgetBytes);
     inputs.rendererBudget = m_framePlanning.budgetPlan;
     inputs.rendererBudgetValid = true;
-    inputs.requested = featurePlan.runRayTracing;
+    inputs.requested =
+        featurePlan.planned.rayTracingEnabled && !featurePlan.runMinimalFrame && !featurePlan.runVoxelBackend;
     inputs.supported = m_rtRuntimeState.supported;
     inputs.contextReady = m_services.rayTracingContext != nullptr;
     inputs.warmingUp = IsRTWarmingUp();

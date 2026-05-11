@@ -93,6 +93,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
 Renderer::RayTracingState Renderer::GetRayTracingState() const {
     RayTracingState state{};
     state.supported = m_rtRuntimeState.supported;
+    state.requested = m_rtRuntimeState.requested;
     state.enabled = m_rtRuntimeState.enabled;
     state.reflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
     state.giEnabled = m_rtRuntimeState.giEnabled;
@@ -134,7 +135,8 @@ Renderer::HealthState Renderer::BuildHealthState() const {
         ? "runtime"
         : m_qualityRuntimeState.activeGraphicsPresetId;
     state.graphicsPresetDirtyFromUI = m_qualityRuntimeState.graphicsPresetDirtyFromUI;
-    state.rayTracingRequested = m_rtRuntimeState.enabled ||
+    state.rayTracingRequested = m_rtRuntimeState.requested ||
+                                m_rtRuntimeState.enabled ||
                                 m_rtRuntimeState.reflectionsEnabled ||
                                 m_rtRuntimeState.giEnabled;
     state.rayTracingEffective = m_rtRuntimeState.supported &&

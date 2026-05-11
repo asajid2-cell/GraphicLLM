@@ -71,16 +71,10 @@ void DrawShadowCasters(const DrawContext& context, DX12Pipeline*& currentPipelin
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = 0;
         DescriptorHandle materialTable{};
         if (alphaTest && (context.shadowAlpha || context.shadowAlphaDoubleSided)) {
-            if (context.ensureMaterialTextures) {
-                context.ensureMaterialTextures(renderable);
-            }
-
             const MaterialModel materialModel =
                 MaterialResolver::ResolveRenderable(renderable, context.materialFallbacks);
             MaterialConstants materialData = MaterialResolver::BuildMaterialConstants(materialModel);
-            if (context.fillMaterialTextureIndices) {
-                context.fillMaterialTextureIndices(renderable, materialData);
-            }
+            MaterialResolver::FillMaterialTextureIndices(renderable, materialData);
 
             if (context.materialConstants) {
                 materialCB = context.materialConstants->AllocateAndWrite(materialData);

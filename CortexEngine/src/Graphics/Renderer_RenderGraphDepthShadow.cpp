@@ -3,6 +3,7 @@
 #include "Passes/DepthPrepass.h"
 #include "Passes/RenderPassScope.h"
 #include "Passes/ShadowPass.h"
+#include "RenderableClassification.h"
 #include "RenderGraph.h"
 #include "Scene/ECS_Registry.h"
 #include <spdlog/spdlog.h>
@@ -33,6 +34,15 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
         localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
         snapshot = &localSnapshot;
     }
+    for (uint32_t entryIndex : snapshot->depthWritingIndices) {
+        if (entryIndex >= snapshot->entries.size()) {
+            continue;
+        }
+        const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
+        if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
+            EnsureMaterialTextures(*sceneEntry.renderable);
+        }
+    }
     graphContext.draw.target.commandList = m_commandResources.graphicsList.Get();
     graphContext.draw.target.depthBuffer = m_depthResources.resources.buffer.Get();
     graphContext.draw.target.depthState = &m_depthResources.resources.resourceState;
@@ -58,13 +68,6 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
         m_materialFallbacks.roughness.get()
     };
     graphContext.draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.depthPrepassDraws;
-    graphContext.draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
-        EnsureMaterialTextures(renderable);
-    };
-    graphContext.draw.fillMaterialTextureIndices =
-        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
-            FillMaterialTextureIndices(renderable, materialData);
-    };
     graphContext.failStage = [&](const char* stage) {
         stageFailed = true;
         stageError = stage ? stage : "unknown";
@@ -125,6 +128,15 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
         localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
         snapshot = &localSnapshot;
     };
+    for (uint32_t entryIndex : snapshot->depthWritingIndices) {
+        if (entryIndex >= snapshot->entries.size()) {
+            continue;
+        }
+        const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
+        if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
+            EnsureMaterialTextures(*sceneEntry.renderable);
+        }
+    }
     graphContext.draw.target.commandList = m_commandResources.graphicsList.Get();
     graphContext.draw.target.shadowMap = m_shadowResources.resources.map.Get();
     graphContext.draw.target.resourceState = &m_shadowResources.resources.resourceState;
@@ -160,13 +172,6 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     graphContext.draw.shadowArraySize = kShadowArraySize;
     graphContext.draw.localShadowHasShadow = m_localShadowState.hasShadow;
     graphContext.draw.localShadowCount = m_localShadowState.count;
-    graphContext.draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
-        EnsureMaterialTextures(renderable);
-    };
-    graphContext.draw.fillMaterialTextureIndices =
-        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
-            FillMaterialTextureIndices(renderable, materialData);
-        };
     graphContext.failStage = [&](const char* stage) {
         stageFailed = true;
         stageError = stage ? stage : "unknown";

@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Graphics/RenderableClassification.h"
 #include "Graphics/Passes/DepthPrepass.h"
 #include "Scene/ECS_Registry.h"
 
@@ -15,6 +16,15 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
     if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
         localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
         snapshot = &localSnapshot;
+    }
+    for (uint32_t entryIndex : snapshot->depthWritingIndices) {
+        if (entryIndex >= snapshot->entries.size()) {
+            continue;
+        }
+        const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
+        if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
+            EnsureMaterialTextures(*sceneEntry.renderable);
+        }
     }
 
     DepthPrepass::DrawContext draw{};
@@ -43,13 +53,6 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         m_materialFallbacks.roughness.get()
     };
     draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.depthPrepassDraws;
-    draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
-        EnsureMaterialTextures(renderable);
-    };
-    draw.fillMaterialTextureIndices =
-        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
-            FillMaterialTextureIndices(renderable, materialData);
-        };
 
     (void)DepthPrepass::Draw(draw);
 }

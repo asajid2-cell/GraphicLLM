@@ -5,6 +5,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RendererControlApplier.h"
 #include "Graphics/EnvironmentManifest.h"
+#include "Graphics/MaterialPresetRegistry.h"
 #include "Graphics/RendererLightingRigControl.h"
 #include "Graphics/RendererTuningState.h"
 #include "LLM/SceneCommands.h"
@@ -283,29 +284,6 @@ struct GraphicsSettingsState {
 
 GraphicsSettingsState g_gfx;
 const wchar_t* kGraphicsSettingsClassName = L"CortexGraphicsSettingsWindow";
-const wchar_t* kGraphicsMaterialPresetLabels[] = {
-    L"<Default>",
-    L"chrome",
-    L"polished_metal",
-    L"brushed_metal",
-    L"plastic",
-    L"painted_plastic",
-    L"matte",
-    L"brick",
-    L"concrete",
-    L"wood_floor",
-    L"backdrop",
-    L"glass",
-    L"glass_panel",
-    L"mirror",
-    L"water",
-    L"emissive_panel",
-    L"skin",
-    L"skin_ish",
-    L"cloth",
-    L"velvet",
-};
-
 std::wstring ToWide(const std::string& text) {
     if (text.empty()) {
         return {};
@@ -330,6 +308,14 @@ std::string ToUtf8(const std::wstring& text) {
     std::string out(static_cast<size_t>(count), '\0');
     WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count, nullptr, nullptr);
     return out;
+}
+
+std::string MaterialPresetIdForComboIndex(int index) {
+    const auto& presets = Graphics::MaterialPresetRegistry::CanonicalPresets();
+    if (index <= 0 || index > static_cast<int>(presets.size())) {
+        return {};
+    }
+    return presets[static_cast<size_t>(index - 1)].id;
 }
 
 float SliderToFloat(const SliderBinding& binding) {
@@ -604,8 +590,10 @@ void LoadMaterialPresetOptions() {
     }
 
     SendMessageW(g_gfx.cmbMaterialPreset, CB_RESETCONTENT, 0, 0);
-    for (const auto* label : kGraphicsMaterialPresetLabels) {
-        SendMessageW(g_gfx.cmbMaterialPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
+    SendMessageW(g_gfx.cmbMaterialPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"<Default>"));
+    for (const auto& preset : Graphics::MaterialPresetRegistry::CanonicalPresets()) {
+        const std::wstring label = ToWide(preset.displayName.empty() ? preset.id : preset.displayName);
+        SendMessageW(g_gfx.cmbMaterialPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
     }
     SendMessageW(g_gfx.cmbMaterialPreset, CB_SETCURSEL, 0, 0);
 }
@@ -638,10 +626,10 @@ void ApplyFocusedMaterialFromGraphicsUI() {
     const int materialIndex = g_gfx.cmbMaterialPreset
         ? static_cast<int>(SendMessageW(g_gfx.cmbMaterialPreset, CB_GETCURSEL, 0, 0))
         : 0;
-    if (materialIndex > 0 &&
-        materialIndex < static_cast<int>(sizeof(kGraphicsMaterialPresetLabels) / sizeof(kGraphicsMaterialPresetLabels[0]))) {
+    const std::string presetId = MaterialPresetIdForComboIndex(materialIndex);
+    if (!presetId.empty()) {
         cmd->setPreset = true;
-        cmd->presetName = ToUtf8(kGraphicsMaterialPresetLabels[materialIndex]);
+        cmd->presetName = presetId;
     }
 
     cmd->setMetallic = true;

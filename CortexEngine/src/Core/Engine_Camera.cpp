@@ -146,6 +146,7 @@ bool Engine::ApplyShowcaseCameraBookmark(const std::string& bookmarkId) {
     case ScenePreset::IBLGallery: sceneId = "ibl_gallery"; break;
     case ScenePreset::MaterialLab: sceneId = "material_lab"; break;
     case ScenePreset::GlassWaterCourtyard: sceneId = "glass_water_courtyard"; break;
+    case ScenePreset::OutdoorSunsetBeach: sceneId = "outdoor_sunset_beach"; break;
     case ScenePreset::EffectsShowcase: sceneId = "effects_showcase"; break;
     case ScenePreset::GodRays: sceneId = "god_rays"; break;
     case ScenePreset::TemporalValidation: sceneId = "temporal_validation"; break;

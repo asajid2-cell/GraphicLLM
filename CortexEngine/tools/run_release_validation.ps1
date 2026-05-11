@@ -143,6 +143,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "editor_frame_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_editor_frame_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "temporal_validation" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -2,6 +2,7 @@
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/IndirectMeshDrawPass.h"
 #include "Graphics/Passes/VisibilityBufferResourcePass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -296,38 +297,46 @@ namespace Cortex::Graphics {
         }
     }
 
-    // Compute dispatch changes the root signature/pipeline; restore graphics state
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.geometry->GetPipelineState());
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(4, m_environmentState.shadowAndEnvDescriptors[0].gpu);
-    }
-    if (m_materialFallbacks.descriptorTable[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, m_materialFallbacks.descriptorTable[0].gpu);
-    }
-    if (m_constantBuffers.biomeMaterialsValid) {
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(7, m_constantBuffers.biomeMaterials.gpuAddress);
+    const bool graphicsStateRestored = IndirectMeshDrawPass::RestoreGraphicsState({
+        m_commandResources.graphicsList.Get(),
+        m_pipelineState.rootSignature->GetRootSignature(),
+        m_pipelineState.geometry->GetPipelineState(),
+        heaps[0],
+        m_constantBuffers.currentFrameGPU,
+        m_environmentState.shadowAndEnvDescriptors[0],
+        m_materialFallbacks.descriptorTable[0],
+        m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0
+    });
+    if (!graphicsStateRestored) {
+        spdlog::warn("RenderSceneIndirect: could not restore graphics state for ExecuteIndirect");
+        RenderScene(registry);
+        return;
     }
 
     const UINT maxCommands = static_cast<UINT>(commands.size());
-    ID3D12CommandSignature* cmdSig = nullptr; // m_indirectCommandSignature.Get(); // FIX ME: identifier not found
-    ID3D12Resource* argBuffer = nullptr; // m_services.gpuCulling->GetArgumentBuffer();
-    ID3D12Resource* countBuffer = nullptr; // m_services.gpuCulling->GetCountBuffer();
+    ID3D12CommandSignature* cmdSig = m_services.gpuCulling->GetCommandSignature();
+    ID3D12Resource* argBuffer = bypassCompaction
+        ? m_services.gpuCulling->GetAllCommandBuffer()
+        : m_services.gpuCulling->GetVisibleCommandBuffer();
+    ID3D12Resource* countBuffer = bypassCompaction
+        ? nullptr
+        : m_services.gpuCulling->GetCommandCountBuffer();
 
-    if (cmdSig && argBuffer && countBuffer) {
-        m_commandResources.graphicsList->ExecuteIndirect(
-            cmdSig,
-            maxCommands,
-            argBuffer,
-            0,
-            countBuffer,
-            0
-        );
+    const auto executeResult = IndirectMeshDrawPass::ExecuteCommands({
+        m_commandResources.graphicsList.Get(),
+        cmdSig,
+        argBuffer,
+        countBuffer,
+        maxCommands
+    });
+
+    if (executeResult.submitted) {
         ++m_frameDiagnostics.contract.drawCounts.indirectExecuteCalls;
-        m_frameDiagnostics.contract.drawCounts.indirectCommands += maxCommands;
+        m_frameDiagnostics.contract.drawCounts.indirectCommands += executeResult.maxCommands;
+    } else {
+        spdlog::warn("RenderSceneIndirect: ExecuteIndirect skipped because command resources are unavailable");
+        RenderScene(registry);
+        return;
     }
 
     static uint64_t s_lastCullingLogFrame = 0;

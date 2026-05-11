@@ -296,11 +296,21 @@
       "id": "indirect_rendering_resource_transitions",
       "owner": "Indirect rendering",
       "status": "release_boundary_validated",
-      "release_boundary": "Renderer_IndirectRendering.cpp still owns indirect command generation, culling policy, ExecuteIndirect restoration, and fallback decisions, but HZB culling readability is routed through VisibilityBufferResourcePass instead of hand-built renderer barriers",
+      "release_boundary": "Renderer_IndirectRendering.cpp still owns indirect command generation, culling policy, and fallback decisions, but HZB culling readability is routed through VisibilityBufferResourcePass instead of hand-built renderer barriers",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
       "target_files": ["Passes/VisibilityBufferResourcePass.h", "Passes/VisibilityBufferResourcePass.cpp", "Renderer_IndirectRendering.cpp"],
       "renderer_state_members": ["m_hzbResources", "m_gpuCullingState", "m_commandResources"],
       "future_extension": "Keep future indirect-rendering resource-state mechanics in pass-owned helpers or declarative render-graph declarations instead of hand-building barriers in Renderer_IndirectRendering.cpp"
+    },
+    {
+      "id": "indirect_rendering_submission",
+      "owner": "Indirect rendering",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_IndirectRendering.cpp still owns indirect command generation, culling policy, and fallback decisions, but graphics state restoration, descriptor/root binding, and ExecuteIndirect submission are owned by IndirectMeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/IndirectMeshDrawPass.h", "Passes/IndirectMeshDrawPass.cpp", "Renderer_IndirectRendering.cpp"],
+      "renderer_state_members": ["m_gpuCullingState", "m_commandResources", "m_pipelineState", "m_environmentState", "m_materialFallbacks"],
+      "future_extension": "Keep future indirect root/descriptor binding and ExecuteIndirect mechanics in IndirectMeshDrawPass or a more specific GPU-driven pass helper instead of reintroducing direct command-list submission to Renderer_IndirectRendering.cpp"
     },
     {
       "id": "main_target_resources",

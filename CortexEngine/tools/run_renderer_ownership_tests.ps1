@@ -106,6 +106,7 @@ $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/Visibil
 $visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
 $visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
 $indirectRenderingPath = Join-Path $root "src/Graphics/Renderer_IndirectRendering.cpp"
+$indirectMeshDrawPassPath = Join-Path $root "src/Graphics/Passes/IndirectMeshDrawPass.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
@@ -1064,6 +1065,35 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "indirect_rendering_resource_transitions missing Renderer_IndirectRendering.cpp"
+        }
+    }
+
+    if ($id -eq "indirect_rendering_submission") {
+        if (Test-Path $indirectMeshDrawPassPath) {
+            $indirectMeshDrawPass = Get-Content $indirectMeshDrawPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::IndirectMeshDrawPass", "RestoreGraphicsState", "ExecuteCommands", "SetGraphicsRootSignature", "SetPipelineState", "SetDescriptorHeaps", "SetGraphicsRootDescriptorTable", "ExecuteIndirect")) {
+                if ($indirectMeshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "indirect_rendering_submission missing IndirectMeshDrawPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "indirect_rendering_submission missing IndirectMeshDrawPass.cpp"
+        }
+
+        if (Test-Path $indirectRenderingPath) {
+            $indirectRendering = Get-Content $indirectRenderingPath -Raw
+            foreach ($directCall in @("SetGraphicsRootSignature(", "SetPipelineState(", "SetDescriptorHeaps(", "SetGraphicsRootDescriptorTable(", "SetGraphicsRootConstantBufferView(", "IASetPrimitiveTopology(", "->ExecuteIndirect(")) {
+                if ($indirectRendering.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "indirect_rendering_submission still performs indirect graphics binding/submission directly in Renderer_IndirectRendering.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("IndirectMeshDrawPass::RestoreGraphicsState", "IndirectMeshDrawPass::ExecuteCommands", "GetCommandSignature", "GetVisibleCommandBuffer", "GetCommandCountBuffer", "GetAllCommandBuffer")) {
+                if ($indirectRendering.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "indirect_rendering_submission missing routed indirect submission marker in Renderer_IndirectRendering.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "indirect_rendering_submission missing Renderer_IndirectRendering.cpp"
         }
     }
 

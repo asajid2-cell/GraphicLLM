@@ -99,6 +99,12 @@ if ($null -eq $particles) {
     foreach ($field in @("density_scale", "quality_scale", "bloom_contribution", "soft_depth_fade", "wind_influence")) {
         if ($null -eq $particles.PSObject.Properties[$field]) { Add-Failure "particles.$field is missing" }
     }
+    if ([string]$particles.effect_preset -ne "gallery_mix") {
+        Add-Failure "effects gallery particle effect preset was '$($particles.effect_preset)', expected gallery_mix"
+    }
+    if ([int]$particles.preset_mismatched_emitters -ne 0) {
+        Add-Failure "effects gallery particle preset mismatch count was $($particles.preset_mismatched_emitters), expected 0"
+    }
     if ([int]$particles.emitter_count -lt 8) { Add-Failure "expected the full public particle effect library to be active" }
     if ([int]$particles.live_particles -lt 1) { Add-Failure "expected live particles" }
     if ([int]$particles.submitted_instances -lt 1) { Add-Failure "expected submitted particle instances" }

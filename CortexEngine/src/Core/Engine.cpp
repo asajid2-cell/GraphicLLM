@@ -23,6 +23,7 @@
 #include "UI/PerformanceWindow.h"
 #include <windows.h>
 #include "Scene/Components.h"
+#include "Scene/ParticleEffectLibrary.h"
 #include "Scene/TerrainNoise.h"
 #include "Game/InteractionSystem.h"
 #include <SDL3/SDL.h>
@@ -817,6 +818,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             auto loaded = Graphics::LoadRendererTuningStateFile(settingsPath, &loadError);
             if (loaded) {
                 Graphics::ApplyRendererTuningState(*m_renderer, *loaded);
+                ApplyParticleEffectPresetToScene(loaded->particles.effectPreset);
                 spdlog::info("Loaded user graphics settings from '{}'", settingsPath.string());
             } else if (!loadError.empty()) {
                 spdlog::warn("Ignoring user graphics settings '{}': {}",
@@ -837,6 +839,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             &loadError);
         if (preset) {
             Graphics::ApplyRendererTuningState(*m_renderer, *preset);
+            ApplyParticleEffectPresetToScene(preset->particles.effectPreset);
             spdlog::info("Startup graphics preset '{}' applied from '{}'",
                          resolvedPreset.empty() ? config.initialGraphicsPreset : resolvedPreset,
                          presetPath.string());

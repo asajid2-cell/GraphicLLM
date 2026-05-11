@@ -299,6 +299,9 @@ struct FrameContract {
         float bloomContribution = 1.0f;
         float softDepthFade = 0.5f;
         float windInfluence = 0.0f;
+        std::string effectPreset = "gallery_mix";
+        uint32_t presetMatchedEmitters = 0;
+        uint32_t presetMismatchedEmitters = 0;
         uint32_t emitterCount = 0;
         uint32_t liveParticles = 0;
         uint32_t submittedInstances = 0;

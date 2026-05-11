@@ -91,6 +91,7 @@ struct RendererParticleTuning {
     float bloomContribution = 1.0f;
     float softDepthFade = 0.5f;
     float windInfluence = 0.0f;
+    std::string effectPreset = "gallery_mix";
 };
 
 struct RendererCinematicPostTuning {

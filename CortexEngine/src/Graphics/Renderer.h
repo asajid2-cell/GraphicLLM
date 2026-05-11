@@ -230,6 +230,8 @@ public:
     void SetParticleDensityScale(float scale);
     [[nodiscard]] float GetParticleDensityScale() const;
     void SetParticleTuning(float qualityScale, float bloomContribution, float softDepthFade, float windInfluence);
+    void SetParticleEffectPreset(const std::string& presetId);
+    [[nodiscard]] const std::string& GetParticleEffectPreset() const;
     void SetSSREnabled(bool enabled);
     void ToggleSSR();
     void CycleScreenSpaceEffectsDebug();

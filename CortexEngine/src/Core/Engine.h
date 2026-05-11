@@ -137,6 +137,7 @@ public:
     // Scene preset controls (used by debug UI / hotkeys)
     void ToggleScenePreset();
     bool ApplyShowcaseCameraBookmark(const std::string& bookmarkId);
+    bool ApplyParticleEffectPresetToScene(const std::string& presetId);
 
     // Engine Editor Mode - check if launched in parallel engine editor architecture
     [[nodiscard]] bool IsEngineEditorMode() const { return m_engineEditorMode; }

@@ -98,7 +98,8 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "quality_scale": 0.82,
     "bloom_contribution": 1.31,
     "soft_depth_fade": 0.47,
-    "wind_influence": 0.58
+    "wind_influence": 0.58,
+    "effect_preset": "snow"
   },
   "cinematic_post": {
     "enabled": true,
@@ -334,6 +335,9 @@ if ($validRun.exit_code -ne 0) {
     Assert-Near "particle_bloom" ([double]$report.frame_contract.particles.bloom_contribution) 1.31 0.03
     Assert-Near "particle_soft_depth" ([double]$report.frame_contract.particles.soft_depth_fade) 0.47 0.03
     Assert-Near "particle_wind" ([double]$report.frame_contract.particles.wind_influence) 0.58 0.03
+    if ([string]$report.frame_contract.particles.effect_preset -ne "snow") {
+        Add-Failure "valid settings particle effect preset was '$($report.frame_contract.particles.effect_preset)', expected snow"
+    }
 }
 
 $corruptRun = Invoke-SettingsSmoke "corrupt_settings" $corruptPath

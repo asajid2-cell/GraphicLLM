@@ -66,6 +66,7 @@ $IDC_GFX_PARTICLE_QUALITY = 9064
 $IDC_GFX_PARTICLE_BLOOM = 9065
 $IDC_GFX_PARTICLE_SOFT_DEPTH = 9066
 $IDC_GFX_PARTICLE_WIND = 9067
+$IDC_GFX_PARTICLE_EFFECT_SELECT = 9213
 $IDC_GFX_RT_REFL_STRENGTH = 9034
 $IDC_GFX_MOTION_BLUR = 9058
 $IDC_GFX_DOF = 9059
@@ -175,6 +176,7 @@ try {
         Set-Trackbar $window $IDC_GFX_PARTICLE_BLOOM 57
         Set-Trackbar $window $IDC_GFX_PARTICLE_SOFT_DEPTH 42
         Set-Trackbar $window $IDC_GFX_PARTICLE_WIND 48
+        Select-ComboIndex $window $IDC_GFX_PARTICLE_EFFECT_SELECT 7
         Set-Trackbar $window $IDC_GFX_ENV_ROTATION 68
         Set-Trackbar $window $IDC_GFX_RT_REFL_STRENGTH 62
         Set-Trackbar $window $IDC_GFX_MOTION_BLUR 29
@@ -229,6 +231,15 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.14 0.06
     Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.42 0.06
     Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.96 0.06
+    if ([string]$fc.particles.effect_preset -ne "rain") {
+        Add-Failure "particle effect preset was '$($fc.particles.effect_preset)', expected rain"
+    }
+    if ([int]$fc.particles.preset_matched_emitters -lt 1) {
+        Add-Failure "particle preset matched emitter count was $($fc.particles.preset_matched_emitters), expected at least one"
+    }
+    if ([int]$fc.particles.preset_mismatched_emitters -ne 0) {
+        Add-Failure "particle preset mismatch count was $($fc.particles.preset_mismatched_emitters), expected 0"
+    }
     Assert-Near "environment_rotation_degrees" ([double]$fc.environment.rotation_degrees) 244.0 5.0
     Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.62 0.05
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.29 0.05

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include <glm/glm.hpp>
 #include "Graphics/Renderer_ConstantBuffer.h"
@@ -21,6 +22,7 @@ struct ParticleRenderState {
     float bloomContribution = 1.0f;
     float softDepthFade = 0.5f;
     float windInfluence = 0.0f;
+    std::string effectPreset = "gallery_mix";
     ComPtr<ID3D12Resource> instanceBuffer;
     UINT instanceCapacity = 0;
     ComPtr<ID3D12Resource> quadVertexBuffer;
@@ -35,6 +37,8 @@ struct ParticleRenderState {
     float frameBloomContribution = 1.0f;
     float frameSoftDepthFade = 0.5f;
     float frameWindInfluence = 0.0f;
+    uint32_t framePresetMatchedEmitters = 0;
+    uint32_t framePresetMismatchedEmitters = 0;
     bool frameCapped = false;
     bool frameExecuted = false;
 
@@ -53,6 +57,8 @@ struct ParticleRenderState {
         frameBloomContribution = bloomContribution;
         frameSoftDepthFade = softDepthFade;
         frameWindInfluence = windInfluence;
+        framePresetMatchedEmitters = 0;
+        framePresetMismatchedEmitters = 0;
         frameCapped = false;
         frameExecuted = false;
     }

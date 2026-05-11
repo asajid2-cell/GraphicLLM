@@ -59,6 +59,12 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);
         auto& transform = view.get<Scene::TransformComponent>(entity);
         ++m_particleState.frameEmitterCount;
+        if (m_particleState.effectPreset == "gallery_mix" ||
+            emitter.effectPresetId == m_particleState.effectPreset) {
+            ++m_particleState.framePresetMatchedEmitters;
+        } else {
+            ++m_particleState.framePresetMismatchedEmitters;
+        }
 
         glm::vec3 emitterWorldPos = glm::vec3(transform.worldMatrix[3]);
 
@@ -332,4 +338,3 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
 #undef CORTEX_REPORT_DEVICE_REMOVED
 
 } // namespace Cortex::Graphics
-

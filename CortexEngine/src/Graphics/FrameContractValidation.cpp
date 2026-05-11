@@ -689,6 +689,11 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.particles.instanceMapFailed) {
         warn("particle_instance_map_failed");
     }
+    if (contract.particles.effectPreset != "gallery_mix" &&
+        contract.particles.emitterCount > 0 &&
+        contract.particles.presetMismatchedEmitters > 0) {
+        warn("particle_effect_preset_mismatch");
+    }
     if (contract.water.waveAmplitude < 0.0f ||
         contract.water.waveAmplitude > 2.0f ||
         contract.water.waveLength < 0.1f ||

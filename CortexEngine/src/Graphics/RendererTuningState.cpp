@@ -93,7 +93,8 @@ json ToJson(const RendererTuningState& state) {
             {"quality_scale", state.particles.qualityScale},
             {"bloom_contribution", state.particles.bloomContribution},
             {"soft_depth_fade", state.particles.softDepthFade},
-            {"wind_influence", state.particles.windInfluence}
+            {"wind_influence", state.particles.windInfluence},
+            {"effect_preset", state.particles.effectPreset}
         }},
         {"cinematic_post", {
             {"enabled", state.cinematicPost.enabled},
@@ -253,6 +254,7 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(p, "bloom_contribution", state.particles.bloomContribution);
         ReadValue(p, "soft_depth_fade", state.particles.softDepthFade);
         ReadValue(p, "wind_influence", state.particles.windInfluence);
+        ReadValue(p, "effect_preset", state.particles.effectPreset);
     }
     if (root.contains("cinematic_post") && root.at("cinematic_post").is_object()) {
         const auto& c = root.at("cinematic_post");
@@ -361,6 +363,9 @@ json GraphicsPresetToTuningJson(const json& preset) {
         if (particles.contains("wind_influence")) {
             root["particles"]["wind_influence"] = particles.at("wind_influence");
         }
+        if (particles.contains("effect_preset")) {
+            root["particles"]["effect_preset"] = particles.at("effect_preset");
+        }
     }
 
     root["cinematic_post"] = preset.value("cinematic_post", json::object());
@@ -446,6 +451,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.particles.bloomContribution = features.particleBloomContribution;
     state.particles.softDepthFade = features.particleSoftDepthFade;
     state.particles.windInfluence = features.particleWindInfluence;
+    state.particles.effectPreset = features.particleEffectPreset;
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
@@ -523,6 +529,9 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.particles.bloomContribution = std::clamp(state.particles.bloomContribution, 0.0f, 2.0f);
     state.particles.softDepthFade = std::clamp(state.particles.softDepthFade, 0.0f, 1.0f);
     state.particles.windInfluence = std::clamp(state.particles.windInfluence, 0.0f, 2.0f);
+    if (state.particles.effectPreset.empty()) {
+        state.particles.effectPreset = "gallery_mix";
+    }
 
     ApplyNamedColorGradePreset(state);
     ClampToneMapperPreset(state);
@@ -615,6 +624,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                                state.particles.bloomContribution,
                                state.particles.softDepthFade,
                                state.particles.windInfluence);
+    renderer.SetParticleEffectPreset(state.particles.effectPreset);
     ApplyBloomShapeControl(renderer,
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,

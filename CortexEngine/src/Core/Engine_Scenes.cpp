@@ -42,6 +42,7 @@ namespace {
             !Scene::ApplyParticleEffectDescriptor("smoke", emitter)) {
             return;
         }
+        emitter.defaultEffectPresetId = emitter.effectPresetId;
         registry.AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
     }
 }
@@ -3452,6 +3453,40 @@ void Engine::BuildEditorModeTerrainScene() {
     spdlog::info("  EditorWorld handles terrain chunks");
     spdlog::info("  Time: {:.1f}h - Press ./,/L to control time", m_worldState.timeOfDay);
     spdlog::info("  Press F5 for play mode, WASD to move, Space to jump");
+}
+
+bool Engine::ApplyParticleEffectPresetToScene(const std::string& presetId) {
+    if (!m_registry) {
+        return false;
+    }
+
+    const std::string selected = presetId.empty() ? "gallery_mix" : presetId;
+    bool changed = false;
+    auto view = m_registry->View<Scene::ParticleEmitterComponent>();
+    for (auto entity : view) {
+        auto& emitter = view.get<Scene::ParticleEmitterComponent>(entity);
+        const std::string target =
+            (selected == "gallery_mix")
+                ? (emitter.defaultEffectPresetId.empty() ? emitter.effectPresetId : emitter.defaultEffectPresetId)
+                : selected;
+        if (target.empty() || target == emitter.effectPresetId) {
+            continue;
+        }
+
+        const std::string defaultPreset = emitter.defaultEffectPresetId;
+        if (!Scene::ApplyParticleEffectDescriptor(target, emitter)) {
+            continue;
+        }
+        emitter.defaultEffectPresetId = defaultPreset.empty() ? target : defaultPreset;
+        emitter.emissionAccumulator = 0.0f;
+        emitter.particles.clear();
+        changed = true;
+    }
+
+    if (m_renderer) {
+        m_renderer->SetParticleEffectPreset(selected);
+    }
+    return changed;
 }
 
 } // namespace Cortex

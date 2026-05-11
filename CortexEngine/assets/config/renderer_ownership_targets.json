@@ -323,6 +323,16 @@
       "future_extension": "Keep future indirect root/descriptor binding and ExecuteIndirect mechanics in IndirectMeshDrawPass or a more specific GPU-driven pass helper instead of reintroducing direct command-list submission to Renderer_IndirectRendering.cpp"
     },
     {
+      "id": "indirect_culling_service_handoff",
+      "owner": "Indirect rendering",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_RootSignatureSetup.cpp and Renderer_IndirectRendering.cpp still decide when GPU culling is configured or when no-compaction indirect command preparation is needed, but those service handoffs route through IndirectMeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "phase3_fallback_matrix", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/IndirectMeshDrawPass.h", "Passes/IndirectMeshDrawPass.cpp", "Renderer_RootSignatureSetup.cpp", "Renderer_IndirectRendering.cpp"],
+      "renderer_state_members": ["m_services", "m_pipelineState", "m_commandResources"],
+      "future_extension": "Keep future GPU-culling setup and indirect command-preparation handoffs in IndirectMeshDrawPass or a dedicated GPU-driven pass helper instead of spreading service calls through renderer orchestration files"
+    },
+    {
       "id": "frame_descriptor_heap_binding",
       "owner": "Frame descriptor heap binding",
       "status": "release_boundary_validated",

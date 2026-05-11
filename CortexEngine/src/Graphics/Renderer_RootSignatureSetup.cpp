@@ -1,5 +1,7 @@
 #include "Renderer.h"
 
+#include "Graphics/Passes/IndirectMeshDrawPass.h"
+
 #include <memory>
 
 #include <spdlog/spdlog.h>
@@ -22,7 +24,9 @@ Result<void> Renderer::CreateRendererRootSignaturesAndComputePasses() {
         return Result<void>::Err("Failed to create root signature: " + rsResult.Error());
     }
     if (m_services.gpuCulling) {
-        auto sigResult = m_services.gpuCulling->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
+        auto sigResult = IndirectMeshDrawPass::ConfigureCullingRootSignature(
+            m_services.gpuCulling.get(),
+            m_pipelineState.rootSignature->GetRootSignature());
         if (sigResult.IsErr()) {
             spdlog::warn("GPU Culling command signature setup failed: {}", sigResult.Error());
         }

@@ -107,6 +107,7 @@ $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/Visibil
 $visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
 $visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
 $indirectRenderingPath = Join-Path $root "src/Graphics/Renderer_IndirectRendering.cpp"
+$rootSignatureSetupPath = Join-Path $root "src/Graphics/Renderer_RootSignatureSetup.cpp"
 $frameBeginPath = Join-Path $root "src/Graphics/Renderer_FrameBegin.cpp"
 $gpuDrivenPath = Join-Path $root "src/Graphics/Renderer_GPUDriven.cpp"
 $indirectMeshDrawPassPath = Join-Path $root "src/Graphics/Passes/IndirectMeshDrawPass.cpp"
@@ -1125,6 +1126,43 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "indirect_rendering_submission missing Renderer_IndirectRendering.cpp"
+        }
+    }
+
+    if ($id -eq "indirect_culling_service_handoff") {
+        if (Test-Path $indirectMeshDrawPassPath) {
+            $indirectMeshDrawPass = Get-Content $indirectMeshDrawPassPath -Raw
+            foreach ($required in @("ConfigureCullingRootSignature", "PrepareAllCommands", "SetGraphicsRootSignature", "PrepareAllCommandsForExecuteIndirect")) {
+                if ($indirectMeshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "indirect_culling_service_handoff missing IndirectMeshDrawPass service marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "indirect_culling_service_handoff missing IndirectMeshDrawPass.cpp"
+        }
+
+        if (Test-Path $rootSignatureSetupPath) {
+            $rootSignatureSource = Get-Content $rootSignatureSetupPath -Raw
+            if ($rootSignatureSource.IndexOf("IndirectMeshDrawPass::ConfigureCullingRootSignature", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "indirect_culling_service_handoff missing culling root-signature route in Renderer_RootSignatureSetup.cpp"
+            }
+            if ($rootSignatureSource.IndexOf("->SetGraphicsRootSignature", [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "indirect_culling_service_handoff still configures GPU culling root signature directly in Renderer_RootSignatureSetup.cpp"
+            }
+        } else {
+            Add-Failure "indirect_culling_service_handoff missing Renderer_RootSignatureSetup.cpp"
+        }
+
+        if (Test-Path $indirectRenderingPath) {
+            $indirectRendering = Get-Content $indirectRenderingPath -Raw
+            if ($indirectRendering.IndexOf("IndirectMeshDrawPass::PrepareAllCommands", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "indirect_culling_service_handoff missing no-compaction command-prep route in Renderer_IndirectRendering.cpp"
+            }
+            if ($indirectRendering.IndexOf("->PrepareAllCommandsForExecuteIndirect", [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "indirect_culling_service_handoff still prepares all commands directly in Renderer_IndirectRendering.cpp"
+            }
+        } else {
+            Add-Failure "indirect_culling_service_handoff missing Renderer_IndirectRendering.cpp"
         }
     }
 

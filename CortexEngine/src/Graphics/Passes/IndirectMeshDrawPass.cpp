@@ -32,6 +32,30 @@ bool RestoreGraphicsState(const RestoreGraphicsStateContext& context) {
     return true;
 }
 
+Result<void> ConfigureCullingRootSignature(GPUCullingPipeline* gpuCulling,
+                                           ID3D12RootSignature* rootSignature) {
+    if (!gpuCulling) {
+        return Result<void>::Ok();
+    }
+    if (!rootSignature) {
+        return Result<void>::Err("ConfigureCullingRootSignature requires a valid root signature");
+    }
+
+    return gpuCulling->SetGraphicsRootSignature(rootSignature);
+}
+
+Result<void> PrepareAllCommands(GPUCullingPipeline* gpuCulling,
+                                ID3D12GraphicsCommandList* commandList) {
+    if (!gpuCulling) {
+        return Result<void>::Err("PrepareAllCommands requires a valid GPU culling pipeline");
+    }
+    if (!commandList) {
+        return Result<void>::Err("PrepareAllCommands requires a valid command list");
+    }
+
+    return gpuCulling->PrepareAllCommandsForExecuteIndirect(commandList);
+}
+
 ExecuteResult ExecuteCommands(const ExecuteContext& context) {
     ExecuteResult result{};
     result.maxCommands = context.maxCommands;

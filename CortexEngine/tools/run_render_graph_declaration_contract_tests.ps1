@@ -225,6 +225,7 @@ Assert-Contains "TemporalRejectionMask.cpp" $temporalMask "bool TemporalRejectio
 Assert-Contains "TemporalRejectionMask.cpp" $temporalMask "ExecuteDispatch(dispatch)"
 Assert-Contains "Renderer_TemporalMaskPass.cpp" (Read-Text "src/Graphics/Renderer_TemporalMaskPass.cpp") "TemporalRejectionMask::ExecuteDispatch({"
 Assert-NotContains "TemporalRejectionMask.h" $temporalMaskHeader "std::function<bool()> dispatch"
+Assert-NotContains "TemporalRejectionMask.h" $temporalMaskHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphTemporalMask.cpp" $rendererTemporalMask "BuildTemporalRejectionMask("
 
 $vb = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"

@@ -71,8 +71,11 @@ void InsertUAVBarrier(ID3D12GraphicsCommandList* commandList, ID3D12Resource* re
 }
 
 void Fail(const TemporalRejectionMask::GraphContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
+    if (context.status.failed) {
+        *context.status.failed = true;
+    }
+    if (context.status.stage && !*context.status.stage) {
+        *context.status.stage = stage ? stage : "unknown";
     }
 }
 

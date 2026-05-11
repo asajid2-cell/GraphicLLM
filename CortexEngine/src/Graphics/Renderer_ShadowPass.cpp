@@ -145,10 +145,13 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
         shadowData.cascadeIndex = glm::uvec4(cascadeIndex, 0u, 0u, 0u);
         D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_constantBuffers.shadow.AllocateAndWrite(shadowData);
 
-        // Bind frame constants
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-        // Bind shadow constants (b3)
-        m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(5, shadowCB);
+        MeshDrawPass::ShadowConstantsContext shadowConstantsContext{};
+        shadowConstantsContext.commandList = m_commandResources.graphicsList.Get();
+        shadowConstantsContext.frameConstants = m_constantBuffers.currentFrameGPU;
+        shadowConstantsContext.shadowConstants = shadowCB;
+        if (!MeshDrawPass::BindShadowConstants(shadowConstantsContext)) {
+            continue;
+        }
 
         ShadowTargetPass::SliceContext sliceContext{};
         sliceContext.commandList = m_commandResources.graphicsList.Get();
@@ -177,10 +180,13 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
             shadowData.cascadeIndex = glm::uvec4(slice, 0u, 0u, 0u);
             D3D12_GPU_VIRTUAL_ADDRESS shadowCB = m_constantBuffers.shadow.AllocateAndWrite(shadowData);
 
-            // Bind frame constants
-            m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-            // Bind shadow constants (b3)
-            m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(5, shadowCB);
+            MeshDrawPass::ShadowConstantsContext shadowConstantsContext{};
+            shadowConstantsContext.commandList = m_commandResources.graphicsList.Get();
+            shadowConstantsContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            shadowConstantsContext.shadowConstants = shadowCB;
+            if (!MeshDrawPass::BindShadowConstants(shadowConstantsContext)) {
+                continue;
+            }
 
             ShadowTargetPass::SliceContext sliceContext{};
             sliceContext.commandList = m_commandResources.graphicsList.Get();

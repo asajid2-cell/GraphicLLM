@@ -363,6 +363,16 @@
       "future_extension": "Keep future repeated mesh root/material descriptor and mesh pipeline binding in MeshDrawPass or a more specific mesh-pass helper instead of reintroducing direct root/table binding to renderer pass loops"
     },
     {
+      "id": "mesh_auxiliary_constant_binding",
+      "owner": "Shared mesh auxiliary constant binding",
+      "status": "release_boundary_validated",
+      "release_boundary": "Forward and shadow mesh passes still allocate and decide the contents of biome, frame, and shadow constants, but root constant-buffer binding for those auxiliary mesh constants is owned by MeshDrawPass",
+      "validated_contracts": ["renderer_ownership", "material_lab", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/MeshDrawPass.h", "Passes/MeshDrawPass.cpp", "Renderer_ForwardPass.cpp", "Renderer_ShadowPass.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_constantBuffers"],
+      "future_extension": "Keep future mesh-pass root constant binding in MeshDrawPass or a more specific pass helper instead of reintroducing direct SetGraphicsRootConstantBufferView calls to renderer mesh pass files"
+    },
+    {
       "id": "mesh_upload_copy_submission",
       "owner": "Mesh upload",
       "status": "release_boundary_validated",

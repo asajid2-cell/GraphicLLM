@@ -106,9 +106,9 @@
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",
-      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, fullscreen draw submission, temporal-screen resources, and cinematic post controls are held in named state/pass helpers and validated through ownership, graphics presets, and effects showcase frame-contract reporting. BloomPyramidResources::CreateTargets owns persistent bloom texture, RTV, and SRV creation; Renderer_Bloom.cpp only supplies dimensions, budgeted level count, and services",
+      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, fullscreen draw submission, temporal-screen resources, and cinematic post controls are held in named state/pass helpers and validated through ownership, graphics presets, and effects showcase frame-contract reporting. BloomPyramidResources::CreateTargets owns persistent bloom texture, RTV, and SRV creation; Renderer_Bloom.cpp only supplies dimensions, budgeted level count, and services. TemporalScreenPassState owns TAA history, TAA intermediate, and velocity target texture/view creation; Renderer_HDRTargets.cpp only invalidates history, supplies dimensions/services, and orchestrates dependent target creation",
       "validated_contracts": ["graphics_preset", "effects_gallery", "effects_showcase", "phase3_visual_matrix"],
-      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h", "Renderer_Bloom.cpp", "Passes/FullscreenPass.h"],
+      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h", "Renderer_Bloom.cpp", "Renderer_HDRTargets.cpp", "Passes/FullscreenPass.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],
       "future_extension": "Keep new post effects inside these state files first; extract orchestration helpers only when a concrete new pass requires it"
     },

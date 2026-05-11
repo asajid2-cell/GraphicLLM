@@ -32,7 +32,7 @@ validation suite:
 - full RT showcase smoke,
 - visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,
-- graphics settings persistence, UI contract, and HUD mode checks,
+- graphics settings persistence, UI contract, native-widget, and HUD mode checks,
 - graphics settings runtime-application smoke,
 - LLM/Architect renderer-command runtime smoke,
 - graphics preset, showcase scene, material editor, conductor-energy, lighting-energy budget, vegetation-state, reflection-probe, and visual baseline contracts,
@@ -87,6 +87,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps
 powershell -ExecutionPolicy Bypass -File tools/run_ibl_asset_policy_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_graphics_native_widget_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
@@ -210,6 +211,11 @@ format as the graphics window save/load path, forces that state into a runtime
 smoke via `CORTEX_LOAD_USER_GRAPHICS_SETTINGS=1`, and asserts that the frame
 contract reflects the applied controls. It is a runtime control-surface gate,
 not a mouse/keyboard automation test for the native Win32 widgets.
+The graphics native-widget smoke opens the actual Win32 graphics settings
+window via `CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP=1`, drives child HWND
+trackbars/buttons with Win32 messages, and verifies the resulting frame report
+for dirty UI state, slider values, color/tone presets, and lighting-rig
+selection.
 
 The effects gallery test uses the Effects Showcase scene and asserts that the
 advanced graphics catalog is release-foundation validated, the public particle

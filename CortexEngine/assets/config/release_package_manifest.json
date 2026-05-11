@@ -67,6 +67,7 @@
   "required_release_validation_steps": [
     "build_release",
     "repo_hygiene",
+    "graphics_native_widget",
     "rt_showcase",
     "phase3_visual_matrix",
     "renderer_full_ownership_audit",

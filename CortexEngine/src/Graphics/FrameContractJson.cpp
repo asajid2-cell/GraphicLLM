@@ -103,7 +103,10 @@ json FrameContractToJson(const FrameContract& contract) {
             {"active_width", contract.environment.activeWidth},
             {"active_height", contract.environment.activeHeight},
             {"max_runtime_dimension", contract.environment.maxRuntimeDimension},
-            {"resident_bytes", contract.environment.residentBytes}
+            {"resident_bytes", contract.environment.residentBytes},
+            {"local_reflection_probe_count", contract.environment.localReflectionProbeCount},
+            {"local_reflection_probe_skipped", contract.environment.localReflectionProbeSkipped},
+            {"local_reflection_probe_table_valid", contract.environment.localReflectionProbeTableValid}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},

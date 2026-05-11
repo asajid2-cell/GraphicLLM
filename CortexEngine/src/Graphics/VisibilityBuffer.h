@@ -373,6 +373,7 @@ public:
     [[nodiscard]] const DescriptorHandle& GetMaterialExt2SRVHandle() const { return m_materialExt2SRV; }
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetNormalRoughnessRTV() const { return m_normalRoughnessRTV.cpu; }
     [[nodiscard]] uint32_t GetReflectionProbeTableIndex() const { return m_reflectionProbeSRV.index; }
+    [[nodiscard]] bool HasReflectionProbeTable() const { return m_reflectionProbeSRV.IsValid(); }
     [[nodiscard]] uint32_t GetLocalLightsTableIndex() const { return m_localLightsSRV.index; }
     [[nodiscard]] uint32_t GetClusterRangesTableIndex() const { return m_clusterRangesSRV.index; }
     [[nodiscard]] uint32_t GetClusterLightIndicesTableIndex() const { return m_clusterLightIndicesSRV.index; }

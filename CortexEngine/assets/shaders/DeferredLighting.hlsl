@@ -751,7 +751,7 @@ float4 PSMain(VSOutput input) : SV_Target0 {
     }
 #endif
 
-    if (g_ReflectionProbeParams.z == 1u) {
+    if (g_ReflectionProbeParams.z == 42u) {
         return float4(probeWeight.xxx, 1.0f);
     }
 

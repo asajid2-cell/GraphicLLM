@@ -47,6 +47,46 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         spdlog::warn("VB local lights update failed: {}", lightsResult.Error());
     }
 
+    {
+        auto probeView = registry->View<Scene::ReflectionProbeComponent, Scene::TransformComponent>();
+        for (auto entity : probeView) {
+            const auto& probe = probeView.get<Scene::ReflectionProbeComponent>(entity);
+            const auto& transform = probeView.get<Scene::TransformComponent>(entity);
+            if (probe.enabled == 0u) {
+                continue;
+            }
+            if (probe.environmentIndex >= m_environmentState.maps.size()) {
+                ++inputs.skippedReflectionProbes;
+                continue;
+            }
+
+            EnvironmentMaps& env = m_environmentState.maps[probe.environmentIndex];
+            EnsureEnvironmentBindlessSRVs(env);
+            if (!env.diffuseIrradianceSRV.IsValid() || !env.specularPrefilteredSRV.IsValid()) {
+                ++inputs.skippedReflectionProbes;
+                continue;
+            }
+
+            VBReflectionProbe vbProbe{};
+            vbProbe.centerBlend = glm::vec4(glm::vec3(transform.worldMatrix[3]), std::max(0.0f, probe.blendDistance));
+            vbProbe.extents = glm::vec4(glm::max(glm::vec3(0.01f), glm::abs(probe.extents * transform.scale)), 0.0f);
+            vbProbe.envIndices = glm::uvec4(env.diffuseIrradianceSRV.index, env.specularPrefilteredSRV.index, 0u, 0u);
+            inputs.reflectionProbes.push_back(vbProbe);
+        }
+    }
+
+    m_visibilityBufferState.reflectionProbes = inputs.reflectionProbes;
+    m_visibilityBufferState.reflectionProbeSkipped = inputs.skippedReflectionProbes;
+    m_visibilityBufferState.reflectionProbeTableValid =
+        !inputs.reflectionProbes.empty() && m_services.visibilityBuffer->HasReflectionProbeTable();
+
+    auto probesResult = m_services.visibilityBuffer->UpdateReflectionProbes(
+        m_commandResources.graphicsList.Get(), inputs.reflectionProbes);
+    if (probesResult.IsErr()) {
+        spdlog::warn("VB reflection probe update failed: {}", probesResult.Error());
+        m_visibilityBufferState.reflectionProbeTableValid = false;
+    }
+
     auto& deferredParams = inputs.params;
     deferredParams.invViewProj = glm::inverse(m_constantBuffers.frameCPU.viewProjectionMatrix);
     deferredParams.viewMatrix = m_constantBuffers.frameCPU.viewMatrix;
@@ -74,7 +114,11 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
     uint32_t screenH = m_services.window ? GetInternalRenderHeight() : 720;
     deferredParams.screenAndCluster = glm::uvec4(screenW, screenH, 16, 9);
     deferredParams.clusterParams = glm::uvec4(24, 128, static_cast<uint32_t>(inputs.localLights.size()), 0);
-    deferredParams.reflectionProbeParams = glm::uvec4(0, 0, m_debugViewState.mode, 0);
+    deferredParams.reflectionProbeParams = glm::uvec4(
+        m_visibilityBufferState.reflectionProbeTableValid ? m_services.visibilityBuffer->GetReflectionProbeTableIndex() : 0u,
+        static_cast<uint32_t>(inputs.reflectionProbes.size()),
+        m_debugViewState.mode,
+        inputs.skippedReflectionProbes);
 
     if (auto* env = m_environmentState.ActiveEnvironment()) {
         if (env->diffuseIrradiance) {

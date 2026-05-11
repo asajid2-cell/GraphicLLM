@@ -1628,6 +1628,36 @@ void Engine::BuildRTShowcaseScene() {
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
     }
 
+    // Local reflection probes exercise VB deferred local IBL selection. They
+    // intentionally overlap the hero gallery so debug view 42 shows the
+    // probe/global blend gradient instead of a binary on/off mask.
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_LocalProbe_Left");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(galleryX - 5.0f, 1.7f, -0.1f);
+
+        Scene::ReflectionProbeComponent probe{};
+        probe.extents = glm::vec3(5.5f, 2.4f, 3.2f);
+        probe.blendDistance = 2.25f;
+        probe.environmentIndex = 0;
+        probe.enabled = 1;
+        m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
+    }
+    {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_LocalProbe_Right");
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = glm::vec3(galleryX + 4.5f, 1.7f, -0.1f);
+
+        Scene::ReflectionProbeComponent probe{};
+        probe.extents = glm::vec3(5.5f, 2.4f, 3.2f);
+        probe.blendDistance = 2.25f;
+        probe.environmentIndex = 0;
+        probe.enabled = 1;
+        m_registry->AddComponent<Scene::ReflectionProbeComponent>(e, probe);
+    }
+
     // Row of primitives down the gallery
     if (sphereMesh && sphereMesh->gpuBuffers && cubeMesh && cubeMesh->gpuBuffers && torusMesh && torusMesh->gpuBuffers) {
         const float baseZ = -1.0f;

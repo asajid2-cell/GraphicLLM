@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 41u;
+constexpr uint32_t kMaxDebugViewMode = 42u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -50,6 +50,7 @@ void Renderer::CycleDebugViewMode() {
     // 39 = VB G-buffer material ext1
     // 40 = VB G-buffer material ext2 / surface class
     // 41 = post-process material class overlay
+    // 42 = local reflection-probe blend weight
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -95,6 +96,7 @@ void Renderer::CycleDebugViewMode() {
         case 39: label = "VB_GBuffer_MaterialExt1"; break;
         case 40: label = "VB_GBuffer_SurfaceClass"; break;
         case 41: label = "SurfaceClass_Overlay"; break;
+        case 42: label = "LocalReflectionProbeWeight"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

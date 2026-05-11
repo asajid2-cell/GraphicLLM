@@ -9,11 +9,14 @@ namespace Cortex::Graphics {
 struct RendererVisibilityBufferState {
     std::vector<VBInstanceData> instances;
     std::vector<VisibilityBufferRenderer::VBMeshDrawInfo> meshDraws;
+    std::vector<VBReflectionProbe> reflectionProbes;
     bool enabled = false;
     bool plannedThisFrame = false;
     bool renderedThisFrame = false;
     bool hzbOcclusionUsedThisFrame = false;
     bool debugOverrideThisFrame = false;
+    bool reflectionProbeTableValid = false;
+    uint32_t reflectionProbeSkipped = 0;
 
     void ResetFrameFlags() {
         renderedThisFrame = false;

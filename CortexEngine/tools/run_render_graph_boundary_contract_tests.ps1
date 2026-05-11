@@ -37,6 +37,10 @@ $vbBoundary = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
 $bloomBoundary = Read-Text "src/Graphics/Renderer_RenderGraphBloom.cpp"
 $postPhase = Read-Text "src/Graphics/Renderer_FramePhases_Post.cpp"
 $endFrameGraph = Read-Text "src/Graphics/Renderer_RenderGraphEndFrame.cpp"
+$ssaoBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSAO.cpp"
+$ssrBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSR.cpp"
+$taaBoundary = Read-Text "src/Graphics/Renderer_RenderGraphTAA.cpp"
+$temporalMaskBoundary = Read-Text "src/Graphics/Renderer_RenderGraphTemporalMask.cpp"
 
 foreach ($envName in @(
     "CORTEX_RG_TRANSIENT_VALIDATE",
@@ -81,6 +85,18 @@ Assert-Matches "Renderer_FramePhases_Post.cpp" $postPhase "!featurePlan\.useRend
 Assert-NotMatches "Renderer_FramePhases_Post.cpp" $postPhase "RenderBloom\("
 Assert-NotMatches "Renderer_RenderGraphEndFrame.cpp" $endFrameGraph "fallbackExecutions"
 
+foreach ($screenPass in @(
+    @{ Name = "Renderer_RenderGraphSSAO.cpp"; Text = $ssaoBoundary },
+    @{ Name = "Renderer_RenderGraphSSR.cpp"; Text = $ssrBoundary },
+    @{ Name = "Renderer_RenderGraphTAA.cpp"; Text = $taaBoundary },
+    @{ Name = "Renderer_RenderGraphTemporalMask.cpp"; Text = $temporalMaskBoundary }
+)) {
+    Assert-Matches $screenPass.Name $screenPass.Text "graph path did not execute"
+    Assert-NotMatches $screenPass.Name $screenPass.Text "fallbackExecutions"
+    Assert-NotMatches $screenPass.Name $screenPass.Text "falling back to legacy"
+    Assert-NotMatches $screenPass.Name $screenPass.Text "falling back to legacy barriers"
+}
+
 foreach ($removedPattern in @(
     "AddLegacyPath",
     "LegacyPathContext",
@@ -104,3 +120,4 @@ Write-Host "  transient_matrix_env=covered"
 Write-Host "  transient_validation_module=covered"
 Write-Host "  vb_staged_boundary=covered"
 Write-Host "  vb_legacy_boundary_removed=covered"
+Write-Host "  screen_space_legacy_fallbacks_removed=covered"

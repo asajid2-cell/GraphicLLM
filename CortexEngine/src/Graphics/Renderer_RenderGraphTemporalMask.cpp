@@ -24,8 +24,6 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
         !m_depthResources.resources.buffer || !m_temporalScreenState.velocityBuffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_temporal_mask_prerequisites_missing";
-        BuildTemporalRejectionMask(frameNormalRoughnessResource);
-        result.executed = m_temporalMaskState.builtThisFrame;
         return result;
     }
 
@@ -42,8 +40,6 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     if (!normalResource) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_temporal_mask_normal_missing";
-        BuildTemporalRejectionMask(frameNormalRoughnessResource);
-        result.executed = m_temporalMaskState.builtThisFrame;
         return result;
     }
 
@@ -124,11 +120,8 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("TemporalRejectionMask RG: {} (falling back to legacy barriers)",
+        spdlog::warn("TemporalRejectionMask RG: {} (graph path did not execute)",
                      result.fallbackReason);
-        BuildTemporalRejectionMask(frameNormalRoughnessResource);
-        result.executed = m_temporalMaskState.builtThisFrame;
     }
 
     return result;

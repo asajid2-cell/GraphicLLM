@@ -25,8 +25,6 @@ Renderer::ExecuteSSRInRenderGraph() {
         !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_prerequisites_missing";
-        RenderSSR();
-        result.executed = true;
         return result;
     }
 
@@ -47,8 +45,6 @@ Renderer::ExecuteSSRInRenderGraph() {
     if (!normalResource) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_normal_resource_missing";
-        RenderSSR();
-        result.executed = true;
         return result;
     }
 
@@ -120,11 +116,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("SSR RG: {} (falling back to legacy path)", result.fallbackReason);
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions, false);
-        RenderSSR();
-        result.executed = true;
+        spdlog::warn("SSR RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;

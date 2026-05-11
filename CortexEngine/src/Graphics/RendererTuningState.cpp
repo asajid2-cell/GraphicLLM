@@ -4,6 +4,7 @@
 #include "Graphics/RendererControlApplier.h"
 
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -46,7 +47,8 @@ json ToJson(const RendererTuningState& state) {
             {"specular_intensity", state.environment.specularIntensity},
             {"background_visible", state.environment.backgroundVisible},
             {"background_exposure", state.environment.backgroundExposure},
-            {"background_blur", state.environment.backgroundBlur}
+            {"background_blur", state.environment.backgroundBlur},
+            {"rotation_degrees", state.environment.rotationDegrees}
         }},
         {"ray_tracing", {
             {"enabled", state.rayTracing.enabled},
@@ -200,6 +202,7 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(e, "background_visible", state.environment.backgroundVisible);
         ReadValue(e, "background_exposure", state.environment.backgroundExposure);
         ReadValue(e, "background_blur", state.environment.backgroundBlur);
+        ReadValue(e, "rotation_degrees", state.environment.rotationDegrees);
     }
     if (root.contains("ray_tracing") && root.at("ray_tracing").is_object()) {
         const auto& rt = root.at("ray_tracing");
@@ -321,6 +324,9 @@ json GraphicsPresetToTuningJson(const json& preset) {
         if (env.contains("background_blur")) {
             root["environment"]["background_blur"] = env.at("background_blur");
         }
+        if (env.contains("rotation_degrees")) {
+            root["environment"]["rotation_degrees"] = env.at("rotation_degrees");
+        }
     }
 
     root["ray_tracing"] = preset.value("ray_tracing", json::object());
@@ -399,6 +405,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.environment.backgroundVisible = features.backgroundVisible;
     state.environment.backgroundExposure = features.backgroundExposure;
     state.environment.backgroundBlur = features.backgroundBlur;
+    state.environment.rotationDegrees = features.environmentRotationDegrees;
 
     state.rayTracing.enabled = rt.requested;
     state.rayTracing.reflectionsEnabled = rt.reflectionsEnabled;
@@ -473,6 +480,13 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.environment.specularIntensity = std::clamp(state.environment.specularIntensity, 0.0f, 3.0f);
     state.environment.backgroundExposure = std::clamp(state.environment.backgroundExposure, 0.0f, 4.0f);
     state.environment.backgroundBlur = std::clamp(state.environment.backgroundBlur, 0.0f, 1.0f);
+    if (!std::isfinite(state.environment.rotationDegrees)) {
+        state.environment.rotationDegrees = 0.0f;
+    }
+    state.environment.rotationDegrees = std::fmod(state.environment.rotationDegrees, 360.0f);
+    if (state.environment.rotationDegrees < 0.0f) {
+        state.environment.rotationDegrees += 360.0f;
+    }
 
     state.rayTracing.reflectionDenoiseAlpha = std::clamp(state.rayTracing.reflectionDenoiseAlpha, 0.02f, 1.0f);
     state.rayTracing.reflectionCompositionStrength =
@@ -557,6 +571,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                                        state.environment.backgroundVisible,
                                        state.environment.backgroundExposure,
                                        state.environment.backgroundBlur);
+    ApplyEnvironmentRotationControl(renderer, state.environment.rotationDegrees);
 
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RayTracing, state.rayTracing.enabled);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RTReflections, state.rayTracing.reflectionsEnabled);

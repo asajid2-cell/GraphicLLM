@@ -80,6 +80,7 @@ struct FrameContract {
         bool backgroundVisible = true;
         float backgroundExposure = 1.0f;
         float backgroundBlur = 0.0f;
+        float rotationDegrees = 0.0f;
         uint32_t residentCount = 0;
         uint32_t pendingCount = 0;
         uint32_t residentLimit = 0;

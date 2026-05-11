@@ -106,7 +106,8 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
     deferredParams.envParams = glm::vec4(
         m_environmentState.diffuseIntensity, m_environmentState.specularIntensity, m_environmentState.enabled ? 1.0f : 0.0f, 0.0f);
     float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.mapSize);
-    deferredParams.shadowInvSizeAndSpecMaxMip = glm::vec4(invShadowDim, invShadowDim, 8.0f, 0.0f);
+    deferredParams.shadowInvSizeAndSpecMaxMip =
+        glm::vec4(invShadowDim, invShadowDim, 8.0f, glm::radians(m_environmentState.rotationDegrees));
     float nearZ = 0.1f, farZ = 1000.0f;
     deferredParams.projectionParams = glm::vec4(
         m_constantBuffers.frameCPU.projectionMatrix[0][0], m_constantBuffers.frameCPU.projectionMatrix[1][1], nearZ, farZ);

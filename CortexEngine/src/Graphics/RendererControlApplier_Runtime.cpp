@@ -221,6 +221,10 @@ void ApplyBackgroundPresentationControl(Renderer& renderer, bool visible, float 
                                        std::clamp(blur, 0.0f, 1.0f));
 }
 
+void ApplyEnvironmentRotationControl(Renderer& renderer, float degrees) {
+    renderer.SetEnvironmentRotation(degrees);
+}
+
 void ApplyColorGradeControl(Renderer& renderer, float warm, float cool) {
     renderer.SetColorGrade(std::clamp(warm, -1.0f, 1.0f),
                            std::clamp(cool, -1.0f, 1.0f));

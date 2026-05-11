@@ -118,6 +118,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.backgroundVisible = m_environmentState.backgroundVisible;
     contract.environment.backgroundExposure = m_environmentState.backgroundExposure;
     contract.environment.backgroundBlur = m_environmentState.backgroundBlur;
+    contract.environment.rotationDegrees = m_environmentState.rotationDegrees;
     contract.environment.residentCount = health.residentEnvironments;
     contract.environment.pendingCount = health.pendingEnvironments;
     contract.environment.residentLimit = m_framePlanning.budgetPlan.iblResidentEnvironmentLimit;

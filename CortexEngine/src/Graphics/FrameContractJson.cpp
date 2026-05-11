@@ -97,6 +97,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"background_visible", contract.environment.backgroundVisible},
             {"background_exposure", contract.environment.backgroundExposure},
             {"background_blur", contract.environment.backgroundBlur},
+            {"rotation_degrees", contract.environment.rotationDegrees},
             {"resident_count", contract.environment.residentCount},
             {"pending_count", contract.environment.pendingCount},
             {"resident_limit", contract.environment.residentLimit},

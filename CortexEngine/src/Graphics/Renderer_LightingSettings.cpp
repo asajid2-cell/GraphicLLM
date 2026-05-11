@@ -28,6 +28,17 @@ const char* LightingRigId(Renderer::LightingRig rig) {
     }
 }
 
+float NormalizeDegrees(float degrees) {
+    if (!std::isfinite(degrees)) {
+        return 0.0f;
+    }
+    float normalized = std::fmod(degrees, 360.0f);
+    if (normalized < 0.0f) {
+        normalized += 360.0f;
+    }
+    return normalized;
+}
+
 } // namespace
 
 float Renderer::GetIBLDiffuseIntensity() const {
@@ -471,6 +482,16 @@ void Renderer::SetBackgroundPresentation(bool visible, float exposure, float blu
                  visible,
                  m_environmentState.backgroundExposure,
                  m_environmentState.backgroundBlur);
+}
+
+void Renderer::SetEnvironmentRotation(float degrees) {
+    const float normalized = NormalizeDegrees(degrees);
+    if (std::abs(m_environmentState.rotationDegrees - normalized) < 0.01f) {
+        return;
+    }
+
+    m_environmentState.rotationDegrees = normalized;
+    spdlog::info("Environment rotation set to {} degrees", m_environmentState.rotationDegrees);
 }
 
 void Renderer::SetSunDirection(const glm::vec3& dir) {

@@ -205,6 +205,7 @@ public:
     void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
     void SetIBLEnabled(bool enabled);
     void SetBackgroundPresentation(bool visible, float exposure, float blur);
+    void SetEnvironmentRotation(float degrees);
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
     void SetToneGrade(float contrast, float saturation);

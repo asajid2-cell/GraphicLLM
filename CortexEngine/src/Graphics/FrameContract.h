@@ -290,6 +290,10 @@ struct FrameContract {
         bool instanceMapFailed = false;
         bool capped = false;
         float densityScale = 1.0f;
+        float qualityScale = 1.0f;
+        float bloomContribution = 1.0f;
+        float softDepthFade = 0.5f;
+        float windInfluence = 0.0f;
         uint32_t emitterCount = 0;
         uint32_t liveParticles = 0;
         uint32_t submittedInstances = 0;

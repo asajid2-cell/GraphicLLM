@@ -96,6 +96,9 @@ if ($null -eq $particles) {
     if (-not [bool]$particles.executed) { Add-Failure "particles.executed is false" }
     if ([bool]$particles.instance_map_failed) { Add-Failure "particles.instance_map_failed is true" }
     if ([bool]$particles.capped) { Add-Failure "particles.capped is true" }
+    foreach ($field in @("density_scale", "quality_scale", "bloom_contribution", "soft_depth_fade", "wind_influence")) {
+        if ($null -eq $particles.PSObject.Properties[$field]) { Add-Failure "particles.$field is missing" }
+    }
     if ([int]$particles.emitter_count -lt 8) { Add-Failure "expected the full public particle effect library to be active" }
     if ([int]$particles.live_particles -lt 1) { Add-Failure "expected live particles" }
     if ([int]$particles.submitted_instances -lt 1) { Add-Failure "expected submitted particle instances" }

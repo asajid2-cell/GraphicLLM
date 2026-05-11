@@ -61,6 +61,10 @@ enum ControlIdGraphics : int {
     IDC_GFX_TONE_REINHARD = 9061,
     IDC_GFX_TONE_SOFT = 9062,
     IDC_GFX_TONE_PUNCHY = 9063,
+    IDC_GFX_PARTICLE_QUALITY = 9064,
+    IDC_GFX_PARTICLE_BLOOM = 9065,
+    IDC_GFX_PARTICLE_SOFT_DEPTH = 9066,
+    IDC_GFX_PARTICLE_WIND = 9067,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -168,6 +172,10 @@ struct GraphicsSettingsState {
     SliderBinding motionBlur;
     SliderBinding depthOfField;
     SliderBinding particleDensity;
+    SliderBinding particleQuality;
+    SliderBinding particleBloom;
+    SliderBinding particleSoftDepth;
+    SliderBinding particleWind;
 
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
@@ -301,6 +309,10 @@ void SyncStateFromSliders() {
     g_gfx.tuning.cinematicPost.motionBlur = SliderToFloat(g_gfx.motionBlur);
     g_gfx.tuning.cinematicPost.depthOfField = SliderToFloat(g_gfx.depthOfField);
     g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
+    g_gfx.tuning.particles.qualityScale = SliderToFloat(g_gfx.particleQuality);
+    g_gfx.tuning.particles.bloomContribution = SliderToFloat(g_gfx.particleBloom);
+    g_gfx.tuning.particles.softDepthFade = SliderToFloat(g_gfx.particleSoftDepth);
+    g_gfx.tuning.particles.windInfluence = SliderToFloat(g_gfx.particleWind);
 }
 
 void ApplyTuningState(bool markColorGradeCustom = false) {
@@ -404,6 +416,10 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.motionBlur, g_gfx.tuning.cinematicPost.motionBlur);
     SetSliderFromFloat(g_gfx.depthOfField, g_gfx.tuning.cinematicPost.depthOfField);
     SetSliderFromFloat(g_gfx.particleDensity, g_gfx.tuning.particles.densityScale);
+    SetSliderFromFloat(g_gfx.particleQuality, g_gfx.tuning.particles.qualityScale);
+    SetSliderFromFloat(g_gfx.particleBloom, g_gfx.tuning.particles.bloomContribution);
+    SetSliderFromFloat(g_gfx.particleSoftDepth, g_gfx.tuning.particles.softDepthFade);
+    SetSliderFromFloat(g_gfx.particleWind, g_gfx.tuning.particles.windInfluence);
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -693,6 +709,10 @@ void RegisterGraphicsSettingsClass() {
             makeSection(L"Showcase Effects");
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
             makeSlider(IDC_GFX_PARTICLE_DENSITY, L"Particle Density", g_gfx.particleDensity, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_PARTICLE_QUALITY, L"Particle Quality", g_gfx.particleQuality, 0.25f, 2.0f);
+            makeSlider(IDC_GFX_PARTICLE_BLOOM, L"Particle Bloom", g_gfx.particleBloom, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_PARTICLE_SOFT_DEPTH, L"Particle Soft Depth", g_gfx.particleSoftDepth, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_PARTICLE_WIND, L"Particle Wind", g_gfx.particleWind, 0.0f, 2.0f);
             makeSlider(IDC_GFX_WATER_WAVE, L"Water Wave Amp", g_gfx.waterWave, 0.0f, 2.0f);
             makeSlider(IDC_GFX_WATER_LENGTH, L"Water Wavelength", g_gfx.waterLength, 0.1f, 100.0f);
             makeSlider(IDC_GFX_WATER_SPEED, L"Water Speed", g_gfx.waterSpeed, 0.0f, 20.0f);

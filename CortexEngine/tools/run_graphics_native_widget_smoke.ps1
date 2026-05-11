@@ -56,6 +56,10 @@ $IDC_GFX_SSR_STRENGTH = 9045
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_WATER_ROUGHNESS = 9046
 $IDC_GFX_PARTICLE_DENSITY = 9028
+$IDC_GFX_PARTICLE_QUALITY = 9064
+$IDC_GFX_PARTICLE_BLOOM = 9065
+$IDC_GFX_PARTICLE_SOFT_DEPTH = 9066
+$IDC_GFX_PARTICLE_WIND = 9067
 $IDC_GFX_RT_REFL_STRENGTH = 9034
 $IDC_GFX_MOTION_BLUR = 9058
 $IDC_GFX_DOF = 9059
@@ -153,6 +157,10 @@ try {
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
         Set-Trackbar $window $IDC_GFX_WATER_ROUGHNESS 41
         Set-Trackbar $window $IDC_GFX_PARTICLE_DENSITY 61
+        Set-Trackbar $window $IDC_GFX_PARTICLE_QUALITY 66
+        Set-Trackbar $window $IDC_GFX_PARTICLE_BLOOM 57
+        Set-Trackbar $window $IDC_GFX_PARTICLE_SOFT_DEPTH 42
+        Set-Trackbar $window $IDC_GFX_PARTICLE_WIND 48
         Set-Trackbar $window $IDC_GFX_RT_REFL_STRENGTH 62
         Set-Trackbar $window $IDC_GFX_MOTION_BLUR 29
         Set-Trackbar $window $IDC_GFX_DOF 31
@@ -200,6 +208,10 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.416 0.05
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 1.22 0.05
+    Assert-Near "particle_quality" ([double]$fc.particles.quality_scale) 1.405 0.06
+    Assert-Near "particle_bloom" ([double]$fc.particles.bloom_contribution) 1.14 0.06
+    Assert-Near "particle_soft_depth" ([double]$fc.particles.soft_depth_fade) 0.42 0.06
+    Assert-Near "particle_wind" ([double]$fc.particles.wind_influence) 0.96 0.06
     Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.62 0.05
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.29 0.05
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.31 0.05

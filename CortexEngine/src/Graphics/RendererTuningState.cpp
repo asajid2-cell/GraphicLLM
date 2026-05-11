@@ -87,7 +87,11 @@ json ToJson(const RendererTuningState& state) {
         }},
         {"particles", {
             {"enabled", state.particles.enabled},
-            {"density_scale", state.particles.densityScale}
+            {"density_scale", state.particles.densityScale},
+            {"quality_scale", state.particles.qualityScale},
+            {"bloom_contribution", state.particles.bloomContribution},
+            {"soft_depth_fade", state.particles.softDepthFade},
+            {"wind_influence", state.particles.windInfluence}
         }},
         {"cinematic_post", {
             {"enabled", state.cinematicPost.enabled},
@@ -242,6 +246,10 @@ RendererTuningState FromJson(const json& root) {
         const auto& p = root.at("particles");
         ReadValue(p, "enabled", state.particles.enabled);
         ReadValue(p, "density_scale", state.particles.densityScale);
+        ReadValue(p, "quality_scale", state.particles.qualityScale);
+        ReadValue(p, "bloom_contribution", state.particles.bloomContribution);
+        ReadValue(p, "soft_depth_fade", state.particles.softDepthFade);
+        ReadValue(p, "wind_influence", state.particles.windInfluence);
     }
     if (root.contains("cinematic_post") && root.at("cinematic_post").is_object()) {
         const auto& c = root.at("cinematic_post");
@@ -331,6 +339,22 @@ json GraphicsPresetToTuningJson(const json& preset) {
         } else if (particles.contains("density")) {
             root["particles"]["density_scale"] = particles.at("density");
         }
+        if (particles.contains("quality_scale")) {
+            root["particles"]["quality_scale"] = particles.at("quality_scale");
+        } else if (particles.contains("quality")) {
+            const std::string quality = particles.at("quality").get<std::string>();
+            root["particles"]["quality_scale"] =
+                (quality == "low") ? 0.5f : ((quality == "high") ? 1.5f : 1.0f);
+        }
+        if (particles.contains("bloom_contribution")) {
+            root["particles"]["bloom_contribution"] = particles.at("bloom_contribution");
+        }
+        if (particles.contains("soft_depth_fade")) {
+            root["particles"]["soft_depth_fade"] = particles.at("soft_depth_fade");
+        }
+        if (particles.contains("wind_influence")) {
+            root["particles"]["wind_influence"] = particles.at("wind_influence");
+        }
     }
 
     root["cinematic_post"] = preset.value("cinematic_post", json::object());
@@ -411,6 +435,10 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.particles.enabled = features.particlesEnabled;
     state.particles.densityScale = features.particleDensityScale;
+    state.particles.qualityScale = features.particleQualityScale;
+    state.particles.bloomContribution = features.particleBloomContribution;
+    state.particles.softDepthFade = features.particleSoftDepthFade;
+    state.particles.windInfluence = features.particleWindInfluence;
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
@@ -477,6 +505,10 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.water.fresnelStrength = std::clamp(state.water.fresnelStrength, 0.0f, 3.0f);
 
     state.particles.densityScale = std::clamp(state.particles.densityScale, 0.0f, 2.0f);
+    state.particles.qualityScale = std::clamp(state.particles.qualityScale, 0.25f, 2.0f);
+    state.particles.bloomContribution = std::clamp(state.particles.bloomContribution, 0.0f, 2.0f);
+    state.particles.softDepthFade = std::clamp(state.particles.softDepthFade, 0.0f, 1.0f);
+    state.particles.windInfluence = std::clamp(state.particles.windInfluence, 0.0f, 2.0f);
 
     ApplyNamedColorGradePreset(state);
     ClampToneMapperPreset(state);
@@ -564,6 +596,10 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyWaterOpticsControl(renderer, state.water.roughness, state.water.fresnelStrength);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::Particles, state.particles.enabled);
     renderer.SetParticleDensityScale(state.particles.densityScale);
+    renderer.SetParticleTuning(state.particles.qualityScale,
+                               state.particles.bloomContribution,
+                               state.particles.softDepthFade,
+                               state.particles.windInfluence);
     ApplyBloomShapeControl(renderer,
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,

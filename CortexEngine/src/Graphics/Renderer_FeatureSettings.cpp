@@ -143,6 +143,16 @@ float Renderer::GetParticleDensityScale() const {
     return m_particleState.densityScale;
 }
 
+void Renderer::SetParticleTuning(float qualityScale,
+                                 float bloomContribution,
+                                 float softDepthFade,
+                                 float windInfluence) {
+    m_particleState.qualityScale = std::clamp(qualityScale, 0.25f, 2.0f);
+    m_particleState.bloomContribution = std::clamp(bloomContribution, 0.0f, 2.0f);
+    m_particleState.softDepthFade = std::clamp(softDepthFade, 0.0f, 1.0f);
+    m_particleState.windInfluence = std::clamp(windInfluence, 0.0f, 2.0f);
+}
+
 void Renderer::SetSSREnabled(bool enabled) {
     if (m_ssrResources.enabled == enabled) {
         return;

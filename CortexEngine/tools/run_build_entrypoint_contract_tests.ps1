@@ -47,6 +47,8 @@ Assert-Matches "setup.ps1" $setup "Visual Studio environment imported"
 
 Assert-Matches "run_release_validation.ps1" $releaseValidation "build_release"
 Assert-Matches "run_release_validation.ps1" $releaseValidation "rebuild\.ps1"
+Assert-Matches "run_release_validation.ps1" $releaseValidation "release_validation_summary\.json"
+Assert-Matches "run_release_validation.ps1" $releaseValidation "Write-ReleaseSummary"
 Assert-NotMatches "run_release_validation.ps1" $releaseValidation "(?im)^\s*&?\s*ninja(\.exe)?\b"
 
 Assert-Matches "BUILD.md" $buildDoc "cmake\s+--build\s+build\s+--config\s+Release"

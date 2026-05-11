@@ -154,6 +154,7 @@ Assert-Contains "RenderGraphValidationPass.cpp" $validation "CreateTransientVali
 Assert-Contains "RenderGraphValidationPass.cpp" $validation "ClearTransientTarget(commandList, graph, *transientA"
 Assert-Contains "RenderGraphValidationPass.cpp" $validation "ClearTransientTarget(commandList, graph, *transientB"
 Assert-NotContains "RenderGraphValidationPass.h" $validationHeader "StageCallback"
+Assert-NotContains "RenderGraphValidationPass.h" $validationHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphDiagnostics.cpp" $rendererDiagnostics "DescriptorTable::EnsureColorTargetViewHandles"
 Assert-NotContains "Renderer_RenderGraphDiagnostics.cpp" $rendererDiagnostics "DescriptorTable::WriteTexture2DRTVAndSRV"
 Assert-NotContains "Renderer_RenderGraphDiagnostics.cpp" $rendererDiagnostics "ClearRenderTargetView"

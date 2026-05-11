@@ -34,8 +34,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     bool wantsFusedBloomThisFrame =
         inputs.runBloom && wantsRgPostThisFrame &&
         m_pipelineState.bloomDownsample && m_pipelineState.bloomBlurH && m_pipelineState.bloomBlurV &&
-        m_pipelineState.bloomComposite && m_mainTargets.hdrSRV.IsValid() && m_bloomResources.intensity > 0.0f &&
-        m_bloomResources.texA[0] && m_bloomResources.texB[0];
+        m_pipelineState.bloomComposite && m_mainTargets.hdrSRV.IsValid() && m_bloomResources.controls.intensity > 0.0f &&
+        m_bloomResources.resources.texA[0] && m_bloomResources.resources.texB[0];
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -90,8 +90,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (useFusedBloomTransients) {
         for (uint32_t level = 0; level < kBloomLevels; ++level) {
-            savedBloomA[level] = m_bloomResources.texA[level];
-            savedBloomB[level] = m_bloomResources.texB[level];
+            savedBloomA[level] = m_bloomResources.resources.texA[level];
+            savedBloomB[level] = m_bloomResources.resources.texB[level];
         }
 
         static bool s_loggedFusedBloomTransients = false;
@@ -108,9 +108,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         context.descriptorManager = m_services.descriptorManager.get();
         context.rootSignature = m_pipelineState.rootSignature.get();
         context.frameConstants = m_constantBuffers.currentFrameGPU;
-        context.srvTable = m_bloomResources.srvTables[m_frameRuntime.frameIndex % kFrameCount].data();
+        context.srvTable = m_bloomResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount].data();
         context.srvTableCount = kBloomDescriptorSlots;
-        context.srvTableValid = m_bloomResources.srvTableValid;
+        context.srvTableValid = m_bloomResources.descriptors.srvTableValid;
         return context;
     };
 
@@ -132,23 +132,23 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         }
         if (wantsFusedBloomThisFrame) {
             if (!useFusedBloomTransients) {
-                for (uint32_t level = 0; level < m_bloomResources.activeLevels; ++level) {
-                    if (m_bloomResources.texA[level]) {
+                for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
+                    if (m_bloomResources.resources.texA[level]) {
                         bloomA[level] = m_services.renderGraph->ImportResource(
-                            m_bloomResources.texA[level].Get(),
-                            m_bloomResources.resourceState[level][0],
+                            m_bloomResources.resources.texA[level].Get(),
+                            m_bloomResources.resources.resourceState[level][0],
                             "BloomA_FusedPersistent" + std::to_string(level));
                     }
-                    if (m_bloomResources.texB[level]) {
+                    if (m_bloomResources.resources.texB[level]) {
                         bloomB[level] = m_services.renderGraph->ImportResource(
-                            m_bloomResources.texB[level].Get(),
-                            m_bloomResources.resourceState[level][1],
+                            m_bloomResources.resources.texB[level].Get(),
+                            m_bloomResources.resources.resourceState[level][1],
                             "BloomB_FusedPersistent" + std::to_string(level));
                     }
                 }
             }
 
-            const uint32_t baseLevel = (m_bloomResources.activeLevels > 1) ? 1u : 0u;
+            const uint32_t baseLevel = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
             std::array<ID3D12Resource*, kBloomLevels> bloomATemplates{};
             std::array<ID3D12Resource*, kBloomLevels> bloomBTemplates{};
             for (uint32_t level = 0; level < kBloomLevels; ++level) {
@@ -164,13 +164,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 std::span<ID3D12Resource* const>(bloomATemplates.data(), bloomATemplates.size());
             bloomContext.bloomBTemplates =
                 std::span<ID3D12Resource* const>(bloomBTemplates.data(), bloomBTemplates.size());
-            bloomContext.graphRtv = m_bloomResources.graphRtv;
+            bloomContext.graphRtv = m_bloomResources.resources.graphRtv;
             bloomContext.fullscreen = bloomFullscreenContext();
             bloomContext.downsamplePipeline = m_pipelineState.bloomDownsample.get();
             bloomContext.blurHPipeline = m_pipelineState.bloomBlurH.get();
             bloomContext.blurVPipeline = m_pipelineState.bloomBlurV.get();
             bloomContext.compositePipeline = m_pipelineState.bloomComposite.get();
-            bloomContext.activeLevels = m_bloomResources.activeLevels;
+            bloomContext.activeLevels = m_bloomResources.resources.activeLevels;
             bloomContext.stageLevels = kBloomLevels;
             bloomContext.baseLevel = baseLevel;
             bloomContext.useTransients = useFusedBloomTransients;
@@ -183,11 +183,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             };
 
             bloomHandle = BloomGraphPass::AddFusedBloom(*m_services.renderGraph, bloomContext);
-        } else if (m_bloomResources.intensity > 0.0f) {
-            ID3D12Resource* bloomRes = (m_bloomResources.activeLevels > 1) ? m_bloomResources.texA[1].Get() : m_bloomResources.texA[0].Get();
+        } else if (m_bloomResources.controls.intensity > 0.0f) {
+            ID3D12Resource* bloomRes = (m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get();
             if (bloomRes) {
-                const uint32_t level = (m_bloomResources.activeLevels > 1) ? 1u : 0u;
-                bloomHandle = m_services.renderGraph->ImportResource(bloomRes, m_bloomResources.resourceState[level][0], "BloomCombined");
+                const uint32_t level = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
+                bloomHandle = m_services.renderGraph->ImportResource(bloomRes, m_bloomResources.resources.resourceState[level][0], "BloomCombined");
             }
         }
         if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
@@ -271,7 +271,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.useBloomOverride = wantsFusedBloomThisFrame && bloomHandle.IsValid();
         executeContext.bloom = bloomHandle;
         executeContext.renderWithBloomOverride = [&](ID3D12Resource* bloomOverride) {
-            ScopedRenderPassValue<ID3D12Resource*> bloomOverrideScope(m_bloomResources.postProcessOverride, bloomOverride);
+            ScopedRenderPassValue<ID3D12Resource*> bloomOverrideScope(m_bloomResources.resources.postProcessOverride, bloomOverride);
             ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.postProcessSkipTransitions, true);
             RenderPostProcess();
         };
@@ -355,8 +355,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     if (wantsRgPostThisFrame) {
         m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
         if (bloomHandle.IsValid() && !wantsFusedBloomThisFrame) {
-            const uint32_t level = (m_bloomResources.activeLevels > 1) ? 1u : 0u;
-            m_bloomResources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
+            const uint32_t level = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
+            m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
         }
         if (ssaoHandle.IsValid()) m_ssaoResources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         if (ssrHandle.IsValid()) m_ssrResources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
@@ -387,12 +387,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (rtReflHistHandle.IsValid()) m_rtReflectionTargets.historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
         if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
-            for (uint32_t level = 0; level < m_bloomResources.activeLevels; ++level) {
+            for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
                 if (bloomA[level].IsValid()) {
-                    m_bloomResources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomA[level]);
+                    m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomA[level]);
                 }
                 if (bloomB[level].IsValid()) {
-                    m_bloomResources.resourceState[level][1] = m_services.renderGraph->GetResourceState(bloomB[level]);
+                    m_bloomResources.resources.resourceState[level][1] = m_services.renderGraph->GetResourceState(bloomB[level]);
                 }
             }
         }

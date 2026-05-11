@@ -26,7 +26,7 @@
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",
-      "release_boundary": "bloom, temporal-screen, and cinematic post controls are held in named state structs and validated through graphics presets plus effects showcase frame-contract reporting",
+      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, temporal-screen resources, and cinematic post controls are held in named state structs and validated through ownership, graphics presets, and effects showcase frame-contract reporting",
       "validated_contracts": ["graphics_preset", "effects_gallery", "phase3_visual_matrix"],
       "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],

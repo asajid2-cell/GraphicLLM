@@ -75,10 +75,10 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     writeOrNull(0, m_mainTargets.hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* bloomRes = nullptr;
-    if (m_bloomResources.intensity > 0.0f) {
-        bloomRes = m_bloomResources.postProcessOverride
-            ? m_bloomResources.postProcessOverride
-            : ((m_bloomResources.activeLevels > 1) ? m_bloomResources.texA[1].Get() : m_bloomResources.texA[0].Get());
+    if (m_bloomResources.controls.intensity > 0.0f) {
+        bloomRes = m_bloomResources.resources.postProcessOverride
+            ? m_bloomResources.resources.postProcessOverride
+            : ((m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get());
     }
     writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
 
@@ -163,8 +163,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_bloomResources.srvTableValid = false;
-    for (auto& table : m_bloomResources.srvTables) {
+    m_bloomResources.descriptors.srvTableValid = false;
+    for (auto& table : m_bloomResources.descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -260,7 +260,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (rtReflectionSignalStatsUavResult.IsErr()) {
         return rtReflectionSignalStatsUavResult;
     }
-    auto bloomTableResult = allocateTableSet(m_bloomResources.srvTables, "bloom");
+    auto bloomTableResult = allocateTableSet(m_bloomResources.descriptors.srvTables, "bloom");
     if (bloomTableResult.IsErr()) {
         return bloomTableResult;
     }
@@ -331,7 +331,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
                      "RT reflection signal stats UAV");
     m_rtReflectionSignalState.descriptors.valid =
         rtReflectionSignalStatsSrvValid && rtReflectionSignalStatsUavValid;
-    validateTableSet(m_bloomResources.srvTables, m_bloomResources.srvTableValid, "Bloom");
+    validateTableSet(m_bloomResources.descriptors.srvTables, m_bloomResources.descriptors.srvTableValid, "Bloom");
     return Result<void>::Ok();
 }
 
@@ -362,8 +362,8 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     writeOrNull(0, m_mainTargets.hdrColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
 
     ID3D12Resource* bloomRes = nullptr;
-    if (m_bloomResources.intensity > 0.0f) {
-        bloomRes = (m_bloomResources.activeLevels > 1) ? m_bloomResources.texA[1].Get() : m_bloomResources.texA[0].Get();
+    if (m_bloomResources.controls.intensity > 0.0f) {
+        bloomRes = (m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get();
     }
     writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
 

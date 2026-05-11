@@ -159,9 +159,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     postFxFlags |= m_postProcessState.EncodedLensDirtByte() << 8u;
     postFxFlags |= (rtReflectionAlpha & 0xFFu) << 16u;
     frameData.bloomParams = glm::vec4(
-        m_bloomResources.threshold,
-        m_bloomResources.softKnee,
-        m_bloomResources.maxContribution,
+        m_bloomResources.controls.threshold,
+        m_bloomResources.controls.softKnee,
+        m_bloomResources.controls.maxContribution,
         static_cast<float>(postFxFlags));
 
     // TAA parameters: history UV offset from jitter delta and blend factor / enable flag.

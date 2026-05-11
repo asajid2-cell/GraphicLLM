@@ -157,6 +157,18 @@ foreach ($target in $doc.targets) {
     if ($id -eq "postprocess_resources") {
         if (-not (Test-Path $bloomStatePath)) {
             Add-Failure "postprocess_resources missing RendererBloomState.h"
+        } else {
+            $bloomState = Get-Content $bloomStatePath -Raw
+            foreach ($required in @("struct BloomPassControls", "struct BloomPyramidResources", "struct BloomDescriptorTables", "BloomPassControls controls", "BloomPyramidResources<BloomLevels> resources", "BloomDescriptorTables<BloomDescriptorSlots> descriptors")) {
+                if ($bloomState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_resources missing bloom ownership marker in RendererBloomState.h: $required"
+                }
+            }
+            foreach ($oldField in @("float intensity", "float threshold", "float softKnee", "float maxContribution", "srvTableValid = false;")) {
+                if ($bloomState -match "struct BloomPassState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "postprocess_resources still exposes loose bloom state field in BloomPassState: $oldField"
+                }
+            }
         }
         if (-not (Test-Path $temporalScreenPath)) {
             Add-Failure "postprocess_resources missing RendererTemporalScreenState.h"

@@ -225,7 +225,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.sunColorB = m_lightingState.directionalColor.b;
     contract.lighting.iblDiffuseIntensity = m_environmentState.diffuseIntensity;
     contract.lighting.iblSpecularIntensity = m_environmentState.specularIntensity;
-    contract.lighting.bloomIntensity = m_bloomResources.intensity;
+    contract.lighting.bloomIntensity = m_bloomResources.controls.intensity;
     contract.lighting.ssaoRadius = m_ssaoResources.radius;
     contract.lighting.ssaoBias = m_ssaoResources.bias;
     contract.lighting.ssaoIntensity = m_ssaoResources.intensity;
@@ -363,12 +363,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
                 m_shadowResources.map.Get(),
                 static_cast<uint32_t>(m_shadowResources.mapSize),
                 static_cast<uint32_t>(m_shadowResources.mapSize));
-    for (uint32_t level = 0; level < m_bloomResources.activeLevels; ++level) {
+    for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
         const uint32_t div = 1u << (level + 1u);
         const uint32_t bloomWidth = std::max(1u, contract.renderWidth / div);
         const uint32_t bloomHeight = std::max(1u, contract.renderHeight / div);
-        addResource(("bloom_a_" + std::to_string(level)).c_str(), m_bloomResources.texA[level].Get(), bloomWidth, bloomHeight);
-        addResource(("bloom_b_" + std::to_string(level)).c_str(), m_bloomResources.texB[level].Get(), bloomWidth, bloomHeight);
+        addResource(("bloom_a_" + std::to_string(level)).c_str(), m_bloomResources.resources.texA[level].Get(), bloomWidth, bloomHeight);
+        addResource(("bloom_b_" + std::to_string(level)).c_str(), m_bloomResources.resources.texB[level].Get(), bloomWidth, bloomHeight);
     }
 
     contract.culling.gpuCullingEnabled = m_gpuCullingState.enabled;
@@ -468,10 +468,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.postProcessExecuted = m_frameDiagnostics.timings.postMs > 0.0f;
     contract.cinematicPost.bloomPlanned = featurePlan.runBloom;
     contract.cinematicPost.bloomExecuted = m_frameDiagnostics.timings.bloomMs > 0.0f;
-    contract.cinematicPost.bloomIntensity = m_bloomResources.intensity;
-    contract.cinematicPost.bloomThreshold = m_bloomResources.threshold;
-    contract.cinematicPost.bloomSoftKnee = m_bloomResources.softKnee;
-    contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
+    contract.cinematicPost.bloomIntensity = m_bloomResources.controls.intensity;
+    contract.cinematicPost.bloomThreshold = m_bloomResources.controls.threshold;
+    contract.cinematicPost.bloomSoftKnee = m_bloomResources.controls.softKnee;
+    contract.cinematicPost.bloomMaxContribution = m_bloomResources.controls.maxContribution;
     contract.cinematicPost.contrast = m_postProcessState.contrast;
     contract.cinematicPost.saturation = m_postProcessState.saturation;
     contract.cinematicPost.colorGradePreset = m_postProcessState.colorGradePreset;

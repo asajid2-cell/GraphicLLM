@@ -151,7 +151,8 @@ namespace {
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return normalized == "rt" || normalized == "rtshowcase" ||
                normalized == "rt_showcase" || normalized == "material_lab" ||
-               normalized == "materiallab" || normalized == "effects_showcase" ||
+               normalized == "materiallab" || normalized == "material_gallery" ||
+               normalized == "materialgallery" || normalized == "effects_showcase" ||
                normalized == "effectsshowcase" || normalized == "effects" ||
                normalized == "glass_water_courtyard" ||
                normalized == "glasswatercourtyard" || normalized == "courtyard" ||
@@ -531,7 +532,9 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             m_currentScenePreset = ScenePreset::CornellBox;
         } else if (sceneLower == "rt" || sceneLower == "rtshowcase" || sceneLower == "rt_showcase") {
             m_currentScenePreset = ScenePreset::RTShowcase;
-        } else if (sceneLower == "material_lab" || sceneLower == "materiallab" || sceneLower == "materials") {
+        } else if (sceneLower == "material_lab" || sceneLower == "materiallab" ||
+                   sceneLower == "material_gallery" || sceneLower == "materialgallery" ||
+                   sceneLower == "materials") {
             m_currentScenePreset = ScenePreset::MaterialLab;
         } else if (sceneLower == "glass_water_courtyard" ||
                    sceneLower == "glasswatercourtyard" ||

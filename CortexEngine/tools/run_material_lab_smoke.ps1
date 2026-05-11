@@ -1,4 +1,5 @@
 param(
+    [string]$SceneName = "material_lab",
     [int]$SmokeFrames = 140,
     [double]$MaxGpuFrameMs = 16.7,
     [double]$MinVisualAvgLuma = 120.0,
@@ -51,7 +52,7 @@ $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
 Push-Location (Split-Path -Parent $exe)
 try {
     $output = & $exe `
-        "--scene" "material_lab" `
+        "--scene" $SceneName `
         "--camera-bookmark" "hero" `
         "--environment" "cool_overcast" `
         "--graphics-preset" "release_showcase" `
@@ -88,7 +89,7 @@ if ($failures.Count -eq 0) {
     $materials = $report.frame_contract.materials
 
     if ([string]$report.scene -ne "material_lab") {
-        Add-Failure "expected material_lab scene but report scene was '$($report.scene)'"
+        Add-Failure "expected material_lab runtime scene for requested '$SceneName' but report scene was '$($report.scene)'"
     }
     if (-not [bool]$report.camera.active -or [string]$report.camera.bookmark -ne "hero") {
         Add-Failure "Material Lab did not report the hero camera bookmark"

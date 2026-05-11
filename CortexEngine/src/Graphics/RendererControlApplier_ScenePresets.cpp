@@ -37,9 +37,7 @@ void ApplyHeroVisualBaselineControls(Renderer& renderer) {
 }
 
 void ApplyAutoDemoFeatureLock(Renderer& renderer) {
-    if (renderer.GetRayTracingState().supported) {
-        renderer.SetRayTracingEnabled(true);
-    }
+    renderer.SetRayTracingEnabled(true);
 
     renderer.SetSSREnabled(true);
     renderer.SetSSAOEnabled(true);

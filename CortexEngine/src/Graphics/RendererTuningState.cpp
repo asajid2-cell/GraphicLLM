@@ -376,7 +376,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.environment.backgroundExposure = features.backgroundExposure;
     state.environment.backgroundBlur = features.backgroundBlur;
 
-    state.rayTracing.enabled = rt.enabled;
+    state.rayTracing.enabled = rt.requested;
     state.rayTracing.reflectionsEnabled = rt.reflectionsEnabled;
     state.rayTracing.giEnabled = rt.giEnabled;
     state.rayTracing.reflectionDenoiseAlpha = rt.reflectionDenoiseAlpha;

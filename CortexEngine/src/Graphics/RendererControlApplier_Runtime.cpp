@@ -76,9 +76,7 @@ void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle,
         renderer.SetShadowsEnabled(enabled);
         break;
     case RendererFeatureToggle::RayTracing:
-        if (renderer.GetRayTracingState().supported) {
-            renderer.SetRayTracingEnabled(enabled);
-        }
+        renderer.SetRayTracingEnabled(enabled);
         break;
     case RendererFeatureToggle::RTReflections:
         renderer.SetRTReflectionsEnabled(enabled);

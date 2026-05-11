@@ -36,9 +36,7 @@ void ApplyDebugControlState(Renderer& renderer, const RendererDebugControlState&
     renderer.SetIBLEnabled(state.iblEnabled);
     renderer.SetFogEnabled(state.fogEnabled);
 
-    if (renderer.GetRayTracingState().supported) {
-        renderer.SetRayTracingEnabled(state.rayTracingEnabled);
-    }
+    renderer.SetRayTracingEnabled(state.rayTracingEnabled);
 }
 
 void ApplyDebugControlReset(Renderer& renderer) {

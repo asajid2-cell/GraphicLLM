@@ -10,6 +10,7 @@ namespace Cortex::Graphics {
 
 struct RTRuntimeState {
     bool supported = false;
+    bool requested = false;
     bool enabled = false;
     bool reflectionsEnabled = false;
     bool giEnabled = false;

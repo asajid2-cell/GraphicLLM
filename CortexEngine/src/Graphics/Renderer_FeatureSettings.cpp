@@ -248,8 +248,13 @@ void Renderer::SetAreaLightSizeScale(float scale) {
 }
 
 void Renderer::SetRayTracingEnabled(bool enabled) {
-    bool newValue = enabled && m_rtRuntimeState.supported;
+    const bool oldRequested = m_rtRuntimeState.requested;
+    const bool newValue = enabled && m_rtRuntimeState.supported;
+    m_rtRuntimeState.requested = enabled;
     if (m_rtRuntimeState.enabled == newValue) {
+        if (enabled && !m_rtRuntimeState.supported && oldRequested != enabled) {
+            spdlog::info("Ray tracing toggle requested, but DXR is not supported on this device.");
+        }
         return;
     }
     if (enabled && !m_rtRuntimeState.supported) {

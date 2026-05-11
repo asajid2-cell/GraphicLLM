@@ -201,6 +201,7 @@ struct RendererFeatureState {
 
 struct RendererRayTracingState {
     bool supported = false;
+    bool requested = false;
     bool enabled = false;
     bool reflectionsEnabled = false;
     bool giEnabled = false;

@@ -37,7 +37,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     FrameFeaturePlanInputs featureInputs{};
     featureInputs.debug = LoadRuntimeFrameDebugSwitches();
     featureInputs.rayTracingSupported = m_rtRuntimeState.supported;
-    featureInputs.rayTracingEnabled = m_rtRuntimeState.enabled;
+    featureInputs.rayTracingEnabled = m_rtRuntimeState.requested;
     featureInputs.rtReflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
     featureInputs.rtGIEnabled = m_rtRuntimeState.giEnabled;
     featureInputs.shadowsEnabled = m_shadowResources.enabled;

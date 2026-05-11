@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [int]$SmokeFrames = 600,
+    [int]$SmokeFrames = 900,
     [string]$LogDir = ""
 )
 
@@ -63,6 +63,11 @@ $IDC_GFX_ENV_REAPPLY = 9212
 $IDC_GFX_ENV_ROTATION = 9068
 $IDC_GFX_RT_GI_STRENGTH = 9069
 $IDC_GFX_RT_GI_DISTANCE = 9070
+$IDC_GFX_SSAO_RADIUS = 9018
+$IDC_GFX_SSAO_INTENSITY = 9019
+$IDC_GFX_SSAO_BIAS = 9042
+$IDC_GFX_SSR_DISTANCE = 9043
+$IDC_GFX_SSR_THICKNESS = 9044
 $IDC_GFX_SSR_STRENGTH = 9045
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_WATER_ROUGHNESS = 9046
@@ -184,7 +189,12 @@ try {
     } else {
         Set-Trackbar $window $IDC_GFX_RENDER_SCALE 68
         Set-CheckboxState $window $IDC_GFX_SAFE_LIGHTING $false
+        Set-Trackbar $window $IDC_GFX_SSR_DISTANCE 47
+        Set-Trackbar $window $IDC_GFX_SSR_THICKNESS 28
         Set-Trackbar $window $IDC_GFX_SSR_STRENGTH 72
+        Set-Trackbar $window $IDC_GFX_SSAO_RADIUS 52
+        Set-Trackbar $window $IDC_GFX_SSAO_BIAS 63
+        Set-Trackbar $window $IDC_GFX_SSAO_INTENSITY 39
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
         Set-Trackbar $window $IDC_GFX_WATER_ROUGHNESS 41
         Set-Trackbar $window $IDC_GFX_PARTICLE_DENSITY 61
@@ -244,7 +254,12 @@ if (-not (Test-Path $reportPath)) {
     if ([bool]$fc.lighting.safe_rig_on_low_vram) {
         Add-Failure "lighting.safe_rig_on_low_vram remained true after native safe-lighting toggle"
     }
+    Assert-Near "ssr_max_distance" ([double]$fc.screen_space.ssr_max_distance) 56.9 1.0
+    Assert-Near "ssr_thickness" ([double]$fc.screen_space.ssr_thickness) 0.284 0.04
     Assert-Near "ssr_strength" ([double]$fc.screen_space.ssr_strength) 0.72 0.04
+    Assert-Near "ssao_radius" ([double]$fc.lighting.ssao_radius) 2.60 0.12
+    Assert-Near "ssao_bias" ([double]$fc.lighting.ssao_bias) 0.063 0.01
+    Assert-Near "ssao_intensity" ([double]$fc.lighting.ssao_intensity) 1.95 0.12
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "water_roughness" ([double]$fc.water.roughness) 0.416 0.05
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 1.22 0.05

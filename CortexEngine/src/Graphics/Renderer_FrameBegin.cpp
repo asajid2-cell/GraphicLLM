@@ -2,6 +2,7 @@
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
+#include "Graphics/Passes/DescriptorTable.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
@@ -254,10 +255,9 @@ void Renderer::BeginFrame() {
     // Root signature uses CBV/SRV/UAV heap direct indexing; bind heaps once
     // immediately after Reset() so subsequent Set*RootSignature calls satisfy
     // D3D12 validation (and so compute/RT paths inherit a valid heap binding).
-    if (m_services.descriptorManager) {
-        ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-        m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    }
+    (void)DescriptorTable::BindCBVSRVUAVHeap(
+        m_commandResources.graphicsList.Get(),
+        m_services.descriptorManager.get());
 }
 
 } // namespace Cortex::Graphics

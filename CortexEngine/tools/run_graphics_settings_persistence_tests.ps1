@@ -70,6 +70,13 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "fog": false,
     "fog_density": 0.0
   },
+  "water": {
+    "level_y": -0.12,
+    "wave_amplitude": 0.19,
+    "wave_length": 11.5,
+    "wave_speed": 1.7,
+    "secondary_amplitude": 0.08
+  },
   "particles": {
     "enabled": false,
     "density_scale": 0.43
@@ -168,6 +175,26 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($backgroundBlur - 0.37) -gt 0.03) {
         Add-Failure "valid settings background blur was $backgroundBlur, expected 0.37"
+    }
+    $water = $report.frame_contract.water
+    if ($null -eq $water) {
+        Add-Failure "valid settings frame contract did not include water"
+    } else {
+        if ([Math]::Abs(([double]$water.level_y) + 0.12) -gt 0.03) {
+            Add-Failure "valid settings water level was $($water.level_y), expected -0.12"
+        }
+        if ([Math]::Abs(([double]$water.wave_amplitude) - 0.19) -gt 0.03) {
+            Add-Failure "valid settings water wave amplitude was $($water.wave_amplitude), expected 0.19"
+        }
+        if ([Math]::Abs(([double]$water.wave_length) - 11.5) -gt 0.08) {
+            Add-Failure "valid settings water wavelength was $($water.wave_length), expected 11.5"
+        }
+        if ([Math]::Abs(([double]$water.wave_speed) - 1.7) -gt 0.04) {
+            Add-Failure "valid settings water speed was $($water.wave_speed), expected 1.7"
+        }
+        if ([Math]::Abs(([double]$water.secondary_amplitude) - 0.08) -gt 0.03) {
+            Add-Failure "valid settings water secondary amplitude was $($water.secondary_amplitude), expected 0.08"
+        }
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt

@@ -74,6 +74,13 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "fog_height": 0.0,
     "fog_falloff": 0.55
   },
+  "water": {
+    "level_y": -0.08,
+    "wave_amplitude": 0.16,
+    "wave_length": 9.25,
+    "wave_speed": 1.35,
+    "secondary_amplitude": 0.06
+  },
   "particles": {
     "enabled": true,
     "density_scale": 0.43
@@ -141,6 +148,15 @@ if ($exitCode -ne 0) {
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
+    if ($null -eq $fc.water) {
+        Add-Failure "water contract section was missing"
+    } else {
+        Assert-Near "water_level" ([double]$fc.water.level_y) -0.08 0.03
+        Assert-Near "water_wave_amplitude" ([double]$fc.water.wave_amplitude) 0.16 0.03
+        Assert-Near "water_wave_length" ([double]$fc.water.wave_length) 9.25 0.08
+        Assert-Near "water_wave_speed" ([double]$fc.water.wave_speed) 1.35 0.04
+        Assert-Near "water_secondary_amplitude" ([double]$fc.water.secondary_amplitude) 0.06 0.03
+    }
     Assert-Near "warm_color_grade" ([double]$fc.cinematic_post.warm) 0.36 0.03
     Assert-Near "cool_color_grade" ([double]$fc.cinematic_post.cool) -0.14 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03

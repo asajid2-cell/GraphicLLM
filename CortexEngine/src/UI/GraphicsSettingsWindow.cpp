@@ -49,6 +49,9 @@ enum ControlIdGraphics : int {
     IDC_GFX_RT_REFL_STRENGTH = 9034,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
+    IDC_GFX_WATER_LENGTH = 9037,
+    IDC_GFX_WATER_SPEED = 9038,
+    IDC_GFX_WATER_SECONDARY = 9039,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -117,6 +120,9 @@ struct GraphicsSettingsState {
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
     SliderBinding waterWave;
+    SliderBinding waterLength;
+    SliderBinding waterSpeed;
+    SliderBinding waterSecondary;
     SliderBinding bloomThreshold;
     SliderBinding bloomKnee;
     SliderBinding vignette;
@@ -231,6 +237,9 @@ void SyncStateFromSliders() {
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
     g_gfx.tuning.water.waveAmplitude = SliderToFloat(g_gfx.waterWave);
+    g_gfx.tuning.water.waveLength = SliderToFloat(g_gfx.waterLength);
+    g_gfx.tuning.water.waveSpeed = SliderToFloat(g_gfx.waterSpeed);
+    g_gfx.tuning.water.secondaryAmplitude = SliderToFloat(g_gfx.waterSecondary);
     g_gfx.tuning.cinematicPost.bloomThreshold = SliderToFloat(g_gfx.bloomThreshold);
     g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
     g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
@@ -286,6 +295,9 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
     SetSliderFromFloat(g_gfx.waterWave, g_gfx.tuning.water.waveAmplitude);
+    SetSliderFromFloat(g_gfx.waterLength, g_gfx.tuning.water.waveLength);
+    SetSliderFromFloat(g_gfx.waterSpeed, g_gfx.tuning.water.waveSpeed);
+    SetSliderFromFloat(g_gfx.waterSecondary, g_gfx.tuning.water.secondaryAmplitude);
     SetSliderFromFloat(g_gfx.bloomThreshold, g_gfx.tuning.cinematicPost.bloomThreshold);
     SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
     SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
@@ -571,6 +583,9 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
             makeSlider(IDC_GFX_PARTICLE_DENSITY, L"Particle Density", g_gfx.particleDensity, 0.0f, 2.0f);
             makeSlider(IDC_GFX_WATER_WAVE, L"Water Wave Amp", g_gfx.waterWave, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_WATER_LENGTH, L"Water Wavelength", g_gfx.waterLength, 0.1f, 100.0f);
+            makeSlider(IDC_GFX_WATER_SPEED, L"Water Speed", g_gfx.waterSpeed, 0.0f, 20.0f);
+            makeSlider(IDC_GFX_WATER_SECONDARY, L"Water Secondary", g_gfx.waterSecondary, 0.0f, 2.0f);
             g_gfx.chkCinematicPost = makeCheckbox(IDC_GFX_CINEMATIC_POST, L"Cinematic Post");
             makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);

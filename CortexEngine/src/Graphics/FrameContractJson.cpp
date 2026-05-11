@@ -252,6 +252,14 @@ json FrameContractToJson(const FrameContract& contract) {
             {"instance_capacity", contract.particles.instanceCapacity},
             {"instance_buffer_bytes", contract.particles.instanceBufferBytes}
         }},
+        {"water", {
+            {"level_y", contract.water.levelY},
+            {"wave_amplitude", contract.water.waveAmplitude},
+            {"wave_length", contract.water.waveLength},
+            {"wave_speed", contract.water.waveSpeed},
+            {"secondary_amplitude", contract.water.secondaryAmplitude},
+            {"steepness", contract.water.steepness}
+        }},
         {"vegetation", {
             {"enabled", contract.vegetation.enabled},
             {"mesh_pipeline_ready", contract.vegetation.meshPipelineReady},

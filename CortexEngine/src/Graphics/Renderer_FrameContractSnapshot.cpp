@@ -322,8 +322,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     const uint32_t ssaoHeight = std::max(1u, contract.renderHeight / ssaoDivisor);
 
     addResource("depth", m_depthResources.resources.buffer.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("hdr_color", m_mainTargets.hdrColor.Get(), contract.renderWidth, contract.renderHeight);
-    addResource("gbuffer_normal_roughness", m_mainTargets.gbufferNormalRoughness.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("hdr_color", m_mainTargets.hdr.resources.color.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("gbuffer_normal_roughness", m_mainTargets.normalRoughness.resources.texture.Get(), contract.renderWidth, contract.renderHeight);
     if (m_services.visibilityBuffer) {
         addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_normal_roughness", m_services.visibilityBuffer->GetNormalRoughnessBuffer(), contract.renderWidth, contract.renderHeight);

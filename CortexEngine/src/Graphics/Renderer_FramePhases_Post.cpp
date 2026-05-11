@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Renderer_FramePhaseGpuScope.h"
 
 #include <chrono>
@@ -84,7 +84,7 @@ void Renderer::ExecutePostProcessingFramePhase(const FrameExecutionContext& fram
         featurePlan.useRenderGraphPost &&
         m_services.renderGraph &&
         m_commandResources.graphicsList &&
-        m_mainTargets.hdrColor &&
+        m_mainTargets.hdr.resources.color &&
         m_services.window &&
         m_services.window->GetCurrentBackBuffer() &&
         m_pipelineState.postProcess &&
@@ -92,7 +92,7 @@ void Renderer::ExecutePostProcessingFramePhase(const FrameExecutionContext& fram
         m_pipelineState.bloomBlurH &&
         m_pipelineState.bloomBlurV &&
         m_pipelineState.bloomComposite &&
-        m_mainTargets.hdrSRV.IsValid() &&
+        m_mainTargets.hdr.descriptors.srv.IsValid() &&
         m_bloomResources.controls.intensity > 0.0f &&
         m_bloomResources.resources.texA[0] &&
         m_bloomResources.resources.texB[0];

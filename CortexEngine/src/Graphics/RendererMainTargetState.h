@@ -5,29 +5,76 @@
 
 namespace Cortex::Graphics {
 
-struct MainRenderTargetState {
-    ComPtr<ID3D12Resource> hdrColor;
-    DescriptorHandle hdrRTV;
-    DescriptorHandle hdrSRV;
-    D3D12_RESOURCE_STATES hdrState = D3D12_RESOURCE_STATE_COMMON;
+struct HDRRenderTargetResources {
+    ComPtr<ID3D12Resource> color;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 
-    ComPtr<ID3D12Resource> gbufferNormalRoughness;
-    DescriptorHandle gbufferNormalRoughnessRTV;
-    DescriptorHandle gbufferNormalRoughnessSRV;
-    D3D12_RESOURCE_STATES gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
+    void Reset() {
+        color.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct HDRRenderTargetDescriptors {
+    DescriptorHandle rtv;
+    DescriptorHandle srv;
+
+    void Reset() {
+        rtv = {};
+        srv = {};
+    }
+};
+
+struct GBufferNormalRoughnessResources {
+    ComPtr<ID3D12Resource> texture;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        texture.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct GBufferNormalRoughnessDescriptors {
+    DescriptorHandle rtv;
+    DescriptorHandle srv;
+
+    void Reset() {
+        rtv = {};
+        srv = {};
+    }
+};
+
+struct HDRRenderTargetState {
+    HDRRenderTargetResources resources;
+    HDRRenderTargetDescriptors descriptors;
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
+struct GBufferNormalRoughnessTargetState {
+    GBufferNormalRoughnessResources resources;
+    GBufferNormalRoughnessDescriptors descriptors;
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
+struct MainRenderTargetState {
+    HDRRenderTargetState hdr;
+    GBufferNormalRoughnessTargetState normalRoughness;
 
     void ResetHDR() {
-        hdrColor.Reset();
-        hdrRTV = {};
-        hdrSRV = {};
-        hdrState = D3D12_RESOURCE_STATE_COMMON;
+        hdr.Reset();
     }
 
     void ResetGBufferNormalRoughness() {
-        gbufferNormalRoughness.Reset();
-        gbufferNormalRoughnessRTV = {};
-        gbufferNormalRoughnessSRV = {};
-        gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
+        normalRoughness.Reset();
     }
 
     void ResetResources() {

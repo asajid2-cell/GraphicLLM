@@ -16,7 +16,7 @@ namespace Cortex::Graphics {
     ReportDeviceRemoved((ctx), (hr), __FILE__, __LINE__)
 void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_particleState.ResetFrameStats();
-    if (m_frameLifecycle.deviceRemoved || !registry || !m_pipelineState.particle || !m_mainTargets.hdrColor || m_particleState.instanceMapFailed) {
+    if (m_frameLifecycle.deviceRemoved || !registry || !m_pipelineState.particle || !m_mainTargets.hdr.resources.color || m_particleState.instanceMapFailed) {
         return;
     }
 
@@ -280,14 +280,14 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
-    if (m_mainTargets.hdrColor && m_mainTargets.hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+    if (m_mainTargets.hdr.resources.color && m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdrColor.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdrState;
+        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
     if (barrierCount > 0) {
@@ -295,7 +295,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     }
 
     // 3. Bind render targets (HDR color + depth)
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdr.descriptors.rtv.cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.descriptors.dsv.cpu;
     m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 

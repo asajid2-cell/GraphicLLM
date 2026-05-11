@@ -92,8 +92,8 @@ void Renderer::BeginFrame() {
         }
     }
 
-    if (m_mainTargets.hdrColor) {
-        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    if (m_mainTargets.hdr.resources.color) {
+        D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
         if (hdrDesc.Width != expectedDepthWidth || hdrDesc.Height != expectedDepthHeight) {
             needHDRResize = true;
         }
@@ -139,10 +139,10 @@ void Renderer::BeginFrame() {
     }
 
     // Handle HDR target resize using the same effective render resolution.
-    if (needHDRResize && m_mainTargets.hdrColor) {
+    if (needHDRResize && m_mainTargets.hdr.resources.color) {
         spdlog::info("BeginFrame: recreating HDR target for renderScale {:.2f} ({}x{})",
                      renderScale, expectedDepthWidth, expectedDepthHeight);
-        m_mainTargets.hdrColor.Reset();
+        m_mainTargets.hdr.resources.color.Reset();
         auto hdrResult = CreateHDRTarget();
         if (hdrResult.IsErr()) {
             spdlog::error("Failed to recreate HDR target on resize: {}", hdrResult.Error());

@@ -143,8 +143,8 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
 void Renderer::ApplyVisibilityBufferDeferredLighting(const VisibilityBufferDeferredLightingInputs& inputs) {
     auto lightingResult = m_services.visibilityBuffer->ApplyDeferredLighting(
         m_commandResources.graphicsList.Get(),
-        m_mainTargets.hdrColor.Get(),
-        m_mainTargets.hdrRTV.cpu,
+        m_mainTargets.hdr.resources.color.Get(),
+        m_mainTargets.hdr.descriptors.rtv.cpu,
         m_depthResources.resources.buffer.Get(),
         m_depthResources.descriptors.srv,
         inputs.envDiffuseResource,

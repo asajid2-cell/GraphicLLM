@@ -64,6 +64,9 @@ $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
+$mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
+$hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
+$postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -331,6 +334,37 @@ foreach ($target in $doc.targets) {
                 foreach ($oldFlatAccess in @("m_depthResources.buffer", "m_depthResources.dsv", "m_depthResources.readOnlyDsv", "m_depthResources.srv", "m_depthResources.resourceState")) {
                     if ($depthSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "depth_resources still uses flat depth state access in $($pathInfo.Label): $oldFlatAccess"
+                    }
+                }
+            }
+        }
+    }
+
+    if ($id -eq "main_target_resources") {
+        if (-not (Test-Path $mainTargetStatePath)) {
+            Add-Failure "main_target_resources missing RendererMainTargetState.h"
+        } else {
+            $mainTargetState = Get-Content $mainTargetStatePath -Raw
+            foreach ($required in @("struct HDRRenderTargetResources", "struct HDRRenderTargetDescriptors", "struct GBufferNormalRoughnessResources", "struct GBufferNormalRoughnessDescriptors", "struct HDRRenderTargetState", "struct GBufferNormalRoughnessTargetState", "HDRRenderTargetState hdr", "GBufferNormalRoughnessTargetState normalRoughness")) {
+                if ($mainTargetState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing ownership marker in RendererMainTargetState.h: $required"
+                }
+            }
+            foreach ($oldField in @("ComPtr<ID3D12Resource> hdrColor", "DescriptorHandle hdrRTV", "DescriptorHandle hdrSRV", "D3D12_RESOURCE_STATES hdrState", "ComPtr<ID3D12Resource> gbufferNormalRoughness", "DescriptorHandle gbufferNormalRoughnessRTV", "DescriptorHandle gbufferNormalRoughnessSRV", "D3D12_RESOURCE_STATES gbufferNormalRoughnessState")) {
+                if ($mainTargetState -match "struct MainRenderTargetState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "main_target_resources still exposes loose main-target state field in MainRenderTargetState: $oldField"
+                }
+            }
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $hdrTargetsPath; Label = "Renderer_HDRTargets.cpp" },
+            [pscustomobject]@{ Path = $postProcessPath; Label = "Renderer_PostProcess.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $targetSource = Get-Content $pathInfo.Path -Raw
+                foreach ($oldFlatAccess in @("m_mainTargets.hdrColor", "m_mainTargets.hdrRTV", "m_mainTargets.hdrSRV", "m_mainTargets.hdrState", "m_mainTargets.gbufferNormalRoughness", "m_mainTargets.gbufferNormalRoughnessRTV", "m_mainTargets.gbufferNormalRoughnessSRV", "m_mainTargets.gbufferNormalRoughnessState")) {
+                    if ($targetSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "main_target_resources still uses flat main-target access in $($pathInfo.Label): $oldFlatAccess"
                     }
                 }
             }

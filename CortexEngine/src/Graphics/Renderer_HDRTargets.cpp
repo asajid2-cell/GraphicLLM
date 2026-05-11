@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/MeshBuffers.h"
 #include <spdlog/spdlog.h>
@@ -54,13 +54,13 @@ Result<void> Renderer::CreateHDRTarget() {
         &desc,
         D3D12_RESOURCE_STATE_RENDER_TARGET,
         &clearValue,
-        IID_PPV_ARGS(&m_mainTargets.hdrColor)
+        IID_PPV_ARGS(&m_mainTargets.hdr.resources.color)
     );
 
     if (FAILED(hr)) {
-        m_mainTargets.hdrColor.Reset();
-        m_mainTargets.hdrRTV = {};
-        m_mainTargets.hdrSRV = {};
+        m_mainTargets.hdr.resources.color.Reset();
+        m_mainTargets.hdr.descriptors.rtv = {};
+        m_mainTargets.hdr.descriptors.srv = {};
 
         CORTEX_REPORT_DEVICE_REMOVED("CreateHDRTarget", hr);
 
@@ -73,15 +73,15 @@ Result<void> Renderer::CreateHDRTarget() {
                                  + ", hr=" + buf + ")");
     }
 
-    m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     // RTV. Reuse the descriptor slot across render-scale resizes.
-    if (!m_mainTargets.hdrRTV.IsValid()) {
+    if (!m_mainTargets.hdr.descriptors.rtv.IsValid()) {
         auto rtvResult = m_services.descriptorManager->AllocateRTV();
         if (rtvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate RTV for HDR target: " + rtvResult.Error());
         }
-        m_mainTargets.hdrRTV = rtvResult.Value();
+        m_mainTargets.hdr.descriptors.rtv = rtvResult.Value();
     }
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -89,18 +89,18 @@ Result<void> Renderer::CreateHDRTarget() {
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
     m_services.device->GetDevice()->CreateRenderTargetView(
-        m_mainTargets.hdrColor.Get(),
+        m_mainTargets.hdr.resources.color.Get(),
         &rtvDesc,
-        m_mainTargets.hdrRTV.cpu
+        m_mainTargets.hdr.descriptors.rtv.cpu
     );
 
     // SRV - use staging heap for persistent descriptors
-    if (!m_mainTargets.hdrSRV.IsValid()) {
+    if (!m_mainTargets.hdr.descriptors.srv.IsValid()) {
         auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate staging SRV for HDR target: " + srvResult.Error());
         }
-        m_mainTargets.hdrSRV = srvResult.Value();
+        m_mainTargets.hdr.descriptors.srv = srvResult.Value();
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -110,16 +110,16 @@ Result<void> Renderer::CreateHDRTarget() {
     srvDesc.Texture2D.MipLevels = 1;
 
     m_services.device->GetDevice()->CreateShaderResourceView(
-        m_mainTargets.hdrColor.Get(),
+        m_mainTargets.hdr.resources.color.Get(),
         &srvDesc,
-        m_mainTargets.hdrSRV.cpu
+        m_mainTargets.hdr.descriptors.srv.cpu
     );
 
     spdlog::info("HDR target created: {}x{} (scale {:.2f})", width, height, scale);
 
     // Normal/roughness G-buffer target (full resolution, matched to HDR)
-    m_mainTargets.gbufferNormalRoughness.Reset();
-    m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_COMMON;
+    m_mainTargets.normalRoughness.resources.texture.Reset();
+    m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_COMMON;
 
     D3D12_RESOURCE_DESC gbufDesc = desc;
     gbufDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -137,29 +137,29 @@ Result<void> Renderer::CreateHDRTarget() {
         &gbufDesc,
         D3D12_RESOURCE_STATE_RENDER_TARGET,
         &gbufClear,
-        IID_PPV_ARGS(&m_mainTargets.gbufferNormalRoughness)
+        IID_PPV_ARGS(&m_mainTargets.normalRoughness.resources.texture)
     );
 
     if (FAILED(hr)) {
         spdlog::warn("Failed to create normal/roughness G-buffer target");
     } else {
-        m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
         // RTV for G-buffer
         auto gbufRtvResult = m_services.descriptorManager->AllocateRTV();
         if (gbufRtvResult.IsErr()) {
             spdlog::warn("Failed to allocate RTV for normal/roughness G-buffer: {}", gbufRtvResult.Error());
         } else {
-            m_mainTargets.gbufferNormalRoughnessRTV = gbufRtvResult.Value();
+            m_mainTargets.normalRoughness.descriptors.rtv = gbufRtvResult.Value();
 
             D3D12_RENDER_TARGET_VIEW_DESC gbufRtvDesc = {};
             gbufRtvDesc.Format = gbufDesc.Format;
             gbufRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
             m_services.device->GetDevice()->CreateRenderTargetView(
-                m_mainTargets.gbufferNormalRoughness.Get(),
+                m_mainTargets.normalRoughness.resources.texture.Get(),
                 &gbufRtvDesc,
-                m_mainTargets.gbufferNormalRoughnessRTV.cpu
+                m_mainTargets.normalRoughness.descriptors.rtv.cpu
             );
         }
 
@@ -168,7 +168,7 @@ Result<void> Renderer::CreateHDRTarget() {
         if (gbufSrvResult.IsErr()) {
             spdlog::warn("Failed to allocate staging SRV for normal/roughness G-buffer: {}", gbufSrvResult.Error());
         } else {
-            m_mainTargets.gbufferNormalRoughnessSRV = gbufSrvResult.Value();
+            m_mainTargets.normalRoughness.descriptors.srv = gbufSrvResult.Value();
 
             D3D12_SHADER_RESOURCE_VIEW_DESC gbufSrvDesc = {};
             gbufSrvDesc.Format = gbufDesc.Format;
@@ -177,9 +177,9 @@ Result<void> Renderer::CreateHDRTarget() {
             gbufSrvDesc.Texture2D.MipLevels = 1;
 
             m_services.device->GetDevice()->CreateShaderResourceView(
-                m_mainTargets.gbufferNormalRoughness.Get(),
+                m_mainTargets.normalRoughness.resources.texture.Get(),
                 &gbufSrvDesc,
-                m_mainTargets.gbufferNormalRoughnessSRV.cpu
+                m_mainTargets.normalRoughness.descriptors.srv.cpu
             );
         }
     }

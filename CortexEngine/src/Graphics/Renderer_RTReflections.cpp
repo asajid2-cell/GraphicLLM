@@ -76,9 +76,9 @@ void Renderer::RenderRayTracedReflections() {
     constexpr D3D12_RESOURCE_STATES kSrvNonPixel =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-    DescriptorHandle normalSrv = m_mainTargets.gbufferNormalRoughnessSRV;
+    DescriptorHandle normalSrv = m_mainTargets.normalRoughness.descriptors.srv;
     DescriptorHandle materialExt2Srv{};
-    ID3D12Resource* normalResource = m_mainTargets.gbufferNormalRoughness.Get();
+    ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     ID3D12Resource* materialExt2Resource = nullptr;
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer) {
         const DescriptorHandle& vbNormal = m_services.visibilityBuffer->GetNormalRoughnessSRVHandle();
@@ -100,15 +100,15 @@ void Renderer::RenderRayTracedReflections() {
     // Ensure the current frame's normal/roughness target is readable. The VB
     // path leaves its G-buffer in a combined SRV state after deferred lighting.
     if (!m_visibilityBufferState.renderedThisFrame) {
-        if (m_mainTargets.gbufferNormalRoughness && m_mainTargets.gbufferNormalRoughnessState != kSrvNonPixel) {
+        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != kSrvNonPixel) {
             D3D12_RESOURCE_BARRIER gbufBarrier{};
             gbufBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            gbufBarrier.Transition.pResource = m_mainTargets.gbufferNormalRoughness.Get();
-            gbufBarrier.Transition.StateBefore = m_mainTargets.gbufferNormalRoughnessState;
+            gbufBarrier.Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
+            gbufBarrier.Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
             gbufBarrier.Transition.StateAfter = kSrvNonPixel;
             gbufBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             rtCmdList->ResourceBarrier(1, &gbufBarrier);
-            m_mainTargets.gbufferNormalRoughnessState = kSrvNonPixel;
+            m_mainTargets.normalRoughness.resources.state = kSrvNonPixel;
         }
     }
 

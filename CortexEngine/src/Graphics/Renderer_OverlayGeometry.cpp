@@ -12,7 +12,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
-    if (!m_pipelineState.overlay || !m_mainTargets.hdrColor || !m_depthResources.resources.buffer) {
+    if (!m_pipelineState.overlay || !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
         return;
     }
 
@@ -29,15 +29,15 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
     const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_constantBuffers.frameCPU.viewProjectionNoJitter);
 
     // Ensure HDR is writable.
-    if (m_mainTargets.hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+    if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_mainTargets.hdrColor.Get();
-        barrier.Transition.StateBefore = m_mainTargets.hdrState;
+        barrier.Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+        barrier.Transition.StateBefore = m_mainTargets.hdr.resources.state;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
     // Depth-test overlays without writing depth. If we have a read-only DSV,
@@ -55,11 +55,11 @@ void Renderer::RenderOverlays(Scene::ECS_Registry* registry) {
         m_depthResources.resources.resourceState = desiredDepthState;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdrRTV.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdr.descriptors.rtv.cpu;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthResources.descriptors.readOnlyDsv.cpu : m_depthResources.descriptors.dsv.cpu;
     m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
-    const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();
+    const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
     D3D12_VIEWPORT viewport{};
     viewport.Width = static_cast<float>(hdrDesc.Width);
     viewport.Height = static_cast<float>(hdrDesc.Height);

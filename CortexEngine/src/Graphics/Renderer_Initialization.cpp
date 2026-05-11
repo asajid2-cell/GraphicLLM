@@ -365,7 +365,7 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     auto hdrResult = CreateHDRTarget();
     if (hdrResult.IsErr()) {
         spdlog::warn("Failed to create HDR target: {}", hdrResult.Error());
-        m_mainTargets.hdrColor.Reset();
+        m_mainTargets.hdr.resources.color.Reset();
     }
 
     // RT sun shadow mask is optional; if creation fails we simply keep using
@@ -447,9 +447,9 @@ Result<void> Renderer::Initialize(DX12Device* device, Window* window) {
     // stability when diagnosing device-removed issues.
     if (std::getenv("CORTEX_DISABLE_HDR")) {
         spdlog::warn("Renderer: CORTEX_DISABLE_HDR set; main pass will render directly to back buffer (HDR/TAA/SSR/SSAO/Bloom disabled)");
-        m_mainTargets.hdrColor.Reset();
-        m_mainTargets.hdrRTV = {};
-        m_mainTargets.hdrSRV = {};
+        m_mainTargets.hdr.resources.color.Reset();
+        m_mainTargets.hdr.descriptors.rtv = {};
+        m_mainTargets.hdr.descriptors.srv = {};
         SetTAAEnabled(false);
         SetSSREnabled(false);
         SetSSAOEnabled(false);

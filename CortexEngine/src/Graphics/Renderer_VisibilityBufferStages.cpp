@@ -83,7 +83,7 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
     m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches = vbDrawBatches;
 
     if (debugView == kVBDebugVisibility) {
-        auto dbg = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu);
+        auto dbg = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu);
         if (dbg.IsErr()) {
             spdlog::warn("VB debug blit (visibility) failed: {}", dbg.Error());
         }
@@ -101,7 +101,7 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
             m_depthResources.resources.resourceState = kDepthSampleState;
         }
         auto dbg = m_services.visibilityBuffer->DebugBlitDepthToHDR(
-            m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, m_depthResources.resources.buffer.Get());
+            m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu, m_depthResources.resources.buffer.Get());
         if (dbg.IsErr()) {
             spdlog::warn("VB debug blit (depth) failed: {}", dbg.Error());
         }
@@ -158,7 +158,7 @@ bool Renderer::RenderVisibilityBufferMaterialResolveStage(uint32_t debugView, bo
             which = VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt2;
         }
 
-        auto dbg = m_services.visibilityBuffer->DebugBlitGBufferToHDR(m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, which);
+        auto dbg = m_services.visibilityBuffer->DebugBlitGBufferToHDR(m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu, which);
         if (dbg.IsErr()) {
             spdlog::warn("VB debug blit (gbuffer) failed: {}", dbg.Error());
         }

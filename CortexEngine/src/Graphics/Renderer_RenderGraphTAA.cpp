@@ -20,7 +20,7 @@ constexpr D3D12_RESOURCE_STATES kScreenSpaceShaderResourceState =
 Renderer::RenderGraphPassResult
 Renderer::ExecuteTAAInRenderGraph() {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_mainTargets.hdrColor) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_mainTargets.hdr.resources.color) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_taa_prerequisites_missing";
         RenderTAA();
@@ -55,7 +55,7 @@ Renderer::ExecuteTAAInRenderGraph() {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle hdrHandle =
-        m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR_TAA");
+        m_services.renderGraph->ImportResource(m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.resources.state, "HDR_TAA");
     const RGResourceHandle historyHandle =
         m_services.renderGraph->ImportResource(m_temporalScreenState.historyColor.Get(), m_temporalScreenState.historyState, "TAA_History");
     const RGResourceHandle taaIntermediateHandle =
@@ -81,10 +81,10 @@ Renderer::ExecuteTAAInRenderGraph() {
             m_services.visibilityBuffer->GetNormalRoughnessBuffer(),
             vbStates.normalRoughness,
             "VB_NormalRoughness_TAA");
-    } else if (m_mainTargets.gbufferNormalRoughness) {
+    } else if (m_mainTargets.normalRoughness.resources.texture) {
         normalHandle = m_services.renderGraph->ImportResource(
-            m_mainTargets.gbufferNormalRoughness.Get(),
-            m_mainTargets.gbufferNormalRoughnessState,
+            m_mainTargets.normalRoughness.resources.texture.Get(),
+            m_mainTargets.normalRoughness.resources.state,
             "NormalRoughness_TAA");
     }
 
@@ -99,13 +99,13 @@ Renderer::ExecuteTAAInRenderGraph() {
     taaContext.seedOnly = seedOnly;
     taaContext.failStage = failStage;
     taaContext.seedHistory = [&]() {
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_COPY_SOURCE;
         m_temporalScreenState.historyState = D3D12_RESOURCE_STATE_COPY_DEST;
         return SeedTAAHistory(true);
     };
     taaContext.resolve = [&]() {
         m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        m_mainTargets.hdrState = kScreenSpaceShaderResourceState;
+        m_mainTargets.hdr.resources.state = kScreenSpaceShaderResourceState;
         m_temporalScreenState.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         if (velocityHandle.IsValid()) {
             m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -119,19 +119,19 @@ Renderer::ExecuteTAAInRenderGraph() {
                 states.normalRoughness = kScreenSpaceShaderResourceState;
                 m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
             } else {
-                m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             }
         }
         return ResolveTAAIntermediate(true);
     };
     taaContext.copyToHDR = [&]() {
         m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_COPY_DEST;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_COPY_DEST;
         return CopyTAAIntermediateToHDR(true);
     };
     taaContext.copyToHistory = [&]() {
         m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_COPY_SOURCE;
         m_temporalScreenState.historyState = D3D12_RESOURCE_STATE_COPY_DEST;
         return CopyHDRToTAAHistory(true);
     };
@@ -147,7 +147,7 @@ Renderer::ExecuteTAAInRenderGraph() {
         result.fallbackUsed = true;
         result.fallbackReason = "taa_graph_stage_failed: " + stageError;
     } else {
-        m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
+        m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
         m_temporalScreenState.taaIntermediateState = m_services.renderGraph->GetResourceState(taaIntermediateHandle);
         if (velocityHandle.IsValid()) {
@@ -162,7 +162,7 @@ Renderer::ExecuteTAAInRenderGraph() {
                 finalStates.normalRoughness = m_services.renderGraph->GetResourceState(normalHandle);
                 m_services.visibilityBuffer->ApplyResourceStateSnapshot(finalStates);
             } else {
-                m_mainTargets.gbufferNormalRoughnessState = m_services.renderGraph->GetResourceState(normalHandle);
+                m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
             }
         }
         result.executed = true;

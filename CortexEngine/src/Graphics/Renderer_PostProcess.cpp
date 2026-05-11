@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/PostProcessPass.h"
 
@@ -7,7 +7,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderPostProcess() {
-    if (!m_pipelineState.postProcess || !m_mainTargets.hdrColor) {
+    if (!m_pipelineState.postProcess || !m_mainTargets.hdr.resources.color) {
         // No HDR/post-process configured; main pass may have rendered directly to back buffer
         return;
     }
@@ -22,14 +22,14 @@ void Renderer::RenderPostProcess() {
     D3D12_RESOURCE_BARRIER barriers[11] = {};
     UINT barrierCount = 0;
 
-    if (m_mainTargets.hdrState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdrColor.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdrState;
+        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
+        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
     if (m_ssaoResources.resources.texture && m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -214,7 +214,7 @@ void Renderer::RenderPostProcess() {
     // Bind a stable SRV table for the post-process shader (t0..t12). The shader
     // samples many slots unconditionally (e.g., RT reflections), so the table
     // must keep fixed slot indices even when certain features are disabled.
-    if (!m_mainTargets.hdrSRV.IsValid()) {
+    if (!m_mainTargets.hdr.descriptors.srv.IsValid()) {
         spdlog::error("RenderPostProcess: HDR SRV is invalid");
         return;
     }

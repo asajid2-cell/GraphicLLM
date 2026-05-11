@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
@@ -369,14 +369,14 @@ void Renderer::EndFrame() {
             m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
 
-        if (m_mainTargets.gbufferNormalRoughness && m_mainTargets.gbufferNormalRoughnessState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        if (m_mainTargets.normalRoughness.resources.texture && m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
             ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_mainTargets.gbufferNormalRoughness.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_mainTargets.gbufferNormalRoughnessState;
+            ppBarriers[ppCount].Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
             ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++ppCount;
-            m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
 
         if (ppCount > 0) {

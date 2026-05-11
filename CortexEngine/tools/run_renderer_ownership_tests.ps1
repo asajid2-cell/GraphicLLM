@@ -93,6 +93,8 @@ $transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeo
 $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
 $voxelPassPath = Join-Path $root "src/Graphics/Passes/VoxelPass.cpp"
 $voxelRendererPath = Join-Path $root "src/Graphics/Renderer_Voxel.cpp"
+$minimalFramePassPath = Join-Path $root "src/Graphics/Passes/MinimalFramePass.cpp"
+$framePlanningPath = Join-Path $root "src/Graphics/Renderer_FramePlanning.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -602,6 +604,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "voxel_pass_submission missing Renderer_Voxel.cpp"
+        }
+    }
+
+    if ($id -eq "minimal_frame_submission") {
+        if (Test-Path $minimalFramePassPath) {
+            $minimalFramePass = Get-Content $minimalFramePassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::MinimalFramePass", "ClearContext", "ClearBackBuffer", "ResourceBarrier", "OMSetRenderTargets", "ClearRenderTargetView")) {
+                if ($minimalFramePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "minimal_frame_submission missing MinimalFramePass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "minimal_frame_submission missing MinimalFramePass.cpp"
+        }
+        if (Test-Path $framePlanningPath) {
+            $framePlanning = Get-Content $framePlanningPath -Raw
+            foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearRenderTargetView")) {
+                if ($framePlanning.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "minimal_frame_submission still performs minimal-frame target setup directly in Renderer_FramePlanning.cpp: $directCall"
+                }
+            }
+            if ($framePlanning.IndexOf("MinimalFramePass::ClearBackBuffer", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "minimal_frame_submission missing MinimalFramePass::ClearBackBuffer in Renderer_FramePlanning.cpp"
+            }
+        } else {
+            Add-Failure "minimal_frame_submission missing Renderer_FramePlanning.cpp"
         }
     }
 }

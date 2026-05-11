@@ -81,7 +81,7 @@ struct EngineConfig {
     std::string initialEnvironmentPreset;
     std::string initialGraphicsPreset;
     std::string initialCameraBookmark;
-    EngineHudMode initialHudMode = EngineHudMode::RendererHealth;
+    EngineHudMode initialHudMode = EngineHudMode::Off;
     std::string startupArchitectCommandJson;
 
     // Automation hooks for renderer smoke tests. maxFrames == 0 keeps normal
@@ -264,7 +264,7 @@ private:
 
     // HUD / debug overlay
     void RenderHUD();
-    EngineHudMode m_hudMode = EngineHudMode::RendererHealth;
+    EngineHudMode m_hudMode = EngineHudMode::Off;
     std::deque<std::string> m_recentCommandMessages;
     bool m_qualityAutoReduced = false;
     bool m_perfScaleReduced = false;

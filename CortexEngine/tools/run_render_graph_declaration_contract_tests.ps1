@@ -99,8 +99,14 @@ Assert-NotContains "Renderer_RenderGraphBloom.cpp" $rendererBloom "CopyBloomComp
 Assert-NotContains "Renderer_RenderGraphBloom.cpp" $rendererBloom "PrepareBloomPassState"
 
 $depth = Read-Text "src/Graphics/Passes/DepthPrepass.cpp"
+$depthHeader = Read-Text "src/Graphics/Passes/DepthPrepass.h"
+$rendererDepthShadow = Read-Text "src/Graphics/Renderer_RenderGraphDepthShadow.cpp"
 Assert-Contains "DepthPrepass.cpp" $depth "graph.AddPass("
 Assert-Contains "DepthPrepass.cpp" $depth "builder.Write(context.depth, RGResourceUsage::DepthStencilWrite)"
+Assert-Contains "DepthPrepass.cpp" $depth "Draw(context.draw)"
+Assert-Contains "DepthPrepass.cpp" $depth "DepthPrepassTargetPass::BindAndClear(context.target)"
+Assert-NotContains "DepthPrepass.h" $depthHeader "std::function<bool()> execute"
+Assert-NotContains "Renderer_RenderGraphDepthShadow.cpp" $rendererDepthShadow "RenderDepthPrepass(registry)"
 
 $hzb = Read-Text "src/Graphics/Passes/HZBPass.cpp"
 Assert-Contains "HZBPass.cpp" $hzb "builder.Read(depthHandle, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead)"

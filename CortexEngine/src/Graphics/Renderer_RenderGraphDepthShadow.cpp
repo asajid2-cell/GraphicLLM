@@ -27,10 +27,43 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
     std::string stageError;
     DepthPrepass::GraphContext graphContext{};
     graphContext.depth = depthHandle;
-    graphContext.execute = [&]() {
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.depthPrepassSkipTransitions, true);
-        RenderDepthPrepass(registry);
-        return true;
+    RendererSceneSnapshot localSnapshot{};
+    const RendererSceneSnapshot* snapshot = &m_framePlanning.sceneSnapshot;
+    if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
+        localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
+        snapshot = &localSnapshot;
+    }
+    graphContext.draw.target.commandList = m_commandResources.graphicsList.Get();
+    graphContext.draw.target.depthBuffer = m_depthResources.resources.buffer.Get();
+    graphContext.draw.target.depthState = &m_depthResources.resources.resourceState;
+    graphContext.draw.target.depthDsv = m_depthResources.descriptors.dsv;
+    graphContext.draw.target.skipTransitions = true;
+    graphContext.draw.pipeline.commandList = m_commandResources.graphicsList.Get();
+    graphContext.draw.pipeline.rootSignature = m_pipelineState.rootSignature->GetRootSignature();
+    graphContext.draw.pipeline.cbvSrvUavHeap = m_services.descriptorManager
+        ? m_services.descriptorManager->GetCBV_SRV_UAV_Heap()
+        : nullptr;
+    graphContext.draw.pipeline.frameConstants = m_constantBuffers.currentFrameGPU;
+    graphContext.draw.depthOnly = m_pipelineState.depthOnly.get();
+    graphContext.draw.depthOnlyDoubleSided = m_pipelineState.depthOnlyDoubleSided.get();
+    graphContext.draw.depthOnlyAlpha = m_pipelineState.depthOnlyAlpha.get();
+    graphContext.draw.depthOnlyAlphaDoubleSided = m_pipelineState.depthOnlyAlphaDoubleSided.get();
+    graphContext.draw.snapshot = snapshot;
+    graphContext.draw.objectConstants = &m_constantBuffers.object;
+    graphContext.draw.materialConstants = &m_constantBuffers.material;
+    graphContext.draw.materialFallbacks = {
+        m_materialFallbacks.albedo.get(),
+        m_materialFallbacks.normal.get(),
+        m_materialFallbacks.metallic.get(),
+        m_materialFallbacks.roughness.get()
+    };
+    graphContext.draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.depthPrepassDraws;
+    graphContext.draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
+        EnsureMaterialTextures(renderable);
+    };
+    graphContext.draw.fillMaterialTextureIndices =
+        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
+            FillMaterialTextureIndices(renderable, materialData);
     };
     graphContext.failStage = [&](const char* stage) {
         stageFailed = true;

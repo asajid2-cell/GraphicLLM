@@ -80,6 +80,8 @@ $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $depthPrepassTargetPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepassTargetPass.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
+$mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
+$mainPassTargetPassPath = Join-Path $root "src/Graphics/Passes/MainPassTargetPass.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
@@ -488,6 +490,29 @@ foreach ($target in $doc.targets) {
                     }
                 }
             }
+        }
+        if (Test-Path $mainPassTargetPassPath) {
+            $mainPassTargetPass = Get-Content $mainPassTargetPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::MainPassTargetPass", "PrepareContext", "Prepare", "ResourceBarrier", "OMSetRenderTargets", "ClearRenderTargetView", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects", "SetGraphicsRootSignature", "SetPipelineState", "SetDescriptorHeaps", "IASetPrimitiveTopology")) {
+                if ($mainPassTargetPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing MainPassTargetPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "main_target_resources missing MainPassTargetPass.cpp"
+        }
+        if (Test-Path $mainPassSetupPath) {
+            $mainPassSetup = Get-Content $mainPassSetupPath -Raw
+            foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearRenderTargetView", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects", "SetPipelineState", "SetDescriptorHeaps", "IASetPrimitiveTopology")) {
+                if ($mainPassSetup.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "main_target_resources still performs main-pass target setup directly in Renderer_MainPassSetup.cpp: $directCall"
+                }
+            }
+            if ($mainPassSetup.IndexOf("MainPassTargetPass::Prepare", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "main_target_resources missing MainPassTargetPass::Prepare in Renderer_MainPassSetup.cpp"
+            }
+        } else {
+            Add-Failure "main_target_resources missing Renderer_MainPassSetup.cpp"
         }
         if (Test-Path $forwardTargetBindingPath) {
             $forwardTargetBinding = Get-Content $forwardTargetBindingPath -Raw

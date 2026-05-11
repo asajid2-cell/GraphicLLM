@@ -798,6 +798,22 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       rebuild, renderer ownership/full audit, effects showcase
       `effects_showcase_20260511_104514_137_94928_2107eb99`, and effects
       gallery `effects_gallery_20260511_104514_121_94896_44e8ce89` passed.
+    - `d7367b1` moved shadow-map transitions and per-slice DSV/clear/viewport
+      setup into `ShadowTargetPass`; Release rebuild, renderer ownership/full
+      audit, temporal validation
+      `temporal_validation_20260511_110527_548_91500_70e8da42`, and RT
+      showcase `rt_showcase_20260511_110527_595_89780_88bf0e55` passed.
+    - The current main-pass target checkpoint moves main-pass depth, RT shadow
+      mask, RT GI, HDR, G-buffer, and fallback backbuffer transitions plus
+      render-target binding, clears, viewport/scissor setup, root/pipeline
+      binding, descriptor heap binding, and primitive topology setup into
+      `MainPassTargetPass`; Release rebuild, renderer ownership tests,
+      renderer full ownership audit, temporal validation
+      `temporal_validation_20260511_111256_152_93716_0b35bdd0`, RT showcase
+      `rt_showcase_20260511_111256_169_54352_a9157778`, and Material Lab
+      `material_lab_20260511_111256_152_92932_4da158d9` passed. The parent
+      ownership rows remain `PARTIAL` because other renderer passes still reach
+      through renderer aggregates directly.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

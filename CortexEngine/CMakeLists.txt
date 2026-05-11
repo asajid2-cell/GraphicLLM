@@ -140,6 +140,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/BloomPass.cpp
     src/Graphics/Passes/BloomGraphPass.cpp
     src/Graphics/Passes/DepthPrepass.cpp
+    src/Graphics/Passes/DepthPrepassTargetPass.cpp
     src/Graphics/Passes/DescriptorTable.cpp
     src/Graphics/Passes/DebugLinePass.cpp
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
@@ -382,6 +383,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/BloomPass.h
     src/Graphics/Passes/BloomGraphPass.h
     src/Graphics/Passes/DepthPrepass.h
+    src/Graphics/Passes/DepthPrepassTargetPass.h
     src/Graphics/Passes/DescriptorTable.h
     src/Graphics/Passes/FullscreenPass.h
     src/Graphics/Passes/HZBPass.h

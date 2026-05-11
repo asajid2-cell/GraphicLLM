@@ -83,6 +83,16 @@
       "future_extension": "Keep future depth pyramid, read-only DSV, and depth sampling expansion inside resources/descriptors or an explicitly named depth pass state before adding renderer orchestration"
     },
     {
+      "id": "depth_prepass_target_submission",
+      "owner": "Depth prepass target setup",
+      "status": "release_boundary_validated",
+      "release_boundary": "Depth prepass scene/material/depth-class iteration remains in Renderer_DepthPasses.cpp, but depth resource transition, DSV binding, depth clear, viewport, and scissor setup are owned by DepthPrepassTargetPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/DepthPrepassTargetPass.h", "Passes/DepthPrepassTargetPass.cpp", "Renderer_DepthPasses.cpp"],
+      "renderer_state_members": ["m_depthResources", "m_commandResources"],
+      "future_extension": "Move future depth-prepass target setup or depth-only render-target binding into DepthPrepassTargetPass before expanding depth-prepass variants"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

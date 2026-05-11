@@ -76,6 +76,7 @@ $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
+$depthPrepassTargetPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepassTargetPass.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
@@ -406,6 +407,32 @@ foreach ($target in $doc.targets) {
                     }
                 }
             }
+        }
+    }
+
+    if ($id -eq "depth_prepass_target_submission") {
+        if (Test-Path $depthPrepassTargetPassPath) {
+            $depthPrepassTargetPass = Get-Content $depthPrepassTargetPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::DepthPrepassTargetPass", "BindAndClear", "ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
+                if ($depthPrepassTargetPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass.cpp"
+        }
+        if (Test-Path $depthPassesPath) {
+            $depthPassSource = Get-Content $depthPassesPath -Raw
+            foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
+                if ($depthPassSource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "depth_prepass_target_submission still performs target setup directly in Renderer_DepthPasses.cpp: $directCall"
+                }
+            }
+            if ($depthPassSource.IndexOf("DepthPrepassTargetPass::BindAndClear", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass::BindAndClear in Renderer_DepthPasses.cpp"
+            }
+        } else {
+            Add-Failure "depth_prepass_target_submission missing Renderer_DepthPasses.cpp"
         }
     }
 

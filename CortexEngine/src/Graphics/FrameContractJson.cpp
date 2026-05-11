@@ -582,6 +582,7 @@ json FrameContractToJson(const FrameContract& contract) {
         {"culled_passes", contract.renderGraph.culledPasses},
         {"barriers", contract.renderGraph.barriers},
         {"fallback_executions", contract.renderGraph.fallbackExecutions},
+        {"transient_validation_ran", contract.renderGraph.transientValidationRan},
         {"transient_resources", contract.renderGraph.transientResources},
         {"placed_resources", contract.renderGraph.placedResources},
         {"aliased_resources", contract.renderGraph.aliasedResources},

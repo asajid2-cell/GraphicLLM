@@ -130,6 +130,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "render_graph_transient_matrix" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_render_graph_transient_matrix.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "graphics_settings_persistence" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

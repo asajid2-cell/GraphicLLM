@@ -81,6 +81,7 @@ $IDC_GFX_DOF_FOCUS_DISTANCE = 9074
 $IDC_GFX_DOF_APERTURE = 9075
 $IDC_GFX_SUN_AZIMUTH = 9217
 $IDC_GFX_SUN_ELEVATION = 9218
+$IDC_GFX_FOG_START = 9222
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -224,6 +225,7 @@ try {
         Set-Trackbar $window $IDC_GFX_SHADOW_PCF 36
         Set-Trackbar $window $IDC_GFX_CASCADE_LAMBDA 67
         Set-Trackbar $window $IDC_GFX_FOG_DENSITY 26
+        Set-Trackbar $window $IDC_GFX_FOG_START 31
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
         Set-Trackbar $window $IDC_GFX_FOG_FALLOFF 34
         Set-Trackbar $window $IDC_GFX_WATER_WAVE 37
@@ -316,6 +318,7 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "shadow_pcf_radius" ([double]$fc.lighting.shadow_pcf_radius) 2.88 0.15
     Assert-Near "cascade_split_lambda" ([double]$fc.lighting.cascade_split_lambda) 0.67 0.04
     Assert-Near "fog_density" ([double]$fc.lighting.fog_density) 0.026 0.01
+    Assert-Near "fog_start_distance" ([double]$fc.lighting.fog_start_distance) 31.0 1.0
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 3.41 0.20
     Assert-Near "water_wave_amplitude" ([double]$fc.water.wave_amplitude) 0.74 0.06

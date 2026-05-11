@@ -91,6 +91,7 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   "atmosphere": {
     "fog": false,
     "fog_density": 0.0,
+    "fog_start_distance": 8.5,
     "fog_height": 4.25,
     "fog_falloff": 0.72
   },
@@ -285,6 +286,7 @@ if ($validRun.exit_code -ne 0) {
     }
     $fogHeight = [double]$report.frame_contract.lighting.fog_height
     $fogFalloff = [double]$report.frame_contract.lighting.fog_falloff
+    Assert-Near "fog_start_distance" ([double]$report.frame_contract.lighting.fog_start_distance) 8.5 0.2
     if ([Math]::Abs($fogHeight - 4.25) -gt 0.08) {
         Add-Failure "valid settings fog height was $fogHeight, expected 4.25"
     }

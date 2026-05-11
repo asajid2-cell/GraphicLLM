@@ -18,6 +18,7 @@ cbuffer FrameConstants : register(b1) {
 
     float4 g_AmbientColor;
     float4 g_FogParams;         // x = start, y = end, z = density, w = enabled
+    float4   g_FogExtraParams;
     float4 g_FogColor;
 
     float4 g_ScreenParams;      // x = width, y = height, z = 1/width, w = 1/height

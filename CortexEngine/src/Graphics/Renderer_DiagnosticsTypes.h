@@ -191,6 +191,7 @@ struct RendererFeatureState {
     std::string particleEffectPreset = "gallery_mix";
     bool vegetationEnabled = false;
     float fogDensity = 0.0f;
+    float fogStartDistance = 0.0f;
     float fogHeight = 0.0f;
     float fogFalloff = 0.0f;
     float iblDiffuseIntensity = 0.0f;
@@ -250,6 +251,7 @@ struct RendererFractalSurfaceState {
 struct RendererFogState {
     bool enabled = false; // Disabled by default for clearer terrain
     float density = 0.02f;
+    float startDistance = 0.0f;
     float height = 0.0f;
     float falloff = 0.5f;
 };

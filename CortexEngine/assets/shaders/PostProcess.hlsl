@@ -45,6 +45,8 @@ cbuffer FrameConstants : register(b1)
     float4   g_ColorGrade;
     // x = fog density, y = base height, z = height falloff, w = fog enabled (>0.5)
     float4   g_FogParams;
+    // x = fog start distance, y/z/w reserved
+    float4   g_FogExtraParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
@@ -1367,9 +1369,11 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
             float distance = length(worldPos - camPos);
             float density = max(g_FogParams.x, 0.0f);
+            float fogStart = max(g_FogExtraParams.x, 0.0f);
+            float fogDistance = max(distance - fogStart, 0.0f);
 
             // Base exponential distance fog
-            float fog = 1.0f - exp(-density * distance);
+            float fog = 1.0f - exp(-density * fogDistance);
 
             // Optional height falloff so fog thickens near a reference plane.
             float baseHeight = g_FogParams.y;

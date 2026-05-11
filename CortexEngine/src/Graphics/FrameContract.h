@@ -250,6 +250,7 @@ struct FrameContract {
         float ssaoBias = 0.0f;
         float ssaoIntensity = 0.0f;
         float fogDensity = 0.0f;
+        float fogStartDistance = 0.0f;
         float fogHeight = 0.0f;
         float fogFalloff = 0.0f;
         float godRayIntensity = 0.0f;

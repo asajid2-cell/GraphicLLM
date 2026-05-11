@@ -81,6 +81,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.particleEffectPreset = m_particleState.effectPreset;
     state.vegetationEnabled = m_vegetationState.enabled;
     state.fogDensity = m_fogState.density;
+    state.fogStartDistance = m_fogState.startDistance;
     state.fogHeight = m_fogState.height;
     state.fogFalloff = m_fogState.falloff;
     state.iblDiffuseIntensity = m_environmentState.diffuseIntensity;

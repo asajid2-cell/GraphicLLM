@@ -120,6 +120,8 @@ struct FrameConstants {
     // Exponential height fog parameters:
     // x = density, y = base height, z = height falloff, w = enabled (>0.5)
     glm::vec4 fogParams;
+    // x = fog start distance, y/z/w reserved
+    glm::vec4 fogExtraParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,

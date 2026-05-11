@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_230440_532_7652_2bb99479
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_230853_222_32360_4f4a512b
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.332`, `disocclusion=0.006621`,
-  `high_motion=0.005163`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.319`, `disocclusion=0.006642`,
+  `high_motion=0.005172`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=3.072`,
+  `camera=reflection_closeup`, `gpu_ms=2.949`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.429/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.653/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -179,6 +179,7 @@ long file/function lists in every row.
 | Script | Runtime or static | Current role |
 |---|---|---|
 | `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release, runs all listed checks below, and treats top-level `failed:` sentinel output as a failed step. |
+| `tools/run_phase2_validation.ps1` | orchestration | Named `phase2.md` validation entrypoint. Delegates to the current release gate so Phase 2 callers get the broader Phase 3-era validation suite instead of a stale partial suite. |
 | `tools/run_build_entrypoint_contract_tests.ps1` | static/contract | Checks that rebuild/release validation use `rebuild.ps1` and `cmake --build`, with VS environment import guards, instead of raw Ninja invocation. |
 | `tools/run_repo_hygiene_tests.ps1` | static/contract | Runs `git diff --check`, verifies generated build/cache artifacts are not tracked, and checks required `.gitignore` guards. |
 | `tools/run_source_list_contract_tests.ps1` | static/contract | Checks explicit CMake source entries for existence, duplicates, renderer split coverage, and temporary/backup source names. |
@@ -292,7 +293,7 @@ of `phase2.md`.
 | P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. | Energy budgeting is still not a distinct runtime gate. |
 | P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1`; `tools/run_reflection_probe_contract_tests.ps1 -NoBuild` | RT showcase, material lab, glass/water courtyard, effects showcase, and local reflection-probe validation pass. | Outdoor/sunset beach remains deferred by user direction. |
 | P2-SYS-14 | Visual validation captures compare luma, saturation, edge stability, temporal stability. | PARTIAL | smoke scripts, `FrameContractJson.cpp`, visual baseline scripts | `tools/run_release_validation.ps1`; `tools/run_visual_probe_validation.ps1 -NoBuild` | Luma/saturation/nonblack/temporal diff checks pass in current smokes. Visual probe passed all four public baseline cases with edge/dominant-color BMP checks. | No full image-diff golden comparison; temporal stability remains metric-smoke based. |
-| P2-SYS-15 | Single script runs the Phase 2 validation suite. | PARTIAL | `tools/run_release_validation.ps1` | `tools/run_release_validation.ps1` | Current one-command release gate passed. | `tools/run_phase2_validation.ps1` named in `phase2.md` does not exist; current script is broader and Phase 3-influenced. |
+| P2-SYS-15 | Single script runs the Phase 2 validation suite. | DONE_VERIFIED | `tools/run_phase2_validation.ps1`, `tools/run_release_validation.ps1` | `tools/run_phase2_validation.ps1` | Named Phase 2 entrypoint exists and delegates to the current release validation gate so Phase 2 coverage cannot drift behind the broader suite. Latest wrapper run passed with logs under `phase2_validation_20260510_230853_029_26268_faa40115`. | None for the named entrypoint; keep the wrapper thin as release validation evolves. |
 | P2-SYS-16 | `rt_showcase` final renderer scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase runtime passed with visual validation and RT signal. | Subjective polish can continue. |
 | P2-SYS-17 | `material_gallery` / material lab scene. | PARTIAL | SRC-SCENES | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material Lab passed. | Name differs from plan; current scene is `material_lab`, not a fully exhaustive gallery. |
 | P2-SYS-18 | `temporal_validation` scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation passed. | Add camera-cut and more motion edge cases. |

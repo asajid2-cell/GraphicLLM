@@ -69,12 +69,12 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.332`, `warnings=0`,
+- temporal validation: `gpu_ms=1.319`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=3.072`;
-- RT showcase: `gpu_ms=2.429/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=2.949`;
+- RT showcase: `gpu_ms=1.653/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -109,12 +109,12 @@ Result:
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=16.939`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=16.517`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_230440_532_7652_2bb99479
+CortexEngine/build/bin/logs/runs/release_validation_20260510_230853_222_32360_4f4a512b
 ```
 
 ## Renderer Scope

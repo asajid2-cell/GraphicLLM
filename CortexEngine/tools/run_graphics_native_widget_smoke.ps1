@@ -67,6 +67,7 @@ $IDC_GFX_HEALTH = 9001
 $IDC_GFX_MEMORY = 9002
 $IDC_GFX_WARNING = 9003
 $IDC_GFX_RT_SCHEDULER = 9004
+$IDC_GFX_RASTER_TEMPORAL = 9005
 $IDC_GFX_RENDER_SCALE = 9010
 $IDC_GFX_SAFE_LIGHTING = 9115
 $IDC_GFX_ENV_SELECT = 9211
@@ -294,6 +295,7 @@ try {
         $budgetText = Get-ControlText $window $IDC_GFX_MEMORY
         $warningText = Get-ControlText $window $IDC_GFX_WARNING
         $schedulerText = Get-ControlText $window $IDC_GFX_RT_SCHEDULER
+        $rasterTemporalText = Get-ControlText $window $IDC_GFX_RASTER_TEMPORAL
         Assert-TextContains "Health label" $healthText "FPS"
         Assert-TextContains "Health label" $healthText "preset="
         Assert-TextContains "Health label" $healthText "env="
@@ -304,6 +306,11 @@ try {
         Assert-TextContains "RT scheduler label" $schedulerText "RT Scheduler:"
         Assert-TextContains "RT scheduler label" $schedulerText "TLAS"
         Assert-TextContains "RT scheduler label" $schedulerText "reason="
+        Assert-TextContains "Raster/Temporal label" $rasterTemporalText "Raster/Temporal:"
+        Assert-TextContains "Raster/Temporal label" $rasterTemporalText "VB="
+        Assert-TextContains "Raster/Temporal label" $rasterTemporalText "HZB="
+        Assert-TextContains "Raster/Temporal label" $rasterTemporalText "TMask="
+        Assert-TextContains "Raster/Temporal label" $rasterTemporalText "histories="
     }
 
     Start-Sleep -Milliseconds 2500

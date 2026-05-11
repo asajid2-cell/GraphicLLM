@@ -1062,8 +1062,71 @@ void Engine::Update(float deltaTime) {
         if (commands.empty()) {
             spdlog::warn("[Architect] Startup command JSON parsed 0 commands");
         } else {
-            m_commandQueue->PushBatch(commands);
-            spdlog::info("[Architect] Queued {} startup Architect command(s)", commands.size());
+            std::vector<std::shared_ptr<LLM::SceneCommand>> queueCommands;
+            for (const auto& command : commands) {
+                if (!command) {
+                    continue;
+                }
+
+                if (m_dreamerService && m_dreamerEnabled &&
+                    command->type == LLM::CommandType::GenerateTexture) {
+                    auto* gen = static_cast<LLM::GenerateTextureCommand*>(command.get());
+                    AI::Vision::TextureRequest req;
+                    req.targetName = !gen->targetName.empty() ? gen->targetName : GetFocusTarget();
+                    req.prompt = gen->prompt;
+                    req.materialPreset = gen->materialPreset;
+                    req.seed = gen->seed;
+                    req.width = gen->width;
+                    req.height = gen->height;
+
+                    std::string usageLower = gen->usage;
+                    std::transform(usageLower.begin(), usageLower.end(), usageLower.begin(),
+                                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                    if (usageLower == "normal") {
+                        req.usage = AI::Vision::TextureUsage::Normal;
+                    } else if (usageLower == "roughness") {
+                        req.usage = AI::Vision::TextureUsage::Roughness;
+                    } else if (usageLower == "metalness" || usageLower == "metallic") {
+                        req.usage = AI::Vision::TextureUsage::Metalness;
+                    } else {
+                        req.usage = AI::Vision::TextureUsage::Albedo;
+                    }
+
+                    m_dreamerService->SubmitRequest(req);
+                    if (req.usage == AI::Vision::TextureUsage::Albedo) {
+                        AI::Vision::TextureRequest normalReq = req;
+                        normalReq.usage = AI::Vision::TextureUsage::Normal;
+                        m_dreamerService->SubmitRequest(normalReq);
+
+                        AI::Vision::TextureRequest roughReq = req;
+                        roughReq.usage = AI::Vision::TextureUsage::Roughness;
+                        m_dreamerService->SubmitRequest(roughReq);
+                    }
+                    spdlog::info("[Dreamer] Queued startup texture job for '{}' (usage={}, preset='{}')",
+                                 req.targetName, gen->usage, req.materialPreset);
+                } else if (m_dreamerService && m_dreamerEnabled &&
+                           command->type == LLM::CommandType::GenerateEnvmap) {
+                    auto* gen = static_cast<LLM::GenerateEnvmapCommand*>(command.get());
+                    AI::Vision::TextureRequest req;
+                    req.targetName = !gen->name.empty() ? gen->name : std::string("Envmap");
+                    req.prompt = gen->prompt;
+                    req.seed = gen->seed;
+                    req.width = gen->width ? gen->width : 1024;
+                    req.height = gen->height ? gen->height : 512;
+                    req.usage = AI::Vision::TextureUsage::Environment;
+                    m_dreamerService->SubmitRequest(req);
+                    spdlog::info("[Dreamer] Queued startup environment job '{}'", req.targetName);
+                } else {
+                    queueCommands.push_back(command);
+                }
+            }
+
+            if (!queueCommands.empty()) {
+                m_commandQueue->PushBatch(queueCommands);
+            }
+            spdlog::info("[Architect] Queued {} startup Architect command(s) ({} direct Dreamer)",
+                         queueCommands.size(),
+                         commands.size() - queueCommands.size());
         }
     }
 

@@ -79,6 +79,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_conductor_energy_contract_tests.ps1 -NoBuild
@@ -114,6 +115,10 @@ after their camera, lighting, and IBL choices are stable enough to avoid churn.
 The LLM renderer-command smoke runs Architect in deterministic mock mode, queues
 a startup `modify_renderer` command, and verifies the renderer applier updates
 exposure, shadows, fog, water, and lighting-rig state in the frame contract.
+The Dreamer positive runtime test runs Architect mock mode with Dreamer enabled,
+queues a startup `generate_texture` command, and verifies Dreamer startup,
+CPU/GPU-backend fallback reporting, generated pixels, GPU texture creation, and
+application to the target scene entity.
 The HUD mode contract verifies the Phase 3 clean-HUD modes, F7 cycling, and
 `--hud` / `CORTEX_HUD_MODE` automation path; it runs short off/full-debug cases
 and checks the generated frame report.

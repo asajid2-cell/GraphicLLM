@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_225538_029_30096_0680d674
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_230440_532_7652_2bb99479
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.339`, `disocclusion=0.006647`,
-  `high_motion=0.005173`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.332`, `disocclusion=0.006621`,
+  `high_motion=0.005163`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=3.075`,
+  `camera=reflection_closeup`, `gpu_ms=3.072`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.576/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.429/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -100,12 +100,17 @@ Key evidence from that run:
   render-graph transient matrix, full renderer ownership audit,
   descriptor/memory stress, VB debug views, visual probe, graphics UI interaction, screenshot
   negative gates, particle-disabled zero-cost, Phase 3 fallback matrix, RT
-  firefly/outlier, LLM renderer command routing, conductor energy, vegetation
-  state, and local reflection probes.
+  firefly/outlier, LLM renderer command routing, positive Dreamer runtime,
+  conductor energy, vegetation state, and local reflection probes.
 - LLM renderer command smoke: deterministic mock Architect startup command
   applied exposure `1.35`, disabled shadows, enabled fog with density `0.031`,
   set water amplitude `0.07`, and selected `studio_three_point` lighting rig
   with frame-contract source `renderer_rig`.
+- Dreamer positive runtime smoke: deterministic mock Architect startup
+  `generate_texture` command ran with Dreamer enabled; Dreamer initialized,
+  DiffusionEngine reported its backend/fallback, generated a texture for
+  `TemporalLab_RotatingRedSphere`, the renderer created a `Dreamer_*` GPU
+  texture, and the result was applied to the target entity.
 - Conductor energy contract: shader invariants passed for forward/deferred
   conductor energy split; Material Lab passed with `resolved_conductor=4`,
   `reflection_conductor=4`, `max_metallic=1.0`, `very_bright_albedo=0`, and
@@ -211,6 +216,7 @@ long file/function lists in every row.
 | `tools/run_fatal_error_contract_tests.ps1` | runtime/static | Fatal summary contract. |
 | `tools/run_phase3_fallback_matrix.ps1` | runtime | Safe startup, explicit no-RT profile, and missing selected environment fallback reporting. |
 | `tools/run_graphics_ui_interaction_smoke.ps1` | runtime | Applies `RendererTuningState` through the startup settings path and asserts frame-contract control values. Not native mouse/keyboard automation. |
+| `tools/run_dreamer_positive_runtime_tests.ps1` | runtime/static | Runs Architect mock mode with Dreamer enabled, queues a startup `generate_texture`, and verifies Dreamer startup, backend/fallback reporting, generated pixels, GPU texture creation, and material application. |
 | `tools/run_screenshot_negative_gates.ps1` | static/generated images | Synthetic black, white, saturated, and edge-heavy BMP negative gates for screenshot metric logic. |
 | `tools/run_particle_disabled_zero_cost.ps1` | runtime | Effects Showcase under `safe_startup`; asserts zero particle planning/execution/submission/allocation. |
 | `tools/run_rt_firefly_outlier_scene.ps1` | runtime wrapper | RT Showcase with stricter raw/history reflection outlier thresholds. |
@@ -416,7 +422,7 @@ foundation or contract rather than the full broad feature.
 | P2-11BG through P2-11CU | Renderer runtime/state boundaries: frame runtime/timing, pipeline, pipeline readiness, render graph transition/runtime, debug overlay, water, fractal surface, post grade, SSAO, bloom, fog, lighting, shadow, SSR, PCSS, post feature, debug view, RT runtime, TAA, GPU culling, camera frame, local shadow, VB frame, quality, shadow cascades, frame lifecycle, GPU culling entity history, frame runtime submission, VB enable, frame contract, constant buffer, breadcrumb, command resources, asset runtime, frame constants CPU, diagnostics, planning, temporal history, services, host services. | DONE_VERIFIED | SRC-STATE plus relevant files named by state headers and SRC-RENDER-ORCH/SRC-CONTRACT | `tools/run_release_validation.ps1`; `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Latest release gate passed; `Renderer.h` has state/service aggregates, renderer ownership test passed, and full ownership audit covered all 48 renderer members. | The broad state-boundary family is validated by build/runtime smoke plus static member audit, not by one focused runtime test per state. |
 | P2-11CV | Pass 11CV - Release Validation Gate | DONE_VERIFIED | `tools/run_release_validation.ps1`, `tools/README.md` | `tools/run_release_validation.ps1` | Latest full release validation passed. |
 | P2-11CW | Pass 11CW - Public Renderer README Refresh | DONE_VERIFIED | SRC-DOCS | documentation inspection plus latest commit `5e7b69f` | README now names Phase 3 gate and current renderer capabilities. | None for docs currentness; keep updated as scope changes. |
-| P2-11CX | Pass 11CX - Dreamer Startup Release Polish | DONE_VERIFIED | `src/Core/Engine.cpp`, Dreamer startup path | `tools/run_release_validation.ps1` | Latest runtime logs include `Dreamer disabled by configuration`; no stale skipped message seen in inspected logs. | No positive Dreamer startup test with TensorRT engines. |
+| P2-11CX | Pass 11CX - Dreamer Startup Release Polish | DONE_VERIFIED | `src/Core/Engine.cpp`, `DreamerService.cpp`, `DiffusionEngine.cpp`, startup Architect command path | `tools/run_dreamer_positive_runtime_tests.ps1`; `tools/run_release_validation.ps1` | Positive runtime gate passed: Dreamer enabled, service initialized, backend/fallback reported, startup `generate_texture` routed directly to Dreamer, generated texture uploaded as `Dreamer_TemporalLab_RotatingRedSphere`, and applied to the target entity. | TensorRT engine execution is hardware/build dependent; current positive gate covers the supported CPU procedural fallback path. |
 | P2-11CY | Pass 11CY - Public Repository Hygiene | DONE_VERIFIED | `.gitignore`, `tools/run_repo_hygiene_tests.ps1` | `tools/run_repo_hygiene_tests.ps1`; release gate | Targeted hygiene gate passed: `git diff --check` passed, generated build/cache artifacts tracked count is 0, and `.gitignore` contains build/log/model guards. | None for current whitespace/generated-artifact hygiene contract; packaging review remains tracked separately. |
 | P2-11CZ | Pass 11CZ - Release Readiness Note | DONE_VERIFIED | `CortexEngine/RELEASE_READINESS.md`, README link | documentation inspection plus latest commit `5e7b69f` | Release readiness note points at latest run and lists current gate. | It now includes Phase 3 claims; keep this ledger separate from completion claims. |
 | P2-11DA | Pass 11DA - RT Showcase Lighting Polish | DONE_VERIFIED | `src/Core/Engine_Scenes.cpp`, `RendererControlApplier_ScenePresets.cpp`, `RELEASE_READINESS.md` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` via release gate | Latest RT showcase passes visual stats: `luma=68.99 center_luma=70.19 dark=0.677/0.68 sat=0.004/0.12`. | Subjective presentation polish can continue; no objective blocker. |
@@ -433,7 +439,7 @@ foundation or contract rather than the full broad feature.
 | REL-06 | Phase 3 public showcase scenes, graphics presets, HUD modes, and renderer UI controls. | PARTIAL | SRC-UI-P3, SRC-SCENES | `tools/run_release_validation.ps1` | Contracts/smokes pass. | UI tests are mostly static/contract, not interactive end-to-end. |
 | REL-07 | Environment/IBL manifests with procedural fallback behavior. | PARTIAL | SRC-ENV-P3 | `tools/run_environment_manifest_tests.ps1`; `tools/run_ibl_gallery_tests.ps1 -NoBuild` | Manifest and IBL gallery passed. | Missing-selected/missing-required runtime fallback is not fully matrixed in latest gate. |
 | REL-08 | Advanced material, particle, lighting-rig, and cinematic-post release foundations. | PARTIAL | SRC-SCENES, SRC-UI-P3, SRC-MATERIAL | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_advanced_graphics_catalog_tests.ps1` | Effects gallery passed with particles and cinematic post active. | These are foundations, not full advanced feature completion. |
-| REL-09 | Optional Dreamer service is honest in startup and smoke tests run with `--no-dreamer`. | DONE_VERIFIED | `src/Core/Engine.cpp` | `tools/run_release_validation.ps1` | Logs show `Dreamer disabled by configuration`. | Positive Dreamer path not covered. |
+| REL-09 | Optional Dreamer service is honest in startup and has both disabled and positive runtime coverage. | DONE_VERIFIED | `src/Core/Engine.cpp`, `DreamerService.cpp`, `DiffusionEngine.cpp`, `tools/run_dreamer_positive_runtime_tests.ps1` | `tools/run_release_validation.ps1`; `tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild` | Standard smokes still show `Dreamer disabled by configuration` when requested; positive gate shows Dreamer enabled, generated pixels, GPU texture creation, and application to a scene entity. | TensorRT-specific execution remains hardware/build dependent. |
 | REL-10 | Voxel backend is smoke-tested but experimental. | DONE_VERIFIED | `Renderer_Voxel.cpp`, `RendererVoxelState.h` | `tools/run_voxel_backend_smoke.ps1 -NoBuild -IsolatedLogs` | Voxel smoke passed in release gate. | Not primary renderer path. |
 
 ## Known Remaining Items
@@ -453,7 +459,7 @@ These items remain after the audit and should not be collapsed into
 | REM-08 | Full GPU particle system as public path. | PARTIAL | Effects showcase validates ECS billboard particles; GPU particle path remains future/experimental. |
 | REM-09 | Full cinematic post stack including DOF, motion blur, and color-grade presets. | PARTIAL | Current release validates bloom threshold/soft knee/vignette/lens dirt foundations. |
 | REM-10 | LLM renderer command routing runtime test. | DONE_VERIFIED | `tools/run_llm_renderer_command_smoke.ps1` runs Architect in deterministic mock mode and verifies `modify_renderer` side effects in runtime logs and the frame contract. |
-| REM-11 | Positive Dreamer startup/runtime test. | DONE_UNVERIFIED | Release smokes run with `--no-dreamer`; optional path is not exercised. |
+| REM-11 | Positive Dreamer startup/runtime test. | DONE_VERIFIED | `tools/run_dreamer_positive_runtime_tests.ps1` runs Architect mock mode with Dreamer enabled, queues `generate_texture`, verifies Dreamer online, DiffusionEngine backend/fallback reporting, generated texture logs, GPU texture creation, and application to `TemporalLab_RotatingRedSphere`. |
 | REM-12 | Full golden-image visual baseline comparisons. | PARTIAL | Visual probe validation now runs all public baseline cases and checks captured BMP structure, but committed golden-image diff comparisons remain intentionally absent. |
 
 ## Phase 3 Top-Level Requirements
@@ -660,7 +666,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, conductor energy, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, conductor energy, positive Dreamer runtime, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -706,6 +712,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_debug_primitive_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_editor_frame_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_dreamer_positive_runtime_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_conductor_energy_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_vegetation_state_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_reflection_probe_contract_tests.ps1
@@ -743,7 +750,6 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    - full Phase 3 graphics slider inventory;
    - full cinematic post stack;
    - particle effect library beyond fire/smoke;
-   - positive Dreamer startup/runtime validation.
 
 5. Only after the missing gates exist and pass should the status move from
    "release-gated foundation" to "`phase2.md` and `phase3.md` complete."

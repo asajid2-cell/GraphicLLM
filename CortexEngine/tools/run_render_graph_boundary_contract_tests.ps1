@@ -34,6 +34,7 @@ $matrix = Read-Text "tools/run_render_graph_transient_matrix.ps1"
 $diagnostics = Read-Text "src/Graphics/Renderer_RenderGraphDiagnostics.cpp"
 $vbGraph = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
 $vbBoundary = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
+$bloomBoundary = Read-Text "src/Graphics/Renderer_RenderGraphBloom.cpp"
 
 foreach ($envName in @(
     "CORTEX_RG_TRANSIENT_VALIDATE",
@@ -71,6 +72,9 @@ foreach ($passName in @(
 Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraph "AddStagedPath"
 Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "AccumulateRenderGraphExecutionStats"
 Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "visibility_buffer_graph_resources_missing"
+Assert-Matches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "graph path did not execute"
+Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "RenderBloom\("
+Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "falling back to legacy path"
 
 foreach ($removedPattern in @(
     "AddLegacyPath",

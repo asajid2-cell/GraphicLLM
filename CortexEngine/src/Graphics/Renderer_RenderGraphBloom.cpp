@@ -30,8 +30,6 @@ Renderer::ExecuteBloomInRenderGraph() {
         !m_bloomResources.resources.texA[0] || !m_bloomResources.resources.texB[0]) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_bloom_prerequisites_missing";
-        RenderBloom();
-        result.executed = true;
         return result;
     }
 
@@ -93,8 +91,6 @@ Renderer::ExecuteBloomInRenderGraph() {
                     if (rtvResult.IsErr()) {
                         result.fallbackUsed = true;
                         result.fallbackReason = "bloom_graph_rtv_allocation_failed: " + rtvResult.Error();
-                        RenderBloom();
-                        result.executed = true;
                         return result;
                     }
                     m_bloomResources.resources.graphRtv[level][ping] = rtvResult.Value();
@@ -104,8 +100,6 @@ Renderer::ExecuteBloomInRenderGraph() {
                     if (srvResult.IsErr()) {
                         result.fallbackUsed = true;
                         result.fallbackReason = "bloom_graph_srv_allocation_failed: " + srvResult.Error();
-                        RenderBloom();
-                        result.executed = true;
                         return result;
                     }
                     m_bloomResources.resources.graphSrv[level][ping] = srvResult.Value();
@@ -307,11 +301,7 @@ Renderer::ExecuteBloomInRenderGraph() {
     m_services.renderGraph->EndFrame();
 
     if (result.fallbackUsed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
-        spdlog::warn("Bloom RG: {} (falling back to legacy path)", result.fallbackReason);
-        ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.bloomSkipTransitions, false);
-        RenderBloom();
-        result.executed = true;
+        spdlog::warn("Bloom RG: {} (graph path did not execute)", result.fallbackReason);
     }
 
     return result;

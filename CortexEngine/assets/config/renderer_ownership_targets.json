@@ -163,6 +163,16 @@
       "future_extension": "Move future depth-prepass target setup or depth-only render-target binding into DepthPrepassTargetPass before expanding depth-prepass variants"
     },
     {
+      "id": "depth_write_transition",
+      "owner": "Depth write state transitions",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_FramePhases_Main.cpp still decides whether visibility-buffer fallback is needed, but the fallback depth-buffer transition back to depth-write state is owned by DepthWriteTransitionPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/DepthWriteTransitionPass.h", "Passes/DepthWriteTransitionPass.cpp", "Renderer_FramePhases_Main.cpp"],
+      "renderer_state_members": ["m_depthResources", "m_commandResources", "m_visibilityBufferState"],
+      "future_extension": "Keep future depth write/read state repair mechanics in DepthWriteTransitionPass or adjacent depth pass helpers instead of hand-building barriers in frame orchestration"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

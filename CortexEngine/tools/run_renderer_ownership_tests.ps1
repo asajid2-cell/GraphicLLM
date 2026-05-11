@@ -46,6 +46,7 @@ $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
 $backBufferPresentPassPath = Join-Path $root "src/Graphics/Passes/BackBufferPresentPass.cpp"
 $descriptorTablePassPath = Join-Path $root "src/Graphics/Passes/DescriptorTable.cpp"
+$rendererDescriptorsPath = Join-Path $root "src/Graphics/Renderer_Descriptors.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -1482,6 +1483,34 @@ foreach ($target in $doc.targets) {
             } else {
                 Add-Failure "frame_descriptor_heap_binding missing $($pathInfo.Label)"
             }
+        }
+    }
+
+    if ($id -eq "postprocess_descriptor_tables") {
+        if (Test-Path $descriptorTablePassPath) {
+            $descriptorTablePass = Get-Content $descriptorTablePassPath -Raw
+            foreach ($required in @("AllocateAndWriteNullSRVTable", "AllocateHandleSet", "AllocateCBV_SRV_UAV", "WriteTexture2DSRV")) {
+                if ($descriptorTablePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_descriptor_tables missing DescriptorTable allocation marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "postprocess_descriptor_tables missing DescriptorTable.cpp"
+        }
+        if (Test-Path $rendererDescriptorsPath) {
+            $rendererDescriptors = Get-Content $rendererDescriptorsPath -Raw
+            foreach ($required in @("DescriptorTable::AllocateAndWriteNullSRVTable", "DescriptorTable::AllocateHandleSet")) {
+                if ($rendererDescriptors.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_descriptor_tables missing DescriptorTable delegation in Renderer_Descriptors.cpp: $required"
+                }
+            }
+            foreach ($removedLocal in @("AllocateCBV_SRV_UAV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($rendererDescriptors.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "postprocess_descriptor_tables still allocates descriptor tables directly in Renderer_Descriptors.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "postprocess_descriptor_tables missing Renderer_Descriptors.cpp"
         }
     }
 

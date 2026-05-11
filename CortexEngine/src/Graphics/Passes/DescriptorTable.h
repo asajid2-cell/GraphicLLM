@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Graphics/RHI/DescriptorHeap.h"
+#include "Utils/Result.h"
 
 #include <cstdint>
 #include <span>
@@ -20,6 +21,17 @@ bool WriteTexture2DUAV(ID3D12Device* device,
                        DescriptorHandle handle,
                        ID3D12Resource* resource,
                        DXGI_FORMAT format);
+
+[[nodiscard]] Result<void> AllocateAndWriteNullSRVTable(ID3D12Device* device,
+                                                        DescriptorHeapManager* descriptorManager,
+                                                        std::span<DescriptorHandle> table,
+                                                        const char* label,
+                                                        DXGI_FORMAT format,
+                                                        uint32_t mipLevels = 1);
+
+[[nodiscard]] Result<void> AllocateHandleSet(DescriptorHeapManager* descriptorManager,
+                                             std::span<DescriptorHandle> handles,
+                                             const char* label);
 
 [[nodiscard]] DescriptorHandle Slot(std::span<DescriptorHandle> table,
                                     size_t slot);

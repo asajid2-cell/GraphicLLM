@@ -1,5 +1,7 @@
 #include "DescriptorTable.h"
 
+#include <string>
+
 namespace Cortex::Graphics::DescriptorTable {
 
 bool BindCBVSRVUAVHeap(ID3D12GraphicsCommandList* commandList,
@@ -44,6 +46,46 @@ bool WriteTexture2DUAV(ID3D12Device* device,
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     device->CreateUnorderedAccessView(resource, nullptr, &uavDesc, handle.cpu);
     return true;
+}
+
+Result<void> AllocateAndWriteNullSRVTable(ID3D12Device* device,
+                                          DescriptorHeapManager* descriptorManager,
+                                          std::span<DescriptorHandle> table,
+                                          const char* label,
+                                          DXGI_FORMAT format,
+                                          uint32_t mipLevels) {
+    if (!device || !descriptorManager) {
+        return Result<void>::Err(std::string("Renderer is not initialized for ") + label + " descriptors");
+    }
+
+    for (size_t i = 0; i < table.size(); ++i) {
+        auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
+        if (handleResult.IsErr()) {
+            return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                     " descriptor: " + handleResult.Error());
+        }
+        table[i] = handleResult.Value();
+        WriteTexture2DSRV(device, table[i], nullptr, format, mipLevels);
+    }
+    return Result<void>::Ok();
+}
+
+Result<void> AllocateHandleSet(DescriptorHeapManager* descriptorManager,
+                               std::span<DescriptorHandle> handles,
+                               const char* label) {
+    if (!descriptorManager) {
+        return Result<void>::Err(std::string("Renderer is not initialized for ") + label + " descriptors");
+    }
+
+    for (auto& handle : handles) {
+        auto handleResult = descriptorManager->AllocateCBV_SRV_UAV();
+        if (handleResult.IsErr()) {
+            return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                     " descriptor: " + handleResult.Error());
+        }
+        handle = handleResult.Value();
+    }
+    return Result<void>::Ok();
 }
 
 DescriptorHandle Slot(std::span<DescriptorHandle> table, size_t slot) {

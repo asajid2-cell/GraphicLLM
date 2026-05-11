@@ -61,23 +61,14 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     graphContext.depth = depthHandle;
     graphContext.visibility = visibilityHandle;
     graphContext.useVisibilityBufferMotion = useVisibilityBufferMotion;
-    graphContext.computeVisibilityBufferMotion = [&]() {
-        m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-        states.visibility = kScreenSpaceShaderResourceState;
-        m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-        auto mvResult = m_services.visibilityBuffer->ComputeMotionVectors(
-            m_commandResources.graphicsList.Get(),
-            m_temporalScreenState.velocityBuffer.Get(),
-            m_visibilityBufferState.meshDraws,
-            m_constantBuffers.currentFrameGPU);
-        if (mvResult.IsErr()) {
-            motionStageError = mvResult.Error();
-            return false;
-        }
-        return true;
-    };
+    graphContext.visibilityMotion.renderer = m_services.visibilityBuffer.get();
+    graphContext.visibilityMotion.commandList = m_commandResources.graphicsList.Get();
+    graphContext.visibilityMotion.velocityBuffer = m_temporalScreenState.velocityBuffer.Get();
+    graphContext.visibilityMotion.velocityState = &m_temporalScreenState.velocityState;
+    graphContext.visibilityMotion.meshDraws = &m_visibilityBufferState.meshDraws;
+    graphContext.visibilityMotion.frameConstants = m_constantBuffers.currentFrameGPU;
+    graphContext.visibilityMotion.visibilityShaderResourceState = kScreenSpaceShaderResourceState;
+    graphContext.visibilityMotion.error = &motionStageError;
     graphContext.cameraTarget.commandList = m_commandResources.graphicsList.Get();
     graphContext.cameraTarget.velocity = {
         m_temporalScreenState.velocityBuffer.Get(),

@@ -42,7 +42,7 @@ The current verified local gate covers:
 - advanced graphics catalog and effects gallery contracts,
 - environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
 - particle-disabled zero-cost and RT firefly/outlier gates,
-- release package contract validation for the public-review payload manifest,
+- release package contract validation and staged launch smoke for the public-review payload,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -169,4 +169,7 @@ infinite-world engine. The validated path emphasizes:
 - Public-review packaging is manifest-driven by
   `assets/config/release_package_manifest.json`; the contract validates the
   planned payload and excludes local models, logs, generated build artifacts,
-  and source HDR/EXR environment files.
+  and source HDR/EXR environment files. The staged launch smoke copies the
+  manifest-selected runtime payload to an isolated directory and launches a
+  short `safe_startup` run from that directory, requiring a clean exit and a
+  valid frame report from the staged working directory.

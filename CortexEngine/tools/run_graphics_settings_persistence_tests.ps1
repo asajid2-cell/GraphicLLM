@@ -95,6 +95,8 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "enabled": true,
     "bloom_threshold": 1.2,
     "bloom_soft_knee": 0.4,
+    "contrast": 1.18,
+    "saturation": 1.34,
     "vignette": 0.31,
     "lens_dirt": 0.22
   }
@@ -248,6 +250,8 @@ if ($validRun.exit_code -ne 0) {
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
+    $contrast = [double]$report.frame_contract.cinematic_post.contrast
+    $saturation = [double]$report.frame_contract.cinematic_post.saturation
     $warm = [double]$report.frame_contract.cinematic_post.warm
     $cool = [double]$report.frame_contract.cinematic_post.cool
     if (-not [bool]$report.frame_contract.cinematic_post.enabled) {
@@ -258,6 +262,12 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($cool + 0.18) -gt 0.03) {
         Add-Failure "valid settings cool color grade was $cool, expected -0.18"
+    }
+    if ([Math]::Abs($contrast - 1.18) -gt 0.03) {
+        Add-Failure "valid settings contrast was $contrast, expected 1.18"
+    }
+    if ([Math]::Abs($saturation - 1.34) -gt 0.03) {
+        Add-Failure "valid settings saturation was $saturation, expected 1.34"
     }
     if ([Math]::Abs($vignette - 0.31) -gt 0.02) {
         Add-Failure "valid settings vignette was $vignette, expected 0.31"

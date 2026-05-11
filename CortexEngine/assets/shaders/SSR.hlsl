@@ -42,6 +42,8 @@ cbuffer FrameConstants : register(b1)
     // x = SSR max ray distance, y = SSR view-space thickness,
     // z = SSR composition strength, w = reserved
     float4   g_SSRParams;
+    // x = contrast, y = saturation, z/w reserved
+    float4   g_PostGradeParams;
 };
 
 Texture2D g_SceneColor        : register(t0);

@@ -201,6 +201,11 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_ssrResources.thickness,
         m_ssrResources.strength,
         0.0f);
+    frameData.postGradeParams = glm::vec4(
+        m_postProcessState.contrast,
+        m_postProcessState.saturation,
+        0.0f,
+        0.0f);
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

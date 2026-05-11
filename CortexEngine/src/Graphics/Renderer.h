@@ -207,6 +207,7 @@ public:
     void SetBackgroundPresentation(bool visible, float exposure, float blur);
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
+    void SetToneGrade(float contrast, float saturation);
     void SetCinematicPostEnabled(bool enabled);
     void SetCinematicPost(float vignette, float lensDirt);
     void SetSSAOEnabled(bool enabled);

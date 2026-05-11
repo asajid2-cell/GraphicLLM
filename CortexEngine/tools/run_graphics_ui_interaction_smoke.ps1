@@ -94,6 +94,8 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "enabled": true,
     "bloom_threshold": 1.4,
     "bloom_soft_knee": 0.33,
+    "contrast": 1.22,
+    "saturation": 1.28,
     "vignette": 0.27,
     "lens_dirt": 0.21
   }
@@ -178,6 +180,8 @@ if ($exitCode -ne 0) {
     }
     Assert-Near "warm_color_grade" ([double]$fc.cinematic_post.warm) 0.36 0.03
     Assert-Near "cool_color_grade" ([double]$fc.cinematic_post.cool) -0.14 0.03
+    Assert-Near "contrast" ([double]$fc.cinematic_post.contrast) 1.22 0.03
+    Assert-Near "saturation" ([double]$fc.cinematic_post.saturation) 1.28 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
     if ($null -eq $fc.ray_tracing.rt_reflection_tuning) {

@@ -298,6 +298,8 @@ json FrameContractToJson(const FrameContract& contract) {
             {"bloom_threshold", contract.cinematicPost.bloomThreshold},
             {"bloom_soft_knee", contract.cinematicPost.bloomSoftKnee},
             {"bloom_max_contribution", contract.cinematicPost.bloomMaxContribution},
+            {"contrast", contract.cinematicPost.contrast},
+            {"saturation", contract.cinematicPost.saturation},
             {"vignette", contract.cinematicPost.vignette},
             {"lens_dirt", contract.cinematicPost.lensDirt},
             {"warm", contract.cinematicPost.warm},

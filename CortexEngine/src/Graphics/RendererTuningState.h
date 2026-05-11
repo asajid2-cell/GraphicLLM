@@ -88,6 +88,8 @@ struct RendererCinematicPostTuning {
     bool enabled = false;
     float bloomThreshold = 1.0f;
     float bloomSoftKnee = 0.5f;
+    float contrast = 1.0f;
+    float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
 };

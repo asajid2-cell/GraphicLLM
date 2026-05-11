@@ -83,6 +83,8 @@ cbuffer FrameConstants : register(b1)
     // x = SSR max ray distance, y = SSR view-space thickness,
     // z = SSR composition strength, w = reserved
     float4 g_SSRParams;
+    // x = contrast, y = saturation, z/w reserved
+    float4 g_PostGradeParams;
 
     // Clustered lighting parameters for forward+ transparency (populated by the VB path).
     // SRV indices refer to the global shader-visible CBV/SRV/UAV heap.

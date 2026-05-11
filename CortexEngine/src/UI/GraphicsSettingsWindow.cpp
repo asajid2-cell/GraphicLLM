@@ -60,6 +60,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_SSR_STRENGTH = 9045,
     IDC_GFX_WATER_ROUGHNESS = 9046,
     IDC_GFX_WATER_FRESNEL = 9047,
+    IDC_GFX_CONTRAST = 9048,
+    IDC_GFX_SATURATION = 9049,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -141,6 +143,8 @@ struct GraphicsSettingsState {
     SliderBinding waterFresnel;
     SliderBinding bloomThreshold;
     SliderBinding bloomKnee;
+    SliderBinding contrast;
+    SliderBinding saturation;
     SliderBinding vignette;
     SliderBinding lensDirt;
     SliderBinding particleDensity;
@@ -266,6 +270,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.water.fresnelStrength = SliderToFloat(g_gfx.waterFresnel);
     g_gfx.tuning.cinematicPost.bloomThreshold = SliderToFloat(g_gfx.bloomThreshold);
     g_gfx.tuning.cinematicPost.bloomSoftKnee = SliderToFloat(g_gfx.bloomKnee);
+    g_gfx.tuning.cinematicPost.contrast = SliderToFloat(g_gfx.contrast);
+    g_gfx.tuning.cinematicPost.saturation = SliderToFloat(g_gfx.saturation);
     g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
     g_gfx.tuning.cinematicPost.lensDirt = SliderToFloat(g_gfx.lensDirt);
     g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
@@ -332,6 +338,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.waterFresnel, g_gfx.tuning.water.fresnelStrength);
     SetSliderFromFloat(g_gfx.bloomThreshold, g_gfx.tuning.cinematicPost.bloomThreshold);
     SetSliderFromFloat(g_gfx.bloomKnee, g_gfx.tuning.cinematicPost.bloomSoftKnee);
+    SetSliderFromFloat(g_gfx.contrast, g_gfx.tuning.cinematicPost.contrast);
+    SetSliderFromFloat(g_gfx.saturation, g_gfx.tuning.cinematicPost.saturation);
     SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
     SetSliderFromFloat(g_gfx.lensDirt, g_gfx.tuning.cinematicPost.lensDirt);
     SetSliderFromFloat(g_gfx.particleDensity, g_gfx.tuning.particles.densityScale);
@@ -629,6 +637,8 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkCinematicPost = makeCheckbox(IDC_GFX_CINEMATIC_POST, L"Cinematic Post");
             makeSlider(IDC_GFX_BLOOM_THRESHOLD, L"Bloom Threshold", g_gfx.bloomThreshold, 0.1f, 5.0f);
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_CONTRAST, L"Contrast", g_gfx.contrast, 0.5f, 1.5f);
+            makeSlider(IDC_GFX_SATURATION, L"Saturation", g_gfx.saturation, 0.0f, 2.0f);
             makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
             {

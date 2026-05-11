@@ -89,6 +89,8 @@ json ToJson(const RendererTuningState& state) {
             {"enabled", state.cinematicPost.enabled},
             {"bloom_threshold", state.cinematicPost.bloomThreshold},
             {"bloom_soft_knee", state.cinematicPost.bloomSoftKnee},
+            {"contrast", state.cinematicPost.contrast},
+            {"saturation", state.cinematicPost.saturation},
             {"vignette", state.cinematicPost.vignette},
             {"lens_dirt", state.cinematicPost.lensDirt}
         }}
@@ -186,6 +188,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(c, "enabled", state.cinematicPost.enabled);
         ReadValue(c, "bloom_threshold", state.cinematicPost.bloomThreshold);
         ReadValue(c, "bloom_soft_knee", state.cinematicPost.bloomSoftKnee);
+        ReadValue(c, "contrast", state.cinematicPost.contrast);
+        ReadValue(c, "saturation", state.cinematicPost.saturation);
         ReadValue(c, "vignette", state.cinematicPost.vignette);
         ReadValue(c, "lens_dirt", state.cinematicPost.lensDirt);
     }
@@ -330,6 +334,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
+    state.cinematicPost.contrast = post.contrast;
+    state.cinematicPost.saturation = post.saturation;
     state.cinematicPost.enabled = post.cinematicEnabled;
     state.cinematicPost.vignette = post.vignette;
     state.cinematicPost.lensDirt = post.lensDirt;
@@ -382,6 +388,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
 
     state.cinematicPost.bloomThreshold = std::clamp(state.cinematicPost.bloomThreshold, 0.1f, 10.0f);
     state.cinematicPost.bloomSoftKnee = std::clamp(state.cinematicPost.bloomSoftKnee, 0.0f, 1.0f);
+    state.cinematicPost.contrast = std::clamp(state.cinematicPost.contrast, 0.5f, 1.5f);
+    state.cinematicPost.saturation = std::clamp(state.cinematicPost.saturation, 0.0f, 2.0f);
     state.cinematicPost.vignette = std::clamp(state.cinematicPost.vignette, 0.0f, 1.0f);
     state.cinematicPost.lensDirt = std::clamp(state.cinematicPost.lensDirt, 0.0f, 1.0f);
 
@@ -459,6 +467,9 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                            state.cinematicPost.bloomThreshold,
                            state.cinematicPost.bloomSoftKnee,
                            4.0f);
+    ApplyToneGradeControl(renderer,
+                          state.cinematicPost.contrast,
+                          state.cinematicPost.saturation);
     renderer.SetCinematicPostEnabled(state.cinematicPost.enabled);
     ApplyCinematicPostControl(renderer,
                               state.cinematicPost.vignette,

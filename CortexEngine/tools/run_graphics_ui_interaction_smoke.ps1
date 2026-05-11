@@ -69,7 +69,11 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
     "reflections": false,
     "gi": false,
     "reflection_denoise_alpha": 0.36,
-    "reflection_composition_strength": 0.58
+    "reflection_composition_strength": 0.58,
+    "reflection_roughness_threshold": 0.46,
+    "reflection_history_max_blend": 0.21,
+    "reflection_firefly_clamp_luma": 13.5,
+    "reflection_signal_scale": 1.18
   },
   "atmosphere": {
     "fog": true,
@@ -189,6 +193,10 @@ if ($exitCode -ne 0) {
     } else {
         Assert-Near "rt_reflection_denoise_alpha" ([double]$fc.ray_tracing.rt_reflection_tuning.denoise_alpha) 0.36 0.03
         Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.58 0.03
+        Assert-Near "rt_reflection_roughness_threshold" ([double]$fc.ray_tracing.rt_reflection_tuning.roughness_threshold) 0.46 0.03
+        Assert-Near "rt_reflection_history_max_blend" ([double]$fc.ray_tracing.rt_reflection_tuning.history_max_blend) 0.21 0.03
+        Assert-Near "rt_reflection_firefly_clamp_luma" ([double]$fc.ray_tracing.rt_reflection_tuning.firefly_clamp_luma) 13.5 0.3
+        Assert-Near "rt_reflection_signal_scale" ([double]$fc.ray_tracing.rt_reflection_tuning.signal_scale) 1.18 0.03
     }
     if ([bool]$fc.features.ray_tracing_enabled) { Add-Failure "ray tracing remained enabled despite settings" }
     if (-not [bool]$fc.features.ssr_enabled) { Add-Failure "SSR was not enabled despite settings" }

@@ -267,6 +267,10 @@ void Renderer::UpdateFrameContractHistories() {
     m_frameDiagnostics.contract.contract.rayTracing.giDenoiseAlpha = m_rtDenoiseState.giAlpha;
     m_frameDiagnostics.contract.contract.rayTracing.reflectionRequestedDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
     m_frameDiagnostics.contract.contract.rayTracing.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
+    m_frameDiagnostics.contract.contract.rayTracing.reflectionRoughnessThreshold = m_rtDenoiseState.reflectionRoughnessThreshold;
+    m_frameDiagnostics.contract.contract.rayTracing.reflectionHistoryMaxBlend = m_rtDenoiseState.reflectionHistoryMaxBlend;
+    m_frameDiagnostics.contract.contract.rayTracing.reflectionFireflyClampLuma = m_rtDenoiseState.reflectionFireflyClampLuma;
+    m_frameDiagnostics.contract.contract.rayTracing.reflectionSignalScale = m_rtDenoiseState.reflectionSignalScale;
     m_frameDiagnostics.contract.contract.rayTracing.reflectionDispatchReady = m_rtReflectionReadiness.ready;
     m_frameDiagnostics.contract.contract.rayTracing.reflectionHasPipeline = m_rtReflectionReadiness.hasPipeline;
     m_frameDiagnostics.contract.contract.rayTracing.reflectionHasTLAS = m_rtReflectionReadiness.hasTLAS;

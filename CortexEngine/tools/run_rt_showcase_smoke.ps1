@@ -696,11 +696,27 @@ if ([bool]$report.frame_contract.ray_tracing.enabled) {
     } else {
         $denoiseAlpha = [double]$rtTuning.denoise_alpha
         $compositionStrength = [double]$rtTuning.composition_strength
+        $roughnessThreshold = [double]$rtTuning.roughness_threshold
+        $historyMaxBlend = [double]$rtTuning.history_max_blend
+        $fireflyClampLuma = [double]$rtTuning.firefly_clamp_luma
+        $signalScale = [double]$rtTuning.signal_scale
         if ($denoiseAlpha -lt 0.02 -or $denoiseAlpha -gt 1.0) {
             Add-Failure "RT reflection denoise alpha is out of range: $denoiseAlpha"
         }
         if ($compositionStrength -lt 0.0 -or $compositionStrength -gt 1.0) {
             Add-Failure "RT reflection composition strength is out of range: $compositionStrength"
+        }
+        if ($roughnessThreshold -lt 0.05 -or $roughnessThreshold -gt 1.0) {
+            Add-Failure "RT reflection roughness threshold is out of range: $roughnessThreshold"
+        }
+        if ($historyMaxBlend -lt 0.0 -or $historyMaxBlend -gt 0.5) {
+            Add-Failure "RT reflection history max blend is out of range: $historyMaxBlend"
+        }
+        if ($fireflyClampLuma -lt 4.0 -or $fireflyClampLuma -gt 32.0) {
+            Add-Failure "RT reflection firefly clamp luma is out of range: $fireflyClampLuma"
+        }
+        if ($signalScale -lt 0.0 -or $signalScale -gt 2.0) {
+            Add-Failure "RT reflection signal scale is out of range: $signalScale"
         }
     }
     if (-not [bool]$report.frame_contract.ray_tracing.denoiser_executed) {

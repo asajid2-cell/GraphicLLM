@@ -55,6 +55,9 @@ cbuffer FrameConstants : register(b0, space0)
     float4x4 g_InvViewProjMatrix;
     float4   g_WaterParams0;
     float4   g_WaterParams1;
+    float4   g_SSRParams;
+    float4   g_PostGradeParams;
+    float4   g_RTReflectionParams;
 };
 
 struct ReflectionPayload
@@ -448,7 +451,8 @@ void RayGen_Reflection()
         SurfaceIsMirrorClass(surfaceClass) ||
         SurfaceIsWater(surfaceClass) ||
         SurfaceIsPolishedConductor(surfaceClass, 0.0f, roughness);
-    if (debugView != 24u && roughness >= 0.50f && !reflectiveClass)
+    float rtRoughnessThreshold = clamp(g_RTReflectionParams.x, 0.05f, 1.0f);
+    if (debugView != 24u && roughness >= rtRoughnessThreshold && !reflectiveClass)
     {
         g_ReflectionOut[launchIndex] = float4(0.0f, 0.0f, 0.0f, 0.0f);
         return;

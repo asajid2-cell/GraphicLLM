@@ -99,6 +99,10 @@ Renderer::RayTracingState Renderer::GetRayTracingState() const {
     state.warmingUp = IsRTWarmingUp();
     state.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
     state.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
+    state.reflectionRoughnessThreshold = m_rtDenoiseState.reflectionRoughnessThreshold;
+    state.reflectionHistoryMaxBlend = m_rtDenoiseState.reflectionHistoryMaxBlend;
+    state.reflectionFireflyClampLuma = m_rtDenoiseState.reflectionFireflyClampLuma;
+    state.reflectionSignalScale = m_rtDenoiseState.reflectionSignalScale;
     return state;
 }
 

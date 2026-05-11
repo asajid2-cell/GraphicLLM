@@ -410,7 +410,15 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         if (contract.rayTracing.reflectionRequestedDenoiseAlpha < 0.02f ||
             contract.rayTracing.reflectionRequestedDenoiseAlpha > 1.0f ||
             contract.rayTracing.reflectionCompositionStrength < 0.0f ||
-            contract.rayTracing.reflectionCompositionStrength > 1.0f) {
+            contract.rayTracing.reflectionCompositionStrength > 1.0f ||
+            contract.rayTracing.reflectionRoughnessThreshold < 0.05f ||
+            contract.rayTracing.reflectionRoughnessThreshold > 1.0f ||
+            contract.rayTracing.reflectionHistoryMaxBlend < 0.0f ||
+            contract.rayTracing.reflectionHistoryMaxBlend > 0.5f ||
+            contract.rayTracing.reflectionFireflyClampLuma < 4.0f ||
+            contract.rayTracing.reflectionFireflyClampLuma > 32.0f ||
+            contract.rayTracing.reflectionSignalScale < 0.0f ||
+            contract.rayTracing.reflectionSignalScale > 2.0f) {
             warn("rt_reflection_tuning_out_of_range");
         }
         if (!contract.rayTracing.reflectionHistorySignalStatsCaptured) {

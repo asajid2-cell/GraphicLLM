@@ -28,19 +28,36 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     }
 
     bool usesVBNormal = false;
+    DescriptorHandle normalSRV = m_mainTargets.normalRoughness.descriptors.srv;
     ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     D3D12_RESOURCE_STATES normalState = m_mainTargets.normalRoughness.resources.state;
     VisibilityBufferRenderer::ResourceStateSnapshot vbStates{};
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
-        usesVBNormal = true;
-        vbStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
-        normalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
-        normalState = vbStates.normalRoughness;
+        const DescriptorHandle& vbNormalSRV = m_services.visibilityBuffer->GetNormalRoughnessSRVHandle();
+        if (vbNormalSRV.IsValid()) {
+            usesVBNormal = true;
+            normalSRV = vbNormalSRV;
+            vbStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
+            normalResource = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
+            normalState = vbStates.normalRoughness;
+        }
     }
-    if (!normalResource) {
+    if (!normalSRV.IsValid() || !normalResource) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_temporal_mask_normal_missing";
         return result;
+    }
+    D3D12_RESOURCE_STATES vbNormalDispatchState = normalState;
+    D3D12_RESOURCE_STATES* normalDispatchState = usesVBNormal
+        ? &vbNormalDispatchState
+        : &m_mainTargets.normalRoughness.resources.state;
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    const D3D12_RESOURCE_DESC maskDesc = m_temporalMaskState.texture->GetDesc();
+    if (maskDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
+        width = static_cast<uint32_t>(maskDesc.Width);
+        height = maskDesc.Height;
     }
 
     bool stageFailed = false;
@@ -63,21 +80,30 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
     graphContext.normalRoughness = normalHandle;
     graphContext.velocity = velocityHandle;
     graphContext.mask = maskHandle;
-    graphContext.dispatch = [&]() {
-        m_depthResources.resources.resourceState = kDepthSampleState;
-        m_temporalScreenState.velocityState = kScreenSpaceShaderResourceState;
-        m_temporalMaskState.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        if (usesVBNormal) {
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.normalRoughness = kScreenSpaceShaderResourceState;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-        } else {
-            m_mainTargets.normalRoughness.resources.state = kScreenSpaceShaderResourceState;
-        }
-
-        BuildTemporalRejectionMask(frameNormalRoughnessResource, true, true);
-        return m_temporalMaskState.builtThisFrame;
-    };
+    graphContext.dispatch.pass = m_services.temporalRejectionMask.get();
+    graphContext.dispatch.device = m_services.device->GetDevice();
+    graphContext.dispatch.descriptorManager = m_services.descriptorManager.get();
+    graphContext.dispatch.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
+    graphContext.dispatch.normalRoughness = {normalResource, normalDispatchState};
+    graphContext.dispatch.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+    graphContext.dispatch.output = {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState};
+    graphContext.dispatch.depthSampleState = kDepthSampleState;
+    graphContext.dispatch.shaderResourceState = kScreenSpaceShaderResourceState;
+    graphContext.dispatch.skipTransitions = true;
+    graphContext.dispatch.dispatch.width = width;
+    graphContext.dispatch.dispatch.height = height;
+    graphContext.dispatch.dispatch.frameConstants = m_constantBuffers.currentFrameGPU;
+    graphContext.dispatch.dispatch.depthSRV = m_depthResources.descriptors.srv;
+    graphContext.dispatch.dispatch.normalRoughnessSRV = normalSRV;
+    graphContext.dispatch.dispatch.velocitySRV = m_temporalScreenState.velocitySRV;
+    graphContext.dispatch.dispatch.outputUAV = m_temporalMaskState.uav;
+    graphContext.dispatch.dispatch.depthResource = m_depthResources.resources.buffer.Get();
+    graphContext.dispatch.dispatch.normalRoughnessResource = normalResource;
+    graphContext.dispatch.dispatch.velocityResource = m_temporalScreenState.velocityBuffer.Get();
+    graphContext.dispatch.dispatch.outputResource = m_temporalMaskState.texture.Get();
+    graphContext.dispatch.dispatch.srvTable = m_temporalMaskState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    graphContext.dispatch.dispatch.uavTable = m_temporalMaskState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
+    graphContext.dispatch.builtThisFrame = &m_temporalMaskState.builtThisFrame;
     graphContext.failStage = [&](const char* stage) {
         stageFailed = true;
         stageError = stage ? stage : "unknown";
@@ -115,6 +141,15 @@ Renderer::ExecuteTemporalRejectionMaskInRenderGraph(const char* frameNormalRough
             m_mainTargets.normalRoughness.resources.state = m_services.renderGraph->GetResourceState(normalHandle);
         }
         result.executed = true;
+        RecordFramePass("TemporalRejectionMask",
+                        true,
+                        true,
+                        1,
+                        {"depth", frameNormalRoughnessResource ? frameNormalRoughnessResource : "normal_roughness", "velocity"},
+                        {"temporal_rejection_mask"},
+                        false,
+                        nullptr,
+                        true);
         CaptureTemporalRejectionMaskStats();
     }
     m_services.renderGraph->EndFrame();

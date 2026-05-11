@@ -40,22 +40,6 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     constexpr D3D12_RESOURCE_STATES kSrvState =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-    if (!TemporalRejectionMask::PrepareDispatchResources({
-            m_commandResources.graphicsList.Get(),
-            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
-            {normalResource, normalState},
-            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
-            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
-            kDepthSampleState,
-            kSrvState,
-            skipTransitions,
-        })) {
-        return;
-    }
-    if (usingVBNormal && m_services.visibilityBuffer) {
-        m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
-    }
-
     uint32_t width = 0;
     uint32_t height = 0;
     const D3D12_RESOURCE_DESC maskDesc = m_temporalMaskState.texture->GetDesc();
@@ -79,23 +63,27 @@ void Renderer::BuildTemporalRejectionMask(const char* frameNormalRoughnessResour
     desc.srvTable = m_temporalMaskState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
     desc.uavTable = m_temporalMaskState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
 
-    const bool executed = m_services.temporalRejectionMask->Dispatch(
-        m_commandResources.graphicsList.Get(),
-        m_services.device->GetDevice(),
-        m_services.descriptorManager.get(),
-        desc);
+    const bool executed = TemporalRejectionMask::ExecuteDispatch({
+            m_services.temporalRejectionMask.get(),
+            m_commandResources.graphicsList.Get(),
+            m_services.device->GetDevice(),
+            m_services.descriptorManager.get(),
+            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
+            {normalResource, normalState},
+            {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState},
+            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
+            kDepthSampleState,
+            kSrvState,
+            skipTransitions,
+            desc,
+            &m_temporalMaskState.builtThisFrame,
+        });
+    if (usingVBNormal && m_services.visibilityBuffer) {
+        m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
+    }
     if (!executed) {
         return;
     }
-
-    if (!TemporalRejectionMask::FinalizeDispatchResources(
-            m_commandResources.graphicsList.Get(),
-            {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState},
-            kSrvState,
-            skipTransitions)) {
-        return;
-    }
-    m_temporalMaskState.builtThisFrame = true;
     if (!renderGraphOwned) {
         CaptureTemporalRejectionMaskStats();
     }

@@ -197,6 +197,16 @@ Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "ResolveTAAInterme
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "CopyTAAIntermediateToHDR(true)"
 Assert-NotContains "Renderer_RenderGraphTAA.cpp" $rendererTAA "CopyHDRToTAAHistory(true)"
 
+$temporalMask = Read-Text "src/Graphics/TemporalRejectionMask.cpp"
+$temporalMaskHeader = Read-Text "src/Graphics/TemporalRejectionMask.h"
+$rendererTemporalMask = Read-Text "src/Graphics/Renderer_RenderGraphTemporalMask.cpp"
+Assert-Contains "TemporalRejectionMask.h" $temporalMaskHeader "DispatchExecutionContext dispatch"
+Assert-Contains "TemporalRejectionMask.cpp" $temporalMask "bool TemporalRejectionMask::ExecuteDispatch(const DispatchExecutionContext& context)"
+Assert-Contains "TemporalRejectionMask.cpp" $temporalMask "ExecuteDispatch(dispatch)"
+Assert-Contains "Renderer_TemporalMaskPass.cpp" (Read-Text "src/Graphics/Renderer_TemporalMaskPass.cpp") "TemporalRejectionMask::ExecuteDispatch({"
+Assert-NotContains "TemporalRejectionMask.h" $temporalMaskHeader "std::function<bool()> dispatch"
+Assert-NotContains "Renderer_RenderGraphTemporalMask.cpp" $rendererTemporalMask "BuildTemporalRejectionMask("
+
 $vb = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
 $vbHeader = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.h"
 $rendererVB = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"

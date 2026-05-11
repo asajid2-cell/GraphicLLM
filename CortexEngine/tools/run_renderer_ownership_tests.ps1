@@ -875,7 +875,7 @@ foreach ($target in $doc.targets) {
     if ($id -eq "temporal_mask_resource_transitions") {
         if (Test-Path $temporalMaskPath) {
             $temporalMask = Get-Content $temporalMaskPath -Raw
-            foreach ($required in @("PrepareResourcesContext", "StatsResourcesContext", "PrepareDispatchResources", "FinalizeDispatchResources", "PrepareStatsResources", "FinalizeStatsReadback", "ResourceBarrier", "CopyBufferRegion")) {
+            foreach ($required in @("PrepareResourcesContext", "StatsResourcesContext", "DispatchExecutionContext", "PrepareDispatchResources", "FinalizeDispatchResources", "ExecuteDispatch", "PrepareStatsResources", "FinalizeStatsReadback", "ResourceBarrier", "CopyBufferRegion")) {
                 if ($temporalMask.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "temporal_mask_resource_transitions missing TemporalRejectionMask marker: $required"
                 }
@@ -885,9 +885,14 @@ foreach ($target in $doc.targets) {
         }
         if (Test-Path $temporalMaskRendererPath) {
             $temporalMaskRenderer = Get-Content $temporalMaskRendererPath -Raw
-            foreach ($route in @("TemporalRejectionMask::PrepareDispatchResources", "TemporalRejectionMask::FinalizeDispatchResources", "TemporalRejectionMask::PrepareStatsResources", "TemporalRejectionMask::FinalizeStatsReadback")) {
+            foreach ($route in @("TemporalRejectionMask::ExecuteDispatch", "TemporalRejectionMask::PrepareStatsResources", "TemporalRejectionMask::FinalizeStatsReadback")) {
                 if ($temporalMaskRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "temporal_mask_resource_transitions missing routed temporal-mask resource call in Renderer_TemporalMaskPass.cpp: $route"
+                }
+            }
+            foreach ($oldRoute in @("TemporalRejectionMask::PrepareDispatchResources", "TemporalRejectionMask::FinalizeDispatchResources")) {
+                if ($temporalMaskRenderer.IndexOf($oldRoute, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "temporal_mask_resource_transitions still calls split dispatch transition route in Renderer_TemporalMaskPass.cpp: $oldRoute"
                 }
             }
             foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "CopyBufferRegion")) {

@@ -143,6 +143,16 @@
       "future_extension": "Keep future TAA resolve input barrier mechanics in TAACopyPass or a dedicated TAA target pass before adding more temporal resources"
     },
     {
+      "id": "temporal_mask_resource_transitions",
+      "owner": "Temporal rejection mask resource transitions",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_TemporalMaskPass.cpp still owns source selection, visibility-buffer state snapshot handoff, frame-pass recording, and stats scheduling, but temporal-mask input/output transitions, UAV barriers, stats-buffer transition, and stats readback copy are owned by TemporalRejectionMask helpers",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["TemporalRejectionMask.h", "TemporalRejectionMask.cpp", "Renderer_TemporalMaskPass.cpp"],
+      "renderer_state_members": ["m_temporalMaskState", "m_temporalScreenState", "m_mainTargets", "m_depthResources", "m_commandResources"],
+      "future_extension": "Keep future temporal-mask resource barriers and readback-copy mechanics in TemporalRejectionMask or declarative render-graph resource declarations"
+    },
+    {
       "id": "motion_vector_target_transitions",
       "owner": "Motion-vector velocity/depth targets",
       "status": "release_boundary_validated",

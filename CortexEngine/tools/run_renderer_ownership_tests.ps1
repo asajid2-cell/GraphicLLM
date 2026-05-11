@@ -71,6 +71,8 @@ $bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 $taaCopyPassPath = Join-Path $root "src/Graphics/Passes/TAACopyPass.cpp"
 $taaExecutionPath = Join-Path $root "src/Graphics/Renderer_TAAExecution.cpp"
+$temporalMaskPath = Join-Path $root "src/Graphics/TemporalRejectionMask.cpp"
+$temporalMaskRendererPath = Join-Path $root "src/Graphics/Renderer_TemporalMaskPass.cpp"
 $motionVectorTargetPassPath = Join-Path $root "src/Graphics/Passes/MotionVectorTargetPass.cpp"
 $motionVectorRendererPath = Join-Path $root "src/Graphics/Renderer_MotionVectors.cpp"
 $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
@@ -524,6 +526,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "taa_resolve_transitions missing Renderer_TAAExecution.cpp"
+        }
+    }
+
+    if ($id -eq "temporal_mask_resource_transitions") {
+        if (Test-Path $temporalMaskPath) {
+            $temporalMask = Get-Content $temporalMaskPath -Raw
+            foreach ($required in @("PrepareResourcesContext", "StatsResourcesContext", "PrepareDispatchResources", "FinalizeDispatchResources", "PrepareStatsResources", "FinalizeStatsReadback", "ResourceBarrier", "CopyBufferRegion")) {
+                if ($temporalMask.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "temporal_mask_resource_transitions missing TemporalRejectionMask marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "temporal_mask_resource_transitions missing TemporalRejectionMask.cpp"
+        }
+        if (Test-Path $temporalMaskRendererPath) {
+            $temporalMaskRenderer = Get-Content $temporalMaskRendererPath -Raw
+            foreach ($route in @("TemporalRejectionMask::PrepareDispatchResources", "TemporalRejectionMask::FinalizeDispatchResources", "TemporalRejectionMask::PrepareStatsResources", "TemporalRejectionMask::FinalizeStatsReadback")) {
+                if ($temporalMaskRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "temporal_mask_resource_transitions missing routed temporal-mask resource call in Renderer_TemporalMaskPass.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "CopyBufferRegion")) {
+                if ($temporalMaskRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "temporal_mask_resource_transitions still has direct temporal-mask resource mechanics in Renderer_TemporalMaskPass.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "temporal_mask_resource_transitions missing Renderer_TemporalMaskPass.cpp"
         }
     }
 

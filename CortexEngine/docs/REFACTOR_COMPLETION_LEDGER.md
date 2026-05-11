@@ -1001,6 +1001,25 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because RT, temporal-mask,
       graph orchestration, and other renderer pass mechanics still live in
       renderer orchestration files.
+    - The current temporal-mask resource checkpoint moves temporal-mask
+      input/output transitions, output UAV barrier, stats-buffer transitions,
+      stats UAV barrier, and stats readback copy into
+      `TemporalRejectionMask::PrepareDispatchResources`,
+      `TemporalRejectionMask::FinalizeDispatchResources`,
+      `TemporalRejectionMask::PrepareStatsResources`, and
+      `TemporalRejectionMask::FinalizeStatsReadback`.
+      `Renderer_TemporalMaskPass.cpp` still owns source selection,
+      visibility-buffer state snapshot handoff, frame-pass recording, and stats
+      scheduling, and now has no direct `D3D12_RESOURCE_BARRIER`,
+      `ResourceBarrier`, or `CopyBufferRegion` calls. Release rebuild passed,
+      renderer ownership tests passed with `targets=29`, renderer full
+      ownership audit passed with `renderer_members=48 expected_members=48`,
+      temporal validation passed at
+      `temporal_validation_20260511_121913_810_92972_6db92be7`, and RT
+      showcase passed at `rt_showcase_20260511_121919_957_97056_0862132c`.
+      The broader ownership rows remain `PARTIAL` because RT, graph
+      orchestration, visibility-buffer internals, and other renderer pass
+      mechanics still live in renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

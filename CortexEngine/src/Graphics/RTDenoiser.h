@@ -52,9 +52,31 @@ public:
         float accumulationAlpha = 1.0f;
     };
 
+    struct ResourceStateRef {
+        ID3D12Resource* resource = nullptr;
+        D3D12_RESOURCE_STATES* state = nullptr;
+    };
+
+    struct CommonResourceContext {
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ResourceStateRef depth;
+        ResourceStateRef normalRoughness;
+        ResourceStateRef velocity;
+        ResourceStateRef temporalMask;
+    };
+
+    struct SignalResourceContext {
+        ID3D12GraphicsCommandList* commandList = nullptr;
+        ResourceStateRef current;
+        ResourceStateRef history;
+    };
+
     Result<void> Initialize(ID3D12Device* device, ID3D12RootSignature* rootSignature);
 
     [[nodiscard]] bool IsReady() const;
+    [[nodiscard]] static bool PrepareCommonResources(const CommonResourceContext& context);
+    [[nodiscard]] static bool PrepareSignalResources(const SignalResourceContext& context);
+    [[nodiscard]] static bool FinalizeSignalResources(const SignalResourceContext& context);
     DispatchResult Dispatch(ID3D12GraphicsCommandList* cmdList,
                             ID3D12Device* device,
                             DescriptorHeapManager* descriptorManager,

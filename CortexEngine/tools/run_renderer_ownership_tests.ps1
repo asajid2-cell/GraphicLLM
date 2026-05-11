@@ -32,6 +32,8 @@ if (-not (Test-Path $rendererRtStatePath)) {
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
 $rtReflectionSignalStatsPath = Join-Path $root "src/Graphics/RTReflectionSignalStats.cpp"
 $rtReflectionSignalStatsRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflectionSignalStats.cpp"
+$rtDenoiserPath = Join-Path $root "src/Graphics/RTDenoiser.cpp"
+$rtDenoiseRendererPath = Join-Path $root "src/Graphics/Renderer_RTDenoise.cpp"
 $rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
 $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
@@ -250,6 +252,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_history_copy missing Renderer_FrameEnd.cpp"
+        }
+    }
+
+    if ($id -eq "rt_denoise_resource_transitions") {
+        if (Test-Path $rtDenoiserPath) {
+            $rtDenoiser = Get-Content $rtDenoiserPath -Raw
+            foreach ($required in @("ResourceStateRef", "CommonResourceContext", "SignalResourceContext", "PrepareCommonResources", "PrepareSignalResources", "FinalizeSignalResources", "TransitionResource", "InsertUAVBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS")) {
+                if ($rtDenoiser.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_denoise_resource_transitions missing RTDenoiser resource marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_denoise_resource_transitions missing RTDenoiser.cpp"
+        }
+        if (Test-Path $rtDenoiseRendererPath) {
+            $rtDenoiseRenderer = Get-Content $rtDenoiseRendererPath -Raw
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS")) {
+                if ($rtDenoiseRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_denoise_resource_transitions still owns denoise resource mechanics in Renderer_RTDenoise.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("RTDenoiser::PrepareCommonResources", "RTDenoiser::PrepareSignalResources", "RTDenoiser::FinalizeSignalResources")) {
+                if ($rtDenoiseRenderer.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_denoise_resource_transitions missing routed denoise resource call in Renderer_RTDenoise.cpp: $requiredRoute"
+                }
+            }
+        } else {
+            Add-Failure "rt_denoise_resource_transitions missing Renderer_RTDenoise.cpp"
         }
     }
 

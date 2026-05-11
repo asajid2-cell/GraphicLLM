@@ -52,25 +52,6 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
         markFallback("rt_denoiser_descriptor_tables_unavailable");
     }
 
-    constexpr D3D12_RESOURCE_STATES kSrvState =
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-    auto transition = [&](ID3D12Resource* resource,
-                          D3D12_RESOURCE_STATES& state,
-                          D3D12_RESOURCE_STATES desired) {
-        if (!resource || state == desired) {
-            return;
-        }
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = state;
-        barrier.Transition.StateAfter = desired;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        state = desired;
-    };
-
     DescriptorHandle normalSrv = m_mainTargets.normalRoughness.descriptors.srv;
     ID3D12Resource* normalResource = m_mainTargets.normalRoughness.resources.texture.Get();
     D3D12_RESOURCE_STATES* normalState = &m_mainTargets.normalRoughness.resources.state;
@@ -93,15 +74,41 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
     }
 
     if (fallbackReason.empty()) {
-        transition(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, kDepthSampleState);
-        if (normalResource && normalState) {
-            transition(normalResource, *normalState, kSrvState);
-            if (usingVBNormal && m_services.visibilityBuffer) {
-                m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
-            }
+        RTDenoiser::CommonResourceContext commonResources{};
+        commonResources.commandList = m_commandResources.graphicsList.Get();
+        commonResources.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
+        commonResources.normalRoughness = {normalResource, normalState};
+        commonResources.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+        commonResources.temporalMask = {m_temporalMaskState.texture.Get(), &m_temporalMaskState.resourceState};
+        if (!RTDenoiser::PrepareCommonResources(commonResources)) {
+            markFallback("rt_denoiser_resource_transition_failed");
         }
-        transition(m_temporalScreenState.velocityBuffer.Get(), m_temporalScreenState.velocityState, kSrvState);
-        transition(m_temporalMaskState.texture.Get(), m_temporalMaskState.resourceState, kSrvState);
+        if (usingVBNormal && m_services.visibilityBuffer) {
+            m_services.visibilityBuffer->ApplyResourceStateSnapshot(vbStates);
+        }
+
+        if (!fallbackReason.empty()) {
+            RecordFramePass("RTDenoise",
+                            planned,
+                            executed,
+                            m_rtDenoiseState.passCountThisFrame,
+                            {"depth",
+                             frameNormalRoughnessResource ? frameNormalRoughnessResource : "gbuffer_normal_roughness",
+                             "velocity",
+                             "temporal_rejection_mask",
+                             "rt_shadow_mask",
+                             "rt_shadow_history",
+                             "rt_reflection",
+                             "rt_reflection_history",
+                             "rt_gi",
+                             "rt_gi_history"},
+                            {"rt_shadow_history",
+                             "rt_reflection_history",
+                             "rt_gi_history"},
+                            true,
+                            fallbackReason.c_str());
+            return;
+        }
 
         auto dispatchSignal = [&](RTDenoiser::Signal signal,
                                   bool shouldRun,
@@ -130,8 +137,14 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
                 return result;
             }
 
-            transition(current, currentState, kSrvState);
-            transition(history, historyState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            RTDenoiser::SignalResourceContext signalResources{};
+            signalResources.commandList = m_commandResources.graphicsList.Get();
+            signalResources.current = {current, &currentState};
+            signalResources.history = {history, &historyState};
+            if (!RTDenoiser::PrepareSignalResources(signalResources)) {
+                markFallback("rt_denoiser_signal_transition_failed");
+                return result;
+            }
 
             RTDenoiser::DispatchDesc desc{};
             desc.signal = signal;
@@ -165,11 +178,10 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
                 desc);
 
             if (result.executed) {
-                D3D12_RESOURCE_BARRIER uavBarrier{};
-                uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                uavBarrier.UAV.pResource = history;
-                m_commandResources.graphicsList->ResourceBarrier(1, &uavBarrier);
-                transition(history, historyState, kSrvState);
+                if (!RTDenoiser::FinalizeSignalResources(signalResources)) {
+                    markFallback("rt_denoiser_signal_finalize_failed");
+                    return result;
+                }
 
                 executed = true;
                 m_rtDenoiseState.executedThisFrame = true;

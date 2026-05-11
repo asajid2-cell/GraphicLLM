@@ -250,6 +250,7 @@ struct FrameContract {
         float areaLightSizeScale = 1.0f;
         float shadowBias = 0.0f;
         float shadowPCFRadius = 0.0f;
+        float cascadeSplitLambda = 0.0f;
         uint32_t lightCount = 0;
         uint32_t shadowCastingLightCount = 0;
         float totalLightIntensity = 0.0f;

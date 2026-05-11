@@ -74,6 +74,9 @@ $IDC_GFX_BLOOM = 9012
 $IDC_GFX_SUN = 9013
 $IDC_GFX_GOD_RAYS = 9014
 $IDC_GFX_AREA_LIGHT = 9015
+$IDC_GFX_SHADOW_BIAS = 9071
+$IDC_GFX_SHADOW_PCF = 9072
+$IDC_GFX_CASCADE_LAMBDA = 9073
 $IDC_GFX_FOG_DENSITY = 9020
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_FOG_FALLOFF = 9041
@@ -210,6 +213,9 @@ try {
         Set-Trackbar $window $IDC_GFX_EXPOSURE 38
         Set-Trackbar $window $IDC_GFX_BLOOM 24
         Set-Trackbar $window $IDC_GFX_GOD_RAYS 55
+        Set-Trackbar $window $IDC_GFX_SHADOW_BIAS 23
+        Set-Trackbar $window $IDC_GFX_SHADOW_PCF 36
+        Set-Trackbar $window $IDC_GFX_CASCADE_LAMBDA 67
         Set-Trackbar $window $IDC_GFX_FOG_DENSITY 26
         Set-Trackbar $window $IDC_GFX_FOG_HEIGHT 53
         Set-Trackbar $window $IDC_GFX_FOG_FALLOFF 34
@@ -289,6 +295,9 @@ if (-not (Test-Path $reportPath)) {
     Assert-Near "sun_intensity" ([double]$fc.lighting.sun_intensity) 8.4 0.4
     Assert-Near "god_ray_intensity" ([double]$fc.lighting.god_ray_intensity) 1.65 0.10
     Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.37 0.08
+    Assert-Near "shadow_bias" ([double]$fc.lighting.shadow_bias) 0.0046 0.001
+    Assert-Near "shadow_pcf_radius" ([double]$fc.lighting.shadow_pcf_radius) 2.88 0.15
+    Assert-Near "cascade_split_lambda" ([double]$fc.lighting.cascade_split_lambda) 0.67 0.04
     Assert-Near "fog_density" ([double]$fc.lighting.fog_density) 0.026 0.01
     Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 6.0 1.0
     Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 3.41 0.20

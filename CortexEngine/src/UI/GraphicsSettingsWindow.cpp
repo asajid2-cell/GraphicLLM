@@ -72,6 +72,9 @@ enum ControlIdGraphics : int {
     IDC_GFX_ENV_ROTATION = 9068,
     IDC_GFX_RT_GI_STRENGTH = 9069,
     IDC_GFX_RT_GI_DISTANCE = 9070,
+    IDC_GFX_SHADOW_BIAS = 9071,
+    IDC_GFX_SHADOW_PCF = 9072,
+    IDC_GFX_CASCADE_LAMBDA = 9073,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -156,6 +159,9 @@ struct GraphicsSettingsState {
     SliderBinding backgroundExposure;
     SliderBinding backgroundBlur;
     SliderBinding environmentRotation;
+    SliderBinding shadowBias;
+    SliderBinding shadowPCF;
+    SliderBinding cascadeLambda;
     SliderBinding rtReflectionDenoise;
     SliderBinding rtReflectionStrength;
     SliderBinding rtReflectionRoughness;
@@ -522,6 +528,9 @@ void SyncStateFromSliders() {
     g_gfx.tuning.environment.backgroundExposure = SliderToFloat(g_gfx.backgroundExposure);
     g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
     g_gfx.tuning.environment.rotationDegrees = SliderToFloat(g_gfx.environmentRotation);
+    g_gfx.tuning.lighting.shadowBias = SliderToFloat(g_gfx.shadowBias);
+    g_gfx.tuning.lighting.shadowPCFRadius = SliderToFloat(g_gfx.shadowPCF);
+    g_gfx.tuning.lighting.cascadeSplitLambda = SliderToFloat(g_gfx.cascadeLambda);
     g_gfx.tuning.rayTracing.reflectionDenoiseAlpha = SliderToFloat(g_gfx.rtReflectionDenoise);
     g_gfx.tuning.rayTracing.reflectionCompositionStrength = SliderToFloat(g_gfx.rtReflectionStrength);
     g_gfx.tuning.rayTracing.reflectionRoughnessThreshold = SliderToFloat(g_gfx.rtReflectionRoughness);
@@ -638,6 +647,9 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.backgroundExposure, g_gfx.tuning.environment.backgroundExposure);
     SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
     SetSliderFromFloat(g_gfx.environmentRotation, g_gfx.tuning.environment.rotationDegrees);
+    SetSliderFromFloat(g_gfx.shadowBias, g_gfx.tuning.lighting.shadowBias);
+    SetSliderFromFloat(g_gfx.shadowPCF, g_gfx.tuning.lighting.shadowPCFRadius);
+    SetSliderFromFloat(g_gfx.cascadeLambda, g_gfx.tuning.lighting.cascadeSplitLambda);
     SetSliderFromFloat(g_gfx.rtReflectionDenoise, g_gfx.tuning.rayTracing.reflectionDenoiseAlpha);
     SetSliderFromFloat(g_gfx.rtReflectionStrength, g_gfx.tuning.rayTracing.reflectionCompositionStrength);
     SetSliderFromFloat(g_gfx.rtReflectionRoughness, g_gfx.tuning.rayTracing.reflectionRoughnessThreshold);
@@ -985,6 +997,9 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkSSAO = makeCheckbox(IDC_GFX_SSAO, L"SSAO");
             g_gfx.chkPCSS = makeCheckbox(IDC_GFX_PCSS, L"PCSS Shadows");
             g_gfx.chkFog = makeCheckbox(IDC_GFX_FOG, L"Fog");
+            makeSlider(IDC_GFX_SHADOW_BIAS, L"Shadow Bias", g_gfx.shadowBias, 0.0f, 0.02f);
+            makeSlider(IDC_GFX_SHADOW_PCF, L"Shadow PCF", g_gfx.shadowPCF, 0.0f, 8.0f);
+            makeSlider(IDC_GFX_CASCADE_LAMBDA, L"Cascade Lambda", g_gfx.cascadeLambda, 0.0f, 1.0f);
             makeSlider(IDC_GFX_SSR_DISTANCE, L"SSR Max Distance", g_gfx.ssrDistance, 1.0f, 120.0f);
             makeSlider(IDC_GFX_SSR_THICKNESS, L"SSR Thickness", g_gfx.ssrThickness, 0.005f, 1.0f);
             makeSlider(IDC_GFX_SSR_STRENGTH, L"SSR Strength", g_gfx.ssrStrength, 0.0f, 1.0f);

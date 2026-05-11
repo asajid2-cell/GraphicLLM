@@ -744,6 +744,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_temporal_camera_cut_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_render_graph_transient_matrix.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_phase3_fallback_matrix.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_minimal_frame_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_graphics_ui_interaction_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_screenshot_negative_gates.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_particle_disabled_zero_cost.ps1
@@ -814,6 +815,16 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       `material_lab_20260511_111256_152_92932_4da158d9` passed. The parent
       ownership rows remain `PARTIAL` because other renderer passes still reach
       through renderer aggregates directly.
+    - The current minimal-frame checkpoint moves the forced clear-only debug
+      path's backbuffer transition, RTV binding, clear, and used-as-RT tracking
+      into `MinimalFramePass`; `run_minimal_frame_smoke.ps1` is wired into
+      `run_release_validation.ps1` and validates that forced minimal mode
+      executes no major renderer features, reaches `MinimalFrame_Done`, uses
+      the backbuffer as a render target, and captures the expected black frame.
+      Latest evidence: renderer ownership tests passed with `targets=14`,
+      renderer full ownership audit passed with `renderer_members=48
+      expected_members=48`, and minimal frame smoke passed at
+      `minimal_frame_20260511_111842_064_95176_7be8b197`.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 #include "Debug/GPUProfiler.h"
+#include "Graphics/Passes/MinimalFramePass.h"
 
 #include <algorithm>
 
@@ -176,20 +177,12 @@ bool Renderer::TryRenderSpecialFramePath(const FrameExecutionContext& frameCtx) 
     if (featurePlan.runMinimalFrame) {
         ID3D12Resource* backBuffer = m_services.window ? m_services.window->GetCurrentBackBuffer() : nullptr;
         if (backBuffer) {
-            D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_services.window->GetCurrentRTV();
-
-            D3D12_RESOURCE_BARRIER bbBarrier{};
-            bbBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            bbBarrier.Transition.pResource   = backBuffer;
-            bbBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-            bbBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            bbBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &bbBarrier);
-            m_frameLifecycle.backBufferUsedAsRTThisFrame = true;
-
-            const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-            m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-            m_commandResources.graphicsList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+            MinimalFramePass::ClearContext clearContext{};
+            clearContext.commandList = m_commandResources.graphicsList.Get();
+            clearContext.backBuffer = backBuffer;
+            clearContext.rtv = m_services.window->GetCurrentRTV();
+            clearContext.backBufferUsedAsRTThisFrame = &m_frameLifecycle.backBufferUsedAsRTThisFrame;
+            (void)MinimalFramePass::ClearBackBuffer(clearContext);
         }
 
         MarkPassComplete("MinimalFrame_Done");

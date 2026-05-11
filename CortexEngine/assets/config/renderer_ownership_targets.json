@@ -13,6 +13,16 @@
       "future_extension": "Move future voxel fullscreen/backend draw submission into VoxelPass before expanding the experimental backend"
     },
     {
+      "id": "minimal_frame_submission",
+      "owner": "Minimal debug frame",
+      "status": "release_boundary_validated",
+      "release_boundary": "The force-minimal-frame debug path keeps frame-plan selection in Renderer_FramePlanning.cpp, but backbuffer transition, render-target binding, clear, and used-as-RT tracking are owned by MinimalFramePass",
+      "validated_contracts": ["renderer_ownership", "minimal_frame_smoke"],
+      "target_files": ["Passes/MinimalFramePass.h", "Passes/MinimalFramePass.cpp", "Renderer_FramePlanning.cpp"],
+      "renderer_state_members": ["m_commandResources", "m_frameLifecycle"],
+      "future_extension": "Keep future minimal/debug clear-only output setup inside MinimalFramePass instead of adding direct swap-chain target setup back to frame planning"
+    },
+    {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
       "status": "release_boundary_validated",

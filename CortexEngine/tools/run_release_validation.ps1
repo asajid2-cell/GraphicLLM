@@ -517,6 +517,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "minimal_frame" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_minimal_frame_smoke.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "fatal_error_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -194,7 +194,7 @@ void Renderer::SetRenderScale(float scale) {
         const unsigned int width = std::max(1u, m_services.window->GetWidth());
         const unsigned int height = std::max(1u, m_services.window->GetHeight());
         const bool heavyEffects =
-            m_rtRuntimeState.enabled || m_ssrResources.enabled || m_ssaoResources.enabled ||
+            m_rtRuntimeState.enabled || m_ssrResources.controls.enabled || m_ssaoResources.controls.enabled ||
             m_rtRuntimeState.reflectionsEnabled || m_rtRuntimeState.giEnabled;
 
         if (m_services.device) {

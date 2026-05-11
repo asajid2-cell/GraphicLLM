@@ -52,6 +52,10 @@ if (-not (Test-Path $environmentStatePath)) {
 $environmentState = Get-Content $environmentStatePath -Raw
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
+$ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
+$ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
+$ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
+$ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -184,6 +188,55 @@ foreach ($target in $doc.targets) {
         foreach ($required in @("ActiveEnvironment", "ActiveEnvironmentName", "UsingFallbackEnvironment", "ResidentCount", "PendingCount")) {
             if ($environmentState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "environment_resources missing state ownership marker in RendererEnvironmentState.h: $required"
+            }
+        }
+    }
+
+    if ($id -eq "screen_space_resources") {
+        if (-not (Test-Path $ssaoStatePath)) {
+            Add-Failure "screen_space_resources missing RendererSSAOState.h"
+        } else {
+            $ssaoState = Get-Content $ssaoStatePath -Raw
+            foreach ($required in @("struct SSAOControls", "struct SSAOResources", "struct SSAODescriptorTables", "SSAOControls controls", "SSAOResources resources", "SSAODescriptorTables descriptors")) {
+                if ($ssaoState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "screen_space_resources missing SSAO ownership marker in RendererSSAOState.h: $required"
+                }
+            }
+            foreach ($oldField in @("bool enabled", "float radius", "float bias", "float intensity", "descriptorTablesValid = false;")) {
+                if ($ssaoState -match "struct SSAOPassState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "screen_space_resources still exposes loose SSAO state field in SSAOPassState: $oldField"
+                }
+            }
+        }
+        if (-not (Test-Path $ssrStatePath)) {
+            Add-Failure "screen_space_resources missing RendererSSRState.h"
+        } else {
+            $ssrState = Get-Content $ssrStatePath -Raw
+            foreach ($required in @("struct SSRControls", "struct SSRResources", "struct SSRDescriptorTables", "struct SSRFrameState", "SSRControls controls", "SSRResources resources", "SSRDescriptorTables descriptors", "SSRFrameState frame")) {
+                if ($ssrState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "screen_space_resources missing SSR ownership marker in RendererSSRState.h: $required"
+                }
+            }
+            foreach ($oldField in @("bool enabled", "bool activeThisFrame", "float maxDistance", "float thickness", "float strength", "srvTableValid = false;")) {
+                if ($ssrState -match "struct SSRPassState[\s\S]*$([regex]::Escape($oldField))") {
+                    Add-Failure "screen_space_resources still exposes loose SSR state field in SSRPassState: $oldField"
+                }
+            }
+        }
+        if (Test-Path $ssaoRendererPath) {
+            $ssaoRenderer = Get-Content $ssaoRendererPath -Raw
+            foreach ($oldFlatAccess in @("m_ssaoResources.enabled", "m_ssaoResources.texture", "m_ssaoResources.resourceState", "m_ssaoResources.srvTables")) {
+                if ($ssaoRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "screen_space_resources still uses flat SSAO state access in Renderer_SSAO.cpp: $oldFlatAccess"
+                }
+            }
+        }
+        if (Test-Path $ssrRendererPath) {
+            $ssrRenderer = Get-Content $ssrRendererPath -Raw
+            foreach ($oldFlatAccess in @("m_ssrResources.enabled", "m_ssrResources.color", "m_ssrResources.resourceState", "m_ssrResources.srvTables")) {
+                if ($ssrRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "screen_space_resources still uses flat SSR state access in Renderer_SSRPass.cpp: $oldFlatAccess"
+                }
             }
         }
     }

@@ -21,7 +21,7 @@ constexpr D3D12_RESOURCE_STATES kScreenSpaceShaderResourceState =
 Renderer::RenderGraphPassResult
 Renderer::ExecuteSSRInRenderGraph() {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_pipelineState.ssr || !m_ssrResources.color ||
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_pipelineState.ssr || !m_ssrResources.resources.color ||
         !m_mainTargets.hdrColor || !m_depthResources.buffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_prerequisites_missing";
@@ -69,7 +69,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     const RGResourceHandle normalHandle =
         m_services.renderGraph->ImportResource(normalResource, normalState, usesVBNormal ? "VB_NormalRoughness_SSR" : "NormalRoughness_SSR");
     const RGResourceHandle ssrHandle =
-        m_services.renderGraph->ImportResource(m_ssrResources.color.Get(), m_ssrResources.resourceState, "SSRColor");
+        m_services.renderGraph->ImportResource(m_ssrResources.resources.color.Get(), m_ssrResources.resources.resourceState, "SSRColor");
 
     SSRPass::GraphContext ssrContext{};
     ssrContext.hdr = hdrHandle;
@@ -80,7 +80,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     ssrContext.execute = [&]() {
         m_mainTargets.hdrState = kScreenSpaceShaderResourceState;
         m_depthResources.resourceState = kDepthSampleState;
-        m_ssrResources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         if (usesVBNormal) {
             auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
             states.normalRoughness = kScreenSpaceShaderResourceState;
@@ -91,7 +91,7 @@ Renderer::ExecuteSSRInRenderGraph() {
 
         ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions, true);
         RenderSSR();
-        return static_cast<bool>(m_ssrResources.color);
+        return static_cast<bool>(m_ssrResources.resources.color);
     };
     (void)SSRPass::AddToGraph(*m_services.renderGraph, ssrContext);
 
@@ -107,7 +107,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     } else {
         m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
         m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_ssrResources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
+        m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (usesVBNormal) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
             finalStates.normalRoughness = m_services.renderGraph->GetResourceState(normalHandle);

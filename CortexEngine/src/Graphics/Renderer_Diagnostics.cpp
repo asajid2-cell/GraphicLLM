@@ -61,16 +61,16 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.taaEnabled = m_temporalAAState.enabled;
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
     state.pcssEnabled = m_shadowResources.pcssEnabled;
-    state.ssaoEnabled = m_ssaoResources.enabled;
-    state.ssaoRadius = m_ssaoResources.radius;
-    state.ssaoBias = m_ssaoResources.bias;
-    state.ssaoIntensity = m_ssaoResources.intensity;
+    state.ssaoEnabled = m_ssaoResources.controls.enabled;
+    state.ssaoRadius = m_ssaoResources.controls.radius;
+    state.ssaoBias = m_ssaoResources.controls.bias;
+    state.ssaoIntensity = m_ssaoResources.controls.intensity;
     state.iblEnabled = m_environmentState.enabled;
     state.iblLimitEnabled = m_environmentState.limitEnabled;
-    state.ssrEnabled = m_ssrResources.enabled;
-    state.ssrMaxDistance = m_ssrResources.maxDistance;
-    state.ssrThickness = m_ssrResources.thickness;
-    state.ssrStrength = m_ssrResources.strength;
+    state.ssrEnabled = m_ssrResources.controls.enabled;
+    state.ssrMaxDistance = m_ssrResources.controls.maxDistance;
+    state.ssrThickness = m_ssrResources.controls.thickness;
+    state.ssrStrength = m_ssrResources.controls.strength;
     state.fogEnabled = m_fogState.enabled;
     state.particlesEnabled = m_particleState.controls.enabledForScene;
     state.particleDensityScale = m_particleState.controls.densityScale;
@@ -326,8 +326,8 @@ void Renderer::ReportDeviceRemoved(const char* context,
         rs(m_rtShadowTargets.maskState),
         rs(m_rtShadowTargets.historyState),
         rs(m_mainTargets.gbufferNormalRoughnessState),
-        rs(m_ssaoResources.resourceState),
-        rs(m_ssrResources.resourceState),
+        rs(m_ssaoResources.resources.resourceState),
+        rs(m_ssrResources.resources.resourceState),
         rs(m_temporalScreenState.velocityState),
         rs(m_temporalScreenState.historyState),
         rs(m_temporalScreenState.taaIntermediateState),
@@ -460,8 +460,8 @@ void Renderer::LogDiagnostics() const {
     spdlog::info("Features: TAA={} FXAA={} SSR={} SSAO={} Bloom={:.2f} Fog={} Shadows={} IBL={}",
                  m_temporalAAState.enabled,
                  m_postProcessState.fxaaEnabled,
-                 m_ssrResources.enabled,
-                 m_ssaoResources.enabled,
+                 m_ssrResources.controls.enabled,
+                 m_ssaoResources.controls.enabled,
                  m_bloomResources.controls.intensity,
                  m_fogState.enabled,
                  m_shadowResources.enabled,
@@ -475,7 +475,7 @@ void Renderer::LogDiagnostics() const {
     spdlog::info("Resource states: depth=0x{:X} hdr=0x{:X} ssr=0x{:X}",
                  static_cast<uint32_t>(m_depthResources.resourceState),
                  static_cast<uint32_t>(m_mainTargets.hdrState),
-                 static_cast<uint32_t>(m_ssrResources.resourceState));
+                 static_cast<uint32_t>(m_ssrResources.resources.resourceState));
     spdlog::info("Timings (ms): depthPrepass={:.2f} shadow={:.2f} main={:.2f}",
                  m_frameDiagnostics.timings.depthPrepassMs,
                  m_frameDiagnostics.timings.shadowPassMs,

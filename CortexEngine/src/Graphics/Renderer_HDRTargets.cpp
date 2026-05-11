@@ -283,8 +283,8 @@ Result<void> Renderer::CreateHDRTarget() {
     }
 
     // (Re)create SSR color buffer (matches HDR resolution/format)
-    m_ssrResources.color.Reset();
-    m_ssrResources.resourceState = D3D12_RESOURCE_STATE_COMMON;
+    m_ssrResources.resources.color.Reset();
+    m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_COMMON;
 
     D3D12_RESOURCE_DESC ssrDesc = desc;
     ssrDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -302,28 +302,28 @@ Result<void> Renderer::CreateHDRTarget() {
         &ssrDesc,
         D3D12_RESOURCE_STATE_RENDER_TARGET,
         &ssrClear,
-        IID_PPV_ARGS(&m_ssrResources.color)
+        IID_PPV_ARGS(&m_ssrResources.resources.color)
     );
 
     if (FAILED(hr)) {
         spdlog::warn("Failed to create SSR color buffer");
     } else {
-        m_ssrResources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
         auto ssrRtvResult = m_services.descriptorManager->AllocateRTV();
         if (ssrRtvResult.IsErr()) {
             spdlog::warn("Failed to allocate RTV for SSR buffer: {}", ssrRtvResult.Error());
         } else {
-            m_ssrResources.rtv = ssrRtvResult.Value();
+            m_ssrResources.resources.rtv = ssrRtvResult.Value();
 
             D3D12_RENDER_TARGET_VIEW_DESC ssrRtvDesc = {};
             ssrRtvDesc.Format = ssrDesc.Format;
             ssrRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
             m_services.device->GetDevice()->CreateRenderTargetView(
-                m_ssrResources.color.Get(),
+                m_ssrResources.resources.color.Get(),
                 &ssrRtvDesc,
-                m_ssrResources.rtv.cpu
+                m_ssrResources.resources.rtv.cpu
             );
         }
 
@@ -332,7 +332,7 @@ Result<void> Renderer::CreateHDRTarget() {
         if (ssrSrvResult.IsErr()) {
             spdlog::warn("Failed to allocate staging SRV for SSR buffer: {}", ssrSrvResult.Error());
         } else {
-            m_ssrResources.srv = ssrSrvResult.Value();
+            m_ssrResources.resources.srv = ssrSrvResult.Value();
 
             D3D12_SHADER_RESOURCE_VIEW_DESC ssrSrvDesc = {};
             ssrSrvDesc.Format = ssrDesc.Format;
@@ -341,9 +341,9 @@ Result<void> Renderer::CreateHDRTarget() {
             ssrSrvDesc.Texture2D.MipLevels = 1;
 
             m_services.device->GetDevice()->CreateShaderResourceView(
-                m_ssrResources.color.Get(),
+                m_ssrResources.resources.color.Get(),
                 &ssrSrvDesc,
-                m_ssrResources.srv.cpu
+                m_ssrResources.resources.srv.cpu
             );
         }
     }

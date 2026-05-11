@@ -82,7 +82,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     }
     writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
 
-    writeOrNull(2, m_ssaoResources.texture.Get(), DXGI_FORMAT_R8_UNORM);
+    writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(4, m_depthResources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
@@ -92,7 +92,7 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
     }
     writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    writeOrNull(6, m_ssrResources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(6, m_ssrResources.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(7, m_temporalScreenState.velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
     // TAA reuses the t12 material-extension slot as the shared temporal
     // rejection mask; the full post-process table still binds material ext2.
@@ -106,8 +106,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
             handle = {};
         }
     }
-    m_ssrResources.srvTableValid = false;
-    for (auto& table : m_ssrResources.srvTables) {
+    m_ssrResources.descriptors.srvTableValid = false;
+    for (auto& table : m_ssrResources.descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -141,13 +141,13 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         }
     }
     m_rtReflectionSignalState.descriptors.ResetHandles();
-    m_ssaoResources.descriptorTablesValid = false;
-    for (auto& table : m_ssaoResources.srvTables) {
+    m_ssaoResources.descriptors.descriptorTablesValid = false;
+    for (auto& table : m_ssaoResources.descriptors.srvTables) {
         for (auto& handle : table) {
             handle = {};
         }
     }
-    for (auto& table : m_ssaoResources.uavTables) {
+    for (auto& table : m_ssaoResources.descriptors.uavTables) {
         for (auto& handle : table) {
             handle = {};
         }
@@ -208,7 +208,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (postTableResult.IsErr()) {
         return postTableResult;
     }
-    auto ssrTableResult = allocateTableSet(m_ssrResources.srvTables, "SSR");
+    auto ssrTableResult = allocateTableSet(m_ssrResources.descriptors.srvTables, "SSR");
     if (ssrTableResult.IsErr()) {
         return ssrTableResult;
     }
@@ -216,11 +216,11 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (motionTableResult.IsErr()) {
         return motionTableResult;
     }
-    auto ssaoSrvTableResult = allocateTableSet(m_ssaoResources.srvTables, "SSAO SRV");
+    auto ssaoSrvTableResult = allocateTableSet(m_ssaoResources.descriptors.srvTables, "SSAO SRV");
     if (ssaoSrvTableResult.IsErr()) {
         return ssaoSrvTableResult;
     }
-    auto ssaoUavTableResult = allocateTableSet(m_ssaoResources.uavTables, "SSAO UAV");
+    auto ssaoUavTableResult = allocateTableSet(m_ssaoResources.descriptors.uavTables, "SSAO UAV");
     if (ssaoUavTableResult.IsErr()) {
         return ssaoUavTableResult;
     }
@@ -299,7 +299,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     };
 
     validateTableSet(m_temporalScreenState.postProcessSrvTables, m_temporalScreenState.postProcessSrvTableValid, "Post-process");
-    validateTableSet(m_ssrResources.srvTables, m_ssrResources.srvTableValid, "SSR");
+    validateTableSet(m_ssrResources.descriptors.srvTables, m_ssrResources.descriptors.srvTableValid, "SSR");
     validateTableSet(m_temporalScreenState.motionVectorSrvTables, m_temporalScreenState.motionVectorSrvTableValid, "Motion-vector");
     bool ssaoSrvValid = false;
     bool ssaoUavValid = false;
@@ -311,9 +311,9 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     bool temporalMaskStatsUavValid = false;
     bool rtReflectionSignalStatsSrvValid = false;
     bool rtReflectionSignalStatsUavValid = false;
-    validateTableSet(m_ssaoResources.srvTables, ssaoSrvValid, "SSAO SRV");
-    validateTableSet(m_ssaoResources.uavTables, ssaoUavValid, "SSAO UAV");
-    m_ssaoResources.descriptorTablesValid = ssaoSrvValid && ssaoUavValid;
+    validateTableSet(m_ssaoResources.descriptors.srvTables, ssaoSrvValid, "SSAO SRV");
+    validateTableSet(m_ssaoResources.descriptors.uavTables, ssaoUavValid, "SSAO UAV");
+    m_ssaoResources.descriptors.descriptorTablesValid = ssaoSrvValid && ssaoUavValid;
     validateTableSet(m_rtDenoiseState.srvTables, rtDenoiseSrvValid, "RT denoise SRV");
     validateTableSet(m_rtDenoiseState.uavTables, rtDenoiseUavValid, "RT denoise UAV");
     m_rtDenoiseState.descriptorTablesValid = rtDenoiseSrvValid && rtDenoiseUavValid;
@@ -367,7 +367,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     }
     writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
 
-    writeOrNull(2, m_ssaoResources.texture.Get(), DXGI_FORMAT_R8_UNORM);
+    writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
     writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(4, m_depthResources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
 
@@ -380,7 +380,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     if (m_debugViewState.mode == 32u && m_hzbResources.texture && m_hzbResources.mipCount > 0) {
         writeOrNull(6, m_hzbResources.texture.Get(), DXGI_FORMAT_R32_FLOAT, m_hzbResources.mipCount);
     } else {
-        writeOrNull(6, m_ssrResources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+        writeOrNull(6, m_ssrResources.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
     }
 
     writeOrNull(7, m_temporalScreenState.velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);

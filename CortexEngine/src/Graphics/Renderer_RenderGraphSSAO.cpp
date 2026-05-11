@@ -16,7 +16,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     RenderGraphPassResult result{};
     const bool useComputeSSAO = m_pipelineState.ssaoCompute && m_frameRuntime.asyncComputeSupported;
 
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_ssaoResources.enabled || !m_ssaoResources.texture ||
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_ssaoResources.controls.enabled || !m_ssaoResources.resources.texture ||
         !m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_prerequisites_missing";
@@ -29,7 +29,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         return result;
     }
 
-    if (useComputeSSAO && !m_ssaoResources.uav.IsValid()) {
+    if (useComputeSSAO && !m_ssaoResources.resources.uav.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_uav_missing";
         RenderSSAOAsync();
@@ -50,7 +50,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     const RGResourceHandle depthHandle =
         m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_SSAO");
     const RGResourceHandle ssaoHandle =
-        m_services.renderGraph->ImportResource(m_ssaoResources.texture.Get(), m_ssaoResources.resourceState, "SSAO");
+        m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
 
     SSAOPass::GraphContext ssaoContext{};
     ssaoContext.depth = depthHandle;
@@ -59,7 +59,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     ssaoContext.failStage = failStage;
     ssaoContext.execute = [&]() {
         m_depthResources.resourceState = kDepthSampleState;
-        m_ssaoResources.resourceState = useComputeSSAO
+        m_ssaoResources.resources.resourceState = useComputeSSAO
             ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
             : D3D12_RESOURCE_STATE_RENDER_TARGET;
         ScopedRenderPassValue<bool> skipTransitions(m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions, true);
@@ -68,7 +68,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         } else {
             RenderSSAO();
         }
-        return static_cast<bool>(m_ssaoResources.texture);
+        return static_cast<bool>(m_ssaoResources.resources.texture);
     };
     (void)SSAOPass::AddToGraph(*m_services.renderGraph, ssaoContext);
 
@@ -83,7 +83,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         result.fallbackReason = "ssao_graph_stage_failed: " + stageError;
     } else {
         m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_ssaoResources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
+        m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         result.executed = true;
     }
     m_services.renderGraph->EndFrame();

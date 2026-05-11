@@ -44,8 +44,8 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.gpuCullingEnabled = m_gpuCullingState.enabled;
     featureInputs.visibilityBufferEnabled = m_visibilityBufferState.enabled;
     featureInputs.taaEnabled = m_temporalAAState.enabled;
-    featureInputs.ssrEnabled = m_ssrResources.enabled;
-    featureInputs.ssaoEnabled = m_ssaoResources.enabled;
+    featureInputs.ssrEnabled = m_ssrResources.controls.enabled;
+    featureInputs.ssaoEnabled = m_ssaoResources.controls.enabled;
     featureInputs.bloomEnabled = (m_bloomResources.controls.intensity > 0.0f);
     featureInputs.fxaaEnabled = m_postProcessState.fxaaEnabled;
     featureInputs.iblEnabled = m_environmentState.enabled;
@@ -62,9 +62,9 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasHistoryColor = (m_temporalScreenState.historyColor != nullptr);
     featureInputs.hasTAAIntermediate = (m_temporalScreenState.taaIntermediate != nullptr);
     featureInputs.hasSSRPipeline = pipelineReadiness.ssr;
-    featureInputs.hasSSRColor = (m_ssrResources.color != nullptr);
+    featureInputs.hasSSRColor = (m_ssrResources.resources.color != nullptr);
     featureInputs.hasHDRColor = (m_mainTargets.hdrColor != nullptr);
-    featureInputs.hasSSAOTarget = (m_ssaoResources.texture != nullptr);
+    featureInputs.hasSSAOTarget = (m_ssaoResources.resources.texture != nullptr);
     featureInputs.hasSSAOComputePipeline = pipelineReadiness.ssaoCompute;
     featureInputs.hasSSAOPipeline = pipelineReadiness.ssao;
     featureInputs.hasBloomBase = (m_bloomResources.resources.texA[0] != nullptr);

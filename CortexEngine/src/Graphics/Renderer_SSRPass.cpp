@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderSSR() {
-    if (!m_pipelineState.ssr || !m_ssrResources.color || !m_mainTargets.hdrColor || !m_depthResources.buffer) {
+    if (!m_pipelineState.ssr || !m_ssrResources.resources.color || !m_mainTargets.hdrColor || !m_depthResources.buffer) {
         return;
     }
 
@@ -25,10 +25,10 @@ void Renderer::RenderSSR() {
     UINT barrierCount = 0;
 
     if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-        m_ssrResources.resourceState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssrResources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_ssrResources.resources.color.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
@@ -70,19 +70,19 @@ void Renderer::RenderSSR() {
         m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
     }
 
-    m_ssrResources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     if (!m_visibilityBufferState.renderedThisFrame && m_mainTargets.gbufferNormalRoughness) {
         m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
     m_depthResources.resourceState = kDepthSampleState;
 
-    if (!m_ssrResources.srvTableValid) {
+    if (!m_ssrResources.descriptors.srvTableValid) {
         spdlog::error("RenderSSR: persistent SRV table is invalid");
         return;
     }
 
-    auto& persistentTable = m_ssrResources.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& persistentTable = m_ssrResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
     if (!SSRPass::Draw({
             m_services.device->GetDevice(),
             m_commandResources.graphicsList.Get(),
@@ -90,8 +90,8 @@ void Renderer::RenderSSR() {
             m_pipelineState.rootSignature.get(),
             m_constantBuffers.currentFrameGPU,
             m_pipelineState.ssr.get(),
-            m_ssrResources.color.Get(),
-            m_ssrResources.rtv,
+            m_ssrResources.resources.color.Get(),
+            m_ssrResources.resources.rtv,
             m_mainTargets.hdrColor.Get(),
             m_depthResources.buffer.Get(),
             normalResource,

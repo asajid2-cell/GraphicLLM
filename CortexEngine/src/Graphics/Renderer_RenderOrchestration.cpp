@@ -109,7 +109,7 @@ void Renderer::Render(Scene::ECS_Registry* registry, float deltaTime) {
     FrameExecutionContext frameCtx = BuildFrameExecutionContext(registry, deltaTime);
     FrameFeaturePlan& featurePlan = frameCtx.features;
 
-    m_ssrResources.activeThisFrame = featurePlan.runSSR;
+    m_ssrResources.frame.activeThisFrame = featurePlan.runSSR;
 
     RunPreFrameServices(frameCtx);
     if (!BeginFrameExecution(frameCtx)) {

@@ -4,6 +4,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace Cortex::Graphics {
 
@@ -31,8 +32,17 @@ struct MaterialPresetInfo {
     bool clearcoat = false;
 };
 
+struct MaterialPresetDescriptor {
+    std::string id;
+    std::string displayName;
+    std::string surfaceClass;
+    bool advanced = false;
+    bool publicAuthoring = true;
+};
+
 class MaterialPresetRegistry {
 public:
+    [[nodiscard]] static const std::vector<MaterialPresetDescriptor>& CanonicalPresets();
     [[nodiscard]] static std::string Normalize(std::string_view presetName);
     [[nodiscard]] static bool ContainsToken(std::string_view presetName, std::string_view token);
     [[nodiscard]] static MaterialPresetInfo Resolve(std::string_view presetName);

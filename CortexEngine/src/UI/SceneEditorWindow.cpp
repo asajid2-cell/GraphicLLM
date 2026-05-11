@@ -137,30 +137,6 @@ const PrimitiveChoice kPrimitiveChoices[] = {
     { L"Line",     LLM::AddEntityCommand::EntityType::Line     },
 };
 
-// Material presets understood by the renderer via presetName heuristics.
-const wchar_t* kMaterialPresetLabels[] = {
-    L"<Default>",
-    L"chrome",
-    L"polished_metal",
-    L"brushed_metal",
-    L"plastic",
-    L"painted_plastic",
-    L"matte",
-    L"brick",
-    L"concrete",
-    L"wood_floor",
-    L"backdrop",
-    L"glass",
-    L"glass_panel",
-    L"mirror",
-    L"water",
-    L"emissive_panel",
-    L"skin",
-    L"skin_ish",
-    L"cloth",
-    L"velvet",
-};
-
 float Slider01ToFloat(HWND slider, float minValue, float maxValue) {
     if (!slider) return minValue;
     int pos = static_cast<int>(SendMessage(slider, TBM_GETPOS, 0, 0));
@@ -202,13 +178,43 @@ std::string WStringToUtf8(const std::wstring& s) {
     return out;
 }
 
-std::string GetFocusedPresetFromUI() {
-    int matIndex = static_cast<int>(SendMessage(g_ed.comboFocusedMaterial, CB_GETCURSEL, 0, 0));
-    if (matIndex <= 0 || matIndex >= static_cast<int>(std::size(kMaterialPresetLabels))) {
+std::wstring Utf8ToWString(const std::string& s) {
+    if (s.empty()) {
         return {};
     }
-    std::wstring wlabel = kMaterialPresetLabels[matIndex];
-    return WStringToUtf8(wlabel);
+    const int chars = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
+    if (chars <= 0) {
+        return {};
+    }
+    std::wstring out(static_cast<size_t>(chars), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), chars);
+    return out;
+}
+
+std::string MaterialPresetIdForComboIndex(int index) {
+    const auto& presets = Graphics::MaterialPresetRegistry::CanonicalPresets();
+    if (index <= 0 || index > static_cast<int>(presets.size())) {
+        return {};
+    }
+    return presets[static_cast<size_t>(index - 1)].id;
+}
+
+void PopulateMaterialPresetCombo(HWND combo) {
+    if (!combo) {
+        return;
+    }
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"<Default>"));
+    for (const auto& preset : Graphics::MaterialPresetRegistry::CanonicalPresets()) {
+        const std::wstring label = Utf8ToWString(preset.displayName.empty() ? preset.id : preset.displayName);
+        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+    }
+    SendMessageW(combo, CB_SETCURSEL, 0, 0);
+}
+
+std::string GetFocusedPresetFromUI() {
+    int matIndex = static_cast<int>(SendMessage(g_ed.comboFocusedMaterial, CB_GETCURSEL, 0, 0));
+    return MaterialPresetIdForComboIndex(matIndex);
 }
 
 void RefreshMaterialValidationStatus() {
@@ -309,10 +315,10 @@ void SpawnPrimitiveFromUI() {
 
     // Material preset from combo (index 0 = default/no preset).
     int matIndex = static_cast<int>(SendMessage(g_ed.comboMaterial, CB_GETCURSEL, 0, 0));
-    if (matIndex > 0 && matIndex < static_cast<int>(std::size(kMaterialPresetLabels))) {
-        std::wstring wlabel = kMaterialPresetLabels[matIndex];
+    const std::string presetId = MaterialPresetIdForComboIndex(matIndex);
+    if (!presetId.empty()) {
         cmd->hasPreset = true;
-        cmd->presetName = WStringToUtf8(wlabel);
+        cmd->presetName = presetId;
     }
 
     // Basic material numeric parameters from sliders.
@@ -381,10 +387,10 @@ void ApplyMaterialToFocusedFromUI() {
 
     // Material preset for focused entity.
     int matIndex = static_cast<int>(SendMessage(g_ed.comboFocusedMaterial, CB_GETCURSEL, 0, 0));
-    if (matIndex > 0 && matIndex < static_cast<int>(std::size(kMaterialPresetLabels))) {
-        std::wstring wlabel = kMaterialPresetLabels[matIndex];
+    const std::string presetId = MaterialPresetIdForComboIndex(matIndex);
+    if (!presetId.empty()) {
         cmd->setPreset = true;
-        cmd->presetName = WStringToUtf8(wlabel);
+        cmd->presetName = presetId;
     }
 
     cmd->setMetallic = true;
@@ -572,10 +578,7 @@ void RegisterSceneEditorClass() {
 
             makeLabel(L"Material Preset", y);
             g_ed.comboMaterial = makeCombo(IDC_SE_MATERIAL_PRESET, y);
-            for (const auto* label : kMaterialPresetLabels) {
-                SendMessageW(g_ed.comboMaterial, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
-            }
-            SendMessageW(g_ed.comboMaterial, CB_SETCURSEL, 0, 0);
+            PopulateMaterialPresetCombo(g_ed.comboMaterial);
             y += comboHeight + rowGap;
 
             makeLabel(L"Metallic", y);
@@ -624,10 +627,7 @@ void RegisterSceneEditorClass() {
 
             makeLabel(L"Preset", y);
             g_ed.comboFocusedMaterial = makeCombo(IDC_SE_FOCUSED_MAT_PRESET, y);
-            for (const auto* label : kMaterialPresetLabels) {
-                SendMessageW(g_ed.comboFocusedMaterial, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
-            }
-            SendMessageW(g_ed.comboFocusedMaterial, CB_SETCURSEL, 0, 0);
+            PopulateMaterialPresetCombo(g_ed.comboFocusedMaterial);
             y += comboHeight + rowGap;
 
             makeLabel(L"Metallic", y);

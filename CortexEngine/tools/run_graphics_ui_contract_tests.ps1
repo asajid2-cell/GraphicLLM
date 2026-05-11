@@ -201,6 +201,8 @@ Assert-Contains $ui "IDC_GFX_BOOKMARK_HERO" "GraphicsSettingsWindow does not exp
 Assert-Contains $ui "IDC_GFX_BOOKMARK_REFLECTION" "GraphicsSettingsWindow does not expose reflection camera bookmark control."
 Assert-Contains $ui "IDC_GFX_BOOKMARK_MATERIALS" "GraphicsSettingsWindow does not expose material overview camera bookmark control."
 Assert-Contains $ui "IDC_GFX_MATERIAL_PRESET" "GraphicsSettingsWindow does not expose focused material preset control."
+Assert-Contains $ui "MaterialPresetRegistry::CanonicalPresets" "GraphicsSettingsWindow does not populate focused material presets from the registry."
+Assert-Contains $ui "MaterialPresetIdForComboIndex" "GraphicsSettingsWindow does not map material combo selections to registry preset ids."
 Assert-Contains $ui "IDC_GFX_MATERIAL_METALLIC" "GraphicsSettingsWindow does not expose focused material metallic control."
 Assert-Contains $ui "IDC_GFX_MATERIAL_ROUGHNESS" "GraphicsSettingsWindow does not expose focused material roughness control."
 Assert-Contains $ui "IDC_GFX_MATERIAL_CLEARCOAT" "GraphicsSettingsWindow does not expose focused material clearcoat control."

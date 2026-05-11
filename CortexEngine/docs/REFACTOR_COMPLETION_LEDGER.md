@@ -846,6 +846,18 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       with denoised reflection-history signal metrics reported. The broader
       ownership rows remain `PARTIAL` because other renderer pass mechanics
       still live in renderer orchestration files.
+    - The current backbuffer-present checkpoint moves the swap-chain
+      render-target-to-present transition and optional visual-validation
+      readback/copy mechanics into `BackBufferPresentPass`. Release rebuild
+      passed, renderer ownership tests passed with `targets=17`, renderer full
+      ownership audit passed with `renderer_members=48 expected_members=48`,
+      visual probe validation passed at
+      `visual_probe_validation_20260511_113050_035_96032_9389ac78`, temporal
+      validation passed at
+      `temporal_validation_20260511_113114_603_90256_08fd0e2e`, and RT
+      showcase passed at `rt_showcase_20260511_113119_785_92812_47603a0c`.
+      The broader ownership rows remain `PARTIAL` because renderer orchestration
+      still schedules late-frame policy and other pass mechanics directly.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

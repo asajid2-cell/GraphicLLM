@@ -139,6 +139,7 @@ set(CORTEX_SOURCES
     src/Graphics/GPUCulling_Uploads.cpp
     src/Graphics/Passes/BloomPass.cpp
     src/Graphics/Passes/BloomGraphPass.cpp
+    src/Graphics/Passes/BackBufferPresentPass.cpp
     src/Graphics/Passes/DepthPrepass.cpp
     src/Graphics/Passes/DepthPrepassTargetPass.cpp
     src/Graphics/Passes/DescriptorTable.cpp
@@ -387,6 +388,7 @@ set(CORTEX_HEADERS
     src/Graphics/RendererSceneSnapshot.h
     src/Graphics/Passes/BloomPass.h
     src/Graphics/Passes/BloomGraphPass.h
+    src/Graphics/Passes/BackBufferPresentPass.h
     src/Graphics/Passes/DepthPrepass.h
     src/Graphics/Passes/DepthPrepassTargetPass.h
     src/Graphics/Passes/DescriptorTable.h

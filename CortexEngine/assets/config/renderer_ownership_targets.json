@@ -53,6 +53,16 @@
       "future_extension": "Keep future shared end-frame shader-resource cleanup in EndFrameShaderResourcePass instead of adding hand-built resource-barrier batches in Renderer_FrameEnd.cpp"
     },
     {
+      "id": "back_buffer_present_transition",
+      "owner": "Backbuffer present/capture transition",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_FrameEnd.cpp still decides whether the swap-chain buffer was used and whether visual validation capture is active, but the backbuffer render-target-to-present transition plus optional readback/copy path are owned by BackBufferPresentPass",
+      "validated_contracts": ["renderer_ownership", "visual_validation", "rt_showcase"],
+      "target_files": ["Passes/BackBufferPresentPass.h", "Passes/BackBufferPresentPass.cpp", "Renderer_FrameEnd.cpp"],
+      "renderer_state_members": ["m_frameLifecycle", "m_commandResources", "m_services"],
+      "future_extension": "Keep future swap-chain present/capture transition mechanics in BackBufferPresentPass instead of adding direct backbuffer barriers or copy-readback setup in Renderer_FrameEnd.cpp"
+    },
+    {
       "id": "environment_resources",
       "owner": "Environment/IBL",
       "status": "release_boundary_validated",

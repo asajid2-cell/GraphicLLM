@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 #include "Renderer_FramePhaseGpuScope.h"
+#include "Graphics/Passes/DepthWriteTransitionPass.h"
 
 #include <chrono>
 #include <spdlog/spdlog.h>
@@ -84,14 +85,13 @@ void Renderer::ExecuteGeometryFramePhase(const FrameExecutionContext& frameCtx) 
     // existing opaque render paths for robustness.
     if (!vbEnabled || !m_visibilityBufferState.renderedThisFrame) {
         if (vbEnabled && !m_visibilityBufferState.renderedThisFrame && m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-            barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+            DepthWriteTransitionPass::TransitionContext depthTransitionContext{};
+            depthTransitionContext.commandList = m_commandResources.graphicsList.Get();
+            depthTransitionContext.depthBuffer = m_depthResources.resources.buffer.Get();
+            depthTransitionContext.depthState = &m_depthResources.resources.resourceState;
+            if (!DepthWriteTransitionPass::TransitionToDepthWrite(depthTransitionContext)) {
+                spdlog::warn("Visibility-buffer fallback could not transition depth to write state");
+            }
         }
 
         if (featurePlan.runGpuCullingFallback) {

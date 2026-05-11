@@ -893,6 +893,18 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       reflection debug-clear mechanics, post-process draw policy, graph
       orchestration, and other renderer pass mechanics still live in renderer
       orchestration files.
+    - The current depth-write transition checkpoint moves the visibility-buffer
+      fallback depth-buffer repair transition into `DepthWriteTransitionPass`.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=21`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, Phase 3 fallback matrix passed
+      at `phase3_fallback_matrix_20260511_115034_018_96548_d159dddf`,
+      temporal validation passed at
+      `temporal_validation_20260511_115012_557_96500_17e751a7`, and RT
+      showcase passed at `rt_showcase_20260511_115012_574_89484_bf3ca1bf`.
+      The broader ownership rows remain `PARTIAL` because fallback selection,
+      graph orchestration, and other renderer pass mechanics still live in
+      renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

@@ -86,6 +86,8 @@ $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $depthPrepassTargetPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepassTargetPass.cpp"
+$depthWriteTransitionPassPath = Join-Path $root "src/Graphics/Passes/DepthWriteTransitionPass.cpp"
+$framePhasesMainPath = Join-Path $root "src/Graphics/Renderer_FramePhases_Main.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
@@ -631,6 +633,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "depth_prepass_target_submission missing Renderer_DepthPasses.cpp"
+        }
+    }
+
+    if ($id -eq "depth_write_transition") {
+        if (Test-Path $depthWriteTransitionPassPath) {
+            $depthWriteTransitionPass = Get-Content $depthWriteTransitionPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::DepthWriteTransitionPass", "TransitionContext", "TransitionToDepthWrite", "ResourceBarrier", "D3D12_RESOURCE_STATE_DEPTH_WRITE")) {
+                if ($depthWriteTransitionPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "depth_write_transition missing DepthWriteTransitionPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "depth_write_transition missing DepthWriteTransitionPass.cpp"
+        }
+        if (Test-Path $framePhasesMainPath) {
+            $framePhasesMain = Get-Content $framePhasesMainPath -Raw
+            if ($framePhasesMain.IndexOf("DepthWriteTransitionPass::TransitionToDepthWrite", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "depth_write_transition missing routed depth-write transition call in Renderer_FramePhases_Main.cpp"
+            }
+            foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier")) {
+                if ($framePhasesMain.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "depth_write_transition still performs direct depth transition in Renderer_FramePhases_Main.cpp: $directCall"
+                }
+            }
+        } else {
+            Add-Failure "depth_write_transition missing Renderer_FramePhases_Main.cpp"
         }
     }
 

@@ -103,6 +103,16 @@
       "future_extension": "Keep future bloom fullscreen target binding and clears in BloomPass; extract bloom barriers and copy mechanics into explicit pass helpers before expanding bloom variants"
     },
     {
+      "id": "bloom_stage_transitions",
+      "owner": "Bloom stage transitions and composite copy",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_Bloom.cpp still owns bloom stage ordering and source/target selection, but per-stage resource transitions, final shader-resource transitions, composite target preparation, and the composite-to-combined copy are owned by BloomPass",
+      "validated_contracts": ["renderer_ownership", "effects_showcase", "effects_gallery", "rt_showcase"],
+      "target_files": ["Passes/BloomPass.h", "Passes/BloomPass.cpp", "Renderer_Bloom.cpp"],
+      "renderer_state_members": ["m_bloomResources", "m_mainTargets", "m_commandResources"],
+      "future_extension": "Keep future bloom barrier and copy mechanics in BloomPass or declarative render-graph resource declarations instead of rebuilding manual barrier batches in Renderer_Bloom.cpp"
+    },
+    {
       "id": "rt_reflection_debug_clear",
       "owner": "RT reflection debug clear",
       "status": "release_boundary_validated",

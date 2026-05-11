@@ -416,6 +416,34 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "bloom_stage_transitions") {
+        if (Test-Path $bloomPassPath) {
+            $bloomPass = Get-Content $bloomPassPath -Raw
+            foreach ($required in @("ResourceStateRef", "StageTransitionContext", "CompositeTransitionContext", "CopyContext", "PrepareSourceToRenderTarget", "TransitionToShaderResource", "PrepareCompositeTargets", "CopyCompositeToCombined", "ResourceBarrier", "CopyResource")) {
+                if ($bloomPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "bloom_stage_transitions missing BloomPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "bloom_stage_transitions missing BloomPass.cpp"
+        }
+        if (Test-Path $bloomRendererPath) {
+            $bloomRenderer = Get-Content $bloomRendererPath -Raw
+            foreach ($route in @("BloomPass::PrepareSourceToRenderTarget", "BloomPass::TransitionToShaderResource", "BloomPass::PrepareCompositeTargets", "BloomPass::CopyCompositeToCombined")) {
+                if ($bloomRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "bloom_stage_transitions missing routed bloom stage transition call in Renderer_Bloom.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "CopyResource")) {
+                if ($bloomRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "bloom_stage_transitions still has direct bloom transition/copy mechanics in Renderer_Bloom.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "bloom_stage_transitions missing Renderer_Bloom.cpp"
+        }
+    }
+
     if ($id -eq "rt_reflection_debug_clear") {
         if (Test-Path $rtReflectionDebugClearPassPath) {
             $rtReflectionDebugClearPass = Get-Content $rtReflectionDebugClearPassPath -Raw

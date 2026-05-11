@@ -48,6 +48,15 @@ cbuffer FrameConstants : register(b0, space0)
     float4x4 g_InvViewProjMatrix;
     float4   g_WaterParams0;
     float4   g_WaterParams1;
+    float4   g_SSRParams;
+    float4   g_PostGradeParams;
+    float4   g_RTReflectionParams;
+    uint4    g_ScreenAndCluster;
+    uint4    g_ClusterParams;
+    uint4    g_ClusterSRVIndices;
+    float4   g_ProjectionParams;
+    // x = tone-mapper mode, y = environment rotation radians, z = RT GI strength, w = RT GI ray distance.
+    float4   g_CinematicParams;
 };
 
 struct GIPayload
@@ -186,6 +195,7 @@ void RayGen_GI()
     // pixel it produces smoother, more stable results than a single ray.
     const float bias = 0.05f;
     float3 origin = worldPos + N * bias;
+    const float rayDistance = clamp(g_CinematicParams.w, 0.5f, 20.0f);
 
     // Build a simple orthonormal basis around N for secondary directions.
     float3 up = (abs(N.y) < 0.99f) ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
@@ -204,7 +214,7 @@ void RayGen_GI()
         ray.Origin = origin;
         ray.Direction = N;
         ray.TMin = 0.0f;
-        ray.TMax = 5.0f; // local occlusion radius
+        ray.TMax = rayDistance; // local occlusion radius
 
         TraceRay(
             g_TopLevel,
@@ -230,7 +240,7 @@ void RayGen_GI()
         ray.Origin = origin;
         ray.Direction = dir1;
         ray.TMin = 0.0f;
-        ray.TMax = 5.0f;
+        ray.TMax = rayDistance;
 
         TraceRay(
             g_TopLevel,

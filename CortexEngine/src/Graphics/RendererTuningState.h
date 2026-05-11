@@ -53,6 +53,8 @@ struct RendererRayTracingTuning {
     float reflectionHistoryMaxBlend = 0.25f;
     float reflectionFireflyClampLuma = 16.0f;
     float reflectionSignalScale = 1.0f;
+    float giStrength = 0.10f;
+    float giRayDistance = 5.0f;
 };
 
 struct RendererScreenSpaceTuning {

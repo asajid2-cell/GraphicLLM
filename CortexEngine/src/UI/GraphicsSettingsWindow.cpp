@@ -70,6 +70,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_PARTICLE_SOFT_DEPTH = 9066,
     IDC_GFX_PARTICLE_WIND = 9067,
     IDC_GFX_ENV_ROTATION = 9068,
+    IDC_GFX_RT_GI_STRENGTH = 9069,
+    IDC_GFX_RT_GI_DISTANCE = 9070,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -157,6 +159,8 @@ struct GraphicsSettingsState {
     SliderBinding rtReflectionHistoryClamp;
     SliderBinding rtReflectionFirefly;
     SliderBinding rtReflectionScale;
+    SliderBinding rtGIStrength;
+    SliderBinding rtGIDistance;
     SliderBinding ssrDistance;
     SliderBinding ssrThickness;
     SliderBinding ssrStrength;
@@ -457,6 +461,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.rayTracing.reflectionHistoryMaxBlend = SliderToFloat(g_gfx.rtReflectionHistoryClamp);
     g_gfx.tuning.rayTracing.reflectionFireflyClampLuma = SliderToFloat(g_gfx.rtReflectionFirefly);
     g_gfx.tuning.rayTracing.reflectionSignalScale = SliderToFloat(g_gfx.rtReflectionScale);
+    g_gfx.tuning.rayTracing.giStrength = SliderToFloat(g_gfx.rtGIStrength);
+    g_gfx.tuning.rayTracing.giRayDistance = SliderToFloat(g_gfx.rtGIDistance);
     g_gfx.tuning.screenSpace.ssrMaxDistance = SliderToFloat(g_gfx.ssrDistance);
     g_gfx.tuning.screenSpace.ssrThickness = SliderToFloat(g_gfx.ssrThickness);
     g_gfx.tuning.screenSpace.ssrStrength = SliderToFloat(g_gfx.ssrStrength);
@@ -571,6 +577,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.rtReflectionHistoryClamp, g_gfx.tuning.rayTracing.reflectionHistoryMaxBlend);
     SetSliderFromFloat(g_gfx.rtReflectionFirefly, g_gfx.tuning.rayTracing.reflectionFireflyClampLuma);
     SetSliderFromFloat(g_gfx.rtReflectionScale, g_gfx.tuning.rayTracing.reflectionSignalScale);
+    SetSliderFromFloat(g_gfx.rtGIStrength, g_gfx.tuning.rayTracing.giStrength);
+    SetSliderFromFloat(g_gfx.rtGIDistance, g_gfx.tuning.rayTracing.giRayDistance);
     SetSliderFromFloat(g_gfx.ssrDistance, g_gfx.tuning.screenSpace.ssrMaxDistance);
     SetSliderFromFloat(g_gfx.ssrThickness, g_gfx.tuning.screenSpace.ssrThickness);
     SetSliderFromFloat(g_gfx.ssrStrength, g_gfx.tuning.screenSpace.ssrStrength);
@@ -850,6 +858,8 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_RT_REFL_HISTORY_CLAMP, L"History Clamp", g_gfx.rtReflectionHistoryClamp, 0.0f, 0.5f);
             makeSlider(IDC_GFX_RT_REFL_FIREFLY, L"Firefly Clamp", g_gfx.rtReflectionFirefly, 4.0f, 32.0f);
             makeSlider(IDC_GFX_RT_REFL_SCALE, L"Reflection Scale", g_gfx.rtReflectionScale, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_RT_GI_STRENGTH, L"GI Strength", g_gfx.rtGIStrength, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_RT_GI_DISTANCE, L"GI Ray Distance", g_gfx.rtGIDistance, 0.5f, 20.0f);
             g_gfx.txtRTScheduler = makeStaticWithHeight(
                 IDC_GFX_RT_SCHEDULER,
                 L"RT Scheduler: --",

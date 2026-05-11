@@ -156,8 +156,8 @@ struct FrameConstants {
     alignas(16) glm::uvec4 clusterParams;      // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
     alignas(16) glm::uvec4 clusterSRVIndices;  // x=localLights, y=clusterRanges, z=clusterIndices, w unused
     glm::vec4 projectionParams;                // x=proj11, y=proj22, z=nearZ, w=farZ (for cluster Z slicing)
-    // x = tone-mapper mode, y = environment rotation radians, z/w reserved
-    glm::vec4 cinematicParams;
+      // x = tone-mapper mode, y = environment rotation radians, z = RT GI strength, w = RT GI ray distance
+      glm::vec4 cinematicParams;
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer

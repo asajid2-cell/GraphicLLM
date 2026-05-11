@@ -59,7 +59,9 @@ json ToJson(const RendererTuningState& state) {
             {"reflection_roughness_threshold", state.rayTracing.reflectionRoughnessThreshold},
             {"reflection_history_max_blend", state.rayTracing.reflectionHistoryMaxBlend},
             {"reflection_firefly_clamp_luma", state.rayTracing.reflectionFireflyClampLuma},
-            {"reflection_signal_scale", state.rayTracing.reflectionSignalScale}
+            {"reflection_signal_scale", state.rayTracing.reflectionSignalScale},
+            {"gi_strength", state.rayTracing.giStrength},
+            {"gi_ray_distance", state.rayTracing.giRayDistance}
         }},
         {"screen_space", {
             {"ssao", state.screenSpace.ssaoEnabled},
@@ -216,6 +218,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(rt, "reflection_history_max_blend", state.rayTracing.reflectionHistoryMaxBlend);
         ReadValue(rt, "reflection_firefly_clamp_luma", state.rayTracing.reflectionFireflyClampLuma);
         ReadValue(rt, "reflection_signal_scale", state.rayTracing.reflectionSignalScale);
+        ReadValue(rt, "gi_strength", state.rayTracing.giStrength);
+        ReadValue(rt, "gi_ray_distance", state.rayTracing.giRayDistance);
     }
     if (root.contains("screen_space") && root.at("screen_space").is_object()) {
         const auto& ss = root.at("screen_space");
@@ -421,6 +425,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.rayTracing.reflectionHistoryMaxBlend = rt.reflectionHistoryMaxBlend;
     state.rayTracing.reflectionFireflyClampLuma = rt.reflectionFireflyClampLuma;
     state.rayTracing.reflectionSignalScale = rt.reflectionSignalScale;
+    state.rayTracing.giStrength = renderer.GetRTGIStrength();
+    state.rayTracing.giRayDistance = renderer.GetRTGIRayDistance();
 
     state.screenSpace.ssaoEnabled = features.ssaoEnabled;
     state.screenSpace.ssaoRadius = features.ssaoRadius;
@@ -505,6 +511,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
         std::clamp(state.rayTracing.reflectionFireflyClampLuma, 4.0f, 32.0f);
     state.rayTracing.reflectionSignalScale =
         std::clamp(state.rayTracing.reflectionSignalScale, 0.0f, 2.0f);
+    state.rayTracing.giStrength = std::clamp(state.rayTracing.giStrength, 0.0f, 1.0f);
+    state.rayTracing.giRayDistance = std::clamp(state.rayTracing.giRayDistance, 0.5f, 20.0f);
 
     state.screenSpace.ssaoRadius = std::clamp(state.screenSpace.ssaoRadius, 0.01f, 5.0f);
     state.screenSpace.ssaoBias = std::clamp(state.screenSpace.ssaoBias, 0.0f, 1.0f);
@@ -592,6 +600,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
                                    state.rayTracing.reflectionHistoryMaxBlend,
                                    state.rayTracing.reflectionFireflyClampLuma,
                                    state.rayTracing.reflectionSignalScale);
+    renderer.SetRTGITuning(state.rayTracing.giStrength, state.rayTracing.giRayDistance);
 
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::SSAO, state.screenSpace.ssaoEnabled);
     ApplySSAOParamsControl(renderer,

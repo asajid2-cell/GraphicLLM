@@ -214,8 +214,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     frameData.cinematicParams = glm::vec4(
         static_cast<float>(m_postProcessState.ToneMapperMode()),
         glm::radians(m_environmentState.rotationDegrees),
-        0.0f,
-        0.0f);
+        m_rtDenoiseState.giStrength,
+        m_rtDenoiseState.giRayDistance);
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

@@ -482,6 +482,8 @@ struct FrameContract {
         float reflectionHistoryMaxBlend = 0.25f;
         float reflectionFireflyClampLuma = 16.0f;
         float reflectionSignalScale = 1.0f;
+        float giStrength = 0.10f;
+        float giRayDistance = 5.0f;
         std::string budgetProfile;
         std::string schedulerDisabledReason;
         uint32_t schedulerTLASCandidates = 0;

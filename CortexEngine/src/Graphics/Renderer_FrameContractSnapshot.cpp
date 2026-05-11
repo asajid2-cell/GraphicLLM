@@ -397,6 +397,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.rayTracing.reflectionHistoryMaxBlend = m_rtDenoiseState.reflectionHistoryMaxBlend;
     contract.rayTracing.reflectionFireflyClampLuma = m_rtDenoiseState.reflectionFireflyClampLuma;
     contract.rayTracing.reflectionSignalScale = m_rtDenoiseState.reflectionSignalScale;
+    contract.rayTracing.giStrength = m_rtDenoiseState.giStrength;
+    contract.rayTracing.giRayDistance = m_rtDenoiseState.giRayDistance;
     contract.rayTracing.reflectionDispatchReady = m_rtReflectionReadiness.ready;
     contract.rayTracing.reflectionHasPipeline = m_rtReflectionReadiness.hasPipeline;
     contract.rayTracing.reflectionHasTLAS = m_rtReflectionReadiness.hasTLAS;

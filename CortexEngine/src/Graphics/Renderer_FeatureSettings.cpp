@@ -83,6 +83,14 @@ float Renderer::GetRTReflectionSignalScale() const {
     return m_rtDenoiseState.reflectionSignalScale;
 }
 
+float Renderer::GetRTGIStrength() const {
+    return m_rtDenoiseState.giStrength;
+}
+
+float Renderer::GetRTGIRayDistance() const {
+    return m_rtDenoiseState.giRayDistance;
+}
+
 bool Renderer::IsRayTracingSupported() const {
     return GetRayTracingState().supported;
 }
@@ -346,6 +354,11 @@ void Renderer::SetRTReflectionTuning(float denoiseAlpha,
                  m_rtDenoiseState.reflectionHistoryMaxBlend,
                  m_rtDenoiseState.reflectionFireflyClampLuma,
                  m_rtDenoiseState.reflectionSignalScale);
+}
+
+void Renderer::SetRTGITuning(float strength, float rayDistance) {
+    m_rtDenoiseState.giStrength = std::clamp(strength, 0.0f, 1.0f);
+    m_rtDenoiseState.giRayDistance = std::clamp(rayDistance, 0.5f, 20.0f);
 }
 
 } // namespace Cortex::Graphics

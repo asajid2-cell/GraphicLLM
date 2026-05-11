@@ -95,7 +95,7 @@ cbuffer FrameConstants : register(b1)
     uint4  g_ClusterParams;      // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
     uint4  g_ClusterSRVIndices;  // x=localLights, y=clusterRanges, z=clusterIndices, w unused
     float4 g_ProjectionParams;   // x=proj11, y=proj22, z=nearZ, w=farZ
-    // x = tone-mapper mode, y = environment rotation radians, z/w reserved
+    // x = tone-mapper mode, y = environment rotation radians, z = RT GI strength, w = RT GI ray distance
     float4 g_CinematicParams;
 };
 
@@ -1512,8 +1512,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         // ambient is only gently modulated by the RT term. Also clamp to a
         // minimum so GI never fully crushes ambient, which helps avoid
         // "breathing" artifacts when rays flip between occluded / clear.
-        const float kGiStrength = 0.10f;
-        giVisibility = lerp(1.0f, giVisibility, kGiStrength);
+        const float giStrength = saturate(g_CinematicParams.z);
+        giVisibility = lerp(1.0f, giVisibility, giStrength);
         giVisibility = max(giVisibility, 0.8f);
     }
 

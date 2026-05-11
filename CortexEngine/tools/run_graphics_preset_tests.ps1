@@ -75,6 +75,8 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.screen_space.ssao_radius" ([double]$preset.screen_space.ssao_radius) 0.05 5.0
     Assert-Range "$id.screen_space.ssao_bias" ([double]$preset.screen_space.ssao_bias) 0.0 0.2
     Assert-Range "$id.screen_space.ssao_intensity" ([double]$preset.screen_space.ssao_intensity) 0.0 3.0
+    Assert-Range "$id.ray_tracing.gi_strength" ([double]$preset.ray_tracing.gi_strength) 0.0 1.0
+    Assert-Range "$id.ray_tracing.gi_ray_distance" ([double]$preset.ray_tracing.gi_ray_distance) 0.5 20.0
     Assert-Range "$id.atmosphere.fog_density" ([double]$preset.atmosphere.fog_density) 0.0 0.2
     Assert-Range "$id.particles.density" ([double]$preset.particles.density) 0.0 2.0
     Assert-Range "$id.particles.bloom_contribution" ([double]$preset.particles.bloom_contribution) 0.0 2.0

@@ -137,6 +137,18 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    $outdoorLogDir = Join-Path $matrixLogDir "outdoor_sunset_beach_release"
+    Invoke-MatrixStep "outdoor_sunset_beach_release" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_outdoor_sunset_beach_smoke.ps1"),
+        "-NoBuild",
+        "-LogDir", $outdoorLogDir,
+        "-SmokeFrames", [string]$TemporalSmokeFrames
+    ) (Join-Path $outdoorLogDir "frame_report_last.json")
+}
+
+if ($failures.Count -eq 0) {
     $effectsLogDir = Join-Path $matrixLogDir "effects_showcase_release"
     Invoke-MatrixStep "effects_showcase_release" @(
         "-NoProfile",

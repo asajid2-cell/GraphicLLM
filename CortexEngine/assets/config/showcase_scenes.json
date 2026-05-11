@@ -143,6 +143,35 @@
       "polish_gaps": []
     },
     {
+      "id": "outdoor_sunset_beach",
+      "display_name": "Outdoor Sunset Beach",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
+      "default_environment": "sunset_courtyard",
+      "default_lighting_rig": "sunset_rim",
+      "required_bookmarks": ["hero", "waterline"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Outdoor sunset hero",
+          "position": [0.0, 3.1, -12.0],
+          "target": [0.0, 0.85, -0.8],
+          "fov": 57.0,
+          "validation": true
+        },
+        {
+          "id": "waterline",
+          "label": "Beach waterline and palms",
+          "position": [-5.0, 1.65, -5.2],
+          "target": [0.5, 0.25, 2.0],
+          "fov": 48.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["outdoor_scene", "sunset_lighting", "water", "atmosphere", "vegetation_props"],
+      "polish_gaps": []
+    },
+    {
       "id": "effects_showcase",
       "display_name": "Effects Showcase",
       "current_status": "public_showcase_validated",

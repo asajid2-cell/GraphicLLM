@@ -236,17 +236,17 @@
       "id": "hzb_resources",
       "owner": "Hierarchical Z Buffer",
       "status": "release_boundary_validated",
-      "release_boundary": "HZB persistent texture state, descriptor tables, debug controls, and capture metadata are split into nested pass-owned bundles and validated by ownership plus temporal/RT runtime paths that consume HZB",
+      "release_boundary": "HZB persistent texture state, descriptor tables, debug controls, and capture metadata are split into nested pass-owned bundles. HZBPass owns HZB texture creation, per-mip SRV/UAV creation, full-mip debug SRV creation, and shader-visible dispatch table population, while Renderer_HZB.cpp only requests resources and records capture metadata",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
-      "target_files": ["RendererHZBState.h"],
+      "target_files": ["RendererHZBState.h", "Passes/HZBPass.h", "Passes/HZBPass.cpp", "Renderer_HZB.cpp"],
       "renderer_state_members": ["m_hzbResources"],
-      "future_extension": "Keep future HZB culling/debug expansion inside the resources/descriptors/debug/capture bundles before adding renderer orchestration"
+      "future_extension": "Keep future HZB texture/descriptor allocation and culling/debug expansion inside HZBPass plus the resources/descriptors/debug/capture bundles before adding renderer orchestration"
     },
     {
       "id": "hzb_compute_build",
       "owner": "HZB depth build compute pass",
       "status": "release_boundary_validated",
-      "release_boundary": "Renderer_HZB.cpp still owns HZB resource/descriptor creation and capture metadata, but depth/HZB resource transitions, compute root and pipeline binding, descriptor-table binding, mip dispatch, and per-mip shader-resource finalization are owned by HZBPass::BuildFromDepth",
+      "release_boundary": "Renderer_HZB.cpp still owns HZB scheduling and capture metadata, but resource/descriptor creation is owned by HZBPass::CreateResources and depth/HZB resource transitions, compute root and pipeline binding, descriptor-table binding, mip dispatch, and per-mip shader-resource finalization are owned by HZBPass::BuildFromDepth",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
       "target_files": ["Passes/HZBPass.h", "Passes/HZBPass.cpp", "Renderer_HZB.cpp"],
       "renderer_state_members": ["m_hzbResources", "m_depthResources", "m_commandResources", "m_pipelineState"],

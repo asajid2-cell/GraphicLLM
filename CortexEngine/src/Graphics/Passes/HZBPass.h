@@ -1,12 +1,22 @@
 #pragma once
 
 #include "Graphics/RenderGraph.h"
+#include "Graphics/RendererHZBState.h"
 #include "Graphics/RHI/DX12Pipeline.h"
 #include "Graphics/RHI/DescriptorHeap.h"
+#include "Utils/Result.h"
 
 #include <span>
 
 namespace Cortex::Graphics::HZBPass {
+
+struct ResourceCreateContext {
+    ID3D12Device* device = nullptr;
+    DescriptorHeapManager* descriptorManager = nullptr;
+    ID3D12Resource* depthBuffer = nullptr;
+    DescriptorHandle depthSrv{};
+    HZBPassState* hzbState = nullptr;
+};
 
 struct GraphContext {
     DescriptorHeapManager* descriptorManager = nullptr;
@@ -48,6 +58,7 @@ struct BuildContext {
     uint32_t mipCount = 0;
 };
 
+[[nodiscard]] Result<void> CreateResources(const ResourceCreateContext& context);
 [[nodiscard]] bool BuildFromDepth(const BuildContext& context);
 
 void AddFromDepth(RenderGraph& graph,

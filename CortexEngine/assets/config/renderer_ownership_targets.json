@@ -33,6 +33,16 @@
       "future_extension": "If RT reflection capture/readback grows again, move the execution helper behind the same stats boundary instead of adding loose Renderer members"
     },
     {
+      "id": "rt_history_copy",
+      "owner": "RT temporal histories",
+      "status": "release_boundary_validated",
+      "release_boundary": "End-frame policy still decides whether RT shadow, GI, and reflection histories should update, but the repeated source-to-history transition/copy/return-to-SRV mechanics are owned by RTHistoryCopyPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/RTHistoryCopyPass.h", "Passes/RTHistoryCopyPass.cpp", "Renderer_FrameEnd.cpp"],
+      "renderer_state_members": ["m_rtShadowTargets", "m_rtGITargets", "m_rtReflectionTargets"],
+      "future_extension": "Keep future RT temporal copy mechanics in RTHistoryCopyPass or an adjacent RT history pass helper instead of duplicating barrier/copy code in Renderer_FrameEnd.cpp"
+    },
+    {
       "id": "environment_resources",
       "owner": "Environment/IBL",
       "status": "release_boundary_validated",

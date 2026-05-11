@@ -2,6 +2,7 @@
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
+#include "Graphics/Passes/RTHistoryCopyPass.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
@@ -154,105 +155,30 @@ void Renderer::EndFrame() {
     // frame's temporal smoothing has valid data.
     if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.shadowDenoisedThisFrame &&
         m_framePlanning.rtPlan.dispatchShadows && m_rtShadowTargets.mask && m_rtShadowTargets.history) {
-        D3D12_RESOURCE_BARRIER barriers[2] = {};
-        UINT barrierCount = 0;
-
-        if (m_rtShadowTargets.maskState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_rtShadowTargets.mask.Get();
-            barriers[barrierCount].Transition.StateBefore = m_rtShadowTargets.maskState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-            m_rtShadowTargets.maskState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        RTHistoryCopyPass::CopyContext copyContext{};
+        copyContext.commandList = m_commandResources.graphicsList.Get();
+        copyContext.source = m_rtShadowTargets.mask.Get();
+        copyContext.sourceState = &m_rtShadowTargets.maskState;
+        copyContext.history = m_rtShadowTargets.history.Get();
+        copyContext.historyState = &m_rtShadowTargets.historyState;
+        if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
+            MarkRTShadowHistoryValid();
         }
-
-        if (m_rtShadowTargets.historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_rtShadowTargets.history.Get();
-            barriers[barrierCount].Transition.StateBefore = m_rtShadowTargets.historyState;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-            m_rtShadowTargets.historyState = D3D12_RESOURCE_STATE_COPY_DEST;
-        }
-
-        if (barrierCount > 0) {
-            m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-        }
-
-        m_commandResources.graphicsList->CopyResource(m_rtShadowTargets.history.Get(), m_rtShadowTargets.mask.Get());
-
-        // Return both resources to shader-resource state for the next frame.
-        barriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[0].Transition.pResource = m_rtShadowTargets.mask.Get();
-        barriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-        barriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        barriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[1].Transition.pResource = m_rtShadowTargets.history.Get();
-        barriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        barriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-        m_commandResources.graphicsList->ResourceBarrier(2, barriers);
-
-        m_rtShadowTargets.maskState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          m_rtShadowTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          MarkRTShadowHistoryValid();
       }
 
       // Update RT GI history buffer in lock-step with the RT GI color buffer
       // so temporal accumulation in the shader has a stable previous frame.
       if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.giDenoisedThisFrame &&
           m_framePlanning.rtPlan.dispatchGI && m_rtGITargets.color && m_rtGITargets.history) {
-          D3D12_RESOURCE_BARRIER giBarriers[2] = {};
-          UINT giBarrierCount = 0;
-
-          if (m_rtGITargets.colorState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
-              giBarriers[giBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-              giBarriers[giBarrierCount].Transition.pResource = m_rtGITargets.color.Get();
-              giBarriers[giBarrierCount].Transition.StateBefore = m_rtGITargets.colorState;
-              giBarriers[giBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-              giBarriers[giBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-              ++giBarrierCount;
-              m_rtGITargets.colorState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          RTHistoryCopyPass::CopyContext copyContext{};
+          copyContext.commandList = m_commandResources.graphicsList.Get();
+          copyContext.source = m_rtGITargets.color.Get();
+          copyContext.sourceState = &m_rtGITargets.colorState;
+          copyContext.history = m_rtGITargets.history.Get();
+          copyContext.historyState = &m_rtGITargets.historyState;
+          if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
+              MarkRTGIHistoryValid();
           }
-
-          if (m_rtGITargets.historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
-              giBarriers[giBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-              giBarriers[giBarrierCount].Transition.pResource = m_rtGITargets.history.Get();
-              giBarriers[giBarrierCount].Transition.StateBefore = m_rtGITargets.historyState;
-              giBarriers[giBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-              giBarriers[giBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-              ++giBarrierCount;
-              m_rtGITargets.historyState = D3D12_RESOURCE_STATE_COPY_DEST;
-          }
-
-          if (giBarrierCount > 0) {
-              m_commandResources.graphicsList->ResourceBarrier(giBarrierCount, giBarriers);
-          }
-
-          m_commandResources.graphicsList->CopyResource(m_rtGITargets.history.Get(), m_rtGITargets.color.Get());
-
-          giBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-          giBarriers[0].Transition.pResource = m_rtGITargets.color.Get();
-          giBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-          giBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          giBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-          giBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-          giBarriers[1].Transition.pResource = m_rtGITargets.history.Get();
-          giBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-          giBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          giBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-          m_commandResources.graphicsList->ResourceBarrier(2, giBarriers);
-
-          m_rtGITargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          m_rtGITargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          MarkRTGIHistoryValid();
       }
 
       // Update RT reflection history after the DXR reflections pass has
@@ -263,52 +189,15 @@ void Renderer::EndFrame() {
       // skip the copy so we do not treat uninitialized data as valid history.
       if (m_rtRuntimeState.supported && m_rtRuntimeState.enabled && !m_rtDenoiseState.reflectionDenoisedThisFrame &&
           m_frameLifecycle.rtReflectionWrittenThisFrame && m_rtReflectionTargets.color && m_rtReflectionTargets.history) {
-          D3D12_RESOURCE_BARRIER reflBarriers[2] = {};
-          UINT reflBarrierCount = 0;
-
-          if (m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_COPY_SOURCE) {
-              reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-              reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionTargets.color.Get();
-              reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionTargets.colorState;
-              reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
-              reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-              ++reflBarrierCount;
-              m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+          RTHistoryCopyPass::CopyContext copyContext{};
+          copyContext.commandList = m_commandResources.graphicsList.Get();
+          copyContext.source = m_rtReflectionTargets.color.Get();
+          copyContext.sourceState = &m_rtReflectionTargets.colorState;
+          copyContext.history = m_rtReflectionTargets.history.Get();
+          copyContext.historyState = &m_rtReflectionTargets.historyState;
+          if (RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource(copyContext)) {
+              MarkRTReflectionHistoryValid();
           }
-
-          if (m_rtReflectionTargets.historyState != D3D12_RESOURCE_STATE_COPY_DEST) {
-              reflBarriers[reflBarrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-              reflBarriers[reflBarrierCount].Transition.pResource = m_rtReflectionTargets.history.Get();
-              reflBarriers[reflBarrierCount].Transition.StateBefore = m_rtReflectionTargets.historyState;
-              reflBarriers[reflBarrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-              reflBarriers[reflBarrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-              ++reflBarrierCount;
-              m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_COPY_DEST;
-          }
-
-          if (reflBarrierCount > 0) {
-              m_commandResources.graphicsList->ResourceBarrier(reflBarrierCount, reflBarriers);
-          }
-
-          m_commandResources.graphicsList->CopyResource(m_rtReflectionTargets.history.Get(), m_rtReflectionTargets.color.Get());
-
-          reflBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-          reflBarriers[0].Transition.pResource = m_rtReflectionTargets.color.Get();
-          reflBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
-          reflBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          reflBarriers[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-          reflBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-          reflBarriers[1].Transition.pResource = m_rtReflectionTargets.history.Get();
-          reflBarriers[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-          reflBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          reflBarriers[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
-          m_commandResources.graphicsList->ResourceBarrier(2, reflBarriers);
-
-          m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          m_rtReflectionTargets.historyState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-          MarkRTReflectionHistoryValid();
       }
 
     // Ensure screen-space/post-process inputs are back in a shader-resource

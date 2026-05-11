@@ -315,7 +315,13 @@ struct Particle {
 
 enum class ParticleEmitterType : uint32_t {
     Smoke = 0,
-    Fire  = 1
+    Fire  = 1,
+    Dust  = 2,
+    Sparks = 3,
+    Embers = 4,
+    Mist = 5,
+    Rain = 6,
+    Snow = 7
 };
 
 struct ParticleEmitterComponent {

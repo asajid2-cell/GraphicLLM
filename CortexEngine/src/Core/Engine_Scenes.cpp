@@ -11,6 +11,7 @@
 #include "Utils/GLTFLoader.h"
 #include "Graphics/RendererControlApplier.h"
 #include "Graphics/Renderer.h"
+#include "Scene/ParticleEffectLibrary.h"
 
 namespace Cortex {
 
@@ -24,6 +25,23 @@ namespace {
     constexpr float kCornellHalfExtent = 4.0f;
     constexpr float kCornellHeight     = 3.0f;
     constexpr float kHeroPoolZ         = -3.0f;
+
+    void AddParticleEffect(Scene::ECS_Registry& registry,
+                           const char* tag,
+                           std::string_view effectId,
+                           const glm::vec3& position) {
+        entt::entity e = registry.CreateEntity();
+        registry.AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = registry.AddComponent<Scene::TransformComponent>(e);
+        t.position = position;
+
+        Scene::ParticleEmitterComponent emitter;
+        if (!Scene::ApplyParticleEffectDescriptor(effectId, emitter) &&
+            !Scene::ApplyParticleEffectDescriptor("smoke", emitter)) {
+            return;
+        }
+        registry.AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
+    }
 }
 
 void Engine::RebuildScene(ScenePreset preset) {
@@ -1373,47 +1391,14 @@ void Engine::BuildEffectsShowcaseScene() {
     addPointLight("EffectsShowcase_CyanGlow", glm::vec3(0.0f, 3.0f, 2.7f), glm::vec3(0.16f, 0.72f, 1.0f), 4.8f, 8.0f);
     addPointLight("EffectsShowcase_AmberGlow", glm::vec3(4.6f, 2.3f, 3.1f), glm::vec3(1.0f, 0.54f, 0.14f), 4.6f, 7.0f);
 
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "EffectsShowcase_FireEmitter");
-        auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(-2.0f, 1.32f, -0.85f);
-
-        Scene::ParticleEmitterComponent emitter;
-        emitter.type = Scene::ParticleEmitterType::Fire;
-        emitter.rate = 95.0f;
-        emitter.lifetime = 0.85f;
-        emitter.initialVelocity = glm::vec3(0.2f, 2.8f, 0.75f);
-        emitter.velocityRandom = glm::vec3(0.65f, 0.9f, 0.65f);
-        emitter.sizeStart = 0.055f;
-        emitter.sizeEnd = 0.34f;
-        emitter.colorStart = glm::vec4(3.3f, 1.35f, 0.35f, 0.9f);
-        emitter.colorEnd = glm::vec4(0.75f, 0.04f, 0.0f, 0.0f);
-        emitter.gravity = 0.7f;
-        emitter.localSpace = true;
-        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
-    }
-
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "EffectsShowcase_MoteEmitter");
-        auto& t = m_registry->AddComponent<TransformComponent>(e);
-        t.position = glm::vec3(1.2f, 1.65f, 0.2f);
-
-        Scene::ParticleEmitterComponent emitter;
-        emitter.type = Scene::ParticleEmitterType::Smoke;
-        emitter.rate = 48.0f;
-        emitter.lifetime = 4.4f;
-        emitter.initialVelocity = glm::vec3(0.0f, 0.22f, 0.0f);
-        emitter.velocityRandom = glm::vec3(0.18f, 0.28f, 0.18f);
-        emitter.sizeStart = 0.04f;
-        emitter.sizeEnd = 0.17f;
-        emitter.colorStart = glm::vec4(0.65f, 0.88f, 1.0f, 0.28f);
-        emitter.colorEnd = glm::vec4(0.35f, 0.55f, 1.0f, 0.0f);
-        emitter.gravity = -0.08f;
-        emitter.localSpace = true;
-        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
-    }
+    AddParticleEffect(*m_registry, "EffectsShowcase_FireEmitter", "fire", glm::vec3(-2.0f, 1.32f, -0.85f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_MoteEmitter", "smoke", glm::vec3(1.2f, 1.65f, 0.2f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_DustEmitter", "dust", glm::vec3(-3.4f, 1.7f, 0.35f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_SparkEmitter", "sparks", glm::vec3(-1.25f, 1.45f, -0.55f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_EmberEmitter", "embers", glm::vec3(-0.55f, 1.50f, -0.35f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_MistEmitter", "mist", glm::vec3(2.6f, 1.42f, -0.45f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_RainEmitter", "rain", glm::vec3(4.0f, 3.25f, 0.2f));
+    AddParticleEffect(*m_registry, "EffectsShowcase_SnowEmitter", "snow", glm::vec3(3.2f, 3.1f, 0.95f));
 }
 
 void Engine::BuildRTShowcaseScene() {
@@ -1886,32 +1871,7 @@ void Engine::BuildRTShowcaseScene() {
     // Dragon fire emitter near the gallery dragon's mouth. This uses the
     // shared CPU-driven particle system and renders as small emissive
     // billboards that are bright enough to feed bloom and RT reflections.
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "RTGallery_FireEmitter");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        // Positioned slightly above and in front of the dragon plinth so
-        // particles travel upward and outward into the gallery space.
-        t.position = glm::vec3(galleryX + 0.4f, 1.4f, 2.0f);
-
-        Scene::ParticleEmitterComponent emitter;
-        emitter.type = Scene::ParticleEmitterType::Fire;
-        emitter.rate = 80.0f;          // steady stream
-        emitter.lifetime = 0.8f;       // short, flame-like
-        emitter.initialVelocity = glm::vec3(0.0f, 3.0f, 2.0f);
-        emitter.velocityRandom  = glm::vec3(0.7f, 0.8f, 0.7f);
-        emitter.sizeStart = 0.08f;
-        emitter.sizeEnd   = 0.40f;
-        // High-intensity warm colors so particles act as emissive sources.
-        emitter.colorStart = glm::vec4(3.2f, 1.6f, 0.55f, 0.85f);
-        emitter.colorEnd   = glm::vec4(0.45f, 0.10f, 0.0f, 0.0f);
-        // Positive gravity here accelerates particles upward, giving a rising
-        // flame motion without needing additional forces.
-        emitter.gravity = 0.8f;
-        emitter.localSpace = true;
-
-        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
-    }
+    AddParticleEffect(*m_registry, "RTGallery_FireEmitter", "fire", glm::vec3(galleryX + 0.4f, 1.4f, 2.0f));
 
     // --------------------
     // Zone B: Liquid courtyard (center)
@@ -2154,26 +2114,7 @@ void Engine::BuildRTShowcaseScene() {
     }
 
     // Dust / mote particle emitter near the light shafts.
-    {
-        entt::entity e = m_registry->CreateEntity();
-        m_registry->AddComponent<Scene::TagComponent>(e, "Atrium_DustEmitter");
-        auto& t = m_registry->AddComponent<Scene::TransformComponent>(e);
-        t.position = glm::vec3(atriumX - 2.5f, 2.0f, -0.5f);
-
-        Scene::ParticleEmitterComponent emitter;
-        emitter.type = Scene::ParticleEmitterType::Smoke;
-        emitter.rate = 40.0f;
-        emitter.lifetime = 5.0f;
-        emitter.initialVelocity = glm::vec3(0.0f, 0.4f, 0.0f);
-        emitter.velocityRandom = glm::vec3(0.15f, 0.2f, 0.15f);
-        emitter.sizeStart = 0.06f;
-        emitter.sizeEnd = 0.18f;
-        emitter.colorStart = glm::vec4(0.9f, 0.9f, 0.9f, 0.25f);
-        emitter.colorEnd   = glm::vec4(0.9f, 0.95f, 1.0f, 0.0f);
-        emitter.gravity = -0.1f;
-        emitter.localSpace = true;
-        m_registry->AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
-    }
+    AddParticleEffect(*m_registry, "Atrium_DustEmitter", "dust", glm::vec3(atriumX - 2.5f, 2.0f, -0.5f));
 
     // Small highlight light in the atrium
     {

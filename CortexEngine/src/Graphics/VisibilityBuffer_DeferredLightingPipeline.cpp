@@ -28,7 +28,7 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
     //   t3: Depth buffer SRV
     //   t4: Material extension 0 SRV (clearcoat/IOR/specular)
     //   t5: Material extension 1 SRV (specularColor/transmission)
-    //   t6: Material extension 2 SRV (surface class / reflection mask / sheen / SSS wrap)
+    //   t6: Material extension 2 SRV (surface class / anisotropy / sheen / SSS wrap)
     //   t7: Diffuse irradiance environment SRV (lat-long)
     //   t8: Specular prefiltered environment SRV (lat-long)
     //   t9: Shadow map array SRV (Texture2DArray)

@@ -971,6 +971,21 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because HZB, RT, temporal,
       graph orchestration, and other renderer pass mechanics still live in
       renderer orchestration files.
+    - The current HZB compute-build checkpoint moves depth/HZB resource
+      transitions, compute root and pipeline binding, persistent descriptor-table
+      binding, mip dispatch, and per-mip shader-resource finalization into
+      `HZBPass::BuildFromDepth`. `Renderer_HZB.cpp` still owns HZB
+      resource/descriptor creation and capture metadata, and now has no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`, `SetComputeRootSignature`,
+      `SetComputeRootDescriptorTable`, or `Dispatch` calls in the build path.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=27`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_121213_477_86640_593d35d4`, and RT
+      showcase passed at `rt_showcase_20260511_121218_941_76744_9d006e46`.
+      The broader ownership rows remain `PARTIAL` because RT, temporal, graph
+      orchestration, and other renderer pass mechanics still live in renderer
+      orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

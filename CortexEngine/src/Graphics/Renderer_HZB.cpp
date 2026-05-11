@@ -11,11 +11,6 @@ namespace Cortex::Graphics {
 
 namespace {
 
-constexpr D3D12_RESOURCE_STATES kDepthSampleState =
-    D3D12_RESOURCE_STATE_DEPTH_READ |
-    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
 uint32_t CalcHZBMipCount(uint32_t width, uint32_t height) {
     width = std::max(1u, width);
     height = std::max(1u, height);
@@ -243,128 +238,30 @@ void Renderer::BuildHZBFromDepth() {
         return;
     }
 
-    if (m_depthResources.resources.resourceState != kDepthSampleState) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        barrier.Transition.StateAfter = kDepthSampleState;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resources.resourceState = kDepthSampleState;
-    }
-
-    if (m_hzbResources.resources.resourceState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
-        barrier.Transition.StateBefore = m_hzbResources.resources.resourceState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    }
-
-    const bool compactHzbRoot = m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
-    ID3D12RootSignature* hzbRootSignature =
-        compactHzbRoot ? m_pipelineState.singleSrvUavComputeRootSignature.Get() : m_pipelineState.computeRootSignature->GetRootSignature();
-    const UINT hzbFrameConstantsRoot = compactHzbRoot ? 0u : 1u;
-    const UINT hzbSrvTableRoot = compactHzbRoot ? 1u : 3u;
-    const UINT hzbUavTableRoot = compactHzbRoot ? 2u : 6u;
-
-    m_commandResources.graphicsList->SetComputeRootSignature(hzbRootSignature);
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    m_commandResources.graphicsList->SetComputeRootConstantBufferView(hzbFrameConstantsRoot, m_constantBuffers.currentFrameGPU);
-
-    auto bindSrvTableT0 = [&](DescriptorHandle src, uint32_t dispatchIndex) -> bool {
-        if (!compactHzbRoot || !m_hzbResources.descriptors.dispatchTablesValid) {
-            spdlog::error("BuildHZBFromDepth: compact persistent HZB descriptors are unavailable");
-            return false;
-        }
-        if (!src.IsValid()) {
-            spdlog::error("BuildHZBFromDepth: invalid SRV staging descriptor");
-            return false;
-        }
-        const auto& table = m_hzbResources.descriptors.dispatchSrvTables[m_frameRuntime.frameIndex % kFrameCount];
-        if (dispatchIndex >= table.size() || !table[dispatchIndex].IsValid()) {
-            spdlog::error("BuildHZBFromDepth: missing persistent SRV descriptor for dispatch {}", dispatchIndex);
-            return false;
-        }
-        m_commandResources.graphicsList->SetComputeRootDescriptorTable(hzbSrvTableRoot, table[dispatchIndex].gpu);
-        return true;
-    };
-
-    auto bindUavTableU0 = [&](DescriptorHandle src, uint32_t dispatchIndex) -> bool {
-        if (!compactHzbRoot || !m_hzbResources.descriptors.dispatchTablesValid) {
-            spdlog::error("BuildHZBFromDepth: compact persistent HZB descriptors are unavailable");
-            return false;
-        }
-        if (!src.IsValid()) {
-            spdlog::error("BuildHZBFromDepth: invalid UAV staging descriptor");
-            return false;
-        }
-        const auto& table = m_hzbResources.descriptors.dispatchUavTables[m_frameRuntime.frameIndex % kFrameCount];
-        if (dispatchIndex >= table.size() || !table[dispatchIndex].IsValid()) {
-            spdlog::error("BuildHZBFromDepth: missing persistent UAV descriptor for dispatch {}", dispatchIndex);
-            return false;
-        }
-        m_commandResources.graphicsList->SetComputeRootDescriptorTable(hzbUavTableRoot, table[dispatchIndex].gpu);
-        return true;
-    };
-
-    auto dispatchForDims = [&](uint32_t w, uint32_t h) {
-        const UINT groupX = (w + 7) / 8;
-        const UINT groupY = (h + 7) / 8;
-        m_commandResources.graphicsList->Dispatch(groupX, groupY, 1);
-    };
-
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.hzbInit->GetPipelineState());
-    if (!bindSrvTableT0(m_depthResources.descriptors.srv, 0)) {
+    const auto& srvTable = m_hzbResources.descriptors.dispatchSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    const auto& uavTable = m_hzbResources.descriptors.dispatchUavTables[m_frameRuntime.frameIndex % kFrameCount];
+    if (!HZBPass::BuildFromDepth({
+            m_commandResources.graphicsList.Get(),
+            m_services.descriptorManager.get(),
+            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState},
+            {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState},
+            m_pipelineState.singleSrvUavComputeRootSignature.Get(),
+            m_pipelineState.computeRootSignature.get(),
+            m_pipelineState.hzbInit.get(),
+            m_pipelineState.hzbDownsample.get(),
+            m_constantBuffers.currentFrameGPU,
+            m_depthResources.descriptors.srv,
+            std::span<const DescriptorHandle>(m_hzbResources.descriptors.mipSRVStaging.data(), m_hzbResources.descriptors.mipSRVStaging.size()),
+            std::span<const DescriptorHandle>(m_hzbResources.descriptors.mipUAVStaging.data(), m_hzbResources.descriptors.mipUAVStaging.size()),
+            std::span<const DescriptorHandle>(srvTable.data(), srvTable.size()),
+            std::span<const DescriptorHandle>(uavTable.data(), uavTable.size()),
+            m_hzbResources.descriptors.dispatchTablesValid,
+            m_hzbResources.resources.width,
+            m_hzbResources.resources.height,
+            m_hzbResources.resources.mipCount,
+        })) {
         return;
     }
-    if (!bindUavTableU0(m_hzbResources.descriptors.mipUAVStaging[0], 0)) {
-        return;
-    }
-    dispatchForDims(m_hzbResources.resources.width, m_hzbResources.resources.height);
-
-    {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = 0;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-    }
-
-    uint32_t mipW = m_hzbResources.resources.width;
-    uint32_t mipH = m_hzbResources.resources.height;
-
-    for (uint32_t mip = 1; mip < m_hzbResources.resources.mipCount; ++mip) {
-        mipW = (mipW + 1u) / 2u;
-        mipH = (mipH + 1u) / 2u;
-
-        m_commandResources.graphicsList->SetPipelineState(m_pipelineState.hzbDownsample->GetPipelineState());
-        if (!bindSrvTableT0(m_hzbResources.descriptors.mipSRVStaging[mip - 1], mip)) {
-            return;
-        }
-        if (!bindUavTableU0(m_hzbResources.descriptors.mipUAVStaging[mip], mip)) {
-            return;
-        }
-
-        dispatchForDims(mipW, mipH);
-
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = mip;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-    }
-
-    m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     m_hzbResources.resources.valid = true;
 
     m_hzbResources.capture.captureViewMatrix = m_constantBuffers.frameCPU.viewMatrix;

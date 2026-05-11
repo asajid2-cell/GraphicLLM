@@ -155,12 +155,12 @@ bool Renderer::PrepareBloomPassState() {
         return false;
     }
 
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(1, m_constantBuffers.currentFrameGPU);
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    return true;
+    BloomPass::FullscreenContext context{};
+    context.commandList = m_commandResources.graphicsList.Get();
+    context.descriptorManager = m_services.descriptorManager.get();
+    context.rootSignature = m_pipelineState.rootSignature.get();
+    context.frameConstants = m_constantBuffers.currentFrameGPU;
+    return BloomPass::PrepareFullscreenState(context);
 }
 
 bool Renderer::BindBloomPassSRV(DescriptorHandle source, const char* label, uint32_t tableSlot) {
@@ -169,27 +169,14 @@ bool Renderer::BindBloomPassSRV(DescriptorHandle source, const char* label, uint
         return false;
     }
 
-    DescriptorHandle dst{};
-    if (m_bloomResources.descriptors.srvTableValid && tableSlot < kBloomDescriptorSlots) {
-        dst = m_bloomResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][tableSlot];
-    } else {
-        auto handleResult = m_services.descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            spdlog::warn("RenderBloom: failed to allocate SRV for {}: {}",
-                         label ? label : "pass",
-                         handleResult.Error());
-            return false;
-        }
-        dst = handleResult.Value();
-    }
-
-    m_services.device->GetDevice()->CopyDescriptorsSimple(
-        1,
-        dst.cpu,
-        source.cpu,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, dst.gpu);
-    return true;
+    BloomPass::FullscreenContext context{};
+    context.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+    context.commandList = m_commandResources.graphicsList.Get();
+    context.descriptorManager = m_services.descriptorManager.get();
+    context.srvTable = m_bloomResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount].data();
+    context.srvTableCount = kBloomDescriptorSlots;
+    context.srvTableValid = m_bloomResources.descriptors.srvTableValid;
+    return BloomPass::BindSrvDescriptor(context, source, label, tableSlot);
 }
 
 bool Renderer::BindBloomPassTexture(ID3D12Resource* source, DXGI_FORMAT format, const char* label, uint32_t tableSlot) {
@@ -198,30 +185,14 @@ bool Renderer::BindBloomPassTexture(ID3D12Resource* source, DXGI_FORMAT format, 
         return false;
     }
 
-    DescriptorHandle dst{};
-    if (m_bloomResources.descriptors.srvTableValid && tableSlot < kBloomDescriptorSlots) {
-        dst = m_bloomResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount][tableSlot];
-    } else {
-        auto handleResult = m_services.descriptorManager->AllocateTransientCBV_SRV_UAV();
-        if (handleResult.IsErr()) {
-            spdlog::warn("RenderBloom: failed to allocate SRV for {}: {}",
-                         label ? label : "pass",
-                         handleResult.Error());
-            return false;
-        }
-        dst = handleResult.Value();
-    }
-
-    const D3D12_RESOURCE_DESC resourceDesc = source->GetDesc();
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = (format == DXGI_FORMAT_UNKNOWN) ? resourceDesc.Format : format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(source, &srvDesc, dst.cpu);
-    m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(3, dst.gpu);
-    return true;
+    BloomPass::FullscreenContext context{};
+    context.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+    context.commandList = m_commandResources.graphicsList.Get();
+    context.descriptorManager = m_services.descriptorManager.get();
+    context.srvTable = m_bloomResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount].data();
+    context.srvTableCount = kBloomDescriptorSlots;
+    context.srvTableValid = m_bloomResources.descriptors.srvTableValid;
+    return BloomPass::BindTexture(context, source, format, label, tableSlot);
 }
 
 bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
@@ -241,7 +212,9 @@ bool Renderer::RenderBloomDownsampleBase(bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomDownsample->GetPipelineState());
+    if (!BloomPass::BindPipelineState(m_commandResources.graphicsList.Get(), m_pipelineState.bloomDownsample.get())) {
+        return false;
+    }
 
     if (!BindBloomPassTexture(m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_UNKNOWN, "downsample hdr", BloomPass::BaseDownsampleSlot())) {
         return false;
@@ -268,7 +241,9 @@ bool Renderer::RenderBloomDownsampleLevel(uint32_t level, bool skipTransitions) 
         return false;
     }
 
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomDownsample->GetPipelineState());
+    if (!BloomPass::BindPipelineState(m_commandResources.graphicsList.Get(), m_pipelineState.bloomDownsample.get())) {
+        return false;
+    }
 
     if (!BindBloomPassTexture(m_bloomResources.resources.texA[level - 1].Get(), DXGI_FORMAT_UNKNOWN, "downsample chain",
                               BloomPass::DownsampleChainSlot(level))) {
@@ -296,7 +271,9 @@ bool Renderer::RenderBloomBlurHorizontal(uint32_t level, bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomBlurH->GetPipelineState());
+    if (!BloomPass::BindPipelineState(m_commandResources.graphicsList.Get(), m_pipelineState.bloomBlurH.get())) {
+        return false;
+    }
 
     if (!BindBloomPassTexture(m_bloomResources.resources.texA[level].Get(), DXGI_FORMAT_UNKNOWN, "blur horizontal",
                               BloomPass::BlurHSlot(level, kBloomLevels))) {
@@ -324,7 +301,9 @@ bool Renderer::RenderBloomBlurVertical(uint32_t level, bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomBlurV->GetPipelineState());
+    if (!BloomPass::BindPipelineState(m_commandResources.graphicsList.Get(), m_pipelineState.bloomBlurV.get())) {
+        return false;
+    }
 
     if (!BindBloomPassTexture(m_bloomResources.resources.texB[level].Get(), DXGI_FORMAT_UNKNOWN, "blur vertical",
                               BloomPass::BlurVSlot(level, kBloomLevels))) {
@@ -365,7 +344,9 @@ bool Renderer::RenderBloomComposite(bool skipTransitions) {
         return false;
     }
 
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.bloomComposite->GetPipelineState());
+    if (!BloomPass::BindPipelineState(m_commandResources.graphicsList.Get(), m_pipelineState.bloomComposite.get())) {
+        return false;
+    }
 
     for (int level = static_cast<int>(m_bloomResources.resources.activeLevels) - 1; level >= 0; --level) {
         if (!m_bloomResources.resources.texA[level]) {

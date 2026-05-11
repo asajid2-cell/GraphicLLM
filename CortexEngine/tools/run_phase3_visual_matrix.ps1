@@ -161,6 +161,18 @@ if ($failures.Count -eq 0) {
     Invoke-MatrixStep "ibl_gallery" $iblArgs ""
 }
 
+if ($failures.Count -eq 0) {
+    $fallbackLogDir = Join-Path $matrixLogDir "fallback_matrix"
+    Invoke-MatrixStep "fallback_matrix" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_phase3_fallback_matrix.ps1"),
+        "-NoBuild",
+        "-LogDir", $fallbackLogDir,
+        "-SmokeFrames", "60"
+    ) ""
+}
+
 $summaryPath = Join-Path $matrixLogDir "phase3_visual_matrix_summary.json"
 $markdownPath = Join-Path $matrixLogDir "phase3_visual_matrix_summary.md"
 $rows | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryPath

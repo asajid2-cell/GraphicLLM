@@ -76,6 +76,7 @@ $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
 $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
 $ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
+$ssrPassPath = Join-Path $root "src/Graphics/Passes/SSRPass.cpp"
 $hzbStatePath = Join-Path $root "src/Graphics/RendererHZBState.h"
 $hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
 $shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
@@ -523,6 +524,32 @@ foreach ($target in $doc.targets) {
                     Add-Failure "screen_space_resources still uses flat SSR state access in Renderer_SSRPass.cpp: $oldFlatAccess"
                 }
             }
+        }
+    }
+
+    if ($id -eq "ssr_target_transitions") {
+        if (Test-Path $ssrPassPath) {
+            $ssrPass = Get-Content $ssrPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::SSRPass", "ResourceStateRef", "PrepareContext", "PrepareTargets", "desiredState", "ResourceBarrier")) {
+                if ($ssrPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "ssr_target_transitions missing SSRPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "ssr_target_transitions missing SSRPass.cpp"
+        }
+        if (Test-Path $ssrRendererPath) {
+            $ssrRenderer = Get-Content $ssrRendererPath -Raw
+            if ($ssrRenderer.IndexOf("SSRPass::PrepareTargets", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "ssr_target_transitions missing routed target preparation call in Renderer_SSRPass.cpp"
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "barrierCount")) {
+                if ($ssrRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "ssr_target_transitions still has direct SSR target transition mechanics in Renderer_SSRPass.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "ssr_target_transitions missing Renderer_SSRPass.cpp"
         }
     }
 

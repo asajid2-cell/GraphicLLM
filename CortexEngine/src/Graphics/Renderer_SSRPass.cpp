@@ -20,62 +20,20 @@ void Renderer::RenderSSR() {
         return;
     }
 
-    // Transition resources to appropriate states
-    D3D12_RESOURCE_BARRIER barriers[4] = {};
-    UINT barrierCount = 0;
-
-    if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-        m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssrResources.resources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
+    SSRPass::PrepareContext prepareContext{};
+    prepareContext.commandList = m_commandResources.graphicsList.Get();
+    prepareContext.skipTransitions = m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions;
+    prepareContext.ssrTarget = {m_ssrResources.resources.color.Get(), &m_ssrResources.resources.resourceState, D3D12_RESOURCE_STATE_RENDER_TARGET};
+    prepareContext.hdr = {m_mainTargets.hdr.resources.color.Get(), &m_mainTargets.hdr.resources.state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
+    prepareContext.normalRoughness = {
+        m_visibilityBufferState.renderedThisFrame ? nullptr : m_mainTargets.normalRoughness.resources.texture.Get(),
+        m_visibilityBufferState.renderedThisFrame ? nullptr : &m_mainTargets.normalRoughness.resources.state,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
+    prepareContext.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState, kDepthSampleState};
+    if (!SSRPass::PrepareTargets(prepareContext)) {
+        spdlog::error("RenderSSR: target transition failed");
+        return;
     }
-
-    if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-        m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-    }
-
-    if (!m_visibilityBufferState.renderedThisFrame) {
-        if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions &&
-            m_mainTargets.normalRoughness.resources.texture &&
-            m_mainTargets.normalRoughness.resources.state != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_mainTargets.normalRoughness.resources.texture.Get();
-            barriers[barrierCount].Transition.StateBefore = m_mainTargets.normalRoughness.resources.state;
-            barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            ++barrierCount;
-        }
-    }
-
-    if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions && m_depthResources.resources.resourceState != kDepthSampleState) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-    }
-
-    if (barrierCount > 0) {
-        m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-    }
-
-    m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (!m_visibilityBufferState.renderedThisFrame && m_mainTargets.normalRoughness.resources.texture) {
-        m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    }
-    m_depthResources.resources.resourceState = kDepthSampleState;
 
     if (!m_ssrResources.descriptors.srvTableValid) {
         spdlog::error("RenderSSR: persistent SRV table is invalid");

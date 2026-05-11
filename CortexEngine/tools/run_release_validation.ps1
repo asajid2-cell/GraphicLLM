@@ -383,6 +383,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "material_path_equivalence" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_material_path_equivalence_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "conductor_energy_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -449,6 +449,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "ibl_asset_policy" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_ibl_asset_policy_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "phase3_fallback_matrix" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

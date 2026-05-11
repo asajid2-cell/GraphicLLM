@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_232645_290_31604_c17d1470
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_233128_383_15348_330e05eb
 ```
 
 Key evidence from that run:
@@ -59,12 +59,12 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.401`, `disocclusion=0.006649`,
-  `high_motion=0.005171`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.695`, `disocclusion=0.006617`,
+  `high_motion=0.005160`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=3.103`,
+  `camera=reflection_closeup`, `gpu_ms=3.140`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.611/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.641/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -93,7 +93,7 @@ Key evidence from that run:
   glass/water courtyard, effects showcase, and uncapped IBL gallery passed.
 - Renderer ownership, full renderer ownership audit, VB debug views,
   descriptor/memory stress, visual probe, fatal error, advanced graphics catalog, effects gallery,
-  environment manifest, uncapped IBL gallery, budget profile matrix, and voxel backend
+  environment manifest, IBL asset policy, uncapped IBL gallery, budget profile matrix, and voxel backend
   gates passed.
 - New focused gates passed in release validation: temporal camera cut,
   visibility-buffer transition contract,
@@ -211,6 +211,7 @@ long file/function lists in every row.
 | `tools/run_effects_showcase_smoke.ps1` | runtime | Runtime effects scene smoke for particles, cinematic post, advanced material coverage. |
 | `tools/run_effects_gallery_tests.ps1` | runtime wrapper | Effects showcase plus catalog/contract checks. |
 | `tools/run_environment_manifest_tests.ps1` | static/asset | Manifest schema/default/fallback/runtime asset checks; by itself not enough for runtime IBL behavior. |
+| `tools/run_ibl_asset_policy_tests.ps1` | static/asset | IBL startup/release-size policy: no startup downloads, source assets optional, legacy scan disabled, runtime format preferences, and budget-class asset size caps. |
 | `tools/run_ibl_gallery_tests.ps1` | runtime | Runtime environment loading and IBL visual checks. |
 | `tools/run_visual_baseline_contract_tests.ps1` | static/runtime sample | Visual baseline manifest and limited runtime case; not full golden-image comparison. |
 | `tools/run_advanced_graphics_catalog_tests.ps1` | static/metadata | Catalog release-foundation coverage; does not prove future advanced features. |
@@ -484,7 +485,7 @@ definition of done in `phase3.md`.
 | P3-GLOBAL-10 | Same scene/profile can be reproduced from config files. | DONE_VERIFIED | SRC-UI-P3, SRC-SCENES, `assets/config/graphics_presets.json` | `tools/run_graphics_preset_tests.ps1 -NoBuild -RuntimeSmoke`; `tools/run_phase3_visual_matrix.ps1 -NoBuild` | Preset runtime smoke and visual matrix passed. | More profiles can be added. |
 | P3-NONGOAL-01 | Do not restart infinite-world effort in Phase 3. | DEFERRED_BY_USER_ONLY | SRC-DOCS, git history | documentation/history inspection | Cortex release path focuses renderer; voxel backend is experimental smoke only. | Keep infinite-world/outdoor work out unless explicitly reopened by user. |
 | P3-NONGOAL-02 | Do not replace renderer architecture wholesale. | DONE_VERIFIED | SRC-STATE, SRC-RENDER-ORCH | `tools/run_release_validation.ps1` | Changes extend existing renderer modules/state; build passes. | Continue avoiding parallel systems. |
-| P3-NONGOAL-03 | Do not add large assets without policy/fallback/release-size awareness. | PARTIAL | SRC-ENV-P3, `assets/environments/environments.json` | `tools/run_environment_manifest_tests.ps1` | Manifest policy exists and passes. | Optional asset download/generation policy is documented but not tool-complete. |
+| P3-NONGOAL-03 | Do not add large assets without policy/fallback/release-size awareness. | DONE_VERIFIED | SRC-ENV-P3, `assets/environments/environments.json`, `tools/run_ibl_asset_policy_tests.ps1` | `tools/run_ibl_asset_policy_tests.ps1`; `tools/run_environment_manifest_tests.ps1` | IBL asset policy gate passed with `runtime_assets=5`, startup downloads disabled, source assets optional, legacy scan fallback disabled, runtime format preference enforced, and budget-class asset size caps checked. | None for committed IBL startup/release-size policy. |
 | P3-DESIGN-01 | Every public visual feature has a control, preset, fallback, and validation path. | PARTIAL | SRC-UI-P3, SRC-SCENES, SRC-CONTRACT | `tools/run_release_validation.ps1` | Release foundations have controls/presets/contracts. | Advanced materials, particles, cinematic post, SSR/RT tuning controls are incomplete. |
 | P3-DESIGN-02 | UI settings clamp and serialize cleanly. | PARTIAL | `RendererTuningState.cpp`, `RendererControlApplier_Runtime.cpp`, `GraphicsSettingsWindow.cpp` | `tools/run_graphics_settings_persistence_tests.ps1 -NoBuild`; `tools/run_graphics_ui_contract_tests.ps1` | Persistence and UI contracts passed. | Not every planned slider exists or is round-tripped. |
 | P3-DESIGN-03 | Environment assets have metadata, budget class, and fallback behavior. | DONE_VERIFIED | SRC-ENV-P3 | `tools/run_environment_manifest_tests.ps1`; `tools/run_ibl_gallery_tests.ps1 -NoBuild`; `tools/run_phase3_fallback_matrix.ps1 -NoBuild` | Manifest metadata/budget policy passed, all enabled runtime IBLs loaded, and missing required asset fallback reports `procedural_sky` plus `requested_environment_load_failed`. | None for current committed environment assets and fallback behavior. |
@@ -586,7 +587,7 @@ definition of done in `phase3.md`.
 | P3-GATE-02 | Existing release validation. | DONE_VERIFIED | `tools/run_release_validation.ps1` | `tools/run_release_validation.ps1` | Latest full release gate passed. | None for current suite. |
 | P3-GATE-03 | Phase 3 visual matrix. | DONE_VERIFIED | `tools/run_phase3_visual_matrix.ps1` | release gate matrix step | Matrix passed. | Matrix lacks some original blueprint rows. |
 | P3-GATE-04 | Graphics preset round-trip test. | DONE_VERIFIED | `tools/run_graphics_preset_tests.ps1`, `RendererTuningState.cpp` | release gate preset step | Preset tests passed. | Add migration/unknown negative coverage. |
-| P3-GATE-05 | IBL asset policy test. | PARTIAL | `tools/run_environment_manifest_tests.ps1`, manifest | release gate environment step | Manifest passed. | Policy is not a separate asset-size/download tool. |
+| P3-GATE-05 | IBL asset policy test. | DONE_VERIFIED | `tools/run_ibl_asset_policy_tests.ps1`, `tools/run_environment_manifest_tests.ps1`, manifest | `tools/run_ibl_asset_policy_tests.ps1` | Standalone policy gate passed: `runtime_assets=5`; startup downloads disabled; source assets optional; legacy scan fallback disabled; runtime format preferences and budget-class size caps enforced. | None for current IBL asset policy gate. |
 | P3-GATE-06 | Environment manifest test. | DONE_VERIFIED | `EnvironmentManifest.cpp`, `environments.json` | `tools/run_environment_manifest_tests.ps1` | Passed. | None for current manifest. |
 | P3-GATE-07 | IBL gallery matrix. | DONE_VERIFIED | `tools/run_ibl_gallery_tests.ps1`; `tools/run_release_validation.ps1`; `tools/run_phase3_visual_matrix.ps1` | `tools/run_ibl_gallery_tests.ps1 -NoBuild`; `tools/run_phase3_visual_matrix.ps1 -NoBuild -TemporalSmokeFrames 90 -RTSmokeFrames 180 -SkipSurfaceDebug` | Direct IBL gallery passed all five enabled runtime IBLs; uncapped Phase 3 matrix passed and included the full gallery. | None for all enabled runtime IBLs; physical missing-asset variants remain tracked under fallback policy rows. |
 | P3-GATE-08 | UI smoke for graphics settings. | DONE_VERIFIED | `tools/run_graphics_ui_contract_tests.ps1`, `tools/run_graphics_ui_interaction_smoke.ps1`, `GraphicsSettingsWindow.cpp` | release gate UI steps; `tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild` | Static contract passed. Runtime interaction smoke passed and verifies settings application through `RendererTuningState`. | Native mouse/keyboard widget automation remains tracked separately. |

@@ -43,7 +43,7 @@ validation suite:
 - renderer ownership, full ownership audit, and fatal error contract checks,
 - advanced graphics catalog and effects gallery checks,
 - particle-disabled zero-cost runtime check,
-- environment manifest and IBL gallery checks,
+- environment manifest, IBL asset policy, and IBL gallery checks,
 - Phase 3 environment/RT fallback matrix,
 - RT reflection firefly/outlier check,
 - RT budget profile matrix,
@@ -83,6 +83,7 @@ Run the Phase 3 foundation checks:
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_ibl_asset_policy_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild

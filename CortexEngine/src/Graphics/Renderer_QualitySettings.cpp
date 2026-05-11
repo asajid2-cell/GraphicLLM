@@ -115,6 +115,21 @@ void Renderer::SetCinematicPost(float vignette, float lensDirt) {
                  m_postProcessState.lensDirt);
 }
 
+void Renderer::SetCinematicPostEffects(float motionBlur, float depthOfField) {
+    const float clampedMotionBlur = glm::clamp(motionBlur, 0.0f, 1.0f);
+    const float clampedDepthOfField = glm::clamp(depthOfField, 0.0f, 1.0f);
+    if (std::abs(clampedMotionBlur - m_postProcessState.motionBlur) < 1e-3f &&
+        std::abs(clampedDepthOfField - m_postProcessState.depthOfField) < 1e-3f) {
+        return;
+    }
+
+    m_postProcessState.motionBlur = clampedMotionBlur;
+    m_postProcessState.depthOfField = clampedDepthOfField;
+    spdlog::info("Cinematic post effects set to motion_blur={} depth_of_field={}",
+                 m_postProcessState.motionBlur,
+                 m_postProcessState.depthOfField);
+}
+
 float Renderer::GetRenderScale() const {
     return GetQualityState().renderScale;
 }

@@ -342,6 +342,8 @@ struct FrameContract {
         std::string colorGradePreset = "neutral";
         float vignette = 0.0f;
         float lensDirt = 0.0f;
+        float motionBlur = 0.0f;
+        float depthOfField = 0.0f;
         float warm = 0.0f;
         float cool = 0.0f;
         float godRayIntensity = 0.0f;

@@ -55,6 +55,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_GRADE_WARM_FILM = 9055,
     IDC_GFX_GRADE_COOL_MOON = 9056,
     IDC_GFX_GRADE_BLEACH = 9057,
+    IDC_GFX_MOTION_BLUR = 9058,
+    IDC_GFX_DOF = 9059,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -159,6 +161,8 @@ struct GraphicsSettingsState {
     SliderBinding saturation;
     SliderBinding vignette;
     SliderBinding lensDirt;
+    SliderBinding motionBlur;
+    SliderBinding depthOfField;
     SliderBinding particleDensity;
 
     HWND chkTAA = nullptr;
@@ -290,6 +294,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.cinematicPost.saturation = SliderToFloat(g_gfx.saturation);
     g_gfx.tuning.cinematicPost.vignette = SliderToFloat(g_gfx.vignette);
     g_gfx.tuning.cinematicPost.lensDirt = SliderToFloat(g_gfx.lensDirt);
+    g_gfx.tuning.cinematicPost.motionBlur = SliderToFloat(g_gfx.motionBlur);
+    g_gfx.tuning.cinematicPost.depthOfField = SliderToFloat(g_gfx.depthOfField);
     g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
 }
 
@@ -378,6 +384,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.saturation, g_gfx.tuning.cinematicPost.saturation);
     SetSliderFromFloat(g_gfx.vignette, g_gfx.tuning.cinematicPost.vignette);
     SetSliderFromFloat(g_gfx.lensDirt, g_gfx.tuning.cinematicPost.lensDirt);
+    SetSliderFromFloat(g_gfx.motionBlur, g_gfx.tuning.cinematicPost.motionBlur);
+    SetSliderFromFloat(g_gfx.depthOfField, g_gfx.tuning.cinematicPost.depthOfField);
     SetSliderFromFloat(g_gfx.particleDensity, g_gfx.tuning.particles.densityScale);
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
@@ -689,6 +697,8 @@ void RegisterGraphicsSettingsClass() {
             }
             makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MOTION_BLUR, L"Motion Blur", g_gfx.motionBlur, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_DOF, L"Depth of Field", g_gfx.depthOfField, 0.0f, 1.0f);
             {
                 const int buttonWidth = (width - margin * 2 - 12) / 3;
                 makeButton(IDC_GFX_BOOKMARK_HERO, L"Hero View", margin, y, buttonWidth);

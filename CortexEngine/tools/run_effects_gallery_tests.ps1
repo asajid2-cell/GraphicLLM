@@ -135,6 +135,12 @@ if ($null -eq $cinematicPost) {
     if ($null -eq $cinematicPost.lens_dirt) {
         Add-Failure "cinematic_post.lens_dirt is missing"
     }
+    if ([double]$cinematicPost.motion_blur -le 0.0) {
+        Add-Failure "cinematic_post.motion_blur is not active"
+    }
+    if ([double]$cinematicPost.depth_of_field -le 0.0) {
+        Add-Failure "cinematic_post.depth_of_field is not active"
+    }
 }
 
 if ($failures.Count -gt 0) {

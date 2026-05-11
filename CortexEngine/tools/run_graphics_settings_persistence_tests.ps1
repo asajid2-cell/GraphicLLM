@@ -103,7 +103,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "contrast": 1.18,
     "saturation": 1.34,
     "vignette": 0.31,
-    "lens_dirt": 0.22
+    "lens_dirt": 0.22,
+    "motion_blur": 0.26,
+    "depth_of_field": 0.38
   }
 }
 '@ | Set-Content -Encoding UTF8 $validPath
@@ -267,6 +269,8 @@ if ($validRun.exit_code -ne 0) {
     }
     $vignette = [double]$report.frame_contract.cinematic_post.vignette
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
+    $motionBlur = [double]$report.frame_contract.cinematic_post.motion_blur
+    $depthOfField = [double]$report.frame_contract.cinematic_post.depth_of_field
     $contrast = [double]$report.frame_contract.cinematic_post.contrast
     $saturation = [double]$report.frame_contract.cinematic_post.saturation
     $warm = [double]$report.frame_contract.cinematic_post.warm
@@ -295,6 +299,12 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($lensDirt - 0.22) -gt 0.02) {
         Add-Failure "valid settings lens dirt was $lensDirt, expected 0.22"
+    }
+    if ([Math]::Abs($motionBlur - 0.26) -gt 0.03) {
+        Add-Failure "valid settings motion blur was $motionBlur, expected 0.26"
+    }
+    if ([Math]::Abs($depthOfField - 0.38) -gt 0.03) {
+        Add-Failure "valid settings depth of field was $depthOfField, expected 0.38"
     }
     $particleDensity = [double]$report.frame_contract.particles.density_scale
     if ([Math]::Abs($particleDensity - 0.43) -gt 0.02) {

@@ -56,7 +56,8 @@
         "bloom_soft_knee": 0.5,
         "vignette": 0.12,
         "lens_dirt": 0.18,
-        "motion_blur": 0.0
+        "motion_blur": 0.08,
+        "depth_of_field": 0.12
       }
     },
     {
@@ -112,7 +113,8 @@
         "bloom_threshold": 1.2,
         "bloom_soft_knee": 0.4,
         "vignette": 0.0,
-        "motion_blur": 0.0
+        "motion_blur": 0.0,
+        "depth_of_field": 0.0
       }
     }
   ]

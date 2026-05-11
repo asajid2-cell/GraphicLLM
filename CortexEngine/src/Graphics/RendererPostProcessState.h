@@ -19,6 +19,8 @@ struct RendererPostProcessState {
     float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
+    float motionBlur = 0.0f;
+    float depthOfField = 0.0f;
     std::string colorGradePreset = "neutral";
 
     [[nodiscard]] float EffectiveVignette() const {
@@ -27,6 +29,14 @@ struct RendererPostProcessState {
 
     [[nodiscard]] float EffectiveLensDirt() const {
         return cinematicEnabled ? std::clamp(lensDirt, 0.0f, 1.0f) : 0.0f;
+    }
+
+    [[nodiscard]] float EffectiveMotionBlur() const {
+        return cinematicEnabled ? std::clamp(motionBlur, 0.0f, 1.0f) : 0.0f;
+    }
+
+    [[nodiscard]] float EffectiveDepthOfField() const {
+        return cinematicEnabled ? std::clamp(depthOfField, 0.0f, 1.0f) : 0.0f;
     }
 
     [[nodiscard]] uint32_t EncodedLensDirtByte() const {

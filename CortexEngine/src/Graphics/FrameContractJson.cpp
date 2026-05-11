@@ -303,6 +303,8 @@ json FrameContractToJson(const FrameContract& contract) {
             {"color_grade_preset", contract.cinematicPost.colorGradePreset},
             {"vignette", contract.cinematicPost.vignette},
             {"lens_dirt", contract.cinematicPost.lensDirt},
+            {"motion_blur", contract.cinematicPost.motionBlur},
+            {"depth_of_field", contract.cinematicPost.depthOfField},
             {"warm", contract.cinematicPost.warm},
             {"cool", contract.cinematicPost.cool},
             {"god_ray_intensity", contract.cinematicPost.godRayIntensity}

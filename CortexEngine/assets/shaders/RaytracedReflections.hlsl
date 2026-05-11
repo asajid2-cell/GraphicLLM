@@ -56,6 +56,7 @@ cbuffer FrameConstants : register(b0, space0)
     float4   g_WaterParams0;
     float4   g_WaterParams1;
     float4   g_SSRParams;
+    // x = contrast, y = saturation, z = motion blur, w = depth of field
     float4   g_PostGradeParams;
     float4   g_RTReflectionParams;
 };

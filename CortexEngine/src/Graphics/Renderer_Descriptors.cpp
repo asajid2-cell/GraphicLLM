@@ -351,7 +351,9 @@ void Renderer::UpdatePostProcessDescriptorTable() {
 
     ID3D12Resource* bloomRes = nullptr;
     if (m_bloomResources.controls.intensity > 0.0f) {
-        bloomRes = (m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get();
+        bloomRes = m_bloomResources.resources.postProcessOverride
+            ? m_bloomResources.resources.postProcessOverride
+            : ((m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get());
     }
     writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
 

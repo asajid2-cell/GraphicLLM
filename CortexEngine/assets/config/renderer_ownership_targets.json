@@ -446,11 +446,11 @@
       "id": "render_graph_transient_views",
       "owner": "Render graph transient views",
       "status": "release_boundary_validated",
-      "release_boundary": "Render graph bloom and transient validation still choose which graph resources need temporary RTV/SRV bindings, but descriptor allocation and RTV/SRV writes are owned by DescriptorTable helpers",
+      "release_boundary": "Render graph bloom and transient validation still choose which graph resources need temporary bindings, but standalone bloom graph execution now routes transient RTV/SRV binding through BloomGraphPass/BloomPass helpers while diagnostic transient validation routes RTV/SRV descriptor allocation and view writes through DescriptorTable helpers",
       "validated_contracts": ["renderer_ownership", "render_graph_transient_matrix", "temporal_validation", "rt_showcase"],
-      "target_files": ["Passes/DescriptorTable.h", "Passes/DescriptorTable.cpp", "Renderer_RenderGraphBloom.cpp", "Renderer_RenderGraphDiagnostics.cpp"],
+      "target_files": ["Passes/DescriptorTable.h", "Passes/DescriptorTable.cpp", "Passes/BloomPass.h", "Passes/BloomPass.cpp", "Passes/BloomGraphPass.h", "Passes/BloomGraphPass.cpp", "Renderer_RenderGraphBloom.cpp", "Renderer_RenderGraphDiagnostics.cpp"],
       "renderer_state_members": ["m_bloomResources", "m_frameDiagnostics", "m_services"],
-      "future_extension": "Keep future transient graph target descriptor/view creation in DescriptorTable or graph-resource helpers instead of reintroducing direct descriptor allocation and Create*View calls in Renderer_RenderGraph*.cpp"
+      "future_extension": "Keep future transient graph target descriptor/view creation in pass helpers, DescriptorTable, or graph-resource helpers instead of reintroducing direct descriptor allocation, Create*View calls, or renderer stage callbacks in Renderer_RenderGraph*.cpp"
     },
     {
       "id": "main_target_resources",

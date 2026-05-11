@@ -32,16 +32,16 @@ namespace {
            (!context.useTransients ||
             (context.bloomATemplates.size() >= context.activeLevels &&
              context.bloomBTemplates.size() >= context.activeLevels)) &&
+           context.targetRtv &&
+           context.downsamplePipeline &&
+           context.blurHPipeline &&
+           context.blurVPipeline &&
+           context.compositePipeline &&
            context.activeLevels > 0 &&
+           context.stageLevels > 0 &&
            context.activeLevels <= context.bloomA.size() &&
            context.activeLevels <= context.bloomB.size() &&
-           context.baseLevel < context.activeLevels &&
-           static_cast<bool>(context.renderDownsampleBase) &&
-           static_cast<bool>(context.renderDownsampleLevel) &&
-           static_cast<bool>(context.renderBlurHorizontal) &&
-           static_cast<bool>(context.renderBlurVertical) &&
-           static_cast<bool>(context.renderComposite) &&
-           static_cast<bool>(context.copyCombined);
+           context.baseLevel < context.activeLevels;
 }
 
 void Fail(const FusedBloomContext& context, const char* stage) {
@@ -237,7 +237,16 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            if (!context.renderDownsampleBase || !context.renderDownsampleBase(graph)) {
+            if (context.markHdrShaderResource) {
+                context.markHdrShaderResource();
+            }
+            if (!BloomPass::RenderFullscreen(context.fullscreen,
+                                             graph.GetResource(context.bloomA[0]),
+                                             context.downsamplePipeline,
+                                             graph.GetResource(context.hdr),
+                                             BloomPass::BaseDownsampleSlot(),
+                                             "downsample hdr",
+                                             context.targetRtv[0][0])) {
                 Fail(context, "downsample_base");
             }
         });
@@ -255,7 +264,13 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
                 builder.Write(context.bloomA[passLevel], RGResourceUsage::RenderTarget);
             },
             [context, passLevel](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-                if (!context.renderDownsampleLevel || !context.renderDownsampleLevel(passLevel, graph)) {
+                if (!BloomPass::RenderFullscreen(context.fullscreen,
+                                                 graph.GetResource(context.bloomA[passLevel]),
+                                                 context.downsamplePipeline,
+                                                 graph.GetResource(context.bloomA[passLevel - 1u]),
+                                                 BloomPass::DownsampleChainSlot(passLevel),
+                                                 "downsample chain",
+                                                 context.targetRtv[passLevel][0])) {
                     Fail(context, "downsample_chain");
                 }
             });
@@ -275,7 +290,13 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
                 builder.Write(context.bloomB[passLevel], RGResourceUsage::RenderTarget);
             },
             [context, passLevel](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-                if (!context.renderBlurHorizontal || !context.renderBlurHorizontal(passLevel, graph)) {
+                if (!BloomPass::RenderFullscreen(context.fullscreen,
+                                                 graph.GetResource(context.bloomB[passLevel]),
+                                                 context.blurHPipeline,
+                                                 graph.GetResource(context.bloomA[passLevel]),
+                                                 BloomPass::BlurHSlot(passLevel, context.stageLevels),
+                                                 "blur horizontal",
+                                                 context.targetRtv[passLevel][1])) {
                     Fail(context, "blur_horizontal");
                 }
             });
@@ -288,7 +309,13 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
                 builder.Write(context.bloomA[passLevel], RGResourceUsage::RenderTarget);
             },
             [context, passLevel](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-                if (!context.renderBlurVertical || !context.renderBlurVertical(passLevel, graph)) {
+                if (!BloomPass::RenderFullscreen(context.fullscreen,
+                                                 graph.GetResource(context.bloomA[passLevel]),
+                                                 context.blurVPipeline,
+                                                 graph.GetResource(context.bloomB[passLevel]),
+                                                 BloomPass::BlurVSlot(passLevel, context.stageLevels),
+                                                 "blur vertical",
+                                                 context.targetRtv[passLevel][0])) {
                     Fail(context, "blur_vertical");
                 }
             });
@@ -307,8 +334,15 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
                 }
                 builder.Write(context.bloomB[compositeBaseLevel], RGResourceUsage::RenderTarget);
             },
-            [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-                if (!context.renderComposite || !context.renderComposite(graph)) {
+            [context, compositeBaseLevel](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
+                if (!BloomPass::RenderComposite(context.fullscreen,
+                                                graph,
+                                                context.bloomB[compositeBaseLevel],
+                                                std::span<const RGResourceHandle>(context.bloomA.data(), context.activeLevels),
+                                                context.activeLevels,
+                                                context.stageLevels,
+                                                context.compositePipeline,
+                                                context.targetRtv[compositeBaseLevel][1])) {
                     Fail(context, "composite");
                 }
             });
@@ -323,8 +357,15 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
                 builder.Read(context.bloomB[combinedLevel], RGResourceUsage::CopySrc);
                 builder.Write(context.bloomA[combinedLevel], RGResourceUsage::CopyDst);
             },
-            [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-                if (!context.copyCombined || !context.copyCombined(graph)) {
+            [context, combinedLevel](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
+                D3D12_RESOURCE_STATES sourceState = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                D3D12_RESOURCE_STATES targetState = D3D12_RESOURCE_STATE_COPY_DEST;
+                if (!BloomPass::CopyCompositeToCombined({
+                        context.fullscreen.commandList,
+                        {graph.GetResource(context.bloomB[combinedLevel]), &sourceState},
+                        {graph.GetResource(context.bloomA[combinedLevel]), &targetState},
+                        true,
+                    })) {
                     Fail(context, "copy_combined");
                 }
             });

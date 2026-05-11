@@ -135,53 +135,60 @@ void Renderer::ExecutePostProcessingFramePhase(const FrameExecutionContext& fram
 
     if (featurePlan.runPostProcess) {
         if (!endFrameGraph.ranPostProcess) {
-            if (runBloomInEndFrameGraph && !endFrameGraph.ranBloom) {
-                const auto tBloomFallbackStart = clock::now();
-                WriteBreadcrumb(GpuMarker::Bloom);
-                FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "Bloom", "PostProcess");
-                RenderBloom();
+            if (!featurePlan.useRenderGraphPost) {
+                const auto tPostOnlyStart = clock::now();
+                WriteBreadcrumb(GpuMarker::PostProcess);
+                FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "PostProcess", "PostProcess");
+                RenderPostProcess();
                 FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
-                RecordFramePass("Bloom",
+                RecordFramePass("PostProcess",
                                 true,
                                 true,
                                 1,
-                                {"hdr_color"},
-                                {"bloom"},
-                                endFrameGraph.fallbackUsed,
-                                endFrameGraph.fallbackUsed ? endFrameGraph.fallbackReason.c_str() : nullptr,
+                                {"hdr_color",
+                                 "ssao",
+                                 "ssr_color",
+                                 "bloom",
+                                 "taa_history",
+                                 "depth",
+                                 frameNormalRoughnessResource,
+                                 "vb_gbuffer_emissive_metallic",
+                                 "vb_gbuffer_material_ext1",
+                                 "vb_gbuffer_material_ext2",
+                                 "velocity",
+                                 "rt_reflection"},
+                                {"back_buffer"});
+                MarkPassComplete("RenderPostProcess_Done");
+                const auto tPostOnlyEnd = clock::now();
+                m_frameDiagnostics.timings.postMs =
+                    std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
+            } else {
+                const char* reason = endFrameGraph.fallbackReason.empty()
+                    ? "render_graph_postprocess_not_executed"
+                    : endFrameGraph.fallbackReason.c_str();
+                RecordFramePass("PostProcess",
+                                true,
+                                false,
+                                0,
+                                {"hdr_color",
+                                 "ssao",
+                                 "ssr_color",
+                                 "bloom",
+                                 "taa_history",
+                                 "depth",
+                                 frameNormalRoughnessResource,
+                                 "vb_gbuffer_emissive_metallic",
+                                 "vb_gbuffer_material_ext1",
+                                 "vb_gbuffer_material_ext2",
+                                 "velocity",
+                                 "rt_reflection"},
+                                {"back_buffer"},
+                                true,
+                                reason,
                                 false);
-                MarkPassComplete("RenderBloom_Done");
-                const auto tBloomFallbackEnd = clock::now();
-                m_frameDiagnostics.timings.bloomMs =
-                    std::chrono::duration_cast<std::chrono::microseconds>(tBloomFallbackEnd - tBloomFallbackStart).count() / 1000.0f;
+                MarkPassComplete("RenderPostProcess_GraphNotExecuted");
+                m_frameDiagnostics.timings.postMs = 0.0f;
             }
-
-            const auto tPostOnlyStart = clock::now();
-            WriteBreadcrumb(GpuMarker::PostProcess);
-            FramePhase::BeginGpuScope(m_commandResources.graphicsList.Get(), "PostProcess", "PostProcess");
-            RenderPostProcess();
-            FramePhase::EndGpuScope(m_commandResources.graphicsList.Get());
-            RecordFramePass("PostProcess",
-                            true,
-                            true,
-                            1,
-                            {"hdr_color",
-                             "ssao",
-                             "ssr_color",
-                             "bloom",
-                             "taa_history",
-                             "depth",
-                             frameNormalRoughnessResource,
-                             "vb_gbuffer_emissive_metallic",
-                             "vb_gbuffer_material_ext1",
-                             "vb_gbuffer_material_ext2",
-                             "velocity",
-                             "rt_reflection"},
-                            {"back_buffer"});
-            MarkPassComplete("RenderPostProcess_Done");
-            const auto tPostOnlyEnd = clock::now();
-            m_frameDiagnostics.timings.postMs =
-                std::chrono::duration_cast<std::chrono::microseconds>(tPostOnlyEnd - tPostOnlyStart).count() / 1000.0f;
         } else {
             MarkPassComplete("RenderPostProcess_Done");
         }

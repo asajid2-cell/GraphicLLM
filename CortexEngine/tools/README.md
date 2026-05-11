@@ -46,6 +46,7 @@ validation suite:
 - environment manifest, IBL asset policy, and IBL gallery checks,
 - Phase 3 environment/RT fallback matrix,
 - RT reflection firefly/outlier check,
+- Release Package Contract validation for the public-review payload manifest,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -222,6 +223,20 @@ executed, live, submitted, and allocated particle work. The screenshot negative
 gate generates synthetic black, white, saturated, and edge-heavy BMPs to prove
 the image-stat thresholds catch common broken captures. The RT firefly/outlier
 gate reruns RT Showcase with strict raw/history reflection outlier limits.
+
+## Release Package Contract
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/run_release_package_contract_tests.ps1 -NoBuild
+```
+
+The package contract reads `assets/config/release_package_manifest.json`,
+validates required docs and runtime files, checks that the planned public-review
+payload excludes models, logs, build products, HDR/EXR source environments, and
+other forbidden artifacts, and verifies that required release validation steps
+remain wired into `run_release_validation.ps1`.
 
 Default budgets are intentionally strict for the RT showcase scene:
 

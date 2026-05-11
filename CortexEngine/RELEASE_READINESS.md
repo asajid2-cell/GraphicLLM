@@ -42,6 +42,7 @@ The current verified local gate covers:
 - advanced graphics catalog and effects gallery contracts,
 - environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
 - particle-disabled zero-cost and RT firefly/outlier gates,
+- release package contract validation for the public-review payload manifest,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -111,7 +112,8 @@ Result:
   state/service aggregates, with no loose GPU resource/descriptors in
   `Renderer.h`;
 - screenshot negative gates, particle-disabled zero-cost, six-case Phase 3
-  fallback matrix, and RT firefly/outlier gates passed;
+  fallback matrix, RT firefly/outlier gates, and the release package contract
+  passed;
 - Phase 3 visual matrix passed across temporal validation, RT Showcase,
   Material Lab, Glass and Water Courtyard, Effects Showcase, uncapped IBL
   Gallery, and fallback matrix rows;
@@ -164,3 +166,7 @@ infinite-world engine. The validated path emphasizes:
   than creating parallel systems. The current validation gates protect the
   renderer from silent RT reflection, material parity, visual metric, budget,
   descriptor, environment, graphics UI, particle, and post-process regressions.
+- Public-review packaging is manifest-driven by
+  `assets/config/release_package_manifest.json`; the contract validates the
+  planned payload and excludes local models, logs, generated build artifacts,
+  and source HDR/EXR environment files.

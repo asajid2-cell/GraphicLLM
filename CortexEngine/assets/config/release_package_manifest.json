@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "package_id": "cortex-public-review",
+  "description": "Public-review package contract for the validated Cortex renderer build.",
+  "max_package_bytes": 536870912,
+  "required_docs": [
+    "README.md",
+    "BUILD.md",
+    "SCRIPTS.md",
+    "RELEASE_READINESS.md",
+    "tools/README.md"
+  ],
+  "required_source_files": [
+    "assets/config/release_package_manifest.json"
+  ],
+  "required_runtime_files": [
+    "CortexEngine.exe",
+    "SDL3.dll",
+    "dxcompiler.dll",
+    "fmt.dll",
+    "spdlog.dll",
+    "assets/config/advanced_graphics_catalog.json",
+    "assets/config/graphics_presets.json",
+    "assets/config/renderer_ownership_targets.json",
+    "assets/config/render_quality.json",
+    "assets/config/showcase_scenes.json",
+    "assets/config/visual_baselines.json",
+    "assets/environments/environments.json",
+    "assets/shaders/RaytracedReflections.dxil",
+    "assets/shaders/RaytracedShadows.dxil",
+    "assets/shaders/RaytracedGI.dxil"
+  ],
+  "runtime_include_globs": [
+    "CortexEngine.exe",
+    "SDL3.dll",
+    "dxcompiler.dll",
+    "fmt.dll",
+    "spdlog.dll",
+    "ggml*.dll",
+    "llama.dll",
+    "assets/config/*.json",
+    "assets/*.dds",
+    "assets/environments/*.json",
+    "assets/shaders/*.hlsl",
+    "assets/shaders/*.dxil",
+    "assets/textures/rtshowcase/*.dds"
+  ],
+  "package_forbidden_globs": [
+    "models/*",
+    "logs/*",
+    "build/*",
+    "vcpkg_installed/*",
+    "*.pdb",
+    "*.ilk",
+    "*.obj",
+    "*.lib",
+    "*.exp",
+    "*.log",
+    "run*.txt",
+    "assets/*.hdr",
+    "assets/*.exr",
+    "assets/**/*.hdr",
+    "assets/**/*.exr",
+    "assets/**/*.blend"
+  ],
+  "required_release_validation_steps": [
+    "build_release",
+    "repo_hygiene",
+    "rt_showcase",
+    "phase3_visual_matrix",
+    "renderer_full_ownership_audit",
+    "rt_firefly_outlier",
+    "rt_overbright_clamp",
+    "budget_profile_matrix"
+  ]
+}

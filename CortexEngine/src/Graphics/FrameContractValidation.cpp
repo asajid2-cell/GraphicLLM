@@ -716,6 +716,14 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.cinematicPost.colorGradePreset.empty()) {
         warn("cinematic_post_color_grade_preset_missing");
     }
+    if (contract.cinematicPost.toneMapperPreset.empty()) {
+        warn("cinematic_post_tone_mapper_preset_missing");
+    } else if (contract.cinematicPost.toneMapperPreset != "aces" &&
+               contract.cinematicPost.toneMapperPreset != "reinhard" &&
+               contract.cinematicPost.toneMapperPreset != "filmic_soft" &&
+               contract.cinematicPost.toneMapperPreset != "punchy") {
+        warn("cinematic_post_tone_mapper_preset_unknown");
+    }
     if (contract.cinematicPost.bloomExecuted && !passExecuted("Bloom")) {
         warn("cinematic_post_bloom_executed_without_pass_record");
     }

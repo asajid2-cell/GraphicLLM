@@ -169,6 +169,7 @@ void ApplyGlassWaterCourtyardSceneControls(Renderer& renderer) {
     renderer.SetCinematicPostEnabled(true);
     renderer.SetCinematicPost(0.10f, 0.10f);
     renderer.SetCinematicPostEffects(0.0f, 0.08f);
+    renderer.SetToneMapperPreset("filmic_soft");
     renderer.SetColorGrade(0.20f, 0.04f);
 
     renderer.SetFXAAEnabled(true);
@@ -217,6 +218,7 @@ void ApplyEffectsShowcaseSceneControls(Renderer& renderer) {
     renderer.SetCinematicPostEnabled(true);
     renderer.SetCinematicPost(0.18f, 0.34f);
     renderer.SetCinematicPostEffects(0.18f, 0.22f);
+    renderer.SetToneMapperPreset("punchy");
     renderer.SetColorGrade(0.08f, 0.24f);
 
     renderer.SetFXAAEnabled(true);

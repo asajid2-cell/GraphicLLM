@@ -208,6 +208,7 @@ public:
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
     void SetToneGrade(float contrast, float saturation);
+    void SetToneMapperPreset(const std::string& preset);
     void SetColorGradePreset(const std::string& preset);
     void SetCinematicPostEnabled(bool enabled);
     void SetCinematicPost(float vignette, float lensDirt);

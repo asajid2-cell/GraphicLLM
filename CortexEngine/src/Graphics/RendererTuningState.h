@@ -91,6 +91,7 @@ struct RendererParticleTuning {
 struct RendererCinematicPostTuning {
     bool enabled = false;
     std::string colorGradePreset = "custom";
+    std::string toneMapperPreset = "aces";
     float bloomThreshold = 1.0f;
     float bloomSoftKnee = 0.5f;
     float contrast = 1.0f;

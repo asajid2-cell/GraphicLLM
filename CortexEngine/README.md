@@ -49,6 +49,7 @@ powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validati
 The gate builds Release, then runs the current public renderer suite:
 
 - temporal validation and full RT showcase smokes,
+- build entrypoint contract for the scripted CMake rebuild path,
 - temporal camera-cut history invalidation smoke,
 - visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,

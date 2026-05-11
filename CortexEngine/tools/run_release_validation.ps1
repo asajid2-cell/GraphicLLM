@@ -103,6 +103,14 @@ if (-not $NoBuild) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "build_entrypoint_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_build_entrypoint_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "temporal_validation" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

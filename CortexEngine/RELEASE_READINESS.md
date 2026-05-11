@@ -15,6 +15,7 @@ powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validati
 The current verified local gate covers:
 
 - Release rebuild,
+- build entrypoint contract for the scripted CMake rebuild path,
 - temporal validation smoke,
 - temporal camera-cut RT history invalidation smoke,
 - full RT showcase smoke,
@@ -46,16 +47,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.759`, `warnings=0`,
+- build entrypoint contract: passed; `rebuild.ps1` / `cmake --build` path
+  verified, with no raw Ninja call in rebuild/release validation;
+- temporal validation: `gpu_ms=2.688`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.637/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.632/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `temporal_diff=mean=0.017/2.5 changed=0.001/0.08`;
+  `transient_delta=0`, `temporal_diff=mean=0.022/2.5 changed=0.001/0.08`;
 - VB debug views: depth view 34 and material-albedo view 35 passed with
   nonblack ratio `0.851` for both captures;
 - descriptor/memory stress: `persistent_descriptors=988/1024`,
@@ -81,7 +84,7 @@ Result:
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_200157_300_149036_7f109ace
+CortexEngine/build/bin/logs/runs/release_validation_20260510_200725_214_152168_21d385a0
 ```
 
 ## Renderer Scope

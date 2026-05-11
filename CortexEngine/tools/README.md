@@ -14,6 +14,7 @@ The release gate builds Release once, then runs the core Phase 3 public
 validation suite:
 
 - temporal validation smoke,
+- build entrypoint contract for `rebuild.ps1` / `cmake --build`,
 - temporal camera-cut history invalidation smoke,
 - full RT showcase smoke,
 - visibility-buffer debug view runtime checks,
@@ -72,6 +73,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_temporal_camera_cut_validation.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_vb_debug_views.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_render_graph_transient_matrix.ps1 -NoBuild
@@ -98,6 +100,11 @@ and checks the generated frame report.
 The material editor contract verifies the focused-entity material preset
 dropdown, metallic/roughness sliders, validation status, and
 `ModifyMaterialCommand` apply path.
+
+The build entrypoint contract verifies that local rebuilds and release
+validation use `rebuild.ps1` / `cmake --build`, with Visual Studio environment
+import guarded by `vswhere` and `VsDevCmd.bat`, instead of calling raw Ninja from
+an unprepared shell.
 
 The temporal camera-cut validation smoke uses the RT Showcase camera bookmarks
 to jump from `hero` to `reflection_closeup` during the run, then asserts that

@@ -473,119 +473,14 @@ Result<void> Renderer::CreateRTReflectionResources() {
         &uavDesc,
         m_rtReflectionTargets.uav.cpu);
 
-    D3D12_RESOURCE_DESC statsDesc{};
-    statsDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    statsDesc.Width = RTReflectionSignalStats::kStatsBytes;
-    statsDesc.Height = 1;
-    statsDesc.DepthOrArraySize = 1;
-    statsDesc.MipLevels = 1;
-    statsDesc.Format = DXGI_FORMAT_UNKNOWN;
-    statsDesc.SampleDesc.Count = 1;
-    statsDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    statsDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &statsDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&m_rtReflectionSignalState.rawResources.statsBuffer));
-    if (FAILED(hr)) {
+    auto signalStatsResult = m_rtReflectionSignalState.CreateStatsResources(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        RTReflectionSignalStats::kStatsBytes,
+        RTReflectionSignalStats::kStatsWords);
+    if (signalStatsResult.IsErr()) {
         m_rtReflectionTargets.color.Reset();
-        m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-        return Result<void>::Err("Failed to create RT reflection signal stats buffer");
-    }
-
-    if (!m_rtReflectionSignalState.rawResources.statsUAV.IsValid()) {
-        auto statsUavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (statsUavResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-            return Result<void>::Err("Failed to allocate RT reflection signal stats UAV: " +
-                                     statsUavResult.Error());
-        }
-        m_rtReflectionSignalState.rawResources.statsUAV = statsUavResult.Value();
-    }
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC statsUavDesc{};
-    statsUavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-    statsUavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-    statsUavDesc.Buffer.NumElements = RTReflectionSignalStats::kStatsWords;
-    statsUavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtReflectionSignalState.rawResources.statsBuffer.Get(),
-        nullptr,
-        &statsUavDesc,
-        m_rtReflectionSignalState.rawResources.statsUAV.cpu);
-
-    D3D12_HEAP_PROPERTIES readbackHeap{};
-    readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-    D3D12_RESOURCE_DESC readbackDesc = statsDesc;
-    readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    for (auto& readback : m_rtReflectionSignalState.rawResources.readback) {
-        hr = m_services.device->GetDevice()->CreateCommittedResource(
-            &readbackHeap,
-            D3D12_HEAP_FLAG_NONE,
-            &readbackDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS(&readback));
-        if (FAILED(hr)) {
-            readback.Reset();
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-            return Result<void>::Err("Failed to create RT reflection signal stats readback buffer");
-        }
-    }
-
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &statsDesc,
-        D3D12_RESOURCE_STATE_COMMON,
-        nullptr,
-        IID_PPV_ARGS(&m_rtReflectionSignalState.historyResources.statsBuffer));
-    if (FAILED(hr)) {
-        m_rtReflectionTargets.color.Reset();
-        m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-        m_rtReflectionSignalState.historyResources.statsBuffer.Reset();
-        return Result<void>::Err("Failed to create RT reflection history signal stats buffer");
-    }
-
-    if (!m_rtReflectionSignalState.historyResources.statsUAV.IsValid()) {
-        auto statsUavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (statsUavResult.IsErr()) {
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-            m_rtReflectionSignalState.historyResources.statsBuffer.Reset();
-            return Result<void>::Err("Failed to allocate RT reflection history signal stats UAV: " +
-                                     statsUavResult.Error());
-        }
-        m_rtReflectionSignalState.historyResources.statsUAV = statsUavResult.Value();
-    }
-
-    m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_rtReflectionSignalState.historyResources.statsBuffer.Get(),
-        nullptr,
-        &statsUavDesc,
-        m_rtReflectionSignalState.historyResources.statsUAV.cpu);
-
-    for (auto& readback : m_rtReflectionSignalState.historyResources.readback) {
-        hr = m_services.device->GetDevice()->CreateCommittedResource(
-            &readbackHeap,
-            D3D12_HEAP_FLAG_NONE,
-            &readbackDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr,
-            IID_PPV_ARGS(&readback));
-        if (FAILED(hr)) {
-            readback.Reset();
-            m_rtReflectionTargets.color.Reset();
-            m_rtReflectionSignalState.rawResources.statsBuffer.Reset();
-            m_rtReflectionSignalState.historyResources.statsBuffer.Reset();
-            return Result<void>::Err("Failed to create RT reflection history signal stats readback buffer");
-        }
+        return signalStatsResult;
     }
 
     ComPtr<ID3D12Resource> reflHistory;

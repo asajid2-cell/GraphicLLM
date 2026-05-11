@@ -32,6 +32,7 @@ if (-not (Test-Path $rendererRtStatePath)) {
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
 $rtReflectionSignalStatsPath = Join-Path $root "src/Graphics/RTReflectionSignalStats.cpp"
 $rtReflectionSignalStatsRendererPath = Join-Path $root "src/Graphics/Renderer_RTReflectionSignalStats.cpp"
+$rtResourcesPath = Join-Path $root "src/Graphics/Renderer_RTResources.cpp"
 $rtDenoiserPath = Join-Path $root "src/Graphics/RTDenoiser.cpp"
 $rtDenoiseRendererPath = Join-Path $root "src/Graphics/Renderer_RTDenoise.cpp"
 $rtReflectionDispatchPassPath = Join-Path $root "src/Graphics/Passes/RTReflectionDispatchPass.cpp"
@@ -208,7 +209,7 @@ foreach ($target in $doc.targets) {
     }
 
     if ($id -eq "rt_reflection_stats") {
-        foreach ($required in @("struct TargetResources", "struct DescriptorTableBundle", "rawResources", "historyResources", "descriptors")) {
+        foreach ($required in @("struct TargetResources", "struct DescriptorTableBundle", "rawResources", "historyResources", "descriptors", "CreateStatsResources", "RTReadbackHeapProperties")) {
             if ($rendererRtState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "rt_reflection_stats missing bundled ownership marker in RendererRTState.h: $required"
             }
@@ -227,6 +228,19 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_reflection_stats missing RTReflectionSignalStats.cpp"
+        }
+        if (Test-Path $rtResourcesPath) {
+            $rtResources = Get-Content $rtResourcesPath -Raw
+            if ($rtResources.IndexOf("m_rtReflectionSignalState.CreateStatsResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_reflection_stats missing delegated stats allocation in Renderer_RTResources.cpp"
+            }
+            foreach ($directStatResource in @("rawResources.statsBuffer", "historyResources.statsBuffer", "rawResources.readback", "historyResources.readback", "statsUavDesc", "D3D12_HEAP_TYPE_READBACK")) {
+                if ($rtResources.IndexOf($directStatResource, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_reflection_stats still owns signal stats allocation mechanics in Renderer_RTResources.cpp: $directStatResource"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_stats missing Renderer_RTResources.cpp"
         }
         if (Test-Path $rtReflectionSignalStatsRendererPath) {
             $rtReflectionSignalStatsRenderer = Get-Content $rtReflectionSignalStatsRendererPath -Raw

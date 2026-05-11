@@ -29,6 +29,9 @@ namespace {
     return context.hdr.IsValid() &&
            !context.bloomA.empty() &&
            !context.bloomB.empty() &&
+           (!context.useTransients ||
+            (context.bloomATemplates.size() >= context.activeLevels &&
+             context.bloomBTemplates.size() >= context.activeLevels)) &&
            context.activeLevels > 0 &&
            context.activeLevels <= context.bloomA.size() &&
            context.activeLevels <= context.bloomB.size() &&
@@ -70,6 +73,27 @@ void DeclareTransients(RGPassBuilder& builder, const FusedBloomContext& context)
                 BloomPass::MakeTextureDesc(
                     context.bloomBTemplates[level],
                     "BloomB_FusedTransient" + std::to_string(level)));
+        }
+    }
+}
+
+void DeclareTransients(RGPassBuilder& builder, const StandaloneBloomContext& context) {
+    if (!context.useTransients) {
+        return;
+    }
+
+    for (uint32_t level = 0; level < context.activeLevels; ++level) {
+        if (!context.bloomA[level].IsValid() && context.bloomATemplates[level]) {
+            context.bloomA[level] = builder.CreateTransient(
+                BloomPass::MakeTextureDesc(
+                    context.bloomATemplates[level],
+                    "BloomA_Transient" + std::to_string(level)));
+        }
+        if (!context.bloomB[level].IsValid() && context.bloomBTemplates[level]) {
+            context.bloomB[level] = builder.CreateTransient(
+                BloomPass::MakeTextureDesc(
+                    context.bloomBTemplates[level],
+                    "BloomB_Transient" + std::to_string(level)));
         }
     }
 }
@@ -207,9 +231,7 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
     graph.AddPass(
         "BloomDownsample0",
         [context](RGPassBuilder& builder) {
-            if (context.declareTransients) {
-                context.declareTransients(builder);
-            }
+            DeclareTransients(builder, context);
             builder.SetType(RGPassType::Graphics);
             builder.Read(context.hdr, RGResourceUsage::ShaderResource);
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);

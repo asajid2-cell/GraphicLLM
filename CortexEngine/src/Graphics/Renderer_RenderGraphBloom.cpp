@@ -47,12 +47,16 @@ Renderer::ExecuteBloomInRenderGraph() {
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomA{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomB{};
+    std::array<ID3D12Resource*, kBloomLevels> bloomATemplates{};
+    std::array<ID3D12Resource*, kBloomLevels> bloomBTemplates{};
     std::array<std::array<D3D12_RESOURCE_STATES, 2>, kBloomLevels> savedBloomStates{};
     std::array<std::array<DescriptorHandle, 2>, kBloomLevels> savedBloomRTV{};
     std::array<std::array<DescriptorHandle, 2>, kBloomLevels> savedBloomSRV{};
     for (uint32_t level = 0; level < kBloomLevels; ++level) {
         savedBloomA[level] = m_bloomResources.resources.texA[level];
         savedBloomB[level] = m_bloomResources.resources.texB[level];
+        bloomATemplates[level] = savedBloomA[level].Get();
+        bloomBTemplates[level] = savedBloomB[level].Get();
         savedBloomStates[level][0] = m_bloomResources.resources.resourceState[level][0];
         savedBloomStates[level][1] = m_bloomResources.resources.resourceState[level][1];
         savedBloomRTV[level][0] = m_bloomResources.resources.rtv[level][0];
@@ -115,27 +119,6 @@ Renderer::ExecuteBloomInRenderGraph() {
         }
     }
 
-    bool bloomTransientsDeclared = false;
-    auto declareBloomTransients = [&](RGPassBuilder& builder) {
-        if (bloomTransientsDeclared) {
-            return;
-        }
-        bloomTransientsDeclared = true;
-        if (!useTransientBloom) {
-            return;
-        }
-        for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
-            if (!bloomA[level].IsValid() && savedBloomA[level]) {
-                bloomA[level] = builder.CreateTransient(
-                    BloomPass::MakeTextureDesc(savedBloomA[level].Get(), "BloomA_Transient" + std::to_string(level)));
-            }
-            if (!bloomB[level].IsValid() && savedBloomB[level]) {
-                bloomB[level] = builder.CreateTransient(
-                    BloomPass::MakeTextureDesc(savedBloomB[level].Get(), "BloomB_Transient" + std::to_string(level)));
-            }
-        }
-    };
-
     auto rewriteBloomViews = [&](ID3D12Resource* resource, uint32_t level, uint32_t ping) -> bool {
         if (!resource || level >= kBloomLevels || ping >= 2u || !m_services.device || !m_services.device->GetDevice()) {
             return false;
@@ -196,9 +179,11 @@ Renderer::ExecuteBloomInRenderGraph() {
     bloomContext.hdr = hdrHandle;
     bloomContext.bloomA = std::span<RGResourceHandle>(bloomA.data(), bloomA.size());
     bloomContext.bloomB = std::span<RGResourceHandle>(bloomB.data(), bloomB.size());
+    bloomContext.bloomATemplates = std::span<ID3D12Resource* const>(bloomATemplates.data(), bloomATemplates.size());
+    bloomContext.bloomBTemplates = std::span<ID3D12Resource* const>(bloomBTemplates.data(), bloomBTemplates.size());
     bloomContext.activeLevels = m_bloomResources.resources.activeLevels;
     bloomContext.baseLevel = baseLevel;
-    bloomContext.declareTransients = declareBloomTransients;
+    bloomContext.useTransients = useTransientBloom;
     bloomContext.failStage = failStage;
     bloomContext.renderDownsampleBase = [&](const RenderGraph& graph) {
         if (!bindBloomGraphResources(graph)) {

@@ -36,9 +36,11 @@ struct StandaloneBloomContext {
     RGResourceHandle hdr;
     std::span<RGResourceHandle> bloomA;
     std::span<RGResourceHandle> bloomB;
+    std::span<ID3D12Resource* const> bloomATemplates;
+    std::span<ID3D12Resource* const> bloomBTemplates;
     uint32_t activeLevels = 0;
     uint32_t baseLevel = 0;
-    std::function<void(RGPassBuilder&)> declareTransients;
+    bool useTransients = true;
     std::function<bool(const RenderGraph&)> renderDownsampleBase;
     std::function<bool(uint32_t, const RenderGraph&)> renderDownsampleLevel;
     std::function<bool(uint32_t, const RenderGraph&)> renderBlurHorizontal;

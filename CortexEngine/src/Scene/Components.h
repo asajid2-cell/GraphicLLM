@@ -212,6 +212,7 @@ struct RenderableComponent {
      float anisotropyStrength = 0.0f;          // elongated highlight strength (0..1)
      float wetnessFactor = 0.0f;               // wet surface response: lower roughness + clearcoat (0..1)
      float emissiveBloomFactor = 0.0f;         // extra emissive boost for bloom authoring (0..1)
+     float proceduralMaskStrength = 0.0f;      // procedural albedo/roughness breakup (0..1)
 
      enum class AlphaMode : uint32_t {
          Opaque = 0,

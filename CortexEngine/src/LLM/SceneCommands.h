@@ -188,6 +188,7 @@ struct ModifyMaterialCommand : public SceneCommand {
     bool setAnisotropy = false;
     bool setWetness = false;
     bool setEmissiveBloom = false;
+    bool setProceduralMask = false;
     glm::vec4 color;
     float metallic = 0.0f;
     float roughness = 0.5f;
@@ -201,6 +202,7 @@ struct ModifyMaterialCommand : public SceneCommand {
     float anisotropy = 0.0f;
     float wetness = 0.0f;
     float emissiveBloom = 0.0f;
+    float proceduralMask = 0.0f;
     std::string presetName;
 
     ModifyMaterialCommand() { type = CommandType::ModifyMaterial; }

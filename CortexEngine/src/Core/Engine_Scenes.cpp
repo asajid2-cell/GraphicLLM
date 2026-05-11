@@ -860,6 +860,7 @@ void Engine::BuildMaterialLabScene() {
             r.wetnessFactor = 0.55f;
         } else if (std::string(s.preset) == "brushed_metal") {
             r.anisotropyStrength = 0.75f;
+            r.proceduralMaskStrength = 0.42f;
         } else if (std::string(s.preset) == "emissive_panel") {
             r.emissiveColor = glm::vec3(1.0f, 0.58f, 0.22f);
             r.emissiveStrength = 3.4f;

@@ -66,6 +66,7 @@ $IDC_SE_FOCUSED_SUBSURFACE_SLIDER = 3225
 $IDC_SE_FOCUSED_ANISOTROPY_SLIDER = 3227
 $IDC_SE_FOCUSED_WETNESS_SLIDER = 3229
 $IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER = 3231
+$IDC_SE_FOCUSED_PROCEDURAL_SLIDER = 3233
 $IDC_SE_APPLY_MATERIAL = 3211
 
 $focusTarget = "MaterialLab_PlasticSphere"
@@ -177,6 +178,7 @@ try {
         Set-Trackbar $window $IDC_SE_FOCUSED_ANISOTROPY_SLIDER 66
         Set-Trackbar $window $IDC_SE_FOCUSED_WETNESS_SLIDER 44
         Set-Trackbar $window $IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER 58
+        Set-Trackbar $window $IDC_SE_FOCUSED_PROCEDURAL_SLIDER 35
         Click-Control $window $IDC_SE_APPLY_MATERIAL
     }
 
@@ -234,6 +236,7 @@ if (-not (Test-Path $reportPath)) {
         Assert-Near "focused material anisotropy" ([double]$mat.anisotropy) 0.66 0.04
         Assert-Near "focused material wetness" ([double]$mat.wetness) 0.44 0.04
         Assert-Near "focused material emissive_bloom" ([double]$mat.emissive_bloom) 0.58 0.04
+        Assert-Near "focused material procedural_mask" ([double]$mat.procedural_mask) 0.35 0.04
     }
 }
 

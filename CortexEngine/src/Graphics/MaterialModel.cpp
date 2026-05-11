@@ -107,6 +107,7 @@ MaterialModel MaterialResolver::ResolveRenderable(
     model.anisotropyStrength = glm::clamp(renderable.anisotropyStrength, 0.0f, 1.0f);
     model.wetnessFactor = glm::clamp(renderable.wetnessFactor, 0.0f, 1.0f);
     model.emissiveBloomFactor = glm::clamp(renderable.emissiveBloomFactor, 0.0f, 1.0f);
+    model.proceduralMaskStrength = glm::clamp(renderable.proceduralMaskStrength, 0.0f, 1.0f);
     model.alphaMode = static_cast<MaterialAlphaMode>(renderable.alphaMode);
     model.alphaCutoff = glm::clamp(renderable.alphaCutoff, 0.0f, 1.0f);
     model.doubleSided = renderable.doubleSided;
@@ -213,7 +214,7 @@ MaterialConstants MaterialResolver::BuildMaterialConstants(const MaterialModel& 
         model.transmissionFactor,
         model.ior,
         model.emissiveBloomFactor,
-        0.0f);
+        model.proceduralMaskStrength);
     material.specularParams = glm::vec4(model.specularColorFactor, model.specularFactor);
     return material;
 }
@@ -249,7 +250,7 @@ VBMaterialConstants MaterialResolver::BuildVBMaterialConstants(
         model.transmissionFactor,
         model.ior,
         model.emissiveBloomFactor,
-        0.0f);
+        model.proceduralMaskStrength);
     material.specularParams = glm::vec4(model.specularColorFactor, model.specularFactor);
     material.alphaCutoff = model.alphaCutoff;
     material.alphaMode = static_cast<uint32_t>(model.alphaMode);

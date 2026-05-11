@@ -25,6 +25,8 @@ if (-not (Test-Path $rendererHeaderPath)) {
     throw "Renderer.h not found: $rendererHeaderPath"
 }
 $rendererHeader = Get-Content $rendererHeaderPath -Raw
+$breadcrumbStatePath = Join-Path $root "src/Graphics/RendererBreadcrumbState.h"
+$diagnosticsPath = Join-Path $root "src/Graphics/Renderer_Diagnostics.cpp"
 $rendererRtStatePath = Join-Path $root "src/Graphics/RendererRTState.h"
 if (-not (Test-Path $rendererRtStatePath)) {
     throw "RendererRTState.h not found: $rendererRtStatePath"
@@ -256,6 +258,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "rt_reflection_stats missing Renderer_RTReflectionSignalStats.cpp"
+        }
+    }
+
+    if ($id -eq "diagnostic_breadcrumb_state") {
+        if (Test-Path $breadcrumbStatePath) {
+            $breadcrumbState = Get-Content $breadcrumbStatePath -Raw
+            foreach ($required in @("struct RendererBreadcrumbState", "CreateBuffer", "Write(", "CreateCommittedResource", "Map(0", "WriteBufferImmediate", "D3D12_HEAP_TYPE_READBACK")) {
+                if ($breadcrumbState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "diagnostic_breadcrumb_state missing RendererBreadcrumbState.h marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "diagnostic_breadcrumb_state missing RendererBreadcrumbState.h"
+        }
+        if (Test-Path $diagnosticsPath) {
+            $diagnostics = Get-Content $diagnosticsPath -Raw
+            foreach ($route in @("m_breadcrumbs.CreateBuffer", "m_breadcrumbs.Write")) {
+                if ($diagnostics.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "diagnostic_breadcrumb_state missing routed breadcrumb call in Renderer_Diagnostics.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "WriteBufferImmediate", "D3D12_HEAP_TYPE_READBACK", "buffer->Map")) {
+                if ($diagnostics.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "diagnostic_breadcrumb_state still has direct breadcrumb mechanics in Renderer_Diagnostics.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "diagnostic_breadcrumb_state missing Renderer_Diagnostics.cpp"
         }
     }
 

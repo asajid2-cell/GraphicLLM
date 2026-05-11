@@ -23,6 +23,16 @@
       "future_extension": "Keep future minimal/debug clear-only output setup inside MinimalFramePass instead of adding direct swap-chain target setup back to frame planning"
     },
     {
+      "id": "diagnostic_breadcrumb_state",
+      "owner": "GPU breadcrumb diagnostics",
+      "status": "release_boundary_validated",
+      "release_boundary": "RendererBreadcrumbState owns the readback breadcrumb buffer allocation, persistent map, initial marker value, and WriteBufferImmediate submission; Renderer_Diagnostics.cpp only validates renderer services, delegates creation/writes, and logs diagnostics",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererBreadcrumbState.h", "Renderer_Diagnostics.cpp"],
+      "renderer_state_members": ["m_breadcrumbs", "m_commandResources"],
+      "future_extension": "Keep future manual breadcrumb buffer mechanics in RendererBreadcrumbState or a dedicated diagnostic pass instead of adding loose resource/map/write-immediate code back to Renderer_Diagnostics.cpp"
+    },
+    {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
       "status": "release_boundary_validated",

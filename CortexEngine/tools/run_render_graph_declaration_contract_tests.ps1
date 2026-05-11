@@ -256,6 +256,7 @@ Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> brdfLut"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clusteredLights"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> deferredLighting"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ClearVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RasterizeVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RenderVisibilityBufferMaterialResolveStage("

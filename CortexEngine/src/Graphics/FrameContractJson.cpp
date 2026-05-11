@@ -86,10 +86,12 @@ json FrameContractToJson(const FrameContract& contract) {
         }},
         {"environment", {
             {"active", contract.environment.active},
+            {"requested", contract.environment.requested},
             {"runtime_path", contract.environment.runtimePath},
             {"budget_class", contract.environment.budgetClass},
             {"loaded", contract.environment.loaded},
             {"fallback", contract.environment.fallback},
+            {"fallback_reason", contract.environment.fallbackReason},
             {"manifest_present", contract.environment.manifestPresent},
             {"ibl_limit_enabled", contract.environment.iblLimitEnabled},
             {"background_visible", contract.environment.backgroundVisible},

@@ -56,6 +56,9 @@ struct EnvironmentLightingState {
     bool backgroundVisible = true;
     float backgroundExposure = 1.0f;
     float backgroundBlur = 0.0f;
+    bool selectionFallbackUsed = false;
+    std::string requestedEnvironment;
+    std::string fallbackReason;
 
     void ResetMaps() {
         maps.clear();
@@ -89,7 +92,7 @@ struct EnvironmentLightingState {
 
     [[nodiscard]] bool UsingFallbackEnvironment() const {
         const std::string name = ActiveEnvironmentName();
-        return name == "Placeholder" || name == "procedural_sky";
+        return selectionFallbackUsed || name == "Placeholder" || name == "procedural_sky";
     }
 
     [[nodiscard]] uint32_t ResidentCount() const {

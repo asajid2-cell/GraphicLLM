@@ -109,8 +109,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.health.lastWarningMessage = health.lastWarningMessage;
 
     contract.environment.active = health.activeEnvironment;
+    contract.environment.requested = m_environmentState.requestedEnvironment;
     contract.environment.loaded = health.environmentLoaded;
     contract.environment.fallback = health.environmentFallback;
+    contract.environment.fallbackReason = m_environmentState.fallbackReason;
     contract.environment.manifestPresent = preflight.environmentManifestPresent;
     contract.environment.iblLimitEnabled = m_environmentState.limitEnabled;
     contract.environment.backgroundVisible = m_environmentState.backgroundVisible;

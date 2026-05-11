@@ -942,6 +942,9 @@ int main(int argc, char* argv[]) {
         if (const char* envSmokeFrames = std::getenv("CORTEX_SMOKE_FRAMES")) {
             config.maxFrames = std::strtoull(envSmokeFrames, nullptr, 10);
         }
+        if (const char* envDeviceRemovedFrame = std::getenv("CORTEX_SIMULATE_DEVICE_REMOVED_FRAME")) {
+            config.simulateDeviceRemovedFrame = std::strtoull(envDeviceRemovedFrame, nullptr, 10);
+        }
         if (const char* envExitVisual = std::getenv("CORTEX_EXIT_AFTER_VISUAL_VALIDATION")) {
             std::string value = envExitVisual;
             if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
@@ -1074,11 +1077,24 @@ int main(int argc, char* argv[]) {
         // Run main loop
         engine.Run();
 
+        const bool rendererDeviceRemoved =
+            engine.GetRenderer() && engine.GetRenderer()->IsDeviceRemoved();
+
         // Always dump a useful snapshot before tearing down renderer/device.
         AppendEndOfRunDump(engine);
 
         // Shutdown
         engine.Shutdown();
+
+        if (rendererDeviceRemoved) {
+            WriteRendererFailureSummary(
+                "device_removed",
+                "DX12 device was removed or reported a GPU fault during runtime",
+                1,
+                argc,
+                argv);
+            return 1;
+        }
 
         spdlog::info("===================================");
         spdlog::info("  Cortex Engine exited cleanly");

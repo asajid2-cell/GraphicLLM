@@ -88,6 +88,7 @@ struct EngineConfig {
     // RT showcase validation image has been captured and inspected.
     uint64_t maxFrames = 0;
     bool exitAfterVisualValidationCapture = false;
+    uint64_t simulateDeviceRemovedFrame = 0;
 };
 
 // Main engine class - orchestrates the game loop
@@ -252,6 +253,7 @@ private:
     float m_qualityGovernorTimer = 0.0f;
     float m_frameReportTimer = 0.0f;
     uint64_t m_maxFrames = 0;
+    uint64_t m_simulateDeviceRemovedFrame = 0;
     uint64_t m_cameraCutAutomationFrame = 0;
     bool m_exitAfterVisualValidationCapture = false;
     bool m_cameraCutAutomationApplied = false;

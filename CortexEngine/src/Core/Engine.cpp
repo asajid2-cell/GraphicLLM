@@ -424,6 +424,7 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     spdlog::info("Initializing Cortex Engine...");
     spdlog::info("Version: 0.1.0 - Phase 1: Iron Foundation");
     m_maxFrames = config.maxFrames;
+    m_simulateDeviceRemovedFrame = config.simulateDeviceRemovedFrame;
     m_exitAfterVisualValidationCapture = config.exitAfterVisualValidationCapture;
     m_hudMode = config.initialHudMode;
     m_startupArchitectCommandJson = config.startupArchitectCommandJson;
@@ -442,10 +443,11 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                          m_cameraCutAutomationBookmark);
         }
     }
-    if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture) {
-        spdlog::info("Smoke automation: maxFrames={} exitAfterVisualValidationCapture={}",
+    if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture || m_simulateDeviceRemovedFrame > 0) {
+        spdlog::info("Smoke automation: maxFrames={} exitAfterVisualValidationCapture={} simulateDeviceRemovedFrame={}",
                      static_cast<unsigned long long>(m_maxFrames),
-                     m_exitAfterVisualValidationCapture);
+                     m_exitAfterVisualValidationCapture,
+                     static_cast<unsigned long long>(m_simulateDeviceRemovedFrame));
     }
 
     // Create device
@@ -1044,6 +1046,12 @@ void Engine::Run() {
         Update(dt);
         Render(dt);
 
+        if (m_renderer && m_renderer->IsDeviceRemoved()) {
+            spdlog::critical("Renderer reported DX12 device removal; stopping engine loop for fatal recovery report.");
+            WriteFrameDiagnosticsReport(true);
+            m_running = false;
+        }
+
         if (m_maxFrames > 0 && m_totalFrameCount >= m_maxFrames) {
             spdlog::info("Smoke automation reached max frame count {}; exiting main loop",
                          static_cast<unsigned long long>(m_maxFrames));
@@ -1569,6 +1577,12 @@ void Engine::Render(float deltaTime) {
         if (m_editorModeController && m_editorModeController->IsInitialized()) {
             m_editorModeController->Render();
         }
+        if (m_renderer &&
+            m_simulateDeviceRemovedFrame > 0 &&
+            m_totalFrameCount >= m_simulateDeviceRemovedFrame &&
+            !m_renderer->IsDeviceRemoved()) {
+            m_renderer->SimulateDeviceRemovedForValidation("CORTEX_SIMULATE_DEVICE_REMOVED_FRAME");
+        }
         m_renderer->Render(m_registry.get(), deltaTime);
     }
 
@@ -1916,6 +1930,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
     }
     report["smoke_automation"] = {
         {"max_frames", m_maxFrames},
+        {"simulate_device_removed_frame", m_simulateDeviceRemovedFrame},
         {"total_frames", m_totalFrameCount},
         {"exit_after_visual_validation_capture", m_exitAfterVisualValidationCapture}
     };

@@ -905,6 +905,19 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because fallback selection,
       graph orchestration, and other renderer pass mechanics still live in
       renderer orchestration files.
+    - The current RT-reflection debug-clear checkpoint moves the env/debug-gated
+      UAV transition, descriptor creation, clear, UAV barrier, and return-to-SRV
+      mechanics into `RTReflectionDebugClearPass`. Release rebuild passed,
+      renderer ownership tests passed with `targets=22`, renderer full
+      ownership audit passed with `renderer_members=48 expected_members=48`,
+      targeted RT showcase debug-clear validation passed at
+      `rt_showcase_20260511_115407_988_93884_75fe5edf` with
+      `CORTEX_RTREFL_CLEAR=2`, debug view 20, and surface-debug
+      `colorful=1.000 nonblack=1.000`, and temporal validation passed at
+      `temporal_validation_20260511_115422_202_95112_ccb77143`.
+      The broader ownership rows remain `PARTIAL` because post-process draw
+      policy, RT reflection dispatch policy, graph orchestration, and other
+      renderer pass mechanics still live in renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

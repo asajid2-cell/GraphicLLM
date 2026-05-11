@@ -94,6 +94,7 @@ $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
 $mainPassTargetPassPath = Join-Path $root "src/Graphics/Passes/MainPassTargetPass.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
 $postProcessTargetPassPath = Join-Path $root "src/Graphics/Passes/PostProcessTargetPass.cpp"
+$rtReflectionDebugClearPassPath = Join-Path $root "src/Graphics/Passes/RTReflectionDebugClearPass.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
 $forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
@@ -383,6 +384,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "postprocess_target_transitions missing Renderer_PostProcess.cpp"
+        }
+    }
+
+    if ($id -eq "rt_reflection_debug_clear") {
+        if (Test-Path $rtReflectionDebugClearPassPath) {
+            $rtReflectionDebugClearPass = Get-Content $rtReflectionDebugClearPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::RTReflectionDebugClearPass", "ClearContext", "ClearForDebugView", "CreateUnorderedAccessView", "ClearUnorderedAccessViewFloat", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+                if ($rtReflectionDebugClearPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_reflection_debug_clear missing RTReflectionDebugClearPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_debug_clear missing RTReflectionDebugClearPass.cpp"
+        }
+        if (Test-Path $postProcessPath) {
+            $postProcess = Get-Content $postProcessPath -Raw
+            if ($postProcess.IndexOf("RTReflectionDebugClearPass::ClearForDebugView", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "rt_reflection_debug_clear missing routed debug clear call in Renderer_PostProcess.cpp"
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "CreateUnorderedAccessView", "ClearUnorderedAccessViewFloat", "ResourceBarrier")) {
+                if ($postProcess.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_reflection_debug_clear still has direct RT reflection debug clear mechanics in Renderer_PostProcess.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "rt_reflection_debug_clear missing Renderer_PostProcess.cpp"
         }
     }
 

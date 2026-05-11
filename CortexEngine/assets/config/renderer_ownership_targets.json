@@ -93,6 +93,16 @@
       "future_extension": "Keep future regular post-process input/output target-state setup in PostProcessTargetPass instead of adding large resource-barrier batches in Renderer_PostProcess.cpp"
     },
     {
+      "id": "rt_reflection_debug_clear",
+      "owner": "RT reflection debug clear",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_PostProcess.cpp still decides whether the env/debug-gated RT reflection clear should run, but UAV transition, descriptor creation, clear, UAV barrier, and return-to-SRV mechanics are owned by RTReflectionDebugClearPass",
+      "validated_contracts": ["renderer_ownership", "rt_showcase"],
+      "target_files": ["Passes/RTReflectionDebugClearPass.h", "Passes/RTReflectionDebugClearPass.cpp", "Renderer_PostProcess.cpp"],
+      "renderer_state_members": ["m_rtReflectionTargets", "m_debugViewState", "m_services", "m_commandResources"],
+      "future_extension": "Keep future RT reflection debug clear/readback mechanics in RTReflectionDebugClearPass or adjacent RT debug helpers instead of adding direct UAV/barrier code to Renderer_PostProcess.cpp"
+    },
+    {
       "id": "taa_copy_transitions",
       "owner": "TAA copy/history transitions",
       "status": "release_boundary_validated",

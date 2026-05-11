@@ -2,6 +2,7 @@
 
 #include "Passes/PostProcessTargetPass.h"
 #include "Passes/PostProcessPass.h"
+#include "Passes/RTReflectionDebugClearPass.h"
 
 #include <cstdlib>
 
@@ -63,64 +64,22 @@ void Renderer::RenderPostProcess() {
         const bool rtReflDebugView =
             (m_debugViewState.mode == 20u || m_debugViewState.mode == 30u || m_debugViewState.mode == 31u);
         if (rtReflDebugView && s_rtReflPostClearMode != 0 && m_services.descriptorManager && m_services.device && m_rtReflectionTargets.uav.IsValid()) {
-            // Transition to UAV for the clear.
-            if (m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_rtReflectionTargets.color.Get();
-                barrier.Transition.StateBefore = m_rtReflectionTargets.colorState;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-                m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            }
-
             DescriptorHandle clearUav = m_rtReflectionTargets.postClearUAVs[m_frameRuntime.frameIndex % kFrameCount];
             if (clearUav.IsValid()) {
-                D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-                uavDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                m_services.device->GetDevice()->CreateUnorderedAccessView(
-                    m_rtReflectionTargets.color.Get(),
-                    nullptr,
-                    &uavDesc,
-                    clearUav.cpu);
-
-                ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-                m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-
-                const float magenta[4] = { 1.0f, 0.0f, 1.0f, 1.0f };
-                const float black[4]   = { 0.0f, 0.0f, 0.0f, 0.0f };
-                const float* clear = (s_rtReflPostClearMode == 2) ? magenta : black;
-                // ClearUnorderedAccessView requires a CPU-visible, CPU-readable descriptor handle.
-                // Use the persistent staging UAV as the CPU handle and the persistent shader-visible
-                // descriptor as the GPU handle.
-                m_commandResources.graphicsList->ClearUnorderedAccessViewFloat(
-                    clearUav.gpu,
-                    m_rtReflectionTargets.uav.cpu,
-                    m_rtReflectionTargets.color.Get(),
-                    clear,
-                    0,
-                    nullptr);
-
-                D3D12_RESOURCE_BARRIER clearBarrier{};
-                clearBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                clearBarrier.UAV.pResource = m_rtReflectionTargets.color.Get();
-                m_commandResources.graphicsList->ResourceBarrier(1, &clearBarrier);
+                RTReflectionDebugClearPass::ClearContext clearContext{};
+                clearContext.commandList = m_commandResources.graphicsList.Get();
+                clearContext.device = m_services.device->GetDevice();
+                clearContext.descriptorHeap = m_services.descriptorManager->GetCBV_SRV_UAV_Heap();
+                clearContext.reflectionColor = m_rtReflectionTargets.color.Get();
+                clearContext.reflectionState = &m_rtReflectionTargets.colorState;
+                clearContext.shaderVisibleUav = clearUav;
+                clearContext.cpuUav = m_rtReflectionTargets.uav;
+                clearContext.clearMode = s_rtReflPostClearMode;
+                if (!RTReflectionDebugClearPass::ClearForDebugView(clearContext)) {
+                    spdlog::warn("Renderer: RT reflection post debug clear failed");
+                }
             } else {
                 spdlog::warn("Renderer: RT reflection post debug clear requested before persistent UAV descriptors were initialized");
-            }
-
-            // Transition back to SRV for sampling in post-process.
-            if (m_rtReflectionTargets.colorState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_rtReflectionTargets.color.Get();
-                barrier.Transition.StateBefore = m_rtReflectionTargets.colorState;
-                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-                m_rtReflectionTargets.colorState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             }
         }
     }

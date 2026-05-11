@@ -238,6 +238,16 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "rt_gi_visual_signal" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_rt_gi_visual_signal_tests.ps1"),
+        "-NoBuild",
+        "-SmokeFrames", [string]$RTSmokeFrames
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "vb_debug_views" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

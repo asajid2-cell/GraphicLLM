@@ -76,9 +76,9 @@
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",
-      "release_boundary": "HDR and normal/roughness G-buffer render-target resources, descriptors, and resource states are split into nested pass-owned bundles and validated by ownership plus runtime paths that write, sample, and present them",
+      "release_boundary": "HDR and normal/roughness G-buffer render-target resources, descriptors, and resource states are split into nested pass-owned bundles. Shared forward HDR/depth target transitions and binding are owned by ForwardTargetBindingPass for transparent, overlay, and water passes. Ownership plus runtime paths validate that these targets are written, sampled, and presented",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
-      "target_files": ["RendererMainTargetState.h"],
+      "target_files": ["RendererMainTargetState.h", "Passes/ForwardTargetBindingPass.h"],
       "renderer_state_members": ["m_mainTargets"],
       "future_extension": "Keep future color/deferred targets inside explicit resources/descriptors bundles before adding renderer orchestration"
     },

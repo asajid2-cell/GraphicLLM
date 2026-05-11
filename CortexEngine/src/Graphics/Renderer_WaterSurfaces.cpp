@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 
+#include "Graphics/Passes/ForwardTargetBindingPass.h"
 #include "Graphics/MaterialState.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
@@ -27,36 +28,19 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // Ensure HDR is writable.
-    if (m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-        barrier.Transition.StateBefore = m_mainTargets.hdr.resources.state;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    ForwardTargetBindingPass::BindContext targetContext{};
+    targetContext.commandList = m_commandResources.graphicsList.Get();
+    targetContext.hdrColor = m_mainTargets.hdr.resources.color.Get();
+    targetContext.hdrState = &m_mainTargets.hdr.resources.state;
+    targetContext.hdrRtv = m_mainTargets.hdr.descriptors.rtv;
+    targetContext.depthBuffer = m_depthResources.resources.buffer.Get();
+    targetContext.depthState = &m_depthResources.resources.resourceState;
+    targetContext.depthDsv = m_depthResources.descriptors.dsv;
+    targetContext.readOnlyDepthDsv = m_depthResources.descriptors.readOnlyDsv;
+    targetContext.readOnlyDepthState = kDepthSampleState;
+    if (!ForwardTargetBindingPass::BindHdrAndDepthReadOnly(targetContext)) {
+        return;
     }
-
-    // Depth-test water without writing depth. Prefer read-only DSV so the depth
-    // buffer can stay in DEPTH_READ after VB resolve.
-    const bool hasReadOnlyDsv = m_depthResources.descriptors.readOnlyDsv.IsValid();
-    const D3D12_RESOURCE_STATES desiredDepthState = hasReadOnlyDsv ? kDepthSampleState : D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    if (m_depthResources.resources.resourceState != desiredDepthState) {
-        D3D12_RESOURCE_BARRIER depthBarrier{};
-        depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        depthBarrier.Transition.StateAfter = desiredDepthState;
-        depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resources.resourceState = desiredDepthState;
-    }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdr.descriptors.rtv.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthResources.descriptors.readOnlyDsv.cpu : m_depthResources.descriptors.dsv.cpu;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdr.resources.color->GetDesc();
     D3D12_VIEWPORT viewport{};

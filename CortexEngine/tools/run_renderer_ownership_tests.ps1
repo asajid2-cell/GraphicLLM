@@ -72,6 +72,10 @@ $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
+$forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
+$waterSurfacesPath = Join-Path $root "src/Graphics/Renderer_WaterSurfaces.cpp"
+$transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeometry.cpp"
+$overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -386,6 +390,33 @@ foreach ($target in $doc.targets) {
                     if ($targetSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "main_target_resources still uses flat main-target access in $($pathInfo.Label): $oldFlatAccess"
                     }
+                }
+            }
+        }
+        if (Test-Path $forwardTargetBindingPath) {
+            $forwardTargetBinding = Get-Content $forwardTargetBindingPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::ForwardTargetBindingPass", "BindHdrAndDepthReadOnly", "ResourceBarrier", "OMSetRenderTargets")) {
+                if ($forwardTargetBinding.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing forward target binding marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "main_target_resources missing ForwardTargetBindingPass.cpp"
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
+            [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
+            [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $forwardSource = Get-Content $pathInfo.Path -Raw
+                foreach ($directTargetBindingCall in @("ResourceBarrier", "OMSetRenderTargets")) {
+                    if ($forwardSource.IndexOf($directTargetBindingCall, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "main_target_resources still binds HDR/depth targets directly in $($pathInfo.Label): $directTargetBindingCall"
+                    }
+                }
+                if ($forwardSource.IndexOf("ForwardTargetBindingPass::BindHdrAndDepthReadOnly", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "main_target_resources missing shared HDR/depth binding in $($pathInfo.Label)"
                 }
             }
         }

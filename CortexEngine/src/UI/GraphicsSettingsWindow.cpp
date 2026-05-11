@@ -4,13 +4,16 @@
 #include "Core/ServiceLocator.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RendererControlApplier.h"
+#include "Graphics/EnvironmentManifest.h"
 #include "Graphics/RendererLightingRigControl.h"
 #include "Graphics/RendererTuningState.h"
 
 #include <commctrl.h>
 
 #include <algorithm>
+#include <cctype>
 #include <string>
+#include <vector>
 
 namespace Cortex::UI {
 
@@ -108,6 +111,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_BOOKMARK_HERO = 9208,
     IDC_GFX_BOOKMARK_REFLECTION = 9209,
     IDC_GFX_BOOKMARK_MATERIALS = 9210,
+    IDC_GFX_ENV_SELECT = 9211,
+    IDC_GFX_ENV_REAPPLY = 9212,
 };
 
 struct SliderBinding {
@@ -192,6 +197,8 @@ struct GraphicsSettingsState {
     HWND chkFog = nullptr;
     HWND chkParticles = nullptr;
     HWND chkCinematicPost = nullptr;
+    HWND cmbEnvironment = nullptr;
+    std::vector<std::string> environmentIds;
 
     int contentHeight = 0;
     int scrollPos = 0;
@@ -242,6 +249,99 @@ void SetCheckbox(HWND hwnd, bool enabled) {
 
 bool GetCheckbox(HWND hwnd) {
     return hwnd && SendMessageW(hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+void SyncStateFromToggles();
+void SyncStateFromSliders();
+
+void LoadEnvironmentOptions() {
+    g_gfx.environmentIds.clear();
+    if (!g_gfx.cmbEnvironment) {
+        return;
+    }
+
+    SendMessageW(g_gfx.cmbEnvironment, CB_RESETCONTENT, 0, 0);
+
+    auto addOption = [](const std::string& id, const std::string& displayName) {
+        if (id.empty()) {
+            return;
+        }
+        std::string label = displayName.empty() ? id : (displayName + " (" + id + ")");
+        g_gfx.environmentIds.push_back(id);
+        const std::wstring wideLabel = ToWide(label);
+        SendMessageW(g_gfx.cmbEnvironment, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideLabel.c_str()));
+    };
+
+    const auto manifestResult = Graphics::LoadEnvironmentManifest(Graphics::DefaultEnvironmentManifestPath());
+    if (manifestResult.IsOk()) {
+        for (const auto& entry : manifestResult.Value().environments) {
+            if (!entry.enabled) {
+                continue;
+            }
+            addOption(entry.id, entry.displayName);
+        }
+    }
+
+    if (g_gfx.environmentIds.empty()) {
+        addOption("studio", "Natural Studio");
+        addOption("warm_gallery", "Mirrored Hall");
+        addOption("sunset_courtyard", "Sky On Fire");
+        addOption("cool_overcast", "Kloofendal Overcast");
+        addOption("night_city", "Shanghai Bund Night");
+        addOption("procedural_sky", "Procedural Sky Fallback");
+    }
+
+    SendMessageW(g_gfx.cmbEnvironment, CB_SETCURSEL, 0, 0);
+}
+
+void SyncEnvironmentComboFromRenderer() {
+    if (!g_gfx.cmbEnvironment || g_gfx.environmentIds.empty()) {
+        return;
+    }
+
+    const std::string active = g_gfx.tuning.environment.environmentId;
+    std::string activeLower = active;
+    std::transform(activeLower.begin(), activeLower.end(), activeLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    int selected = -1;
+    for (size_t i = 0; i < g_gfx.environmentIds.size(); ++i) {
+        std::string idLower = g_gfx.environmentIds[i];
+        std::transform(idLower.begin(), idLower.end(), idLower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (idLower == activeLower || activeLower.find(idLower) != std::string::npos) {
+            selected = static_cast<int>(i);
+            break;
+        }
+    }
+    if (selected >= 0) {
+        SendMessageW(g_gfx.cmbEnvironment, CB_SETCURSEL, selected, 0);
+    }
+}
+
+void ApplySelectedEnvironmentFromGraphicsUI(bool loadAllFirst = false) {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (!renderer || renderer->IsDeviceRemoved() || !g_gfx.cmbEnvironment) {
+        return;
+    }
+
+    const int selected = static_cast<int>(SendMessageW(g_gfx.cmbEnvironment, CB_GETCURSEL, 0, 0));
+    if (selected < 0 || static_cast<size_t>(selected) >= g_gfx.environmentIds.size()) {
+        return;
+    }
+
+    SyncStateFromToggles();
+    SyncStateFromSliders();
+    g_gfx.tuning.environment.environmentId = g_gfx.environmentIds[static_cast<size_t>(selected)];
+    g_gfx.tuning.quality.dirtyFromUI = true;
+
+    if (loadAllFirst) {
+        Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 64);
+    }
+    Graphics::ApplyEnvironmentPresetControl(*renderer, g_gfx.tuning.environment.environmentId);
+    Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+    SyncEnvironmentComboFromRenderer();
 }
 
 void SyncStateFromToggles() {
@@ -436,6 +536,7 @@ void RefreshControlsFromRenderer() {
     SetCheckbox(g_gfx.chkFog, g_gfx.tuning.atmosphere.fogEnabled);
     SetCheckbox(g_gfx.chkParticles, g_gfx.tuning.particles.enabled);
     SetCheckbox(g_gfx.chkCinematicPost, g_gfx.tuning.cinematicPost.enabled);
+    SyncEnvironmentComboFromRenderer();
 }
 
 void RefreshHealthLabels() {
@@ -627,6 +728,24 @@ void RegisterGraphicsSettingsClass() {
                 setFont(h);
                 return h;
             };
+            auto makeCombo = [&](int id, const wchar_t* text) {
+                makeStatic(0, text, y);
+                HWND h = CreateWindowExW(0,
+                                         L"COMBOBOX",
+                                         L"",
+                                         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                         margin + labelWidth,
+                                         y - 3,
+                                         sliderWidth,
+                                         180,
+                                         hwnd,
+                                         reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
+                                         nullptr,
+                                         nullptr);
+                setFont(h);
+                y += 26 + rowGap;
+                return h;
+            };
 
             g_gfx.txtHealth = makeStatic(IDC_GFX_HEALTH, L"Health: --", y);
             y += labelHeight + rowGap;
@@ -676,6 +795,8 @@ void RegisterGraphicsSettingsClass() {
             }
 
             makeSection(L"Environment / IBL");
+            g_gfx.cmbEnvironment = makeCombo(IDC_GFX_ENV_SELECT, L"Environment");
+            LoadEnvironmentOptions();
             g_gfx.chkIBL = makeCheckbox(IDC_GFX_IBL, L"IBL Enabled");
             g_gfx.chkIBLLimit = makeCheckbox(IDC_GFX_IBL_LIMIT, L"IBL Residency Limit");
             g_gfx.chkBackgroundVisible = makeCheckbox(IDC_GFX_BACKGROUND_VISIBLE, L"Background Visible");
@@ -684,10 +805,11 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_BACKGROUND_EXPOSURE, L"Background Exposure", g_gfx.backgroundExposure, 0.0f, 4.0f);
             makeSlider(IDC_GFX_BACKGROUND_BLUR, L"Background Blur", g_gfx.backgroundBlur, 0.0f, 1.0f);
             {
-                const int buttonWidth = (width - margin * 2 - 12) / 3;
+                const int buttonWidth = (width - margin * 2 - 18) / 4;
                 makeButton(IDC_GFX_ENV_NEXT, L"Next Env", margin, y, buttonWidth);
-                makeButton(IDC_GFX_ENV_ONE, L"Load One", margin + buttonWidth + 6, y, buttonWidth);
-                makeButton(IDC_GFX_ENV_ALL, L"Load All", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                makeButton(IDC_GFX_ENV_REAPPLY, L"Reapply", margin + buttonWidth + 6, y, buttonWidth);
+                makeButton(IDC_GFX_ENV_ONE, L"Load One", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                makeButton(IDC_GFX_ENV_ALL, L"Load All", margin + (buttonWidth + 6) * 3, y, buttonWidth);
                 y += 24 + rowGap;
             }
 
@@ -844,6 +966,12 @@ void RegisterGraphicsSettingsClass() {
             return 0;
         }
         case WM_COMMAND: {
+            if (LOWORD(wParam) == IDC_GFX_ENV_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
+                ApplySelectedEnvironmentFromGraphicsUI();
+                RefreshControlsFromRenderer();
+                RefreshHealthLabels();
+                return 0;
+            }
             if (HIWORD(wParam) != BN_CLICKED) {
                 break;
             }
@@ -864,6 +992,9 @@ void RegisterGraphicsSettingsClass() {
                 break;
             case IDC_GFX_ENV_NEXT:
                 Graphics::CycleEnvironmentPresetControl(*renderer);
+                break;
+            case IDC_GFX_ENV_REAPPLY:
+                ApplySelectedEnvironmentFromGraphicsUI();
                 break;
             case IDC_GFX_ENV_ONE:
                 Graphics::ApplyEnvironmentResidencyLoadControl(*renderer, 1);

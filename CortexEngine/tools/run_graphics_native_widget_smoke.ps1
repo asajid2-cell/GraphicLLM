@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [int]$SmokeFrames = 420,
+    [int]$SmokeFrames = 600,
     [string]$LogDir = ""
 )
 
@@ -47,11 +47,16 @@ public static class CortexWin32UiSmoke {
 "@
 
 $WM_HSCROLL = 0x0114
+$WM_COMMAND = 0x0111
 $TBM_SETPOS = 0x0405
 $TB_ENDTRACK = 8
 $BM_CLICK = 0x00F5
+$CB_SETCURSEL = 0x014E
+$CBN_SELCHANGE = 1
 
 $IDC_GFX_RENDER_SCALE = 9010
+$IDC_GFX_ENV_SELECT = 9211
+$IDC_GFX_ENV_REAPPLY = 9212
 $IDC_GFX_SSR_STRENGTH = 9045
 $IDC_GFX_FOG_HEIGHT = 9040
 $IDC_GFX_WATER_ROUGHNESS = 9046
@@ -147,6 +152,14 @@ function Click-Control([IntPtr]$Parent, [int]$Id) {
     Start-Sleep -Milliseconds 160
 }
 
+function Select-ComboIndex([IntPtr]$Parent, [int]$Id, [int]$Index) {
+    $control = Get-Control $Parent $Id
+    [void][CortexWin32UiSmoke]::SendMessage($control, $CB_SETCURSEL, [IntPtr]$Index, [IntPtr]::Zero)
+    $wParam = ($CBN_SELCHANGE -shl 16) -bor ($Id -band 0xffff)
+    [void][CortexWin32UiSmoke]::SendMessage($Parent, $WM_COMMAND, [IntPtr]$wParam, $control)
+    Start-Sleep -Milliseconds 350
+}
+
 try {
     $window = Wait-GraphicsWindow $process 35
     if ($window -eq [IntPtr]::Zero) {
@@ -167,6 +180,8 @@ try {
         Click-Control $window $IDC_GFX_GRADE_COOL_MOON
         Click-Control $window $IDC_GFX_TONE_PUNCHY
         Click-Control $window $IDC_GFX_RIG_LANTERNS
+        Select-ComboIndex $window $IDC_GFX_ENV_SELECT 4
+        Click-Control $window $IDC_GFX_ENV_REAPPLY
     }
 
     Start-Sleep -Milliseconds 2500
@@ -226,6 +241,18 @@ if (-not (Test-Path $reportPath)) {
     }
     if ([string]$fc.lighting.rig_source -ne "renderer_rig") {
         Add-Failure "lighting rig_source was '$($fc.lighting.rig_source)', expected renderer_rig"
+    }
+    if ([string]$fc.environment.active -ne "cool_overcast") {
+        Add-Failure "environment active was '$($fc.environment.active)', expected cool_overcast"
+    }
+    if ([string]$fc.environment.requested -ne "cool_overcast") {
+        Add-Failure "environment requested was '$($fc.environment.requested)', expected cool_overcast"
+    }
+    if (-not [bool]$fc.environment.loaded) {
+        Add-Failure "environment.loaded was false after native dropdown selection"
+    }
+    if ([bool]$fc.environment.fallback) {
+        Add-Failure "environment unexpectedly reported fallback after native dropdown selection"
     }
 }
 

@@ -1109,7 +1109,21 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because visibility-buffer
       graph orchestration, GPU particle public runtime, mesh upload mechanics,
       indirect rendering transitions, and other renderer pass mechanics still
-      need extraction or implementation.
+      needed extraction or implementation at that checkpoint.
+    - The current indirect-rendering resource checkpoint routes HZB culling
+      non-pixel-readability through `VisibilityBufferResourcePass` in
+      `Renderer_IndirectRendering.cpp`. The renderer still owns indirect
+      command generation, culling policy, graphics-state restoration, and
+      fallback decisions, and now has no direct `D3D12_RESOURCE_BARRIER` or
+      `ResourceBarrier` calls. Release rebuild passed, renderer ownership tests
+      passed with `targets=34`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_124503_489_100528_0acaaa3f`, and RT
+      showcase passed at `rt_showcase_20260511_124503_502_100364_b0ec5581`.
+      The broader ownership rows remain `PARTIAL` because mesh-upload copy
+      mechanics, visibility-buffer graph orchestration, GPU particle public
+      runtime, and other renderer pass mechanics still need extraction or
+      implementation.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

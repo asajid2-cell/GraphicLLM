@@ -18,6 +18,7 @@ The current verified local gate covers:
 - temporal validation smoke,
 - temporal camera-cut RT history invalidation smoke,
 - full RT showcase smoke,
+- visibility-buffer debug view runtime checks,
 - render-graph transient alias/no-alias matrix,
 - graphics settings persistence, unified graphics UI contracts, and runtime
   graphics settings application,
@@ -45,16 +46,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.240`, `warnings=0`,
+- temporal validation: `gpu_ms=1.759`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.644/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.637/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`;
+  `transient_delta=0`, `temporal_diff=mean=0.017/2.5 changed=0.001/0.08`;
+- VB debug views: depth view 34 and material-albedo view 35 passed with
+  nonblack ratio `0.851` for both captures;
 - descriptor/memory stress: `persistent_descriptors=988/1024`,
   `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`,
   `estimated_mb=190.52/256`;
@@ -78,7 +81,7 @@ Result:
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_195119_906_147724_445f0c19
+CortexEngine/build/bin/logs/runs/release_validation_20260510_200157_300_149036_7f109ace
 ```
 
 ## Renderer Scope

@@ -52,6 +52,11 @@ function Invoke-ReleaseStep([string]$Name, [string[]]$Arguments) {
         $elapsed = [Math]::Round(((Get-Date) - $started).TotalSeconds, 1)
         $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
         $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw } else { "" }
+        if ($exitCode -eq 0 -and $stdoutText -match "(?im)^\s*[A-Za-z0-9 _/'`"-]+ failed:") {
+            $exitCode = 1
+            $stdoutText = $stdoutText + [Environment]::NewLine + "Release validation detected a failure sentinel in stdout."
+            $stdoutText | Set-Content -Encoding UTF8 $stdoutPath
+        }
         $lastStdout = $stdoutText
         $lastStderr = $stderrText
         $lastLogDir = $stepLogDir
@@ -126,6 +131,15 @@ if ($failures.Count -eq 0) {
         "-NoBuild",
         "-IsolatedLogs",
         "-SmokeFrames", [string]$RTSmokeFrames
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "vb_debug_views" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_vb_debug_views.ps1"),
+        "-NoBuild"
     )
 }
 

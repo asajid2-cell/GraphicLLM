@@ -35,7 +35,7 @@ validation suite:
 - graphics settings persistence, UI contract, and HUD mode checks,
 - graphics settings runtime-application smoke,
 - LLM/Architect renderer-command runtime smoke,
-- graphics preset, showcase scene, material editor, conductor-energy, vegetation-state, reflection-probe, and visual baseline contracts,
+- graphics preset, showcase scene, material editor, conductor-energy, lighting-energy budget, vegetation-state, reflection-probe, and visual baseline contracts,
 - descriptor/memory stress scene for the old 1024 persistent-descriptor ceiling,
 - visual probe validation across all public baseline cases,
 - screenshot negative gates for black/white/saturation/edge regressions,
@@ -91,6 +91,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_test
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_material_editor_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_conductor_energy_contract_tests.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_lighting_energy_budget_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_vegetation_state_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_reflection_probe_contract_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_build_entrypoint_contract_tests.ps1
@@ -136,6 +137,9 @@ dropdown, metallic/roughness sliders, validation status, and
 The conductor-energy contract verifies forward/deferred shader energy split
 invariants and reruns Material Lab to prove full-metal conductors remain present
 without overbright visual statistics.
+The lighting-energy budget gate reruns the public showcase scenes and fails if
+their frame-contract lighting, exposure, bloom, near-white, or saturation values
+leave the public-review budget envelope.
 The vegetation-state contract verifies the extracted vegetation state bundle,
 frame-contract reporting, and the explicitly dormant public draw path after
 world/outdoor vegetation rendering was deferred.

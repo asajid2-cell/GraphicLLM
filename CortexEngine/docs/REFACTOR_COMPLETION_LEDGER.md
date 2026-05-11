@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_233633_407_34848_41636535
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_234247_548_36060_1e9785fd
 ```
 
 Key evidence from that run:
@@ -59,19 +59,19 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.271`, `disocclusion=0.006852`,
-  `high_motion=0.005223`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.398`, `disocclusion=0.007139`,
+  `high_motion=0.005277`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.898`,
+  `camera=reflection_closeup`, `gpu_ms=2.335`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=2.025/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.617/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.017/2.5 changed=0.000/0.08`,
+  `temporal_diff=mean=0.023/2.5 changed=0.001/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
@@ -116,6 +116,10 @@ Key evidence from that run:
   conductor energy split; Material Lab passed with `resolved_conductor=4`,
   `reflection_conductor=4`, `max_metallic=1.0`, `very_bright_albedo=0`, and
   bounded saturated/near-white ratios.
+- Lighting energy budget: RT Showcase, Material Lab, Glass/Water Courtyard,
+  and Effects Showcase passed scene-level lighting/exposure/bloom and
+  near-white/saturation budget checks; summary logs were written under
+  `lighting_energy_budget_20260510_234344_636_36924_0bb9f6ca`.
 - Vegetation state contract: extracted state bundle, renderer ownership audit
   coverage, frame-contract serialization, and dormant public draw pipeline
   reporting passed in the latest release gate.
@@ -126,27 +130,16 @@ Key evidence from that run:
 Recent git history relevant to the audit:
 
 ```text
+9352b46 Add fallback row to Phase 3 visual matrix
+73f77f4 Refresh environment fallback ledger statuses
+d3ed555 Add IBL asset policy gate
+04a0e9b Add environment fallback matrix coverage
+abad454 Run IBL gallery across all enabled environments
+63a6200 Add Phase 2 validation entrypoint
+0610ec7 Add positive Dreamer runtime validation
+97d96ad Add local reflection probe validation
 5e7b69f Update Phase 3 release readiness docs
 9293e44 Tighten Phase 3 release metadata
-92ac235 Mark showcase scenes release validated
-db911d3 Add material editor validation status
-a7301f4 Add clean HUD modes
-a595ed5 Show RT scheduler status in graphics UI
-84cd3c3 Gate Phase 3 visual matrix in release validation
-6954c3a Gate graphics UI contract in release validation
-e22380a Add fatal error contract summary
-0a07cc3 Centralize environment state helpers
-7105d1e Centralize cinematic post state
-debe56f Harden particle ownership gate
-c7e25d9 Bundle RT reflection stats resources
-32101cc Add cinematic post enable contract
-6b24a42 Add particle density tuning contract
-1104c19 Add sheen and subsurface material coverage
-3d3e65c Add effects showcase release gate
-2785a30 Add renderer ownership release gate
-b1896a6 Add phase 3 validation contracts
-c96c9db Add renderer phase three foundations
-230c64c Save renderer refactor checkpoint
 ```
 
 ## Source Map
@@ -223,6 +216,7 @@ long file/function lists in every row.
 | `tools/run_screenshot_negative_gates.ps1` | static/generated images | Synthetic black, white, saturated, and edge-heavy BMP negative gates for screenshot metric logic. |
 | `tools/run_particle_disabled_zero_cost.ps1` | runtime | Effects Showcase under `safe_startup`; asserts zero particle planning/execution/submission/allocation. |
 | `tools/run_rt_firefly_outlier_scene.ps1` | runtime wrapper | RT Showcase with stricter raw/history reflection outlier thresholds. |
+| `tools/run_lighting_energy_budget_tests.ps1` | runtime wrapper | Runs public showcase smokes and fails scene-level lighting/exposure/bloom or near-white/saturation budget regressions. |
 
 ## Phase 2 Top-Level Requirements
 
@@ -292,14 +286,14 @@ of `phase2.md`.
 | P2-SYS-09 | Explicit camera-cut invalidation coverage. | DONE_VERIFIED | `src/Core/Engine.cpp::Engine::Initialize`, `src/Core/Engine.cpp::Engine::Update`, `src/Graphics/Renderer_FrameTemporalConstants.cpp::Renderer::PublishFrameConstants`, SRC-TEMPORAL | `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Targeted run passed: frames=53, cut_frame=20, camera=`reflection_closeup`, `rt_reflection_reset=camera_cut`, `invalidated_frame=20`, RT shadow/reflection/GI histories reseeded and resource-valid. | None for RT history camera-cut coverage. TAA-specific camera-cut policy can be separately tightened if needed. |
 | P2-SYS-10 | Visibility buffer correctness for opaque depth, material resolve, deferred lighting, local lights, probes, debug blits. | PARTIAL | SRC-VB, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_vb_debug_views.ps1 -NoBuild`; `tools/run_reflection_probe_contract_tests.ps1 -NoBuild` | Runtime VB path passes. Targeted VB debug gate passed for depth view 34 and material-albedo view 35 with non-empty image statistics. Local reflection probe gate passed with two RT Showcase probes uploaded, zero skips, a valid probe table, and non-empty probe-weight debug capture. | Broad VB "correctness" is still smoke/contract based rather than exhaustive visual equivalence for every deferred-lighting input. |
 | P2-SYS-11 | GPU culling and HZB diagnostics are visible and budgeted. | DONE_VERIFIED | `Renderer_GPUDriven.cpp`, `Renderer_GPUCulling*.cpp`, `Renderer_HZB*.cpp`, SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase reports GPU culling and HZB logs; smoke budget passed. | More occlusion-correctness scene tests could be added. |
-| P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | PARTIAL | SRC-BUDGET, SRC-RENDERGRAPH | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. | Energy budgeting is still not a distinct runtime gate. |
+| P2-SYS-12 | Memory, descriptor, energy budgets, and transient aliasing. | DONE_VERIFIED | SRC-BUDGET, SRC-RENDERGRAPH, `tools/run_lighting_energy_budget_tests.ps1` | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild`; `tools/run_lighting_energy_budget_tests.ps1 -NoBuild` | Memory/descriptor budgets passed; render-graph transient matrix validates aliasing on/off and bloom-transient disabled behavior. Descriptor/memory stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`. Lighting energy budget passed four public scenes with bounded total/max light intensity, exposure, bloom, near-white ratio, and saturation. | None for the current memory/descriptor/transient/lighting-energy gate set; broader feature-specific budgets remain tracked by Phase 3 particle/post rows. |
 | P2-SYS-13 | Lighting/atmosphere/visual quality proof scenes: reflective, glass/water, emissive, outdoor/sunset beach. | PARTIAL | SRC-SCENES | `tools/run_release_validation.ps1`; `tools/run_reflection_probe_contract_tests.ps1 -NoBuild` | RT showcase, material lab, glass/water courtyard, effects showcase, and local reflection-probe validation pass. | Outdoor/sunset beach remains deferred by user direction. |
 | P2-SYS-14 | Visual validation captures compare luma, saturation, edge stability, temporal stability. | PARTIAL | smoke scripts, `FrameContractJson.cpp`, visual baseline scripts | `tools/run_release_validation.ps1`; `tools/run_visual_probe_validation.ps1 -NoBuild` | Luma/saturation/nonblack/temporal diff checks pass in current smokes. Visual probe passed all four public baseline cases with edge/dominant-color BMP checks. | No full image-diff golden comparison; temporal stability remains metric-smoke based. |
 | P2-SYS-15 | Single script runs the Phase 2 validation suite. | DONE_VERIFIED | `tools/run_phase2_validation.ps1`, `tools/run_release_validation.ps1` | `tools/run_phase2_validation.ps1` | Named Phase 2 entrypoint exists and delegates to the current release validation gate so Phase 2 coverage cannot drift behind the broader suite. Latest wrapper run passed with logs under `phase2_validation_20260510_230853_029_26268_faa40115`. | None for the named entrypoint; keep the wrapper thin as release validation evolves. |
 | P2-SYS-16 | `rt_showcase` final renderer scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase runtime passed with visual validation and RT signal. | Subjective polish can continue. |
 | P2-SYS-17 | `material_gallery` / material lab scene. | PARTIAL | SRC-SCENES | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Material Lab passed. | Name differs from plan; current scene is `material_lab`, not a fully exhaustive gallery. |
 | P2-SYS-18 | `temporal_validation` scene. | DONE_VERIFIED | SRC-SCENES | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Latest temporal validation passed. | Add camera-cut and more motion edge cases. |
-| P2-SYS-19 | `stress_memory` / descriptor stress scene. | DONE_VERIFIED | `tools/run_descriptor_memory_stress_scene.ps1`, SRC-BUDGET, SRC-RT | `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Runtime stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_budget=81920`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`, `write_mb=107.75/128`, raw/history RT signal nonzero. | None for the historical descriptor/memory stress gate; broader energy accounting remains separate. |
+| P2-SYS-19 | `stress_memory` / descriptor stress scene. | DONE_VERIFIED | `tools/run_descriptor_memory_stress_scene.ps1`, SRC-BUDGET, SRC-RT | `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild` | Runtime stress passed with `persistent_descriptors=988/1024`, `staging=78/128`, `transient_budget=81920`, `transient_delta=0`, `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`, `write_mb=107.75/128`, raw/history RT signal nonzero. | None for the historical descriptor/memory stress gate. |
 | P2-SYS-20 | `sunset_beach` final visual target scene / eventual outdoor scenes. | DEFERRED_BY_USER_ONLY | none found in current validated path | none | User direction de-scoped infinite/outdoor/world work from main path. | Only revive if user explicitly wants outdoor/world scene work. |
 
 ## Ordered Implementation Passes And Later Phase 2 Pass Log
@@ -320,7 +314,7 @@ foundation or contract rather than the full broad feature.
 | P2-ORDER-05 | Pass 5: Material Model Unification | DONE_VERIFIED | SRC-MATERIAL | `tools/run_material_lab_smoke.ps1 -NoBuild -IsolatedLogs` | Runtime material coverage passed. |
 | P2-ORDER-06 | Pass 6: RT Scheduler And Denoising | DONE_VERIFIED | SRC-RT | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT readiness and raw/history signal passed. |
 | P2-ORDER-07 | Pass 7: Temporal Manager | PARTIAL | SRC-TEMPORAL | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_camera_cut_validation.ps1 -NoBuild -IsolatedLogs` | Core manager/mask/stats done; camera-cut RT history invalidation coverage passed. | Broader visual ghosting claims remain quality-sensitive and not fully golden-tested. |
-| P2-ORDER-08 | Pass 8: Budget Profiles | PARTIAL | SRC-BUDGET | `tools/run_budget_profile_matrix.ps1 -NoBuild`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs` | Budget matrix, descriptor/memory stress, and render-graph transient matrix pass. | Energy budgeting and all possible hardware pressure profiles are not distinct gates. |
+| P2-ORDER-08 | Pass 8: Budget Profiles | DONE_VERIFIED | SRC-BUDGET | `tools/run_budget_profile_matrix.ps1 -NoBuild`; `tools/run_descriptor_memory_stress_scene.ps1 -NoBuild`; `tools/run_render_graph_transient_matrix.ps1 -NoBuild -IsolatedLogs`; `tools/run_lighting_energy_budget_tests.ps1 -NoBuild` | Budget matrix, descriptor/memory stress, render-graph transient matrix, and lighting energy budget pass in the current release gate. | None for current budget profiles; no-RT physical hardware coverage remains tracked under Phase 3 fallback/no-RT rows. |
 | P2-ORDER-09 | Pass 9: Visual Demo Maturity | PARTIAL | SRC-SCENES, SRC-DOCS | `tools/run_release_validation.ps1` | Public scenes pass, but visual maturity is subjective and outdoor/sunset target is missing/deferred. |
 | P2-08AK | Pass 8AK - Visibility Buffer Graph Module | DONE_VERIFIED | SRC-RENDERGRAPH, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | VB graph path active in RT showcase. |
 | P2-08AL | Pass 8AL - Visibility Buffer Legacy Graph Boundary | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Passes/VisibilityBufferGraphPass.cpp`, SRC-RENDERGRAPH, SRC-VB | `tools/run_render_graph_boundary_contract_tests.ps1`; `tools/run_render_graph_transient_matrix.ps1`; release gate | Boundary contract passed: `LegacyPathContext`, `AddLegacyPath`, `VisibilityBufferPath`, `fallbackExecutions`, and render-graph execution-stat accumulation are present. Runtime transient matrix also passes with render-graph fallback executions required to be 0. | None for current static/runtime legacy-boundary contract; full removal of legacy path remains tracked separately. |
@@ -490,7 +484,7 @@ definition of done in `phase3.md`.
 | P3-DESIGN-01 | Every public visual feature has a control, preset, fallback, and validation path. | PARTIAL | SRC-UI-P3, SRC-SCENES, SRC-CONTRACT | `tools/run_release_validation.ps1` | Release foundations have controls/presets/contracts. | Advanced materials, particles, cinematic post, SSR/RT tuning controls are incomplete. |
 | P3-DESIGN-02 | UI settings clamp and serialize cleanly. | PARTIAL | `RendererTuningState.cpp`, `RendererControlApplier_Runtime.cpp`, `GraphicsSettingsWindow.cpp` | `tools/run_graphics_settings_persistence_tests.ps1 -NoBuild`; `tools/run_graphics_ui_contract_tests.ps1` | Persistence and UI contracts passed. | Not every planned slider exists or is round-tripped. |
 | P3-DESIGN-03 | Environment assets have metadata, budget class, and fallback behavior. | DONE_VERIFIED | SRC-ENV-P3 | `tools/run_environment_manifest_tests.ps1`; `tools/run_ibl_gallery_tests.ps1 -NoBuild`; `tools/run_phase3_fallback_matrix.ps1 -NoBuild` | Manifest metadata/budget policy passed, all enabled runtime IBLs loaded, and missing required asset fallback reports `procedural_sky` plus `requested_environment_load_failed`. | None for current committed environment assets and fallback behavior. |
-| P3-DESIGN-04 | Performance-sensitive features report scheduling and budget state. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-RT | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1` | RT scheduler/budget metrics reported; budget matrix passed. | Particles/cinematic post budgets are only foundation-level. |
+| P3-DESIGN-04 | Performance-sensitive features report scheduling and budget state. | PARTIAL | SRC-CONTRACT, SRC-BUDGET, SRC-RT | `tools/run_rt_showcase_smoke.ps1`; `tools/run_budget_profile_matrix.ps1`; `tools/run_lighting_energy_budget_tests.ps1 -NoBuild` | RT scheduler/budget metrics reported; budget matrix passed; public scene lighting energy budgets are now release-gated. | Particles/cinematic post budgets are only foundation-level. |
 | P3-DESIGN-05 | Default view is clean enough for public capture while debug info remains available. | PARTIAL | `Engine_UI.cpp`, `Engine_Input.cpp`, `FrameContractJson.cpp` | `tools/run_hud_mode_contract_tests.ps1 -NoBuild` | HUD mode contract passed. | Full visual review of public default capture remains subjective. |
 | P3-DESIGN-06 | Renderer state moves into named structs as Phase 3 touches each area. | DONE_VERIFIED | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1` | Ownership test passed. Full ownership audit passed with every `Renderer.h` member in a named state/service aggregate. | Future new renderer resources must extend the audit expectations. |
 
@@ -669,7 +663,7 @@ definition of done in `phase3.md`.
 | P3-DOD-12 | Settings persist safely. | DONE_VERIFIED | RendererTuningState | persistence tests | Passed. | Migration tests optional. |
 | P3-DOD-13 | Passes release validation and Phase 3 visual matrix from clean build. | DONE_VERIFIED | release/matrix scripts | `tools/run_release_validation.ps1` | Latest full clean release gate passed. | None for current suite. |
 | P3-DOD-14 | README/release notes match actual scripts and launch flow. | DONE_VERIFIED | SRC-DOCS | documentation inspection | Latest docs updated. | Keep current. |
-| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, conductor energy, positive Dreamer runtime, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
+| P3-DOD-15 | No known descriptor, memory, startup, screenshot regression hidden by test suite. | PARTIAL | tools scripts, SRC-BUDGET, SRC-VISUAL | release gate plus focused gates | Current suite catches many regressions; fallback, screenshot negative, visual probe, particle-disabled, RT outlier, camera-cut, VB debug views, render-graph transient matrix, conductor energy, lighting energy, positive Dreamer runtime, full ownership audit, descriptor/memory stress, and release stdout failure-sentinel detection now exist and pass. | Full committed golden-image comparison and public packaging remain incomplete. |
 
 ## Phase 3 Remaining Items
 
@@ -717,6 +711,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_llm_renderer_command_smoke.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_dreamer_positive_runtime_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_conductor_energy_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_lighting_energy_budget_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_vegetation_state_contract_tests.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_reflection_probe_contract_tests.ps1
    ```
@@ -741,8 +736,8 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 
    These scripts now exist, are wired into `run_release_validation.ps1`, and
    passed individually after the fallback-reporting, camera-cut, render-graph
-   transient, full renderer ownership, descriptor/memory stress, VB debug view,
-   and visual probe checkpoints.
+   transient, full renderer ownership, descriptor/memory stress, lighting-energy,
+   VB debug view, and visual probe checkpoints.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

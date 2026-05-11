@@ -499,6 +499,34 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "taa_resolve_transitions") {
+        if (Test-Path $taaCopyPassPath) {
+            $taaCopyPass = Get-Content $taaCopyPassPath -Raw
+            foreach ($required in @("ResolveInputsContext", "PrepareResolveInputs", "TransitionToShaderResource", "D3D12_RESOURCE_STATE_RENDER_TARGET", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE", "ResourceBarrier")) {
+                if ($taaCopyPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "taa_resolve_transitions missing TAACopyPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "taa_resolve_transitions missing TAACopyPass.cpp"
+        }
+        if (Test-Path $taaExecutionPath) {
+            $taaExecution = Get-Content $taaExecutionPath -Raw
+            foreach ($route in @("TAACopyPass::PrepareResolveInputs", "TAACopyPass::TransitionToShaderResource")) {
+                if ($taaExecution.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "taa_resolve_transitions missing routed TAA resolve transition call in Renderer_TAAExecution.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier")) {
+                if ($taaExecution.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "taa_resolve_transitions still has direct TAA resolve transition mechanics in Renderer_TAAExecution.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "taa_resolve_transitions missing Renderer_TAAExecution.cpp"
+        }
+    }
+
     if ($id -eq "motion_vector_target_transitions") {
         if (Test-Path $motionVectorTargetPassPath) {
             $motionVectorTargetPass = Get-Content $motionVectorTargetPassPath -Raw

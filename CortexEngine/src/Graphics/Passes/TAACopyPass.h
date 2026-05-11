@@ -26,7 +26,24 @@ struct IntermediateCopyContext {
     bool skipTransitions = false;
 };
 
+struct ResolveInputsContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ResourceStateRef taaIntermediate;
+    ResourceStateRef hdrColor;
+    ResourceStateRef depth;
+    ResourceStateRef normalRoughness;
+    ResourceStateRef velocity;
+    ResourceStateRef historyColor;
+    ResourceStateRef temporalMask;
+    D3D12_RESOURCE_STATES depthSampleState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    bool skipTransitions = false;
+};
+
 [[nodiscard]] bool CopyHdrToHistory(const HistoryCopyContext& context);
 [[nodiscard]] bool CopyIntermediateToHdr(const IntermediateCopyContext& context);
+[[nodiscard]] bool PrepareResolveInputs(const ResolveInputsContext& context);
+[[nodiscard]] bool TransitionToShaderResource(ID3D12GraphicsCommandList* commandList,
+                                              const ResourceStateRef& resource,
+                                              bool skipTransitions = false);
 
 } // namespace Cortex::Graphics::TAACopyPass

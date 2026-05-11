@@ -66,6 +66,21 @@ void Renderer::SetColorGrade(float warm, float cool) {
                  m_postProcessState.cool);
 }
 
+void Renderer::SetToneGrade(float contrast, float saturation) {
+    const float clampedContrast = glm::clamp(contrast, 0.5f, 1.5f);
+    const float clampedSaturation = glm::clamp(saturation, 0.0f, 2.0f);
+    if (std::abs(clampedContrast - m_postProcessState.contrast) < 1e-3f &&
+        std::abs(clampedSaturation - m_postProcessState.saturation) < 1e-3f) {
+        return;
+    }
+
+    m_postProcessState.contrast = clampedContrast;
+    m_postProcessState.saturation = clampedSaturation;
+    spdlog::info("Tone grade contrast/saturation set to ({}, {})",
+                 m_postProcessState.contrast,
+                 m_postProcessState.saturation);
+}
+
 void Renderer::SetCinematicPostEnabled(bool enabled) {
     if (m_postProcessState.cinematicEnabled == enabled) {
         return;

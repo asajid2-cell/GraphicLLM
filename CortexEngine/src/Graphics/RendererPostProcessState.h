@@ -14,6 +14,8 @@ struct RendererPostProcessState {
     float bloomThreshold = 1.0f;
     float bloomSoftKnee = 0.5f;
     float bloomMaxContribution = 4.0f;
+    float contrast = 1.0f;
+    float saturation = 1.0f;
     float vignette = 0.0f;
     float lensDirt = 0.0f;
 

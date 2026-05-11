@@ -217,6 +217,11 @@ void ApplyColorGradeControl(Renderer& renderer, float warm, float cool) {
                            std::clamp(cool, -1.0f, 1.0f));
 }
 
+void ApplyToneGradeControl(Renderer& renderer, float contrast, float saturation) {
+    renderer.SetToneGrade(std::clamp(contrast, 0.5f, 1.5f),
+                          std::clamp(saturation, 0.0f, 2.0f));
+}
+
 void ApplySSAOParamsControl(Renderer& renderer, float radius, float bias, float intensity) {
     renderer.SetSSAOParams(std::clamp(radius, 0.01f, 5.0f),
                            std::clamp(bias, 0.0f, 1.0f),

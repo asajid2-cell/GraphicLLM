@@ -342,6 +342,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.bloomThreshold = m_bloomResources.threshold;
     contract.cinematicPost.bloomSoftKnee = m_bloomResources.softKnee;
     contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
+    contract.cinematicPost.contrast = m_postProcessState.contrast;
+    contract.cinematicPost.saturation = m_postProcessState.saturation;
     contract.cinematicPost.vignette = m_postProcessState.EffectiveVignette();
     contract.cinematicPost.lensDirt = m_postProcessState.EffectiveLensDirt();
     contract.cinematicPost.warm = m_postProcessState.warm;

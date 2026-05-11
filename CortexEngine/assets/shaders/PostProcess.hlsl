@@ -59,6 +59,11 @@ cbuffer FrameConstants : register(b1)
     float4x4 g_InvViewProjMatrix;
     float4   g_WaterParams0;
     float4   g_WaterParams1;
+    // x = SSR max ray distance, y = SSR view-space thickness,
+    // z = SSR composition strength, w = reserved
+    float4   g_SSRParams;
+    // x = contrast, y = saturation, z/w reserved
+    float4   g_PostGradeParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -1585,6 +1590,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float3 warmTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(1.05f, 1.0f, 0.95f), warm);
     float3 coolTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(0.96f, 1.0f, 1.05f), cool);
     color *= warmTint * coolTint;
+
+    float saturation = clamp(g_PostGradeParams.y, 0.0f, 2.0f);
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    color = lerp(luma.xxx, color, saturation);
+
+    float contrastGrade = clamp(g_PostGradeParams.x, 0.5f, 1.5f);
+    color = (color - 0.5f.xxx) * contrastGrade + 0.5f.xxx;
 
     float vignetteStrength = saturate(g_ColorGrade.w);
     if (vignetteStrength > 0.001f)

@@ -691,6 +691,10 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.cinematicPost.bloomSoftKnee > 1.0f ||
         contract.cinematicPost.bloomMaxContribution < 0.0f ||
         contract.cinematicPost.bloomMaxContribution > 16.0f ||
+        contract.cinematicPost.contrast < 0.5f ||
+        contract.cinematicPost.contrast > 1.5f ||
+        contract.cinematicPost.saturation < 0.0f ||
+        contract.cinematicPost.saturation > 2.0f ||
         contract.cinematicPost.vignette < 0.0f ||
         contract.cinematicPost.vignette > 1.0f ||
         contract.cinematicPost.lensDirt < 0.0f ||

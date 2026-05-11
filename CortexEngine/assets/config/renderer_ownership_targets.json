@@ -86,9 +86,9 @@
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",
-      "release_boundary": "ECS CPU-simulated particles with DX12-instanced billboard rendering are the public Phase 3 path, with controls/resources/frame stats split into pass-owned bundles. ParticleRenderResources owns instance/quad buffer allocation, upload, and vertex-buffer view creation; renderer ownership tests reject moving that GPU resource work back into Renderer_Particles.cpp. Backend-stage frame-contract stats and effects showcase validation keep GPUParticleSystem non-public until GPU simulation/sort/render are runtime-validated",
+      "release_boundary": "ECS CPU-simulated particles with DX12-instanced billboard rendering are the public Phase 3 path, with controls/resources/frame stats split into pass-owned bundles. ParticleRenderResources owns instance/quad buffer allocation, upload, and vertex-buffer view creation; ParticleBillboardPass owns render-target barriers, pipeline binding, and draw submission; renderer ownership tests reject moving that GPU resource/draw work back into Renderer_Particles.cpp. Backend-stage frame-contract stats and effects showcase validation keep GPUParticleSystem non-public until GPU simulation/sort/render are runtime-validated",
       "validated_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
-      "target_files": ["RendererParticleState.h", "Renderer_Particles.cpp", "GPUParticles.h"],
+      "target_files": ["RendererParticleState.h", "Renderer_Particles.cpp", "Passes/ParticleBillboardPass.h", "GPUParticles.h"],
       "renderer_state_members": ["m_particleState"],
       "future_extension": "Keep GPU particle migration explicit and separate from the public billboard contract until it has equivalent budget and visual validation"
     }

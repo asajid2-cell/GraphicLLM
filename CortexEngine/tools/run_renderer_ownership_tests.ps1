@@ -154,7 +154,7 @@ foreach ($target in $doc.targets) {
     }
 
     if ($id -eq "particle_resources") {
-        foreach ($required in @("struct ParticleRenderControls", "struct ParticleRenderResources", "struct ParticleFrameStats", "struct ParticleRenderState", "ParticleRenderControls controls", "ParticleRenderResources resources", "ParticleFrameStats frame", "densityScale", "frameLiveParticles", "frameSubmittedInstances", "frameDensityScale", "InstanceBufferBytes")) {
+        foreach ($required in @("struct ParticleRenderControls", "struct ParticleRenderResources", "struct ParticleFrameStats", "struct ParticleRenderState", "ParticleRenderControls controls", "ParticleRenderResources resources", "ParticleFrameStats frame", "densityScale", "frameLiveParticles", "frameSubmittedInstances", "frameDensityScale", "InstanceBufferBytes", "EnsureInstanceBuffer", "UploadInstances", "EnsureQuadVertexBuffer", "InstanceBufferView", "QuadVertexBufferView")) {
             if ($particleState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "particle_resources missing public billboard state marker in RendererParticleState.h: $required"
             }
@@ -162,6 +162,11 @@ foreach ($target in $doc.targets) {
         foreach ($oldFlatAccess in @("m_particleState.densityScale", "m_particleState.instanceBuffer", "m_particleState.frameLiveParticles", "m_particleState.effectPreset")) {
             if ($particleRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                 Add-Failure "particle_resources still uses flat Renderer particle state access in Renderer_Particles.cpp: $oldFlatAccess"
+            }
+        }
+        foreach ($rendererOwnedResourceCall in @("CreateCommittedResource", "resources.instanceBuffer->Map", "resources.instanceBuffer->Unmap", "resources.quadVertexBuffer->Map", "resources.quadVertexBuffer->Unmap")) {
+            if ($particleRenderer.IndexOf($rendererOwnedResourceCall, [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "particle_resources still allocates/maps particle-owned GPU buffers in Renderer_Particles.cpp: $rendererOwnedResourceCall"
             }
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {

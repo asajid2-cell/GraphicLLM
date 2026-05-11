@@ -5,7 +5,6 @@
 #include "Scene/Components.h"
 
 #include <algorithm>
-#include <cstring>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -143,59 +142,20 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     const UINT requiredCapacity = instanceCount;
     const UINT minCapacity = 256;
 
-    if (!resources.instanceBuffer || resources.instanceCapacity < requiredCapacity) {
-        // CRITICAL: If replacing an existing buffer, wait for GPU to finish using it
-        if (resources.instanceBuffer) {
-            WaitForGPU();
-        }
-
-        UINT newCapacity = std::max(requiredCapacity, minCapacity);
-
-        D3D12_HEAP_PROPERTIES heapProps = {};
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Width = static_cast<UINT64>(newCapacity) * sizeof(ParticleInstance);
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc.Count = 1;
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        ComPtr<ID3D12Resource> buffer;
-        HRESULT hr = device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&buffer));
-
-        if (FAILED(hr)) {
-            spdlog::warn("RenderParticles: failed to allocate instance buffer");
-            return;
-        }
-
-        resources.instanceBuffer = buffer;
-        resources.instanceCapacity = newCapacity;
+    if (resources.NeedsInstanceCapacity(requiredCapacity) && resources.instanceBuffer) {
+        WaitForGPU();
+    }
+    const HRESULT bufferHr = resources.EnsureInstanceBuffer(device, requiredCapacity, minCapacity);
+    if (FAILED(bufferHr)) {
+        spdlog::warn("RenderParticles: failed to allocate instance buffer (hr=0x{:08X})",
+                     static_cast<unsigned int>(bufferHr));
+        CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_CreateInstanceBuffer", bufferHr);
+        return;
     }
 
-    // Upload instance data
-    void* mapped = nullptr;
-    D3D12_RANGE readRange{0, 0};
-    const UINT bufferSize = instanceCount * sizeof(ParticleInstance);
-    HRESULT mapHr = resources.instanceBuffer->Map(0, &readRange, &mapped);
-    if (SUCCEEDED(mapHr)) {
-        memcpy(mapped, instances.data(), bufferSize);
-        resources.instanceBuffer->Unmap(0, nullptr);
-    } else {
+    UINT bufferSize = 0;
+    const HRESULT mapHr = resources.UploadInstances(instances.data(), instanceCount, bufferSize);
+    if (FAILED(mapHr)) {
         spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
                      static_cast<unsigned int>(mapHr));
         // Map failures are one of the first places a hung device surfaces.
@@ -215,51 +175,13 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         {  0.5f,  0.5f, 0.0f, 1.0f, 0.0f },
     };
 
-    if (!resources.quadVertexBuffer) {
-        D3D12_HEAP_PROPERTIES quadHeapProps = {};
-        quadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        quadHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        quadHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        quadHeapProps.CreationNodeMask = 1;
-        quadHeapProps.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC vbDesc = {};
-        vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        vbDesc.Width = sizeof(kQuadVertices);
-        vbDesc.Height = 1;
-        vbDesc.DepthOrArraySize = 1;
-        vbDesc.MipLevels = 1;
-        vbDesc.Format = DXGI_FORMAT_UNKNOWN;
-        vbDesc.SampleDesc.Count = 1;
-        vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        vbDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        HRESULT hrVB = device->CreateCommittedResource(
-            &quadHeapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &vbDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(&resources.quadVertexBuffer));
-        if (FAILED(hrVB)) {
-            spdlog::warn("RenderParticles: failed to allocate quad vertex buffer (hr=0x{:08X})",
-                         static_cast<unsigned int>(hrVB));
-            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_CreateQuadVB", hrVB);
-            return;
-        }
-
-        void* quadMapped = nullptr;
-        HRESULT mapQuadHr = resources.quadVertexBuffer->Map(0, &readRange, &quadMapped);
-        if (SUCCEEDED(mapQuadHr)) {
-            memcpy(quadMapped, kQuadVertices, sizeof(kQuadVertices));
-            resources.quadVertexBuffer->Unmap(0, nullptr);
-        } else {
-            spdlog::warn("RenderParticles: failed to map quad vertex buffer (hr=0x{:08X})",
-                         static_cast<unsigned int>(mapQuadHr));
-            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapQuadVB", mapQuadHr);
-            resources.quadVertexBuffer.Reset();
-            return;
-        }
+    const HRESULT quadHr = resources.EnsureQuadVertexBuffer(device, kQuadVertices, sizeof(kQuadVertices));
+    if (FAILED(quadHr)) {
+        spdlog::warn("RenderParticles: failed to prepare quad vertex buffer (hr=0x{:08X})",
+                     static_cast<unsigned int>(quadHr));
+        CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_PrepareQuadVB", quadHr);
+        resources.quadVertexBuffer.Reset();
+        return;
     }
 
     // --- FIX: Bind render targets with depth buffer BEFORE setting pipeline ---
@@ -316,13 +238,8 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objAddr);
 
     D3D12_VERTEX_BUFFER_VIEW vbViews[2] = {};
-    vbViews[0].BufferLocation = resources.quadVertexBuffer->GetGPUVirtualAddress();
-    vbViews[0].StrideInBytes  = sizeof(QuadVertex);
-    vbViews[0].SizeInBytes    = sizeof(kQuadVertices);
-
-    vbViews[1].BufferLocation = resources.instanceBuffer->GetGPUVirtualAddress();
-    vbViews[1].StrideInBytes  = sizeof(ParticleInstance);
-    vbViews[1].SizeInBytes    = bufferSize;
+    vbViews[0] = resources.QuadVertexBufferView(sizeof(QuadVertex), sizeof(kQuadVertices));
+    vbViews[1] = resources.InstanceBufferView(instanceCount, bufferSize);
 
     m_commandResources.graphicsList->IASetVertexBuffers(0, 2, vbViews);
     m_commandResources.graphicsList->IASetIndexBuffer(nullptr);

@@ -762,7 +762,7 @@ foreach ($target in $doc.targets) {
             Add-Failure "screen_space_resources missing RendererSSAOState.h"
         } else {
             $ssaoState = Get-Content $ssaoStatePath -Raw
-            foreach ($required in @("struct SSAOControls", "struct SSAOResources", "struct SSAODescriptorTables", "SSAOControls controls", "SSAOResources resources", "SSAODescriptorTables descriptors")) {
+            foreach ($required in @("struct SSAOControls", "struct SSAOResources", "struct SSAODescriptorTables", "SSAOControls controls", "SSAOResources resources", "SSAODescriptorTables descriptors", "CreateTarget", "CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "CreateUnorderedAccessView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
                 if ($ssaoState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "screen_space_resources missing SSAO ownership marker in RendererSSAOState.h: $required"
                 }
@@ -793,6 +793,14 @@ foreach ($target in $doc.targets) {
             foreach ($oldFlatAccess in @("m_ssaoResources.enabled", "m_ssaoResources.texture", "m_ssaoResources.resourceState", "m_ssaoResources.srvTables")) {
                 if ($ssaoRenderer.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "screen_space_resources still uses flat SSAO state access in Renderer_SSAO.cpp: $oldFlatAccess"
+                }
+            }
+            if ($ssaoRenderer.IndexOf("m_ssaoResources.resources.CreateTarget", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "screen_space_resources SSAO renderer does not route resource creation through SSAOResources::CreateTarget"
+            }
+            foreach ($rendererOwnedSSAOResourceCall in @("CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "CreateUnorderedAccessView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($ssaoRenderer.IndexOf($rendererOwnedSSAOResourceCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "screen_space_resources still owns SSAO GPU resource/descriptor work in Renderer_SSAO.cpp: $rendererOwnedSSAOResourceCall"
                 }
             }
         }

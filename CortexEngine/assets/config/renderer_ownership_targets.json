@@ -26,9 +26,9 @@
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",
-      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, temporal-screen resources, and cinematic post controls are held in named state structs and validated through ownership, graphics presets, and effects showcase frame-contract reporting",
-      "validated_contracts": ["graphics_preset", "effects_gallery", "phase3_visual_matrix"],
-      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h"],
+      "release_boundary": "bloom controls, persistent pyramid resources, descriptor tables, fullscreen draw submission, temporal-screen resources, and cinematic post controls are held in named state/pass helpers and validated through ownership, graphics presets, and effects showcase frame-contract reporting",
+      "validated_contracts": ["graphics_preset", "effects_gallery", "effects_showcase", "phase3_visual_matrix"],
+      "target_files": ["RendererBloomState.h", "RendererTemporalScreenState.h", "RendererPostProcessState.h", "Renderer_Bloom.cpp", "Passes/FullscreenPass.h"],
       "renderer_state_members": ["m_bloomResources", "m_temporalScreenState", "m_postProcessState"],
       "future_extension": "Keep new post effects inside these state files first; extract orchestration helpers only when a concrete new pass requires it"
     },

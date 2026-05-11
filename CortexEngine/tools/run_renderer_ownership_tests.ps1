@@ -62,6 +62,7 @@ if (-not (Test-Path $environmentStatePath)) {
 }
 $environmentState = Get-Content $environmentStatePath -Raw
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
+$bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
@@ -239,6 +240,17 @@ foreach ($target in $doc.targets) {
                     Add-Failure "postprocess_resources still exposes loose bloom state field in BloomPassState: $oldField"
                 }
             }
+        }
+        if (Test-Path $bloomRendererPath) {
+            $bloomRenderer = Get-Content $bloomRendererPath -Raw
+            if ($bloomRenderer.IndexOf("FullscreenPass::DrawTriangle", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "postprocess_resources bloom renderer does not route fullscreen draws through FullscreenPass::DrawTriangle"
+            }
+            if ($bloomRenderer.IndexOf("DrawInstanced", [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "postprocess_resources still submits fullscreen bloom draws directly in Renderer_Bloom.cpp"
+            }
+        } else {
+            Add-Failure "postprocess_resources missing Renderer_Bloom.cpp"
         }
         if (-not (Test-Path $temporalScreenPath)) {
             Add-Failure "postprocess_resources missing RendererTemporalScreenState.h"

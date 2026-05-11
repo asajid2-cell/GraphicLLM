@@ -153,6 +153,16 @@
       "future_extension": "If environment streaming/residency becomes more complex, extract orchestration from Renderer_Environment without duplicating the manifest loader"
     },
     {
+      "id": "texture_descriptor_publication",
+      "owner": "Texture publication",
+      "status": "release_boundary_validated",
+      "release_boundary": "TextureDescriptorState owns staging SRV allocation, texture SRV creation, fallback material descriptor-table allocation, and fallback/reserved texture SRV writes; Renderer_TexturePublication.cpp and Renderer_TextureCreation.cpp keep texture admission, receipt, asset registry, bindless registration, and placeholder creation policy",
+      "validated_contracts": ["renderer_ownership", "material_lab", "rt_showcase", "temporal_validation"],
+      "target_files": ["RendererMaterialTextureState.h", "Renderer_TexturePublication.cpp", "Renderer_TextureCreation.cpp"],
+      "renderer_state_members": ["m_materialFallbacks", "m_assetRuntime", "m_services"],
+      "future_extension": "Keep future texture descriptor allocation/write helpers in TextureDescriptorState or a dedicated texture-publication service before expanding texture residency policy"
+    },
+    {
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",

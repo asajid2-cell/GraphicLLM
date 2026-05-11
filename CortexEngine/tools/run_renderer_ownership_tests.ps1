@@ -72,6 +72,9 @@ if (-not (Test-Path $postStatePath)) {
     throw "RendererPostProcessState.h not found: $postStatePath"
 }
 $postState = Get-Content $postStatePath -Raw
+$materialTextureStatePath = Join-Path $root "src/Graphics/RendererMaterialTextureState.h"
+$texturePublicationPath = Join-Path $root "src/Graphics/Renderer_TexturePublication.cpp"
+$textureCreationPath = Join-Path $root "src/Graphics/Renderer_TextureCreation.cpp"
 $environmentStatePath = Join-Path $root "src/Graphics/RendererEnvironmentState.h"
 if (-not (Test-Path $environmentStatePath)) {
     throw "RendererEnvironmentState.h not found: $environmentStatePath"
@@ -1749,6 +1752,37 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "visibility_buffer_mesh_srvs missing Renderer_VisibilityBufferCollection.cpp"
+        }
+    }
+
+    if ($id -eq "texture_descriptor_publication") {
+        if (Test-Path $materialTextureStatePath) {
+            $materialTextureState = Get-Content $materialTextureStatePath -Raw
+            foreach ($required in @("struct TextureDescriptorState", "CreateStagingSRV", "AllocateStagingCBV_SRV_UAV", "CreateSRV", "WriteTexture2DSRV", "CreateShaderResourceView", "AllocateFallbackDescriptorTable", "AllocateCBV_SRV_UAV", "WriteTexture2DSRVTable")) {
+                if ($materialTextureState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "texture_descriptor_publication missing RendererMaterialTextureState marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "texture_descriptor_publication missing RendererMaterialTextureState.h"
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $texturePublicationPath; Label = "Renderer_TexturePublication.cpp" },
+            [pscustomobject]@{ Path = $textureCreationPath; Label = "Renderer_TextureCreation.cpp" }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $textureSource = Get-Content $pathInfo.Path -Raw
+                if ($textureSource.IndexOf("TextureDescriptorState::", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "texture_descriptor_publication missing TextureDescriptorState delegation in $($pathInfo.Label)"
+                }
+                foreach ($removedLocal in @("AllocateStagingCBV_SRV_UAV", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "D3D12_SHADER_RESOURCE_VIEW_DESC")) {
+                    if ($textureSource.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "texture_descriptor_publication still has direct texture descriptor mechanics in $($pathInfo.Label): $removedLocal"
+                    }
+                }
+            } else {
+                Add-Failure "texture_descriptor_publication missing $($pathInfo.Label)"
+            }
         }
     }
 

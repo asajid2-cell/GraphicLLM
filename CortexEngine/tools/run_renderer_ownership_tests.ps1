@@ -1005,6 +1005,27 @@ foreach ($target in $doc.targets) {
                 }
             }
         }
+        if (Test-Path $depthPrepassTargetPassPath) {
+            $depthTargetPassSource = Get-Content $depthPrepassTargetPassPath -Raw
+            foreach ($required in @("ResourceCreateContext", "CreateResources", "CreateCommittedResource", "CreateDepthStencilView", "CreateShaderResourceView", "AllocateDSV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($depthTargetPassSource.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "depth_resources missing DepthPrepassTargetPass resource-creation marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "depth_resources missing DepthPrepassTargetPass.cpp"
+        }
+        if (Test-Path $depthTargetPath) {
+            $depthTargetSource = Get-Content $depthTargetPath -Raw
+            if ($depthTargetSource.IndexOf("DepthPrepassTargetPass::CreateResources", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "depth_resources missing routed resource creation call in Renderer_DepthTarget.cpp: DepthPrepassTargetPass::CreateResources"
+            }
+            foreach ($directCall in @("CreateCommittedResource", "CreateDepthStencilView", "CreateShaderResourceView", "AllocateDSV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($depthTargetSource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "depth_resources still creates depth resources/descriptors directly in Renderer_DepthTarget.cpp: $directCall"
+                }
+            }
+        }
     }
 
     if ($id -eq "depth_prepass_target_submission") {

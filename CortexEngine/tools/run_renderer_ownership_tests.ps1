@@ -495,6 +495,28 @@ foreach ($target in $doc.targets) {
         }
         if (-not (Test-Path $temporalScreenPath)) {
             Add-Failure "postprocess_resources missing RendererTemporalScreenState.h"
+        } else {
+            $temporalScreen = Get-Content $temporalScreenPath -Raw
+            foreach ($required in @("CreateHistoryColor", "CreateTAAIntermediate", "CreateVelocityBuffer", "CreateCommittedResource", "CreateRenderTargetView", "CreateShaderResourceView", "AllocateRTV", "AllocateStagingCBV_SRV_UAV")) {
+                if ($temporalScreen.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_resources missing temporal-screen ownership marker in RendererTemporalScreenState.h: $required"
+                }
+            }
+        }
+        if (Test-Path $hdrTargetsPath) {
+            $hdrTargets = Get-Content $hdrTargetsPath -Raw
+            foreach ($requiredRoute in @("m_temporalScreenState.CreateHistoryColor", "m_temporalScreenState.CreateTAAIntermediate", "m_temporalScreenState.CreateVelocityBuffer")) {
+                if ($hdrTargets.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "postprocess_resources missing routed temporal-screen creation in Renderer_HDRTargets.cpp: $requiredRoute"
+                }
+            }
+            foreach ($directTemporalCreate in @("IID_PPV_ARGS(&m_temporalScreenState.historyColor)", "IID_PPV_ARGS(&m_temporalScreenState.taaIntermediate)", "IID_PPV_ARGS(&m_temporalScreenState.velocityBuffer)")) {
+                if ($hdrTargets.IndexOf($directTemporalCreate, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "postprocess_resources still creates temporal-screen resources directly in Renderer_HDRTargets.cpp: $directTemporalCreate"
+                }
+            }
+        } else {
+            Add-Failure "postprocess_resources missing Renderer_HDRTargets.cpp"
         }
         foreach ($required in @("cinematicEnabled", "EffectiveVignette", "EffectiveLensDirt", "EncodedLensDirtByte")) {
             if ($postState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {

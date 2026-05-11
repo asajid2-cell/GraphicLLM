@@ -300,6 +300,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"bloom_max_contribution", contract.cinematicPost.bloomMaxContribution},
             {"contrast", contract.cinematicPost.contrast},
             {"saturation", contract.cinematicPost.saturation},
+            {"color_grade_preset", contract.cinematicPost.colorGradePreset},
             {"vignette", contract.cinematicPost.vignette},
             {"lens_dirt", contract.cinematicPost.lensDirt},
             {"warm", contract.cinematicPost.warm},

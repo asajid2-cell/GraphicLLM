@@ -91,6 +91,7 @@ json ToJson(const RendererTuningState& state) {
         }},
         {"cinematic_post", {
             {"enabled", state.cinematicPost.enabled},
+            {"color_grade_preset", state.cinematicPost.colorGradePreset},
             {"bloom_threshold", state.cinematicPost.bloomThreshold},
             {"bloom_soft_knee", state.cinematicPost.bloomSoftKnee},
             {"contrast", state.cinematicPost.contrast},
@@ -105,6 +106,37 @@ template <typename T>
 void ReadValue(const json& object, const char* key, T& value) {
     if (object.contains(key) && !object.at(key).is_null()) {
         value = object.at(key).get<T>();
+    }
+}
+
+void ApplyNamedColorGradePreset(RendererTuningState& state) {
+    std::string& id = state.cinematicPost.colorGradePreset;
+    if (id.empty()) {
+        id = "custom";
+    }
+
+    if (id == "neutral") {
+        state.lighting.warm = 0.0f;
+        state.lighting.cool = 0.0f;
+        state.cinematicPost.contrast = 1.0f;
+        state.cinematicPost.saturation = 1.0f;
+    } else if (id == "warm_film") {
+        state.lighting.warm = 0.32f;
+        state.lighting.cool = -0.08f;
+        state.cinematicPost.contrast = 1.12f;
+        state.cinematicPost.saturation = 1.18f;
+    } else if (id == "cool_moon") {
+        state.lighting.warm = -0.08f;
+        state.lighting.cool = 0.34f;
+        state.cinematicPost.contrast = 1.08f;
+        state.cinematicPost.saturation = 0.92f;
+    } else if (id == "bleach_bypass") {
+        state.lighting.warm = 0.04f;
+        state.lighting.cool = 0.08f;
+        state.cinematicPost.contrast = 1.28f;
+        state.cinematicPost.saturation = 0.72f;
+    } else if (id != "custom") {
+        id = "custom";
     }
 }
 
@@ -194,6 +226,11 @@ RendererTuningState FromJson(const json& root) {
     if (root.contains("cinematic_post") && root.at("cinematic_post").is_object()) {
         const auto& c = root.at("cinematic_post");
         ReadValue(c, "enabled", state.cinematicPost.enabled);
+        if (c.contains("color_grade_preset")) {
+            ReadValue(c, "color_grade_preset", state.cinematicPost.colorGradePreset);
+        } else {
+            ReadValue(c, "preset", state.cinematicPost.colorGradePreset);
+        }
         ReadValue(c, "bloom_threshold", state.cinematicPost.bloomThreshold);
         ReadValue(c, "bloom_soft_knee", state.cinematicPost.bloomSoftKnee);
         ReadValue(c, "contrast", state.cinematicPost.contrast);
@@ -346,6 +383,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.cinematicPost.bloomThreshold = post.bloomThreshold;
     state.cinematicPost.bloomSoftKnee = post.bloomSoftKnee;
+    state.cinematicPost.colorGradePreset = post.colorGradePreset;
     state.cinematicPost.contrast = post.contrast;
     state.cinematicPost.saturation = post.saturation;
     state.cinematicPost.enabled = post.cinematicEnabled;
@@ -405,6 +443,8 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.water.fresnelStrength = std::clamp(state.water.fresnelStrength, 0.0f, 3.0f);
 
     state.particles.densityScale = std::clamp(state.particles.densityScale, 0.0f, 2.0f);
+
+    ApplyNamedColorGradePreset(state);
 
     state.cinematicPost.bloomThreshold = std::clamp(state.cinematicPost.bloomThreshold, 0.1f, 10.0f);
     state.cinematicPost.bloomSoftKnee = std::clamp(state.cinematicPost.bloomSoftKnee, 0.0f, 1.0f);
@@ -494,6 +534,7 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyToneGradeControl(renderer,
                           state.cinematicPost.contrast,
                           state.cinematicPost.saturation);
+    renderer.SetColorGradePreset(state.cinematicPost.colorGradePreset);
     renderer.SetCinematicPostEnabled(state.cinematicPost.enabled);
     ApplyCinematicPostControl(renderer,
                               state.cinematicPost.vignette,

@@ -97,6 +97,7 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   },
   "cinematic_post": {
     "enabled": true,
+    "color_grade_preset": "warm_film",
     "bloom_threshold": 1.2,
     "bloom_soft_knee": 0.4,
     "contrast": 1.18,
@@ -270,20 +271,24 @@ if ($validRun.exit_code -ne 0) {
     $saturation = [double]$report.frame_contract.cinematic_post.saturation
     $warm = [double]$report.frame_contract.cinematic_post.warm
     $cool = [double]$report.frame_contract.cinematic_post.cool
+    $colorGradePreset = [string]$report.frame_contract.cinematic_post.color_grade_preset
     if (-not [bool]$report.frame_contract.cinematic_post.enabled) {
         Add-Failure "valid settings cinematic post was not enabled"
     }
-    if ([Math]::Abs($warm - 0.42) -gt 0.03) {
-        Add-Failure "valid settings warm color grade was $warm, expected 0.42"
+    if ($colorGradePreset -ne "warm_film") {
+        Add-Failure "valid settings color grade preset was '$colorGradePreset', expected warm_film"
     }
-    if ([Math]::Abs($cool + 0.18) -gt 0.03) {
-        Add-Failure "valid settings cool color grade was $cool, expected -0.18"
+    if ([Math]::Abs($warm - 0.32) -gt 0.03) {
+        Add-Failure "valid settings warm color grade was $warm, expected 0.32"
     }
-    if ([Math]::Abs($contrast - 1.18) -gt 0.03) {
-        Add-Failure "valid settings contrast was $contrast, expected 1.18"
+    if ([Math]::Abs($cool + 0.08) -gt 0.03) {
+        Add-Failure "valid settings cool color grade was $cool, expected -0.08"
     }
-    if ([Math]::Abs($saturation - 1.34) -gt 0.03) {
-        Add-Failure "valid settings saturation was $saturation, expected 1.34"
+    if ([Math]::Abs($contrast - 1.12) -gt 0.03) {
+        Add-Failure "valid settings contrast was $contrast, expected 1.12"
+    }
+    if ([Math]::Abs($saturation - 1.18) -gt 0.03) {
+        Add-Failure "valid settings saturation was $saturation, expected 1.18"
     }
     if ([Math]::Abs($vignette - 0.31) -gt 0.02) {
         Add-Failure "valid settings vignette was $vignette, expected 0.31"

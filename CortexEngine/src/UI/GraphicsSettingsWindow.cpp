@@ -51,6 +51,10 @@ enum ControlIdGraphics : int {
     IDC_GFX_RT_REFL_HISTORY_CLAMP = 9051,
     IDC_GFX_RT_REFL_FIREFLY = 9052,
     IDC_GFX_RT_REFL_SCALE = 9053,
+    IDC_GFX_GRADE_NEUTRAL = 9054,
+    IDC_GFX_GRADE_WARM_FILM = 9055,
+    IDC_GFX_GRADE_COOL_MOON = 9056,
+    IDC_GFX_GRADE_BLEACH = 9057,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -289,13 +293,16 @@ void SyncStateFromSliders() {
     g_gfx.tuning.particles.densityScale = SliderToFloat(g_gfx.particleDensity);
 }
 
-void ApplyTuningState() {
+void ApplyTuningState(bool markColorGradeCustom = false) {
     auto* renderer = Cortex::ServiceLocator::GetRenderer();
     if (!renderer || renderer->IsDeviceRemoved()) {
         return;
     }
     SyncStateFromToggles();
     SyncStateFromSliders();
+    if (markColorGradeCustom) {
+        g_gfx.tuning.cinematicPost.colorGradePreset = "custom";
+    }
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
@@ -308,6 +315,19 @@ void ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig rig) {
         return;
     }
     Graphics::ApplyLightingRigControl(*renderer, rig, engine->GetRegistry());
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+}
+
+void ApplyColorGradePresetFromGraphicsUI(const char* preset) {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (!renderer || renderer->IsDeviceRemoved()) {
+        return;
+    }
+    SyncStateFromToggles();
+    SyncStateFromSliders();
+    g_gfx.tuning.cinematicPost.colorGradePreset = preset ? preset : "neutral";
+    g_gfx.tuning.quality.dirtyFromUI = true;
+    Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
 }
 
@@ -659,6 +679,14 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_BLOOM_KNEE, L"Bloom Soft Knee", g_gfx.bloomKnee, 0.0f, 1.0f);
             makeSlider(IDC_GFX_CONTRAST, L"Contrast", g_gfx.contrast, 0.5f, 1.5f);
             makeSlider(IDC_GFX_SATURATION, L"Saturation", g_gfx.saturation, 0.0f, 2.0f);
+            {
+                const int buttonWidth = (width - margin * 2 - 18) / 4;
+                makeButton(IDC_GFX_GRADE_NEUTRAL, L"Neutral", margin, y, buttonWidth);
+                makeButton(IDC_GFX_GRADE_WARM_FILM, L"Warm Film", margin + buttonWidth + 6, y, buttonWidth);
+                makeButton(IDC_GFX_GRADE_COOL_MOON, L"Cool Moon", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                makeButton(IDC_GFX_GRADE_BLEACH, L"Bleach", margin + (buttonWidth + 6) * 3, y, buttonWidth);
+                y += 24 + rowGap;
+            }
             makeSlider(IDC_GFX_VIGNETTE, L"Vignette", g_gfx.vignette, 0.0f, 1.0f);
             makeSlider(IDC_GFX_LENS_DIRT, L"Lens Dirt", g_gfx.lensDirt, 0.0f, 1.0f);
             {
@@ -748,7 +776,13 @@ void RegisterGraphicsSettingsClass() {
         case WM_HSCROLL: {
             const int scrollCode = LOWORD(wParam);
             if (scrollCode == TB_ENDTRACK || scrollCode == TB_THUMBPOSITION) {
-                ApplyTuningState();
+                const HWND source = reinterpret_cast<HWND>(lParam);
+                const bool colorGradeSlider =
+                    source == g_gfx.warm.hwnd ||
+                    source == g_gfx.cool.hwnd ||
+                    source == g_gfx.contrast.hwnd ||
+                    source == g_gfx.saturation.hwnd;
+                ApplyTuningState(colorGradeSlider);
                 RefreshControlsFromRenderer();
                 RefreshHealthLabels();
             }
@@ -793,6 +827,18 @@ void RegisterGraphicsSettingsClass() {
                 break;
             case IDC_GFX_RIG_LANTERNS:
                 ApplyLightingRigFromGraphicsUI(Graphics::Renderer::LightingRig::StreetLanterns);
+                break;
+            case IDC_GFX_GRADE_NEUTRAL:
+                ApplyColorGradePresetFromGraphicsUI("neutral");
+                break;
+            case IDC_GFX_GRADE_WARM_FILM:
+                ApplyColorGradePresetFromGraphicsUI("warm_film");
+                break;
+            case IDC_GFX_GRADE_COOL_MOON:
+                ApplyColorGradePresetFromGraphicsUI("cool_moon");
+                break;
+            case IDC_GFX_GRADE_BLEACH:
+                ApplyColorGradePresetFromGraphicsUI("bleach_bypass");
                 break;
             case IDC_GFX_BOOKMARK_HERO:
             case IDC_GFX_BOOKMARK_REFLECTION:

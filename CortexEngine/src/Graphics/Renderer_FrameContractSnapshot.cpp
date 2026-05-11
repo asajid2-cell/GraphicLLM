@@ -344,6 +344,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.bloomMaxContribution = m_bloomResources.maxContribution;
     contract.cinematicPost.contrast = m_postProcessState.contrast;
     contract.cinematicPost.saturation = m_postProcessState.saturation;
+    contract.cinematicPost.colorGradePreset = m_postProcessState.colorGradePreset;
     contract.cinematicPost.vignette = m_postProcessState.EffectiveVignette();
     contract.cinematicPost.lensDirt = m_postProcessState.EffectiveLensDirt();
     contract.cinematicPost.warm = m_postProcessState.warm;

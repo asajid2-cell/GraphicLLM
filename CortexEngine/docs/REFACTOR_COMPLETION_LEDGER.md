@@ -929,6 +929,17 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because SSAO, HZB, bloom, RT,
       graph orchestration, and other renderer pass mechanics still live in
       renderer orchestration files.
+    - The current SSAO target checkpoint moves graphics/compute depth and SSAO
+      target resource-state setup plus compute finalization into
+      `SSAOPass::PrepareGraphicsTargets`, `SSAOPass::PrepareComputeTargets`, and
+      `SSAOPass::FinishComputeTarget`. Release rebuild passed, renderer
+      ownership tests passed with `targets=24`, renderer full ownership audit
+      passed with `renderer_members=48 expected_members=48`, temporal validation
+      passed at `temporal_validation_20260511_115922_072_90004_31a46dbc`, and
+      RT showcase passed at `rt_showcase_20260511_115922_089_94644_2c57f0b7`.
+      The broader ownership rows remain `PARTIAL` because HZB, bloom, RT, graph
+      orchestration, and other renderer pass mechanics still live in renderer
+      orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

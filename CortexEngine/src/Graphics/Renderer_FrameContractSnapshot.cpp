@@ -149,6 +149,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.safeRigVariantActive = m_lightingState.safeRigVariantActive;
     contract.lighting.exposure = m_qualityRuntimeState.exposure;
     contract.lighting.sunIntensity = m_lightingState.directionalIntensity;
+    contract.lighting.sunDirectionX = m_lightingState.directionalDirection.x;
+    contract.lighting.sunDirectionY = m_lightingState.directionalDirection.y;
+    contract.lighting.sunDirectionZ = m_lightingState.directionalDirection.z;
+    contract.lighting.sunColorR = m_lightingState.directionalColor.r;
+    contract.lighting.sunColorG = m_lightingState.directionalColor.g;
+    contract.lighting.sunColorB = m_lightingState.directionalColor.b;
     contract.lighting.iblDiffuseIntensity = m_environmentState.diffuseIntensity;
     contract.lighting.iblSpecularIntensity = m_environmentState.specularIntensity;
     contract.lighting.bloomIntensity = m_bloomResources.intensity;

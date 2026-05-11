@@ -204,6 +204,8 @@ json FrameContractToJson(const FrameContract& contract) {
             {"safe_rig_variant_active", contract.lighting.safeRigVariantActive},
             {"exposure", contract.lighting.exposure},
             {"sun_intensity", contract.lighting.sunIntensity},
+            {"sun_direction", {contract.lighting.sunDirectionX, contract.lighting.sunDirectionY, contract.lighting.sunDirectionZ}},
+            {"sun_color", {contract.lighting.sunColorR, contract.lighting.sunColorG, contract.lighting.sunColorB}},
             {"ibl_diffuse_intensity", contract.lighting.iblDiffuseIntensity},
             {"ibl_specular_intensity", contract.lighting.iblSpecularIntensity},
             {"bloom_intensity", contract.lighting.bloomIntensity},

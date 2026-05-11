@@ -237,6 +237,12 @@ struct FrameContract {
         bool safeRigVariantActive = false;
         float exposure = 1.0f;
         float sunIntensity = 0.0f;
+        float sunDirectionX = 0.0f;
+        float sunDirectionY = 1.0f;
+        float sunDirectionZ = 0.0f;
+        float sunColorR = 1.0f;
+        float sunColorG = 1.0f;
+        float sunColorB = 1.0f;
         float iblDiffuseIntensity = 0.0f;
         float iblSpecularIntensity = 0.0f;
         float bloomIntensity = 0.0f;

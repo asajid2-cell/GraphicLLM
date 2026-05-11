@@ -92,6 +92,8 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.godRayIntensity = m_postProcessState.godRayIntensity;
     state.areaLightSizeScale = m_lightingState.areaLightSizeScale;
     state.sunIntensity = m_lightingState.directionalIntensity;
+    state.sunDirection = m_lightingState.directionalDirection;
+    state.sunColor = m_lightingState.directionalColor;
     state.useSafeLightingRigOnLowVRAM = m_lightingState.useSafeRigOnLowVRAM;
     return state;
 }

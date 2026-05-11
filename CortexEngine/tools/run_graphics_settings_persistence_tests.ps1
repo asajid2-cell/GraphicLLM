@@ -42,6 +42,11 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "warm": 0.42,
     "cool": -0.18,
     "sun_intensity": 3.5,
+    "sun_azimuth_degrees": 135.0,
+    "sun_elevation_degrees": 42.0,
+    "sun_color_r": 1.2,
+    "sun_color_g": 0.84,
+    "sun_color_b": 0.55,
     "god_ray_intensity": 0.0,
     "area_light_size_scale": 1.0,
     "shadow_bias": 0.006,
@@ -234,6 +239,12 @@ if ($validRun.exit_code -ne 0) {
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur
     $environmentRotation = [double]$report.frame_contract.environment.rotation_degrees
     Assert-Near "area_light_size_scale" ([double]$report.frame_contract.lighting.area_light_size_scale) 1.0 0.04
+    Assert-Near "sun_direction_x" ([double]$report.frame_contract.lighting.sun_direction[0]) 0.525 0.03
+    Assert-Near "sun_direction_y" ([double]$report.frame_contract.lighting.sun_direction[1]) 0.669 0.03
+    Assert-Near "sun_direction_z" ([double]$report.frame_contract.lighting.sun_direction[2]) -0.525 0.03
+    Assert-Near "sun_color_r" ([double]$report.frame_contract.lighting.sun_color[0]) 1.2 0.03
+    Assert-Near "sun_color_g" ([double]$report.frame_contract.lighting.sun_color[1]) 0.84 0.03
+    Assert-Near "sun_color_b" ([double]$report.frame_contract.lighting.sun_color[2]) 0.55 0.03
     Assert-Near "shadow_bias" ([double]$report.frame_contract.lighting.shadow_bias) 0.006 0.001
     Assert-Near "shadow_pcf_radius" ([double]$report.frame_contract.lighting.shadow_pcf_radius) 3.25 0.05
     Assert-Near "cascade_split_lambda" ([double]$report.frame_contract.lighting.cascade_split_lambda) 0.72 0.03

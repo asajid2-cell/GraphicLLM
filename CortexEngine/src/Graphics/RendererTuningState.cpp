@@ -7,6 +7,8 @@
 #include <cmath>
 #include <exception>
 #include <fstream>
+#include <glm/geometric.hpp>
+#include <glm/vec3.hpp>
 #include <nlohmann/json.hpp>
 
 namespace Cortex::Graphics {
@@ -14,6 +16,51 @@ namespace Cortex::Graphics {
 namespace {
 
 using nlohmann::json;
+
+constexpr float kPi = 3.14159265358979323846f;
+
+float DegreesToRadians(float degrees) {
+    return degrees * (kPi / 180.0f);
+}
+
+float RadiansToDegrees(float radians) {
+    return radians * (180.0f / kPi);
+}
+
+float NormalizeDegrees(float degrees) {
+    if (!std::isfinite(degrees)) {
+        return 0.0f;
+    }
+    float normalized = std::fmod(degrees, 360.0f);
+    if (normalized < 0.0f) {
+        normalized += 360.0f;
+    }
+    return normalized;
+}
+
+glm::vec3 SunDirectionFromAngles(float azimuthDegrees, float elevationDegrees) {
+    const float azimuth = DegreesToRadians(NormalizeDegrees(azimuthDegrees));
+    const float elevation = DegreesToRadians(std::clamp(elevationDegrees, -89.0f, 89.0f));
+    const float horizontal = std::cos(elevation);
+    return glm::normalize(glm::vec3(horizontal * std::sin(azimuth),
+                                   std::sin(elevation),
+                                   horizontal * std::cos(azimuth)));
+}
+
+void SunAnglesFromDirection(glm::vec3 direction, float& azimuthDegrees, float& elevationDegrees) {
+    if (!std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z) ||
+        glm::length(direction) < 1e-5f) {
+        azimuthDegrees = 0.0f;
+        elevationDegrees = 58.0f;
+        return;
+    }
+
+    direction = glm::normalize(direction);
+    azimuthDegrees = NormalizeDegrees(RadiansToDegrees(std::atan2(direction.x, direction.z)));
+    elevationDegrees = std::clamp(RadiansToDegrees(std::asin(std::clamp(direction.y, -1.0f, 1.0f))),
+                                  -89.0f,
+                                  89.0f);
+}
 
 json ToJson(const RendererTuningState& state) {
     return {
@@ -33,6 +80,11 @@ json ToJson(const RendererTuningState& state) {
             {"warm", state.lighting.warm},
             {"cool", state.lighting.cool},
             {"sun_intensity", state.lighting.sunIntensity},
+            {"sun_azimuth_degrees", state.lighting.sunAzimuthDegrees},
+            {"sun_elevation_degrees", state.lighting.sunElevationDegrees},
+            {"sun_color_r", state.lighting.sunColorR},
+            {"sun_color_g", state.lighting.sunColorG},
+            {"sun_color_b", state.lighting.sunColorB},
             {"god_ray_intensity", state.lighting.godRayIntensity},
             {"area_light_size_scale", state.lighting.areaLightSizeScale},
             {"shadow_bias", state.lighting.shadowBias},
@@ -191,6 +243,11 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(l, "warm", state.lighting.warm);
         ReadValue(l, "cool", state.lighting.cool);
         ReadValue(l, "sun_intensity", state.lighting.sunIntensity);
+        ReadValue(l, "sun_azimuth_degrees", state.lighting.sunAzimuthDegrees);
+        ReadValue(l, "sun_elevation_degrees", state.lighting.sunElevationDegrees);
+        ReadValue(l, "sun_color_r", state.lighting.sunColorR);
+        ReadValue(l, "sun_color_g", state.lighting.sunColorG);
+        ReadValue(l, "sun_color_b", state.lighting.sunColorB);
         ReadValue(l, "god_ray_intensity", state.lighting.godRayIntensity);
         ReadValue(l, "area_light_size_scale", state.lighting.areaLightSizeScale);
         ReadValue(l, "shadow_bias", state.lighting.shadowBias);
@@ -404,6 +461,12 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.lighting.warm = post.warm;
     state.lighting.cool = post.cool;
     state.lighting.sunIntensity = features.sunIntensity;
+    SunAnglesFromDirection(features.sunDirection,
+                           state.lighting.sunAzimuthDegrees,
+                           state.lighting.sunElevationDegrees);
+    state.lighting.sunColorR = features.sunColor.r;
+    state.lighting.sunColorG = features.sunColor.g;
+    state.lighting.sunColorB = features.sunColor.b;
     state.lighting.godRayIntensity = features.godRayIntensity;
     state.lighting.areaLightSizeScale = features.areaLightSizeScale;
     state.lighting.shadowBias = quality.shadowBias;
@@ -488,6 +551,11 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.lighting.warm = std::clamp(state.lighting.warm, -1.0f, 1.0f);
     state.lighting.cool = std::clamp(state.lighting.cool, -1.0f, 1.0f);
     state.lighting.sunIntensity = std::clamp(state.lighting.sunIntensity, 0.0f, 20.0f);
+    state.lighting.sunAzimuthDegrees = NormalizeDegrees(state.lighting.sunAzimuthDegrees);
+    state.lighting.sunElevationDegrees = std::clamp(state.lighting.sunElevationDegrees, -89.0f, 89.0f);
+    state.lighting.sunColorR = std::clamp(state.lighting.sunColorR, 0.0f, 2.0f);
+    state.lighting.sunColorG = std::clamp(state.lighting.sunColorG, 0.0f, 2.0f);
+    state.lighting.sunColorB = std::clamp(state.lighting.sunColorB, 0.0f, 2.0f);
     state.lighting.godRayIntensity = std::clamp(state.lighting.godRayIntensity, 0.0f, 3.0f);
     state.lighting.areaLightSizeScale = std::clamp(state.lighting.areaLightSizeScale, 0.25f, 2.0f);
     state.lighting.shadowBias = std::clamp(state.lighting.shadowBias, 0.0f, 0.02f);
@@ -578,6 +646,13 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyBloomIntensityControl(renderer, state.lighting.bloomIntensity);
     ApplyColorGradeControl(renderer, state.lighting.warm, state.lighting.cool);
     ApplySunIntensityControl(renderer, state.lighting.sunIntensity);
+    ApplySunDirectionControl(renderer,
+                             SunDirectionFromAngles(state.lighting.sunAzimuthDegrees,
+                                                    state.lighting.sunElevationDegrees));
+    ApplySunColorControl(renderer,
+                         glm::vec3(state.lighting.sunColorR,
+                                   state.lighting.sunColorG,
+                                   state.lighting.sunColorB));
     ApplyGodRayIntensityControl(renderer, state.lighting.godRayIntensity);
     ApplyAreaLightSizeControl(renderer, state.lighting.areaLightSizeScale);
     ApplyShadowBiasControl(renderer, state.lighting.shadowBias);

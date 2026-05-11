@@ -77,6 +77,11 @@ enum ControlIdGraphics : int {
     IDC_GFX_CASCADE_LAMBDA = 9073,
     IDC_GFX_DOF_FOCUS_DISTANCE = 9074,
     IDC_GFX_DOF_APERTURE = 9075,
+    IDC_GFX_SUN_AZIMUTH = 9076,
+    IDC_GFX_SUN_ELEVATION = 9077,
+    IDC_GFX_SUN_COLOR_R = 9078,
+    IDC_GFX_SUN_COLOR_G = 9079,
+    IDC_GFX_SUN_COLOR_B = 9080,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -154,6 +159,11 @@ struct GraphicsSettingsState {
     SliderBinding warm;
     SliderBinding cool;
     SliderBinding sun;
+    SliderBinding sunAzimuth;
+    SliderBinding sunElevation;
+    SliderBinding sunColorR;
+    SliderBinding sunColorG;
+    SliderBinding sunColorB;
     SliderBinding godRays;
     SliderBinding areaLight;
     SliderBinding iblDiffuse;
@@ -525,6 +535,11 @@ void SyncStateFromSliders() {
     g_gfx.tuning.lighting.warm = SliderToFloat(g_gfx.warm);
     g_gfx.tuning.lighting.cool = SliderToFloat(g_gfx.cool);
     g_gfx.tuning.lighting.sunIntensity = SliderToFloat(g_gfx.sun);
+    g_gfx.tuning.lighting.sunAzimuthDegrees = SliderToFloat(g_gfx.sunAzimuth);
+    g_gfx.tuning.lighting.sunElevationDegrees = SliderToFloat(g_gfx.sunElevation);
+    g_gfx.tuning.lighting.sunColorR = SliderToFloat(g_gfx.sunColorR);
+    g_gfx.tuning.lighting.sunColorG = SliderToFloat(g_gfx.sunColorG);
+    g_gfx.tuning.lighting.sunColorB = SliderToFloat(g_gfx.sunColorB);
     g_gfx.tuning.lighting.godRayIntensity = SliderToFloat(g_gfx.godRays);
     g_gfx.tuning.lighting.areaLightSizeScale = SliderToFloat(g_gfx.areaLight);
     g_gfx.tuning.environment.diffuseIntensity = SliderToFloat(g_gfx.iblDiffuse);
@@ -646,6 +661,11 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.warm, g_gfx.tuning.lighting.warm);
     SetSliderFromFloat(g_gfx.cool, g_gfx.tuning.lighting.cool);
     SetSliderFromFloat(g_gfx.sun, g_gfx.tuning.lighting.sunIntensity);
+    SetSliderFromFloat(g_gfx.sunAzimuth, g_gfx.tuning.lighting.sunAzimuthDegrees);
+    SetSliderFromFloat(g_gfx.sunElevation, g_gfx.tuning.lighting.sunElevationDegrees);
+    SetSliderFromFloat(g_gfx.sunColorR, g_gfx.tuning.lighting.sunColorR);
+    SetSliderFromFloat(g_gfx.sunColorG, g_gfx.tuning.lighting.sunColorG);
+    SetSliderFromFloat(g_gfx.sunColorB, g_gfx.tuning.lighting.sunColorB);
     SetSliderFromFloat(g_gfx.godRays, g_gfx.tuning.lighting.godRayIntensity);
     SetSliderFromFloat(g_gfx.areaLight, g_gfx.tuning.lighting.areaLightSizeScale);
     SetSliderFromFloat(g_gfx.iblDiffuse, g_gfx.tuning.environment.diffuseIntensity);
@@ -962,6 +982,11 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_WARM, L"Warm Grade", g_gfx.warm, -1.0f, 1.0f);
             makeSlider(IDC_GFX_COOL, L"Cool Grade", g_gfx.cool, -1.0f, 1.0f);
             makeSlider(IDC_GFX_SUN, L"Sun Intensity", g_gfx.sun, 0.0f, 20.0f);
+            makeSlider(IDC_GFX_SUN_AZIMUTH, L"Sun Azimuth", g_gfx.sunAzimuth, 0.0f, 359.0f);
+            makeSlider(IDC_GFX_SUN_ELEVATION, L"Sun Elevation", g_gfx.sunElevation, -89.0f, 89.0f);
+            makeSlider(IDC_GFX_SUN_COLOR_R, L"Sun Red", g_gfx.sunColorR, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_SUN_COLOR_G, L"Sun Green", g_gfx.sunColorG, 0.0f, 2.0f);
+            makeSlider(IDC_GFX_SUN_COLOR_B, L"Sun Blue", g_gfx.sunColorB, 0.0f, 2.0f);
             makeSlider(IDC_GFX_GOD_RAYS, L"God Rays", g_gfx.godRays, 0.0f, 3.0f);
             makeSlider(IDC_GFX_AREA_LIGHT, L"Area Light Size", g_gfx.areaLight, 0.25f, 2.0f);
             {

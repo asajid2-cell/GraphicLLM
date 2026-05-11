@@ -85,6 +85,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_FOG_START = 9222,
     IDC_GFX_MOTION_BLUR_ENABLED = 9223,
     IDC_GFX_DOF_ENABLED = 9224,
+    IDC_GFX_PARTICLE_QUALITY_SELECT = 9225,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -240,6 +241,7 @@ struct GraphicsSettingsState {
     HWND cmbEnvironmentBudget = nullptr;
     HWND cmbEnvironment = nullptr;
     HWND cmbParticleEffect = nullptr;
+    HWND cmbParticleQuality = nullptr;
     std::string environmentBudgetFilter = "all";
     std::vector<std::string> qualityPresetIds;
     std::vector<std::string> environmentIds;
@@ -495,6 +497,52 @@ void SyncParticleEffectComboFromRenderer() {
     SendMessageW(g_gfx.cmbParticleEffect, CB_SETCURSEL, 0, 0);
 }
 
+float ParticleQualityScaleForIndex(int index) {
+    switch (index) {
+    case 0: return 0.5f;
+    case 1: return 1.0f;
+    case 2: return 1.5f;
+    case 3: return 2.0f;
+    default: return 1.0f;
+    }
+}
+
+int ParticleQualityIndexForScale(float scale) {
+    if (scale < 0.75f) {
+        return 0;
+    }
+    if (scale < 1.25f) {
+        return 1;
+    }
+    if (scale < 1.75f) {
+        return 2;
+    }
+    return 3;
+}
+
+void LoadParticleQualityOptions() {
+    if (!g_gfx.cmbParticleQuality) {
+        return;
+    }
+
+    SendMessageW(g_gfx.cmbParticleQuality, CB_RESETCONTENT, 0, 0);
+    SendMessageW(g_gfx.cmbParticleQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Low"));
+    SendMessageW(g_gfx.cmbParticleQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Balanced"));
+    SendMessageW(g_gfx.cmbParticleQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"High"));
+    SendMessageW(g_gfx.cmbParticleQuality, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Ultra"));
+    SendMessageW(g_gfx.cmbParticleQuality, CB_SETCURSEL, 1, 0);
+}
+
+void SyncParticleQualityComboFromRenderer() {
+    if (!g_gfx.cmbParticleQuality) {
+        return;
+    }
+    SendMessageW(g_gfx.cmbParticleQuality,
+                 CB_SETCURSEL,
+                 static_cast<WPARAM>(ParticleQualityIndexForScale(g_gfx.tuning.particles.qualityScale)),
+                 0);
+}
+
 void SyncSelectedParticleEffectToState() {
     if (!g_gfx.cmbParticleEffect || g_gfx.particleEffectIds.empty()) {
         return;
@@ -502,6 +550,16 @@ void SyncSelectedParticleEffectToState() {
     const int selected = static_cast<int>(SendMessageW(g_gfx.cmbParticleEffect, CB_GETCURSEL, 0, 0));
     if (selected >= 0 && static_cast<size_t>(selected) < g_gfx.particleEffectIds.size()) {
         g_gfx.tuning.particles.effectPreset = g_gfx.particleEffectIds[static_cast<size_t>(selected)];
+    }
+}
+
+void SyncSelectedParticleQualityToState() {
+    if (!g_gfx.cmbParticleQuality) {
+        return;
+    }
+    const int selected = static_cast<int>(SendMessageW(g_gfx.cmbParticleQuality, CB_GETCURSEL, 0, 0));
+    if (selected >= 0) {
+        g_gfx.tuning.particles.qualityScale = ParticleQualityScaleForIndex(selected);
     }
 }
 
@@ -520,6 +578,25 @@ void ApplySelectedParticleEffectFromGraphicsUI() {
     engine->ApplyParticleEffectPresetToScene(g_gfx.tuning.particles.effectPreset);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
     SyncParticleEffectComboFromRenderer();
+}
+
+void ApplySelectedParticleQualityFromGraphicsUI() {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (!renderer || renderer->IsDeviceRemoved() || !g_gfx.cmbParticleQuality) {
+        return;
+    }
+
+    SyncStateFromToggles();
+    SyncStateFromSliders();
+    SyncSelectedParticleEffectToState();
+    SyncSelectedParticleQualityToState();
+    g_gfx.tuning.quality.dirtyFromUI = true;
+    Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    if (auto* engine = Cortex::ServiceLocator::GetEngine()) {
+        engine->ApplyParticleEffectPresetToScene(g_gfx.tuning.particles.effectPreset);
+    }
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+    SyncParticleQualityComboFromRenderer();
 }
 
 void ApplySelectedQualityPresetFromGraphicsUI() {
@@ -557,6 +634,7 @@ void ApplySelectedQualityPresetFromGraphicsUI() {
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
     SyncQualityPresetComboFromRenderer();
     SyncParticleEffectComboFromRenderer();
+    SyncParticleQualityComboFromRenderer();
     SyncEnvironmentComboFromRenderer();
     const std::wstring status = L"Graphics preset applied: " + ToWide(g_gfx.tuning.quality.preset);
     SetWindowTextW(g_gfx.txtWarning, status.c_str());
@@ -802,6 +880,7 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.particleSoftDepth, g_gfx.tuning.particles.softDepthFade);
     SetSliderFromFloat(g_gfx.particleWind, g_gfx.tuning.particles.windInfluence);
     SyncParticleEffectComboFromRenderer();
+    SyncParticleQualityComboFromRenderer();
 
     SetCheckbox(g_gfx.chkTAA, g_gfx.tuning.quality.taaEnabled);
     SetCheckbox(g_gfx.chkFXAA, g_gfx.tuning.quality.fxaaEnabled);
@@ -1140,6 +1219,8 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");
             g_gfx.cmbParticleEffect = makeCombo(IDC_GFX_PARTICLE_EFFECT_SELECT, L"Particle Effect");
             LoadParticleEffectOptions();
+            g_gfx.cmbParticleQuality = makeCombo(IDC_GFX_PARTICLE_QUALITY_SELECT, L"Particle Quality Preset");
+            LoadParticleQualityOptions();
             makeSlider(IDC_GFX_PARTICLE_DENSITY, L"Particle Density", g_gfx.particleDensity, 0.0f, 2.0f);
             makeSlider(IDC_GFX_PARTICLE_QUALITY, L"Particle Quality", g_gfx.particleQuality, 0.25f, 2.0f);
             makeSlider(IDC_GFX_PARTICLE_BLOOM, L"Particle Bloom", g_gfx.particleBloom, 0.0f, 2.0f);
@@ -1302,6 +1383,12 @@ void RegisterGraphicsSettingsClass() {
             }
             if (LOWORD(wParam) == IDC_GFX_PARTICLE_EFFECT_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
                 ApplySelectedParticleEffectFromGraphicsUI();
+                RefreshControlsFromRenderer();
+                RefreshHealthLabels();
+                return 0;
+            }
+            if (LOWORD(wParam) == IDC_GFX_PARTICLE_QUALITY_SELECT && HIWORD(wParam) == CBN_SELCHANGE) {
+                ApplySelectedParticleQualityFromGraphicsUI();
                 RefreshControlsFromRenderer();
                 RefreshHealthLabels();
                 return 0;

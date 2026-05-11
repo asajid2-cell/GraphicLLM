@@ -75,6 +75,7 @@ $motionVectorRendererPath = Join-Path $root "src/Graphics/Renderer_MotionVectors
 $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
 $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
+$ssaoPassPath = Join-Path $root "src/Graphics/Passes/SSAOPass.cpp"
 $ssrRendererPath = Join-Path $root "src/Graphics/Renderer_SSRPass.cpp"
 $ssrPassPath = Join-Path $root "src/Graphics/Passes/SSRPass.cpp"
 $hzbStatePath = Join-Path $root "src/Graphics/RendererHZBState.h"
@@ -550,6 +551,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "ssr_target_transitions missing Renderer_SSRPass.cpp"
+        }
+    }
+
+    if ($id -eq "ssao_target_transitions") {
+        if (Test-Path $ssaoPassPath) {
+            $ssaoPass = Get-Content $ssaoPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::SSAOPass", "ResourceStateRef", "PrepareContext", "PrepareGraphicsTargets", "PrepareComputeTargets", "FinishComputeTarget", "ResourceBarrier", "D3D12_RESOURCE_STATE_RENDER_TARGET", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+                if ($ssaoPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "ssao_target_transitions missing SSAOPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "ssao_target_transitions missing SSAOPass.cpp"
+        }
+        if (Test-Path $ssaoRendererPath) {
+            $ssaoRenderer = Get-Content $ssaoRendererPath -Raw
+            foreach ($route in @("SSAOPass::PrepareGraphicsTargets", "SSAOPass::PrepareComputeTargets", "SSAOPass::FinishComputeTarget")) {
+                if ($ssaoRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "ssao_target_transitions missing routed target transition call in Renderer_SSAO.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier")) {
+                if ($ssaoRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "ssao_target_transitions still has direct SSAO target transition mechanics in Renderer_SSAO.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "ssao_target_transitions missing Renderer_SSAO.cpp"
         }
     }
 

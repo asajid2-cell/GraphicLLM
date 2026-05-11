@@ -143,6 +143,16 @@
       "future_extension": "Keep future SSR pre-draw resource-state setup in SSRPass or render-graph declarations instead of hand-building barrier batches in Renderer_SSRPass.cpp"
     },
     {
+      "id": "ssao_target_transitions",
+      "owner": "SSAO target preparation",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_SSAO.cpp still owns SSAO resource creation, controls, and root-selection policy, but graphics/compute depth and SSAO target resource-state setup plus compute finalization are owned by SSAOPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/SSAOPass.h", "Passes/SSAOPass.cpp", "Renderer_SSAO.cpp"],
+      "renderer_state_members": ["m_ssaoResources", "m_depthResources", "m_frameDiagnostics", "m_pipelineState"],
+      "future_extension": "Keep future SSAO pre/post target-state setup in SSAOPass or render-graph declarations instead of hand-building barriers in Renderer_SSAO.cpp"
+    },
+    {
       "id": "hzb_resources",
       "owner": "Hierarchical Z Buffer",
       "status": "release_boundary_validated",

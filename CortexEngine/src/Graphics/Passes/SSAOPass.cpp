@@ -21,6 +21,73 @@ void Fail(const GraphContext& context, const char* stage) {
 
 } // namespace
 
+namespace {
+
+[[nodiscard]] bool PrepareResources(const PrepareContext& context) {
+    if (!context.commandList ||
+        !context.depth.resource ||
+        !context.depth.state ||
+        !context.target.resource ||
+        !context.target.state) {
+        return false;
+    }
+
+    D3D12_RESOURCE_BARRIER barriers[2] = {};
+    UINT barrierCount = 0;
+    const ResourceStateRef resources[] = {context.depth, context.target};
+    for (const ResourceStateRef& resource : resources) {
+        if (!context.skipTransitions && *resource.state != resource.desiredState) {
+            barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barriers[barrierCount].Transition.pResource = resource.resource;
+            barriers[barrierCount].Transition.StateBefore = *resource.state;
+            barriers[barrierCount].Transition.StateAfter = resource.desiredState;
+            barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            ++barrierCount;
+        }
+    }
+
+    if (barrierCount > 0) {
+        context.commandList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    *context.depth.state = context.depth.desiredState;
+    *context.target.state = context.target.desiredState;
+    return true;
+}
+
+} // namespace
+
+bool PrepareGraphicsTargets(const PrepareContext& context) {
+    PrepareContext local = context;
+    local.target.desiredState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    return PrepareResources(local);
+}
+
+bool PrepareComputeTargets(const PrepareContext& context) {
+    PrepareContext local = context;
+    local.target.desiredState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    return PrepareResources(local);
+}
+
+bool FinishComputeTarget(const PrepareContext& context) {
+    if (!context.commandList || !context.target.resource || !context.target.state) {
+        return false;
+    }
+    if (context.skipTransitions) {
+        return true;
+    }
+
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = context.target.resource;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    context.commandList->ResourceBarrier(1, &barrier);
+    *context.target.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    return true;
+}
+
 bool DrawGraphics(const GraphicsContext& context) {
     if (!context.device || !context.commandList || !context.pipeline ||
         !context.pipeline->GetPipelineState() || !context.target ||

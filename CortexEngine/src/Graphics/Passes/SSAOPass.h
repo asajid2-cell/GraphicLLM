@@ -42,6 +42,19 @@ struct ComputeContext {
     std::span<DescriptorHandle> uavTable{};
 };
 
+struct ResourceStateRef {
+    ID3D12Resource* resource = nullptr;
+    D3D12_RESOURCE_STATES* state = nullptr;
+    D3D12_RESOURCE_STATES desiredState = D3D12_RESOURCE_STATE_COMMON;
+};
+
+struct PrepareContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    bool skipTransitions = false;
+    ResourceStateRef depth{};
+    ResourceStateRef target{};
+};
+
 struct GraphContext {
     RGResourceHandle depth;
     RGResourceHandle ssao;
@@ -50,6 +63,9 @@ struct GraphContext {
     std::function<void(const char*)> failStage;
 };
 
+[[nodiscard]] bool PrepareGraphicsTargets(const PrepareContext& context);
+[[nodiscard]] bool PrepareComputeTargets(const PrepareContext& context);
+[[nodiscard]] bool FinishComputeTarget(const PrepareContext& context);
 [[nodiscard]] bool DrawGraphics(const GraphicsContext& context);
 [[nodiscard]] bool DispatchCompute(const ComputeContext& context);
 [[nodiscard]] RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context);

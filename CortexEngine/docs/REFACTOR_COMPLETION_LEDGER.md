@@ -940,6 +940,19 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because HZB, bloom, RT, graph
       orchestration, and other renderer pass mechanics still live in renderer
       orchestration files.
+    - The current bloom target-binding checkpoint moves bloom fullscreen
+      viewport/scissor setup, RTV binding, and target clears into
+      `BloomPass::BindAndClearTarget`; `Renderer_Bloom.cpp` still owns stage
+      ordering, barrier/copy mechanics, and SRV source selection. Release
+      rebuild passed, renderer ownership tests passed with `targets=25`,
+      renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, Effects Showcase passed at
+      `effects_showcase_20260511_120404_028_92752_1e62b5e8`, Effects Gallery
+      passed at `effects_gallery_20260511_120409_165_95044_b87fe8d2`, and RT
+      showcase passed at `rt_showcase_20260511_120414_079_92168_18fded2c`.
+      The broader ownership rows remain `PARTIAL` because bloom transition/copy
+      mechanics, HZB, RT, temporal, graph orchestration, and other renderer pass
+      mechanics still live in renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

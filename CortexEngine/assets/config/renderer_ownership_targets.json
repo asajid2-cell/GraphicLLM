@@ -143,6 +143,16 @@
       "future_extension": "Keep future bloom barrier and copy mechanics in BloomPass or declarative render-graph resource declarations instead of rebuilding manual barrier batches in Renderer_Bloom.cpp"
     },
     {
+      "id": "bloom_fullscreen_binding",
+      "owner": "Bloom fullscreen state and source binding",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_Bloom.cpp still owns bloom stage ordering and source/target selection, but fullscreen root/descriptor/frame binding, source SRV descriptor-table binding, pipeline switching, and fullscreen draw submission are owned by BloomPass and FullscreenPass helpers",
+      "validated_contracts": ["renderer_ownership", "effects_showcase", "effects_gallery", "rt_showcase"],
+      "target_files": ["Passes/BloomPass.h", "Passes/BloomPass.cpp", "Passes/FullscreenPass.h", "Passes/FullscreenPass.cpp", "Renderer_Bloom.cpp"],
+      "renderer_state_members": ["m_bloomResources", "m_mainTargets", "m_commandResources", "m_pipelineState"],
+      "future_extension": "Keep future bloom fullscreen root/descriptor/pipeline binding in BloomPass or FullscreenPass helpers instead of reintroducing direct command-list binding to Renderer_Bloom.cpp"
+    },
+    {
       "id": "rt_reflection_debug_clear",
       "owner": "RT reflection debug clear",
       "status": "release_boundary_validated",

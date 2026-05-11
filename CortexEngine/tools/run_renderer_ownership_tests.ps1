@@ -571,6 +571,34 @@ foreach ($target in $doc.targets) {
         }
     }
 
+    if ($id -eq "bloom_fullscreen_binding") {
+        if (Test-Path $bloomPassPath) {
+            $bloomPass = Get-Content $bloomPassPath -Raw
+            foreach ($required in @("PrepareFullscreenState", "BindPipelineState", "BindSrvDescriptor", "BindTexture", "SetGraphicsRootDescriptorTable", "SetPipelineState")) {
+                if ($bloomPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "bloom_fullscreen_binding missing BloomPass fullscreen binding marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "bloom_fullscreen_binding missing BloomPass.cpp"
+        }
+        if (Test-Path $bloomRendererPath) {
+            $bloomRenderer = Get-Content $bloomRendererPath -Raw
+            foreach ($route in @("BloomPass::PrepareFullscreenState", "BloomPass::BindPipelineState", "BloomPass::BindSrvDescriptor", "BloomPass::BindTexture", "FullscreenPass::DrawTriangle")) {
+                if ($bloomRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "bloom_fullscreen_binding missing routed bloom fullscreen binding call in Renderer_Bloom.cpp: $route"
+                }
+            }
+            foreach ($directCall in @("SetGraphicsRootSignature(", "SetDescriptorHeaps(", "SetGraphicsRootDescriptorTable(", "SetGraphicsRootConstantBufferView(", "IASetPrimitiveTopology(", "SetPipelineState(", "DrawInstanced(")) {
+                if ($bloomRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "bloom_fullscreen_binding still performs direct fullscreen binding/submission in Renderer_Bloom.cpp: $directCall"
+                }
+            }
+        } else {
+            Add-Failure "bloom_fullscreen_binding missing Renderer_Bloom.cpp"
+        }
+    }
+
     if ($id -eq "rt_reflection_debug_clear") {
         if (Test-Path $rtReflectionDebugClearPassPath) {
             $rtReflectionDebugClearPass = Get-Content $rtReflectionDebugClearPassPath -Raw

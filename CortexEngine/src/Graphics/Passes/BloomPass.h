@@ -71,10 +71,21 @@ void SetFullscreenViewport(ID3D12GraphicsCommandList* commandList, ID3D12Resourc
 [[nodiscard]] bool CopyCompositeToCombined(const CopyContext& context);
 
 [[nodiscard]] bool PrepareFullscreenState(const FullscreenContext& context);
+[[nodiscard]] bool BindPipelineState(ID3D12GraphicsCommandList* commandList,
+                                     DX12Pipeline* pipeline);
+[[nodiscard]] bool BindSrvDescriptor(const FullscreenContext& context,
+                                     DescriptorHandle source,
+                                     const char* label,
+                                     uint32_t tableSlot);
 [[nodiscard]] bool BindGraphTexture(const FullscreenContext& context,
                                     ID3D12Resource* source,
                                     const char* label,
                                     uint32_t tableSlot);
+[[nodiscard]] bool BindTexture(const FullscreenContext& context,
+                               ID3D12Resource* source,
+                               DXGI_FORMAT format,
+                               const char* label,
+                               uint32_t tableSlot);
 [[nodiscard]] bool EnsureGraphRTV(const FullscreenContext& context,
                                   ID3D12Resource* target,
                                   DescriptorHandle& cachedRtv);

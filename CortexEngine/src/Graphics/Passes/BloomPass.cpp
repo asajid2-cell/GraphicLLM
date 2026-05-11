@@ -200,16 +200,23 @@ bool PrepareFullscreenState(const FullscreenContext& context) {
     });
 }
 
-bool BindGraphTexture(const FullscreenContext& context,
-                      ID3D12Resource* source,
-                      const char* label,
-                      uint32_t tableSlot) {
-    if (!source || !context.device || !context.commandList || !context.descriptorManager) {
-        spdlog::warn("Bloom RG: invalid source texture for {}", label ? label : "pass");
+bool BindPipelineState(ID3D12GraphicsCommandList* commandList,
+                       DX12Pipeline* pipeline) {
+    if (!commandList || !pipeline || !pipeline->GetPipelineState()) {
+        return false;
+    }
+    commandList->SetPipelineState(pipeline->GetPipelineState());
+    return true;
+}
+
+bool AllocateSourceTable(const FullscreenContext& context,
+                         const char* label,
+                         uint32_t tableSlot,
+                         DescriptorHandle& dst) {
+    if (!context.commandList || !context.descriptorManager) {
         return false;
     }
 
-    DescriptorHandle dst{};
     if (context.srvTableValid && context.srvTable && tableSlot < context.srvTableCount) {
         dst = context.srvTable[tableSlot];
     } else {
@@ -223,13 +230,50 @@ bool BindGraphTexture(const FullscreenContext& context,
         dst = handleResult.Value();
     }
 
-    if (!dst.IsValid()) {
+    return dst.IsValid();
+}
+
+bool BindSrvDescriptor(const FullscreenContext& context,
+                       DescriptorHandle source,
+                       const char* label,
+                       uint32_t tableSlot) {
+    if (!source.IsValid() || !context.device || !context.commandList) {
+        spdlog::warn("Bloom: invalid source SRV for {}", label ? label : "pass");
+        return false;
+    }
+
+    DescriptorHandle dst{};
+    if (!AllocateSourceTable(context, label, tableSlot, dst)) {
+        return false;
+    }
+
+    context.device->CopyDescriptorsSimple(
+        1,
+        dst.cpu,
+        source.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    context.commandList->SetGraphicsRootDescriptorTable(3, dst.gpu);
+    return true;
+}
+
+bool BindTexture(const FullscreenContext& context,
+                 ID3D12Resource* source,
+                 DXGI_FORMAT format,
+                 const char* label,
+                 uint32_t tableSlot) {
+    if (!source || !context.device || !context.commandList) {
+        spdlog::warn("Bloom: invalid source texture for {}", label ? label : "pass");
+        return false;
+    }
+
+    DescriptorHandle dst{};
+    if (!AllocateSourceTable(context, label, tableSlot, dst)) {
         return false;
     }
 
     const D3D12_RESOURCE_DESC resourceDesc = source->GetDesc();
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = resourceDesc.Format;
+    srvDesc.Format = (format == DXGI_FORMAT_UNKNOWN) ? resourceDesc.Format : format;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Texture2D.MipLevels = 1;
@@ -237,6 +281,13 @@ bool BindGraphTexture(const FullscreenContext& context,
     context.device->CreateShaderResourceView(source, &srvDesc, dst.cpu);
     context.commandList->SetGraphicsRootDescriptorTable(3, dst.gpu);
     return true;
+}
+
+bool BindGraphTexture(const FullscreenContext& context,
+                      ID3D12Resource* source,
+                      const char* label,
+                      uint32_t tableSlot) {
+    return BindTexture(context, source, DXGI_FORMAT_UNKNOWN, label, tableSlot);
 }
 
 bool EnsureGraphRTV(const FullscreenContext& context,
@@ -283,7 +334,9 @@ bool RenderFullscreen(const FullscreenContext& context,
     if (!BindAndClearTarget({context.commandList, target, targetRtv})) {
         return false;
     }
-    context.commandList->SetPipelineState(pipeline->GetPipelineState());
+    if (!BindPipelineState(context.commandList, pipeline)) {
+        return false;
+    }
 
     if (!BindGraphTexture(context, source, label, sourceSlot)) {
         return false;
@@ -321,7 +374,9 @@ bool RenderComposite(const FullscreenContext& context,
     if (!BindAndClearTarget({context.commandList, target, targetRtv})) {
         return false;
     }
-    context.commandList->SetPipelineState(pipeline->GetPipelineState());
+    if (!BindPipelineState(context.commandList, pipeline)) {
+        return false;
+    }
 
     const uint32_t clampedLevels = std::min<uint32_t>(activeLevels, static_cast<uint32_t>(bloomSources.size()));
     for (int level = static_cast<int>(clampedLevels) - 1; level >= 0; --level) {

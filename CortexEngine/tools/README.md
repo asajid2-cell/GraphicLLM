@@ -85,6 +85,7 @@ Run the Phase 3 foundation checks:
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_preset_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_environment_manifest_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_ibl_asset_policy_tests.ps1
+powershell -ExecutionPolicy Bypass -File tools/prepare_ibl_runtime_assets.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_native_widget_smoke.ps1 -NoBuild
@@ -223,6 +224,12 @@ window via `CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP=1`, drives child HWND
 trackbars/buttons with Win32 messages, and verifies the resulting frame report
 for dirty UI state, slider values, color/tone presets, and lighting-rig
 selection.
+
+The IBL authoring tool reads `assets/environments/environments.json`, writes a
+local-only conversion plan to `ibl_authoring_plan.json`, preserves the
+procedural fallback as the no-asset default, and never downloads environments.
+Actual conversion is opt-in through `-Execute` and requires an explicit
+converter such as `texconv.exe`.
 
 The graphics material-controls smoke opens the same Win32 graphics settings
 window, drives the focused material preset and advanced material sliders, applies

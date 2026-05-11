@@ -38,6 +38,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     m_frameDiagnostics.contract.motionVectors.cameraOnlyFallback = !useVisibilityBufferMotion;
 
     bool motionStageFailed = false;
+    const char* motionStage = nullptr;
     std::string motionStageError;
 
     m_services.renderGraph->BeginFrame();
@@ -69,6 +70,8 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     graphContext.visibilityMotion.frameConstants = m_constantBuffers.currentFrameGPU;
     graphContext.visibilityMotion.visibilityShaderResourceState = kScreenSpaceShaderResourceState;
     graphContext.visibilityMotion.error = &motionStageError;
+    graphContext.status.failed = &motionStageFailed;
+    graphContext.status.stage = &motionStage;
     graphContext.cameraTarget.commandList = m_commandResources.graphicsList.Get();
     graphContext.cameraTarget.velocity = {
         m_temporalScreenState.velocityBuffer.Get(),
@@ -93,11 +96,6 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         graphContext.cameraDraw.depth = m_depthResources.resources.buffer.Get();
         graphContext.cameraDraw.srvTable = std::span<DescriptorHandle>(motionTable.data(), motionTable.size());
     }
-    graphContext.failStage = [&](const char* stage) {
-        motionStageFailed = true;
-        motionStageError = stage ? stage : "unknown";
-    };
-
     RGResourceHandle motionResult{};
     if (useVisibilityBufferMotion) {
         motionResult = MotionVectorPass::AddToGraph(*m_services.renderGraph, graphContext);
@@ -118,7 +116,7 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
     if (!motionResult.IsValid()) {
         motionStageFailed = true;
         if (motionStageError.empty()) {
-            motionStageError = "motion_vectors_graph_contract";
+            motionStageError = motionStage ? motionStage : "motion_vectors_graph_contract";
         }
     }
 
@@ -130,7 +128,13 @@ Renderer::ExecuteMotionVectorsInRenderGraph() {
         result.fallbackReason = execResult.Error();
     } else if (motionStageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "motion_vectors_graph_stage_failed: " + motionStageError;
+        result.fallbackReason = "motion_vectors_graph_stage_failed";
+        if (!motionStageError.empty()) {
+            result.fallbackReason += ": " + motionStageError;
+        } else if (motionStage) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += motionStage;
+        }
     } else {
         m_temporalScreenState.velocityState = m_services.renderGraph->GetResourceState(velocityHandle);
         if (depthHandle.IsValid()) {

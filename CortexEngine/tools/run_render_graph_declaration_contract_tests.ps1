@@ -128,6 +128,7 @@ Assert-Contains "MotionVectorPass.cpp" $motion "Draw(context.cameraDraw)"
 Assert-Contains "MotionVectorPass.cpp" $motion "ComputeVisibilityBufferMotion(context.visibilityMotion)"
 Assert-NotContains "MotionVectorPass.h" $motionHeader "drawCameraMotion"
 Assert-NotContains "MotionVectorPass.h" $motionHeader "std::function<bool()> computeVisibilityBufferMotion"
+Assert-NotContains "MotionVectorPass.h" $motionHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphMotionVectors.cpp" $rendererMotion "RenderMotionVectors();"
 Assert-NotContains "Renderer_RenderGraphMotionVectors.cpp" $rendererMotion "ComputeMotionVectors("
 

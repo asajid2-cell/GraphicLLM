@@ -6,12 +6,16 @@
 #include "Graphics/RHI/DescriptorHeap.h"
 #include "Graphics/VisibilityBuffer.h"
 
-#include <functional>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace Cortex::Graphics::MotionVectorPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct DrawContext {
     ID3D12Device* device = nullptr;
@@ -47,7 +51,7 @@ struct GraphContext {
     VisibilityBufferMotionContext visibilityMotion;
     MotionVectorTargetPass::CameraTargetContext cameraTarget;
     DrawContext cameraDraw;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool Draw(const DrawContext& context);

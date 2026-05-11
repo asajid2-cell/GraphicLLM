@@ -196,6 +196,12 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_waterState.secondaryAmplitude,
         m_waterState.steepness);
 
+    frameData.ssrParams = glm::vec4(
+        m_ssrResources.maxDistance,
+        m_ssrResources.thickness,
+        m_ssrResources.strength,
+        0.0f);
+
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and
     // clustered lists are built.

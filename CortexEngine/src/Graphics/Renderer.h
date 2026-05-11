@@ -211,6 +211,7 @@ public:
     void SetCinematicPost(float vignette, float lensDirt);
     void SetSSAOEnabled(bool enabled);
     void SetSSAOParams(float radius, float bias, float intensity);
+    void SetSSRParams(float maxDistance, float thickness, float strength);
     void SetPCSS(bool enabled);
     void SetFXAAEnabled(bool enabled);
     void SetTAAEnabled(bool enabled);

@@ -80,6 +80,9 @@ cbuffer FrameConstants : register(b1)
     // x = primary wave dir X,  y = primary wave dir Z,
     // z = secondary amplitude, w = steepness (0..1)
     float4 g_WaterParams1;
+    // x = SSR max ray distance, y = SSR view-space thickness,
+    // z = SSR composition strength, w = reserved
+    float4 g_SSRParams;
 
     // Clustered lighting parameters for forward+ transparency (populated by the VB path).
     // SRV indices refer to the global shader-visible CBV/SRV/UAV heap.
@@ -462,7 +465,7 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
   float ComputeShadowCascade(float3 worldPos, float3 normal, uint cascadeIndex)
   {
       cascadeIndex = min(cascadeIndex, 2u);
-  
+
       float4 lightClip = mul(g_LightViewProjection[cascadeIndex], float4(worldPos, 1.0f));
       if (lightClip.w <= 1e-4f || !all(isfinite(lightClip)))
       {
@@ -471,7 +474,7 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
           return 1.0f;
       }
       float3 lightNDC = lightClip.xyz / lightClip.w;
-  
+
       // Outside light frustum for this cascade
       if (lightNDC.x < -1.0f || lightNDC.x > 1.0f ||
           lightNDC.y < -1.0f || lightNDC.y > 1.0f ||
@@ -479,13 +482,13 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       {
           return 1.0f;
       }
-  
+
       float2 shadowUV;
       shadowUV.x = 0.5f * lightNDC.x + 0.5f;
       shadowUV.y = -0.5f * lightNDC.y + 0.5f;
-  
+
       float currentDepth = lightNDC.z;
-  
+
       float bias = g_ShadowParams.x;
       float pcfRadius = g_ShadowParams.y;
 
@@ -494,21 +497,21 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       // excessively washing out contact shadows.
       float cascadeScale = 1.0f + (float)cascadeIndex * 0.5f;
       bias *= cascadeScale;
-  
+
       // Simple slope-scaled bias to reduce acne
       float3 lightDirWS = normalize(g_Lights[0].direction_cosInner.xyz);
       float ndotl = saturate(dot(normal, lightDirWS));
       bias *= lerp(1.5f, 0.5f, ndotl);
-  
+
       // Optional PCSS-style contact-hardening
       if (g_ShadowParams.w > 0.5f)
       {
           float2 texelSize = 1.0f / float2(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
           float searchRadius = pcfRadius * 2.5f;
-  
+
           float avgBlocker = 0.0f;
           int blockerCount = 0;
-  
+
           [unroll]
           for (int x = -1; x <= 1; ++x)
           {
@@ -524,7 +527,7 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
                   }
               }
           }
-  
+
           if (blockerCount > 0)
           {
               avgBlocker /= blockerCount;
@@ -532,10 +535,10 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
               pcfRadius *= (1.0f + penumbra * 4.0f);
           }
       }
-  
+
       return SamplePCF(shadowUV, currentDepth, bias, pcfRadius, cascadeIndex);
   }
-  
+
   // Cascaded shadow evaluation with cheap cross-fade between cascades near the split planes
   // to reduce visible popping/flicker on large objects.
   float ComputeShadow(float3 worldPos, float3 normal)
@@ -545,24 +548,24 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
       {
           return 1.0f;
       }
-  
+
       // View-space depth (camera looks down +Z)
       float3 viewPos = mul(g_ViewMatrix, float4(worldPos, 1.0f)).xyz;
       float depth = viewPos.z;
-  
+
       float split0 = g_CascadeSplits.x;
       float split1 = g_CascadeSplits.y;
-  
+
       // Choose primary cascade and optional secondary cascade to blend with
       uint primary = 0;
       uint secondary = 0;
       float blend = 0.0f;
-  
+
       // Blend range in world units around each split; widened slightly so large objects
       // spanning multiple cascades see a smoother transition.
       float range0 = max(split0 * 0.2f, 4.0f);
       float range1 = max(split1 * 0.2f, 8.0f);
-  
+
       if (depth <= split0)
       {
           primary = 0;
@@ -594,18 +597,18 @@ float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius
           float d = depth - split1;
           blend = saturate(1.0f - d / range1);
       }
-  
+
       primary = min(primary, 2u);
       secondary = min(secondary, 2u);
-  
+
       float shadowPrimary = ComputeShadowCascade(worldPos, normal, primary);
-  
+
       // Outside blend zones or degenerate case
       if (blend <= 0.001f || primary == secondary)
       {
           return shadowPrimary;
       }
-  
+
       float shadowSecondary = ComputeShadowCascade(worldPos, normal, secondary);
       return lerp(shadowPrimary, shadowSecondary, blend);
   }

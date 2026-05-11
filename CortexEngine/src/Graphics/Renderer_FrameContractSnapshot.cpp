@@ -154,6 +154,14 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.ssaoRadius = m_ssaoResources.radius;
     contract.lighting.ssaoBias = m_ssaoResources.bias;
     contract.lighting.ssaoIntensity = m_ssaoResources.intensity;
+    contract.screenSpace.ssrEnabled = m_ssrResources.enabled;
+    contract.screenSpace.ssrMaxDistance = m_ssrResources.maxDistance;
+    contract.screenSpace.ssrThickness = m_ssrResources.thickness;
+    contract.screenSpace.ssrStrength = m_ssrResources.strength;
+    contract.screenSpace.ssaoEnabled = m_ssaoResources.enabled;
+    contract.screenSpace.ssaoRadius = m_ssaoResources.radius;
+    contract.screenSpace.ssaoBias = m_ssaoResources.bias;
+    contract.screenSpace.ssaoIntensity = m_ssaoResources.intensity;
     contract.lighting.fogDensity = m_fogState.density;
     contract.lighting.fogHeight = m_fogState.height;
     contract.lighting.fogFalloff = m_fogState.falloff;

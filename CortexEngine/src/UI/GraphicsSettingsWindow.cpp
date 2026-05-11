@@ -55,6 +55,9 @@ enum ControlIdGraphics : int {
     IDC_GFX_FOG_HEIGHT = 9040,
     IDC_GFX_FOG_FALLOFF = 9041,
     IDC_GFX_SSAO_BIAS = 9042,
+    IDC_GFX_SSR_DISTANCE = 9043,
+    IDC_GFX_SSR_THICKNESS = 9044,
+    IDC_GFX_SSR_STRENGTH = 9045,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -119,6 +122,9 @@ struct GraphicsSettingsState {
     SliderBinding backgroundBlur;
     SliderBinding rtReflectionDenoise;
     SliderBinding rtReflectionStrength;
+    SliderBinding ssrDistance;
+    SliderBinding ssrThickness;
+    SliderBinding ssrStrength;
     SliderBinding ssaoRadius;
     SliderBinding ssaoBias;
     SliderBinding ssaoIntensity;
@@ -239,6 +245,9 @@ void SyncStateFromSliders() {
     g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
     g_gfx.tuning.rayTracing.reflectionDenoiseAlpha = SliderToFloat(g_gfx.rtReflectionDenoise);
     g_gfx.tuning.rayTracing.reflectionCompositionStrength = SliderToFloat(g_gfx.rtReflectionStrength);
+    g_gfx.tuning.screenSpace.ssrMaxDistance = SliderToFloat(g_gfx.ssrDistance);
+    g_gfx.tuning.screenSpace.ssrThickness = SliderToFloat(g_gfx.ssrThickness);
+    g_gfx.tuning.screenSpace.ssrStrength = SliderToFloat(g_gfx.ssrStrength);
     g_gfx.tuning.screenSpace.ssaoRadius = SliderToFloat(g_gfx.ssaoRadius);
     g_gfx.tuning.screenSpace.ssaoBias = SliderToFloat(g_gfx.ssaoBias);
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
@@ -300,6 +309,9 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
     SetSliderFromFloat(g_gfx.rtReflectionDenoise, g_gfx.tuning.rayTracing.reflectionDenoiseAlpha);
     SetSliderFromFloat(g_gfx.rtReflectionStrength, g_gfx.tuning.rayTracing.reflectionCompositionStrength);
+    SetSliderFromFloat(g_gfx.ssrDistance, g_gfx.tuning.screenSpace.ssrMaxDistance);
+    SetSliderFromFloat(g_gfx.ssrThickness, g_gfx.tuning.screenSpace.ssrThickness);
+    SetSliderFromFloat(g_gfx.ssrStrength, g_gfx.tuning.screenSpace.ssrStrength);
     SetSliderFromFloat(g_gfx.ssaoRadius, g_gfx.tuning.screenSpace.ssaoRadius);
     SetSliderFromFloat(g_gfx.ssaoBias, g_gfx.tuning.screenSpace.ssaoBias);
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
@@ -587,6 +599,9 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkSSAO = makeCheckbox(IDC_GFX_SSAO, L"SSAO");
             g_gfx.chkPCSS = makeCheckbox(IDC_GFX_PCSS, L"PCSS Shadows");
             g_gfx.chkFog = makeCheckbox(IDC_GFX_FOG, L"Fog");
+            makeSlider(IDC_GFX_SSR_DISTANCE, L"SSR Max Distance", g_gfx.ssrDistance, 1.0f, 120.0f);
+            makeSlider(IDC_GFX_SSR_THICKNESS, L"SSR Thickness", g_gfx.ssrThickness, 0.005f, 1.0f);
+            makeSlider(IDC_GFX_SSR_STRENGTH, L"SSR Strength", g_gfx.ssrStrength, 0.0f, 1.0f);
             makeSlider(IDC_GFX_SSAO_RADIUS, L"SSAO Radius", g_gfx.ssaoRadius, 0.01f, 5.0f);
             makeSlider(IDC_GFX_SSAO_BIAS, L"SSAO Bias", g_gfx.ssaoBias, 0.0f, 0.1f);
             makeSlider(IDC_GFX_SSAO_INTENSITY, L"SSAO Intensity", g_gfx.ssaoIntensity, 0.0f, 5.0f);

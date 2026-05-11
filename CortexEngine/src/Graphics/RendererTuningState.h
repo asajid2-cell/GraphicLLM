@@ -56,6 +56,9 @@ struct RendererScreenSpaceTuning {
     float ssaoBias = 0.02f;
     float ssaoIntensity = 1.0f;
     bool ssrEnabled = true;
+    float ssrMaxDistance = 30.0f;
+    float ssrThickness = 0.20f;
+    float ssrStrength = 1.0f;
     bool pcssEnabled = true;
 };
 

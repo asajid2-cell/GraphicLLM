@@ -251,6 +251,20 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.lighting.safeRigVariantActive && contract.lighting.rigId == "custom") {
         warn("lighting_safe_variant_active_for_custom_rig");
     }
+    if (contract.screenSpace.ssrMaxDistance < 1.0f ||
+        contract.screenSpace.ssrMaxDistance > 120.0f ||
+        contract.screenSpace.ssrThickness < 0.005f ||
+        contract.screenSpace.ssrThickness > 1.0f ||
+        contract.screenSpace.ssrStrength < 0.0f ||
+        contract.screenSpace.ssrStrength > 1.0f ||
+        contract.screenSpace.ssaoRadius < 0.0f ||
+        contract.screenSpace.ssaoRadius > 5.0f ||
+        contract.screenSpace.ssaoBias < 0.0f ||
+        contract.screenSpace.ssaoBias > 0.1f ||
+        contract.screenSpace.ssaoIntensity < 0.0f ||
+        contract.screenSpace.ssaoIntensity > 5.0f) {
+        warn("screen_space_params_out_of_range");
+    }
 
     if (contract.features.rayTracingEnabled &&
         contract.rayTracing.tlasInstances != contract.rayTracing.materialRecords) {

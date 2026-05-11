@@ -216,6 +216,16 @@ json FrameContractToJson(const FrameContract& contract) {
             {"total_light_intensity", contract.lighting.totalLightIntensity},
             {"max_light_intensity", contract.lighting.maxLightIntensity}
         }},
+        {"screen_space", {
+            {"ssr_enabled", contract.screenSpace.ssrEnabled},
+            {"ssr_max_distance", contract.screenSpace.ssrMaxDistance},
+            {"ssr_thickness", contract.screenSpace.ssrThickness},
+            {"ssr_strength", contract.screenSpace.ssrStrength},
+            {"ssao_enabled", contract.screenSpace.ssaoEnabled},
+            {"ssao_radius", contract.screenSpace.ssaoRadius},
+            {"ssao_bias", contract.screenSpace.ssaoBias},
+            {"ssao_intensity", contract.screenSpace.ssaoIntensity}
+        }},
         {"culling", {
             {"gpu_culling_enabled", contract.culling.gpuCullingEnabled},
             {"culling_frozen", contract.culling.cullingFrozen},

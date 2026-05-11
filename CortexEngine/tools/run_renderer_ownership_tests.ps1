@@ -81,6 +81,8 @@ $postProcessPath = Join-Path $root "src/Graphics/Renderer_PostProcess.cpp"
 $forwardTargetBindingPath = Join-Path $root "src/Graphics/Passes/ForwardTargetBindingPass.cpp"
 $meshDrawPassPath = Join-Path $root "src/Graphics/Passes/MeshDrawPass.cpp"
 $forwardPassPath = Join-Path $root "src/Graphics/Renderer_ForwardPass.cpp"
+$depthPassPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
+$shadowDrawPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 $waterSurfacesPath = Join-Path $root "src/Graphics/Renderer_WaterSurfaces.cpp"
 $transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeometry.cpp"
 $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
@@ -466,7 +468,9 @@ foreach ($target in $doc.targets) {
             [pscustomobject]@{ Path = $forwardPassPath; Label = "Renderer_ForwardPass.cpp" },
             [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
             [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
-            [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" }
+            [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
+            [pscustomobject]@{ Path = $depthPassPath; Label = "Renderer_DepthPasses.cpp" },
+            [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
         )) {
             if (Test-Path $pathInfo.Path) {
                 $meshSource = Get-Content $pathInfo.Path -Raw

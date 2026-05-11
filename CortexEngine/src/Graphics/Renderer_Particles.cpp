@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 
+#include "Graphics/Passes/ParticleBillboardPass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -184,71 +185,35 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    // --- FIX: Bind render targets with depth buffer BEFORE setting pipeline ---
-    // The particle pipeline expects DXGI_FORMAT_D32_FLOAT depth, so we MUST bind the DSV
-
-    // 1. Transition depth buffer to write state if needed
-    // 2. NEW FIX: Transition HDR Color to RENDER_TARGET (may be in PIXEL_SHADER_RESOURCE from previous pass)
-    D3D12_RESOURCE_BARRIER barriers[2] = {};
-    uint32_t barrierCount = 0;
-
-    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barrierCount++;
-        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    }
-
-    if (m_mainTargets.hdr.resources.color && m_mainTargets.hdr.resources.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_mainTargets.hdr.resources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_mainTargets.hdr.resources.state;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barrierCount++;
-        m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    }
-
-    if (barrierCount > 0) {
-        m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
-    }
-
-    // 3. Bind render targets (HDR color + depth)
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdr.descriptors.rtv.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.descriptors.dsv.cpu;
-    m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
-
-    m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());
-    m_commandResources.graphicsList->SetPipelineState(m_pipelineState.particle->GetPipelineState());
-
-    if (m_environmentState.shadowAndEnvDescriptors[0].IsValid()) {
-        m_commandResources.graphicsList->SetGraphicsRootDescriptorTable(4, m_environmentState.shadowAndEnvDescriptors[0].gpu);
-    }
-
-    ID3D12DescriptorHeap* heaps[] = { m_services.descriptorManager->GetCBV_SRV_UAV_Heap() };
-    m_commandResources.graphicsList->SetDescriptorHeaps(1, heaps);
-
     ObjectConstants obj{};
     obj.modelMatrix  = glm::mat4(1.0f);
     obj.normalMatrix = glm::mat4(1.0f);
-    auto objAddr = m_constantBuffers.object.AllocateAndWrite(obj);
-    m_commandResources.graphicsList->SetGraphicsRootConstantBufferView(0, objAddr);
+    const auto objAddr = m_constantBuffers.object.AllocateAndWrite(obj);
 
-    D3D12_VERTEX_BUFFER_VIEW vbViews[2] = {};
-    vbViews[0] = resources.QuadVertexBufferView(sizeof(QuadVertex), sizeof(kQuadVertices));
-    vbViews[1] = resources.InstanceBufferView(instanceCount, bufferSize);
+    ParticleBillboardPass::TargetBindings targets{};
+    targets.hdrColor = m_mainTargets.hdr.resources.color.Get();
+    targets.hdrState = &m_mainTargets.hdr.resources.state;
+    targets.hdrRtv = m_mainTargets.hdr.descriptors.rtv.cpu;
+    targets.depthBuffer = m_depthResources.resources.buffer.Get();
+    targets.depthState = &m_depthResources.resources.resourceState;
+    targets.depthDsv = m_depthResources.descriptors.dsv.cpu;
 
-    m_commandResources.graphicsList->IASetVertexBuffers(0, 2, vbViews);
-    m_commandResources.graphicsList->IASetIndexBuffer(nullptr);
-    m_commandResources.graphicsList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ParticleBillboardPass::DrawContext drawContext{};
+    drawContext.commandList = m_commandResources.graphicsList.Get();
+    drawContext.rootSignature = m_pipelineState.rootSignature.get();
+    drawContext.pipeline = m_pipelineState.particle.get();
+    drawContext.descriptorManager = m_services.descriptorManager.get();
+    drawContext.shadowEnvironmentTable = m_environmentState.shadowAndEnvDescriptors[0];
+    drawContext.objectConstants = objAddr;
+    drawContext.resources = &resources;
+    drawContext.instanceCount = instanceCount;
+    drawContext.instanceBytes = bufferSize;
 
-    m_commandResources.graphicsList->DrawInstanced(4, instanceCount, 0, 0);
-    frame.frameExecuted = true;
-    ++m_frameDiagnostics.contract.drawCounts.particleDraws;
-    m_frameDiagnostics.contract.drawCounts.particleInstances += instanceCount;
+    if (ParticleBillboardPass::Draw(drawContext, targets)) {
+        frame.frameExecuted = true;
+        ++m_frameDiagnostics.contract.drawCounts.particleDraws;
+        m_frameDiagnostics.contract.drawCounts.particleInstances += instanceCount;
+    }
 }
 
 // ============================================================================

@@ -40,6 +40,11 @@ if (-not (Test-Path $particleRendererPath)) {
     throw "Renderer_Particles.cpp not found: $particleRendererPath"
 }
 $particleRenderer = Get-Content $particleRendererPath -Raw
+$particlePassPath = Join-Path $root "src/Graphics/Passes/ParticleBillboardPass.cpp"
+if (-not (Test-Path $particlePassPath)) {
+    throw "ParticleBillboardPass.cpp not found: $particlePassPath"
+}
+$particlePass = Get-Content $particlePassPath -Raw
 $postStatePath = Join-Path $root "src/Graphics/RendererPostProcessState.h"
 if (-not (Test-Path $postStatePath)) {
     throw "RendererPostProcessState.h not found: $postStatePath"
@@ -167,6 +172,16 @@ foreach ($target in $doc.targets) {
         foreach ($rendererOwnedResourceCall in @("CreateCommittedResource", "resources.instanceBuffer->Map", "resources.instanceBuffer->Unmap", "resources.quadVertexBuffer->Map", "resources.quadVertexBuffer->Unmap")) {
             if ($particleRenderer.IndexOf($rendererOwnedResourceCall, [StringComparison]::Ordinal) -ge 0) {
                 Add-Failure "particle_resources still allocates/maps particle-owned GPU buffers in Renderer_Particles.cpp: $rendererOwnedResourceCall"
+            }
+        }
+        foreach ($rendererOwnedDrawCall in @("ResourceBarrier", "OMSetRenderTargets", "SetPipelineState", "DrawInstanced")) {
+            if ($particleRenderer.IndexOf($rendererOwnedDrawCall, [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "particle_resources still performs particle draw submission directly in Renderer_Particles.cpp: $rendererOwnedDrawCall"
+            }
+        }
+        foreach ($passMarker in @("namespace Cortex::Graphics::ParticleBillboardPass", "TargetBindings", "DrawContext", "ResourceBarrier", "OMSetRenderTargets", "DrawInstanced")) {
+            if ($particlePass.IndexOf($passMarker, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "particle_resources missing ParticleBillboardPass marker: $passMarker"
             }
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {

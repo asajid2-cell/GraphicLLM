@@ -44,17 +44,6 @@ struct GraphContext {
     std::function<void(const char*)> failStage;
 };
 
-struct LegacyPathContext {
-    RGResourceHandle depth;
-    RGResourceHandle hdr;
-    RGResourceHandle shadow;
-    RGResourceHandle rtShadow;
-    RGResourceHandle rtGI;
-    std::function<void()> execute;
-    std::function<void(const char*)> failStage;
-};
-
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
-[[nodiscard]] bool AddLegacyPath(RenderGraph& graph, const LegacyPathContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

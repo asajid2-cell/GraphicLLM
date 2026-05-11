@@ -37,6 +37,7 @@ $vbBoundary = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
 $bloomBoundary = Read-Text "src/Graphics/Renderer_RenderGraphBloom.cpp"
 $postPhase = Read-Text "src/Graphics/Renderer_FramePhases_Post.cpp"
 $endFrameGraph = Read-Text "src/Graphics/Renderer_RenderGraphEndFrame.cpp"
+$descriptors = Read-Text "src/Graphics/Renderer_Descriptors.cpp"
 $ssaoBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSAO.cpp"
 $ssrBoundary = Read-Text "src/Graphics/Renderer_RenderGraphSSR.cpp"
 $taaBoundary = Read-Text "src/Graphics/Renderer_RenderGraphTAA.cpp"
@@ -87,6 +88,9 @@ Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "falling back t
 Assert-Matches "Renderer_FramePhases_Post.cpp" $postPhase "!featurePlan\.useRenderGraphPost"
 Assert-NotMatches "Renderer_FramePhases_Post.cpp" $postPhase "RenderBloom\("
 Assert-NotMatches "Renderer_RenderGraphEndFrame.cpp" $endFrameGraph "fallbackExecutions"
+Assert-Matches "Renderer_RenderGraphEndFrame.cpp" $endFrameGraph "postProcessOverride"
+Assert-Matches "Renderer_Descriptors.cpp" $descriptors "m_bloomResources\.resources\.postProcessOverride"
+Assert-Matches "Renderer_Descriptors.cpp" $descriptors "\?\s*m_bloomResources\.resources\.postProcessOverride"
 
 foreach ($screenPass in @(
     @{ Name = "Renderer_RenderGraphSSAO.cpp"; Text = $ssaoBoundary },

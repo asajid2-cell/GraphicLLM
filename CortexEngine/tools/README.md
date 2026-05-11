@@ -10,6 +10,13 @@ Run the full local release gate from the repository root:
 powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
+The historical Phase 2 entrypoint is kept as a thin wrapper around the current
+release gate:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_phase2_validation.ps1
+```
+
 The release gate builds Release once, then runs the core Phase 3 public
 validation suite:
 

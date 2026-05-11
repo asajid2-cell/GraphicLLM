@@ -825,6 +825,16 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       renderer full ownership audit passed with `renderer_members=48
       expected_members=48`, and minimal frame smoke passed at
       `minimal_frame_20260511_111842_064_95176_7be8b197`.
+    - The current RT-history checkpoint moves repeated end-frame source-to-
+      history transition, copy, and return-to-shader-resource mechanics for RT
+      shadows, RT GI, and RT reflections into `RTHistoryCopyPass`. Release
+      rebuild passed, renderer ownership tests passed with `targets=15`,
+      renderer full ownership audit passed with `renderer_members=48
+      expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_112225_043_74864_0d71ae62`, and RT
+      showcase passed at `rt_showcase_20260511_112225_270_95288_5d7f3c13`.
+      The broader ownership rows remain `PARTIAL` because other end-frame and
+      renderer pass mechanics still live in renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

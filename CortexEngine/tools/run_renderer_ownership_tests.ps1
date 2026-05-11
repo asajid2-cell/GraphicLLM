@@ -30,6 +30,8 @@ if (-not (Test-Path $rendererRtStatePath)) {
     throw "RendererRTState.h not found: $rendererRtStatePath"
 }
 $rendererRtState = Get-Content $rendererRtStatePath -Raw
+$rtHistoryCopyPassPath = Join-Path $root "src/Graphics/Passes/RTHistoryCopyPass.cpp"
+$frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -178,6 +180,33 @@ foreach ($target in $doc.targets) {
             if ($rendererRtState -match "\b$([regex]::Escape($oldField))\b") {
                 Add-Failure "rt_reflection_stats still exposes loose state field in RendererRTState.h: $oldField"
             }
+        }
+    }
+
+    if ($id -eq "rt_history_copy") {
+        if (Test-Path $rtHistoryCopyPassPath) {
+            $rtHistoryCopyPass = Get-Content $rtHistoryCopyPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::RTHistoryCopyPass", "CopyContext", "CopyToHistoryAndReturnToShaderResource", "ResourceBarrier", "CopyResource", "D3D12_RESOURCE_STATE_COPY_SOURCE", "D3D12_RESOURCE_STATE_COPY_DEST", "D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE")) {
+                if ($rtHistoryCopyPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "rt_history_copy missing RTHistoryCopyPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "rt_history_copy missing RTHistoryCopyPass.cpp"
+        }
+        if (Test-Path $frameEndPath) {
+            $frameEnd = Get-Content $frameEndPath -Raw
+            $routeCount = ([regex]::Matches($frameEnd, [regex]::Escape("RTHistoryCopyPass::CopyToHistoryAndReturnToShaderResource"))).Count
+            if ($routeCount -lt 3) {
+                Add-Failure "rt_history_copy expected three routed history-copy calls in Renderer_FrameEnd.cpp, found $routeCount"
+            }
+            foreach ($removedLocal in @("giBarrierCount", "reflBarrierCount")) {
+                if ($frameEnd.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "rt_history_copy still has duplicated RT history barrier counter in Renderer_FrameEnd.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "rt_history_copy missing Renderer_FrameEnd.cpp"
         }
     }
 

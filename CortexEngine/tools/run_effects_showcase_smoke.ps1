@@ -195,6 +195,9 @@ if ($failures.Count -eq 0) {
         if ([double]$cinematicPost.depth_of_field -le 0.0) {
             Add-Failure "cinematic_post.depth_of_field is not active"
         }
+        if ([string]$cinematicPost.tone_mapper_preset -ne "aces") {
+            Add-Failure "cinematic_post.tone_mapper_preset was '$($cinematicPost.tone_mapper_preset)', expected aces from release_showcase preset"
+        }
     }
 
     if ([int]$materials.sampled -lt 10) {

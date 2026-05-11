@@ -96,6 +96,7 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
   },
   "cinematic_post": {
     "enabled": true,
+    "tone_mapper_preset": "filmic_soft",
     "bloom_threshold": 1.4,
     "bloom_soft_knee": 0.33,
     "contrast": 1.22,
@@ -192,6 +193,9 @@ if ($exitCode -ne 0) {
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
     Assert-Near "motion_blur" ([double]$fc.cinematic_post.motion_blur) 0.22 0.03
     Assert-Near "depth_of_field" ([double]$fc.cinematic_post.depth_of_field) 0.34 0.03
+    if ([string]$fc.cinematic_post.tone_mapper_preset -ne "filmic_soft") {
+        Add-Failure "tone_mapper_preset was '$($fc.cinematic_post.tone_mapper_preset)', expected filmic_soft"
+    }
     if ($null -eq $fc.ray_tracing.rt_reflection_tuning) {
         Add-Failure "rt_reflection_tuning was missing"
     } else {

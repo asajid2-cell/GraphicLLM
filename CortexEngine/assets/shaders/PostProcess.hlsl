@@ -67,6 +67,12 @@ cbuffer FrameConstants : register(b1)
     // x = RT reflection roughness threshold, y = history max blend,
     // z = firefly clamp max luma, w = signal scale
     float4   g_RTReflectionParams;
+    uint4    g_ScreenAndCluster;
+    uint4    g_ClusterParams;
+    uint4    g_ClusterSRVIndices;
+    float4   g_ProjectionParams;
+    // x = tone-mapper mode (0=ACES, 1=Reinhard, 2=soft filmic, 3=punchy)
+    float4   g_CinematicParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -481,6 +487,26 @@ float3 ApplyACESFilm(float3 x)
     const float d = 0.59f;
     const float e = 0.14f;
     return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
+float3 ApplyToneMapper(float3 color, uint mode)
+{
+    if (mode == 1u)
+    {
+        return saturate(color / (1.0f.xxx + color));
+    }
+    if (mode == 2u)
+    {
+        float3 soft = ApplyACESFilm(color * 0.88f);
+        float3 shoulder = color / (1.0f.xxx + color);
+        return saturate(lerp(soft, shoulder, 0.28f));
+    }
+    if (mode == 3u)
+    {
+        float3 aces = ApplyACESFilm(color * 1.08f);
+        return saturate((aces - 0.5f.xxx) * 1.10f + 0.5f.xxx);
+    }
+    return ApplyACESFilm(color);
 }
 
 // Downsample + bright-pass for bloom (runs at reduced resolution, sampling g_SceneColor)
@@ -1483,7 +1509,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float exposure = max(g_TimeAndExposure.z, 0.01f);
     float3 color = hdrCombined * exposure;
 
-    color = ApplyACESFilm(color);
+    uint toneMapperMode = (uint)round(max(g_CinematicParams.x, 0.0f));
+    color = ApplyToneMapper(color, toneMapperMode);
     color = pow(color, 1.0f / 2.2f);
 
     // GPU-driven settings overlay. When g_DebugMode.y > 0.5 the engine is

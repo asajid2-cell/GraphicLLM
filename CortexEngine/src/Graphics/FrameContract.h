@@ -340,6 +340,7 @@ struct FrameContract {
         float contrast = 1.0f;
         float saturation = 1.0f;
         std::string colorGradePreset = "neutral";
+        std::string toneMapperPreset = "aces";
         float vignette = 0.0f;
         float lensDirt = 0.0f;
         float motionBlur = 0.0f;

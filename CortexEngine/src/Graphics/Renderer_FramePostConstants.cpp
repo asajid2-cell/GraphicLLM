@@ -211,6 +211,11 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_rtDenoiseState.reflectionHistoryMaxBlend,
         m_rtDenoiseState.reflectionFireflyClampLuma,
         m_rtDenoiseState.reflectionSignalScale);
+    frameData.cinematicParams = glm::vec4(
+        static_cast<float>(m_postProcessState.ToneMapperMode()),
+        0.0f,
+        0.0f,
+        0.0f);
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

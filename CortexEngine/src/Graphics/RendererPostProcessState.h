@@ -22,6 +22,7 @@ struct RendererPostProcessState {
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
     std::string colorGradePreset = "neutral";
+    std::string toneMapperPreset = "aces";
 
     [[nodiscard]] float EffectiveVignette() const {
         return cinematicEnabled ? std::clamp(vignette, 0.0f, 1.0f) : 0.0f;
@@ -37,6 +38,19 @@ struct RendererPostProcessState {
 
     [[nodiscard]] float EffectiveDepthOfField() const {
         return cinematicEnabled ? std::clamp(depthOfField, 0.0f, 1.0f) : 0.0f;
+    }
+
+    [[nodiscard]] uint32_t ToneMapperMode() const {
+        if (toneMapperPreset == "reinhard") {
+            return 1u;
+        }
+        if (toneMapperPreset == "filmic_soft") {
+            return 2u;
+        }
+        if (toneMapperPreset == "punchy") {
+            return 3u;
+        }
+        return 0u;
     }
 
     [[nodiscard]] uint32_t EncodedLensDirtByte() const {

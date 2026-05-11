@@ -52,6 +52,7 @@
       "cinematic_post": {
         "enabled": true,
         "preset": "clean_filmic",
+        "tone_mapper_preset": "aces",
         "bloom_threshold": 1.0,
         "bloom_soft_knee": 0.5,
         "vignette": 0.12,
@@ -110,6 +111,7 @@
       "cinematic_post": {
         "enabled": false,
         "preset": "neutral",
+        "tone_mapper_preset": "aces",
         "bloom_threshold": 1.2,
         "bloom_soft_knee": 0.4,
         "vignette": 0.0,

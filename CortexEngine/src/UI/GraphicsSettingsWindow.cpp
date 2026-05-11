@@ -57,6 +57,10 @@ enum ControlIdGraphics : int {
     IDC_GFX_GRADE_BLEACH = 9057,
     IDC_GFX_MOTION_BLUR = 9058,
     IDC_GFX_DOF = 9059,
+    IDC_GFX_TONE_ACES = 9060,
+    IDC_GFX_TONE_REINHARD = 9061,
+    IDC_GFX_TONE_SOFT = 9062,
+    IDC_GFX_TONE_PUNCHY = 9063,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -332,6 +336,19 @@ void ApplyColorGradePresetFromGraphicsUI(const char* preset) {
     SyncStateFromToggles();
     SyncStateFromSliders();
     g_gfx.tuning.cinematicPost.colorGradePreset = preset ? preset : "neutral";
+    g_gfx.tuning.quality.dirtyFromUI = true;
+    Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
+    g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
+}
+
+void ApplyToneMapperPresetFromGraphicsUI(const char* preset) {
+    auto* renderer = Cortex::ServiceLocator::GetRenderer();
+    if (!renderer || renderer->IsDeviceRemoved()) {
+        return;
+    }
+    SyncStateFromToggles();
+    SyncStateFromSliders();
+    g_gfx.tuning.cinematicPost.toneMapperPreset = preset ? preset : "aces";
     g_gfx.tuning.quality.dirtyFromUI = true;
     Graphics::ApplyRendererTuningState(*renderer, g_gfx.tuning);
     g_gfx.tuning = Graphics::CaptureRendererTuningState(*renderer);
@@ -689,6 +706,14 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_SATURATION, L"Saturation", g_gfx.saturation, 0.0f, 2.0f);
             {
                 const int buttonWidth = (width - margin * 2 - 18) / 4;
+                makeButton(IDC_GFX_TONE_ACES, L"ACES", margin, y, buttonWidth);
+                makeButton(IDC_GFX_TONE_REINHARD, L"Reinhard", margin + buttonWidth + 6, y, buttonWidth);
+                makeButton(IDC_GFX_TONE_SOFT, L"Soft", margin + (buttonWidth + 6) * 2, y, buttonWidth);
+                makeButton(IDC_GFX_TONE_PUNCHY, L"Punchy", margin + (buttonWidth + 6) * 3, y, buttonWidth);
+                y += 24 + rowGap;
+            }
+            {
+                const int buttonWidth = (width - margin * 2 - 18) / 4;
                 makeButton(IDC_GFX_GRADE_NEUTRAL, L"Neutral", margin, y, buttonWidth);
                 makeButton(IDC_GFX_GRADE_WARM_FILM, L"Warm Film", margin + buttonWidth + 6, y, buttonWidth);
                 makeButton(IDC_GFX_GRADE_COOL_MOON, L"Cool Moon", margin + (buttonWidth + 6) * 2, y, buttonWidth);
@@ -849,6 +874,18 @@ void RegisterGraphicsSettingsClass() {
                 break;
             case IDC_GFX_GRADE_BLEACH:
                 ApplyColorGradePresetFromGraphicsUI("bleach_bypass");
+                break;
+            case IDC_GFX_TONE_ACES:
+                ApplyToneMapperPresetFromGraphicsUI("aces");
+                break;
+            case IDC_GFX_TONE_REINHARD:
+                ApplyToneMapperPresetFromGraphicsUI("reinhard");
+                break;
+            case IDC_GFX_TONE_SOFT:
+                ApplyToneMapperPresetFromGraphicsUI("filmic_soft");
+                break;
+            case IDC_GFX_TONE_PUNCHY:
+                ApplyToneMapperPresetFromGraphicsUI("punchy");
                 break;
             case IDC_GFX_BOOKMARK_HERO:
             case IDC_GFX_BOOKMARK_REFLECTION:

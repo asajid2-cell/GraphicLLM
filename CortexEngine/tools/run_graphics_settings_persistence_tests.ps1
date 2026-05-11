@@ -98,6 +98,7 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   "cinematic_post": {
     "enabled": true,
     "color_grade_preset": "warm_film",
+    "tone_mapper_preset": "punchy",
     "bloom_threshold": 1.2,
     "bloom_soft_knee": 0.4,
     "contrast": 1.18,
@@ -276,11 +277,15 @@ if ($validRun.exit_code -ne 0) {
     $warm = [double]$report.frame_contract.cinematic_post.warm
     $cool = [double]$report.frame_contract.cinematic_post.cool
     $colorGradePreset = [string]$report.frame_contract.cinematic_post.color_grade_preset
+    $toneMapperPreset = [string]$report.frame_contract.cinematic_post.tone_mapper_preset
     if (-not [bool]$report.frame_contract.cinematic_post.enabled) {
         Add-Failure "valid settings cinematic post was not enabled"
     }
     if ($colorGradePreset -ne "warm_film") {
         Add-Failure "valid settings color grade preset was '$colorGradePreset', expected warm_film"
+    }
+    if ($toneMapperPreset -ne "punchy") {
+        Add-Failure "valid settings tone mapper preset was '$toneMapperPreset', expected punchy"
     }
     if ([Math]::Abs($warm - 0.32) -gt 0.03) {
         Add-Failure "valid settings warm color grade was $warm, expected 0.32"

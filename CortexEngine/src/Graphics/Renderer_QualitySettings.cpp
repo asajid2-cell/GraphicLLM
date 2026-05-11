@@ -83,6 +83,21 @@ void Renderer::SetToneGrade(float contrast, float saturation) {
                  m_postProcessState.saturation);
 }
 
+void Renderer::SetToneMapperPreset(const std::string& preset) {
+    std::string id = preset.empty() ? "aces" : preset;
+    if (id == "clean_filmic") {
+        id = "aces";
+    }
+    if (id != "aces" && id != "reinhard" && id != "filmic_soft" && id != "punchy") {
+        id = "aces";
+    }
+    if (m_postProcessState.toneMapperPreset == id) {
+        return;
+    }
+    m_postProcessState.toneMapperPreset = id;
+    spdlog::info("Tone mapper preset set to '{}'", m_postProcessState.toneMapperPreset);
+}
+
 void Renderer::SetColorGradePreset(const std::string& preset) {
     const std::string id = preset.empty() ? "custom" : preset;
     if (m_postProcessState.colorGradePreset == id) {

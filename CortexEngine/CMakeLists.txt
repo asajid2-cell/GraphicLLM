@@ -171,6 +171,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/SkyboxPass.cpp
     src/Graphics/Passes/TAAPass.cpp
     src/Graphics/Passes/VisibilityBufferGraphPass.cpp
+    src/Graphics/Passes/VisibilityBufferResourcePass.cpp
     src/Graphics/Passes/VoxelPass.cpp
     src/Graphics/RenderGraph.cpp
     src/Graphics/RenderGraph_Barriers.cpp
@@ -424,6 +425,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/SkyboxPass.h
     src/Graphics/Passes/TAAPass.h
     src/Graphics/Passes/VisibilityBufferGraphPass.h
+    src/Graphics/Passes/VisibilityBufferResourcePass.h
     src/Graphics/RenderGraph.h
     src/Graphics/VisibilityBuffer.h
     src/Graphics/MeshletBuilder.h

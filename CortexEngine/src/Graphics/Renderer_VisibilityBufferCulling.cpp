@@ -2,6 +2,7 @@
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/VisibilityBufferResourcePass.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Graphics/SurfaceClassification.h"
@@ -146,17 +147,14 @@ D3D12_GPU_VIRTUAL_ADDRESS Renderer::ResolveVisibilityBufferCullMask(uint32_t deb
         m_hzbResources.capture.captureFarPlane,
         useHzbOcclusion);
 
-    if (useHzbOcclusion &&
-        m_hzbResources.resources.texture &&
-        (m_hzbResources.resources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
-        barrier.Transition.StateBefore = m_hzbResources.resources.resourceState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    if (useHzbOcclusion && m_hzbResources.resources.texture) {
+        const bool hzbReady = VisibilityBufferResourcePass::PrepareHZBForCulling(
+            m_commandResources.graphicsList.Get(),
+            {m_hzbResources.resources.texture.Get(), &m_hzbResources.resources.resourceState});
+        if (!hzbReady) {
+            useHzbOcclusion = false;
+            m_visibilityBufferState.hzbOcclusionUsedThisFrame = false;
+        }
     }
 
     static bool s_debugCullingEnv = (std::getenv("CORTEX_DEBUG_CULLING") != nullptr);

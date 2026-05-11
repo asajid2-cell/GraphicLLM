@@ -35,6 +35,7 @@ cbuffer FrameConstants : register(b1)
     float4   g_EnvParams;
     float4   g_ColorGrade;
     float4   g_FogParams;
+    float4   g_FogExtraParams;
     float4   g_AOParams;
     float4   g_BloomParams;
     float4   g_TAAParams;

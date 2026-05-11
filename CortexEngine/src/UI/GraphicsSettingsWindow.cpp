@@ -82,6 +82,7 @@ enum ControlIdGraphics : int {
     IDC_GFX_SUN_COLOR_R = 9219,
     IDC_GFX_SUN_COLOR_G = 9220,
     IDC_GFX_SUN_COLOR_B = 9221,
+    IDC_GFX_FOG_START = 9222,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -190,6 +191,7 @@ struct GraphicsSettingsState {
     SliderBinding ssaoBias;
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
+    SliderBinding fogStart;
     SliderBinding fogHeight;
     SliderBinding fogFalloff;
     SliderBinding waterWave;
@@ -642,6 +644,7 @@ void SyncStateFromSliders() {
     g_gfx.tuning.screenSpace.ssaoBias = SliderToFloat(g_gfx.ssaoBias);
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
+    g_gfx.tuning.atmosphere.fogStartDistance = SliderToFloat(g_gfx.fogStart);
     g_gfx.tuning.atmosphere.fogHeight = SliderToFloat(g_gfx.fogHeight);
     g_gfx.tuning.atmosphere.fogFalloff = SliderToFloat(g_gfx.fogFalloff);
     g_gfx.tuning.water.waveAmplitude = SliderToFloat(g_gfx.waterWave);
@@ -768,6 +771,7 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.ssaoBias, g_gfx.tuning.screenSpace.ssaoBias);
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
+    SetSliderFromFloat(g_gfx.fogStart, g_gfx.tuning.atmosphere.fogStartDistance);
     SetSliderFromFloat(g_gfx.fogHeight, g_gfx.tuning.atmosphere.fogHeight);
     SetSliderFromFloat(g_gfx.fogFalloff, g_gfx.tuning.atmosphere.fogFalloff);
     SetSliderFromFloat(g_gfx.waterWave, g_gfx.tuning.water.waveAmplitude);
@@ -1120,6 +1124,7 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_SSAO_BIAS, L"SSAO Bias", g_gfx.ssaoBias, 0.0f, 0.1f);
             makeSlider(IDC_GFX_SSAO_INTENSITY, L"SSAO Intensity", g_gfx.ssaoIntensity, 0.0f, 5.0f);
             makeSlider(IDC_GFX_FOG_DENSITY, L"Fog Density", g_gfx.fogDensity, 0.0f, 0.1f);
+            makeSlider(IDC_GFX_FOG_START, L"Fog Start", g_gfx.fogStart, 0.0f, 100.0f);
             makeSlider(IDC_GFX_FOG_HEIGHT, L"Fog Height", g_gfx.fogHeight, -100.0f, 100.0f);
             makeSlider(IDC_GFX_FOG_FALLOFF, L"Fog Falloff", g_gfx.fogFalloff, 0.01f, 10.0f);
 

@@ -43,6 +43,7 @@
       "atmosphere": {
         "fog": true,
         "fog_density": 0.012,
+        "fog_start_distance": 8.0,
         "fog_height": 0.0,
         "fog_falloff": 0.55
       },
@@ -110,6 +111,7 @@
       "atmosphere": {
         "fog": false,
         "fog_density": 0.0,
+        "fog_start_distance": 0.0,
         "fog_height": 0.0,
         "fog_falloff": 0.5
       },

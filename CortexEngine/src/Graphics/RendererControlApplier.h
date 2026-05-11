@@ -88,7 +88,7 @@ void ApplyWaterStateControl(Renderer& renderer,
                             float secondaryAmplitude);
 void ApplyWaterOpticsControl(Renderer& renderer, float roughness, float fresnelStrength);
 void ApplyFogDensityControl(Renderer& renderer, float density);
-void ApplyFogParamsControl(Renderer& renderer, float density, float height, float falloff);
+void ApplyFogParamsControl(Renderer& renderer, float density, float height, float falloff, float startDistance = 0.0f);
 void ApplyAreaLightSizeControl(Renderer& renderer, float scale);
 void ApplySafeQualityPresetControl(Renderer& renderer);
 void ApplyEnvironmentResidencyLoadControl(Renderer& renderer, int count);

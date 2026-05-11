@@ -77,6 +77,7 @@ struct RendererScreenSpaceTuning {
 struct RendererAtmosphereTuning {
     bool fogEnabled = true;
     float fogDensity = 0.015f;
+    float fogStartDistance = 0.0f;
     float fogHeight = 0.0f;
     float fogFalloff = 0.5f;
 };

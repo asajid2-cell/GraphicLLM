@@ -15,6 +15,10 @@ float Renderer::GetFogDensity() const {
     return GetFeatureState().fogDensity;
 }
 
+float Renderer::GetFogStartDistance() const {
+    return GetFeatureState().fogStartDistance;
+}
+
 float Renderer::GetFogHeight() const {
     return GetFeatureState().fogHeight;
 }
@@ -241,18 +245,25 @@ void Renderer::SetFogEnabled(bool enabled) {
     spdlog::info("Fog {}", m_fogState.enabled ? "ENABLED" : "DISABLED");
 }
 
-void Renderer::SetFogParams(float density, float height, float falloff) {
+void Renderer::SetFogParams(float density, float height, float falloff, float startDistance) {
     float d = std::max(density, 0.0f);
     float f = std::max(falloff, 0.0f);
+    float s = std::max(startDistance, 0.0f);
     if (std::abs(d - m_fogState.density) < 1e-6f &&
+        std::abs(s - m_fogState.startDistance) < 1e-6f &&
         std::abs(height - m_fogState.height) < 1e-6f &&
         std::abs(f - m_fogState.falloff) < 1e-6f) {
         return;
     }
     m_fogState.density = d;
+    m_fogState.startDistance = s;
     m_fogState.height = height;
     m_fogState.falloff = f;
-    spdlog::info("Fog params: density={}, height={}, falloff={}", m_fogState.density, m_fogState.height, m_fogState.falloff);
+    spdlog::info("Fog params: density={}, start={}, height={}, falloff={}",
+                 m_fogState.density,
+                 m_fogState.startDistance,
+                 m_fogState.height,
+                 m_fogState.falloff);
 }
 
 void Renderer::SetGodRayIntensity(float intensity) {

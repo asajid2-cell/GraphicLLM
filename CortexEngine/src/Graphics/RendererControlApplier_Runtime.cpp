@@ -295,13 +295,15 @@ void ApplyFogDensityControl(Renderer& renderer, float density) {
     const auto features = renderer.GetFeatureState();
     renderer.SetFogParams(std::clamp(density, 0.0f, 0.1f),
                           features.fogHeight,
-                          features.fogFalloff);
+                          features.fogFalloff,
+                          features.fogStartDistance);
 }
 
-void ApplyFogParamsControl(Renderer& renderer, float density, float height, float falloff) {
+void ApplyFogParamsControl(Renderer& renderer, float density, float height, float falloff, float startDistance) {
     renderer.SetFogParams(std::clamp(density, 0.0f, 0.1f),
                           std::clamp(height, -100.0f, 100.0f),
-                          std::clamp(falloff, 0.01f, 10.0f));
+                          std::clamp(falloff, 0.01f, 10.0f),
+                          std::clamp(startDistance, 0.0f, 100.0f));
 }
 
 void ApplyAreaLightSizeControl(Renderer& renderer, float scale) {

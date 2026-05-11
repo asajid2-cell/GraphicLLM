@@ -129,6 +129,7 @@ json ToJson(const RendererTuningState& state) {
         {"atmosphere", {
             {"fog", state.atmosphere.fogEnabled},
             {"fog_density", state.atmosphere.fogDensity},
+            {"fog_start_distance", state.atmosphere.fogStartDistance},
             {"fog_height", state.atmosphere.fogHeight},
             {"fog_falloff", state.atmosphere.fogFalloff}
         }},
@@ -296,6 +297,7 @@ RendererTuningState FromJson(const json& root) {
         const auto& a = root.at("atmosphere");
         ReadValue(a, "fog", state.atmosphere.fogEnabled);
         ReadValue(a, "fog_density", state.atmosphere.fogDensity);
+        ReadValue(a, "fog_start_distance", state.atmosphere.fogStartDistance);
         ReadValue(a, "fog_height", state.atmosphere.fogHeight);
         ReadValue(a, "fog_falloff", state.atmosphere.fogFalloff);
     }
@@ -507,6 +509,7 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
 
     state.atmosphere.fogEnabled = features.fogEnabled;
     state.atmosphere.fogDensity = features.fogDensity;
+    state.atmosphere.fogStartDistance = features.fogStartDistance;
     state.atmosphere.fogHeight = features.fogHeight;
     state.atmosphere.fogFalloff = features.fogFalloff;
 
@@ -596,6 +599,7 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.screenSpace.ssrStrength = std::clamp(state.screenSpace.ssrStrength, 0.0f, 1.0f);
 
     state.atmosphere.fogDensity = std::clamp(state.atmosphere.fogDensity, 0.0f, 0.1f);
+    state.atmosphere.fogStartDistance = std::clamp(state.atmosphere.fogStartDistance, 0.0f, 100.0f);
     state.atmosphere.fogHeight = std::clamp(state.atmosphere.fogHeight, -100.0f, 100.0f);
     state.atmosphere.fogFalloff = std::clamp(state.atmosphere.fogFalloff, 0.01f, 10.0f);
 
@@ -701,7 +705,8 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyFogParamsControl(renderer,
                           state.atmosphere.fogDensity,
                           state.atmosphere.fogHeight,
-                          state.atmosphere.fogFalloff);
+                          state.atmosphere.fogFalloff,
+                          state.atmosphere.fogStartDistance);
 
     ApplyWaterStateControl(renderer,
                            state.water.levelY,

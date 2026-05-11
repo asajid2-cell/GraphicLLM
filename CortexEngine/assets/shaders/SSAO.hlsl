@@ -32,6 +32,7 @@ cbuffer FrameConstants : register(b1)
     float4   g_EnvParams;
     float4   g_ColorGrade;
     float4   g_FogParams;
+    float4   g_FogExtraParams;
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution, w reserved

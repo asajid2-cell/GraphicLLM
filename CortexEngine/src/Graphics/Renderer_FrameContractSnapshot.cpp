@@ -170,6 +170,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.screenSpace.ssaoBias = m_ssaoResources.bias;
     contract.screenSpace.ssaoIntensity = m_ssaoResources.intensity;
     contract.lighting.fogDensity = m_fogState.density;
+    contract.lighting.fogStartDistance = m_fogState.startDistance;
     contract.lighting.fogHeight = m_fogState.height;
     contract.lighting.fogFalloff = m_fogState.falloff;
     contract.lighting.godRayIntensity = m_postProcessState.godRayIntensity;

@@ -239,9 +239,10 @@ public:
     void ToggleSSR();
     void CycleScreenSpaceEffectsDebug();
     void SetFogEnabled(bool enabled);
-    void SetFogParams(float density, float height, float falloff);
+    void SetFogParams(float density, float height, float falloff, float startDistance = 0.0f);
     [[nodiscard]] bool IsFogEnabled() const;
     [[nodiscard]] float GetFogDensity() const;
+    [[nodiscard]] float GetFogStartDistance() const;
     [[nodiscard]] float GetFogHeight() const;
     [[nodiscard]] float GetFogFalloff() const;
     [[nodiscard]] bool IsPCSS() const;

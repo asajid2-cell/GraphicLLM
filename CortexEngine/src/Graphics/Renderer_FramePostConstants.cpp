@@ -90,6 +90,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_fogState.height,
         m_fogState.falloff,
         m_fogState.enabled ? 1.0f : 0.0f);
+    frameData.fogExtraParams = glm::vec4(m_fogState.startDistance, 0.0f, 0.0f, 0.0f);
 
     // SSAO parameters packed into aoParams. Disable sampling if the SSAO
     // resources are unavailable so post-process does not read null SRVs.

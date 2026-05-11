@@ -409,6 +409,109 @@ struct RTReflectionTargetState {
         colorState = D3D12_RESOURCE_STATE_COMMON;
         historyState = D3D12_RESOURCE_STATE_COMMON;
     }
+
+    [[nodiscard]] Result<void> CreateResources(ID3D12Device* device,
+                                               DescriptorHeapManager* descriptorManager,
+                                               UINT width,
+                                               UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for RT reflection creation");
+        }
+
+        ResetResources();
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+        auto createTarget = [&](ComPtr<ID3D12Resource>& target,
+                                DescriptorHandle& targetSrv,
+                                DescriptorHandle& targetUav,
+                                D3D12_RESOURCE_STATES& targetState,
+                                D3D12_RESOURCE_STATES initialState,
+                                const char* label) -> Result<void> {
+            const auto heapProps = RTDefaultHeapProperties();
+            const HRESULT hr = device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                initialState,
+                nullptr,
+                IID_PPV_ARGS(&target));
+            if (FAILED(hr)) {
+                target.Reset();
+                return Result<void>::Err(std::string("Failed to create ") + label + " buffer");
+            }
+            targetState = initialState;
+
+            if (!targetSrv.IsValid()) {
+                auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (srvResult.IsErr()) {
+                    target.Reset();
+                    return Result<void>::Err(std::string("Failed to allocate staging SRV for ") +
+                                             label + ": " + srvResult.Error());
+                }
+                targetSrv = srvResult.Value();
+            }
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = desc.Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(target.Get(), &srvDesc, targetSrv.cpu);
+
+            if (!targetUav.IsValid()) {
+                auto uavResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (uavResult.IsErr()) {
+                    target.Reset();
+                    return Result<void>::Err(std::string("Failed to allocate staging UAV for ") +
+                                             label + ": " + uavResult.Error());
+                }
+                targetUav = uavResult.Value();
+            }
+
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+            uavDesc.Format = desc.Format;
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            device->CreateUnorderedAccessView(target.Get(), nullptr, &uavDesc, targetUav.cpu);
+            return Result<void>::Ok();
+        };
+
+        auto colorResult = createTarget(
+            color,
+            srv,
+            uav,
+            colorState,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            "RT reflection color");
+        if (colorResult.IsErr()) {
+            ResetResources();
+            return colorResult;
+        }
+
+        auto historyResult = createTarget(
+            history,
+            historySRV,
+            historyUAV,
+            historyState,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            "RT reflection history");
+        if (historyResult.IsErr()) {
+            ResetResources();
+            return historyResult;
+        }
+
+        return Result<void>::Ok();
+    }
 };
 
 struct RTGITargetState {

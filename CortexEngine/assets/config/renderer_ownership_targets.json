@@ -73,6 +73,16 @@
       "future_extension": "Move future RT GI target texture/view mechanics into RTGITargetState or an adjacent RT target bundle instead of expanding Renderer_RTResources.cpp inline allocation code"
     },
     {
+      "id": "rt_reflection_targets",
+      "owner": "RT reflections",
+      "status": "release_boundary_validated",
+      "release_boundary": "RTReflectionTargetState owns RT reflection color/history texture creation, SRV/UAV descriptor allocation, view creation, and resource-state initialization; Renderer_RTResources.cpp computes budgeted dimensions, delegates target creation, delegates signal-stats allocation to RTReflectionSignalStatsState, and invalidates history",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererRTState.h", "Renderer_RTResources.cpp"],
+      "renderer_state_members": ["m_rtReflectionTargets", "m_rtReflectionSignalState"],
+      "future_extension": "Move future RT reflection target texture/view mechanics into RTReflectionTargetState or an adjacent RT target bundle instead of expanding Renderer_RTResources.cpp inline allocation code"
+    },
+    {
       "id": "rt_history_copy",
       "owner": "RT temporal histories",
       "status": "release_boundary_validated",

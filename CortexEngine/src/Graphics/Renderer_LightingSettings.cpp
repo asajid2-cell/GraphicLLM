@@ -313,6 +313,9 @@ void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) 
 void Renderer::SetEnvironmentPreset(const std::string& name) {
     if (m_environmentState.maps.empty()) {
         spdlog::warn("No environments loaded");
+        m_environmentState.selectionFallbackUsed = true;
+        m_environmentState.requestedEnvironment = name;
+        m_environmentState.fallbackReason = "no_resident_environments";
         return;
     }
 
@@ -357,6 +360,9 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
                              name,
                              pending.path,
                              texResult.Error());
+                m_environmentState.selectionFallbackUsed = true;
+                m_environmentState.requestedEnvironment = name;
+                m_environmentState.fallbackReason = "requested_environment_load_failed";
                 return;
             }
 
@@ -372,6 +378,9 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
 
             m_environmentState.maps.push_back(std::move(env));
             m_environmentState.currentIndex = m_environmentState.maps.size() - 1;
+            m_environmentState.selectionFallbackUsed = false;
+            m_environmentState.requestedEnvironment = name;
+            m_environmentState.fallbackReason.clear();
             EnforceIBLResidencyLimit();
             UpdateEnvironmentDescriptorTable();
 
@@ -385,10 +394,16 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
         }
 
         spdlog::warn("Environment '{}' not found, keeping current environment", name);
+        m_environmentState.selectionFallbackUsed = true;
+        m_environmentState.requestedEnvironment = name;
+        m_environmentState.fallbackReason = "requested_environment_not_found";
         return;
     }
 
     if (targetIndex == m_environmentState.currentIndex) {
+        m_environmentState.selectionFallbackUsed = false;
+        m_environmentState.requestedEnvironment = name;
+        m_environmentState.fallbackReason.clear();
         if (const EnvironmentMaps* current = m_environmentState.ActiveEnvironment()) {
             SetIBLIntensity(current->defaultDiffuseIntensity, current->defaultSpecularIntensity);
         }
@@ -396,6 +411,9 @@ void Renderer::SetEnvironmentPreset(const std::string& name) {
     }
 
     m_environmentState.currentIndex = targetIndex;
+    m_environmentState.selectionFallbackUsed = false;
+    m_environmentState.requestedEnvironment = name;
+    m_environmentState.fallbackReason.clear();
     UpdateEnvironmentDescriptorTable();
     const EnvironmentMaps* current = m_environmentState.ActiveEnvironment();
     if (current) {
@@ -491,6 +509,9 @@ void Renderer::CycleEnvironmentPreset() {
         // Currently in "no IBL" mode; re-enable and jump to the first environment.
         SetIBLEnabled(true);
         m_environmentState.currentIndex = 0;
+        m_environmentState.selectionFallbackUsed = false;
+        m_environmentState.requestedEnvironment = m_environmentState.ActiveEnvironmentName();
+        m_environmentState.fallbackReason.clear();
         UpdateEnvironmentDescriptorTable();
 
         const std::string name = m_environmentState.ActiveEnvironmentName();
@@ -501,6 +522,9 @@ void Renderer::CycleEnvironmentPreset() {
     if (m_environmentState.currentIndex + 1 < m_environmentState.maps.size()) {
         // Advance to the next environment preset.
         m_environmentState.currentIndex++;
+        m_environmentState.selectionFallbackUsed = false;
+        m_environmentState.requestedEnvironment = m_environmentState.ActiveEnvironmentName();
+        m_environmentState.fallbackReason.clear();
         UpdateEnvironmentDescriptorTable();
 
         const std::string name = m_environmentState.ActiveEnvironmentName();

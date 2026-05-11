@@ -137,6 +137,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "graphics_ui_interaction" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_graphics_ui_interaction_smoke.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "hud_mode_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -205,6 +214,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "screenshot_negative_gates" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_screenshot_negative_gates.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "phase3_visual_matrix" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -252,10 +270,28 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "particle_disabled_zero_cost" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_particle_disabled_zero_cost.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "environment_manifest" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $PSScriptRoot "run_environment_manifest_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "phase3_fallback_matrix" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_phase3_fallback_matrix.ps1"),
+        "-NoBuild"
     )
 }
 
@@ -266,6 +302,15 @@ if ($failures.Count -eq 0) {
         "-File", (Join-Path $PSScriptRoot "run_ibl_gallery_tests.ps1"),
         "-NoBuild",
         "-MaxEnvironments", [string]$IBLGalleryMaxEnvironments
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "rt_firefly_outlier" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_rt_firefly_outlier_scene.ps1"),
+        "-NoBuild"
     )
 }
 

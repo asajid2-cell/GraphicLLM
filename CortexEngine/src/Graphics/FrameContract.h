@@ -69,10 +69,12 @@ struct FrameContract {
 
     struct EnvironmentInfo {
         std::string active;
+        std::string requested;
         std::string runtimePath;
         std::string budgetClass = "unknown";
         bool loaded = false;
         bool fallback = false;
+        std::string fallbackReason;
         bool manifestPresent = false;
         bool iblLimitEnabled = false;
         bool backgroundVisible = true;

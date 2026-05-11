@@ -17,13 +17,16 @@ The current verified local gate covers:
 - Release rebuild,
 - temporal validation smoke,
 - full RT showcase smoke,
-- graphics settings persistence and unified graphics UI contracts,
+- graphics settings persistence, unified graphics UI contracts, and runtime
+  graphics settings application,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
-- Material Lab, Glass and Water Courtyard, Effects Showcase, and visual baseline smokes,
+- Material Lab, Glass and Water Courtyard, Effects Showcase, visual baseline
+  smokes, and screenshot negative gates,
 - Phase 3 visual matrix,
 - renderer ownership and fatal error contracts,
 - advanced graphics catalog and effects gallery contracts,
-- environment manifest and IBL gallery validation,
+- environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
+- particle-disabled zero-cost and RT firefly/outlier gates,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -38,25 +41,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.995`, `warnings=0`,
+- temporal validation: `gpu_ms=1.273`, `warnings=0`,
   `object_motion=0.0731`;
-- RT showcase: `gpu_ms=2.010/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.892/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`;
-- graphics UI, HUD, preset, material editor, showcase, ownership, fatal error,
+- graphics UI contract/runtime interaction, HUD, preset, material editor,
+  showcase, ownership, fatal error,
   environment manifest, advanced graphics catalog, and effects gallery contracts passed;
+- screenshot negative gates, particle-disabled zero-cost, Phase 3 fallback
+  matrix, and RT firefly/outlier gates passed;
 - Phase 3 visual matrix passed across temporal validation, RT Showcase,
   Material Lab, Glass and Water Courtyard, Effects Showcase, and IBL Gallery;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=15.371`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=17.137`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_081419_716_120580_62fbe9d2
+CortexEngine/build/bin/logs/runs/release_validation_20260510_191044_513_136388_1f91bf39
 ```
 
 ## Renderer Scope

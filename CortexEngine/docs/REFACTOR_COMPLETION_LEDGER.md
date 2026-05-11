@@ -924,6 +924,8 @@ Latest checkpoint note for `P3-REM-13`: renderer CPU readback mapping is now hel
 
 Latest checkpoint note for `P3-REM-13`: render-graph transient bloom and diagnostics RTV/SRV descriptor allocation plus view creation are now helper-owned by `DescriptorTable::EnsureColorTargetViewHandles` and `DescriptorTable::WriteTexture2DRTVAndSRV`; ownership tests reject direct transient graph descriptor/view mechanics in `Renderer_RenderGraphBloom.cpp` and `Renderer_RenderGraphDiagnostics.cpp`. Validation evidence: Release rebuild; `tools/run_renderer_ownership_tests.ps1` (`targets=55`); `tools/run_renderer_full_ownership_audit.ps1 -NoBuild`; render-graph transient matrix `render_graph_transient_matrix_20260511_153821_895_114108_59a0cbe8`; temporal validation `temporal_validation_20260511_153821_879_115324_c2dd2f6a`; RT showcase `rt_showcase_20260511_153836_957_106188_d19ff1f2`. The row remains `PARTIAL` because the broad requirement still includes pass/resource declaration and any future persistent GPU resources, and GPU particles remain blocked by product decision.
 
+Latest checkpoint note for `P2-GLOBAL-02`, `P2-SYS-03`, `P3-READY-01`, `P3-READY-06`, `P3-ORDER-21`, and `P3-REM-13`: a renderer-wide orchestration mechanics boundary is now part of `assets/config/renderer_ownership_targets.json` as `renderer_orchestration_mechanics_boundary`. `tools/run_renderer_ownership_tests.ps1` strips comments/string literals and rejects direct D3D12 resource/view allocation, descriptor allocation, map/unmap, resource barriers, copy commands, render-target binding, pipeline/root binding, descriptor-heap binding, IA setup, viewport/scissor setup, and draw/indirect submission in every `src/Graphics/Renderer*.cpp` file. Validation evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_ownership_tests.ps1` passed with `targets=56`; `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_renderer_full_ownership_audit.ps1 -NoBuild` passed with `renderer_members=48 expected_members=48`. These rows remain `PARTIAL` where their text requires full render-graph declarative ownership or GPU particles; this checkpoint closes the unguarded renderer-side low-level D3D12 mechanics gap.
+
 ## Completion Gate
 
 The refactor is not marked complete by this ledger.
@@ -997,10 +999,20 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
      `effects_gallery_20260511_101833_643_92584_271f436d`, effects showcase
      `effects_showcase_20260511_101833_638_93028_20bd533f`, and GPU particle
      contract tests passed.
-    - `0d06246` moved shared HDR/depth target transitions and binding for
-      water, transparent, and overlay passes into `ForwardTargetBindingPass`;
-      Release rebuild, renderer ownership/full audit, glass/water courtyard
-      `glass_water_courtyard_20260511_102340_840_92924_c79adf2d`, Material Lab
+   - The current renderer-boundary checkpoint adds
+     `renderer_orchestration_mechanics_boundary` to the ownership manifest and
+     rejects direct low-level D3D12 mechanics in every `Renderer*.cpp` file:
+     resource/view allocation, descriptor allocation, map/unmap, barriers,
+     copy commands, target binding, pipeline/root/heap binding, IA setup,
+     viewport/scissor setup, and draw/indirect submission. Ownership tests
+     passed with `targets=56`, and full ownership audit passed with
+     `renderer_members=48 expected_members=48`. This tightens the architectural
+     boundary but does not close GPU-particle or full declarative render-graph
+     rows.
+   - `0d06246` moved shared HDR/depth target transitions and binding for
+     water, transparent, and overlay passes into `ForwardTargetBindingPass`;
+     Release rebuild, renderer ownership/full audit, glass/water courtyard
+     `glass_water_courtyard_20260511_102340_840_92924_c79adf2d`, Material Lab
       `material_lab_20260511_102340_867_83768_b0d0d5a9`, and effects showcase
       `effects_showcase_20260511_102340_851_91340_72aff482` passed.
     - `7f120de` moved debug upload-buffer

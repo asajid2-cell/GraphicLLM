@@ -15,6 +15,12 @@ function Add-Failure([string]$Message) {
     $script:failures.Add($Message)
 }
 
+function Get-SourceForOwnershipTokenScan([string]$Text) {
+    $withoutBlockComments = [regex]::Replace($Text, "/\*.*?\*/", " ", [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    $withoutLineComments = [regex]::Replace($withoutBlockComments, "//.*$", " ", [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    return [regex]::Replace($withoutLineComments, '"(?:\\.|[^"\\])*"', '""')
+}
+
 if (-not (Test-Path $OwnershipPath)) {
     throw "Renderer ownership target file not found: $OwnershipPath"
 }
@@ -2038,6 +2044,70 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "minimal_frame_submission missing Renderer_FramePlanning.cpp"
+        }
+    }
+
+    if ($id -eq "renderer_orchestration_mechanics_boundary") {
+        $rendererFiles = Get-ChildItem (Join-Path $root "src/Graphics") -Filter "Renderer*.cpp" -File
+        if ($rendererFiles.Count -lt 1) {
+            Add-Failure "renderer_orchestration_mechanics_boundary found no Renderer*.cpp files"
+        }
+
+        $forbiddenRendererMechanics = @(
+            "CreateCommittedResource(",
+            "CreateShaderResourceView(",
+            "CreateUnorderedAccessView(",
+            "CreateRenderTargetView(",
+            "CreateDepthStencilView(",
+            "AllocateCBV_SRV_UAV(",
+            "AllocateStagingCBV_SRV_UAV(",
+            "AllocateRTV(",
+            "AllocateDSV(",
+            "->Map(",
+            ".Map(",
+            "->Unmap(",
+            ".Unmap(",
+            "ResourceBarrier(",
+            "CopyBufferRegion(",
+            "CopyTextureRegion(",
+            "OMSetRenderTargets(",
+            "SetPipelineState(",
+            "SetGraphicsRootSignature(",
+            "SetGraphicsRootDescriptorTable(",
+            "SetGraphicsRootConstantBufferView(",
+            "SetDescriptorHeaps(",
+            "IASetVertexBuffers(",
+            "IASetIndexBuffer(",
+            "IASetPrimitiveTopology(",
+            "RSSetViewports(",
+            "RSSetScissorRects(",
+            "DrawInstanced(",
+            "DrawIndexedInstanced(",
+            "ExecuteIndirect("
+        )
+
+        foreach ($file in $rendererFiles) {
+            $source = Get-Content $file.FullName -Raw
+            $scan = Get-SourceForOwnershipTokenScan $source
+            foreach ($token in $forbiddenRendererMechanics) {
+                if ($scan.IndexOf($token, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "renderer_orchestration_mechanics_boundary found direct renderer-owned D3D12 mechanic in $($file.Name): $token"
+                }
+            }
+        }
+
+        foreach ($requiredHelper in @(
+            "Passes/DescriptorTable.cpp",
+            "Passes/ReadbackBuffer.cpp",
+            "Passes/MeshDrawPass.cpp",
+            "Passes/ParticleBillboardPass.cpp",
+            "Passes/MainPassTargetPass.cpp",
+            "Passes/PostProcessTargetPass.cpp",
+            "Passes/BackBufferPresentPass.cpp"
+        )) {
+            if (-not (Test-Path (Join-Path $root ("src/Graphics/{0}" -f $requiredHelper)))) {
+                Add-Failure "renderer_orchestration_mechanics_boundary missing helper file: $requiredHelper"
+            }
         }
     }
 }

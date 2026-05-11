@@ -91,6 +91,16 @@
       "target_files": ["RendererParticleState.h", "Renderer_Particles.cpp", "Passes/ParticleBillboardPass.h", "GPUParticles.h"],
       "renderer_state_members": ["m_particleState"],
       "future_extension": "Keep GPU particle migration explicit and separate from the public billboard contract until it has equivalent budget and visual validation"
+    },
+    {
+      "id": "debug_line_resources",
+      "owner": "Debug lines",
+      "status": "release_boundary_validated",
+      "release_boundary": "DebugLineRenderState owns line collection plus upload-buffer allocation, upload, and vertex-buffer view creation; DebugLinePass owns pipeline/root binding, IA setup, and draw submission; renderer/editor frame contracts report debug-line draw counts through the existing DebugLines pass",
+      "validated_contracts": ["debug_primitive_contract", "editor_frame_contract", "temporal_validation", "renderer_ownership"],
+      "target_files": ["RendererDebugLineState.h", "Renderer_DebugLines.cpp", "Passes/DebugLinePass.h"],
+      "renderer_state_members": ["m_debugLineState", "m_debugViewState"],
+      "future_extension": "Keep future debug primitive buffers and draw submission in debug state/pass helpers instead of adding loose Renderer resources"
     }
   ]
 }

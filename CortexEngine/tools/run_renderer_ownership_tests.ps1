@@ -45,6 +45,12 @@ if (-not (Test-Path $particlePassPath)) {
     throw "ParticleBillboardPass.cpp not found: $particlePassPath"
 }
 $particlePass = Get-Content $particlePassPath -Raw
+$debugLineStatePath = Join-Path $root "src/Graphics/RendererDebugLineState.h"
+$debugLineRendererPath = Join-Path $root "src/Graphics/Renderer_DebugLines.cpp"
+$debugLinePassPath = Join-Path $root "src/Graphics/Passes/DebugLinePass.cpp"
+$debugLineState = if (Test-Path $debugLineStatePath) { Get-Content $debugLineStatePath -Raw } else { "" }
+$debugLineRenderer = if (Test-Path $debugLineRendererPath) { Get-Content $debugLineRendererPath -Raw } else { "" }
+$debugLinePass = if (Test-Path $debugLinePassPath) { Get-Content $debugLinePassPath -Raw } else { "" }
 $postStatePath = Join-Path $root "src/Graphics/RendererPostProcessState.h"
 if (-not (Test-Path $postStatePath)) {
     throw "RendererPostProcessState.h not found: $postStatePath"
@@ -190,6 +196,27 @@ foreach ($target in $doc.targets) {
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {
             Add-Failure "particle_resources public renderer path is not the ECS billboard particle path"
+        }
+    }
+
+    if ($id -eq "debug_line_resources") {
+        foreach ($required in @("struct DebugLineRenderState", "EnsureVertexBuffer", "UploadVertices", "VertexBufferView")) {
+            if ($debugLineState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "debug_line_resources missing DebugLineRenderState marker: $required"
+            }
+        }
+        foreach ($required in @("namespace Cortex::Graphics::DebugLinePass", "DrawContext", "SetPipelineState", "IASetPrimitiveTopology", "DrawInstanced")) {
+            if ($debugLinePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "debug_line_resources missing DebugLinePass marker: $required"
+            }
+        }
+        foreach ($rendererOwnedDebugCall in @("CreateCommittedResource", "vertexBuffer->Map", "vertexBuffer->Unmap", "SetPipelineState", "IASetPrimitiveTopology", "DrawInstanced")) {
+            if ($debugLineRenderer.IndexOf($rendererOwnedDebugCall, [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "debug_line_resources still owns debug-line GPU resource/draw work in Renderer_DebugLines.cpp: $rendererOwnedDebugCall"
+            }
+        }
+        if ($debugLineRenderer.IndexOf("DebugLinePass::Draw", [StringComparison]::Ordinal) -lt 0) {
+            Add-Failure "debug_line_resources renderer does not route through DebugLinePass::Draw"
         }
     }
 

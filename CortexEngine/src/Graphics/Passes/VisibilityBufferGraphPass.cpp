@@ -85,6 +85,13 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
     return context.renderer && context.commandList;
 }
 
+[[nodiscard]] bool IsValid(const DeferredLightingContext& context) {
+    return context.renderer &&
+           context.commandList &&
+           context.hdrTarget &&
+           context.depthBuffer;
+}
+
 } // namespace
 
 bool Clear(const ClearContext& context) {
@@ -346,13 +353,84 @@ bool BuildClusteredLights(const ClusteredLightsContext& context) {
     return true;
 }
 
+bool ApplyDeferredLighting(const DeferredLightingContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "deferred_lighting", "visibility-buffer deferred-lighting context incomplete");
+        return false;
+    }
+
+    if (context.depthState) {
+        *context.depthState = kDepthSampleState;
+    }
+    if (context.hdrState) {
+        *context.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+    if (context.shadowValid && context.shadowState) {
+        *context.shadowState = kVBShaderResourceState;
+    }
+    if (context.rtShadowValid && context.rtShadowState) {
+        *context.rtShadowState = kVBShaderResourceState;
+    }
+    if (context.rtGIValid && context.rtGIState) {
+        *context.rtGIState = kVBShaderResourceState;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.albedo = kVBShaderResourceState;
+    states.normalRoughness = kVBShaderResourceState;
+    states.emissiveMetallic = kVBShaderResourceState;
+    states.materialExt0 = kVBShaderResourceState;
+    states.materialExt1 = kVBShaderResourceState;
+    states.materialExt2 = kVBShaderResourceState;
+    if (context.brdfLutValid) {
+        states.brdfLut = kVBShaderResourceState;
+    }
+    if (context.clusterGraphOwned) {
+        states.clusterRanges = kVBShaderResourceState;
+        states.clusterLightIndices = kVBShaderResourceState;
+    }
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.deferredLighting = true;
+    if (context.clusterGraphOwned) {
+        controls.clusteredLights = true;
+    }
+    context.renderer->SetTransitionSkipControls(controls);
+    auto lightingResult = context.renderer->ApplyDeferredLighting(
+        context.commandList,
+        context.hdrTarget,
+        context.hdrRTV,
+        context.depthBuffer,
+        context.depthSRV,
+        context.envDiffuseResource,
+        context.envSpecularResource,
+        context.envFormat,
+        context.shadowMapSRV,
+        context.params);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (lightingResult.IsErr()) {
+        RecordFailure(context.failure, "deferred_lighting", lightingResult.Error());
+        return false;
+    }
+
+    if (context.renderedThisFrame) {
+        *context.renderedThisFrame = true;
+    }
+    return true;
+}
+
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
     if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
         Fail(context, "visibility_buffer_graph_contract");
         return false;
     }
-    if (!context.debugPath && (!HasGBufferResources(resources) || !context.deferredLighting)) {
+    if (!context.debugPath && (!HasGBufferResources(resources) || !IsValid(context.deferredLighting))) {
         Fail(context, "visibility_buffer_deferred_contract");
         return false;
     }
@@ -480,7 +558,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(resources.hdr, RGResourceUsage::RenderTarget);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                context.deferredLighting();
+                (void)ApplyDeferredLighting(context.deferredLighting);
             });
     }
 

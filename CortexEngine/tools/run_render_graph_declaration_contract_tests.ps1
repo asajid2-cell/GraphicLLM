@@ -217,12 +217,14 @@ Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "ResolveMaterials(context.ma
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "DebugBlit(context.debugBlit)"
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "GenerateBRDFLUT(context.brdfLut)"
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "BuildClusteredLights(context.clusteredLights)"
+Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "ApplyDeferredLighting(context.deferredLighting)"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clear"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> visibility"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> materialResolve"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> debugBlit"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> brdfLut"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clusteredLights"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> deferredLighting"
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ClearVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RasterizeVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RenderVisibilityBufferMaterialResolveStage("
@@ -231,6 +233,7 @@ Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "Debug
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "DebugBlitGBufferToHDR("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "EnsureBRDFLUT("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "BuildClusteredLightLists("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ApplyVisibilityBufferDeferredLighting("
 
 if ($failures.Count -gt 0) {
     Write-Host "Render graph declaration contract tests failed:" -ForegroundColor Red

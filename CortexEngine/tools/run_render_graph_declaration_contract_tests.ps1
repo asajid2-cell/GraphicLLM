@@ -106,6 +106,8 @@ Assert-Contains "DepthPrepass.cpp" $depth "builder.Write(context.depth, RGResour
 Assert-Contains "DepthPrepass.cpp" $depth "Draw(context.draw)"
 Assert-Contains "DepthPrepass.cpp" $depth "DepthPrepassTargetPass::BindAndClear(context.target)"
 Assert-NotContains "DepthPrepass.h" $depthHeader "std::function<bool()> execute"
+Assert-NotContains "DepthPrepass.h" $depthHeader "ensureMaterialTextures"
+Assert-NotContains "DepthPrepass.h" $depthHeader "fillMaterialTextureIndices"
 Assert-NotContains "Renderer_RenderGraphDepthShadow.cpp" $rendererDepthShadow "RenderDepthPrepass(registry)"
 
 $hzb = Read-Text "src/Graphics/Passes/HZBPass.cpp"
@@ -162,6 +164,8 @@ Assert-Contains "ShadowPass.cpp" $shadow "Draw(context.draw)"
 Assert-Contains "ShadowPass.cpp" $shadow "ShadowTargetPass::TransitionToDepthWrite(context.target)"
 Assert-Contains "ShadowPass.cpp" $shadow "ShadowTargetPass::BindAndClearSlice(sliceContext)"
 Assert-NotContains "ShadowPass.h" $shadowHeader "std::function<bool()> execute"
+Assert-NotContains "ShadowPass.h" $shadowHeader "ensureMaterialTextures"
+Assert-NotContains "ShadowPass.h" $shadowHeader "fillMaterialTextureIndices"
 Assert-NotContains "Renderer_RenderGraphDepthShadow.cpp" $rendererDepthShadow "RenderShadowPass(registry)"
 
 $ssao = Read-Text "src/Graphics/Passes/SSAOPass.cpp"

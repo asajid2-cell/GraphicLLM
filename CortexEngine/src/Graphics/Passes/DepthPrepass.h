@@ -25,8 +25,6 @@ struct DrawContext {
     ConstantBuffer<MaterialConstants>* materialConstants = nullptr;
     MaterialTextureFallbacks materialFallbacks{};
     uint32_t* drawCounter = nullptr;
-    std::function<void(Scene::RenderableComponent&)> ensureMaterialTextures;
-    std::function<void(const Scene::RenderableComponent&, MaterialConstants&)> fillMaterialTextureIndices;
 };
 
 struct GraphContext {

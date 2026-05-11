@@ -91,16 +91,10 @@ bool Draw(const DrawContext& context) {
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = 0;
         DescriptorHandle materialTable{};
         if (IsAlphaTestedDepthClass(depthClass)) {
-            if (context.ensureMaterialTextures) {
-                context.ensureMaterialTextures(renderable);
-            }
-
             const MaterialModel materialModel =
                 MaterialResolver::ResolveRenderable(renderable, context.materialFallbacks);
             MaterialConstants materialData = MaterialResolver::BuildMaterialConstants(materialModel);
-            if (context.fillMaterialTextureIndices) {
-                context.fillMaterialTextureIndices(renderable, materialData);
-            }
+            MaterialResolver::FillMaterialTextureIndices(renderable, materialData);
 
             if (context.materialConstants) {
                 materialCB = context.materialConstants->AllocateAndWrite(materialData);

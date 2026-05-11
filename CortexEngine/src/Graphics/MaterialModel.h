@@ -92,6 +92,9 @@ public:
 
     [[nodiscard]] static MaterialConstants BuildMaterialConstants(const MaterialModel& model);
 
+    static void FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
+                                           MaterialConstants& materialData);
+
     [[nodiscard]] static VBMaterialConstants BuildVBMaterialConstants(
         const MaterialModel& model,
         const glm::uvec4& textureIndices,

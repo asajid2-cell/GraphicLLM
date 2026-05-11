@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "Graphics/RenderableClassification.h"
 #include "Graphics/Passes/ShadowPass.h"
 #include "Scene/ECS_Registry.h"
 
@@ -15,6 +16,15 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
         localSnapshot = BuildRendererSceneSnapshot(registry, m_frameLifecycle.renderFrameCounter);
         snapshot = &localSnapshot;
+    }
+    for (uint32_t entryIndex : snapshot->depthWritingIndices) {
+        if (entryIndex >= snapshot->entries.size()) {
+            continue;
+        }
+        const RendererSceneRenderable& sceneEntry = snapshot->entries[entryIndex];
+        if (IsAlphaTestedDepthClass(sceneEntry.depthClass) && sceneEntry.renderable) {
+            EnsureMaterialTextures(*sceneEntry.renderable);
+        }
     }
 
     ShadowPass::DrawContext draw{};
@@ -53,13 +63,6 @@ void Renderer::RenderShadowPass(Scene::ECS_Registry* registry) {
     draw.shadowArraySize = kShadowArraySize;
     draw.localShadowHasShadow = m_localShadowState.hasShadow;
     draw.localShadowCount = m_localShadowState.count;
-    draw.ensureMaterialTextures = [&](Scene::RenderableComponent& renderable) {
-        EnsureMaterialTextures(renderable);
-    };
-    draw.fillMaterialTextureIndices =
-        [&](const Scene::RenderableComponent& renderable, MaterialConstants& materialData) {
-            FillMaterialTextureIndices(renderable, materialData);
-        };
 
     (void)ShadowPass::Draw(draw);
 }

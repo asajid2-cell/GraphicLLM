@@ -1,6 +1,8 @@
 #include "Graphics/MaterialModel.h"
 
+#include "Graphics/MaterialState.h"
 #include "Graphics/MaterialPresetRegistry.h"
+#include "Graphics/RHI/BindlessConstants.h"
 #include "Graphics/VisibilityBuffer.h"
 #include "Scene/Components.h"
 
@@ -217,6 +219,86 @@ MaterialConstants MaterialResolver::BuildMaterialConstants(const MaterialModel& 
         model.proceduralMaskStrength);
     material.specularParams = glm::vec4(model.specularColorFactor, model.specularFactor);
     return material;
+}
+
+void MaterialResolver::FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
+                                                  MaterialConstants& materialData) {
+    uint32_t texIndices[MaterialGPUState::kSlotCount] = {};
+    for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
+        texIndices[i] = kInvalidBindlessIndex;
+    }
+
+    uint32_t effectiveMapFlags[6] = {
+        materialData.mapFlags.x,
+        materialData.mapFlags.y,
+        materialData.mapFlags.z,
+        materialData.mapFlags.w,
+        materialData.mapFlags2.x,
+        materialData.mapFlags2.y
+    };
+
+    if (renderable.textures.gpuState) {
+        for (int i = 0; i < 6; ++i) {
+            const bool hasMap = (effectiveMapFlags[i] != 0u);
+            if (hasMap && renderable.textures.gpuState->descriptors[i].IsValid()) {
+                texIndices[i] = renderable.textures.gpuState->descriptors[i].index;
+            } else {
+                effectiveMapFlags[i] = 0u;
+                texIndices[i] = kInvalidBindlessIndex;
+            }
+        }
+
+        const bool hasTransmission = static_cast<bool>(renderable.textures.transmission);
+        const bool hasClearcoat = static_cast<bool>(renderable.textures.clearcoat);
+        const bool hasClearcoatRoughness = static_cast<bool>(renderable.textures.clearcoatRoughness);
+        const bool hasSpecular = static_cast<bool>(renderable.textures.specular);
+        const bool hasSpecularColor = static_cast<bool>(renderable.textures.specularColor);
+
+        const auto& desc = renderable.textures.gpuState->descriptors;
+        texIndices[6] = (hasTransmission && desc[6].IsValid()) ? desc[6].index : kInvalidBindlessIndex;
+        texIndices[7] = (hasClearcoat && desc[7].IsValid()) ? desc[7].index : kInvalidBindlessIndex;
+        texIndices[8] = (hasClearcoatRoughness && desc[8].IsValid()) ? desc[8].index : kInvalidBindlessIndex;
+        texIndices[9] = (hasSpecular && desc[9].IsValid()) ? desc[9].index : kInvalidBindlessIndex;
+        texIndices[10] = (hasSpecularColor && desc[10].IsValid()) ? desc[10].index : kInvalidBindlessIndex;
+    } else {
+        for (int i = 0; i < 6; ++i) {
+            effectiveMapFlags[i] = 0u;
+            texIndices[i] = kInvalidBindlessIndex;
+        }
+    }
+
+    materialData.mapFlags = glm::uvec4(
+        effectiveMapFlags[0],
+        effectiveMapFlags[1],
+        effectiveMapFlags[2],
+        effectiveMapFlags[3]);
+    materialData.mapFlags2 = glm::uvec4(
+        effectiveMapFlags[4],
+        effectiveMapFlags[5],
+        0u,
+        0u);
+
+    materialData.textureIndices = glm::uvec4(
+        texIndices[0],
+        texIndices[1],
+        texIndices[2],
+        texIndices[3]);
+    materialData.textureIndices2 = glm::uvec4(
+        texIndices[4],
+        texIndices[5],
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex);
+
+    materialData.textureIndices3 = glm::uvec4(
+        texIndices[6],
+        texIndices[7],
+        texIndices[8],
+        texIndices[9]);
+    materialData.textureIndices4 = glm::uvec4(
+        texIndices[10],
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex,
+        kInvalidBindlessIndex);
 }
 
 VBMaterialConstants MaterialResolver::BuildVBMaterialConstants(

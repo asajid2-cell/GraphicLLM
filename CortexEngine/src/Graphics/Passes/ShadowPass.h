@@ -36,8 +36,6 @@ struct DrawContext {
     uint32_t shadowArraySize = 0;
     bool localShadowHasShadow = false;
     uint32_t localShadowCount = 0;
-    std::function<void(Scene::RenderableComponent&)> ensureMaterialTextures;
-    std::function<void(const Scene::RenderableComponent&, MaterialConstants&)> fillMaterialTextureIndices;
 };
 
 struct GraphContext {

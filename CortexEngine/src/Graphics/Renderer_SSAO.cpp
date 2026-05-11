@@ -40,7 +40,7 @@ Result<void> Renderer::CreateSSAOResources() {
     const UINT height = std::max<UINT>(1, fullHeight / ssaoDivisor);
 
     // Release existing target (descriptor handles remain valid and are reused)
-    m_ssaoResources.texture.Reset();
+    m_ssaoResources.resources.texture.Reset();
 
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -74,22 +74,22 @@ Result<void> Renderer::CreateSSAOResources() {
         &desc,
         D3D12_RESOURCE_STATE_RENDER_TARGET,
         &clearValue,
-        IID_PPV_ARGS(&m_ssaoResources.texture)
+        IID_PPV_ARGS(&m_ssaoResources.resources.texture)
     );
 
     if (FAILED(hr)) {
         return Result<void>::Err("Failed to create SSAO render target");
     }
 
-    m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     // RTV
-    if (!m_ssaoResources.rtv.IsValid()) {
+    if (!m_ssaoResources.resources.rtv.IsValid()) {
         auto rtvResult = m_services.descriptorManager->AllocateRTV();
         if (rtvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate RTV for SSAO target: " + rtvResult.Error());
         }
-        m_ssaoResources.rtv = rtvResult.Value();
+        m_ssaoResources.resources.rtv = rtvResult.Value();
     }
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -97,18 +97,18 @@ Result<void> Renderer::CreateSSAOResources() {
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
     m_services.device->GetDevice()->CreateRenderTargetView(
-        m_ssaoResources.texture.Get(),
+        m_ssaoResources.resources.texture.Get(),
         &rtvDesc,
-        m_ssaoResources.rtv.cpu
+        m_ssaoResources.resources.rtv.cpu
     );
 
     // SRV - use staging heap for persistent SSAO SRV (copied in post-process)
-    if (!m_ssaoResources.srv.IsValid()) {
+    if (!m_ssaoResources.resources.srv.IsValid()) {
         auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (srvResult.IsErr()) {
             return Result<void>::Err("Failed to allocate staging SRV for SSAO target: " + srvResult.Error());
         }
-        m_ssaoResources.srv = srvResult.Value();
+        m_ssaoResources.resources.srv = srvResult.Value();
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -118,18 +118,18 @@ Result<void> Renderer::CreateSSAOResources() {
     srvDesc.Texture2D.MipLevels = 1;
 
     m_services.device->GetDevice()->CreateShaderResourceView(
-        m_ssaoResources.texture.Get(),
+        m_ssaoResources.resources.texture.Get(),
         &srvDesc,
-        m_ssaoResources.srv.cpu
+        m_ssaoResources.resources.srv.cpu
     );
 
     // UAV for async compute SSAO
-    if (!m_ssaoResources.uav.IsValid()) {
+    if (!m_ssaoResources.resources.uav.IsValid()) {
         auto uavResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
         if (uavResult.IsErr()) {
             return Result<void>::Err("Failed to allocate UAV for SSAO target: " + uavResult.Error());
         }
-        m_ssaoResources.uav = uavResult.Value();
+        m_ssaoResources.resources.uav = uavResult.Value();
     }
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -137,10 +137,10 @@ Result<void> Renderer::CreateSSAOResources() {
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
     m_services.device->GetDevice()->CreateUnorderedAccessView(
-        m_ssaoResources.texture.Get(),
+        m_ssaoResources.resources.texture.Get(),
         nullptr,
         &uavDesc,
-        m_ssaoResources.uav.cpu
+        m_ssaoResources.resources.uav.cpu
     );
 
     spdlog::info("SSAO target created: {}x{}", width, height);
@@ -148,7 +148,7 @@ Result<void> Renderer::CreateSSAOResources() {
 }
 
 void Renderer::RenderSSAO() {
-    if (!m_ssaoResources.enabled || !m_pipelineState.ssao || !m_ssaoResources.texture || !m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
+    if (!m_ssaoResources.controls.enabled || !m_pipelineState.ssao || !m_ssaoResources.resources.texture || !m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
         return;
     }
 
@@ -166,22 +166,22 @@ void Renderer::RenderSSAO() {
 
     // Transition SSAO target to render target state
     if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions &&
-        m_ssaoResources.resourceState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_ssaoResources.texture.Get();
-        barrier.Transition.StateBefore = m_ssaoResources.resourceState;
+        barrier.Transition.pResource = m_ssaoResources.resources.texture.Get();
+        barrier.Transition.StateBefore = m_ssaoResources.resources.resourceState;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
     }
-    m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    if (!m_ssaoResources.descriptorTablesValid) {
+    if (!m_ssaoResources.descriptors.descriptorTablesValid) {
         spdlog::warn("RenderSSAO: persistent SSAO descriptor tables are unavailable");
         return;
     }
-    auto& depthTable = m_ssaoResources.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& depthTable = m_ssaoResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
 
     if (!SSAOPass::DrawGraphics({
             m_services.device->GetDevice(),
@@ -190,8 +190,8 @@ void Renderer::RenderSSAO() {
             m_pipelineState.rootSignature.get(),
             m_constantBuffers.currentFrameGPU,
             m_pipelineState.ssao.get(),
-            m_ssaoResources.texture.Get(),
-            m_ssaoResources.rtv,
+            m_ssaoResources.resources.texture.Get(),
+            m_ssaoResources.resources.rtv,
             m_depthResources.buffer.Get(),
             std::span<DescriptorHandle>(depthTable.data(), depthTable.size()),
         })) {
@@ -200,11 +200,11 @@ void Renderer::RenderSSAO() {
 }
 
 void Renderer::SetSSAOEnabled(bool enabled) {
-    if (m_ssaoResources.enabled == enabled) {
+    if (m_ssaoResources.controls.enabled == enabled) {
         return;
     }
-    m_ssaoResources.enabled = enabled;
-    spdlog::info("SSAO {}", m_ssaoResources.enabled ? "ENABLED" : "DISABLED");
+    m_ssaoResources.controls.enabled = enabled;
+    spdlog::info("SSAO {}", m_ssaoResources.controls.enabled ? "ENABLED" : "DISABLED");
 }
 
 void Renderer::SetSSAOParams(float radius, float bias, float intensity) {
@@ -212,26 +212,26 @@ void Renderer::SetSSAOParams(float radius, float bias, float intensity) {
     float b = glm::clamp(bias, 0.0f, 0.1f);
     float i = glm::clamp(intensity, 0.0f, 4.0f);
 
-    if (std::abs(r - m_ssaoResources.radius) < 1e-3f &&
-        std::abs(b - m_ssaoResources.bias) < 1e-4f &&
-        std::abs(i - m_ssaoResources.intensity) < 1e-3f) {
+    if (std::abs(r - m_ssaoResources.controls.radius) < 1e-3f &&
+        std::abs(b - m_ssaoResources.controls.bias) < 1e-4f &&
+        std::abs(i - m_ssaoResources.controls.intensity) < 1e-3f) {
         return;
     }
 
-    m_ssaoResources.radius = r;
-    m_ssaoResources.bias = b;
-    m_ssaoResources.intensity = i;
+    m_ssaoResources.controls.radius = r;
+    m_ssaoResources.controls.bias = b;
+    m_ssaoResources.controls.intensity = i;
     spdlog::info("SSAO params set to radius={}, bias={}, intensity={}",
-                 m_ssaoResources.radius,
-                 m_ssaoResources.bias,
-                 m_ssaoResources.intensity);
+                 m_ssaoResources.controls.radius,
+                 m_ssaoResources.controls.bias,
+                 m_ssaoResources.controls.intensity);
 }
 
 void Renderer::RenderSSAOAsync() {
     // Compute shader version of SSAO - runs on graphics queue for now
     // TODO: Move to dedicated async compute queue for true parallel execution
-    if (!m_ssaoResources.enabled || !m_pipelineState.ssaoCompute || !m_ssaoResources.texture ||
-        !m_depthResources.buffer || !m_depthResources.srv.IsValid() || !m_ssaoResources.uav.IsValid()) {
+    if (!m_ssaoResources.controls.enabled || !m_pipelineState.ssaoCompute || !m_ssaoResources.resources.texture ||
+        !m_depthResources.buffer || !m_depthResources.srv.IsValid() || !m_ssaoResources.resources.uav.IsValid()) {
         return;
     }
 
@@ -249,16 +249,16 @@ void Renderer::RenderSSAOAsync() {
 
     // Transition SSAO target to UAV
     if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions &&
-        m_ssaoResources.resourceState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
+        m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_ssaoResources.texture.Get();
-        barrier.Transition.StateBefore = m_ssaoResources.resourceState;
+        barrier.Transition.pResource = m_ssaoResources.resources.texture.Get();
+        barrier.Transition.StateBefore = m_ssaoResources.resources.resourceState;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
     }
-    m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
     const bool compactRoot = m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
     ID3D12RootSignature* ssaoRootSignature =
@@ -269,12 +269,12 @@ void Renderer::RenderSSAOAsync() {
     const uint32_t srvTableSize = compactRoot ? 1u : 10u;
     const uint32_t uavTableSize = compactRoot ? 1u : 4u;
 
-    if (!m_ssaoResources.descriptorTablesValid) {
+    if (!m_ssaoResources.descriptors.descriptorTablesValid) {
         spdlog::warn("RenderSSAOAsync: persistent SSAO descriptor tables are unavailable");
         return;
     }
-    auto& depthTable = m_ssaoResources.srvTables[m_frameRuntime.frameIndex % kFrameCount];
-    auto& uavTable = m_ssaoResources.uavTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& depthTable = m_ssaoResources.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+    auto& uavTable = m_ssaoResources.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount];
 
     if (!SSAOPass::DispatchCompute({
             m_services.device->GetDevice(),
@@ -286,7 +286,7 @@ void Renderer::RenderSSAOAsync() {
             frameConstantsRoot,
             srvTableRoot,
             uavTableRoot,
-            m_ssaoResources.texture.Get(),
+            m_ssaoResources.resources.texture.Get(),
             m_depthResources.buffer.Get(),
             std::span<DescriptorHandle>(depthTable.data(), srvTableSize),
             std::span<DescriptorHandle>(uavTable.data(), uavTableSize),
@@ -299,12 +299,12 @@ void Renderer::RenderSSAOAsync() {
     if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_ssaoResources.texture.Get();
+        barrier.Transition.pResource = m_ssaoResources.resources.texture.Get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 }
 

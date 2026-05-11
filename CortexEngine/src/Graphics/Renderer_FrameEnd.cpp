@@ -319,24 +319,24 @@ void Renderer::EndFrame() {
         D3D12_RESOURCE_BARRIER ppBarriers[8] = {};
         UINT ppCount = 0;
 
-        if (m_ssaoResources.texture && m_ssaoResources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        if (m_ssaoResources.resources.texture && m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
             ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_ssaoResources.texture.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_ssaoResources.resourceState;
+            ppBarriers[ppCount].Transition.pResource = m_ssaoResources.resources.texture.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_ssaoResources.resources.resourceState;
             ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++ppCount;
-            m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
 
-        if (m_ssrResources.color && m_ssrResources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+        if (m_ssrResources.resources.color && m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
             ppBarriers[ppCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            ppBarriers[ppCount].Transition.pResource = m_ssrResources.color.Get();
-            ppBarriers[ppCount].Transition.StateBefore = m_ssrResources.resourceState;
+            ppBarriers[ppCount].Transition.pResource = m_ssrResources.resources.color.Get();
+            ppBarriers[ppCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
             ppBarriers[ppCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             ppBarriers[ppCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++ppCount;
-            m_ssrResources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         }
 
         if (m_temporalScreenState.velocityBuffer && m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {

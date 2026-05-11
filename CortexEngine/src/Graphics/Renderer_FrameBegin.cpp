@@ -102,8 +102,8 @@ void Renderer::BeginFrame() {
     // Check SSAO resize against the active budget profile. Balanced and
     // 4 GB profiles use half resolution; the 2 GB profile uses quarter
     // resolution to keep SSAO enabled without reallocating every frame.
-    if (m_ssaoResources.texture) {
-        D3D12_RESOURCE_DESC ssaoDesc = m_ssaoResources.texture->GetDesc();
+    if (m_ssaoResources.resources.texture) {
+        D3D12_RESOURCE_DESC ssaoDesc = m_ssaoResources.resources.texture->GetDesc();
         const auto budget = BudgetPlanner::BuildPlan(
             m_services.device ? m_services.device->GetDedicatedVideoMemoryBytes() : 0,
             expectedDepthWidth,
@@ -168,13 +168,13 @@ void Renderer::BeginFrame() {
         }
     }
     // Handle SSAO target resize.
-    if (needSSAOResize && m_ssaoResources.texture) {
+    if (needSSAOResize && m_ssaoResources.resources.texture) {
         spdlog::info("BeginFrame: recreating SSAO target for active budget profile");
-        m_ssaoResources.texture.Reset();
+        m_ssaoResources.resources.texture.Reset();
         auto ssaoResult = CreateSSAOResources();
         if (ssaoResult.IsErr()) {
             spdlog::error("Failed to recreate SSAO target on resize: {}", ssaoResult.Error());
-            m_ssaoResources.enabled = false;
+            m_ssaoResources.controls.enabled = false;
         }
     }
     // Propagate resize to ray tracing context so it can adjust any RT targets.

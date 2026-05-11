@@ -124,11 +124,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 ? depthHandle
                 : m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_Post");
         }
-        if (m_ssaoResources.texture) {
-            ssaoHandle = m_services.renderGraph->ImportResource(m_ssaoResources.texture.Get(), m_ssaoResources.resourceState, "SSAO");
+        if (m_ssaoResources.resources.texture) {
+            ssaoHandle = m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
         }
-        if (m_ssrResources.color) {
-            ssrHandle = m_services.renderGraph->ImportResource(m_ssrResources.color.Get(), m_ssrResources.resourceState, "SSRColor");
+        if (m_ssrResources.resources.color) {
+            ssrHandle = m_services.renderGraph->ImportResource(m_ssrResources.resources.color.Get(), m_ssrResources.resources.resourceState, "SSRColor");
         }
         if (wantsFusedBloomThisFrame) {
             if (!useFusedBloomTransients) {
@@ -358,8 +358,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             const uint32_t level = (m_bloomResources.resources.activeLevels > 1) ? 1u : 0u;
             m_bloomResources.resources.resourceState[level][0] = m_services.renderGraph->GetResourceState(bloomHandle);
         }
-        if (ssaoHandle.IsValid()) m_ssaoResources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
-        if (ssrHandle.IsValid()) m_ssrResources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
+        if (ssaoHandle.IsValid()) m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
+        if (ssrHandle.IsValid()) m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
         if (depthPpHandle.IsValid()) m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
         if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {

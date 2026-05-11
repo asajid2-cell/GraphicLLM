@@ -94,12 +94,12 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
 
     // SSAO parameters packed into aoParams. Disable sampling if the SSAO
     // resources are unavailable so post-process does not read null SRVs.
-    const bool ssaoResourcesReady = (m_ssaoResources.texture && m_ssaoResources.srv.IsValid());
+    const bool ssaoResourcesReady = (m_ssaoResources.resources.texture && m_ssaoResources.resources.srv.IsValid());
     frameData.aoParams = glm::vec4(
-        (m_ssaoResources.enabled && ssaoResourcesReady) ? 1.0f : 0.0f,
-        m_ssaoResources.radius,
-        m_ssaoResources.bias,
-        m_ssaoResources.intensity);
+        (m_ssaoResources.controls.enabled && ssaoResourcesReady) ? 1.0f : 0.0f,
+        m_ssaoResources.controls.radius,
+        m_ssaoResources.controls.bias,
+        m_ssaoResources.controls.intensity);
 
     // Bloom shaping parameters. The w component is used as a small bitmask for
     // post-process feature toggles so the shader can safely gate optional
@@ -136,7 +136,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
             spdlog::warn("Renderer: CORTEX_RTREFL_DISABLE_TEMPORAL set; disabling RT reflection temporal accumulation (debug)");
         }
     }
-    if (m_ssrResources.activeThisFrame) {
+    if (m_ssrResources.frame.activeThisFrame) {
         postFxFlags |= 1u;
     }
     if (rtReflPipelineReady && m_rtRuntimeState.reflectionsEnabled) {
@@ -198,9 +198,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_waterState.steepness);
 
     frameData.ssrParams = glm::vec4(
-        m_ssrResources.maxDistance,
-        m_ssrResources.thickness,
-        m_ssrResources.strength,
+        m_ssrResources.controls.maxDistance,
+        m_ssrResources.controls.thickness,
+        m_ssrResources.controls.strength,
         0.0f);
     frameData.postGradeParams = glm::vec4(
         m_postProcessState.contrast,

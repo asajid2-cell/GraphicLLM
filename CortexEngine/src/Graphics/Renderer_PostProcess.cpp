@@ -32,25 +32,25 @@ void Renderer::RenderPostProcess() {
         m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
-    if (m_ssaoResources.texture && m_ssaoResources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_ssaoResources.resources.texture && m_ssaoResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssaoResources.texture.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssaoResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_ssaoResources.resources.texture.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssaoResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_ssaoResources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_ssaoResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
     // Transition SSR color buffer (used as t6 in post-process shader)
-    if (m_ssrResources.color && m_ssrResources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+    if (m_ssrResources.resources.color && m_ssrResources.resources.resourceState != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_ssrResources.color.Get();
-        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_ssrResources.resources.color.Get();
+        barriers[barrierCount].Transition.StateBefore = m_ssrResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_ssrResources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
 
     // HZB debug view reuses slot t6; ensure the pyramid is pixel-shader readable.

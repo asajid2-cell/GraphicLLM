@@ -69,8 +69,8 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "depth") return resourceBytes(m_depthResources.buffer.Get());
         if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdrColor.Get());
         if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.gbufferNormalRoughness.Get());
-        if (resource == "ssao") return resourceBytes(m_ssaoResources.texture.Get());
-        if (resource == "ssr_color") return resourceBytes(m_ssrResources.color.Get());
+        if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());
+        if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());
         if (resource == "temporal_rejection_mask") return resourceBytes(m_temporalMaskState.texture.Get());
         if (resource == "taa_history") return resourceBytes(m_temporalScreenState.historyColor.Get());

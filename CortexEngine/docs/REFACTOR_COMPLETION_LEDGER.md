@@ -835,6 +835,17 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       showcase passed at `rt_showcase_20260511_112225_270_95288_5d7f3c13`.
       The broader ownership rows remain `PARTIAL` because other end-frame and
       renderer pass mechanics still live in renderer orchestration files.
+    - The current end-frame shader-resource checkpoint moves the batched
+      SSAO, SSR, velocity, TAA intermediate, RT reflection color, and
+      normal/roughness end-frame transitions into
+      `EndFrameShaderResourcePass`. Release rebuild passed, renderer ownership
+      tests passed with `targets=16`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_112602_778_95652_2c046588`, and RT
+      showcase passed at `rt_showcase_20260511_112602_843_95768_7378b42c`
+      with denoised reflection-history signal metrics reported. The broader
+      ownership rows remain `PARTIAL` because other renderer pass mechanics
+      still live in renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

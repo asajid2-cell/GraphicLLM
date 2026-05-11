@@ -143,6 +143,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/DepthPrepassTargetPass.cpp
     src/Graphics/Passes/DescriptorTable.cpp
     src/Graphics/Passes/DebugLinePass.cpp
+    src/Graphics/Passes/EndFrameShaderResourcePass.cpp
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp
@@ -389,6 +390,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/DepthPrepass.h
     src/Graphics/Passes/DepthPrepassTargetPass.h
     src/Graphics/Passes/DescriptorTable.h
+    src/Graphics/Passes/EndFrameShaderResourcePass.h
     src/Graphics/Passes/FullscreenPass.h
     src/Graphics/Passes/HZBPass.h
     src/Graphics/Passes/MainPassTargetPass.h

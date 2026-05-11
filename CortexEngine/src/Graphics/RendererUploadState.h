@@ -57,6 +57,54 @@ struct MeshUploadResourceBundle {
 };
 
 struct MeshUploadResourceState {
+    [[nodiscard]] static Result<void> EnsureRawSRVs(ID3D12Device* device,
+                                                    DescriptorHeapManager* descriptorManager,
+                                                    MeshBuffers& buffers) {
+        if (buffers.vbRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex &&
+            buffers.ibRawSRVIndex != MeshBuffers::kInvalidDescriptorIndex) {
+            return Result<void>::Ok();
+        }
+        if (!device || !descriptorManager || !buffers.vertexBuffer || !buffers.indexBuffer) {
+            return Result<void>::Err("Mesh raw SRV creation requires a device, descriptor manager, and vertex/index buffers");
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
+        rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
+        rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        rawSrv.Buffer.FirstElement = 0;
+        rawSrv.Buffer.StructureByteStride = 0;
+        rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+        const UINT64 vertexBytes = buffers.vertexBuffer->GetDesc().Width;
+        const UINT64 indexBytes = buffers.indexBuffer->GetDesc().Width;
+
+        auto vbSrvResult = descriptorManager->AllocateCBV_SRV_UAV();
+        auto ibSrvResult = descriptorManager->AllocateCBV_SRV_UAV();
+        if (vbSrvResult.IsErr() || ibSrvResult.IsErr()) {
+            return Result<void>::Err("failed to allocate persistent mesh SRVs (vb=" +
+                                     std::string(vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok") +
+                                     ", ib=" +
+                                     std::string(ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok") +
+                                     ")");
+        }
+
+        DescriptorHandle vbSrv = vbSrvResult.Value();
+        DescriptorHandle ibSrv = ibSrvResult.Value();
+
+        rawSrv.Buffer.NumElements = static_cast<UINT>(vertexBytes / 4u);
+        device->CreateShaderResourceView(buffers.vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
+
+        rawSrv.Buffer.NumElements = static_cast<UINT>(indexBytes / 4u);
+        device->CreateShaderResourceView(buffers.indexBuffer.Get(), &rawSrv, ibSrv.cpu);
+
+        buffers.vbRawSRVIndex = vbSrv.index;
+        buffers.ibRawSRVIndex = ibSrv.index;
+        buffers.vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
+        buffers.indexFormat = 0u; // R32_UINT
+        return Result<void>::Ok();
+    }
+
     [[nodiscard]] static Result<MeshUploadResourceBundle, MeshUploadResourceError> CreateResources(
         ID3D12Device* device,
         DescriptorHeapManager* descriptorManager,
@@ -198,36 +246,9 @@ struct MeshUploadResourceState {
         bundle.indexUpload->Unmap(0, nullptr);
 
         if (descriptorManager) {
-            D3D12_SHADER_RESOURCE_VIEW_DESC rawSrv{};
-            rawSrv.Format = DXGI_FORMAT_R32_TYPELESS;
-            rawSrv.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-            rawSrv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            rawSrv.Buffer.FirstElement = 0;
-            rawSrv.Buffer.StructureByteStride = 0;
-            rawSrv.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-
-            auto vbSrvResult = descriptorManager->AllocateCBV_SRV_UAV();
-            auto ibSrvResult = descriptorManager->AllocateCBV_SRV_UAV();
-            if (vbSrvResult.IsOk() && ibSrvResult.IsOk()) {
-                DescriptorHandle vbSrv = vbSrvResult.Value();
-                DescriptorHandle ibSrv = ibSrvResult.Value();
-
-                rawSrv.Buffer.NumElements = static_cast<UINT>(vertexBytes / 4u);
-                device->CreateShaderResourceView(bundle.gpuBuffers->vertexBuffer.Get(), &rawSrv, vbSrv.cpu);
-
-                rawSrv.Buffer.NumElements = static_cast<UINT>(indexBytes / 4u);
-                device->CreateShaderResourceView(bundle.gpuBuffers->indexBuffer.Get(), &rawSrv, ibSrv.cpu);
-
-                bundle.gpuBuffers->vbRawSRVIndex = vbSrv.index;
-                bundle.gpuBuffers->ibRawSRVIndex = ibSrv.index;
-                bundle.gpuBuffers->vertexStrideBytes = static_cast<uint32_t>(sizeof(Vertex));
-                bundle.gpuBuffers->indexFormat = 0u; // R32_UINT
-            } else {
-                bundle.descriptorWarning = "UploadMesh: failed to allocate persistent SRVs for VB resolve (vb=" +
-                    std::string(vbSrvResult.IsErr() ? vbSrvResult.Error() : "ok") +
-                    ", ib=" +
-                    std::string(ibSrvResult.IsErr() ? ibSrvResult.Error() : "ok") +
-                    ")";
+            auto rawSrvResult = EnsureRawSRVs(device, descriptorManager, *bundle.gpuBuffers);
+            if (rawSrvResult.IsErr()) {
+                bundle.descriptorWarning = "UploadMesh: " + rawSrvResult.Error();
             }
         }
 

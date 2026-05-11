@@ -111,6 +111,7 @@ $framePhasesMainPath = Join-Path $root "src/Graphics/Renderer_FramePhases_Main.c
 $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/VisibilityBufferResourcePass.cpp"
 $visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
 $visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
+$visibilityBufferCollectionPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCollection.cpp"
 $indirectRenderingPath = Join-Path $root "src/Graphics/Renderer_IndirectRendering.cpp"
 $rootSignatureSetupPath = Join-Path $root "src/Graphics/Renderer_RootSignatureSetup.cpp"
 $frameBeginPath = Join-Path $root "src/Graphics/Renderer_FrameBegin.cpp"
@@ -1702,7 +1703,7 @@ foreach ($target in $doc.targets) {
     if ($id -eq "mesh_upload_resources") {
         if (Test-Path $uploadStatePath) {
             $uploadState = Get-Content $uploadStatePath -Raw
-            foreach ($required in @("struct MeshUploadResourceState", "CreateResources", "CreateCommittedResource", "D3D12_HEAP_TYPE_DEFAULT", "D3D12_HEAP_TYPE_UPLOAD", "Map(0", "Unmap(0", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "vbRawSRVIndex", "ibRawSRVIndex")) {
+            foreach ($required in @("struct MeshUploadResourceState", "CreateResources", "EnsureRawSRVs", "CreateCommittedResource", "D3D12_HEAP_TYPE_DEFAULT", "D3D12_HEAP_TYPE_UPLOAD", "Map(0", "Unmap(0", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "vbRawSRVIndex", "ibRawSRVIndex")) {
                 if ($uploadState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "mesh_upload_resources missing RendererUploadState marker: $required"
                 }
@@ -1722,6 +1723,32 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "mesh_upload_resources missing Renderer_MeshUpload.cpp"
+        }
+    }
+
+    if ($id -eq "visibility_buffer_mesh_srvs") {
+        if (Test-Path $uploadStatePath) {
+            $uploadState = Get-Content $uploadStatePath -Raw
+            foreach ($required in @("EnsureRawSRVs", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "DXGI_FORMAT_R32_TYPELESS", "D3D12_BUFFER_SRV_FLAG_RAW")) {
+                if ($uploadState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "visibility_buffer_mesh_srvs missing RendererUploadState marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "visibility_buffer_mesh_srvs missing RendererUploadState.h"
+        }
+        if (Test-Path $visibilityBufferCollectionPath) {
+            $vbCollection = Get-Content $visibilityBufferCollectionPath -Raw
+            if ($vbCollection.IndexOf("MeshUploadResourceState::EnsureRawSRVs", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "visibility_buffer_mesh_srvs missing MeshUploadResourceState::EnsureRawSRVs delegation in Renderer_VisibilityBufferCollection.cpp"
+            }
+            foreach ($removedLocal in @("D3D12_SHADER_RESOURCE_VIEW_DESC", "DXGI_FORMAT_R32_TYPELESS", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "D3D12_BUFFER_SRV_FLAG_RAW")) {
+                if ($vbCollection.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "visibility_buffer_mesh_srvs still has direct raw mesh SRV mechanics in Renderer_VisibilityBufferCollection.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "visibility_buffer_mesh_srvs missing Renderer_VisibilityBufferCollection.cpp"
         }
     }
 

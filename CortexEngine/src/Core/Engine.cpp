@@ -854,6 +854,13 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         spdlog::info("Startup environment preset applied: '{}'", config.initialEnvironmentPreset);
     }
 
+    if (const char* openGraphicsSettings = std::getenv("CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP")) {
+        if (openGraphicsSettings[0] != '\0' && openGraphicsSettings[0] != '0') {
+            UI::GraphicsSettingsWindow::SetVisible(true);
+            spdlog::info("Graphics settings window opened by startup automation");
+        }
+    }
+
     m_running = true;
     {
         auto now = std::chrono::high_resolution_clock::now();
@@ -1900,6 +1907,11 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         {"mode", HudModeName(m_hudMode)},
         {"visible", m_hudMode != EngineHudMode::Off},
         {"overlay_forced", m_settingsOverlayVisible || UI::DebugMenu::IsVisible()}
+    };
+    report["ui_state"] = {
+        {"graphics_settings_open", UI::GraphicsSettingsWindow::IsVisible()},
+        {"debug_menu_open", UI::DebugMenu::IsVisible()},
+        {"settings_overlay_open", m_settingsOverlayVisible}
     };
     report["health_warnings"] = std::move(health);
 

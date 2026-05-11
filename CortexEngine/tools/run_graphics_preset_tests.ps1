@@ -90,6 +90,8 @@ foreach ($preset in $presetDoc.presets) {
     Assert-Range "$id.cinematic_post.vignette" ([double]$preset.cinematic_post.vignette) 0.0 1.0
     Assert-Range "$id.cinematic_post.motion_blur" ([double]$preset.cinematic_post.motion_blur) 0.0 1.0
     Assert-Range "$id.cinematic_post.depth_of_field" ([double]$preset.cinematic_post.depth_of_field) 0.0 1.0
+    Assert-Range "$id.cinematic_post.dof_focus_distance" ([double]$preset.cinematic_post.dof_focus_distance) 0.1 100.0
+    Assert-Range "$id.cinematic_post.dof_aperture" ([double]$preset.cinematic_post.dof_aperture) 0.0 8.0
     if ([string]::IsNullOrWhiteSpace([string]$preset.cinematic_post.tone_mapper_preset)) {
         Add-Failure "$id.cinematic_post.tone_mapper_preset is missing"
     }

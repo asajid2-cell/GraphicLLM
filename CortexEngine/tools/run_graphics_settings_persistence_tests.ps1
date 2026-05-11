@@ -118,7 +118,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
     "vignette": 0.31,
     "lens_dirt": 0.22,
     "motion_blur": 0.26,
-    "depth_of_field": 0.38
+    "depth_of_field": 0.38,
+    "dof_focus_distance": 12.5,
+    "dof_aperture": 3.2
   }
 }
 '@ | Set-Content -Encoding UTF8 $validPath
@@ -308,6 +310,8 @@ if ($validRun.exit_code -ne 0) {
     $lensDirt = [double]$report.frame_contract.cinematic_post.lens_dirt
     $motionBlur = [double]$report.frame_contract.cinematic_post.motion_blur
     $depthOfField = [double]$report.frame_contract.cinematic_post.depth_of_field
+    $dofFocusDistance = [double]$report.frame_contract.cinematic_post.dof_focus_distance
+    $dofAperture = [double]$report.frame_contract.cinematic_post.dof_aperture
     $contrast = [double]$report.frame_contract.cinematic_post.contrast
     $saturation = [double]$report.frame_contract.cinematic_post.saturation
     $warm = [double]$report.frame_contract.cinematic_post.warm
@@ -346,6 +350,12 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([Math]::Abs($depthOfField - 0.38) -gt 0.03) {
         Add-Failure "valid settings depth of field was $depthOfField, expected 0.38"
+    }
+    if ([Math]::Abs($dofFocusDistance - 12.5) -gt 0.2) {
+        Add-Failure "valid settings DOF focus distance was $dofFocusDistance, expected 12.5"
+    }
+    if ([Math]::Abs($dofAperture - 3.2) -gt 0.1) {
+        Add-Failure "valid settings DOF aperture was $dofAperture, expected 3.2"
     }
     $particleDensity = [double]$report.frame_contract.particles.density_scale
     if ([Math]::Abs($particleDensity - 0.43) -gt 0.02) {

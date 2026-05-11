@@ -108,6 +108,8 @@ struct RendererCinematicPostTuning {
     float lensDirt = 0.0f;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
+    float dofFocusDistance = 18.0f;
+    float dofAperture = 0.0f;
 };
 
 struct RendererTuningState {

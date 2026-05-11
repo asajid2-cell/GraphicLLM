@@ -733,7 +733,11 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.cinematicPost.motionBlur < 0.0f ||
         contract.cinematicPost.motionBlur > 1.0f ||
         contract.cinematicPost.depthOfField < 0.0f ||
-        contract.cinematicPost.depthOfField > 1.0f) {
+        contract.cinematicPost.depthOfField > 1.0f ||
+        contract.cinematicPost.dofFocusDistance < 0.1f ||
+        contract.cinematicPost.dofFocusDistance > 100.0f ||
+        contract.cinematicPost.dofAperture < 0.0f ||
+        contract.cinematicPost.dofAperture > 8.0f) {
         warn("cinematic_post_params_out_of_range");
     }
     if (contract.cinematicPost.colorGradePreset.empty()) {

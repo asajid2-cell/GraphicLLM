@@ -146,6 +146,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp
+    src/Graphics/Passes/MainPassTargetPass.cpp
     src/Graphics/Passes/MeshDrawPass.cpp
     src/Graphics/Passes/MotionVectorPass.cpp
     src/Graphics/Passes/ParticleBillboardPass.cpp
@@ -388,6 +389,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/DescriptorTable.h
     src/Graphics/Passes/FullscreenPass.h
     src/Graphics/Passes/HZBPass.h
+    src/Graphics/Passes/MainPassTargetPass.h
     src/Graphics/Passes/MotionVectorPass.h
     src/Graphics/Passes/PostProcessGraphPass.h
     src/Graphics/Passes/PostProcessPass.h

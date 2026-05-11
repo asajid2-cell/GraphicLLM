@@ -153,6 +153,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/PostProcessPass.cpp
     src/Graphics/Passes/RenderGraphValidationPass.cpp
     src/Graphics/Passes/ShadowPass.cpp
+    src/Graphics/Passes/ShadowTargetPass.cpp
     src/Graphics/Passes/SSAOPass.cpp
     src/Graphics/Passes/SSRPass.cpp
     src/Graphics/Passes/SkyboxPass.cpp
@@ -393,6 +394,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/RenderPassScope.h
     src/Graphics/Passes/RenderGraphValidationPass.h
     src/Graphics/Passes/ShadowPass.h
+    src/Graphics/Passes/ShadowTargetPass.h
     src/Graphics/Passes/SSAOPass.h
     src/Graphics/Passes/SSRPass.h
     src/Graphics/Passes/SkyboxPass.h

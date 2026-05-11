@@ -73,6 +73,7 @@ $hzbRendererPath = Join-Path $root "src/Graphics/Renderer_HZB.cpp"
 $shadowStatePath = Join-Path $root "src/Graphics/RendererShadowState.h"
 $shadowResourcesPath = Join-Path $root "src/Graphics/Renderer_ShadowResources.cpp"
 $shadowPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
+$shadowTargetPassPath = Join-Path $root "src/Graphics/Passes/ShadowTargetPass.cpp"
 $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
@@ -374,6 +375,29 @@ foreach ($target in $doc.targets) {
                     if ($shadowSource.IndexOf($oldFlatAccess, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "shadow_resources still uses flat shadow state access in $($pathInfo.Label): $oldFlatAccess"
                     }
+                }
+            }
+        }
+        if (Test-Path $shadowTargetPassPath) {
+            $shadowTargetPass = Get-Content $shadowTargetPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::ShadowTargetPass", "TransitionToDepthWrite", "BindAndClearSlice", "TransitionToShaderResource", "ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
+                if ($shadowTargetPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "shadow_resources missing ShadowTargetPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "shadow_resources missing ShadowTargetPass.cpp"
+        }
+        if (Test-Path $shadowPassPath) {
+            $shadowPassSource = Get-Content $shadowPassPath -Raw
+            foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
+                if ($shadowPassSource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "shadow_resources still performs shadow target setup directly in Renderer_ShadowPass.cpp: $directCall"
+                }
+            }
+            foreach ($requiredRoute in @("ShadowTargetPass::TransitionToDepthWrite", "ShadowTargetPass::BindAndClearSlice", "ShadowTargetPass::TransitionToShaderResource")) {
+                if ($shadowPassSource.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "shadow_resources missing routed shadow target call in Renderer_ShadowPass.cpp: $requiredRoute"
                 }
             }
         }

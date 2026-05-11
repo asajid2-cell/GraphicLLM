@@ -1,101 +1,449 @@
 {
-  "schema": 1,
-  "purpose": "Tolerant visual baseline contracts for public Phase 3 captures. These are metric gates, not pixel-perfect golden images.",
-  "policy": {
-    "baseline_type": "metric_tolerance",
-    "image_assets_committed": false,
-    "capture_format": "bmp",
-    "warmup_frames": 30,
-    "notes": "Only add committed bitmap baselines after the public scene composition has stopped changing."
-  },
-  "cases": [
-    {
-      "id": "rt_showcase_hero_release",
-      "scene": "rt_showcase",
-      "camera_bookmark": "hero",
-      "environment": "studio",
-      "graphics_preset": "release_showcase",
-      "lighting_rig": "rt_showcase_gallery",
-      "required": true,
-      "capture": {
-        "filename": "visual_validation_rt_showcase.bmp",
-        "smoke_frames": 240
-      },
-      "metrics": {
-        "gpu_frame_ms": { "max": 16.7 },
-        "avg_luma": { "min": 60.0, "max": 95.0 },
-        "center_avg_luma": { "min": 60.0, "max": 115.0 },
-        "nonblack_ratio": { "min": 0.95 },
-        "saturated_ratio": { "max": 0.12 },
-        "near_white_ratio": { "max": 0.14 },
-        "dark_detail_ratio": { "max": 0.69 }
-      }
-    },
-    {
-      "id": "material_lab_hero_release",
-      "scene": "material_lab",
-      "camera_bookmark": "hero",
-      "environment": "cool_overcast",
-      "graphics_preset": "release_showcase",
-      "lighting_rig": "material_lab_review",
-      "required": true,
-      "capture": {
-        "filename": "visual_validation_rt_showcase.bmp",
-        "smoke_frames": 140
-      },
-      "metrics": {
-        "gpu_frame_ms": { "max": 16.7 },
-        "avg_luma": { "min": 120.0, "max": 220.0 },
-        "center_avg_luma": { "min": 110.0, "max": 220.0 },
-        "nonblack_ratio": { "min": 0.95 },
-        "saturated_ratio": { "max": 0.12 },
-        "near_white_ratio": { "max": 0.20 },
-        "dark_detail_ratio": { "max": 0.08 }
-      }
-    },
-    {
-      "id": "effects_showcase_hero_release",
-      "scene": "effects_showcase",
-      "camera_bookmark": "hero",
-      "environment": "night_city",
-      "graphics_preset": "release_showcase",
-      "lighting_rig": "night_emissive",
-      "required": true,
-      "capture": {
-        "filename": "visual_validation_rt_showcase.bmp",
-        "smoke_frames": 180
-      },
-      "metrics": {
-        "gpu_frame_ms": { "max": 16.7 },
-        "avg_luma": { "min": 30.0, "max": 185.0 },
-        "center_avg_luma": { "min": 20.0, "max": 210.0 },
-        "nonblack_ratio": { "min": 0.80 },
-        "saturated_ratio": { "max": 0.20 },
-        "near_white_ratio": { "max": 0.24 },
-        "dark_detail_ratio": { "max": 0.85 }
-      }
-    },
-    {
-      "id": "glass_water_courtyard_hero_release",
-      "scene": "glass_water_courtyard",
-      "camera_bookmark": "hero",
-      "environment": "sunset_courtyard",
-      "graphics_preset": "release_showcase",
-      "lighting_rig": "sunset_rim",
-      "required": true,
-      "capture": {
-        "filename": "visual_validation_rt_showcase.bmp",
-        "smoke_frames": 180
-      },
-      "metrics": {
-        "gpu_frame_ms": { "max": 16.7 },
-        "avg_luma": { "min": 55.0, "max": 190.0 },
-        "center_avg_luma": { "min": 45.0, "max": 210.0 },
-        "nonblack_ratio": { "min": 0.92 },
-        "saturated_ratio": { "max": 0.16 },
-        "near_white_ratio": { "max": 0.20 },
-        "dark_detail_ratio": { "max": 0.72 }
-      }
-    }
-  ]
+    "schema":  1,
+    "purpose":  "Tolerant visual baseline contracts for public Phase 3 captures. These are metric gates, not pixel-perfect golden images.",
+    "policy":  {
+                   "baseline_type":  "metric_tolerance_with_perceptual_signature",
+                   "image_assets_committed":  false,
+                   "capture_format":  "bmp",
+                   "warmup_frames":  30,
+                   "notes":  "Committed 8x8 luma signatures provide tolerant image comparison without large bitmap baselines."
+               },
+    "cases":  [
+                  {
+                      "id":  "rt_showcase_hero_release",
+                      "scene":  "rt_showcase",
+                      "camera_bookmark":  "hero",
+                      "environment":  "studio",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "rt_showcase_gallery",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  240
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  {
+                                                           "max":  16.7
+                                                       },
+                                      "avg_luma":  {
+                                                       "min":  60.0,
+                                                       "max":  95.0
+                                                   },
+                                      "center_avg_luma":  {
+                                                              "min":  60.0,
+                                                              "max":  115.0
+                                                          },
+                                      "nonblack_ratio":  {
+                                                             "min":  0.95
+                                                         },
+                                      "saturated_ratio":  {
+                                                              "max":  0.12
+                                                          },
+                                      "near_white_ratio":  {
+                                                               "max":  0.14
+                                                           },
+                                      "dark_detail_ratio":  {
+                                                                "max":  0.69
+                                                            }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [
+                                                       102.52,
+                                                       130.86,
+                                                       125.38,
+                                                       186.57,
+                                                       187.21,
+                                                       153.57,
+                                                       107.07,
+                                                       99.48,
+                                                       118.05,
+                                                       121.06,
+                                                       85.92,
+                                                       100.25,
+                                                       129.56,
+                                                       129.98,
+                                                       79.3,
+                                                       74.96,
+                                                       66.6,
+                                                       68.18,
+                                                       76.13,
+                                                       87.51,
+                                                       89.46,
+                                                       77.3,
+                                                       69.31,
+                                                       65.88,
+                                                       64.63,
+                                                       66.7,
+                                                       77.33,
+                                                       125.81,
+                                                       99.19,
+                                                       91.72,
+                                                       68.2,
+                                                       64.59,
+                                                       46.05,
+                                                       43.65,
+                                                       60.74,
+                                                       101,
+                                                       129.46,
+                                                       34.1,
+                                                       50.73,
+                                                       61.94,
+                                                       22.28,
+                                                       19.81,
+                                                       26.16,
+                                                       62.33,
+                                                       27.7,
+                                                       18.97,
+                                                       20.2,
+                                                       20.62,
+                                                       33.48,
+                                                       37.42,
+                                                       28.92,
+                                                       21.37,
+                                                       22.13,
+                                                       29.45,
+                                                       24.48,
+                                                       24.87,
+                                                       92.04,
+                                                       69.09,
+                                                       29.04,
+                                                       30.83,
+                                                       32.65,
+                                                       28.26,
+                                                       33.72,
+                                                       46.75
+                                                   ]
+                                    }
+                  },
+                  {
+                      "id":  "material_lab_hero_release",
+                      "scene":  "material_lab",
+                      "camera_bookmark":  "hero",
+                      "environment":  "cool_overcast",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "material_lab_review",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  140
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  {
+                                                           "max":  16.7
+                                                       },
+                                      "avg_luma":  {
+                                                       "min":  120.0,
+                                                       "max":  220.0
+                                                   },
+                                      "center_avg_luma":  {
+                                                              "min":  110.0,
+                                                              "max":  220.0
+                                                          },
+                                      "nonblack_ratio":  {
+                                                             "min":  0.95
+                                                         },
+                                      "saturated_ratio":  {
+                                                              "max":  0.12
+                                                          },
+                                      "near_white_ratio":  {
+                                                               "max":  0.20
+                                                           },
+                                      "dark_detail_ratio":  {
+                                                                "max":  0.08
+                                                            }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [
+                                                       158.26,
+                                                       162.23,
+                                                       165.18,
+                                                       168.76,
+                                                       168.89,
+                                                       166.27,
+                                                       163.15,
+                                                       155.82,
+                                                       155.62,
+                                                       162.39,
+                                                       168.2,
+                                                       171.41,
+                                                       171.82,
+                                                       172.1,
+                                                       164.92,
+                                                       156.06,
+                                                       150.38,
+                                                       162.21,
+                                                       168.86,
+                                                       170.65,
+                                                       171.54,
+                                                       175.58,
+                                                       165.67,
+                                                       155.27,
+                                                       146.51,
+                                                       159.65,
+                                                       166.07,
+                                                       174.65,
+                                                       175.42,
+                                                       167.49,
+                                                       163.83,
+                                                       151.15,
+                                                       164.88,
+                                                       158.51,
+                                                       173.6,
+                                                       161.32,
+                                                       164.31,
+                                                       167.13,
+                                                       170.17,
+                                                       152.99,
+                                                       200.42,
+                                                       178.48,
+                                                       207.83,
+                                                       204.98,
+                                                       197.35,
+                                                       218.91,
+                                                       173.9,
+                                                       211.02,
+                                                       220.7,
+                                                       218.93,
+                                                       228.3,
+                                                       231.42,
+                                                       229.48,
+                                                       228.14,
+                                                       217.8,
+                                                       219.47,
+                                                       220.98,
+                                                       221.04,
+                                                       224.67,
+                                                       229.44,
+                                                       229.18,
+                                                       224.15,
+                                                       220.2,
+                                                       219.98
+                                                   ]
+                                    }
+                  },
+                  {
+                      "id":  "effects_showcase_hero_release",
+                      "scene":  "effects_showcase",
+                      "camera_bookmark":  "hero",
+                      "environment":  "night_city",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "night_emissive",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  180
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  {
+                                                           "max":  16.7
+                                                       },
+                                      "avg_luma":  {
+                                                       "min":  30.0,
+                                                       "max":  185.0
+                                                   },
+                                      "center_avg_luma":  {
+                                                              "min":  20.0,
+                                                              "max":  210.0
+                                                          },
+                                      "nonblack_ratio":  {
+                                                             "min":  0.80
+                                                         },
+                                      "saturated_ratio":  {
+                                                              "max":  0.20
+                                                          },
+                                      "near_white_ratio":  {
+                                                               "max":  0.24
+                                                           },
+                                      "dark_detail_ratio":  {
+                                                                "max":  0.85
+                                                            }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [
+                                                       122.61,
+                                                       173.09,
+                                                       175.26,
+                                                       132.6,
+                                                       110.31,
+                                                       92.6,
+                                                       88.07,
+                                                       74.44,
+                                                       64.05,
+                                                       49.2,
+                                                       52.87,
+                                                       54.5,
+                                                       54.53,
+                                                       55.02,
+                                                       55.67,
+                                                       56.96,
+                                                       63.86,
+                                                       49.96,
+                                                       67.2,
+                                                       82.15,
+                                                       80.75,
+                                                       67.9,
+                                                       59.04,
+                                                       68.88,
+                                                       61.13,
+                                                       50.99,
+                                                       102.41,
+                                                       66.52,
+                                                       65.1,
+                                                       101.26,
+                                                       56.75,
+                                                       64.24,
+                                                       66.51,
+                                                       69.28,
+                                                       81.22,
+                                                       83.35,
+                                                       70.71,
+                                                       75.97,
+                                                       59.71,
+                                                       62.7,
+                                                       142.83,
+                                                       155.48,
+                                                       144.16,
+                                                       144.85,
+                                                       143.96,
+                                                       123.21,
+                                                       132.99,
+                                                       129.3,
+                                                       156.51,
+                                                       158.14,
+                                                       158.96,
+                                                       155.77,
+                                                       149.74,
+                                                       141.72,
+                                                       133.45,
+                                                       130.78,
+                                                       157.01,
+                                                       152.95,
+                                                       155.53,
+                                                       155.74,
+                                                       149.58,
+                                                       140.54,
+                                                       134.12,
+                                                       131.56
+                                                   ]
+                                    }
+                  },
+                  {
+                      "id":  "glass_water_courtyard_hero_release",
+                      "scene":  "glass_water_courtyard",
+                      "camera_bookmark":  "hero",
+                      "environment":  "sunset_courtyard",
+                      "graphics_preset":  "release_showcase",
+                      "lighting_rig":  "sunset_rim",
+                      "required":  true,
+                      "capture":  {
+                                      "filename":  "visual_validation_rt_showcase.bmp",
+                                      "smoke_frames":  180
+                                  },
+                      "metrics":  {
+                                      "gpu_frame_ms":  {
+                                                           "max":  16.7
+                                                       },
+                                      "avg_luma":  {
+                                                       "min":  55.0,
+                                                       "max":  190.0
+                                                   },
+                                      "center_avg_luma":  {
+                                                              "min":  45.0,
+                                                              "max":  210.0
+                                                          },
+                                      "nonblack_ratio":  {
+                                                             "min":  0.92
+                                                         },
+                                      "saturated_ratio":  {
+                                                              "max":  0.16
+                                                          },
+                                      "near_white_ratio":  {
+                                                               "max":  0.20
+                                                           },
+                                      "dark_detail_ratio":  {
+                                                                "max":  0.72
+                                                            }
+                                  },
+                      "signature":  {
+                                        "grid":  "8x8_luma",
+                                        "mean_abs_delta_max":  18,
+                                        "max_cell_delta":  80,
+                                        "values":  [
+                                                       72.17,
+                                                       151.87,
+                                                       163.74,
+                                                       167.2,
+                                                       167.29,
+                                                       164.05,
+                                                       165.13,
+                                                       190.56,
+                                                       74.34,
+                                                       142.89,
+                                                       164.43,
+                                                       167.96,
+                                                       166.78,
+                                                       163.87,
+                                                       166.84,
+                                                       187.6,
+                                                       120.09,
+                                                       134.54,
+                                                       177.63,
+                                                       175.63,
+                                                       166.32,
+                                                       159.63,
+                                                       168.38,
+                                                       169.37,
+                                                       117.71,
+                                                       125.16,
+                                                       164.74,
+                                                       164.6,
+                                                       164.54,
+                                                       156,
+                                                       165.99,
+                                                       155.19,
+                                                       155.87,
+                                                       169.44,
+                                                       187.18,
+                                                       188.53,
+                                                       179.28,
+                                                       167.68,
+                                                       127.94,
+                                                       131.44,
+                                                       185.5,
+                                                       212.33,
+                                                       224.52,
+                                                       214.9,
+                                                       212.4,
+                                                       213.05,
+                                                       201.36,
+                                                       120.24,
+                                                       198.4,
+                                                       203.4,
+                                                       210.5,
+                                                       214.27,
+                                                       214.6,
+                                                       211.38,
+                                                       177.87,
+                                                       183.57,
+                                                       201.66,
+                                                       202.03,
+                                                       205.71,
+                                                       210.46,
+                                                       210.89,
+                                                       206.93,
+                                                       203.78,
+                                                       204.52
+                                                   ]
+                                    }
+                  }
+              ]
 }

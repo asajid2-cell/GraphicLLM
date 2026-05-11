@@ -58,9 +58,13 @@ function Get-BmpProbeStats([string]$Path) {
     $sumR = 0.0
     $sumG = 0.0
     $sumB = 0.0
+    $grid = 8
+    $signatureSums = New-Object 'double[]' ($grid * $grid)
+    $signatureCounts = New-Object 'int[]' ($grid * $grid)
 
     for ($y = 0; $y -lt $height; ++$y) {
         $row = [int]$dataOffset + ($y * $rowStride)
+        $cellY = [Math]::Min($grid - 1, [int][Math]::Floor(($y * $grid) / [double]$height))
         for ($x = 0; $x -lt $width; ++$x) {
             $p = $row + ($x * $bytesPerPixel)
             $b = [double]$bytes[$p]
@@ -76,9 +80,14 @@ function Get-BmpProbeStats([string]$Path) {
                 ++$pureDominantPixels
             }
 
+            $luma = (0.2126 * $r) + (0.7152 * $g) + (0.0722 * $b)
+            $cellX = [Math]::Min($grid - 1, [int][Math]::Floor(($x * $grid) / [double]$width))
+            $cellIndex = ($cellY * $grid) + $cellX
+            $signatureSums[$cellIndex] += $luma
+            $signatureCounts[$cellIndex] += 1
+
             if ($x -gt 0) {
                 $q = $p - $bytesPerPixel
-                $luma = (0.2126 * $r) + (0.7152 * $g) + (0.0722 * $b)
                 $prev = (0.2126 * [double]$bytes[$q + 2]) +
                         (0.7152 * [double]$bytes[$q + 1]) +
                         (0.0722 * [double]$bytes[$q])
@@ -94,6 +103,10 @@ function Get-BmpProbeStats([string]$Path) {
     $avgG = $sumG / [double]$pixelCount
     $avgB = $sumB / [double]$pixelCount
     $maxAverageChannelShareActual = [Math]::Max($sumR, [Math]::Max($sumG, $sumB)) / $sumAll
+    $signatureValues = @()
+    for ($i = 0; $i -lt $signatureSums.Length; ++$i) {
+        $signatureValues += [Math]::Round($signatureSums[$i] / [Math]::Max(1, $signatureCounts[$i]), 2)
+    }
 
     return [pscustomobject]@{
         valid = $true
@@ -108,6 +121,36 @@ function Get-BmpProbeStats([string]$Path) {
         avg_g = $avgG
         avg_b = $avgB
         max_average_channel_share = $maxAverageChannelShareActual
+        luma_signature = $signatureValues
+    }
+}
+
+function Compare-LumaSignature([string]$CaseId, [object]$SignatureSpec, [object[]]$ActualValues) {
+    if ($null -eq $SignatureSpec) {
+        return $null
+    }
+    $expectedValues = @($SignatureSpec.values)
+    if ($expectedValues.Count -ne 64 -or $ActualValues.Count -ne 64) {
+        Add-Failure "$CaseId perceptual signature has invalid cell count"
+        return $null
+    }
+    $sumDelta = 0.0
+    $maxDelta = 0.0
+    for ($i = 0; $i -lt 64; ++$i) {
+        $delta = [Math]::Abs([double]$ActualValues[$i] - [double]$expectedValues[$i])
+        $sumDelta += $delta
+        $maxDelta = [Math]::Max($maxDelta, $delta)
+    }
+    $meanDelta = $sumDelta / 64.0
+    if ($meanDelta -gt [double]$SignatureSpec.mean_abs_delta_max) {
+        Add-Failure "$CaseId perceptual signature mean delta $meanDelta above max $($SignatureSpec.mean_abs_delta_max)"
+    }
+    if ($maxDelta -gt [double]$SignatureSpec.max_cell_delta) {
+        Add-Failure "$CaseId perceptual signature max cell delta $maxDelta above max $($SignatureSpec.max_cell_delta)"
+    }
+    return [pscustomobject]@{
+        mean_abs_delta = $meanDelta
+        max_cell_delta = $maxDelta
     }
 }
 
@@ -176,6 +219,7 @@ foreach ($case in $baselineDoc.cases) {
     if ([double]$probe.max_average_channel_share -gt $MaxAverageChannelShare) {
         Add-Failure "$caseId average channel share $($probe.max_average_channel_share) above maximum $MaxAverageChannelShare"
     }
+    $signatureDelta = Compare-LumaSignature $caseId $case.signature @($probe.luma_signature)
     if (-not [bool]$report.visual_validation.captured -or
         -not [bool]$report.visual_validation.image_stats.valid) {
         Add-Failure "$caseId frame report says visual validation capture is invalid"
@@ -195,6 +239,8 @@ foreach ($case in $baselineDoc.cases) {
         edge_ratio = [double]$probe.edge_ratio
         pure_dominant_ratio = [double]$probe.pure_dominant_ratio
         max_average_channel_share = [double]$probe.max_average_channel_share
+        signature_mean_abs_delta = if ($signatureDelta) { [double]$signatureDelta.mean_abs_delta } else { $null }
+        signature_max_cell_delta = if ($signatureDelta) { [double]$signatureDelta.max_cell_delta } else { $null }
         capture = $capturePath
     })
 }
@@ -223,8 +269,8 @@ Write-Host "Visual probe validation passed." -ForegroundColor Green
 Write-Host ("  cases={0} min_edge_pixels={1} min_edge_ratio={2:N4} max_pure_dominant={3:N3}" -f `
     $caseSummaries.Count, $MinProbeEdgePixels, $MinProbeEdgeRatio, $MaxPureDominantRatio)
 foreach ($row in $caseSummaries) {
-    Write-Host ("  {0}: scene={1} gpu_ms={2:N3} luma={3:N2} edge={4}/{5:N4} dominant={6:N4}" -f `
-        $row.id, $row.scene, $row.gpu_frame_ms, $row.avg_luma, $row.edge_pixels, $row.edge_ratio, $row.pure_dominant_ratio)
+    Write-Host ("  {0}: scene={1} gpu_ms={2:N3} luma={3:N2} edge={4}/{5:N4} dominant={6:N4} sig_mean={7:N2} sig_max={8:N2}" -f `
+        $row.id, $row.scene, $row.gpu_frame_ms, $row.avg_luma, $row.edge_pixels, $row.edge_ratio, $row.pure_dominant_ratio, $row.signature_mean_abs_delta, $row.signature_max_cell_delta)
 }
 Write-Host "  logs=$LogDir"
 exit 0

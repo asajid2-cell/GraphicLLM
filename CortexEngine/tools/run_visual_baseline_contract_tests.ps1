@@ -102,8 +102,8 @@ $environmentDoc = Load-Json (Join-Path $root "assets/environments/environments.j
 if ([int]$baselineDoc.schema -ne 1) {
     Add-Failure "visual baseline schema must be 1"
 }
-if ([string]$baselineDoc.policy.baseline_type -ne "metric_tolerance") {
-    Add-Failure "visual baseline policy.baseline_type must be metric_tolerance"
+if ([string]$baselineDoc.policy.baseline_type -notin @("metric_tolerance", "metric_tolerance_with_perceptual_signature")) {
+    Add-Failure "visual baseline policy.baseline_type must be metric_tolerance or metric_tolerance_with_perceptual_signature"
 }
 if ([bool]$baselineDoc.policy.image_assets_committed) {
     Add-Failure "visual baseline policy should not require committed image assets yet"
@@ -156,6 +156,25 @@ foreach ($case in $baselineDoc.cases) {
     Test-MetricRange $caseId "saturated_ratio" $case.metrics.saturated_ratio
     Test-MetricRange $caseId "near_white_ratio" $case.metrics.near_white_ratio
     Test-MetricRange $caseId "dark_detail_ratio" $case.metrics.dark_detail_ratio
+
+    if ([string]$baselineDoc.policy.baseline_type -eq "metric_tolerance_with_perceptual_signature") {
+        if ($null -eq $case.signature) {
+            Add-Failure "$caseId signature is missing"
+        } else {
+            if ([string]$case.signature.grid -ne "8x8_luma") {
+                Add-Failure "$caseId signature.grid must be 8x8_luma"
+            }
+            if (@($case.signature.values).Count -ne 64) {
+                Add-Failure "$caseId signature.values must contain 64 luma cells"
+            }
+            if ([double]$case.signature.mean_abs_delta_max -le 0.0) {
+                Add-Failure "$caseId signature.mean_abs_delta_max must be positive"
+            }
+            if ([double]$case.signature.max_cell_delta -le 0.0) {
+                Add-Failure "$caseId signature.max_cell_delta must be positive"
+            }
+        }
+    }
 }
 
 if ($RuntimeSmoke -and $failures.Count -eq 0) {

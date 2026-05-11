@@ -199,6 +199,8 @@ struct RendererRayTracingState {
     bool reflectionsEnabled = false;
     bool giEnabled = false;
     bool warmingUp = false;
+    float reflectionDenoiseAlpha = 0.28f;
+    float reflectionCompositionStrength = 1.0f;
 };
 
 struct RendererWaterState {

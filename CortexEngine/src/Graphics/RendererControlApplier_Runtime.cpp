@@ -169,6 +169,10 @@ bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle) {
     return enabled;
 }
 
+void ApplyRTReflectionTuningControl(Renderer& renderer, float denoiseAlpha, float compositionStrength) {
+    renderer.SetRTReflectionTuning(denoiseAlpha, compositionStrength);
+}
+
 void ApplyShadowBiasControl(Renderer& renderer, float bias) {
     renderer.SetShadowBias(bias);
 }

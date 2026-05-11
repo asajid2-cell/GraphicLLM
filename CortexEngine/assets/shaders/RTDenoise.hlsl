@@ -15,6 +15,43 @@ RWTexture2D<float> g_ShadowOut : register(u0);
 RWTexture2D<float4> g_ReflectionOut : register(u1);
 RWTexture2D<float4> g_GIOut : register(u2);
 
+cbuffer FrameConstants : register(b1)
+{
+    float4x4 g_ViewMatrix;
+    float4x4 g_ProjectionMatrix;
+    float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
+    float4   g_CameraPosition;
+    float4   g_TimeAndExposure;
+    float4   g_AmbientColor;
+    uint4    g_LightCount;
+    struct Light
+    {
+        float4 position_type;
+        float4 direction_cosInner;
+        float4 color_range;
+        float4 params;
+    };
+    static const uint LIGHT_MAX = 16;
+    Light    g_Lights[LIGHT_MAX];
+    float4x4 g_LightViewProjection[6];
+    float4   g_CascadeSplits;
+    float4   g_ShadowParams;
+    float4   g_DebugMode;
+    float4   g_PostParams;
+    float4   g_EnvParams;
+    float4   g_ColorGrade;
+    float4   g_FogParams;
+    float4   g_AOParams;
+    float4   g_BloomParams;
+};
+
+static float DecodeReflectionDenoiseAlpha()
+{
+    uint postFxFlags = (uint)(g_BloomParams.w + 0.5f);
+    return max((float)((postFxFlags >> 16u) & 255u) * (1.0f / 255.0f), 0.02f);
+}
+
 static uint2 MapToDepthPixel(uint2 p, uint2 outDim)
 {
     uint depthW;
@@ -264,7 +301,7 @@ void ReflectionSeedCS(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void ReflectionTemporalCS(uint3 id : SV_DispatchThreadID)
 {
-    StoreReflection(id, true, 0.28f);
+    StoreReflection(id, true, DecodeReflectionDenoiseAlpha());
 }
 
 [numthreads(8, 8, 1)]

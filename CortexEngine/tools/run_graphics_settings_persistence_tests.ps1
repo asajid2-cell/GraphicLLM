@@ -55,7 +55,9 @@ $corruptPath = Join-Path $LogDir "corrupt_graphics_settings.json"
   "ray_tracing": {
     "enabled": false,
     "reflections": false,
-    "gi": false
+    "gi": false,
+    "reflection_denoise_alpha": 0.41,
+    "reflection_composition_strength": 0.62
   },
   "screen_space": {
     "ssao": true,
@@ -145,6 +147,17 @@ if ($validRun.exit_code -ne 0) {
     }
     if ([bool]$report.frame_contract.ray_tracing.enabled) {
         Add-Failure "valid settings did not disable ray tracing"
+    }
+    $rtTuning = $report.frame_contract.ray_tracing.rt_reflection_tuning
+    if ($null -eq $rtTuning) {
+        Add-Failure "valid settings frame contract did not include rt_reflection_tuning"
+    } else {
+        if ([Math]::Abs(([double]$rtTuning.denoise_alpha) - 0.41) -gt 0.03) {
+            Add-Failure "valid settings RT reflection denoise alpha was $($rtTuning.denoise_alpha), expected 0.41"
+        }
+        if ([Math]::Abs(([double]$rtTuning.composition_strength) - 0.62) -gt 0.03) {
+            Add-Failure "valid settings RT reflection composition strength was $($rtTuning.composition_strength), expected 0.62"
+        }
     }
     $backgroundExposure = [double]$report.frame_contract.environment.background_exposure
     $backgroundBlur = [double]$report.frame_contract.environment.background_blur

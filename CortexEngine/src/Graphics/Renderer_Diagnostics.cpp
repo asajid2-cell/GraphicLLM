@@ -91,6 +91,8 @@ Renderer::RayTracingState Renderer::GetRayTracingState() const {
     state.reflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
     state.giEnabled = m_rtRuntimeState.giEnabled;
     state.warmingUp = IsRTWarmingUp();
+    state.reflectionDenoiseAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
+    state.reflectionCompositionStrength = m_rtDenoiseState.reflectionCompositionStrength;
     return state;
 }
 

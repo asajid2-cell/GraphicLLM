@@ -154,6 +154,9 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
             desc.temporalMaskResource = m_temporalMaskState.texture.Get();
             desc.srvTable = m_rtDenoiseState.srvTables[m_frameRuntime.frameIndex % kFrameCount][0];
             desc.uavTable = m_rtDenoiseState.uavTables[m_frameRuntime.frameIndex % kFrameCount][0];
+            if (signal == RTDenoiser::Signal::Reflection) {
+                desc.accumulationAlpha = m_rtDenoiseState.reflectionHistoryAlpha;
+            }
 
             result = m_services.rtDenoiser->Dispatch(
                 m_commandResources.graphicsList.Get(),

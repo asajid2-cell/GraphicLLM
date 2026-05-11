@@ -51,7 +51,9 @@ json ToJson(const RendererTuningState& state) {
         {"ray_tracing", {
             {"enabled", state.rayTracing.enabled},
             {"reflections", state.rayTracing.reflectionsEnabled},
-            {"gi", state.rayTracing.giEnabled}
+            {"gi", state.rayTracing.giEnabled},
+            {"reflection_denoise_alpha", state.rayTracing.reflectionDenoiseAlpha},
+            {"reflection_composition_strength", state.rayTracing.reflectionCompositionStrength}
         }},
         {"screen_space", {
             {"ssao", state.screenSpace.ssaoEnabled},
@@ -137,6 +139,8 @@ RendererTuningState FromJson(const json& root) {
         ReadValue(rt, "enabled", state.rayTracing.enabled);
         ReadValue(rt, "reflections", state.rayTracing.reflectionsEnabled);
         ReadValue(rt, "gi", state.rayTracing.giEnabled);
+        ReadValue(rt, "reflection_denoise_alpha", state.rayTracing.reflectionDenoiseAlpha);
+        ReadValue(rt, "reflection_composition_strength", state.rayTracing.reflectionCompositionStrength);
     }
     if (root.contains("screen_space") && root.at("screen_space").is_object()) {
         const auto& ss = root.at("screen_space");
@@ -283,6 +287,8 @@ RendererTuningState CaptureRendererTuningState(const Renderer& renderer) {
     state.rayTracing.enabled = rt.enabled;
     state.rayTracing.reflectionsEnabled = rt.reflectionsEnabled;
     state.rayTracing.giEnabled = rt.giEnabled;
+    state.rayTracing.reflectionDenoiseAlpha = rt.reflectionDenoiseAlpha;
+    state.rayTracing.reflectionCompositionStrength = rt.reflectionCompositionStrength;
 
     state.screenSpace.ssaoEnabled = features.ssaoEnabled;
     state.screenSpace.ssaoRadius = 1.5f;
@@ -332,6 +338,10 @@ RendererTuningState ClampRendererTuningState(RendererTuningState state) {
     state.environment.specularIntensity = std::clamp(state.environment.specularIntensity, 0.0f, 3.0f);
     state.environment.backgroundExposure = std::clamp(state.environment.backgroundExposure, 0.0f, 4.0f);
     state.environment.backgroundBlur = std::clamp(state.environment.backgroundBlur, 0.0f, 1.0f);
+
+    state.rayTracing.reflectionDenoiseAlpha = std::clamp(state.rayTracing.reflectionDenoiseAlpha, 0.02f, 1.0f);
+    state.rayTracing.reflectionCompositionStrength =
+        std::clamp(state.rayTracing.reflectionCompositionStrength, 0.0f, 1.0f);
 
     state.screenSpace.ssaoRadius = std::clamp(state.screenSpace.ssaoRadius, 0.01f, 5.0f);
     state.screenSpace.ssaoBias = std::clamp(state.screenSpace.ssaoBias, 0.0f, 1.0f);
@@ -392,6 +402,9 @@ void ApplyRendererTuningState(Renderer& renderer, const RendererTuningState& raw
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RayTracing, state.rayTracing.enabled);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RTReflections, state.rayTracing.reflectionsEnabled);
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::RTGI, state.rayTracing.giEnabled);
+    ApplyRTReflectionTuningControl(renderer,
+                                   state.rayTracing.reflectionDenoiseAlpha,
+                                   state.rayTracing.reflectionCompositionStrength);
 
     ApplyFeatureToggleControl(renderer, RendererFeatureToggle::SSAO, state.screenSpace.ssaoEnabled);
     ApplySSAOParamsControl(renderer,

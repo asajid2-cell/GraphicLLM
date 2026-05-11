@@ -62,7 +62,9 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
   "ray_tracing": {
     "enabled": false,
     "reflections": false,
-    "gi": false
+    "gi": false,
+    "reflection_denoise_alpha": 0.36,
+    "reflection_composition_strength": 0.58
   },
   "atmosphere": {
     "fog": true,
@@ -139,6 +141,12 @@ if ($exitCode -ne 0) {
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
     Assert-Near "vignette" ([double]$fc.cinematic_post.vignette) 0.27 0.03
     Assert-Near "lens_dirt" ([double]$fc.cinematic_post.lens_dirt) 0.21 0.03
+    if ($null -eq $fc.ray_tracing.rt_reflection_tuning) {
+        Add-Failure "rt_reflection_tuning was missing"
+    } else {
+        Assert-Near "rt_reflection_denoise_alpha" ([double]$fc.ray_tracing.rt_reflection_tuning.denoise_alpha) 0.36 0.03
+        Assert-Near "rt_reflection_composition_strength" ([double]$fc.ray_tracing.rt_reflection_tuning.composition_strength) 0.58 0.03
+    }
     if ([bool]$fc.features.ray_tracing_enabled) { Add-Failure "ray tracing remained enabled despite settings" }
     if ([bool]$fc.features.ssr_enabled) { Add-Failure "SSR remained enabled despite settings" }
     if (-not [bool]$fc.features.ssao_enabled) { Add-Failure "SSAO was not enabled despite settings" }

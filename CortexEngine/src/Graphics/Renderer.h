@@ -269,8 +269,11 @@ public:
     // Optional RT feature toggles exposed to UI.
     void SetRTReflectionsEnabled(bool enabled);
     void SetRTGIEnabled(bool enabled);
+    void SetRTReflectionTuning(float denoiseAlpha, float compositionStrength);
     [[nodiscard]] bool GetRTReflectionsEnabled() const;
     [[nodiscard]] bool GetRTGIEnabled() const;
+    [[nodiscard]] float GetRTReflectionDenoiseAlpha() const;
+    [[nodiscard]] float GetRTReflectionCompositionStrength() const;
 
     using VRAMBreakdown = RendererVRAMBreakdown;
     using DescriptorStats = RendererDescriptorStats;

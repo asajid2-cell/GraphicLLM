@@ -45,6 +45,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_RIG_WAREHOUSE = 9030,
     IDC_GFX_RIG_SIDE = 9031,
     IDC_GFX_RIG_LANTERNS = 9032,
+    IDC_GFX_RT_REFL_DENOISE = 9033,
+    IDC_GFX_RT_REFL_STRENGTH = 9034,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -105,6 +107,8 @@ struct GraphicsSettingsState {
     SliderBinding iblSpecular;
     SliderBinding backgroundExposure;
     SliderBinding backgroundBlur;
+    SliderBinding rtReflectionDenoise;
+    SliderBinding rtReflectionStrength;
     SliderBinding ssaoRadius;
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
@@ -215,6 +219,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.environment.specularIntensity = SliderToFloat(g_gfx.iblSpecular);
     g_gfx.tuning.environment.backgroundExposure = SliderToFloat(g_gfx.backgroundExposure);
     g_gfx.tuning.environment.backgroundBlur = SliderToFloat(g_gfx.backgroundBlur);
+    g_gfx.tuning.rayTracing.reflectionDenoiseAlpha = SliderToFloat(g_gfx.rtReflectionDenoise);
+    g_gfx.tuning.rayTracing.reflectionCompositionStrength = SliderToFloat(g_gfx.rtReflectionStrength);
     g_gfx.tuning.screenSpace.ssaoRadius = SliderToFloat(g_gfx.ssaoRadius);
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
@@ -266,6 +272,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.iblSpecular, g_gfx.tuning.environment.specularIntensity);
     SetSliderFromFloat(g_gfx.backgroundExposure, g_gfx.tuning.environment.backgroundExposure);
     SetSliderFromFloat(g_gfx.backgroundBlur, g_gfx.tuning.environment.backgroundBlur);
+    SetSliderFromFloat(g_gfx.rtReflectionDenoise, g_gfx.tuning.rayTracing.reflectionDenoiseAlpha);
+    SetSliderFromFloat(g_gfx.rtReflectionStrength, g_gfx.tuning.rayTracing.reflectionCompositionStrength);
     SetSliderFromFloat(g_gfx.ssaoRadius, g_gfx.tuning.screenSpace.ssaoRadius);
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
@@ -500,6 +508,8 @@ void RegisterGraphicsSettingsClass() {
             g_gfx.chkRT = makeCheckbox(IDC_GFX_RT, L"RT Master");
             g_gfx.chkRTReflections = makeCheckbox(IDC_GFX_RT_REFLECTIONS, L"RT Reflections");
             g_gfx.chkRTGI = makeCheckbox(IDC_GFX_RT_GI, L"RT GI");
+            makeSlider(IDC_GFX_RT_REFL_DENOISE, L"Reflection Denoise", g_gfx.rtReflectionDenoise, 0.02f, 1.0f);
+            makeSlider(IDC_GFX_RT_REFL_STRENGTH, L"Reflection Strength", g_gfx.rtReflectionStrength, 0.0f, 1.0f);
             g_gfx.txtRTScheduler = makeStaticWithHeight(
                 IDC_GFX_RT_SCHEDULER,
                 L"RT Scheduler: --",

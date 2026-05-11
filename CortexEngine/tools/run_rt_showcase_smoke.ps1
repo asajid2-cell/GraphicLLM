@@ -690,6 +690,19 @@ if ($null -eq $report.frame_contract.temporal_mask) {
     }
 }
 if ([bool]$report.frame_contract.ray_tracing.enabled) {
+    $rtTuning = $report.frame_contract.ray_tracing.rt_reflection_tuning
+    if ($null -eq $rtTuning) {
+        Add-Failure "ray_tracing.rt_reflection_tuning is missing"
+    } else {
+        $denoiseAlpha = [double]$rtTuning.denoise_alpha
+        $compositionStrength = [double]$rtTuning.composition_strength
+        if ($denoiseAlpha -lt 0.02 -or $denoiseAlpha -gt 1.0) {
+            Add-Failure "RT reflection denoise alpha is out of range: $denoiseAlpha"
+        }
+        if ($compositionStrength -lt 0.0 -or $compositionStrength -gt 1.0) {
+            Add-Failure "RT reflection composition strength is out of range: $compositionStrength"
+        }
+    }
     if (-not [bool]$report.frame_contract.ray_tracing.denoiser_executed) {
         Add-Failure "RT denoiser did not execute while ray tracing is active"
     }

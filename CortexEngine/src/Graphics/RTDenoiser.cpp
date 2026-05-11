@@ -1,5 +1,6 @@
 #include "Graphics/RTDenoiser.h"
 
+#include <algorithm>
 #include <array>
 #include <string>
 
@@ -136,9 +137,12 @@ ID3D12PipelineState* RTDenoiser::SelectPipeline(Signal signal, bool historyValid
     return nullptr;
 }
 
-float RTDenoiser::AlphaForSignal(Signal signal, bool historyValid) const {
+float RTDenoiser::AlphaForSignal(Signal signal, bool historyValid, float overrideAlpha) const {
     if (!historyValid) {
         return 1.0f;
+    }
+    if (overrideAlpha >= 0.0f) {
+        return std::clamp(overrideAlpha, 0.02f, 1.0f);
     }
     switch (signal) {
     case Signal::Shadow: return 0.20f;
@@ -158,7 +162,7 @@ RTDenoiser::DispatchResult RTDenoiser::Dispatch(ID3D12GraphicsCommandList* cmdLi
     result.usedDepthNormalRejection = true;
     result.usedVelocityReprojection = desc.historyValid;
     result.usedDisocclusionRejection = desc.historyValid;
-    result.accumulationAlpha = AlphaForSignal(desc.signal, desc.historyValid);
+    result.accumulationAlpha = AlphaForSignal(desc.signal, desc.historyValid, desc.accumulationAlpha);
 
     if (!IsReady() || !cmdList || !device || !descriptorManager || !IsValidDispatch(desc)) {
         return result;

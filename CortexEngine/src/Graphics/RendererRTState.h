@@ -31,6 +31,8 @@ struct RTDenoisePassState {
     float shadowAlpha = 1.0f;
     float reflectionAlpha = 1.0f;
     float giAlpha = 1.0f;
+    float reflectionHistoryAlpha = 0.28f;
+    float reflectionCompositionStrength = 1.0f;
 
     void ResetFrame() {
         shadowDenoisedThisFrame = false;
@@ -42,7 +44,7 @@ struct RTDenoisePassState {
         usedVelocityThisFrame = false;
         usedDisocclusionRejectionThisFrame = false;
         shadowAlpha = 1.0f;
-        reflectionAlpha = 1.0f;
+        reflectionAlpha = reflectionHistoryAlpha;
         giAlpha = 1.0f;
     }
 };

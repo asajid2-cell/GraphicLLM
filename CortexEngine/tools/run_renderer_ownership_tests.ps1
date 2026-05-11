@@ -96,6 +96,7 @@ $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $renderGraphBloomPath = Join-Path $root "src/Graphics/Renderer_RenderGraphBloom.cpp"
 $bloomGraphPassPath = Join-Path $root "src/Graphics/Passes/BloomGraphPass.cpp"
 $renderGraphDiagnosticsPath = Join-Path $root "src/Graphics/Renderer_RenderGraphDiagnostics.cpp"
+$renderGraphValidationPassPath = Join-Path $root "src/Graphics/Passes/RenderGraphValidationPass.cpp"
 $bloomPassPath = Join-Path $root "src/Graphics/Passes/BloomPass.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 $temporalStatePath = Join-Path $root "src/Graphics/RendererTemporalState.h"
@@ -1623,18 +1624,28 @@ foreach ($target in $doc.targets) {
         }
         if (Test-Path $renderGraphDiagnosticsPath) {
             $diagnosticsContent = Get-Content $renderGraphDiagnosticsPath -Raw
-            foreach ($required in @("DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV")) {
+            foreach ($required in @("RenderGraphValidationPass::CreateTransientValidationViews", "RenderGraphValidationPass::AddTransientValidation")) {
                 if ($diagnosticsContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
-                    Add-Failure "render_graph_transient_views missing diagnostics DescriptorTable route: $required"
+                    Add-Failure "render_graph_transient_views missing diagnostics validation-pass route: $required"
                 }
             }
-            foreach ($removedLocal in @("AllocateRTV", "AllocateStagingCBV_SRV_UAV", "CreateRenderTargetView", "CreateShaderResourceView")) {
+            foreach ($removedLocal in @("DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV", "AllocateRTV", "AllocateStagingCBV_SRV_UAV", "CreateRenderTargetView", "CreateShaderResourceView", "ClearRenderTargetView")) {
                 if ($diagnosticsContent.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "render_graph_transient_views still has direct transient view mechanics in Renderer_RenderGraphDiagnostics.cpp: $removedLocal"
                 }
             }
         } else {
             Add-Failure "render_graph_transient_views missing Renderer_RenderGraphDiagnostics.cpp"
+        }
+        if (Test-Path $renderGraphValidationPassPath) {
+            $validationPassContent = Get-Content $renderGraphValidationPassPath -Raw
+            foreach ($required in @("CreateTransientValidationViews", "DescriptorTable::EnsureColorTargetViewHandles", "DescriptorTable::WriteTexture2DRTVAndSRV", "ClearRenderTargetView")) {
+                if ($validationPassContent.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "render_graph_transient_views missing RenderGraphValidationPass ownership marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "render_graph_transient_views missing RenderGraphValidationPass.cpp"
         }
     }
 

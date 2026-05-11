@@ -500,6 +500,7 @@ struct FrameContract {
         uint32_t culledPasses = 0;
         uint32_t barriers = 0;
         uint32_t fallbackExecutions = 0;
+        bool transientValidationRan = false;
         uint32_t transientResources = 0;
         uint32_t placedResources = 0;
         uint32_t aliasedResources = 0;

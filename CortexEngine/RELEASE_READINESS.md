@@ -18,6 +18,7 @@ The current verified local gate covers:
 - temporal validation smoke,
 - temporal camera-cut RT history invalidation smoke,
 - full RT showcase smoke,
+- render-graph transient alias/no-alias matrix,
 - graphics settings persistence, unified graphics UI contracts, and runtime
   graphics settings application,
 - HUD mode, graphics preset, material editor, and showcase scene contracts,
@@ -42,17 +43,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_relea
 Result:
 
 - build_release: passed;
-- temporal validation: `gpu_ms=1.521`, `warnings=0`,
+- temporal validation: `gpu_ms=1.265`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=2.733/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.622/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`;
-- temporal camera-cut, graphics UI contract/runtime interaction, HUD, preset, material editor,
+- render-graph transient matrix: aliasing-on, aliasing-off, and bloom-transients-off rows passed;
+- temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, HUD, preset, material editor,
   showcase, ownership, fatal error,
   environment manifest, advanced graphics catalog, and effects gallery contracts passed;
 - screenshot negative gates, particle-disabled zero-cost, Phase 3 fallback
@@ -66,7 +68,7 @@ Result:
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_192026_492_140800_cd8984c4
+CortexEngine/build/bin/logs/runs/release_validation_20260510_192843_875_137568_e1f06141
 ```
 
 ## Renderer Scope

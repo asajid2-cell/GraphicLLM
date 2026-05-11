@@ -20,6 +20,8 @@ void Renderer::AccumulateRenderGraphExecutionStats(RenderGraphPassResult* result
     }
 
     m_frameDiagnostics.renderGraph.info.active = true;
+    m_frameDiagnostics.renderGraph.info.transientValidationRan =
+        m_frameDiagnostics.renderGraph.transientValidationRan;
     ++m_frameDiagnostics.renderGraph.info.executions;
     m_frameDiagnostics.renderGraph.info.graphPasses += passCount;
     m_frameDiagnostics.renderGraph.info.culledPasses += m_services.renderGraph->GetCulledPassCount();

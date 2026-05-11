@@ -280,6 +280,7 @@ set(CORTEX_SOURCES
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
+    src/Scene/ParticleEffectLibrary.cpp
     src/Scene/TerrainNoise.cpp
     src/Scene/BiomeMap.cpp
 
@@ -398,6 +399,7 @@ set(CORTEX_HEADERS
 
     src/Scene/ECS_Registry.h
     src/Scene/Components.h
+    src/Scene/ParticleEffectLibrary.h
     src/Scene/TerrainNoise.h
     src/Scene/BiomeTypes.h
     src/Scene/BiomeMap.h

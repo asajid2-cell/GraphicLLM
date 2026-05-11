@@ -210,9 +210,10 @@ contract reflects the applied controls. It is a runtime control-surface gate,
 not a mouse/keyboard automation test for the native Win32 widgets.
 
 The effects gallery test uses the Effects Showcase scene and asserts that the
-advanced graphics catalog is release-foundation validated, the particle
-contract is present, the particles pass executed, particles were submitted, and
-cinematic post was active without breaking visual or budget gates.
+advanced graphics catalog is release-foundation validated, the public particle
+effect library is present, the particle contract is present, the particles pass
+executed, particles were submitted, and cinematic post was active without
+breaking visual or budget gates.
 
 The Phase 3 fallback matrix verifies safe startup, no-RT startup, and explicit
 missing-environment fallback reporting. The particle-disabled zero-cost check

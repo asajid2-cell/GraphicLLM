@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_234247_548_36060_1e9785fd
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_235833_231_38436_cedd6bec
 ```
 
 Key evidence from that run:
@@ -59,19 +59,19 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.398`, `disocclusion=0.007139`,
-  `high_motion=0.005277`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.267`, `disocclusion=0.006633`,
+  `high_motion=0.005166`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.335`,
+  `camera=reflection_closeup`, `gpu_ms=3.291`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.617/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=2.022/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.023/2.5 changed=0.001/0.08`,
+  `temporal_diff=mean=0.009/2.5 changed=0.000/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
@@ -119,7 +119,11 @@ Key evidence from that run:
 - Lighting energy budget: RT Showcase, Material Lab, Glass/Water Courtyard,
   and Effects Showcase passed scene-level lighting/exposure/bloom and
   near-white/saturation budget checks; summary logs were written under
-  `lighting_energy_budget_20260510_234344_636_36924_0bb9f6ca`.
+  `lighting_energy_budget_20260511_000148_909_42292_47e5508e`.
+- Particle effect library: advanced graphics catalog passed with fire, smoke,
+  dust, sparks, embers, mist, rain, snow, and procedural billboard fallback;
+  Effects Gallery passed with `emitters=8`, `particles=77`, and
+  particle-disabled zero-cost still passed.
 - Vegetation state contract: extracted state bundle, renderer ownership audit
   coverage, frame-contract serialization, and dormant public draw pipeline
   reporting passed in the latest release gate.
@@ -203,7 +207,7 @@ long file/function lists in every row.
 | `tools/run_material_lab_smoke.ps1` | runtime | Runtime material lab visual/material coverage smoke. |
 | `tools/run_glass_water_courtyard_smoke.ps1` | runtime | Runtime glass/water/fog/RT/material scene smoke. |
 | `tools/run_effects_showcase_smoke.ps1` | runtime | Runtime effects scene smoke for particles, cinematic post, advanced material coverage. |
-| `tools/run_effects_gallery_tests.ps1` | runtime wrapper | Effects showcase plus catalog/contract checks. |
+| `tools/run_effects_gallery_tests.ps1` | runtime wrapper | Effects showcase plus catalog/contract checks, including the public particle effect descriptor library. |
 | `tools/run_environment_manifest_tests.ps1` | static/asset | Manifest schema/default/fallback/runtime asset checks; by itself not enough for runtime IBL behavior. |
 | `tools/run_ibl_asset_policy_tests.ps1` | static/asset | IBL startup/release-size policy: no startup downloads, source assets optional, legacy scan disabled, runtime format preferences, and budget-class asset size caps. |
 | `tools/run_ibl_gallery_tests.ps1` | runtime | Runtime environment loading and IBL visual checks. |
@@ -475,7 +479,7 @@ definition of done in `phase3.md`.
 | P3-GLOBAL-05 | Reviewer can inspect RT/raster/temporal state without guessing. | PARTIAL | SRC-CONTRACT, SRC-UI-P3, SRC-RT, SRC-TEMPORAL | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs`; `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | RT readiness/signal and temporal stats passed; RT scheduler UI contract exists. | Raster/temporal debug UI is not fully unified or interactively tested. |
 | P3-GLOBAL-06 | Reviewer can run release validation and get useful pass/fail output. | DONE_VERIFIED | `tools/run_release_validation.ps1`, `tools/README.md` | `tools/run_release_validation.ps1` | Latest release gate passed and printed per-step summaries/log dirs. | None for current suite. |
 | P3-GLOBAL-07 | Public scenes demonstrate renderer strengths. | PARTIAL | SRC-SCENES | `tools/run_phase3_visual_matrix.ps1 -NoBuild`; `tools/run_showcase_scene_contract_tests.ps1 -NoBuild -RuntimeSmoke` | Public scene metadata has no polish gaps and visual matrix passed. | Subjective composition and final asset/polish review remain. |
-| P3-GLOBAL-08 | Complex shaders, lighting, and particles used in composed scenes. | PARTIAL | SRC-SCENES, SRC-MATERIAL, `Renderer_Particles.cpp`, `RendererPostProcessState.h` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_material_lab_smoke.ps1 -NoBuild` | Effects showcase passed with particles and cinematic post; material lab covers advanced material counts. | GPU particles, effect library, DOF/motion blur/color grading, and richer shader controls remain incomplete. |
+| P3-GLOBAL-08 | Complex shaders, lighting, and particles used in composed scenes. | PARTIAL | SRC-SCENES, SRC-MATERIAL, `Renderer_Particles.cpp`, `RendererPostProcessState.h`, `src/Scene/ParticleEffectLibrary.cpp` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_material_lab_smoke.ps1 -NoBuild` | Effects showcase passed with particles and cinematic post; material lab covers advanced material counts. Particle effect library now validates fire, smoke, dust, sparks, embers, mist, rain, snow, and procedural billboard fallback; runtime effects gallery passed with `emitters=8`, `particles=77`. | GPU particles, DOF/motion blur/color grading, and richer shader controls remain incomplete. |
 | P3-GLOBAL-09 | Degraded behavior on low-memory or no-RT hardware is understandable. | PARTIAL | SRC-BUDGET, SRC-RT, SRC-UI-P3 | `tools/run_budget_profile_matrix.ps1 -NoBuild`; `tools/run_graphics_ui_contract_tests.ps1` | Budget matrix passed; RT scheduler UI contract exists. | No-RT hardware path is not proven by current run on RTX 3070 Ti. |
 | P3-GLOBAL-10 | Same scene/profile can be reproduced from config files. | DONE_VERIFIED | SRC-UI-P3, SRC-SCENES, `assets/config/graphics_presets.json` | `tools/run_graphics_preset_tests.ps1 -NoBuild -RuntimeSmoke`; `tools/run_phase3_visual_matrix.ps1 -NoBuild` | Preset runtime smoke and visual matrix passed. | More profiles can be added. |
 | P3-NONGOAL-01 | Do not restart infinite-world effort in Phase 3. | DEFERRED_BY_USER_ONLY | SRC-DOCS, git history | documentation/history inspection | Cortex release path focuses renderer; voxel backend is experimental smoke only. | Keep infinite-world/outdoor work out unless explicitly reopened by user. |
@@ -501,7 +505,7 @@ definition of done in `phase3.md`.
 | P3-WS-07 | RT and temporal tuning. | PARTIAL | SRC-RT, SRC-TEMPORAL, SRC-UI-P3 | `tools/run_rt_showcase_smoke.ps1`; `tools/run_temporal_validation_smoke.ps1`; `tools/run_graphics_ui_contract_tests.ps1` | RT readiness/signal, temporal stats, scheduler UI passed. | RT tuning sliders, firefly scenes, and luma-aware tuning are incomplete. |
 | P3-WS-08 | User experience polish. | PARTIAL | SRC-UI-P3, SRC-DOCS | `tools/run_hud_mode_contract_tests.ps1`; `tools/run_graphics_preset_tests.ps1` | HUD/preset/docs passed. | Launcher/profile UX and interactive UI automation incomplete. |
 | P3-WS-09 | Renderer architecture cleanup. | PARTIAL | SRC-STATE, `assets/config/renderer_ownership_targets.json` | `tools/run_renderer_ownership_tests.ps1`; `tools/run_renderer_full_ownership_audit.ps1`; `tools/run_release_validation.ps1` | Ownership gate and full member audit passed. | Full pass-owned resource extraction remains incomplete; renderer orchestration still centralizes pass execution. |
-| P3-WS-10 | Advanced shaders, lighting, and particles. | PARTIAL | SRC-MATERIAL, SRC-SCENES, `Renderer_Particles.cpp`, `RendererPostProcessState.h` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_advanced_graphics_catalog_tests.ps1` | Effects gallery and catalog passed. | Planned advanced feature projects are not complete. |
+| P3-WS-10 | Advanced shaders, lighting, and particles. | PARTIAL | SRC-MATERIAL, SRC-SCENES, `Renderer_Particles.cpp`, `RendererPostProcessState.h`, `src/Scene/ParticleEffectLibrary.cpp` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_advanced_graphics_catalog_tests.ps1` | Effects gallery and catalog passed. Particle descriptor library covers the planned public ECS effects set and procedural fallback. | Planned advanced material, GPU particle, and full cinematic-post feature projects are not complete. |
 
 ## Phase 3 Pass Ledger
 
@@ -537,7 +541,7 @@ definition of done in `phase3.md`.
 | P3-3AA | Advanced Material Shader Framework. | PARTIAL | SRC-MATERIAL, `assets/shaders/Basic.hlsl`, `DeferredLighting.hlsl`, `MaterialResolve.hlsl` | `tools/run_material_lab_smoke.ps1`; `tools/run_advanced_graphics_catalog_tests.ps1` | Material Lab checks advanced material counts; catalog says foundation validated. | Procedural masks and author-facing advanced material sliders incomplete. |
 | P3-3AB | Cinematic Lighting Rigs. | PARTIAL | `RendererLightingRigControl.cpp`, `RendererControlApplier_ScenePresets.cpp`, SRC-SCENES | `tools/run_phase3_visual_matrix.ps1 -NoBuild`; `tools/run_showcase_scene_contract_tests.ps1` | Public scenes report explicit rigs: material_lab_review, sunset_rim, night_emissive, RT gallery. | UI selection/command routing for rigs not fully implemented/tested. |
 | P3-3AC | GPU Particle System Foundation. | PARTIAL | `Renderer_Particles.cpp`, `RendererParticleState.h`, `GPUParticles.h`, particle shaders | `tools/run_effects_showcase_smoke.ps1 -NoBuild`; `tools/run_effects_gallery_tests.ps1 -NoBuild` | Effects showcase passes with live/submitted ECS billboard particles. | Public path is CPU/ECS billboards; GPU particle simulation/sort/render path is not public validated. |
-| P3-3AD | Particle Effect Library. | PARTIAL | SRC-SCENES, `RendererParticleState.h` | `tools/run_effects_gallery_tests.ps1 -NoBuild` | Effects showcase validates fire/smoke emitters. | Dust, sparks, embers, mist, rain, snow descriptors and fallback particle texture validation incomplete. |
+| P3-3AD | Particle Effect Library. | DONE_VERIFIED | `src/Scene/ParticleEffectLibrary.h`, `src/Scene/ParticleEffectLibrary.cpp`, `src/Scene/Components.h`, SRC-SCENES, `RendererParticleState.h` | `tools/run_advanced_graphics_catalog_tests.ps1`; `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_phase3_visual_matrix.ps1 -NoBuild` | Static catalog validates fire, smoke, dust, sparks, embers, mist, rain, snow, and `procedural_billboard` fallback policy. Runtime effects gallery passed with `emitters=8`, `particles=77`; particle-disabled zero-cost gate still passed; Phase 3 visual matrix passed. | None for the public ECS billboard particle effect library. GPU particle migration remains tracked separately. |
 | P3-3AE | Volumetric and Atmospheric Polish. | PARTIAL | fog/god-ray controls, `Engine_Scenes.cpp`, shaders | `tools/run_glass_water_courtyard_smoke.ps1 -NoBuild`; `tools/run_effects_showcase_smoke.ps1 -NoBuild` | Glass/water/effects scenes pass with fog/cinematic settings. | Volumetric shafts, environment-matched fog, depth consistency beyond current smokes incomplete. |
 | P3-3AF | Cinematic Post Stack. | PARTIAL | `RendererPostProcessState.h`, `Renderer_QualitySettings.cpp`, `PostProcess.hlsl`, `RendererTuningState.cpp` | `tools/run_effects_showcase_smoke.ps1 -NoBuild`; `tools/run_effects_gallery_tests.ps1 -NoBuild` | Effects showcase validates cinematic post enabled, vignette and lens dirt active. | DOF, motion blur, tone mapper/color grade presets incomplete. |
 | P3-3AG | Effects Showcase Scene. | DONE_VERIFIED | SRC-SCENES, `run_effects_showcase_smoke.ps1` | `tools/run_effects_showcase_smoke.ps1 -NoBuild`; release gate | Effects showcase passed with particles, cinematic post, advanced material coverage, visual stats. | Scene can still be polished, but current runtime gate passes. |
@@ -590,7 +594,7 @@ definition of done in `phase3.md`.
 | P3-GATE-10 | RT reflection tuning validation. | PARTIAL | SRC-RT | `tools/run_rt_showcase_smoke.ps1`; `tools/run_rt_firefly_outlier_scene.ps1 -NoBuild` | RT signal/readiness validated. Firefly/outlier gate passed with raw/history outlier ratios under stricter thresholds. | Tuning sliders and a deliberately overbright/clamped stress scene remain incomplete. |
 | P3-GATE-11 | Low-memory safe profile validation. | DONE_VERIFIED | SRC-BUDGET, budget script | `tools/run_budget_profile_matrix.ps1 -NoBuild` | Budget matrix passed 4 GB/2 GB. | No-RT hardware path still unproven. |
 | P3-GATE-12 | Advanced material shader validation. | PARTIAL | SRC-MATERIAL, shaders | `tools/run_material_lab_smoke.ps1`; `tools/run_advanced_graphics_catalog_tests.ps1` | Material Lab/catalog pass. | Full advanced shader framework still partial. |
-| P3-GATE-13 | Particle effect gallery validation. | PARTIAL | `tools/run_effects_gallery_tests.ps1`, particles | release gate effects gallery step | Effects gallery passed with fire/smoke particles. | Full effect library and GPU path incomplete. |
+| P3-GATE-13 | Particle effect gallery validation. | DONE_VERIFIED | `tools/run_effects_gallery_tests.ps1`, `tools/run_advanced_graphics_catalog_tests.ps1`, `src/Scene/ParticleEffectLibrary.cpp`, particles | `tools/run_effects_gallery_tests.ps1 -NoBuild`; release gate effects gallery step | Effects gallery passed after the full public effect-library implementation with `emitters=8`, `particles=77`; catalog validates all public effect descriptors and fallback policy. | None for the public ECS billboard gallery validation. GPU particle public path remains tracked separately. |
 | P3-GATE-14 | Effects showcase visual validation. | DONE_VERIFIED | `tools/run_effects_showcase_smoke.ps1`, SRC-SCENES | release gate effects/gallery/matrix steps | Effects showcase passed. | Further polish possible. |
 | P3-THRESH-01 | No fatal startup warnings in default profile. | DONE_VERIFIED | SRC-PREFLIGHT | `tools/run_release_validation.ps1` | Startup preflight warnings=0/errors=0 in inspected logs. | None for default profile. |
 | P3-THRESH-02 | No frame-contract warnings in release showcase. | DONE_VERIFIED | SRC-CONTRACT | `tools/run_rt_showcase_smoke.ps1` | RT showcase passed with warnings=0. | None for current scene. |
@@ -637,7 +641,7 @@ definition of done in `phase3.md`.
 | P3-ORDER-14 | Extend material registry and validation for material lab. | DONE_VERIFIED | SRC-MATERIAL | material lab/editor tests | Passed. | More advanced authoring remains. |
 | P3-ORDER-15 | Extend advanced material features and lab shader rows. | PARTIAL | SRC-MATERIAL, shaders, scenes | material lab/catalog tests | Foundations pass. | Procedural/authoring controls incomplete. |
 | P3-ORDER-16 | Extend lighting rigs and scene rig selection. | PARTIAL | lighting rig controls, scenes | visual matrix/showcase tests | Public scenes report explicit rigs. | UI/command rig selection incomplete. |
-| P3-ORDER-17 | Consolidate particle paths, descriptors, budget controls. | PARTIAL | particles, ownership manifest | effects gallery/ownership tests | ECS billboard path validated. | GPU public path/effect descriptors incomplete. |
+| P3-ORDER-17 | Consolidate particle paths, descriptors, budget controls. | PARTIAL | particles, ownership manifest, `src/Scene/ParticleEffectLibrary.cpp` | effects gallery/ownership tests | ECS billboard path, reusable effect descriptors, procedural fallback policy, density scaling, max-instance cap, and particle-disabled zero-cost behavior are validated. | GPU particle public path remains incomplete. |
 | P3-ORDER-18 | Add effects showcase scene with particles, emissives, advanced materials, cinematic post. | DONE_VERIFIED | SRC-SCENES | effects showcase smoke | Passed. | Further polish possible. |
 | P3-ORDER-19 | Polish public scenes and bookmarks. | PARTIAL | SRC-SCENES | visual matrix/showcase tests | Public scenes pass. | Human polish remains. |
 | P3-ORDER-20 | Add tolerant golden baselines after stability. | PARTIAL | `visual_baselines.json`, visual baseline tests | visual baseline contract; visual probe validation | Metric-tolerance manifest, runtime baseline contract, and all-case visual probe pass. | Full committed image comparison is not implemented. |
@@ -656,7 +660,7 @@ definition of done in `phase3.md`.
 | P3-DOD-05 | Material presets and validation strong enough for public scenes. | DONE_VERIFIED | SRC-MATERIAL | material lab/editor/RT smokes | Public scene material validation passes. | More presets optional. |
 | P3-DOD-06 | Advanced material shaders for clearcoat, anisotropy, wetness, sheen/subsurface approximation, emissive bloom. | PARTIAL | SRC-MATERIAL, shaders | material lab/catalog tests | Foundation features are detected/validated. | Full framework/controls/procedural masks incomplete. |
 | P3-DOD-07 | Cinematic lighting rigs selectable from scenes, UI, and validation. | PARTIAL | scenes/lighting controls | visual matrix/showcase tests | Scene/validation selection works. | UI/command selection incomplete. |
-| P3-DOD-08 | Controlled particle system with reusable effects and budget-aware quality scaling. | PARTIAL | particles, effects scene | effects gallery tests | ECS billboard particles and density foundation pass. | Reusable effect library/GPU path/quality matrix incomplete. |
+| P3-DOD-08 | Controlled particle system with reusable effects and budget-aware quality scaling. | DONE_VERIFIED | `Renderer_Particles.cpp`, `RendererParticleState.h`, `src/Scene/ParticleEffectLibrary.cpp`, `tools/run_effects_gallery_tests.ps1`, `tools/run_particle_disabled_zero_cost.ps1` | `tools/run_effects_gallery_tests.ps1 -NoBuild`; `tools/run_particle_disabled_zero_cost.ps1 -NoBuild`; `tools/run_phase3_visual_matrix.ps1 -NoBuild` | Runtime effects gallery passed with eight reusable public effects and live submitted particles; density/max-instance budget controls are active; particle-disabled profile reports zero planned/executed/live/submitted/allocation cost; Phase 3 visual matrix passed. | None for the public ECS billboard particle system. GPU particle simulation remains tracked separately. |
 | P3-DOD-09 | Cinematic post controls improve scenes without hiding correctness. | PARTIAL | post state/shaders/effects scene | effects showcase smoke | Vignette/lens dirt foundations pass. | DOF/motion blur/color grade and quality review incomplete. |
 | P3-DOD-10 | RT reflection tuning measurable and stable. | PARTIAL | SRC-RT | RT showcase smoke; `tools/run_rt_firefly_outlier_scene.ps1 -NoBuild` | Raw/history metrics stable in current showcase; firefly/outlier gate passes strict raw/history outlier thresholds. | Tuning controls and explicit overbright clamp scene incomplete. |
 | P3-DOD-11 | RT scheduling/fallback explained in UI and contracts. | DONE_VERIFIED | GraphicsSettingsWindow, frame contract | graphics UI contract; RT smoke | Scheduler panel/reasons and contract fields pass. | Interactive UI inspection optional. |
@@ -677,7 +681,7 @@ definition of done in `phase3.md`.
 | P3-REM-06 | Full golden/tolerant image comparison workflow. | PARTIAL | Baseline contracts and all-case visual probes exist; committed full image comparison is not implemented by policy. |
 | P3-REM-07 | RT reflection tuning sliders and firefly/outlier stress scenes. | PARTIAL | Firefly/outlier gate now passes strict RT showcase raw/history outlier thresholds. Tuning sliders and a deliberately overbright clamp stress scene remain incomplete. |
 | P3-REM-08 | GPU particle system as public validated path. | PARTIAL | Current public path is ECS billboard particles. |
-| P3-REM-09 | Particle effect descriptor library for dust, sparks, embers, mist, rain, snow, fallback texture. | PARTIAL | Fire/smoke foundations are validated only. |
+| P3-REM-09 | Particle effect descriptor library for dust, sparks, embers, mist, rain, snow, fallback texture. | DONE_VERIFIED | `src/Scene/ParticleEffectLibrary.cpp`, `assets/config/advanced_graphics_catalog.json`, `tools/run_advanced_graphics_catalog_tests.ps1`, `tools/run_effects_gallery_tests.ps1` | `tools/run_advanced_graphics_catalog_tests.ps1`; `tools/run_effects_gallery_tests.ps1 -NoBuild` | Descriptor library and catalog cover dust, sparks, embers, mist, rain, snow, fire, smoke, and procedural billboard fallback; runtime effects gallery passed with the complete public emitter set. | None for the descriptor library. |
 | P3-REM-10 | Full cinematic post stack: DOF, motion blur, tone mapper/color-grade presets. | PARTIAL | Bloom/vignette/lens dirt foundations only. |
 | P3-REM-11 | Volumetric/atmospheric polish beyond current fog/god-ray settings. | PARTIAL | Current scenes pass, but advanced atmosphere pass is not complete. |
 | P3-REM-12 | Lighting rig selection from UI and commands. | PARTIAL | Scene/validation rigs and LLM command selection now work and are runtime-tested; native UI rig selection remains incomplete. |
@@ -743,11 +747,9 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    are user-deferred:
 
    - outdoor/sunset beach scene;
-   - local reflection probes;
    - GPU particles as the public particle path;
    - full Phase 3 graphics slider inventory;
    - full cinematic post stack;
-   - particle effect library beyond fire/smoke;
 
 5. Only after the missing gates exist and pass should the status move from
    "release-gated foundation" to "`phase2.md` and `phase3.md` complete."

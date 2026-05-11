@@ -34,15 +34,21 @@
       "existing_entry_points": [
         "src/Graphics/Renderer_Particles.cpp",
         "src/Graphics/RendererParticleState.h",
+        "src/Scene/ParticleEffectLibrary.h",
+        "src/Scene/ParticleEffectLibrary.cpp",
         "src/Graphics/GPUParticles.h",
         "assets/shaders/Particles.hlsl",
         "assets/shaders/ParticleSimulate.hlsl",
         "assets/shaders/ParticleRender.hlsl"
       ],
-      "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "density_scale", "frame_contract_stats", "budgeted_zero_cost_disabled_path"],
+      "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "dust_motes", "sparks", "embers", "mist", "rain", "snow", "density_scale", "frame_contract_stats", "budgeted_zero_cost_disabled_path", "procedural_billboard_fallback"],
       "validation_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
       "first_validation_scene": "effects_showcase",
-      "future_extensions": ["dust_motes", "sparks", "embers", "mist", "rain", "snow", "gpu_particle_public_path"]
+      "fallback_policy": {
+        "texture": "procedural_billboard",
+        "startup_downloads": false
+      },
+      "future_extensions": ["gpu_particle_public_path", "textured_particle_atlas"]
     },
     {
       "id": "cinematic_post",

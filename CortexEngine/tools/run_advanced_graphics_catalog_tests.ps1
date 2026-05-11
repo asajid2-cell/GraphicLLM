@@ -141,10 +141,48 @@ if ($systems.ContainsKey("particles")) {
     foreach ($feature in $systems["particles"].validated_features) {
         $features[[string]$feature] = $true
     }
-    foreach ($requiredParticleFeature in @("ecs_billboard_emitters", "fire", "smoke", "density_scale", "frame_contract_stats")) {
+    foreach ($requiredParticleFeature in @(
+        "ecs_billboard_emitters",
+        "fire",
+        "smoke",
+        "dust_motes",
+        "sparks",
+        "embers",
+        "mist",
+        "rain",
+        "snow",
+        "density_scale",
+        "frame_contract_stats",
+        "budgeted_zero_cost_disabled_path",
+        "procedural_billboard_fallback")) {
         if (-not $features.ContainsKey($requiredParticleFeature)) {
             Add-Failure "particles missing validated feature '$requiredParticleFeature'"
         }
+    }
+    if ($null -eq $systems["particles"].fallback_policy) {
+        Add-Failure "particles fallback_policy is missing"
+    } else {
+        if ([string]$systems["particles"].fallback_policy.texture -ne "procedural_billboard") {
+            Add-Failure "particles fallback texture must be procedural_billboard"
+        }
+        if ([bool]$systems["particles"].fallback_policy.startup_downloads) {
+            Add-Failure "particles fallback policy must not use startup downloads"
+        }
+    }
+
+    $particleLibraryPath = Join-Path $root "src/Scene/ParticleEffectLibrary.cpp"
+    $particleLibrary = if (Test-Path $particleLibraryPath) {
+        Get-Content $particleLibraryPath -Raw
+    } else {
+        ""
+    }
+    foreach ($effectId in @("fire", "smoke", "dust", "sparks", "embers", "mist", "rain", "snow")) {
+        if ($particleLibrary.IndexOf("`"$effectId`"", [StringComparison]::Ordinal) -lt 0) {
+            Add-Failure "particle effect library missing effect id '$effectId'"
+        }
+    }
+    if ($particleLibrary.IndexOf("procedural_billboard", [StringComparison]::Ordinal) -lt 0) {
+        Add-Failure "particle effect library missing procedural billboard fallback"
     }
 }
 if ($systems.ContainsKey("cinematic_post")) {

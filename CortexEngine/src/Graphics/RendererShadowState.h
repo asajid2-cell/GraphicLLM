@@ -6,6 +6,7 @@
 
 #include "Graphics/Renderer_ConstantBuffer.h"
 #include "RHI/DescriptorHeap.h"
+#include "Utils/Result.h"
 
 namespace Cortex::Graphics {
 
@@ -16,6 +17,82 @@ struct ShadowMapResources {
     DescriptorHandle srv;
     D3D12_RESOURCE_STATES resourceState = D3D12_RESOURCE_STATE_COMMON;
     bool initializedForEditor = false;
+
+    [[nodiscard]] Result<void> CreateMap(ID3D12Device* device,
+                                         DescriptorHeapManager* descriptorManager,
+                                         UINT shadowDim) {
+        if (!device || !descriptorManager || shadowDim == 0) {
+            return Result<void>::Err("Renderer not initialized for shadow map creation");
+        }
+
+        D3D12_RESOURCE_DESC shadowDesc = {};
+        shadowDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        shadowDesc.Width = shadowDim;
+        shadowDesc.Height = shadowDim;
+        shadowDesc.DepthOrArraySize = ShadowArraySize;
+        shadowDesc.MipLevels = 1;
+        shadowDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+        shadowDesc.SampleDesc.Count = 1;
+        shadowDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = DXGI_FORMAT_D32_FLOAT;
+        clearValue.DepthStencil.Depth = 1.0f;
+
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        const HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &shadowDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &clearValue,
+            IID_PPV_ARGS(&map));
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create shadow map resource");
+        }
+
+        resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+        for (uint32_t i = 0; i < ShadowArraySize; ++i) {
+            auto dsvResult = descriptorManager->AllocateDSV();
+            if (dsvResult.IsErr()) {
+                return Result<void>::Err("Failed to allocate DSV for shadow cascade: " + dsvResult.Error());
+            }
+            dsvs[i] = dsvResult.Value();
+
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+            dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsvDesc.Texture2DArray.MipSlice = 0;
+            dsvDesc.Texture2DArray.FirstArraySlice = i;
+            dsvDesc.Texture2DArray.ArraySize = 1;
+            dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+            device->CreateDepthStencilView(map.Get(), &dsvDesc, dsvs[i].cpu);
+        }
+
+        auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<void>::Err("Failed to allocate staging SRV for shadow map: " + srvResult.Error());
+        }
+        srv = srvResult.Value();
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2DArray.MipLevels = 1;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+        srvDesc.Texture2DArray.ArraySize = ShadowArraySize;
+        device->CreateShaderResourceView(map.Get(), &srvDesc, srv.cpu);
+        return Result<void>::Ok();
+    }
 
     void Reset() {
         map.Reset();

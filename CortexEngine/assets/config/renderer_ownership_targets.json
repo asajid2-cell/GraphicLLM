@@ -256,9 +256,9 @@
       "id": "shadow_resources",
       "owner": "Shadow maps",
       "status": "release_boundary_validated",
-      "release_boundary": "Shadow map persistent resources, raster viewport/scissor state, and shadow tuning controls are split into nested pass-owned bundles. ShadowTargetPass owns shadow-map transitions, per-slice DSV binding, depth clear, viewport, and scissor setup while Renderer_ShadowPass keeps caster/material selection. Ownership plus runtime paths validate that shadows are rendered and consumed",
+      "release_boundary": "Shadow map persistent resources, raster viewport/scissor state, and shadow tuning controls are split into nested pass-owned bundles. ShadowMapResources::CreateMap owns the shadow map texture, per-slice DSVs, and SRV creation; Renderer_ShadowResources.cpp supplies the budgeted dimension, renderer services, raster viewport/scissor setup, and environment descriptor refresh. ShadowTargetPass owns shadow-map transitions, per-slice DSV binding, depth clear, viewport, and scissor setup while Renderer_ShadowPass keeps caster/material selection. Ownership plus runtime paths validate that shadows are rendered and consumed",
       "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
-      "target_files": ["RendererShadowState.h", "Passes/ShadowTargetPass.h", "Passes/ShadowTargetPass.cpp", "Renderer_ShadowPass.cpp"],
+      "target_files": ["RendererShadowState.h", "Passes/ShadowTargetPass.h", "Passes/ShadowTargetPass.cpp", "Renderer_ShadowResources.cpp", "Renderer_ShadowPass.cpp"],
       "renderer_state_members": ["m_shadowResources", "m_shadowCascadeState", "m_localShadowState"],
       "future_extension": "Keep future shadow map and cascade resource expansion inside resources/raster/controls or the existing cascade/local shadow state before adding renderer orchestration"
     },

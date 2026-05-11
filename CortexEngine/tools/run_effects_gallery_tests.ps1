@@ -111,6 +111,27 @@ if ($null -eq $particles) {
     if ([int]$particles.instance_capacity -lt [int]$particles.submitted_instances) {
         Add-Failure "particle instance capacity is smaller than submitted instances"
     }
+    if ([string]$particles.runtime_backend -ne "ecs_billboard_instanced") {
+        Add-Failure "particle runtime_backend was '$($particles.runtime_backend)', expected ecs_billboard_instanced"
+    }
+    if (-not [bool]$particles.public_runtime_path) {
+        Add-Failure "particles.public_runtime_path is false"
+    }
+    if ([bool]$particles.gpu_particle_public_path) {
+        Add-Failure "particles.gpu_particle_public_path unexpectedly reported true for the ECS billboard public path"
+    }
+    if (-not [bool]$particles.simulation_budget_tracked) {
+        Add-Failure "particles.simulation_budget_tracked is false"
+    }
+    if ([int]$particles.simulation_budget_particles -lt [int]$particles.submitted_instances) {
+        Add-Failure "particle simulation budget is smaller than submitted instances"
+    }
+    if ([int64]$particles.simulation_budget_bytes -le 0) {
+        Add-Failure "particle simulation_budget_bytes is not positive"
+    }
+    if ([int64]$particles.upload_bytes_this_frame -le 0) {
+        Add-Failure "particle upload_bytes_this_frame is not positive"
+    }
 
     $drawInstances = [int]$report.frame_contract.draw_counts.particle_instances
     if ([int]$particles.submitted_instances -ne $drawInstances) {

@@ -153,6 +153,8 @@ if ($systems.ContainsKey("particles")) {
         "snow",
         "density_scale",
         "frame_contract_stats",
+        "runtime_backend_stats",
+        "simulation_budget_stats",
         "budgeted_zero_cost_disabled_path",
         "procedural_billboard_fallback")) {
         if (-not $features.ContainsKey($requiredParticleFeature)) {

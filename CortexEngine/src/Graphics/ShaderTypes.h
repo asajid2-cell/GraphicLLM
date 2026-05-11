@@ -200,7 +200,7 @@ struct MaterialConstants {
     // z,w reserved for future layering parameters.
     alignas(16) glm::vec4 coatParams;
     // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
-    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w reserved.
+    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w = procedural mask.
     alignas(16) glm::vec4 transmissionParams;
     // Specular extension (KHR_materials_specular).
     // rgb = specular color factor (linear), w = specular factor.

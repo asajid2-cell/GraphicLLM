@@ -124,7 +124,7 @@ cbuffer MaterialConstants : register(b2)
     float4 g_FractalParams2; // x=lacunarity, y=gain, z=warpStrength, w=noiseType (0=fbm,1=ridged,2=turb)
     // x = clear-coat weight, y = clear-coat roughness, z/w reserved.
     float4 g_CoatParams;
-    // x = transmission factor, y = IOR, z = emissive bloom boost, w reserved
+    // x = transmission factor, y = IOR, z = emissive bloom boost, w = procedural mask
     float4 g_TransmissionParams;
     // rgb = specular color factor (linear), w = specular factor
     float4 g_SpecularParams;
@@ -406,6 +406,22 @@ float FractalHeightBase(float2 p, float amplitude, float frequency, int octaves,
 // Backward-compatible helper with default lacunarity/gain/warp/noiseType
 float FractalHeight(float2 p, float amplitude, float frequency, int octaves) {
     return FractalHeightBase(p, amplitude, frequency, octaves, 2.0f, 0.5f, 0.0f, 0);
+}
+
+float ProceduralMaterialMask(float2 uv, float3 worldPos)
+{
+    float mode = g_FractalParams1.x;
+    float2 scale = max(abs(g_FractalParams1.yz), float2(6.0f, 6.0f));
+    float2 p = (mode < 0.5f) ? (uv * scale) : (worldPos.xz * max(scale, float2(0.25f, 0.25f)));
+    float amplitude = max(abs(g_FractalParams0.x), 0.35f);
+    float frequency = max(abs(g_FractalParams0.y), 1.75f);
+    int octaves = max((int)g_FractalParams0.z, 3);
+    float lacunarity = max(g_FractalParams2.x, 1.8f);
+    float gain = (g_FractalParams2.y > 0.0f) ? saturate(g_FractalParams2.y) : 0.55f;
+    float warpStrength = max(g_FractalParams2.z, 0.15f);
+    int noiseType = (int)g_FractalParams2.w;
+    float h = FractalHeightBase(p, amplitude, frequency, octaves, lacunarity, gain, warpStrength, noiseType);
+    return saturate(0.5f + h / max(2.0f * amplitude, 1.0e-3f));
 }
 
 float3 ApplyACESFilm(float3 x)
@@ -1643,6 +1659,14 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
         // Only apply biome values if no explicit texture maps are provided
         if (!hasMetallicMap) metallic = biomeMetallic;
         if (!hasRoughnessMap) roughness = biomeRoughness;
+    }
+    float proceduralMaskStrength = saturate(g_TransmissionParams.w);
+    if (proceduralMaskStrength > 0.001f)
+    {
+        float mask = ProceduralMaterialMask(input.texCoord, input.worldPos);
+        float albedoVariation = lerp(0.78f, 1.16f, mask);
+        albedo = saturate(albedo * lerp(1.0f, albedoVariation, proceduralMaskStrength));
+        roughness = saturate(lerp(roughness, roughness + (mask - 0.5f) * 0.35f, proceduralMaskStrength));
     }
 
     float ao = g_AO;

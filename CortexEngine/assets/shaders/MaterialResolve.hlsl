@@ -77,7 +77,7 @@ struct VBMaterialConstants {
     // x = clear-coat weight, y = clear-coat roughness, z = sheen weight, w = SSS wrap
     float4 coatParams;
     // Transmission + IOR (KHR_materials_transmission / KHR_materials_ior).
-    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w reserved.
+    // x = transmission factor (0..1), y = IOR (>= 1), z = emissive bloom boost, w = procedural mask.
     float4 transmissionParams;
     // Specular extension (KHR_materials_specular).
     // rgb = specular color factor (linear), w = specular factor.
@@ -309,6 +309,32 @@ float3 ComputeScreenSpaceBarycentrics(float2 p, float2 v0, float2 v1, float2 v2)
     return float3(w0 * invArea, w1 * invArea, w2 * invArea);
 }
 
+float Hash21(float2 p) {
+    float3 p3 = frac(float3(p.x, p.y, p.x) * 0.1031f);
+    p3 += dot(p3, p3.yzx + 33.33f);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float ValueNoise2D(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0f - 2.0f * f);
+    float a = Hash21(i);
+    float b = Hash21(i + float2(1, 0));
+    float c = Hash21(i + float2(0, 1));
+    float d = Hash21(i + float2(1, 1));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float ProceduralMaterialMask(float2 uv, float3 worldPos, uint materialClass) {
+    float classOffset = (float)(materialClass % 17u) * 13.71f;
+    float2 p = uv * 9.0f + worldPos.xz * 0.21f + float2(classOffset, classOffset);
+    float mask = 0.55f * ValueNoise2D(p) +
+                 0.30f * ValueNoise2D(p * 2.17f + 19.3f) +
+                 0.15f * ValueNoise2D(p * 4.41f - 7.1f);
+    return saturate(mask);
+}
+
 // Compute shader: One thread per pixel
 [numthreads(8, 8, 1)]
 void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
@@ -474,6 +500,7 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         float occlusionStrength = saturate(mat.extraParams.x);
         float normalScale = max(mat.extraParams.y, 0.0f);
         float wetnessFactor = saturate(mat.extraParams.w);
+        float proceduralMaskStrength = saturate(mat.transmissionParams.w);
         emissive = max(mat.emissiveFactorStrength.rgb, 0.0f) * max(mat.emissiveFactorStrength.w, 0.0f);
         emissive *= (1.0f + saturate(mat.transmissionParams.z) * 2.0f);
         clearCoatWeight = saturate(mat.coatParams.x);
@@ -592,6 +619,12 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
         metallic = saturate(metallic);
         roughness = saturate(roughness);
         ao = saturate(ao);
+        if (proceduralMaskStrength > 0.001f) {
+            float mask = ProceduralMaterialMask(texCoord, worldPos, mat.materialClass);
+            float albedoVariation = lerp(0.78f, 1.16f, mask);
+            albedo = saturate(albedo * lerp(1.0f, albedoVariation, proceduralMaskStrength));
+            roughness = saturate(lerp(roughness, roughness + (mask - 0.5f) * 0.35f, proceduralMaskStrength));
+        }
 
         // KHR_materials_transmission: transmissionTexture stored in R.
         if (mat.textureIndices3.x != INVALID_BINDLESS_INDEX) {

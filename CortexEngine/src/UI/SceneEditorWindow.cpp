@@ -65,6 +65,8 @@ enum ControlIdEditor : int {
     IDC_SE_FOCUSED_WETNESS_SLIDER = 3229,
     IDC_SE_FOCUSED_EMISSIVE_BLOOM_LABEL = 3230,
     IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER = 3231,
+    IDC_SE_FOCUSED_PROCEDURAL_LABEL = 3232,
+    IDC_SE_FOCUSED_PROCEDURAL_SLIDER = 3233,
 };
 
 struct SceneEditorState {
@@ -99,6 +101,7 @@ struct SceneEditorState {
     HWND sliderFocusedAnisotropy = nullptr;
     HWND sliderFocusedWetness = nullptr;
     HWND sliderFocusedEmissiveBloom = nullptr;
+    HWND sliderFocusedProceduralMask = nullptr;
     HWND sliderFocusedScale = nullptr;
     HWND btnApplyMaterial = nullptr;
     HWND btnApplyScale = nullptr;
@@ -230,6 +233,7 @@ void RefreshMaterialValidationStatus() {
     const float anisotropy = Slider01ToFloat(g_ed.sliderFocusedAnisotropy, 0.0f, 1.0f);
     const float wetness = Slider01ToFloat(g_ed.sliderFocusedWetness, 0.0f, 1.0f);
     const float emissiveBloom = Slider01ToFloat(g_ed.sliderFocusedEmissiveBloom, 0.0f, 1.0f);
+    const float proceduralMask = Slider01ToFloat(g_ed.sliderFocusedProceduralMask, 0.0f, 1.0f);
     const float emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     const Graphics::MaterialPresetInfo info = Graphics::MaterialPresetRegistry::Resolve(preset);
 
@@ -257,6 +261,8 @@ void RefreshMaterialValidationStatus() {
         status = L"Material validation: warning - anisotropy is clearest on metals or fabric";
     } else if (emissiveBloom > 0.2f && emissiveStrength <= 1.0f) {
         status = L"Material validation: warning - bloom needs emissive strength above 1";
+    } else if (proceduralMask > 0.6f && preset.empty()) {
+        status = L"Material validation: warning - procedural mask is clearest with a named material";
     } else if (emissiveStrength > 8.0f && preset.empty()) {
         status = L"Material validation: warning - high emissive strength without emissive preset";
     }
@@ -401,6 +407,8 @@ void ApplyMaterialToFocusedFromUI() {
     cmd->wetness = Slider01ToFloat(g_ed.sliderFocusedWetness, 0.0f, 1.0f);
     cmd->setEmissiveBloom = true;
     cmd->emissiveBloom = Slider01ToFloat(g_ed.sliderFocusedEmissiveBloom, 0.0f, 1.0f);
+    cmd->setProceduralMask = true;
+    cmd->proceduralMask = Slider01ToFloat(g_ed.sliderFocusedProceduralMask, 0.0f, 1.0f);
     cmd->setEmissiveStrength = true;
     cmd->emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     cmd->setAO = false;
@@ -664,6 +672,10 @@ void RegisterSceneEditorClass() {
 
             makeLabel(L"Emissive Bloom", y);
             g_ed.sliderFocusedEmissiveBloom = makeSlider(IDC_SE_FOCUSED_EMISSIVE_BLOOM_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Procedural Mask", y);
+            g_ed.sliderFocusedProceduralMask = makeSlider(IDC_SE_FOCUSED_PROCEDURAL_SLIDER, y);
             y += sliderHeight + rowGap;
 
             makeLabel(L"Uniform Scale", y);

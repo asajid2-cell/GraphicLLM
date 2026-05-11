@@ -310,6 +310,7 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
         const bool advancedAnisotropy = materialModel.anisotropyStrength > 0.001f;
         const bool advancedWetness = materialModel.wetnessFactor > 0.001f;
         const bool advancedEmissiveBloom = materialModel.emissiveBloomFactor > 0.001f;
+        const bool advancedProceduralMask = materialModel.proceduralMaskStrength > 0.001f;
         if (advancedClearcoat) {
             ++snapshot.materials.advancedClearcoat;
         }
@@ -337,9 +338,13 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
         if (advancedEmissiveBloom) {
             ++snapshot.materials.advancedEmissiveBloom;
         }
+        if (advancedProceduralMask) {
+            ++snapshot.materials.advancedProceduralMask;
+        }
         if (advancedClearcoat || advancedTransmission || resolvedEmissive ||
             advancedSpecular || advancedSheen || advancedSubsurface ||
-            advancedAnisotropy || advancedWetness || advancedEmissiveBloom) {
+            advancedAnisotropy || advancedWetness || advancedEmissiveBloom ||
+            advancedProceduralMask) {
             ++snapshot.materials.advancedFeatureMaterials;
         }
 

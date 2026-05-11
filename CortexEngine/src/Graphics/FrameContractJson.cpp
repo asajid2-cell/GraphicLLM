@@ -172,6 +172,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"advanced_anisotropy", contract.materials.advancedAnisotropy},
             {"advanced_wetness", contract.materials.advancedWetness},
             {"advanced_emissive_bloom", contract.materials.advancedEmissiveBloom},
+            {"advanced_procedural_mask", contract.materials.advancedProceduralMask},
             {"surface_default", contract.materials.surfaceDefault},
             {"surface_glass", contract.materials.surfaceGlass},
             {"surface_mirror", contract.materials.surfaceMirror},

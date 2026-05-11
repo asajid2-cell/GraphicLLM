@@ -330,6 +330,7 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     materialCountExceedsSampled(contract.materials.advancedAnisotropy, "advanced_anisotropy");
     materialCountExceedsSampled(contract.materials.advancedWetness, "advanced_wetness");
     materialCountExceedsSampled(contract.materials.advancedEmissiveBloom, "advanced_emissive_bloom");
+    materialCountExceedsSampled(contract.materials.advancedProceduralMask, "advanced_procedural_mask");
     const uint32_t advancedFeatureSum =
         contract.materials.advancedClearcoat +
         contract.materials.advancedTransmission +
@@ -339,7 +340,8 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.materials.advancedSubsurface +
         contract.materials.advancedAnisotropy +
         contract.materials.advancedWetness +
-        contract.materials.advancedEmissiveBloom;
+        contract.materials.advancedEmissiveBloom +
+        contract.materials.advancedProceduralMask;
     if (contract.materials.advancedFeatureMaterials > 0 && advancedFeatureSum == 0) {
         warn("material_advanced_feature_materials_without_feature_counts");
     }

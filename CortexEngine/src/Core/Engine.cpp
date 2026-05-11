@@ -1950,6 +1950,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
                 {"anisotropy", renderable.anisotropyStrength},
                 {"wetness", renderable.wetnessFactor},
                 {"emissive_bloom", renderable.emissiveBloomFactor},
+                {"procedural_mask", renderable.proceduralMaskStrength},
                 {"emissive_strength", renderable.emissiveStrength}
             };
             break;

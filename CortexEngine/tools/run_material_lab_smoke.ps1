@@ -162,7 +162,8 @@ if ($failures.Count -eq 0) {
         [int]$materials.advanced_subsurface -lt 1 -or
         [int]$materials.advanced_anisotropy -lt 1 -or
         [int]$materials.advanced_wetness -lt 1 -or
-        [int]$materials.advanced_emissive_bloom -lt 1) {
+        [int]$materials.advanced_emissive_bloom -lt 1 -or
+        [int]$materials.advanced_procedural_mask -lt 1) {
         Add-Failure "advanced material coverage is incomplete"
     }
 }

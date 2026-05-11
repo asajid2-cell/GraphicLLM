@@ -30,6 +30,15 @@ bool BindPipelineState(const PipelineStateContext& context) {
     return true;
 }
 
+bool SwitchPipelineState(ID3D12GraphicsCommandList* commandList,
+                         ID3D12PipelineState* pipelineState) {
+    if (!commandList || !pipelineState) {
+        return false;
+    }
+    commandList->SetPipelineState(pipelineState);
+    return true;
+}
+
 bool BindObjectMaterial(const ObjectMaterialContext& context) {
     if (!context.commandList || context.objectConstants == 0) {
         return false;

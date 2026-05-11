@@ -1187,7 +1187,7 @@ foreach ($target in $doc.targets) {
     if ($id -eq "mesh_pipeline_material_binding") {
         if (Test-Path $meshDrawPassPath) {
             $meshDrawPass = Get-Content $meshDrawPassPath -Raw
-            foreach ($required in @("PipelineStateContext", "ObjectMaterialContext", "BindPipelineState", "BindObjectMaterial", "SetGraphicsRootSignature", "SetDescriptorHeaps", "SetGraphicsRootConstantBufferView(1", "SetGraphicsRootDescriptorTable(4", "IASetPrimitiveTopology", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "SetGraphicsRootDescriptorTable(3")) {
+            foreach ($required in @("PipelineStateContext", "ObjectMaterialContext", "BindPipelineState", "SwitchPipelineState", "BindObjectMaterial", "SetGraphicsRootSignature", "SetDescriptorHeaps", "SetPipelineState", "SetGraphicsRootConstantBufferView(1", "SetGraphicsRootDescriptorTable(4", "IASetPrimitiveTopology", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "SetGraphicsRootDescriptorTable(3")) {
                 if ($meshDrawPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                     Add-Failure "mesh_pipeline_material_binding missing MeshDrawPass binding marker: $required"
                 }
@@ -1205,7 +1205,7 @@ foreach ($target in $doc.targets) {
         )) {
             if (Test-Path $pathInfo.Path) {
                 $meshSource = Get-Content $pathInfo.Path -Raw
-                foreach ($directBindingCall in @("SetGraphicsRootSignature", "SetDescriptorHeaps", "SetGraphicsRootDescriptorTable(3", "SetGraphicsRootDescriptorTable(4", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "IASetPrimitiveTopology")) {
+                foreach ($directBindingCall in @("SetGraphicsRootSignature", "SetDescriptorHeaps", "SetPipelineState", "SetGraphicsRootDescriptorTable(3", "SetGraphicsRootDescriptorTable(4", "SetGraphicsRootConstantBufferView(0", "SetGraphicsRootConstantBufferView(2", "IASetPrimitiveTopology")) {
                     if ($meshSource.IndexOf($directBindingCall, [StringComparison]::Ordinal) -ge 0) {
                         Add-Failure "mesh_pipeline_material_binding still performs shared mesh root/material binding directly in $($pathInfo.Label): $directBindingCall"
                     }

@@ -74,7 +74,10 @@ void Renderer::RenderDepthPrepass(Scene::ECS_Registry* registry) {
         }
 
         if (desiredDepthPipeline != currentDepthPipeline) {
-            m_commandResources.graphicsList->SetPipelineState(desiredDepthPipeline->GetPipelineState());
+            if (!MeshDrawPass::SwitchPipelineState(m_commandResources.graphicsList.Get(),
+                                                   desiredDepthPipeline->GetPipelineState())) {
+                continue;
+            }
             currentDepthPipeline = desiredDepthPipeline;
         }
 

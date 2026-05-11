@@ -167,6 +167,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.lighting.fogHeight = m_fogState.height;
     contract.lighting.fogFalloff = m_fogState.falloff;
     contract.lighting.godRayIntensity = m_postProcessState.godRayIntensity;
+    contract.lighting.areaLightSizeScale = m_lightingState.areaLightSizeScale;
     contract.lighting.shadowBias = m_shadowResources.bias;
     contract.lighting.shadowPCFRadius = m_shadowResources.pcfRadius;
 

@@ -247,6 +247,7 @@ struct FrameContract {
         float fogHeight = 0.0f;
         float fogFalloff = 0.0f;
         float godRayIntensity = 0.0f;
+        float areaLightSizeScale = 1.0f;
         float shadowBias = 0.0f;
         float shadowPCFRadius = 0.0f;
         uint32_t lightCount = 0;

@@ -169,6 +169,7 @@ if ($exitCode -ne 0) {
     if ([bool]$fc.lighting.safe_rig_on_low_vram) { Add-Failure "safe lighting rig remained enabled despite UI settings" }
     Assert-Near "exposure" ([double]$fc.lighting.exposure) 1.31 0.03
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.19 0.03
+    Assert-Near "area_light_size_scale" ([double]$fc.lighting.area_light_size_scale) 1.42 0.04
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
     Assert-Near "environment_rotation_degrees" ([double]$fc.environment.rotation_degrees) 137.0 0.5

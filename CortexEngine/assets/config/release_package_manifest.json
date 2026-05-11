@@ -42,6 +42,7 @@
     "assets/*.dds",
     "assets/environments/*.json",
     "assets/shaders/*.hlsl",
+    "assets/shaders/*.hlsli",
     "assets/shaders/*.dxil",
     "assets/textures/rtshowcase/*.dds"
   ],
@@ -71,6 +72,7 @@
     "renderer_full_ownership_audit",
     "rt_firefly_outlier",
     "rt_overbright_clamp",
+    "release_package_launch_smoke",
     "budget_profile_matrix"
   ]
 }

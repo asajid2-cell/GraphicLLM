@@ -46,7 +46,7 @@ validation suite:
 - environment manifest, IBL asset policy, and IBL gallery checks,
 - Phase 3 environment/RT fallback matrix,
 - RT reflection firefly/outlier check,
-- Release Package Contract validation for the public-review payload manifest,
+- Release Package Contract validation and staged launch smoke for the public-review payload,
 - RT budget profile matrix,
 - voxel backend smoke.
 
@@ -114,6 +114,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_particle_disabled_zero_cost.p
 powershell -ExecutionPolicy Bypass -File tools/run_screenshot_negative_gates.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_rt_firefly_outlier_scene.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_renderer_full_ownership_audit.ps1
+powershell -ExecutionPolicy Bypass -File tools/run_release_package_launch_smoke.ps1 -NoBuild
 ```
 
 The UI contract test verifies the unified graphics settings window is compiled,
@@ -230,13 +231,17 @@ Run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/run_release_package_contract_tests.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_release_package_launch_smoke.ps1 -NoBuild
 ```
 
 The package contract reads `assets/config/release_package_manifest.json`,
 validates required docs and runtime files, checks that the planned public-review
 payload excludes models, logs, build products, HDR/EXR source environments, and
 other forbidden artifacts, and verifies that required release validation steps
-remain wired into `run_release_validation.ps1`.
+remain wired into `run_release_validation.ps1`. The launch smoke stages exactly
+the manifest-selected runtime payload into an isolated directory, starts
+`CortexEngine.exe` from that directory with `safe_startup`, and requires a clean
+exit plus valid frame report from the staged working directory.
 
 Default budgets are intentionally strict for the RT showcase scene:
 

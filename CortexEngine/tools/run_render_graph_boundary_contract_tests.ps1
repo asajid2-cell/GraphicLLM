@@ -35,6 +35,8 @@ $diagnostics = Read-Text "src/Graphics/Renderer_RenderGraphDiagnostics.cpp"
 $vbGraph = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
 $vbBoundary = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
 $bloomBoundary = Read-Text "src/Graphics/Renderer_RenderGraphBloom.cpp"
+$postPhase = Read-Text "src/Graphics/Renderer_FramePhases_Post.cpp"
+$endFrameGraph = Read-Text "src/Graphics/Renderer_RenderGraphEndFrame.cpp"
 
 foreach ($envName in @(
     "CORTEX_RG_TRANSIENT_VALIDATE",
@@ -75,6 +77,9 @@ Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbBoundary "visibilit
 Assert-Matches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "graph path did not execute"
 Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "RenderBloom\("
 Assert-NotMatches "Renderer_RenderGraphBloom.cpp" $bloomBoundary "falling back to legacy path"
+Assert-Matches "Renderer_FramePhases_Post.cpp" $postPhase "!featurePlan\.useRenderGraphPost"
+Assert-NotMatches "Renderer_FramePhases_Post.cpp" $postPhase "RenderBloom\("
+Assert-NotMatches "Renderer_RenderGraphEndFrame.cpp" $endFrameGraph "fallbackExecutions"
 
 foreach ($removedPattern in @(
     "AddLegacyPath",

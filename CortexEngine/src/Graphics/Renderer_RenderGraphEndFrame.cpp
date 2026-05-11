@@ -300,7 +300,6 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     Debug::GPUProfiler::Get().EndScope(m_commandResources.graphicsList.Get());
 
     if (execResult.IsErr()) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
         result.fallbackUsed = true;
         result.fallbackReason = execResult.Error();
         spdlog::warn("RenderGraph end-of-frame: Execute failed: {}", result.fallbackReason);
@@ -315,12 +314,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     }
 
     if (wantsFusedBloomThisFrame && bloomStageFailed) {
-        ++m_frameDiagnostics.renderGraph.info.fallbackExecutions;
         result.fallbackUsed = true;
         result.fallbackReason = "fused_bloom_graph_stage_failed: " + bloomStageError;
         result.ranBloom = false;
         result.ranPostProcess = false;
-        spdlog::warn("RenderGraph end-of-frame: {}", result.fallbackReason);
+        spdlog::warn("RenderGraph end-of-frame: {} (graph path did not execute)", result.fallbackReason);
     }
 
     static bool s_loggedHzbRg = false;

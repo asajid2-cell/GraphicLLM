@@ -494,6 +494,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "rt_overbright_clamp" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_rt_overbright_clamp_scene.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "budget_profile_matrix" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

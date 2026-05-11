@@ -13,6 +13,8 @@
 #include "Graphics/Renderer.h"
 #include "Scene/ParticleEffectLibrary.h"
 
+#include <cstdlib>
+
 namespace Cortex {
 
 using Graphics::Renderer;
@@ -1478,6 +1480,10 @@ void Engine::BuildRTShowcaseScene() {
     // Zone A: Reflective gallery (x < 0)
     // --------------------
     const float galleryX = -14.0f;
+    const bool overbrightReflectionStress = [] {
+        const char* value = std::getenv("CORTEX_RT_REFLECTION_OVERBRIGHT_STRESS");
+        return value && value[0] != '\0' && value[0] != '0';
+    }();
 
     if (floorPlane && floorPlane->gpuBuffers) {
         // Floor
@@ -1611,6 +1617,53 @@ void Engine::BuildRTShowcaseScene() {
         r.doubleSided = true;
         r.textures.albedoPath = "assets/textures/rtshowcase/rt_gallery_rightwall_albedo.dds";
         r.textures.normalPath = "assets/textures/rtshowcase/rt_gallery_rightwall_normal_bc5.dds";
+        if (overbrightReflectionStress) {
+            r.albedoColor = glm::vec4(1.0f, 0.76f, 0.42f, 1.0f);
+            r.roughness = 0.32f;
+            r.emissiveColor = glm::vec3(1.0f, 0.74f, 0.36f);
+            r.emissiveStrength = 32.0f;
+            r.presetName = "emissive_panel";
+            r.textures.albedoPath.clear();
+            r.textures.normalPath.clear();
+        }
+    }
+
+    if (overbrightReflectionStress && quadPanel && quadPanel->gpuBuffers) {
+        spdlog::info("RTShowcase overbright reflection stress enabled");
+
+        entt::entity hotPanel = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(hotPanel, "RTGallery_OverbrightClampPanel");
+        auto& hotT = m_registry->AddComponent<TransformComponent>(hotPanel);
+        hotT.position = glm::vec3(galleryX + 9.65f, 2.05f, -1.5f);
+        hotT.rotation = glm::quat(glm::vec3(-glm::half_pi<float>(), -glm::half_pi<float>(), 0.0f));
+        hotT.scale = glm::vec3(1.3f, 1.1f, 1.0f);
+
+        auto& hotR = m_registry->AddComponent<Scene::RenderableComponent>(hotPanel);
+        hotR.mesh = quadPanel;
+        hotR.albedoColor = glm::vec4(1.0f, 0.78f, 0.42f, 1.0f);
+        hotR.metallic = 0.0f;
+        hotR.roughness = 0.18f;
+        hotR.ao = 1.0f;
+        hotR.emissiveColor = glm::vec3(1.0f, 0.72f, 0.36f);
+        hotR.emissiveStrength = 48.0f;
+        hotR.presetName = "emissive_panel";
+        hotR.doubleSided = true;
+
+        entt::entity hotLight = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(hotLight, "RTGallery_OverbrightClampLight");
+        auto& lightT = m_registry->AddComponent<Scene::TransformComponent>(hotLight);
+        lightT.position = glm::vec3(galleryX + 8.9f, 2.25f, -1.35f);
+        lightT.rotation = glm::quatLookAtLH(glm::normalize(glm::vec3(-1.0f, -0.15f, 0.05f)),
+                                            glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& light = m_registry->AddComponent<Scene::LightComponent>(hotLight);
+        light.type = Scene::LightType::Spot;
+        light.color = glm::vec3(1.0f, 0.78f, 0.48f);
+        light.intensity = 18.0f;
+        light.range = 18.0f;
+        light.innerConeDegrees = 18.0f;
+        light.outerConeDegrees = 36.0f;
+        light.castsShadows = false;
     }
 
     // Local reflection probes exercise VB deferred local IBL selection. They

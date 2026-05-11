@@ -34,6 +34,9 @@ if ([string]::IsNullOrWhiteSpace([string]$manifest.fallback)) {
 if ($manifest.policy.normal_startup_downloads -ne $false) {
     Add-Failure "normal_startup_downloads must stay false"
 }
+if ($manifest.policy.legacy_scan_fallback -ne $false) {
+    Add-Failure "legacy_scan_fallback must stay false so manifest fallback behavior is deterministic"
+}
 
 $ids = @{}
 $defaultFound = $false

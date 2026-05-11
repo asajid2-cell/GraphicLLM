@@ -110,6 +110,107 @@ function Invoke-FallbackCase([string]$Name, [string[]]$Arguments, [hashtable]$En
 
 $common = @("--mode=default", "--no-llm", "--no-dreamer", "--no-launcher", "--smoke-frames=$SmokeFrames", "--exit-after-visual-validation")
 
+$tempManifestDir = Join-Path $LogDir "temp_environment_manifest"
+New-Item -ItemType Directory -Force -Path $tempManifestDir | Out-Null
+$missingManifestPath = Join-Path $tempManifestDir "manifest_does_not_exist.json"
+$missingAssetManifest = Join-Path $tempManifestDir "missing_required_environment.json"
+$optionalMissingAssetManifest = Join-Path $tempManifestDir "missing_optional_environment.json"
+$studioRuntimePath = [System.IO.Path]::GetFullPath((Join-Path $root "build/bin/assets/MR_INT-001_NaturalStudio_NAD.dds"))
+@'
+{
+  "schema": 1,
+  "default": "studio",
+  "fallback": "procedural_sky",
+  "policy": {
+    "runtime_format_preference": ["dds", "hdr", "exr"],
+    "normal_startup_downloads": false,
+    "source_assets_optional": true,
+    "legacy_scan_fallback": false,
+    "thumbnail_required": false,
+    "notes": "Synthetic validation manifest: required runtime asset is intentionally missing."
+  },
+  "environments": [
+    {
+      "id": "procedural_sky",
+      "display_name": "Procedural Sky Fallback",
+      "type": "procedural",
+      "budget_class": "tiny",
+      "enabled": true,
+      "required": true,
+      "default_diffuse": 0.75,
+      "default_specular": 0.35,
+      "max_runtime_dimension": 0
+    },
+    {
+      "id": "studio",
+      "display_name": "Missing Required Studio",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": true,
+      "runtime_path": "../definitely_missing_required_environment_asset.hdr",
+      "default_diffuse": 1.0,
+      "default_specular": 1.0,
+      "max_runtime_dimension": 2048
+    }
+  ]
+}
+'@ | Set-Content -Encoding UTF8 $missingAssetManifest
+
+$optionalMissingJson = @"
+{
+  "schema": 1,
+  "default": "studio",
+  "fallback": "procedural_sky",
+  "policy": {
+    "runtime_format_preference": ["dds", "hdr", "exr"],
+    "normal_startup_downloads": false,
+    "source_assets_optional": true,
+    "legacy_scan_fallback": false,
+    "thumbnail_required": false,
+    "notes": "Synthetic validation manifest: optional runtime asset is intentionally missing."
+  },
+  "environments": [
+    {
+      "id": "procedural_sky",
+      "display_name": "Procedural Sky Fallback",
+      "type": "procedural",
+      "budget_class": "tiny",
+      "enabled": true,
+      "required": true,
+      "default_diffuse": 0.75,
+      "default_specular": 0.35,
+      "max_runtime_dimension": 0
+    },
+    {
+      "id": "studio",
+      "display_name": "Studio",
+      "type": "equirectangular",
+      "budget_class": "small",
+      "enabled": true,
+      "required": true,
+      "runtime_path": "$($studioRuntimePath.Replace('\', '\\'))",
+      "default_diffuse": 1.0,
+      "default_specular": 1.0,
+      "max_runtime_dimension": 2048
+    },
+    {
+      "id": "optional_missing_gallery",
+      "display_name": "Optional Missing Gallery",
+      "type": "equirectangular",
+      "budget_class": "medium",
+      "enabled": true,
+      "required": false,
+      "runtime_path": "../definitely_missing_optional_environment_asset.hdr",
+      "default_diffuse": 1.0,
+      "default_specular": 1.0,
+      "max_runtime_dimension": 4096
+    }
+  ]
+}
+"@
+$optionalMissingJson | Set-Content -Encoding UTF8 $optionalMissingAssetManifest
+
 $safe = Invoke-FallbackCase "safe_startup_no_rt" (
     @("--scene", "rt_showcase", "--graphics-preset", "safe_startup", "--environment", "studio") + $common
 ) @{ "CORTEX_FORCE_SAFE_MODE" = "1" }
@@ -139,6 +240,93 @@ if ($null -ne $missing) {
     }
     if ([string]$fc.environment.fallback_reason -ne "requested_environment_not_found") {
         Add-Failure "missing_selected_environment fallback reason was '$($fc.environment.fallback_reason)'"
+    }
+}
+
+$missingManifest = Invoke-FallbackCase "missing_environment_manifest" (
+    @("--scene", "rt_showcase", "--graphics-preset", "safe_startup", "--environment", "studio") + $common
+) @{ "CORTEX_ENVIRONMENT_MANIFEST_PATH" = $missingManifestPath }
+if ($null -ne $missingManifest) {
+    $fc = $missingManifest.frame_contract
+    $stdoutPath = Join-Path (Join-Path $LogDir "missing_environment_manifest") "engine_stdout.txt"
+    $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
+    if (-not [bool]$fc.startup.preflight_passed) {
+        Add-Failure "missing_environment_manifest preflight did not pass with fallback"
+    }
+    if ([bool]$fc.startup.environment_manifest_present) {
+        Add-Failure "missing_environment_manifest reported environment_manifest_present=true"
+    }
+    if ([int]$fc.startup.warning_count -lt 1) {
+        Add-Failure "missing_environment_manifest did not report a startup warning"
+    }
+    if ($stdout -notmatch "ENVIRONMENT_MANIFEST_MISSING") {
+        Add-Failure "missing_environment_manifest stdout did not include ENVIRONMENT_MANIFEST_MISSING"
+    }
+}
+
+$missingRequiredAsset = Invoke-FallbackCase "missing_required_environment_asset" (
+    @("--scene", "rt_showcase", "--graphics-preset", "safe_startup", "--environment", "studio") + $common
+) @{ "CORTEX_ENVIRONMENT_MANIFEST_PATH" = $missingAssetManifest }
+if ($null -ne $missingRequiredAsset) {
+    $fc = $missingRequiredAsset.frame_contract
+    $stdoutPath = Join-Path (Join-Path $LogDir "missing_required_environment_asset") "engine_stdout.txt"
+    $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
+    if (-not [bool]$fc.startup.preflight_passed) {
+        Add-Failure "missing_required_environment_asset preflight did not pass with fallback"
+    }
+    if (-not [bool]$fc.startup.safe_mode) {
+        Add-Failure "missing_required_environment_asset did not report startup.safe_mode=true"
+    }
+    if ([int]$fc.startup.warning_count -lt 1) {
+        Add-Failure "missing_required_environment_asset did not report a startup warning"
+    }
+    if (-not [bool]$fc.environment.loaded) {
+        Add-Failure "missing_required_environment_asset did not report a loaded fallback environment"
+    }
+    if (-not [bool]$fc.environment.fallback) {
+        Add-Failure "missing_required_environment_asset did not report environment.fallback=true"
+    }
+    if ([string]$fc.environment.requested -ne "studio") {
+        Add-Failure "missing_required_environment_asset did not preserve requested environment"
+    }
+    if ([string]$fc.environment.fallback_reason -ne "requested_environment_load_failed") {
+        Add-Failure "missing_required_environment_asset fallback reason was '$($fc.environment.fallback_reason)'"
+    }
+    if ($stdout -notmatch "REQUIRED_ENVIRONMENT_ASSET_MISSING") {
+        Add-Failure "missing_required_environment_asset stdout did not include REQUIRED_ENVIRONMENT_ASSET_MISSING"
+    }
+    if ($stdout -notmatch "legacy HDR/EXR scan is disabled by policy") {
+        Add-Failure "missing_required_environment_asset stdout did not confirm legacy scan policy"
+    }
+}
+
+$missingOptionalAsset = Invoke-FallbackCase "missing_optional_environment_asset" (
+    @("--scene", "rt_showcase", "--graphics-preset", "safe_startup", "--environment", "optional_missing_gallery") + $common
+) @{ "CORTEX_ENVIRONMENT_MANIFEST_PATH" = $optionalMissingAssetManifest }
+if ($null -ne $missingOptionalAsset) {
+    $fc = $missingOptionalAsset.frame_contract
+    $stdoutPath = Join-Path (Join-Path $LogDir "missing_optional_environment_asset") "engine_stdout.txt"
+    $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw } else { "" }
+    if (-not [bool]$fc.startup.preflight_passed) {
+        Add-Failure "missing_optional_environment_asset preflight did not pass with fallback"
+    }
+    if ([int]$fc.startup.issue_count -lt 1) {
+        Add-Failure "missing_optional_environment_asset did not report a startup issue"
+    }
+    if (-not [bool]$fc.environment.loaded) {
+        Add-Failure "missing_optional_environment_asset did not report a loaded fallback environment"
+    }
+    if (-not [bool]$fc.environment.fallback) {
+        Add-Failure "missing_optional_environment_asset did not report environment.fallback=true"
+    }
+    if ([string]$fc.environment.requested -ne "optional_missing_gallery") {
+        Add-Failure "missing_optional_environment_asset did not preserve requested environment"
+    }
+    if ([string]$fc.environment.fallback_reason -ne "requested_environment_load_failed") {
+        Add-Failure "missing_optional_environment_asset fallback reason was '$($fc.environment.fallback_reason)'"
+    }
+    if ($stdout -notmatch "OPTIONAL_ENVIRONMENT_ASSET_MISSING") {
+        Add-Failure "missing_optional_environment_asset stdout did not include OPTIONAL_ENVIRONMENT_ASSET_MISSING"
     }
 }
 

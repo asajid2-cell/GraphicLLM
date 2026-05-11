@@ -1,5 +1,6 @@
 #include "Graphics/EnvironmentManifest.h"
 
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <utility>
@@ -92,6 +93,15 @@ std::filesystem::path ResolveEnvironmentAssetPath(const std::filesystem::path& m
     return manifestPath.parent_path() / assetPath;
 }
 
+std::filesystem::path DefaultEnvironmentManifestPath() {
+    if (const char* overridePath = std::getenv("CORTEX_ENVIRONMENT_MANIFEST_PATH")) {
+        if (*overridePath) {
+            return std::filesystem::path(overridePath);
+        }
+    }
+    return std::filesystem::path("assets") / "environments" / "environments.json";
+}
+
 Result<EnvironmentManifest> LoadEnvironmentManifest(const std::filesystem::path& path) {
     std::ifstream in(path);
     if (!in) {
@@ -118,6 +128,10 @@ Result<EnvironmentManifest> LoadEnvironmentManifest(const std::filesystem::path&
 
     manifest.defaultEnvironment = OptionalString(root, "default", manifest.defaultEnvironment);
     manifest.fallback = OptionalString(root, "fallback", manifest.fallback);
+    if (root.contains("policy") && root.at("policy").is_object()) {
+        manifest.legacyScanFallback =
+            OptionalBool(root.at("policy"), "legacy_scan_fallback", manifest.legacyScanFallback);
+    }
 
     if (!root.contains("environments") || !root.at("environments").is_array()) {
         return Result<EnvironmentManifest>::Err("Environment manifest requires an environments array");

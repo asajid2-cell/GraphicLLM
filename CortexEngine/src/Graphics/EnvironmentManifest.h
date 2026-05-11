@@ -34,10 +34,12 @@ struct EnvironmentManifest {
     uint32_t schema = 1;
     std::string defaultEnvironment = "studio";
     std::string fallback = "procedural_sky";
+    bool legacyScanFallback = false;
     std::vector<EnvironmentManifestEntry> environments;
 };
 
 [[nodiscard]] Result<EnvironmentManifest> LoadEnvironmentManifest(const std::filesystem::path& path);
+[[nodiscard]] std::filesystem::path DefaultEnvironmentManifestPath();
 [[nodiscard]] std::filesystem::path ResolveEnvironmentAssetPath(const std::filesystem::path& manifestPath,
                                                                 const std::filesystem::path& assetPath);
 [[nodiscard]] bool IsEnvironmentAllowedForBudget(RendererBudgetProfile profile,

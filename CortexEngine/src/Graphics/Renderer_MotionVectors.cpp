@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Passes/MotionVectorPass.h"
 
@@ -40,7 +40,7 @@ void Renderer::RenderMotionVectors() {
         }
     }
 
-    if (!m_pipelineState.motionVectors || !m_depthResources.buffer) {
+    if (!m_pipelineState.motionVectors || !m_depthResources.resources.buffer) {
         return;
     }
 
@@ -58,14 +58,14 @@ void Renderer::RenderMotionVectors() {
         m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
 
-    if (m_depthResources.resourceState != kDepthSampleState) {
+    if (m_depthResources.resources.resourceState != kDepthSampleState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
 
     if (barrierCount > 0) {
@@ -87,7 +87,7 @@ void Renderer::RenderMotionVectors() {
             m_pipelineState.motionVectors.get(),
             m_temporalScreenState.velocityBuffer.Get(),
             m_temporalScreenState.velocityRTV,
-            m_depthResources.buffer.Get(),
+            m_depthResources.resources.buffer.Get(),
             std::span<DescriptorHandle>(persistentTable.data(), persistentTable.size()),
         })) {
         spdlog::error("RenderMotionVectors: pass draw failed");

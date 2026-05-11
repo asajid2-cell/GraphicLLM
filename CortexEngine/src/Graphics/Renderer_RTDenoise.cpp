@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -87,13 +87,13 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
         }
     }
 
-    if (!normalSrv.IsValid() || !m_depthResources.srv.IsValid() || !m_temporalScreenState.velocitySRV.IsValid() ||
+    if (!normalSrv.IsValid() || !m_depthResources.descriptors.srv.IsValid() || !m_temporalScreenState.velocitySRV.IsValid() ||
         !m_temporalMaskState.builtThisFrame || !m_temporalMaskState.srv.IsValid()) {
         markFallback("rt_denoiser_missing_inputs");
     }
 
     if (fallbackReason.empty()) {
-        transition(m_depthResources.buffer.Get(), m_depthResources.resourceState, kDepthSampleState);
+        transition(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, kDepthSampleState);
         if (normalResource && normalState) {
             transition(normalResource, *normalState, kSrvState);
             if (usingVBNormal && m_services.visibilityBuffer) {
@@ -141,14 +141,14 @@ void Renderer::ExecuteRTDenoisePass(const char* frameNormalRoughnessResource) {
             desc.frameConstants = m_constantBuffers.currentFrameGPU;
             desc.currentSRV = currentSRV;
             desc.historySRV = historySRV;
-            desc.depthSRV = m_depthResources.srv;
+            desc.depthSRV = m_depthResources.descriptors.srv;
             desc.normalRoughnessSRV = normalSrv;
             desc.velocitySRV = m_temporalScreenState.velocitySRV;
             desc.temporalMaskSRV = m_temporalMaskState.srv;
             desc.historyUAV = historyUAV;
             desc.currentResource = current;
             desc.historyResource = history;
-            desc.depthResource = m_depthResources.buffer.Get();
+            desc.depthResource = m_depthResources.resources.buffer.Get();
             desc.normalRoughnessResource = normalResource;
             desc.velocityResource = m_temporalScreenState.velocityBuffer.Get();
             desc.temporalMaskResource = m_temporalMaskState.texture.Get();

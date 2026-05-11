@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Passes/TAAPass.h"
 
@@ -102,10 +102,10 @@ bool Renderer::ResolveTAAIntermediate(bool skipTransitions) {
             ++barrierCount;
         }
 
-        if (m_depthResources.buffer && m_depthResources.resourceState != kDepthSampleState) {
+        if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
             barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[barrierCount].Transition.pResource = m_depthResources.buffer.Get();
-            barriers[barrierCount].Transition.StateBefore = m_depthResources.resourceState;
+            barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
+            barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
             barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
             barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             ++barrierCount;
@@ -155,8 +155,8 @@ bool Renderer::ResolveTAAIntermediate(bool skipTransitions) {
 
     m_temporalScreenState.taaIntermediateState = D3D12_RESOURCE_STATE_RENDER_TARGET;
     m_mainTargets.hdrState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    if (m_depthResources.buffer) {
-        m_depthResources.resourceState = kDepthSampleState;
+    if (m_depthResources.resources.buffer) {
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
     if (m_mainTargets.gbufferNormalRoughness) {
         m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

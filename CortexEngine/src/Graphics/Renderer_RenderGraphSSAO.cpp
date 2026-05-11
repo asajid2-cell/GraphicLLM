@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/RenderPassScope.h"
 #include "Passes/SSAOPass.h"
@@ -17,7 +17,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     const bool useComputeSSAO = m_pipelineState.ssaoCompute && m_frameRuntime.asyncComputeSupported;
 
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_ssaoResources.controls.enabled || !m_ssaoResources.resources.texture ||
-        !m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
+        !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid()) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssao_prerequisites_missing";
         if (useComputeSSAO) {
@@ -48,7 +48,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_SSAO");
+        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_SSAO");
     const RGResourceHandle ssaoHandle =
         m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
 
@@ -58,7 +58,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
     ssaoContext.useCompute = useComputeSSAO;
     ssaoContext.failStage = failStage;
     ssaoContext.execute = [&]() {
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
         m_ssaoResources.resources.resourceState = useComputeSSAO
             ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
             : D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -82,7 +82,7 @@ Renderer::ExecuteSSAOInRenderGraph() {
         result.fallbackUsed = true;
         result.fallbackReason = "ssao_graph_stage_failed: " + stageError;
     } else {
-        m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         result.executed = true;
     }

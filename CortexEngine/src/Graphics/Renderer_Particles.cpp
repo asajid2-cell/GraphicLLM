@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -270,14 +270,14 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     D3D12_RESOURCE_BARRIER barriers[2] = {};
     uint32_t barrierCount = 0;
 
-    if (m_depthResources.buffer && m_depthResources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrierCount++;
-        m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
     if (m_mainTargets.hdrColor && m_mainTargets.hdrState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
@@ -296,7 +296,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
 
     // 3. Bind render targets (HDR color + depth)
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdrRTV.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.dsv.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = m_depthResources.descriptors.dsv.cpu;
     m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     m_commandResources.graphicsList->SetGraphicsRootSignature(m_pipelineState.rootSignature->GetRootSignature());

@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Core/Window.h"
 #include "Passes/SSAOPass.h"
 #include <algorithm>
@@ -148,21 +148,21 @@ Result<void> Renderer::CreateSSAOResources() {
 }
 
 void Renderer::RenderSSAO() {
-    if (!m_ssaoResources.controls.enabled || !m_pipelineState.ssao || !m_ssaoResources.resources.texture || !m_depthResources.buffer || !m_depthResources.srv.IsValid()) {
+    if (!m_ssaoResources.controls.enabled || !m_pipelineState.ssao || !m_ssaoResources.resources.texture || !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid()) {
         return;
     }
 
     // Transition depth to SRV for sampling (include DEPTH_READ for depth resources).
-    if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions && m_depthResources.resourceState != kDepthSampleState) {
+    if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions && m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resourceState;
+        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
     }
-    m_depthResources.resourceState = kDepthSampleState;
+    m_depthResources.resources.resourceState = kDepthSampleState;
 
     // Transition SSAO target to render target state
     if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions &&
@@ -192,7 +192,7 @@ void Renderer::RenderSSAO() {
             m_pipelineState.ssao.get(),
             m_ssaoResources.resources.texture.Get(),
             m_ssaoResources.resources.rtv,
-            m_depthResources.buffer.Get(),
+            m_depthResources.resources.buffer.Get(),
             std::span<DescriptorHandle>(depthTable.data(), depthTable.size()),
         })) {
         spdlog::warn("RenderSSAO: pass execution failed");
@@ -231,21 +231,21 @@ void Renderer::RenderSSAOAsync() {
     // Compute shader version of SSAO - runs on graphics queue for now
     // TODO: Move to dedicated async compute queue for true parallel execution
     if (!m_ssaoResources.controls.enabled || !m_pipelineState.ssaoCompute || !m_ssaoResources.resources.texture ||
-        !m_depthResources.buffer || !m_depthResources.srv.IsValid() || !m_ssaoResources.resources.uav.IsValid()) {
+        !m_depthResources.resources.buffer || !m_depthResources.descriptors.srv.IsValid() || !m_ssaoResources.resources.uav.IsValid()) {
         return;
     }
 
     // Transition depth for compute shader access (include DEPTH_READ for depth resources).
-    if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions && m_depthResources.resourceState != kDepthSampleState) {
+    if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions && m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier = {};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resourceState;
+        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
     }
-    m_depthResources.resourceState = kDepthSampleState;
+    m_depthResources.resources.resourceState = kDepthSampleState;
 
     // Transition SSAO target to UAV
     if (!m_frameDiagnostics.renderGraph.transitions.ssaoSkipTransitions &&
@@ -287,7 +287,7 @@ void Renderer::RenderSSAOAsync() {
             srvTableRoot,
             uavTableRoot,
             m_ssaoResources.resources.texture.Get(),
-            m_depthResources.buffer.Get(),
+            m_depthResources.resources.buffer.Get(),
             std::span<DescriptorHandle>(depthTable.data(), srvTableSize),
             std::span<DescriptorHandle>(uavTable.data(), uavTableSize),
         })) {

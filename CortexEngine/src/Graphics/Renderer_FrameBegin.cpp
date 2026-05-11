@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Core/Window.h"
 #include "Debug/GPUProfiler.h"
 #include "Graphics/MeshBuffers.h"
@@ -85,8 +85,8 @@ void Renderer::BeginFrame() {
         m_services.descriptorManager->BeginFrame(m_frameRuntime.frameIndex);
     }
 
-    if (m_depthResources.buffer) {
-        D3D12_RESOURCE_DESC depthDesc = m_depthResources.buffer->GetDesc();
+    if (m_depthResources.resources.buffer) {
+        D3D12_RESOURCE_DESC depthDesc = m_depthResources.resources.buffer->GetDesc();
         if (depthDesc.Width != expectedDepthWidth || depthDesc.Height != expectedDepthHeight) {
             needDepthResize = true;
         }
@@ -125,10 +125,10 @@ void Renderer::BeginFrame() {
         WaitForGPU();
     }
 
-    if (needDepthResize && m_depthResources.buffer) {
+    if (needDepthResize && m_depthResources.resources.buffer) {
         spdlog::info("BeginFrame: recreating depth buffer for renderScale {:.2f} ({}x{})",
                      renderScale, expectedDepthWidth, expectedDepthHeight);
-        m_depthResources.buffer.Reset();
+        m_depthResources.resources.buffer.Reset();
         auto depthResult = CreateDepthBuffer();
         if (depthResult.IsErr()) {
             spdlog::error("Failed to recreate depth buffer on resize: {}", depthResult.Error());

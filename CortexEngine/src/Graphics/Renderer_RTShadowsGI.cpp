@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
@@ -25,15 +25,15 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
 
     // Ensure the depth buffer is in a readable state for the DXR passes.
     // Depth resources should include DEPTH_READ when sampled as SRVs.
-    if (m_depthResources.buffer && m_depthResources.resourceState != kDepthSampleState) {
+    if (m_depthResources.resources.buffer && m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resourceState;
+        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         depthBarrier.Transition.StateAfter = kDepthSampleState;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         rtCmdList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
 
     // Ensure the RT shadow mask is ready for UAV writes before the DXR pass.
@@ -86,11 +86,11 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
     }
 
     // Dispatch the DXR sun-shadow pass when depth and mask descriptors are ready.
-    if (m_framePlanning.rtPlan.dispatchShadows && m_depthResources.srv.IsValid() && m_rtShadowTargets.maskUAV.IsValid()) {
+    if (m_framePlanning.rtPlan.dispatchShadows && m_depthResources.descriptors.srv.IsValid() && m_rtShadowTargets.maskUAV.IsValid()) {
         DescriptorHandle envTable = m_environmentState.shadowAndEnvDescriptors[0];
             m_services.rayTracingContext->DispatchRayTracing(
                 rtCmdList.Get(),
-                m_depthResources.srv,
+                m_depthResources.descriptors.srv,
                 m_rtShadowTargets.maskUAV,
                 m_constantBuffers.currentFrameGPU,
                 envTable);
@@ -117,7 +117,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
             m_rtGITargets.colorState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         }
 
-        if (m_depthResources.srv.IsValid() && m_services.rayTracingContext->HasGIPipeline()) {
+        if (m_depthResources.descriptors.srv.IsValid() && m_services.rayTracingContext->HasGIPipeline()) {
             DescriptorHandle envTable = m_environmentState.shadowAndEnvDescriptors[0];
             D3D12_RESOURCE_DESC giDesc = m_rtGITargets.color->GetDesc();
             const uint32_t giW = m_framePlanning.rtPlan.budget.giWidth > 0
@@ -128,7 +128,7 @@ void Renderer::RenderRayTracing(Scene::ECS_Registry* registry) {
                 : static_cast<uint32_t>(giDesc.Height);
             m_services.rayTracingContext->DispatchGI(
                 rtCmdList.Get(),
-                m_depthResources.srv,
+                m_depthResources.descriptors.srv,
                 m_rtGITargets.uav,
                 m_constantBuffers.currentFrameGPU,
                 envTable,

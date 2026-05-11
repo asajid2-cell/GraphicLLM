@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Passes/SSRPass.h"
 
@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderSSR() {
-    if (!m_pipelineState.ssr || !m_ssrResources.resources.color || !m_mainTargets.hdrColor || !m_depthResources.buffer) {
+    if (!m_pipelineState.ssr || !m_ssrResources.resources.color || !m_mainTargets.hdrColor || !m_depthResources.resources.buffer) {
         return;
     }
 
@@ -57,10 +57,10 @@ void Renderer::RenderSSR() {
         }
     }
 
-    if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions && m_depthResources.resourceState != kDepthSampleState) {
+    if (!m_frameDiagnostics.renderGraph.transitions.ssrSkipTransitions && m_depthResources.resources.resourceState != kDepthSampleState) {
         barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resourceState;
+        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
+        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
         barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
         barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         ++barrierCount;
@@ -75,7 +75,7 @@ void Renderer::RenderSSR() {
     if (!m_visibilityBufferState.renderedThisFrame && m_mainTargets.gbufferNormalRoughness) {
         m_mainTargets.gbufferNormalRoughnessState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
-    m_depthResources.resourceState = kDepthSampleState;
+    m_depthResources.resources.resourceState = kDepthSampleState;
 
     if (!m_ssrResources.descriptors.srvTableValid) {
         spdlog::error("RenderSSR: persistent SRV table is invalid");
@@ -93,7 +93,7 @@ void Renderer::RenderSSR() {
             m_ssrResources.resources.color.Get(),
             m_ssrResources.resources.rtv,
             m_mainTargets.hdrColor.Get(),
-            m_depthResources.buffer.Get(),
+            m_depthResources.resources.buffer.Get(),
             normalResource,
             std::span<DescriptorHandle>(persistentTable.data(), persistentTable.size()),
             m_environmentState.shadowAndEnvDescriptors[0],

@@ -99,7 +99,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
         bucket += EstimateResourceBytes(resource);
     };
 
-    addResource(breakdown.renderTargetBytes, m_depthResources.buffer.Get());
+    addResource(breakdown.renderTargetBytes, m_depthResources.resources.buffer.Get());
     addResource(breakdown.renderTargetBytes, m_hzbResources.resources.texture.Get());
     addResource(breakdown.renderTargetBytes, m_shadowResources.resources.map.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.hdrColor.Get());

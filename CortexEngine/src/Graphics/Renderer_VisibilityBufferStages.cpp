@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
@@ -47,21 +47,21 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
                                                      uint32_t debugView,
                                                      bool& completedPath) {
     completedPath = false;
-    if (m_depthResources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
+    if (m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resourceState;
+        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     }
 
     auto visResult = m_services.visibilityBuffer->RenderVisibilityPass(
         m_commandResources.graphicsList.Get(),
-        m_depthResources.buffer.Get(),
-        m_depthResources.dsv.cpu,
+        m_depthResources.resources.buffer.Get(),
+        m_depthResources.descriptors.dsv.cpu,
         m_constantBuffers.frameCPU.viewProjectionMatrix,
         m_visibilityBufferState.meshDraws,
         cullMaskAddress);
@@ -90,18 +90,18 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
         m_visibilityBufferState.renderedThisFrame = true;
         completedPath = true;
     } else if (debugView == kVBDebugDepth) {
-        if (m_depthResources.resourceState != kDepthSampleState) {
+        if (m_depthResources.resources.resourceState != kDepthSampleState) {
             D3D12_RESOURCE_BARRIER barrier{};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_depthResources.buffer.Get();
-            barrier.Transition.StateBefore = m_depthResources.resourceState;
+            barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+            barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
             barrier.Transition.StateAfter = kDepthSampleState;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_depthResources.resourceState = kDepthSampleState;
+            m_depthResources.resources.resourceState = kDepthSampleState;
         }
         auto dbg = m_services.visibilityBuffer->DebugBlitDepthToHDR(
-            m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, m_depthResources.buffer.Get());
+            m_commandResources.graphicsList.Get(), m_mainTargets.hdrColor.Get(), m_mainTargets.hdrRTV.cpu, m_depthResources.resources.buffer.Get());
         if (dbg.IsErr()) {
             spdlog::warn("VB debug blit (depth) failed: {}", dbg.Error());
         }
@@ -114,21 +114,21 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
 
 bool Renderer::RenderVisibilityBufferMaterialResolveStage(uint32_t debugView, bool& completedPath) {
     completedPath = false;
-    if (m_depthResources.resourceState != kDepthSampleState) {
+    if (m_depthResources.resources.resourceState != kDepthSampleState) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resourceState;
+        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         barrier.Transition.StateAfter = kDepthSampleState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
     }
 
     auto resolveResult = m_services.visibilityBuffer->ResolveMaterials(
         m_commandResources.graphicsList.Get(),
-        m_depthResources.buffer.Get(),
-        m_depthResources.srv.cpu,
+        m_depthResources.resources.buffer.Get(),
+        m_depthResources.descriptors.srv.cpu,
         m_visibilityBufferState.meshDraws,
         m_constantBuffers.frameCPU.viewProjectionMatrix,
         m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0);

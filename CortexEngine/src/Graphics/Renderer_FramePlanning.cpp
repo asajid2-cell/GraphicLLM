@@ -72,7 +72,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasVoxelPipeline = pipelineReadiness.voxel;
     featureInputs.hasMotionVectorsPipeline = pipelineReadiness.motionVectors;
     featureInputs.hasVelocityBuffer = (m_temporalScreenState.velocityBuffer != nullptr);
-    featureInputs.hasDepthBuffer = (m_depthResources.buffer != nullptr);
+    featureInputs.hasDepthBuffer = (m_depthResources.resources.buffer != nullptr);
     featureInputs.hasPostProcessPipeline = pipelineReadiness.postProcess;
     featureInputs.particlesEnabledForScene = m_particleState.controls.enabledForScene;
 

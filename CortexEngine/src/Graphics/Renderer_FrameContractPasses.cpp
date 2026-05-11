@@ -66,7 +66,7 @@ void Renderer::RecordFramePass(const char* name,
         };
 
         const std::string resource = resourceName;
-        if (resource == "depth") return resourceBytes(m_depthResources.buffer.Get());
+        if (resource == "depth") return resourceBytes(m_depthResources.resources.buffer.Get());
         if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdrColor.Get());
         if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.gbufferNormalRoughness.Get());
         if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());

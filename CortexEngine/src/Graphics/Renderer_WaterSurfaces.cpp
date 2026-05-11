@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/MaterialState.h"
 #include "Graphics/RenderableClassification.h"
@@ -13,7 +13,7 @@
 namespace Cortex::Graphics {
 
 void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
-    if (!m_pipelineState.waterOverlay || !m_mainTargets.hdrColor || !m_depthResources.buffer) {
+    if (!m_pipelineState.waterOverlay || !m_mainTargets.hdrColor || !m_depthResources.resources.buffer) {
         return;
     }
 
@@ -41,21 +41,21 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
 
     // Depth-test water without writing depth. Prefer read-only DSV so the depth
     // buffer can stay in DEPTH_READ after VB resolve.
-    const bool hasReadOnlyDsv = m_depthResources.readOnlyDsv.IsValid();
+    const bool hasReadOnlyDsv = m_depthResources.descriptors.readOnlyDsv.IsValid();
     const D3D12_RESOURCE_STATES desiredDepthState = hasReadOnlyDsv ? kDepthSampleState : D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    if (m_depthResources.resourceState != desiredDepthState) {
+    if (m_depthResources.resources.resourceState != desiredDepthState) {
         D3D12_RESOURCE_BARRIER depthBarrier{};
         depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        depthBarrier.Transition.pResource = m_depthResources.buffer.Get();
-        depthBarrier.Transition.StateBefore = m_depthResources.resourceState;
+        depthBarrier.Transition.pResource = m_depthResources.resources.buffer.Get();
+        depthBarrier.Transition.StateBefore = m_depthResources.resources.resourceState;
         depthBarrier.Transition.StateAfter = desiredDepthState;
         depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         m_commandResources.graphicsList->ResourceBarrier(1, &depthBarrier);
-        m_depthResources.resourceState = desiredDepthState;
+        m_depthResources.resources.resourceState = desiredDepthState;
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = m_mainTargets.hdrRTV.cpu;
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthResources.readOnlyDsv.cpu : m_depthResources.dsv.cpu;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = hasReadOnlyDsv ? m_depthResources.descriptors.readOnlyDsv.cpu : m_depthResources.descriptors.dsv.cpu;
     m_commandResources.graphicsList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 
     const D3D12_RESOURCE_DESC hdrDesc = m_mainTargets.hdrColor->GetDesc();

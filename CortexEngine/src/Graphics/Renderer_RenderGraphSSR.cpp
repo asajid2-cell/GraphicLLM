@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/RenderPassScope.h"
 #include "Passes/SSRPass.h"
@@ -22,7 +22,7 @@ Renderer::RenderGraphPassResult
 Renderer::ExecuteSSRInRenderGraph() {
     RenderGraphPassResult result{};
     if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_pipelineState.ssr || !m_ssrResources.resources.color ||
-        !m_mainTargets.hdrColor || !m_depthResources.buffer) {
+        !m_mainTargets.hdrColor || !m_depthResources.resources.buffer) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_ssr_prerequisites_missing";
         RenderSSR();
@@ -65,7 +65,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     const RGResourceHandle hdrHandle =
         m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR_SSR");
     const RGResourceHandle depthHandle =
-        m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_SSR");
+        m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_SSR");
     const RGResourceHandle normalHandle =
         m_services.renderGraph->ImportResource(normalResource, normalState, usesVBNormal ? "VB_NormalRoughness_SSR" : "NormalRoughness_SSR");
     const RGResourceHandle ssrHandle =
@@ -79,7 +79,7 @@ Renderer::ExecuteSSRInRenderGraph() {
     ssrContext.failStage = failStage;
     ssrContext.execute = [&]() {
         m_mainTargets.hdrState = kScreenSpaceShaderResourceState;
-        m_depthResources.resourceState = kDepthSampleState;
+        m_depthResources.resources.resourceState = kDepthSampleState;
         m_ssrResources.resources.resourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         if (usesVBNormal) {
             auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
@@ -106,7 +106,7 @@ Renderer::ExecuteSSRInRenderGraph() {
         result.fallbackReason = "ssr_graph_stage_failed: " + stageError;
     } else {
         m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
-        m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (usesVBNormal) {
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();

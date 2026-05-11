@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Debug/GPUProfiler.h"
 #include "Passes/BloomGraphPass.h"
@@ -26,8 +26,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     const bool canRunRg = (m_services.renderGraph && m_services.device && m_commandResources.graphicsList && m_services.descriptorManager);
     const bool wantsRgHzbThisFrame =
-        inputs.hzbPending && inputs.useRenderGraphHZB && canRunRg && m_depthResources.buffer &&
-        m_depthResources.srv.IsValid() && m_hzbResources.resources.texture;
+        inputs.hzbPending && inputs.useRenderGraphHZB && canRunRg && m_depthResources.resources.buffer &&
+        m_depthResources.descriptors.srv.IsValid() && m_hzbResources.resources.texture;
     const bool wantsRgPostThisFrame =
         inputs.runPostProcess && inputs.useRenderGraphPost && canRunRg && m_pipelineState.postProcess &&
         m_mainTargets.hdrColor && m_services.window && m_services.window->GetCurrentBackBuffer();
@@ -52,7 +52,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle depthHandle{};
     RGResourceHandle hzbHandle{};
     if (wantsRgHzbThisFrame) {
-        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth");
+        depthHandle = m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth");
         hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB");
         AddHZBFromDepthPasses_RG(*m_services.renderGraph, depthHandle, hzbHandle);
     }
@@ -119,10 +119,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (m_temporalScreenState.historyColor) {
             historyHandle = m_services.renderGraph->ImportResource(m_temporalScreenState.historyColor.Get(), m_temporalScreenState.historyState, "TAAHistory");
         }
-        if (m_depthResources.buffer) {
+        if (m_depthResources.resources.buffer) {
             depthPpHandle = depthHandle.IsValid()
                 ? depthHandle
-                : m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth_Post");
+                : m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth_Post");
         }
         if (m_ssaoResources.resources.texture) {
             ssaoHandle = m_services.renderGraph->ImportResource(m_ssaoResources.resources.texture.Get(), m_ssaoResources.resources.resourceState, "SSAO");
@@ -331,7 +331,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     }
 
     if (wantsRgHzbThisFrame) {
-        m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
+        m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
         m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         m_hzbResources.resources.valid = true;
 
@@ -361,7 +361,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (ssaoHandle.IsValid()) m_ssaoResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssaoHandle);
         if (ssrHandle.IsValid()) m_ssrResources.resources.resourceState = m_services.renderGraph->GetResourceState(ssrHandle);
         if (historyHandle.IsValid()) m_temporalScreenState.historyState = m_services.renderGraph->GetResourceState(historyHandle);
-        if (depthPpHandle.IsValid()) m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
+        if (depthPpHandle.IsValid()) m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthPpHandle);
         if (!m_visibilityBufferState.renderedThisFrame && normalHandle.IsValid()) {
             m_mainTargets.gbufferNormalRoughnessState = m_services.renderGraph->GetResourceState(normalHandle);
         }

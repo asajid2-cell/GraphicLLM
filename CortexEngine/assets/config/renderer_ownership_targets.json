@@ -63,6 +63,16 @@
       "future_extension": "Keep future shadow map and cascade resource expansion inside resources/raster/controls or the existing cascade/local shadow state before adding renderer orchestration"
     },
     {
+      "id": "depth_resources",
+      "owner": "Depth target",
+      "status": "release_boundary_validated",
+      "release_boundary": "Depth buffer resource state and DSV/SRV descriptors are split into pass-owned nested bundles and validated by ownership plus temporal/RT runtime paths that sample and write depth",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RendererDepthState.h"],
+      "renderer_state_members": ["m_depthResources"],
+      "future_extension": "Keep future depth pyramid, read-only DSV, and depth sampling expansion inside resources/descriptors or an explicitly named depth pass state before adding renderer orchestration"
+    },
+    {
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",

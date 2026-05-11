@@ -4,7 +4,6 @@
 #include "Graphics/VisibilityBuffer.h"
 
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -142,7 +141,7 @@ struct GraphContext {
     BRDFLUTContext brdfLut;
     ClusteredLightsContext clusteredLights;
     DeferredLightingContext deferredLighting;
-    std::function<void(const char*)> failStage;
+    StageFailureContext graphFailure;
 };
 
 [[nodiscard]] bool Clear(const ClearContext& context);

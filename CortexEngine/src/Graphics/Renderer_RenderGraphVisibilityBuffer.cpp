@@ -72,12 +72,6 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         bool vbStageFailed = false;
         std::string vbStageFailureStage;
         std::string vbStageFailureError;
-        auto markStageFailure = [&](const char* stage, const std::string& error) {
-            if (!vbStageFailed) {
-                spdlog::warn("VisibilityBuffer RG {} failed: {}", stage, error);
-            }
-            vbStageFailed = true;
-        };
 
         const bool brdfGraphOwned =
             !debugPath && vbResources.brdfLut.IsValid() && !m_services.visibilityBuffer->IsBRDFLUTReady();
@@ -108,14 +102,12 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugGBuffer = debugGBuffer;
         vbGraphContext.brdfGraphOwned = brdfGraphOwned;
         vbGraphContext.clusterGraphOwned = clusterGraphOwned;
-        vbGraphContext.failStage = [&](const char* stage) {
-            markStageFailure(stage ? stage : "graph_contract", "graph contract failed");
-        };
         VisibilityBufferGraphPass::StageFailureContext vbFailure{
             &vbStageFailed,
             &vbStageFailureStage,
             &vbStageFailureError
         };
+        vbGraphContext.graphFailure = vbFailure;
         vbGraphContext.clear.renderer = m_services.visibilityBuffer.get();
         vbGraphContext.clear.commandList = m_commandResources.graphicsList.Get();
         vbGraphContext.clear.failure = vbFailure;

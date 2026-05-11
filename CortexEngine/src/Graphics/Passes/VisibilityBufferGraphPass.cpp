@@ -11,10 +11,10 @@ inline constexpr D3D12_RESOURCE_STATES kDepthSampleState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
+void RecordFailure(const StageFailureContext& failure, const char* stage, const std::string& error);
+
 void Fail(const GraphContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
-    }
+    RecordFailure(context.graphFailure, stage, "graph contract failed");
 }
 
 [[nodiscard]] bool HasFailed(const StageFailureContext& failure) {

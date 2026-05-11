@@ -163,46 +163,29 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.clusteredLights.commandList = m_commandResources.graphicsList.Get();
         vbGraphContext.clusteredLights.params = deferredInputs.params;
         vbGraphContext.clusteredLights.failure = vbFailure;
-        vbGraphContext.deferredLighting = [&]() {
-            if (vbStageFailed) return;
-            m_depthResources.resources.resourceState = kDepthSampleState;
-            m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-            if (vbResources.shadow.IsValid()) {
-                m_shadowResources.resources.resourceState = kVBShaderResourceState;
-            }
-            if (vbResources.rtShadow.IsValid()) {
-                m_rtShadowTargets.maskState = kVBShaderResourceState;
-            }
-            if (vbResources.rtGI.IsValid()) {
-                m_rtGITargets.colorState = kVBShaderResourceState;
-            }
-
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.albedo = kVBShaderResourceState;
-            states.normalRoughness = kVBShaderResourceState;
-            states.emissiveMetallic = kVBShaderResourceState;
-            states.materialExt0 = kVBShaderResourceState;
-            states.materialExt1 = kVBShaderResourceState;
-            states.materialExt2 = kVBShaderResourceState;
-            if (vbResources.brdfLut.IsValid()) {
-                states.brdfLut = kVBShaderResourceState;
-            }
-            if (clusterGraphOwned) {
-                states.clusterRanges = kVBShaderResourceState;
-                states.clusterLightIndices = kVBShaderResourceState;
-            }
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.deferredLighting = true;
-            if (clusterGraphOwned) {
-                controls.clusteredLights = true;
-            }
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            ApplyVisibilityBufferDeferredLighting(deferredInputs);
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-        };
+        vbGraphContext.deferredLighting.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.deferredLighting.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.deferredLighting.hdrTarget = m_mainTargets.hdr.resources.color.Get();
+        vbGraphContext.deferredLighting.hdrRTV = m_mainTargets.hdr.descriptors.rtv.cpu;
+        vbGraphContext.deferredLighting.depthBuffer = m_depthResources.resources.buffer.Get();
+        vbGraphContext.deferredLighting.depthSRV = m_depthResources.descriptors.srv;
+        vbGraphContext.deferredLighting.envDiffuseResource = deferredInputs.envDiffuseResource;
+        vbGraphContext.deferredLighting.envSpecularResource = deferredInputs.envSpecularResource;
+        vbGraphContext.deferredLighting.envFormat = deferredInputs.envFormat;
+        vbGraphContext.deferredLighting.shadowMapSRV = m_shadowResources.resources.srv;
+        vbGraphContext.deferredLighting.params = deferredInputs.params;
+        vbGraphContext.deferredLighting.depthState = &m_depthResources.resources.resourceState;
+        vbGraphContext.deferredLighting.hdrState = &m_mainTargets.hdr.resources.state;
+        vbGraphContext.deferredLighting.shadowState = &m_shadowResources.resources.resourceState;
+        vbGraphContext.deferredLighting.rtShadowState = &m_rtShadowTargets.maskState;
+        vbGraphContext.deferredLighting.rtGIState = &m_rtGITargets.colorState;
+        vbGraphContext.deferredLighting.shadowValid = vbResources.shadow.IsValid();
+        vbGraphContext.deferredLighting.rtShadowValid = vbResources.rtShadow.IsValid();
+        vbGraphContext.deferredLighting.rtGIValid = vbResources.rtGI.IsValid();
+        vbGraphContext.deferredLighting.brdfLutValid = vbResources.brdfLut.IsValid();
+        vbGraphContext.deferredLighting.clusterGraphOwned = clusterGraphOwned;
+        vbGraphContext.deferredLighting.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
+        vbGraphContext.deferredLighting.failure = vbFailure;
 
         if (!VisibilityBufferGraphPass::AddStagedPath(*m_services.renderGraph, vbGraphContext)) {
             vbStageFailed = true;

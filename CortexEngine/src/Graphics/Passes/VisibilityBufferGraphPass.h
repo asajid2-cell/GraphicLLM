@@ -100,6 +100,32 @@ struct ClusteredLightsContext {
     StageFailureContext failure;
 };
 
+struct DeferredLightingContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ID3D12Resource* hdrTarget = nullptr;
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV{};
+    ID3D12Resource* depthBuffer = nullptr;
+    DescriptorHandle depthSRV{};
+    ID3D12Resource* envDiffuseResource = nullptr;
+    ID3D12Resource* envSpecularResource = nullptr;
+    DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    DescriptorHandle shadowMapSRV{};
+    VisibilityBufferRenderer::DeferredLightingParams params{};
+    D3D12_RESOURCE_STATES* depthState = nullptr;
+    D3D12_RESOURCE_STATES* hdrState = nullptr;
+    D3D12_RESOURCE_STATES* shadowState = nullptr;
+    D3D12_RESOURCE_STATES* rtShadowState = nullptr;
+    D3D12_RESOURCE_STATES* rtGIState = nullptr;
+    bool shadowValid = false;
+    bool rtShadowValid = false;
+    bool rtGIValid = false;
+    bool brdfLutValid = false;
+    bool clusterGraphOwned = false;
+    bool* renderedThisFrame = nullptr;
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -115,7 +141,7 @@ struct GraphContext {
     DebugBlitContext debugBlit;
     BRDFLUTContext brdfLut;
     ClusteredLightsContext clusteredLights;
-    std::function<void()> deferredLighting;
+    DeferredLightingContext deferredLighting;
     std::function<void(const char*)> failStage;
 };
 
@@ -125,6 +151,7 @@ struct GraphContext {
 [[nodiscard]] bool DebugBlit(const DebugBlitContext& context);
 [[nodiscard]] bool GenerateBRDFLUT(const BRDFLUTContext& context);
 [[nodiscard]] bool BuildClusteredLights(const ClusteredLightsContext& context);
+[[nodiscard]] bool ApplyDeferredLighting(const DeferredLightingContext& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

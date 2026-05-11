@@ -2,6 +2,7 @@
 
 #include "Passes/DescriptorTable.h"
 #include "Passes/PostProcessPass.h"
+#include "Passes/TAAPass.h"
 
 #include <spdlog/spdlog.h>
 
@@ -60,42 +61,29 @@ void Renderer::UpdateTAAResolveDescriptorTable() {
         return;
     }
 
-    auto& table = m_temporalScreenState.taaResolveSrvTables[m_frameRuntime.frameIndex % kFrameCount];
-    auto writeOrNull = [&](size_t slot, ID3D12Resource* resource, DXGI_FORMAT fmt) {
-        if (slot >= table.size() || !table[slot].IsValid()) {
-            return;
-        }
-
-        DescriptorTable::WriteTexture2DSRV(device, table[slot], nullptr, fmt);
-        if (resource) DescriptorTable::WriteTexture2DSRV(device, table[slot], resource, fmt);
-    };
-
-    // Must match PostProcess.hlsl TAAResolvePS bindings.
-    writeOrNull(0, m_mainTargets.hdr.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-    ID3D12Resource* bloomRes = nullptr;
-    if (m_bloomResources.controls.intensity > 0.0f) {
-        bloomRes = m_bloomResources.resources.postProcessOverride
-            ? m_bloomResources.resources.postProcessOverride
-            : ((m_bloomResources.resources.activeLevels > 1) ? m_bloomResources.resources.texA[1].Get() : m_bloomResources.resources.texA[0].Get());
-    }
-    writeOrNull(1, bloomRes, DXGI_FORMAT_R11G11B10_FLOAT);
-
-    writeOrNull(2, m_ssaoResources.resources.texture.Get(), DXGI_FORMAT_R8_UNORM);
-    writeOrNull(3, m_temporalScreenState.historyColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(4, m_depthResources.resources.buffer.Get(), DXGI_FORMAT_R32_FLOAT);
-
     ID3D12Resource* normalRes = m_mainTargets.normalRoughness.resources.texture.Get();
     if (m_visibilityBufferState.renderedThisFrame && m_services.visibilityBuffer && m_services.visibilityBuffer->GetNormalRoughnessBuffer()) {
         normalRes = m_services.visibilityBuffer->GetNormalRoughnessBuffer();
     }
-    writeOrNull(5, normalRes, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-    writeOrNull(6, m_ssrResources.resources.color.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
-    writeOrNull(7, m_temporalScreenState.velocityBuffer.Get(), DXGI_FORMAT_R16G16_FLOAT);
-    // TAA reuses the t12 material-extension slot as the shared temporal
-    // rejection mask; the full post-process table still binds material ext2.
-    writeOrNull(12, m_temporalMaskState.texture.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT);
+    auto& table = m_temporalScreenState.taaResolveSrvTables[m_frameRuntime.frameIndex % kFrameCount];
+    TAAPass::DescriptorUpdateContext context{};
+    context.device = device;
+    context.srvTable = std::span<DescriptorHandle>(table.data(), table.size());
+    context.hdr = m_mainTargets.hdr.resources.color.Get();
+    context.bloomIntensity = m_bloomResources.controls.intensity;
+    context.bloomOverride = m_bloomResources.resources.postProcessOverride;
+    context.bloomFallback = (m_bloomResources.resources.activeLevels > 1)
+        ? m_bloomResources.resources.texA[1].Get()
+        : m_bloomResources.resources.texA[0].Get();
+    context.ssao = m_ssaoResources.resources.texture.Get();
+    context.history = m_temporalScreenState.historyColor.Get();
+    context.depth = m_depthResources.resources.buffer.Get();
+    context.normalRoughness = normalRes;
+    context.ssr = m_ssrResources.resources.color.Get();
+    context.velocity = m_temporalScreenState.velocityBuffer.Get();
+    context.temporalMask = m_temporalMaskState.texture.Get();
+    (void)TAAPass::UpdateResolveDescriptorTable(context);
 }
 
 Result<void> Renderer::InitializePostProcessDescriptorTable() {

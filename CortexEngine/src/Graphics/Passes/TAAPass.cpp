@@ -1,5 +1,6 @@
 #include "TAAPass.h"
 
+#include "DescriptorTable.h"
 #include "FullscreenPass.h"
 
 namespace Cortex::Graphics::TAAPass {
@@ -17,15 +18,54 @@ void Fail(const GraphContext& context, const char* stage) {
         return false;
     }
     if (context.seedOnly) {
-        return static_cast<bool>(context.seedHistory);
+        return context.seedHistory.commandList &&
+               context.seedHistory.hdrColor.resource &&
+               context.seedHistory.historyColor.resource;
     }
     return context.intermediate.IsValid() &&
-           static_cast<bool>(context.resolve) &&
-           static_cast<bool>(context.copyToHDR) &&
-           static_cast<bool>(context.copyToHistory);
+           context.resolveInputs.commandList &&
+           context.resolveDescriptors.device &&
+           !context.resolveDescriptors.srvTable.empty() &&
+           context.resolve.commandList &&
+           context.copyToHDR.commandList &&
+           context.copyToHistory.commandList;
 }
 
 } // namespace
+
+bool UpdateResolveDescriptorTable(const DescriptorUpdateContext& context) {
+    if (!context.device || context.srvTable.empty()) {
+        return false;
+    }
+
+    auto writeOrNull = [&](size_t slot, ID3D12Resource* resource, DXGI_FORMAT fmt) {
+        if (slot >= context.srvTable.size() || !context.srvTable[slot].IsValid()) {
+            return;
+        }
+        DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[slot], nullptr, fmt);
+        if (resource) {
+            DescriptorTable::WriteTexture2DSRV(context.device, context.srvTable[slot], resource, fmt);
+        }
+    };
+
+    // Must match PostProcess.hlsl TAAResolvePS bindings.
+    writeOrNull(0, context.hdr, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+    ID3D12Resource* bloom = nullptr;
+    if (context.bloomIntensity > 0.0f) {
+        bloom = context.bloomOverride ? context.bloomOverride : context.bloomFallback;
+    }
+    writeOrNull(1, bloom, DXGI_FORMAT_R11G11B10_FLOAT);
+
+    writeOrNull(2, context.ssao, DXGI_FORMAT_R8_UNORM);
+    writeOrNull(3, context.history, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(4, context.depth, DXGI_FORMAT_R32_FLOAT);
+    writeOrNull(5, context.normalRoughness, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(6, context.ssr, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    writeOrNull(7, context.velocity, DXGI_FORMAT_R16G16_FLOAT);
+    writeOrNull(12, context.temporalMask, DXGI_FORMAT_R16G16B16A16_FLOAT);
+    return true;
+}
 
 bool Resolve(const ResolveContext& context) {
     if (!context.commandList || !context.pipeline || !context.pipeline->GetPipelineState() ||
@@ -70,7 +110,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(context.history, RGResourceUsage::CopyDst);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                if (!context.seedHistory || !context.seedHistory()) {
+                if (!TAACopyPass::CopyHdrToHistory(context.seedHistory)) {
                     Fail(context, "seed_history");
                 }
             });
@@ -105,7 +145,9 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
             builder.Write(context.intermediate, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.resolve || !context.resolve()) {
+            if (!TAACopyPass::PrepareResolveInputs(context.resolveInputs) ||
+                !UpdateResolveDescriptorTable(context.resolveDescriptors) ||
+                !Resolve(context.resolve)) {
                 Fail(context, "resolve");
             }
         });
@@ -118,7 +160,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
             builder.Write(context.hdr, RGResourceUsage::CopyDst);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.copyToHDR || !context.copyToHDR()) {
+            if (!TAACopyPass::CopyIntermediateToHdr(context.copyToHDR)) {
                 Fail(context, "copy_to_hdr");
             }
         });
@@ -132,7 +174,7 @@ RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context) {
             builder.Write(context.intermediate, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            if (!context.copyToHistory || !context.copyToHistory()) {
+            if (!TAACopyPass::CopyHdrToHistory(context.copyToHistory)) {
                 Fail(context, "copy_to_history");
             }
         });

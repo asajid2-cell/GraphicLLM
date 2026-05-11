@@ -141,6 +141,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/BloomGraphPass.cpp
     src/Graphics/Passes/DepthPrepass.cpp
     src/Graphics/Passes/DescriptorTable.cpp
+    src/Graphics/Passes/DebugLinePass.cpp
     src/Graphics/Passes/ForwardTargetBindingPass.cpp
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp

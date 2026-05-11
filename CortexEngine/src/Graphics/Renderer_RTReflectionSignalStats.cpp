@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "Graphics/Passes/ReadbackBuffer.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -158,8 +159,6 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
 
     constexpr float kStatsScale = 256.0f;
     const D3D12_RANGE readRange{0, RTReflectionSignalStats::kStatsBytes};
-    const D3D12_RANGE writeRange{0, 0};
-
     auto readStats = [&](ID3D12Resource* readback,
                          bool& pending,
                          const char* label,
@@ -173,16 +172,12 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
             return false;
         }
 
-        uint32_t* mapped = nullptr;
-        HRESULT hr = readback->Map(
-            0,
-            &readRange,
-            reinterpret_cast<void**>(&mapped));
-        if (FAILED(hr) || !mapped) {
-            spdlog::warn("{}: failed to map readback buffer", label);
+        auto mappedReadback = ReadbackBuffer::MapRange(readback, readRange, label);
+        if (!mappedReadback.IsValid()) {
             pending = false;
             return false;
         }
+        const uint32_t* mapped = mappedReadback.As<const uint32_t>();
 
         const uint32_t lumaSumQ = mapped[0];
         const uint32_t nonZero = mapped[1];
@@ -190,7 +185,7 @@ void Renderer::UpdateRTReflectionSignalStatsFromReadback() {
         const uint32_t mappedPixels = mapped[3];
         const uint32_t maxLumaQ = mapped[4];
         const uint32_t outliers = mapped[5];
-        readback->Unmap(0, &writeRange);
+        mappedReadback.Reset();
         pending = false;
 
         pixels = mappedPixels;

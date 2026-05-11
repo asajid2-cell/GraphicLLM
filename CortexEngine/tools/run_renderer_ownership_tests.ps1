@@ -46,7 +46,9 @@ $frameEndPath = Join-Path $root "src/Graphics/Renderer_FrameEnd.cpp"
 $endFrameShaderResourcePassPath = Join-Path $root "src/Graphics/Passes/EndFrameShaderResourcePass.cpp"
 $backBufferPresentPassPath = Join-Path $root "src/Graphics/Passes/BackBufferPresentPass.cpp"
 $descriptorTablePassPath = Join-Path $root "src/Graphics/Passes/DescriptorTable.cpp"
+$readbackBufferPath = Join-Path $root "src/Graphics/Passes/ReadbackBuffer.cpp"
 $rendererDescriptorsPath = Join-Path $root "src/Graphics/Renderer_Descriptors.cpp"
+$rendererTemporalReadbackPath = Join-Path $root "src/Graphics/Renderer_TemporalReadback.cpp"
 $particleStatePath = Join-Path $root "src/Graphics/RendererParticleState.h"
 if (-not (Test-Path $particleStatePath)) {
     throw "RendererParticleState.h not found: $particleStatePath"
@@ -1511,6 +1513,39 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "postprocess_descriptor_tables missing Renderer_Descriptors.cpp"
+        }
+    }
+
+    if ($id -eq "renderer_readback_mapping") {
+        if (Test-Path $readbackBufferPath) {
+            $readbackBuffer = Get-Content $readbackBufferPath -Raw
+            foreach ($required in @("ScopedMap::Reset", "MapRange", "Map(0", "Unmap(0")) {
+                if ($readbackBuffer.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "renderer_readback_mapping missing ReadbackBuffer marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "renderer_readback_mapping missing ReadbackBuffer.cpp"
+        }
+        $readbackRendererFiles = @(
+            @{ Path = $frameEndPath; Name = "Renderer_FrameEnd.cpp" },
+            @{ Path = $rendererTemporalReadbackPath; Name = "Renderer_TemporalReadback.cpp" },
+            @{ Path = $rtReflectionSignalStatsRendererPath; Name = "Renderer_RTReflectionSignalStats.cpp" }
+        )
+        foreach ($entry in $readbackRendererFiles) {
+            if (Test-Path $entry.Path) {
+                $content = Get-Content $entry.Path -Raw
+                if ($content.IndexOf("ReadbackBuffer::MapRange", [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "renderer_readback_mapping missing ReadbackBuffer::MapRange route in $($entry.Name)"
+                }
+                foreach ($removedLocal in @("->Map(", "->Unmap(")) {
+                    if ($content.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "renderer_readback_mapping still has direct readback mapping in $($entry.Name): $removedLocal"
+                    }
+                }
+            } else {
+                Add-Failure "renderer_readback_mapping missing $($entry.Name)"
+            }
         }
     }
 

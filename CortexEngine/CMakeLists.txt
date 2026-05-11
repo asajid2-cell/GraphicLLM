@@ -160,6 +160,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/PostProcessGraphPass.cpp
     src/Graphics/Passes/PostProcessTargetPass.cpp
     src/Graphics/Passes/PostProcessPass.cpp
+    src/Graphics/Passes/ReadbackBuffer.cpp
     src/Graphics/Passes/RenderGraphValidationPass.cpp
     src/Graphics/Passes/RTReflectionDebugClearPass.cpp
     src/Graphics/Passes/RTReflectionDispatchPass.cpp

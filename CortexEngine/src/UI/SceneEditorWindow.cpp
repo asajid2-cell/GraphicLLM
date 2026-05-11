@@ -47,6 +47,18 @@ enum ControlIdEditor : int {
     IDC_SE_APPLY_MATERIAL      = 3211,
     IDC_SE_APPLY_SCALE         = 3212,
     IDC_SE_MATERIAL_VALIDATION = 3213,
+    IDC_SE_FOCUSED_CLEARCOAT_LABEL = 3214,
+    IDC_SE_FOCUSED_CLEARCOAT_SLIDER = 3215,
+    IDC_SE_FOCUSED_COAT_ROUGH_LABEL = 3216,
+    IDC_SE_FOCUSED_COAT_ROUGH_SLIDER = 3217,
+    IDC_SE_FOCUSED_TRANSMISSION_LABEL = 3218,
+    IDC_SE_FOCUSED_TRANSMISSION_SLIDER = 3219,
+    IDC_SE_FOCUSED_EMISSIVE_LABEL = 3220,
+    IDC_SE_FOCUSED_EMISSIVE_SLIDER = 3221,
+    IDC_SE_FOCUSED_SHEEN_LABEL = 3222,
+    IDC_SE_FOCUSED_SHEEN_SLIDER = 3223,
+    IDC_SE_FOCUSED_SUBSURFACE_LABEL = 3224,
+    IDC_SE_FOCUSED_SUBSURFACE_SLIDER = 3225,
 };
 
 struct SceneEditorState {
@@ -72,6 +84,12 @@ struct SceneEditorState {
     HWND comboFocusedMaterial = nullptr;
     HWND sliderFocusedMetallic = nullptr;
     HWND sliderFocusedRoughness = nullptr;
+    HWND sliderFocusedClearcoat = nullptr;
+    HWND sliderFocusedClearcoatRoughness = nullptr;
+    HWND sliderFocusedTransmission = nullptr;
+    HWND sliderFocusedEmissiveStrength = nullptr;
+    HWND sliderFocusedSheen = nullptr;
+    HWND sliderFocusedSubsurface = nullptr;
     HWND sliderFocusedScale = nullptr;
     HWND btnApplyMaterial = nullptr;
     HWND btnApplyScale = nullptr;
@@ -195,6 +213,12 @@ void RefreshMaterialValidationStatus() {
     const std::string preset = GetFocusedPresetFromUI();
     const float metallic = Slider01ToFloat(g_ed.sliderFocusedMetallic, 0.0f, 1.0f);
     const float roughness = Slider01ToFloat(g_ed.sliderFocusedRoughness, 0.0f, 1.0f);
+    const float transmission = Slider01ToFloat(g_ed.sliderFocusedTransmission, 0.0f, 1.0f);
+    const float clearcoat = Slider01ToFloat(g_ed.sliderFocusedClearcoat, 0.0f, 1.0f);
+    const float coatRoughness = Slider01ToFloat(g_ed.sliderFocusedClearcoatRoughness, 0.0f, 1.0f);
+    const float sheen = Slider01ToFloat(g_ed.sliderFocusedSheen, 0.0f, 1.0f);
+    const float subsurface = Slider01ToFloat(g_ed.sliderFocusedSubsurface, 0.0f, 1.0f);
+    const float emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     const Graphics::MaterialPresetInfo info = Graphics::MaterialPresetRegistry::Resolve(preset);
 
     std::wstring status = L"Material validation: OK";
@@ -206,6 +230,17 @@ void RefreshMaterialValidationStatus() {
         status = L"Material validation: warning - metallic preset with low metallic slider";
     } else if (info.clearcoat && roughness > 0.8f) {
         status = L"Material validation: warning - clearcoat is very rough";
+    }
+    if (transmission > 0.05f && metallic > 0.1f) {
+        status = L"Material validation: warning - transmissive materials should stay nonmetallic";
+    } else if (clearcoat > 0.05f && coatRoughness > 0.9f) {
+        status = L"Material validation: warning - clearcoat roughness is near maximum";
+    } else if (sheen > 0.5f && metallic > 0.2f) {
+        status = L"Material validation: warning - sheen usually belongs on dielectric cloth";
+    } else if (subsurface > 0.4f && transmission > 0.2f) {
+        status = L"Material validation: warning - subsurface and transmission overlap";
+    } else if (emissiveStrength > 8.0f && preset.empty()) {
+        status = L"Material validation: warning - high emissive strength without emissive preset";
     }
 
     SetWindowTextW(g_ed.lblMaterialValidation, status.c_str());
@@ -332,6 +367,18 @@ void ApplyMaterialToFocusedFromUI() {
     cmd->metallic = Slider01ToFloat(g_ed.sliderFocusedMetallic, 0.0f, 1.0f);
     cmd->setRoughness = true;
     cmd->roughness = Slider01ToFloat(g_ed.sliderFocusedRoughness, 0.0f, 1.0f);
+    cmd->setTransmission = true;
+    cmd->transmission = Slider01ToFloat(g_ed.sliderFocusedTransmission, 0.0f, 1.0f);
+    cmd->setClearcoat = true;
+    cmd->clearcoat = Slider01ToFloat(g_ed.sliderFocusedClearcoat, 0.0f, 1.0f);
+    cmd->setClearcoatRoughness = true;
+    cmd->clearcoatRoughness = Slider01ToFloat(g_ed.sliderFocusedClearcoatRoughness, 0.0f, 1.0f);
+    cmd->setSheen = true;
+    cmd->sheen = Slider01ToFloat(g_ed.sliderFocusedSheen, 0.0f, 1.0f);
+    cmd->setSubsurface = true;
+    cmd->subsurface = Slider01ToFloat(g_ed.sliderFocusedSubsurface, 0.0f, 1.0f);
+    cmd->setEmissiveStrength = true;
+    cmd->emissiveStrength = Slider01ToFloat(g_ed.sliderFocusedEmissiveStrength, 0.0f, 16.0f);
     cmd->setAO = false;
 
     engine->EnqueueSceneCommand(std::move(cmd));
@@ -557,6 +604,30 @@ void RegisterSceneEditorClass() {
 
             makeLabel(L"Roughness", y);
             g_ed.sliderFocusedRoughness = makeSlider(IDC_SE_FOCUSED_ROUGH_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Clearcoat", y);
+            g_ed.sliderFocusedClearcoat = makeSlider(IDC_SE_FOCUSED_CLEARCOAT_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Coat Roughness", y);
+            g_ed.sliderFocusedClearcoatRoughness = makeSlider(IDC_SE_FOCUSED_COAT_ROUGH_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Transmission", y);
+            g_ed.sliderFocusedTransmission = makeSlider(IDC_SE_FOCUSED_TRANSMISSION_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Emissive", y);
+            g_ed.sliderFocusedEmissiveStrength = makeSlider(IDC_SE_FOCUSED_EMISSIVE_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Sheen", y);
+            g_ed.sliderFocusedSheen = makeSlider(IDC_SE_FOCUSED_SHEEN_SLIDER, y);
+            y += sliderHeight + rowGap;
+
+            makeLabel(L"Subsurface", y);
+            g_ed.sliderFocusedSubsurface = makeSlider(IDC_SE_FOCUSED_SUBSURFACE_SLIDER, y);
             y += sliderHeight + rowGap;
 
             makeLabel(L"Uniform Scale", y);

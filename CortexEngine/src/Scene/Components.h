@@ -207,6 +207,8 @@ struct RenderableComponent {
      glm::vec3 specularColorFactor = glm::vec3(1.0f); // dielectric specular tint
      float clearcoatFactor = 0.0f;             // additional glossy layer weight
      float clearcoatRoughnessFactor = 0.0f;    // clearcoat roughness (0..1)
+     float sheenWeight = 0.0f;                 // cloth/velvet grazing highlight weight
+     float subsurfaceWrap = 0.0f;              // cheap wrap-lighting approximation for skin/wax
 
      enum class AlphaMode : uint32_t {
          Opaque = 0,

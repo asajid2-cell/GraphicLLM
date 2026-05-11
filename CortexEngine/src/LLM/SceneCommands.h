@@ -179,10 +179,22 @@ struct ModifyMaterialCommand : public SceneCommand {
     bool setRoughness = false;
     bool setAO = false;
     bool setPreset = false;
+    bool setTransmission = false;
+    bool setClearcoat = false;
+    bool setClearcoatRoughness = false;
+    bool setSheen = false;
+    bool setSubsurface = false;
+    bool setEmissiveStrength = false;
     glm::vec4 color;
     float metallic = 0.0f;
     float roughness = 0.5f;
     float ao = 1.0f;
+    float transmission = 0.0f;
+    float clearcoat = 0.0f;
+    float clearcoatRoughness = 0.0f;
+    float sheen = 0.0f;
+    float subsurface = 0.0f;
+    float emissiveStrength = 1.0f;
     std::string presetName;
 
     ModifyMaterialCommand() { type = CommandType::ModifyMaterial; }

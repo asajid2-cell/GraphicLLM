@@ -453,6 +453,16 @@
       "future_extension": "Keep future upload command recording and copy submission mechanics in MeshUploadCopyPass or a dedicated upload service instead of adding CopyBufferRegion calls to Renderer_MeshUpload.cpp"
     },
     {
+      "id": "vegetation_instance_resources",
+      "owner": "Vegetation",
+      "status": "release_boundary_validated",
+      "release_boundary": "VegetationInstanceBufferState owns vegetation, billboard, and grass instance upload-buffer allocation, SRV descriptor allocation/view creation, and CPU-to-GPU map/copy/unmap upload mechanics; Renderer_Vegetation.cpp owns vegetation instance filtering, LOD/material policy, buffer resize timing, and delegates resource/upload work through the state bundle",
+      "validated_contracts": ["renderer_ownership", "outdoor_sunset_beach", "phase3_visual_matrix"],
+      "target_files": ["RendererVegetationState.h", "Renderer_Vegetation.cpp"],
+      "renderer_state_members": ["m_vegetationState"],
+      "future_extension": "Keep future vegetation instance buffer resources and upload mechanics in VegetationInstanceBufferState or a dedicated vegetation pass before implementing the remaining vegetation render TODOs"
+    },
+    {
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",

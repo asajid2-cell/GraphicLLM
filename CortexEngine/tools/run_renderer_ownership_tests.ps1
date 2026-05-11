@@ -75,6 +75,7 @@ $postState = Get-Content $postStatePath -Raw
 $materialTextureStatePath = Join-Path $root "src/Graphics/RendererMaterialTextureState.h"
 $texturePublicationPath = Join-Path $root "src/Graphics/Renderer_TexturePublication.cpp"
 $textureCreationPath = Join-Path $root "src/Graphics/Renderer_TextureCreation.cpp"
+$rendererMaterialsPath = Join-Path $root "src/Graphics/Renderer_Materials.cpp"
 $environmentStatePath = Join-Path $root "src/Graphics/RendererEnvironmentState.h"
 if (-not (Test-Path $environmentStatePath)) {
     throw "RendererEnvironmentState.h not found: $environmentStatePath"
@@ -1799,6 +1800,32 @@ foreach ($target in $doc.targets) {
             } else {
                 Add-Failure "texture_descriptor_publication missing $($pathInfo.Label)"
             }
+        }
+    }
+
+    if ($id -eq "material_descriptor_tables") {
+        if (Test-Path $materialTextureStatePath) {
+            $materialTextureState = Get-Content $materialTextureStatePath -Raw
+            foreach ($required in @("RefreshMaterialDescriptorTable", "AllocateMaterialDescriptorTable", "WriteNullTexture2DSRV", "MaterialGPUState::kSlotCount", "sourceTextures", "descriptorsReady", "AllocateCBV_SRV_UAV", "CreateShaderResourceView")) {
+                if ($materialTextureState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "material_descriptor_tables missing TextureDescriptorState marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "material_descriptor_tables missing RendererMaterialTextureState.h"
+        }
+        if (Test-Path $rendererMaterialsPath) {
+            $materialsSource = Get-Content $rendererMaterialsPath -Raw
+            if ($materialsSource.IndexOf("TextureDescriptorState::RefreshMaterialDescriptorTable", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "material_descriptor_tables missing TextureDescriptorState delegation in Renderer_Materials.cpp"
+            }
+            foreach ($removedLocal in @("AllocateCBV_SRV_UAV", "CreateShaderResourceView", "D3D12_SHADER_RESOURCE_VIEW_DESC", "WriteTexture2DSRV")) {
+                if ($materialsSource.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "material_descriptor_tables still has direct descriptor mechanics in Renderer_Materials.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "material_descriptor_tables missing Renderer_Materials.cpp"
         }
     }
 

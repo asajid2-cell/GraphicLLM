@@ -161,6 +161,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/ShadowTargetPass.cpp
     src/Graphics/Passes/SSAOPass.cpp
     src/Graphics/Passes/SSRPass.cpp
+    src/Graphics/Passes/TAACopyPass.cpp
     src/Graphics/Passes/SkyboxPass.cpp
     src/Graphics/Passes/TAAPass.cpp
     src/Graphics/Passes/VisibilityBufferGraphPass.cpp
@@ -407,6 +408,7 @@ set(CORTEX_HEADERS
     src/Graphics/Passes/ShadowTargetPass.h
     src/Graphics/Passes/SSAOPass.h
     src/Graphics/Passes/SSRPass.h
+    src/Graphics/Passes/TAACopyPass.h
     src/Graphics/Passes/SkyboxPass.h
     src/Graphics/Passes/TAAPass.h
     src/Graphics/Passes/VisibilityBufferGraphPass.h

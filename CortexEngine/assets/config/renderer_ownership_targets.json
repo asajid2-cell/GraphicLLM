@@ -83,6 +83,16 @@
       "future_extension": "Keep new post effects inside these state files first; extract orchestration helpers only when a concrete new pass requires it"
     },
     {
+      "id": "taa_copy_transitions",
+      "owner": "TAA copy/history transitions",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_TAAExecution.cpp still owns temporal policy and shader resolve orchestration, but the repeated HDR-to-history and TAA-intermediate-to-HDR copy/barrier mechanics are owned by TAACopyPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/TAACopyPass.h", "Passes/TAACopyPass.cpp", "Renderer_TAAExecution.cpp"],
+      "renderer_state_members": ["m_temporalScreenState", "m_mainTargets", "m_commandResources"],
+      "future_extension": "Keep future TAA history/intermediate copy mechanics in TAACopyPass instead of adding duplicated CopyResource/barrier batches in Renderer_TAAExecution.cpp"
+    },
+    {
       "id": "screen_space_resources",
       "owner": "SSAO and SSR",
       "status": "release_boundary_validated",

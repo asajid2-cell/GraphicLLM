@@ -858,6 +858,16 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       showcase passed at `rt_showcase_20260511_113119_785_92812_47603a0c`.
       The broader ownership rows remain `PARTIAL` because renderer orchestration
       still schedules late-frame policy and other pass mechanics directly.
+    - The current TAA-copy checkpoint moves repeated HDR-to-history and
+      TAA-intermediate-to-HDR copy/barrier mechanics into `TAACopyPass`.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=18`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_113603_979_89084_f35e23b5`, and RT
+      showcase passed at `rt_showcase_20260511_113610_099_95604_9cfc0848`.
+      The broader ownership rows remain `PARTIAL` because TAA resolve policy
+      and other renderer pass mechanics still live in renderer orchestration
+      files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

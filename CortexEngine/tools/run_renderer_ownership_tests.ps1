@@ -68,6 +68,8 @@ $environmentState = Get-Content $environmentStatePath -Raw
 $bloomStatePath = Join-Path $root "src/Graphics/RendererBloomState.h"
 $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
+$taaCopyPassPath = Join-Path $root "src/Graphics/Passes/TAACopyPass.cpp"
+$taaExecutionPath = Join-Path $root "src/Graphics/Renderer_TAAExecution.cpp"
 $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
 $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
@@ -350,6 +352,34 @@ foreach ($target in $doc.targets) {
             if ($postState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "postprocess_resources missing post-state ownership marker in RendererPostProcessState.h: $required"
             }
+        }
+    }
+
+    if ($id -eq "taa_copy_transitions") {
+        if (Test-Path $taaCopyPassPath) {
+            $taaCopyPass = Get-Content $taaCopyPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::TAACopyPass", "ResourceStateRef", "HistoryCopyContext", "IntermediateCopyContext", "CopyHdrToHistory", "CopyIntermediateToHdr", "ResourceBarrier", "CopyResource", "D3D12_RESOURCE_STATE_COPY_SOURCE", "D3D12_RESOURCE_STATE_COPY_DEST")) {
+                if ($taaCopyPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "taa_copy_transitions missing TAACopyPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "taa_copy_transitions missing TAACopyPass.cpp"
+        }
+        if (Test-Path $taaExecutionPath) {
+            $taaExecution = Get-Content $taaExecutionPath -Raw
+            foreach ($route in @("TAACopyPass::CopyHdrToHistory", "TAACopyPass::CopyIntermediateToHdr")) {
+                if ($taaExecution.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "taa_copy_transitions missing routed TAA copy call in Renderer_TAAExecution.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("initBarriers", "copyBarriers", "postTaa", "finalBarriers", "CopyResource")) {
+                if ($taaExecution.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "taa_copy_transitions still has duplicated TAA copy/barrier mechanics in Renderer_TAAExecution.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "taa_copy_transitions missing Renderer_TAAExecution.cpp"
         }
     }
 

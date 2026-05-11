@@ -285,6 +285,23 @@ struct FrameContract {
         uint64_t instanceBufferBytes = 0;
     };
 
+    struct VegetationInfo {
+        bool enabled = false;
+        bool meshPipelineReady = false;
+        bool billboardPipelineReady = false;
+        bool grassPipelineReady = false;
+        bool shadowPipelineReady = false;
+        bool atlasLoaded = false;
+        uint32_t totalInstances = 0;
+        uint32_t visibleInstances = 0;
+        uint32_t meshInstances = 0;
+        uint32_t billboardInstances = 0;
+        uint32_t grassInstances = 0;
+        uint32_t meshCapacity = 0;
+        uint32_t billboardCapacity = 0;
+        uint32_t grassCapacity = 0;
+    };
+
     struct CinematicPostInfo {
         bool enabled = false;
         bool postProcessPlanned = false;
@@ -550,6 +567,7 @@ struct FrameContract {
     LightingInfo lighting;
     CullingInfo culling;
     ParticleInfo particles;
+    VegetationInfo vegetation;
     CinematicPostInfo cinematicPost;
     MotionVectorInfo motionVectors;
     TemporalMaskInfo temporalMask;

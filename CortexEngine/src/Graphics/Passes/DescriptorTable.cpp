@@ -48,6 +48,32 @@ bool WriteTexture2DUAV(ID3D12Device* device,
     return true;
 }
 
+bool WriteTexture2DRTVAndSRV(ID3D12Device* device,
+                             ID3D12Resource* resource,
+                             DescriptorHandle rtv,
+                             DescriptorHandle srv,
+                             DXGI_FORMAT format) {
+    if (!device || !resource || !rtv.IsValid() || !srv.IsValid()) {
+        return false;
+    }
+
+    const DXGI_FORMAT viewFormat =
+        (format != DXGI_FORMAT_UNKNOWN) ? format : resource->GetDesc().Format;
+
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+    rtvDesc.Format = viewFormat;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    device->CreateRenderTargetView(resource, &rtvDesc, rtv.cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format = viewFormat;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels = 1;
+    device->CreateShaderResourceView(resource, &srvDesc, srv.cpu);
+    return true;
+}
+
 Result<void> AllocateAndWriteNullSRVTable(ID3D12Device* device,
                                           DescriptorHeapManager* descriptorManager,
                                           std::span<DescriptorHandle> table,
@@ -85,6 +111,35 @@ Result<void> AllocateHandleSet(DescriptorHeapManager* descriptorManager,
         }
         handle = handleResult.Value();
     }
+    return Result<void>::Ok();
+}
+
+Result<void> EnsureColorTargetViewHandles(DescriptorHeapManager* descriptorManager,
+                                          DescriptorHandle& rtv,
+                                          DescriptorHandle& srv,
+                                          const char* label) {
+    if (!descriptorManager) {
+        return Result<void>::Err(std::string("Renderer is not initialized for ") + label + " descriptors");
+    }
+
+    if (!rtv.IsValid()) {
+        auto rtvResult = descriptorManager->AllocateRTV();
+        if (rtvResult.IsErr()) {
+            return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                     " RTV: " + rtvResult.Error());
+        }
+        rtv = rtvResult.Value();
+    }
+
+    if (!srv.IsValid()) {
+        auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+        if (srvResult.IsErr()) {
+            return Result<void>::Err(std::string("Failed to allocate ") + label +
+                                     " SRV: " + srvResult.Error());
+        }
+        srv = srvResult.Value();
+    }
+
     return Result<void>::Ok();
 }
 

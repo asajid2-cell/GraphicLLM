@@ -2,6 +2,7 @@
 
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
+#include "Passes/DescriptorTable.h"
 #include "Passes/RenderPassScope.h"
 #include "RenderGraph.h"
 
@@ -86,23 +87,15 @@ Renderer::ExecuteBloomInRenderGraph() {
                 if (!bloomPingIsTransient(level, ping)) {
                     continue;
                 }
-                if (!m_bloomResources.resources.graphRtv[level][ping].IsValid()) {
-                    auto rtvResult = m_services.descriptorManager->AllocateRTV();
-                    if (rtvResult.IsErr()) {
-                        result.fallbackUsed = true;
-                        result.fallbackReason = "bloom_graph_rtv_allocation_failed: " + rtvResult.Error();
-                        return result;
-                    }
-                    m_bloomResources.resources.graphRtv[level][ping] = rtvResult.Value();
-                }
-                if (!m_bloomResources.resources.graphSrv[level][ping].IsValid()) {
-                    auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-                    if (srvResult.IsErr()) {
-                        result.fallbackUsed = true;
-                        result.fallbackReason = "bloom_graph_srv_allocation_failed: " + srvResult.Error();
-                        return result;
-                    }
-                    m_bloomResources.resources.graphSrv[level][ping] = srvResult.Value();
+                auto viewResult = DescriptorTable::EnsureColorTargetViewHandles(
+                    m_services.descriptorManager.get(),
+                    m_bloomResources.resources.graphRtv[level][ping],
+                    m_bloomResources.resources.graphSrv[level][ping],
+                    "bloom graph transient");
+                if (viewResult.IsErr()) {
+                    result.fallbackUsed = true;
+                    result.fallbackReason = "bloom_graph_view_allocation_failed: " + viewResult.Error();
+                    return result;
                 }
                 m_bloomResources.resources.rtv[level][ping] = m_bloomResources.resources.graphRtv[level][ping];
                 m_bloomResources.resources.srv[level][ping] = m_bloomResources.resources.graphSrv[level][ping];
@@ -147,19 +140,12 @@ Renderer::ExecuteBloomInRenderGraph() {
         if (!resource || level >= kBloomLevels || ping >= 2u || !m_services.device || !m_services.device->GetDevice()) {
             return false;
         }
-        const D3D12_RESOURCE_DESC desc = resource->GetDesc();
-
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = desc.Format;
-        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        m_services.device->GetDevice()->CreateRenderTargetView(resource, &rtvDesc, m_bloomResources.resources.rtv[level][ping].cpu);
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-        m_services.device->GetDevice()->CreateShaderResourceView(resource, &srvDesc, m_bloomResources.resources.srv[level][ping].cpu);
+        if (!DescriptorTable::WriteTexture2DRTVAndSRV(m_services.device->GetDevice(),
+                                                      resource,
+                                                      m_bloomResources.resources.rtv[level][ping],
+                                                      m_bloomResources.resources.srv[level][ping])) {
+            return false;
+        }
 
         if (ping == 0) {
             m_bloomResources.resources.texA[level] = resource;

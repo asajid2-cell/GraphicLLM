@@ -123,6 +123,7 @@ $depthStatePath = Join-Path $root "src/Graphics/RendererDepthState.h"
 $depthTargetPath = Join-Path $root "src/Graphics/Renderer_DepthTarget.cpp"
 $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $depthPrepassTargetPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepassTargetPass.cpp"
+$depthPrepassPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepass.cpp"
 $depthWriteTransitionPassPath = Join-Path $root "src/Graphics/Passes/DepthWriteTransitionPass.cpp"
 $framePhasesMainPath = Join-Path $root "src/Graphics/Renderer_FramePhases_Main.cpp"
 $visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/VisibilityBufferResourcePass.cpp"
@@ -1301,15 +1302,20 @@ foreach ($target in $doc.targets) {
         } else {
             Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass.cpp"
         }
+        if (Test-Path $depthPrepassPassPath) {
+            $depthPrepassSource = Get-Content $depthPrepassPassPath -Raw
+            if ($depthPrepassSource.IndexOf("DepthPrepassTargetPass::BindAndClear", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass::BindAndClear in DepthPrepass.cpp"
+            }
+        } else {
+            Add-Failure "depth_prepass_target_submission missing DepthPrepass.cpp"
+        }
         if (Test-Path $depthPassesPath) {
             $depthPassSource = Get-Content $depthPassesPath -Raw
             foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "ClearDepthStencilView", "RSSetViewports", "RSSetScissorRects")) {
                 if ($depthPassSource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
                     Add-Failure "depth_prepass_target_submission still performs target setup directly in Renderer_DepthPasses.cpp: $directCall"
                 }
-            }
-            if ($depthPassSource.IndexOf("DepthPrepassTargetPass::BindAndClear", [StringComparison]::Ordinal) -lt 0) {
-                Add-Failure "depth_prepass_target_submission missing DepthPrepassTargetPass::BindAndClear in Renderer_DepthPasses.cpp"
             }
         } else {
             Add-Failure "depth_prepass_target_submission missing Renderer_DepthPasses.cpp"
@@ -1736,7 +1742,7 @@ foreach ($target in $doc.targets) {
             [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
             [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
             [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
-            [pscustomobject]@{ Path = $depthPassPath; Label = "Renderer_DepthPasses.cpp" },
+            [pscustomobject]@{ Path = $depthPrepassPassPath; Label = "DepthPrepass.cpp" },
             [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
         )) {
             if (Test-Path $pathInfo.Path) {
@@ -1769,7 +1775,7 @@ foreach ($target in $doc.targets) {
             [pscustomobject]@{ Path = $transparentGeometryPath; Label = "Renderer_TransparentGeometry.cpp" },
             [pscustomobject]@{ Path = $overlayGeometryPath; Label = "Renderer_OverlayGeometry.cpp" },
             [pscustomobject]@{ Path = $waterSurfacesPath; Label = "Renderer_WaterSurfaces.cpp" },
-            [pscustomobject]@{ Path = $depthPassPath; Label = "Renderer_DepthPasses.cpp" },
+            [pscustomobject]@{ Path = $depthPrepassPassPath; Label = "DepthPrepass.cpp" },
             [pscustomobject]@{ Path = $shadowDrawPassPath; Label = "Renderer_ShadowPass.cpp" }
         )) {
             if (Test-Path $pathInfo.Path) {

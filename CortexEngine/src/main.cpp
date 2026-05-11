@@ -67,6 +67,43 @@ bool EnvTruthy(const char* name) {
            normalized != "no";
 }
 
+struct FatalDialogDecision {
+    bool show = false;
+    std::string suppressedReason;
+};
+
+FatalDialogDecision DecideFatalDialogVisibility() {
+    if (EnvTruthy("CORTEX_FORCE_FATAL_DIALOG")) {
+        return {true, ""};
+    }
+    if (EnvTruthy("CORTEX_SUPPRESS_FATAL_DIALOG")) {
+        return {false, "suppressed_by_env"};
+    }
+    if (std::getenv("CORTEX_LOG_DIR")) {
+        return {false, "automation_log_dir"};
+    }
+    if (EnvTruthy("CORTEX_FORCE_FATAL_ERROR")) {
+        return {false, "forced_test_failure"};
+    }
+    return {true, ""};
+}
+
+void ShowFatalErrorDialog(const std::string& kind,
+                          const std::string& message,
+                          const std::filesystem::path& summaryPath) {
+    const std::string body =
+        "Cortex hit a fatal renderer/runtime error and wrote a recovery report.\n\n"
+        "Kind: " + kind + "\n"
+        "Message: " + message + "\n\n"
+        "Report:\n" + summaryPath.string() + "\n\n"
+        "Try the Safe Startup graphics profile if this happened during launch.";
+
+    MessageBoxA(nullptr,
+                body.c_str(),
+                "Cortex Renderer Failure",
+                MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+}
+
 bool TrySetRenderBackend(EngineConfig& config, std::string backend) {
     std::transform(backend.begin(), backend.end(), backend.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -120,6 +157,7 @@ std::filesystem::path WriteRendererFailureSummary(const std::string& kind,
     const fs::path logDir = GetLogDirectory();
     const fs::path summaryPath = logDir / "last_renderer_failure.json";
     const auto& logState = GetRunLogState();
+    const FatalDialogDecision dialog = DecideFatalDialogVisibility();
 
     nlohmann::json summary;
     summary["schema"] = "cortex.renderer_failure.v1";
@@ -131,6 +169,12 @@ std::filesystem::path WriteRendererFailureSummary(const std::string& kind,
     summary["working_directory"] = fs::current_path().string();
     summary["executable_directory"] = GetExecutableDirectory();
     summary["log_file"] = logState.logFilePath.string();
+    summary["user_message"] = {
+        {"dialog_supported", true},
+        {"dialog_shown", dialog.show},
+        {"dialog_suppressed_reason", dialog.suppressedReason},
+        {"recovery_hint", "Try the Safe Startup graphics profile, then inspect last_renderer_failure.json and engine.log."}
+    };
 
     nlohmann::json args = nlohmann::json::array();
     for (int i = 0; i < argc; ++i) {
@@ -153,6 +197,9 @@ std::filesystem::path WriteRendererFailureSummary(const std::string& kind,
     spdlog::critical("Renderer failure summary written to '{}'", summaryPath.string());
     if (auto logger = spdlog::default_logger()) {
         logger->flush();
+    }
+    if (dialog.show) {
+        ShowFatalErrorDialog(kind, message, summaryPath);
     }
     return summaryPath;
 }

@@ -71,6 +71,23 @@ if (-not (Test-Path $summaryPath)) {
     if ([string]::IsNullOrWhiteSpace([string]$summary.log_file)) {
         Add-Failure "Failure summary missing log_file."
     }
+    if ($null -eq $summary.user_message) {
+        Add-Failure "Failure summary missing user_message UX block."
+    } else {
+        if (-not [bool]$summary.user_message.dialog_supported) {
+            Add-Failure "Failure summary user_message.dialog_supported was false."
+        }
+        if ([bool]$summary.user_message.dialog_shown) {
+            Add-Failure "Fatal dialog was shown during automation; expected suppression."
+        }
+        if ([string]$summary.user_message.dialog_suppressed_reason -ne "automation_log_dir") {
+            Add-Failure "Fatal dialog suppression reason was '$($summary.user_message.dialog_suppressed_reason)', expected automation_log_dir."
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$summary.user_message.recovery_hint) -or
+            [string]$summary.user_message.recovery_hint -notmatch "Safe Startup") {
+            Add-Failure "Failure summary user_message.recovery_hint is missing Safe Startup guidance."
+        }
+    }
     if ($null -eq $summary.recent_log_lines -or $summary.recent_log_lines.Count -lt 1) {
         Add-Failure "Failure summary missing recent log lines."
     }

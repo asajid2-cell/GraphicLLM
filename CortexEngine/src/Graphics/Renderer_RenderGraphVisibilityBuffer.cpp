@@ -156,42 +156,13 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugBlit.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
         vbGraphContext.debugBlit.debugOverrideThisFrame = &m_visibilityBufferState.debugOverrideThisFrame;
         vbGraphContext.debugBlit.failure = vbFailure;
-        vbGraphContext.brdfLut = [&]() {
-            if (vbStageFailed) return;
-
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.brdfLut = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.brdfLut = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            auto brdfResult = m_services.visibilityBuffer->EnsureBRDFLUT(m_commandResources.graphicsList.Get());
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (brdfResult.IsErr()) {
-                markStageFailure("brdf_lut", brdfResult.Error());
-            }
-        };
-        vbGraphContext.clusteredLights = [&]() {
-            if (vbStageFailed) return;
-
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.clusterRanges = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.clusterLightIndices = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.clusteredLights = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            auto clusterResult =
-                m_services.visibilityBuffer->BuildClusteredLightLists(m_commandResources.graphicsList.Get(), deferredInputs.params);
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (clusterResult.IsErr()) {
-                markStageFailure("clustered_lights", clusterResult.Error());
-            }
-        };
+        vbGraphContext.brdfLut.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.brdfLut.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.brdfLut.failure = vbFailure;
+        vbGraphContext.clusteredLights.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.clusteredLights.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.clusteredLights.params = deferredInputs.params;
+        vbGraphContext.clusteredLights.failure = vbFailure;
         vbGraphContext.deferredLighting = [&]() {
             if (vbStageFailed) return;
             m_depthResources.resources.resourceState = kDepthSampleState;

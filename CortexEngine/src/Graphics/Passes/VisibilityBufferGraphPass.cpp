@@ -77,6 +77,14 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            (context.debugVisibility || (context.debugDepth && context.depthBuffer) || context.debugGBuffer);
 }
 
+[[nodiscard]] bool IsValid(const BRDFLUTContext& context) {
+    return context.renderer && context.commandList;
+}
+
+[[nodiscard]] bool IsValid(const ClusteredLightsContext& context) {
+    return context.renderer && context.commandList;
+}
+
 } // namespace
 
 bool Clear(const ClearContext& context) {
@@ -285,6 +293,59 @@ bool DebugBlit(const DebugBlitContext& context) {
     return true;
 }
 
+bool GenerateBRDFLUT(const BRDFLUTContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "brdf_lut", "visibility-buffer BRDF LUT context incomplete");
+        return false;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.brdfLut = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.brdfLut = true;
+    context.renderer->SetTransitionSkipControls(controls);
+    auto brdfResult = context.renderer->EnsureBRDFLUT(context.commandList);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (brdfResult.IsErr()) {
+        RecordFailure(context.failure, "brdf_lut", brdfResult.Error());
+        return false;
+    }
+    return true;
+}
+
+bool BuildClusteredLights(const ClusteredLightsContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "clustered_lights", "visibility-buffer clustered-lights context incomplete");
+        return false;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.clusterRanges = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.clusterLightIndices = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.clusteredLights = true;
+    context.renderer->SetTransitionSkipControls(controls);
+    auto clusterResult = context.renderer->BuildClusteredLightLists(context.commandList, context.params);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (clusterResult.IsErr()) {
+        RecordFailure(context.failure, "clustered_lights", clusterResult.Error());
+        return false;
+    }
+    return true;
+}
+
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
     if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
@@ -301,6 +362,14 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     }
     if (context.debugPath && !IsValid(context.debugBlit)) {
         Fail(context, "visibility_buffer_debug_contract");
+        return false;
+    }
+    if (context.brdfGraphOwned && !IsValid(context.brdfLut)) {
+        Fail(context, "visibility_buffer_brdf_lut_contract");
+        return false;
+    }
+    if (!context.debugPath && context.clusterGraphOwned && !IsValid(context.clusteredLights)) {
+        Fail(context, "visibility_buffer_clustered_lights_contract");
         return false;
     }
 
@@ -371,9 +440,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(resources.brdfLut, RGResourceUsage::UnorderedAccess);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                if (context.brdfLut) {
-                    context.brdfLut();
-                }
+                (void)GenerateBRDFLUT(context.brdfLut);
             });
     }
 
@@ -386,9 +453,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(resources.clusterLightIndices, RGResourceUsage::UnorderedAccess);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                if (context.clusteredLights) {
-                    context.clusteredLights();
-                }
+                (void)BuildClusteredLights(context.clusteredLights);
             });
     }
 

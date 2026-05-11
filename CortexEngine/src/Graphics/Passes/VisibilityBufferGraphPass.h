@@ -87,6 +87,19 @@ struct DebugBlitContext {
     StageFailureContext failure;
 };
 
+struct BRDFLUTContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    StageFailureContext failure;
+};
+
+struct ClusteredLightsContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    VisibilityBufferRenderer::DeferredLightingParams params{};
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -100,8 +113,8 @@ struct GraphContext {
     VisibilityContext visibility;
     MaterialResolveContext materialResolve;
     DebugBlitContext debugBlit;
-    std::function<void()> brdfLut;
-    std::function<void()> clusteredLights;
+    BRDFLUTContext brdfLut;
+    ClusteredLightsContext clusteredLights;
     std::function<void()> deferredLighting;
     std::function<void(const char*)> failStage;
 };
@@ -110,6 +123,8 @@ struct GraphContext {
 [[nodiscard]] bool RasterizeVisibility(const VisibilityContext& context);
 [[nodiscard]] bool ResolveMaterials(const MaterialResolveContext& context);
 [[nodiscard]] bool DebugBlit(const DebugBlitContext& context);
+[[nodiscard]] bool GenerateBRDFLUT(const BRDFLUTContext& context);
+[[nodiscard]] bool BuildClusteredLights(const ClusteredLightsContext& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

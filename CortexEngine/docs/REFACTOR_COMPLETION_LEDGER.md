@@ -868,6 +868,16 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because TAA resolve policy
       and other renderer pass mechanics still live in renderer orchestration
       files.
+    - The current motion-vector target checkpoint moves velocity UAV/RT and
+      depth sample-state transition mechanics into `MotionVectorTargetPass`.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=19`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_113945_603_91052_7377ac8f`, and RT
+      showcase passed at `rt_showcase_20260511_113952_284_89072_861593ab`.
+      The broader ownership rows remain `PARTIAL` because motion-vector policy,
+      graph orchestration, and other renderer pass mechanics still live in
+      renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

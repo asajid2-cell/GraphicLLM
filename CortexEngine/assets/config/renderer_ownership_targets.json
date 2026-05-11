@@ -93,6 +93,16 @@
       "future_extension": "Keep future TAA history/intermediate copy mechanics in TAACopyPass instead of adding duplicated CopyResource/barrier batches in Renderer_TAAExecution.cpp"
     },
     {
+      "id": "motion_vector_target_transitions",
+      "owner": "Motion-vector velocity/depth targets",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_MotionVectors.cpp still decides VB motion vs camera fallback and invokes MotionVectorPass, but velocity UAV/RT and depth sample-state target transitions are owned by MotionVectorTargetPass",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/MotionVectorTargetPass.h", "Passes/MotionVectorTargetPass.cpp", "Renderer_MotionVectors.cpp"],
+      "renderer_state_members": ["m_temporalScreenState", "m_depthResources", "m_commandResources"],
+      "future_extension": "Keep future motion-vector target-state setup in MotionVectorTargetPass instead of adding direct velocity/depth barrier batches in Renderer_MotionVectors.cpp"
+    },
+    {
       "id": "screen_space_resources",
       "owner": "SSAO and SSR",
       "status": "release_boundary_validated",

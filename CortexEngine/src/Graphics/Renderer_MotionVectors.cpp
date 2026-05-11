@@ -1,5 +1,6 @@
 ﻿#include "Renderer.h"
 #include "Graphics/RendererGeometryUtils.h"
+#include "Passes/MotionVectorTargetPass.h"
 #include "Passes/MotionVectorPass.h"
 
 #include <span>
@@ -15,28 +16,23 @@ void Renderer::RenderMotionVectors() {
     // When the visibility-buffer path is active, compute per-object motion vectors
     // from VB + barycentrics (better stability for TAA/SSR/RT).
     if (m_visibilityBufferState.enabled && m_services.visibilityBuffer && !m_visibilityBufferState.meshDraws.empty() && !m_visibilityBufferState.instances.empty()) {
-        // Transition velocity buffer for UAV writes.
-        if (m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_UNORDERED_ACCESS) {
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_temporalScreenState.velocityBuffer.Get();
-            barrier.Transition.StateBefore = m_temporalScreenState.velocityState;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        }
-
-        auto mvResult = m_services.visibilityBuffer->ComputeMotionVectors(
-            m_commandResources.graphicsList.Get(),
-            m_temporalScreenState.velocityBuffer.Get(),
-            m_visibilityBufferState.meshDraws,
-            m_constantBuffers.currentFrameGPU
-        );
-        if (mvResult.IsErr()) {
-            spdlog::warn("VB motion vectors failed; falling back to camera-only: {}", mvResult.Error());
+        MotionVectorTargetPass::VelocityUAVContext uavContext{};
+        uavContext.commandList = m_commandResources.graphicsList.Get();
+        uavContext.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+        if (!MotionVectorTargetPass::TransitionVelocityToUnorderedAccess(uavContext)) {
+            spdlog::warn("VB motion vectors failed; falling back to camera-only: velocity target transition failed");
         } else {
-            return;
+            auto mvResult = m_services.visibilityBuffer->ComputeMotionVectors(
+                m_commandResources.graphicsList.Get(),
+                m_temporalScreenState.velocityBuffer.Get(),
+                m_visibilityBufferState.meshDraws,
+                m_constantBuffers.currentFrameGPU
+            );
+            if (mvResult.IsErr()) {
+                spdlog::warn("VB motion vectors failed; falling back to camera-only: {}", mvResult.Error());
+            } else {
+                return;
+            }
         }
     }
 
@@ -44,32 +40,14 @@ void Renderer::RenderMotionVectors() {
         return;
     }
 
-    // Transition resources
-    D3D12_RESOURCE_BARRIER barriers[2] = {};
-    UINT barrierCount = 0;
-
-    if (m_temporalScreenState.velocityState != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_temporalScreenState.velocityBuffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_temporalScreenState.velocityState;
-        barriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_temporalScreenState.velocityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    }
-
-    if (m_depthResources.resources.resourceState != kDepthSampleState) {
-        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[barrierCount].Transition.pResource = m_depthResources.resources.buffer.Get();
-        barriers[barrierCount].Transition.StateBefore = m_depthResources.resources.resourceState;
-        barriers[barrierCount].Transition.StateAfter = kDepthSampleState;
-        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        ++barrierCount;
-        m_depthResources.resources.resourceState = kDepthSampleState;
-    }
-
-    if (barrierCount > 0) {
-        m_commandResources.graphicsList->ResourceBarrier(barrierCount, barriers);
+    MotionVectorTargetPass::CameraTargetContext cameraTargetContext{};
+    cameraTargetContext.commandList = m_commandResources.graphicsList.Get();
+    cameraTargetContext.velocity = {m_temporalScreenState.velocityBuffer.Get(), &m_temporalScreenState.velocityState};
+    cameraTargetContext.depth = {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState};
+    cameraTargetContext.depthSampleState = kDepthSampleState;
+    if (!MotionVectorTargetPass::TransitionCameraTargets(cameraTargetContext)) {
+        spdlog::error("RenderMotionVectors: target transition failed");
+        return;
     }
 
     if (!m_temporalScreenState.motionVectorSrvTableValid) {

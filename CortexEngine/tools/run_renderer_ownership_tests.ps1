@@ -70,6 +70,8 @@ $bloomRendererPath = Join-Path $root "src/Graphics/Renderer_Bloom.cpp"
 $temporalScreenPath = Join-Path $root "src/Graphics/RendererTemporalScreenState.h"
 $taaCopyPassPath = Join-Path $root "src/Graphics/Passes/TAACopyPass.cpp"
 $taaExecutionPath = Join-Path $root "src/Graphics/Renderer_TAAExecution.cpp"
+$motionVectorTargetPassPath = Join-Path $root "src/Graphics/Passes/MotionVectorTargetPass.cpp"
+$motionVectorRendererPath = Join-Path $root "src/Graphics/Renderer_MotionVectors.cpp"
 $ssaoStatePath = Join-Path $root "src/Graphics/RendererSSAOState.h"
 $ssrStatePath = Join-Path $root "src/Graphics/RendererSSRState.h"
 $ssaoRendererPath = Join-Path $root "src/Graphics/Renderer_SSAO.cpp"
@@ -380,6 +382,34 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "taa_copy_transitions missing Renderer_TAAExecution.cpp"
+        }
+    }
+
+    if ($id -eq "motion_vector_target_transitions") {
+        if (Test-Path $motionVectorTargetPassPath) {
+            $motionVectorTargetPass = Get-Content $motionVectorTargetPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::MotionVectorTargetPass", "ResourceStateRef", "VelocityUAVContext", "CameraTargetContext", "TransitionVelocityToUnorderedAccess", "TransitionCameraTargets", "ResourceBarrier", "D3D12_RESOURCE_STATE_UNORDERED_ACCESS", "D3D12_RESOURCE_STATE_RENDER_TARGET")) {
+                if ($motionVectorTargetPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "motion_vector_target_transitions missing MotionVectorTargetPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "motion_vector_target_transitions missing MotionVectorTargetPass.cpp"
+        }
+        if (Test-Path $motionVectorRendererPath) {
+            $motionVectorRenderer = Get-Content $motionVectorRendererPath -Raw
+            foreach ($route in @("MotionVectorTargetPass::TransitionVelocityToUnorderedAccess", "MotionVectorTargetPass::TransitionCameraTargets")) {
+                if ($motionVectorRenderer.IndexOf($route, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "motion_vector_target_transitions missing routed transition call in Renderer_MotionVectors.cpp: $route"
+                }
+            }
+            foreach ($removedLocal in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier", "barrierCount")) {
+                if ($motionVectorRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "motion_vector_target_transitions still has direct velocity/depth barrier mechanics in Renderer_MotionVectors.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "motion_vector_target_transitions missing Renderer_MotionVectors.cpp"
         }
     }
 

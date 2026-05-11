@@ -102,6 +102,9 @@ $depthPassesPath = Join-Path $root "src/Graphics/Renderer_DepthPasses.cpp"
 $depthPrepassTargetPassPath = Join-Path $root "src/Graphics/Passes/DepthPrepassTargetPass.cpp"
 $depthWriteTransitionPassPath = Join-Path $root "src/Graphics/Passes/DepthWriteTransitionPass.cpp"
 $framePhasesMainPath = Join-Path $root "src/Graphics/Renderer_FramePhases_Main.cpp"
+$visibilityBufferResourcePassPath = Join-Path $root "src/Graphics/Passes/VisibilityBufferResourcePass.cpp"
+$visibilityBufferStagesPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferStages.cpp"
+$visibilityBufferCullingPath = Join-Path $root "src/Graphics/Renderer_VisibilityBufferCulling.cpp"
 $mainTargetStatePath = Join-Path $root "src/Graphics/RendererMainTargetState.h"
 $hdrTargetsPath = Join-Path $root "src/Graphics/Renderer_HDRTargets.cpp"
 $mainPassSetupPath = Join-Path $root "src/Graphics/Renderer_MainPassSetup.cpp"
@@ -999,6 +1002,39 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "depth_write_transition missing Renderer_FramePhases_Main.cpp"
+        }
+    }
+
+    if ($id -eq "visibility_buffer_resource_transitions") {
+        if (Test-Path $visibilityBufferResourcePassPath) {
+            $visibilityBufferResourcePass = Get-Content $visibilityBufferResourcePassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::VisibilityBufferResourcePass", "PrepareDepthForVisibility", "PrepareDepthForSampling", "PrepareHZBForCulling", "TransitionResource", "EnsureStateIncludes", "ResourceBarrier", "D3D12_RESOURCE_STATE_DEPTH_WRITE", "D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE", "kDepthSampleState")) {
+                if ($visibilityBufferResourcePass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "visibility_buffer_resource_transitions missing VisibilityBufferResourcePass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "visibility_buffer_resource_transitions missing VisibilityBufferResourcePass.cpp"
+        }
+        foreach ($pathInfo in @(
+            [pscustomobject]@{ Path = $visibilityBufferStagesPath; Label = "Renderer_VisibilityBufferStages.cpp"; Routes = @("VisibilityBufferResourcePass::PrepareDepthForVisibility", "VisibilityBufferResourcePass::PrepareDepthForSampling") },
+            [pscustomobject]@{ Path = $visibilityBufferCullingPath; Label = "Renderer_VisibilityBufferCulling.cpp"; Routes = @("VisibilityBufferResourcePass::PrepareHZBForCulling") }
+        )) {
+            if (Test-Path $pathInfo.Path) {
+                $visibilitySource = Get-Content $pathInfo.Path -Raw
+                foreach ($directCall in @("D3D12_RESOURCE_BARRIER", "ResourceBarrier")) {
+                    if ($visibilitySource.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                        Add-Failure "visibility_buffer_resource_transitions still performs resource transition directly in $($pathInfo.Label): $directCall"
+                    }
+                }
+                foreach ($requiredRoute in $pathInfo.Routes) {
+                    if ($visibilitySource.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                        Add-Failure "visibility_buffer_resource_transitions missing routed resource call in $($pathInfo.Label): $requiredRoute"
+                    }
+                }
+            } else {
+                Add-Failure "visibility_buffer_resource_transitions missing $($pathInfo.Label)"
+            }
         }
     }
 

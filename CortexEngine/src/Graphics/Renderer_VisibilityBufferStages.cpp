@@ -2,6 +2,7 @@
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
+#include "Graphics/Passes/VisibilityBufferResourcePass.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Graphics/SurfaceClassification.h"
@@ -47,15 +48,11 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
                                                      uint32_t debugView,
                                                      bool& completedPath) {
     completedPath = false;
-    if (m_depthResources.resources.resourceState != D3D12_RESOURCE_STATE_DEPTH_WRITE) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    const bool depthReady = VisibilityBufferResourcePass::PrepareDepthForVisibility(
+        m_commandResources.graphicsList.Get(),
+        {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState});
+    if (!depthReady) {
+        return false;
     }
 
     auto visResult = m_services.visibilityBuffer->RenderVisibilityPass(
@@ -90,15 +87,11 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
         m_visibilityBufferState.renderedThisFrame = true;
         completedPath = true;
     } else if (debugView == kVBDebugDepth) {
-        if (m_depthResources.resources.resourceState != kDepthSampleState) {
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-            barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-            barrier.Transition.StateAfter = kDepthSampleState;
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-            m_depthResources.resources.resourceState = kDepthSampleState;
+        const bool debugDepthReady = VisibilityBufferResourcePass::PrepareDepthForSampling(
+            m_commandResources.graphicsList.Get(),
+            {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState});
+        if (!debugDepthReady) {
+            return false;
         }
         auto dbg = m_services.visibilityBuffer->DebugBlitDepthToHDR(
             m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu, m_depthResources.resources.buffer.Get());
@@ -114,15 +107,11 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
 
 bool Renderer::RenderVisibilityBufferMaterialResolveStage(uint32_t debugView, bool& completedPath) {
     completedPath = false;
-    if (m_depthResources.resources.resourceState != kDepthSampleState) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = m_depthResources.resources.buffer.Get();
-        barrier.Transition.StateBefore = m_depthResources.resources.resourceState;
-        barrier.Transition.StateAfter = kDepthSampleState;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-        m_depthResources.resources.resourceState = kDepthSampleState;
+    const bool depthSampleReady = VisibilityBufferResourcePass::PrepareDepthForSampling(
+        m_commandResources.graphicsList.Get(),
+        {m_depthResources.resources.buffer.Get(), &m_depthResources.resources.resourceState});
+    if (!depthSampleReady) {
+        return false;
     }
 
     auto resolveResult = m_services.visibilityBuffer->ResolveMaterials(

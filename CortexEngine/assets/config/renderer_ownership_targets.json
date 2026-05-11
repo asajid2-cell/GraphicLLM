@@ -283,6 +283,16 @@
       "future_extension": "Keep future depth write/read state repair mechanics in DepthWriteTransitionPass or adjacent depth pass helpers instead of hand-building barriers in frame orchestration"
     },
     {
+      "id": "visibility_buffer_resource_transitions",
+      "owner": "Visibility buffer",
+      "status": "release_boundary_validated",
+      "release_boundary": "Visibility-buffer culling/stage files still own debug mode, cull-mask policy, visibility draw, material resolve, and debug-blit selection, but depth visibility/sample transitions and HZB culling readability are owned by VisibilityBufferResourcePass",
+      "validated_contracts": ["renderer_ownership", "vb_debug_views", "temporal_validation", "rt_showcase"],
+      "target_files": ["Passes/VisibilityBufferResourcePass.h", "Passes/VisibilityBufferResourcePass.cpp", "Renderer_VisibilityBufferStages.cpp", "Renderer_VisibilityBufferCulling.cpp"],
+      "renderer_state_members": ["m_depthResources", "m_hzbResources", "m_visibilityBufferState", "m_commandResources"],
+      "future_extension": "Keep future visibility-buffer resource-state mechanics in VisibilityBufferResourcePass or declarative render-graph declarations instead of hand-building barriers in renderer visibility-buffer files"
+    },
+    {
       "id": "main_target_resources",
       "owner": "Main render targets",
       "status": "release_boundary_validated",

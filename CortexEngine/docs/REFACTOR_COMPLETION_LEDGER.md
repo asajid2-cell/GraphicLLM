@@ -1088,9 +1088,28 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       showcase passed at `rt_showcase_20260511_123917_232_96628_2480901f`
       with RT reflections/GI enabled, dispatch readiness true, and valid
       raw/history reflection signal metrics. The broader ownership rows remain
-      `PARTIAL` because visibility-buffer internals, graph orchestration, GPU
-      particle public runtime, and other renderer pass mechanics still need
-      extraction or implementation.
+      `PARTIAL` because visibility-buffer stage/culling transitions still
+      needed the same ownership treatment at that checkpoint, and graph
+      orchestration, GPU particle public runtime, and other renderer pass
+      mechanics still need extraction or implementation.
+    - The current visibility-buffer resource checkpoint moves visibility-pass
+      depth-write transition, debug/material-resolve depth sampling transition,
+      and HZB culling non-pixel-readability transition mechanics into
+      `VisibilityBufferResourcePass`. `Renderer_VisibilityBufferStages.cpp`
+      still owns visibility draw, material resolve, debug-mode selection, and
+      debug blits; `Renderer_VisibilityBufferCulling.cpp` still owns cull-mask,
+      freeze/HZB-policy, and GPU culling dispatch decisions. Both renderer
+      files now have no direct `D3D12_RESOURCE_BARRIER` or `ResourceBarrier`
+      calls. Release rebuild passed, renderer ownership tests passed with
+      `targets=33`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, VB debug views passed at
+      `vb_debug_views_20260511_124227_005_100320_bd7886b7`, temporal validation
+      passed at `temporal_validation_20260511_124227_003_96200_1177af19`, and
+      RT showcase passed at `rt_showcase_20260511_124227_010_93924_07ef7d06`.
+      The broader ownership rows remain `PARTIAL` because visibility-buffer
+      graph orchestration, GPU particle public runtime, mesh upload mechanics,
+      indirect rendering transitions, and other renderer pass mechanics still
+      need extraction or implementation.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

@@ -25,9 +25,11 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
         m_services.renderGraph->ImportResource(m_depthResources.resources.buffer.Get(), m_depthResources.resources.resourceState, "Depth");
 
     bool stageFailed = false;
-    std::string stageError;
+    const char* stageError = nullptr;
     DepthPrepass::GraphContext graphContext{};
     graphContext.depth = depthHandle;
+    graphContext.status.failed = &stageFailed;
+    graphContext.status.stage = &stageError;
     RendererSceneSnapshot localSnapshot{};
     const RendererSceneSnapshot* snapshot = &m_framePlanning.sceneSnapshot;
     if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
@@ -68,15 +70,11 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
         m_materialFallbacks.roughness.get()
     };
     graphContext.draw.drawCounter = &m_frameDiagnostics.contract.drawCounts.depthPrepassDraws;
-    graphContext.failStage = [&](const char* stage) {
-        stageFailed = true;
-        stageError = stage ? stage : "unknown";
-    };
 
     const RGResourceHandle depthResult = DepthPrepass::AddToGraph(*m_services.renderGraph, graphContext);
     if (!depthResult.IsValid()) {
         stageFailed = true;
-        if (stageError.empty()) {
+        if (!stageError) {
             stageError = "depth_prepass_graph_contract";
         }
     }
@@ -89,8 +87,9 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
     } else if (stageFailed) {
         result.fallbackUsed = true;
         result.fallbackReason = "depth_prepass_graph_stage_failed";
-        if (!stageError.empty()) {
-            result.fallbackReason += ": " + stageError;
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
         }
     } else {
         m_depthResources.resources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
@@ -119,9 +118,11 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
         m_services.renderGraph->ImportResource(m_shadowResources.resources.map.Get(), m_shadowResources.resources.resourceState, "ShadowMap");
 
     bool stageFailed = false;
-    std::string stageError;
+    const char* stageError = nullptr;
     ShadowPass::GraphContext graphContext{};
     graphContext.shadowMap = shadowHandle;
+    graphContext.status.failed = &stageFailed;
+    graphContext.status.stage = &stageError;
     RendererSceneSnapshot localSnapshot{};
     const RendererSceneSnapshot* snapshot = &m_framePlanning.sceneSnapshot;
     if (!snapshot->IsValidForFrame(m_frameLifecycle.renderFrameCounter)) {
@@ -172,15 +173,11 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     graphContext.draw.shadowArraySize = kShadowArraySize;
     graphContext.draw.localShadowHasShadow = m_localShadowState.hasShadow;
     graphContext.draw.localShadowCount = m_localShadowState.count;
-    graphContext.failStage = [&](const char* stage) {
-        stageFailed = true;
-        stageError = stage ? stage : "unknown";
-    };
 
     const RGResourceHandle shadowResult = ShadowPass::AddToGraph(*m_services.renderGraph, graphContext);
     if (!shadowResult.IsValid()) {
         stageFailed = true;
-        if (stageError.empty()) {
+        if (!stageError) {
             stageError = "shadow_graph_contract";
         }
     }
@@ -193,8 +190,9 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     } else if (stageFailed) {
         result.fallbackUsed = true;
         result.fallbackReason = "shadow_graph_stage_failed";
-        if (!stageError.empty()) {
-            result.fallbackReason += ": " + stageError;
+        if (stageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += stageError;
         }
     } else {
         m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);

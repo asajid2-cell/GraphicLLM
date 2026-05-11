@@ -9,10 +9,14 @@
 #include "Graphics/Passes/MeshDrawPass.h"
 #include "Graphics/Passes/ShadowTargetPass.h"
 
-#include <functional>
 #include <span>
 
 namespace Cortex::Graphics::ShadowPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct DrawContext {
     ShadowTargetPass::TransitionContext target;
@@ -41,7 +45,7 @@ struct DrawContext {
 struct GraphContext {
     RGResourceHandle shadowMap;
     DrawContext draw;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] bool Draw(const DrawContext& context);

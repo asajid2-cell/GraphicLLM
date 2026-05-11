@@ -11,8 +11,11 @@ namespace Cortex::Graphics::ShadowPass {
 namespace {
 
 void Fail(const GraphContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
+    if (context.status.failed) {
+        *context.status.failed = true;
+    }
+    if (context.status.stage) {
+        *context.status.stage = stage ? stage : "unknown";
     }
 }
 

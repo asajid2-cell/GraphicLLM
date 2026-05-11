@@ -918,6 +918,17 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because post-process draw
       policy, RT reflection dispatch policy, graph orchestration, and other
       renderer pass mechanics still live in renderer orchestration files.
+    - The current SSR target checkpoint moves SSR target, HDR, normal/roughness,
+      and depth resource-state setup into `SSRPass::PrepareTargets`, while
+      `Renderer_SSRPass.cpp` keeps normal-source and SSR policy selection.
+      Release rebuild passed, renderer ownership tests passed with
+      `targets=23`, renderer full ownership audit passed with
+      `renderer_members=48 expected_members=48`, temporal validation passed at
+      `temporal_validation_20260511_115652_947_95760_67a538f1`, and RT
+      showcase passed at `rt_showcase_20260511_115652_964_90940_2734d154`.
+      The broader ownership rows remain `PARTIAL` because SSAO, HZB, bloom, RT,
+      graph orchestration, and other renderer pass mechanics still live in
+      renderer orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

@@ -31,6 +31,21 @@ struct DrawContext {
     DescriptorHandle shadowAndEnvironmentTable{};
 };
 
+struct ResourceStateRef {
+    ID3D12Resource* resource = nullptr;
+    D3D12_RESOURCE_STATES* state = nullptr;
+    D3D12_RESOURCE_STATES desiredState = D3D12_RESOURCE_STATE_COMMON;
+};
+
+struct PrepareContext {
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    bool skipTransitions = false;
+    ResourceStateRef ssrTarget{};
+    ResourceStateRef hdr{};
+    ResourceStateRef normalRoughness{};
+    ResourceStateRef depth{};
+};
+
 struct GraphContext {
     RGResourceHandle hdr;
     RGResourceHandle depth;
@@ -40,6 +55,7 @@ struct GraphContext {
     std::function<void(const char*)> failStage;
 };
 
+[[nodiscard]] bool PrepareTargets(const PrepareContext& context);
 [[nodiscard]] bool Draw(const DrawContext& context);
 [[nodiscard]] RGResourceHandle AddToGraph(RenderGraph& graph, const GraphContext& context);
 

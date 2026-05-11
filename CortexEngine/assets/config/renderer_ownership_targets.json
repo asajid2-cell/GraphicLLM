@@ -133,6 +133,16 @@
       "future_extension": "Keep additional screen-space effects in explicit controls/resources/descriptors/frame bundles before adding renderer orchestration"
     },
     {
+      "id": "ssr_target_transitions",
+      "owner": "SSR target preparation",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_SSRPass.cpp still selects the normal source and SSR policy, but SSR target, HDR, normal/roughness, and depth resource-state setup is owned by SSRPass",
+      "validated_contracts": ["renderer_ownership", "rt_showcase", "temporal_validation"],
+      "target_files": ["Passes/SSRPass.h", "Passes/SSRPass.cpp", "Renderer_SSRPass.cpp"],
+      "renderer_state_members": ["m_ssrResources", "m_mainTargets", "m_depthResources", "m_visibilityBufferState", "m_frameDiagnostics"],
+      "future_extension": "Keep future SSR pre-draw resource-state setup in SSRPass or render-graph declarations instead of hand-building barrier batches in Renderer_SSRPass.cpp"
+    },
+    {
       "id": "hzb_resources",
       "owner": "Hierarchical Z Buffer",
       "status": "release_boundary_validated",

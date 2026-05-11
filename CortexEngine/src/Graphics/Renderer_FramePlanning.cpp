@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Debug/GPUProfiler.h"
 
 #include <algorithm>
@@ -40,7 +40,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.rayTracingEnabled = m_rtRuntimeState.requested;
     featureInputs.rtReflectionsEnabled = m_rtRuntimeState.reflectionsEnabled;
     featureInputs.rtGIEnabled = m_rtRuntimeState.giEnabled;
-    featureInputs.shadowsEnabled = m_shadowResources.enabled;
+    featureInputs.shadowsEnabled = m_shadowResources.controls.enabled;
     featureInputs.gpuCullingEnabled = m_gpuCullingState.enabled;
     featureInputs.visibilityBufferEnabled = m_visibilityBufferState.enabled;
     featureInputs.taaEnabled = m_temporalAAState.enabled;
@@ -54,7 +54,7 @@ FrameExecutionContext Renderer::BuildFrameExecutionContext(Scene::ECS_Registry* 
     featureInputs.hasRayTracingContext = (m_services.rayTracingContext != nullptr);
     featureInputs.hasRTReflectionColor = (m_rtReflectionTargets.color != nullptr);
     featureInputs.hasRTGIColor = (m_rtGITargets.color != nullptr);
-    featureInputs.hasShadowMap = (m_shadowResources.map != nullptr);
+    featureInputs.hasShadowMap = (m_shadowResources.resources.map != nullptr);
     featureInputs.hasShadowPipeline = pipelineReadiness.shadow;
     featureInputs.hasGPUCulling = (m_services.gpuCulling != nullptr);
     featureInputs.hasVisibilityBuffer = (m_services.visibilityBuffer != nullptr);

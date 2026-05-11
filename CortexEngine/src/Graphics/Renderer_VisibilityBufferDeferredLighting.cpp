@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/MaterialModel.h"
 #include "Graphics/MaterialState.h"
@@ -99,13 +99,13 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         glm::vec4(m_lightingState.directionalColor * m_lightingState.directionalIntensity, 0.0f);
     deferredParams.cascadeSplits = m_constantBuffers.frameCPU.cascadeSplits;
     deferredParams.shadowParams = glm::vec4(
-        m_shadowResources.bias,
-        m_shadowResources.pcfRadius,
-        m_shadowResources.enabled ? 1.0f : 0.0f,
-        m_shadowResources.pcssEnabled ? 1.0f : 0.0f);
+        m_shadowResources.controls.bias,
+        m_shadowResources.controls.pcfRadius,
+        m_shadowResources.controls.enabled ? 1.0f : 0.0f,
+        m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
     deferredParams.envParams = glm::vec4(
         m_environmentState.diffuseIntensity, m_environmentState.specularIntensity, m_environmentState.enabled ? 1.0f : 0.0f, 0.0f);
-    float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.mapSize);
+    float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.controls.mapSize);
     deferredParams.shadowInvSizeAndSpecMaxMip =
         glm::vec4(invShadowDim, invShadowDim, 8.0f, glm::radians(m_environmentState.rotationDegrees));
     float nearZ = 0.1f, farZ = 1000.0f;
@@ -150,7 +150,7 @@ void Renderer::ApplyVisibilityBufferDeferredLighting(const VisibilityBufferDefer
         inputs.envDiffuseResource,
         inputs.envSpecularResource,
         inputs.envFormat,
-        m_shadowResources.srv,
+        m_shadowResources.resources.srv,
         inputs.params);
     if (lightingResult.IsErr()) {
         spdlog::warn("VB deferred lighting failed: {}", lightingResult.Error());

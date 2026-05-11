@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Debug/GPUProfiler.h"
 
 #include "Graphics/FrameContractResources.h"
@@ -101,7 +101,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
 
     addResource(breakdown.renderTargetBytes, m_depthResources.buffer.Get());
     addResource(breakdown.renderTargetBytes, m_hzbResources.resources.texture.Get());
-    addResource(breakdown.renderTargetBytes, m_shadowResources.map.Get());
+    addResource(breakdown.renderTargetBytes, m_shadowResources.resources.map.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.hdrColor.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.gbufferNormalRoughness.Get());
     addResource(breakdown.renderTargetBytes, m_temporalScreenState.velocityBuffer.Get());

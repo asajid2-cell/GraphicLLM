@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/VisibilityBufferGraphPass.h"
 #include "RenderGraph.h"
@@ -59,8 +59,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_depthResources.resourceState,
             m_mainTargets.hdrColor.Get(),
             m_mainTargets.hdrState,
-            m_shadowResources.map.Get(),
-            m_shadowResources.resourceState,
+            m_shadowResources.resources.map.Get(),
+            m_shadowResources.resources.resourceState,
             m_rtShadowTargets.mask.Get(),
             m_rtShadowTargets.maskState,
             m_rtGITargets.color.Get(),
@@ -288,7 +288,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_depthResources.resourceState = kDepthSampleState;
             m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
             if (vbResources.shadow.IsValid()) {
-                m_shadowResources.resourceState = kVBShaderResourceState;
+                m_shadowResources.resources.resourceState = kVBShaderResourceState;
             }
             if (vbResources.rtShadow.IsValid()) {
                 m_rtShadowTargets.maskState = kVBShaderResourceState;
@@ -339,7 +339,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         } else {
             m_depthResources.resourceState = m_services.renderGraph->GetResourceState(vbResources.depth);
             m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(vbResources.hdr);
-            if (vbResources.shadow.IsValid()) m_shadowResources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
+            if (vbResources.shadow.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
             if (vbResources.rtShadow.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
             if (vbResources.rtGI.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
 
@@ -423,8 +423,8 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         m_services.renderGraph->ImportResource(m_mainTargets.hdrColor.Get(), m_mainTargets.hdrState, "HDR_VB");
 
     RGResourceHandle shadowHandle{};
-    if (m_shadowResources.map) {
-        shadowHandle = m_services.renderGraph->ImportResource(m_shadowResources.map.Get(), m_shadowResources.resourceState, "ShadowMap_VB");
+    if (m_shadowResources.resources.map) {
+        shadowHandle = m_services.renderGraph->ImportResource(m_shadowResources.resources.map.Get(), m_shadowResources.resources.resourceState, "ShadowMap_VB");
     }
 
     RGResourceHandle rtShadowHandle{};
@@ -451,7 +451,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_depthResources.resourceState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
             m_mainTargets.hdrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
             if (shadowHandle.IsValid()) {
-                m_shadowResources.resourceState =
+                m_shadowResources.resources.resourceState =
                     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
             }
             if (rtShadowHandle.IsValid()) {
@@ -485,7 +485,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         result.fallbackReason = execResult.Error();
     } else {
         m_mainTargets.hdrState = m_services.renderGraph->GetResourceState(hdrHandle);
-        if (shadowHandle.IsValid()) m_shadowResources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
+        if (shadowHandle.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
         if (rtShadowHandle.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(rtShadowHandle);
         if (rtGIHandle.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(rtGIHandle);
         result.executed = m_visibilityBufferState.renderedThisFrame;

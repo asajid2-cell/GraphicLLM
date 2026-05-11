@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Passes/DepthPrepass.h"
 #include "Passes/RenderPassScope.h"
@@ -79,7 +79,7 @@ Renderer::ExecuteDepthPrepassInRenderGraph(Scene::ECS_Registry* registry) {
 Renderer::RenderGraphPassResult
 Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
     RenderGraphPassResult result{};
-    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_shadowResources.map) {
+    if (!m_services.renderGraph || !m_commandResources.graphicsList || !m_shadowResources.resources.map) {
         result.fallbackUsed = true;
         result.fallbackReason = "render_graph_shadow_prerequisites_missing";
         RenderShadowPass(registry);
@@ -89,7 +89,7 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
 
     m_services.renderGraph->BeginFrame();
     const RGResourceHandle shadowHandle =
-        m_services.renderGraph->ImportResource(m_shadowResources.map.Get(), m_shadowResources.resourceState, "ShadowMap");
+        m_services.renderGraph->ImportResource(m_shadowResources.resources.map.Get(), m_shadowResources.resources.resourceState, "ShadowMap");
 
     bool stageFailed = false;
     std::string stageError;
@@ -125,7 +125,7 @@ Renderer::ExecuteShadowPassInRenderGraph(Scene::ECS_Registry* registry) {
             result.fallbackReason += ": " + stageError;
         }
     } else {
-        m_shadowResources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
+        m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(shadowHandle);
         result.executed = true;
     }
     m_services.renderGraph->EndFrame();

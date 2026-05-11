@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 
 #include "Graphics/EnvironmentManifest.h"
 #include "Scene/ECS_Registry.h"
@@ -344,11 +344,11 @@ void Renderer::UpdateEnvironmentDescriptorTable() {
     ID3D12Device* device = m_services.device->GetDevice();
 
     // Slot 0 (t4): shadow map array, or a neutral placeholder if shadows are unavailable.
-    if (m_shadowResources.srv.IsValid()) {
+    if (m_shadowResources.resources.srv.IsValid()) {
         device->CopyDescriptorsSimple(
             1,
             m_environmentState.shadowAndEnvDescriptors[0].cpu,
-            m_shadowResources.srv.cpu,
+            m_shadowResources.resources.srv.cpu,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
         );
     } else if (!WriteTexture2DSRV(device, m_materialFallbacks.roughness, m_environmentState.shadowAndEnvDescriptors[0].cpu)) {

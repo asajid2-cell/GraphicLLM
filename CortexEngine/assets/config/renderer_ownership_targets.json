@@ -146,9 +146,9 @@
       "id": "environment_resources",
       "owner": "Environment/IBL",
       "status": "release_boundary_validated",
-      "release_boundary": "manifest policy is owned by EnvironmentManifest and runtime environment reporting is owned by RendererEnvironmentState; public startup uses committed assets or procedural fallback",
+      "release_boundary": "manifest policy and loading orchestration stay in EnvironmentManifest/Renderer_Environment, while runtime environment reporting plus shadow/environment descriptor-table allocation, bindless IBL SRV allocation, SRV/null-SRV writes, and table publication are owned by RendererEnvironmentState; public startup uses committed assets or procedural fallback",
       "validated_contracts": ["environment_manifest", "ibl_gallery", "phase3_visual_matrix"],
-      "target_files": ["RendererEnvironmentState.h", "EnvironmentManifest.h"],
+      "target_files": ["RendererEnvironmentState.h", "EnvironmentManifest.h", "Renderer_Environment.cpp"],
       "renderer_state_members": ["m_environmentState"],
       "future_extension": "If environment streaming/residency becomes more complex, extract orchestration from Renderer_Environment without duplicating the manifest loader"
     },

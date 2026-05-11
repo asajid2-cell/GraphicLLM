@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_200725_214_152168_21d385a0
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260510_201154_452_149044_31b10f97
 ```
 
 Key evidence from that run:
@@ -47,12 +47,14 @@ Key evidence from that run:
 - Build entrypoint contract: passed; rebuild uses `vswhere`/`VsDevCmd.bat`
   plus `cmake --build`, release validation calls `rebuild.ps1`, and raw Ninja
   is not used by rebuild/release.
-- Temporal validation: `gpu_ms=2.688`, `disocclusion=0.006658`,
-  `high_motion=0.005176`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Repository hygiene: passed; `git diff --check` passed, generated-artifact
+  tracked count is 0, and `.gitignore` contains local artifact guards.
+- Temporal validation: `gpu_ms=2.001`, `disocclusion=0.006636`,
+  `high_motion=0.005167`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.799`,
+  `camera=reflection_closeup`, `gpu_ms=3.669`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.632/16.7`,
+- RT showcase: `frames=33`, `gpu_ms=1.865/16.7`,
   `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
@@ -147,6 +149,7 @@ long file/function lists in every row.
 |---|---|---|
 | `tools/run_release_validation.ps1` | orchestration | Current top-level release gate. Builds Release, runs all listed checks below, and treats top-level `failed:` sentinel output as a failed step. |
 | `tools/run_build_entrypoint_contract_tests.ps1` | static/contract | Checks that rebuild/release validation use `rebuild.ps1` and `cmake --build`, with VS environment import guards, instead of raw Ninja invocation. |
+| `tools/run_repo_hygiene_tests.ps1` | static/contract | Runs `git diff --check`, verifies generated build/cache artifacts are not tracked, and checks required `.gitignore` guards. |
 | `tools/run_rt_showcase_smoke.ps1` | runtime | Main RT showcase runtime gate for budgets, materials, RT readiness, raw/history signal, descriptor delta, visual stats. |
 | `tools/run_vb_debug_views.ps1` | runtime wrapper | RT Showcase debug-view matrix for visibility-buffer depth and material-albedo debug captures. |
 | `tools/run_descriptor_memory_stress_scene.ps1` | runtime | Descriptor-heavy RT showcase stress gate for the historical 1024 persistent-descriptor ceiling, staging budget, transient balance, memory budgets, and raw/history RT signal. |
@@ -212,7 +215,7 @@ of `phase2.md`.
 | P2-PASS-04G | Pass 4G - Visibility Buffer Transition Skip Controls | DONE_UNVERIFIED | SRC-VB, SRC-RENDERGRAPH | Historical targeted VB debug captures in `phase2.md` | Historical evidence only in `phase2.md`; latest release gate does not enumerate each transition skip mode. | Add static/runtime test for skip-control use under graph-owned resources. |
 | P2-PASS-04H | Pass 4H - Visibility Buffer Internal Graph Nodes | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp` records `VBClear`, `VBVisibility`, `VBMaterialResolve`, `VBDeferredLighting` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase passes through VB path with frame contract pass records. | Debug path/fallback still not exhaustively tested. |
 | P2-PASS-04I | Pass 4I - VB Lighting Graph Resources And Subpass Records | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, SRC-VB | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | Current frame contract checks pass; VB initialization log includes clustered light/BRDF LUT pipelines. | No separate assertion in top-level output for every VB subpass name. |
-| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_200738_852_149808_7c3054ba`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
+| P2-PASS-04J | Pass 4J - VB Debug Graph Paths And Mesh Table Contract | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBuffer.cpp`, `Renderer_VisibilityBufferDiagnostics.cpp`, SRC-VB | `tools/run_vb_debug_views.ps1 -NoBuild` | Release-gated targeted run passed: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`, luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`, colorful `0.251`, luma `148.49`. Logs: `CortexEngine/build/bin/logs/runs/vb_debug_views_20260510_201208_531_152816_ebb9ba65`. | None for the current depth/albedo VB debug-view runtime contract; transition skip controls remain tracked separately in P2-PASS-04G. |
 | P2-PASS-04K | Pass 4K - VB Graph Helper And Motion Vector Graph Adapter | DONE_VERIFIED | `Renderer_RenderGraphVisibilityBufferHelpers.h::VisibilityBufferGraphResources`, `Renderer_RenderGraphMotionVectors.cpp::Renderer::ExecuteMotionVectorsInRenderGraph` | `tools/run_temporal_validation_smoke.ps1 -NoBuild -IsolatedLogs` | Temporal validation passed with `object_motion=0.0731`, `visible=7`, `warnings=0`. | Add explicit report of camera-only fallback absence for more scenes. |
 | P2-PASS-04L | Pass 4L - TAA And SSAO Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphTAA.cpp::Renderer::ExecuteTAAInRenderGraph`, `Renderer_RenderGraphSSAO.cpp::Renderer::ExecuteSSAOInRenderGraph` | `tools/run_release_validation.ps1` | Temporal and RT showcase smokes pass with TAA/SSAO enabled. | No dedicated SSAO visual comparison. |
 | P2-PASS-04M | Pass 4M - SSR Graph Ownership | DONE_VERIFIED | `Renderer_RenderGraphSSR.cpp::Renderer::ExecuteSSRInRenderGraph` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` | RT showcase smoke passes with SSR enabled in feature set. | SSR visual correctness is not deeply measured beyond luma/scene gates. |
@@ -382,7 +385,7 @@ foundation or contract rather than the full broad feature.
 | P2-11CV | Pass 11CV - Release Validation Gate | DONE_VERIFIED | `tools/run_release_validation.ps1`, `tools/README.md` | `tools/run_release_validation.ps1` | Latest full release validation passed. |
 | P2-11CW | Pass 11CW - Public Renderer README Refresh | DONE_VERIFIED | SRC-DOCS | documentation inspection plus latest commit `5e7b69f` | README now names Phase 3 gate and current renderer capabilities. | None for docs currentness; keep updated as scope changes. |
 | P2-11CX | Pass 11CX - Dreamer Startup Release Polish | DONE_VERIFIED | `src/Core/Engine.cpp`, Dreamer startup path | `tools/run_release_validation.ps1` | Latest runtime logs include `Dreamer disabled by configuration`; no stale skipped message seen in inspected logs. | No positive Dreamer startup test with TensorRT engines. |
-| P2-11CY | Pass 11CY - Public Repository Hygiene | DONE_UNVERIFIED | `.gitignore`, removed artifacts | historical `phase2.md` evidence | No current hygiene command was run in this audit except worktree status. | Run `git diff --check` and ignored-file audit before a public release. |
+| P2-11CY | Pass 11CY - Public Repository Hygiene | DONE_VERIFIED | `.gitignore`, `tools/run_repo_hygiene_tests.ps1` | `tools/run_repo_hygiene_tests.ps1`; release gate | Targeted hygiene gate passed: `git diff --check` passed, generated build/cache artifacts tracked count is 0, and `.gitignore` contains build/log/model guards. | None for current whitespace/generated-artifact hygiene contract; packaging review remains tracked separately. |
 | P2-11CZ | Pass 11CZ - Release Readiness Note | DONE_VERIFIED | `CortexEngine/RELEASE_READINESS.md`, README link | documentation inspection plus latest commit `5e7b69f` | Release readiness note points at latest run and lists current gate. | It now includes Phase 3 claims; keep this ledger separate from completion claims. |
 | P2-11DA | Pass 11DA - RT Showcase Lighting Polish | DONE_VERIFIED | `src/Core/Engine_Scenes.cpp`, `RendererControlApplier_ScenePresets.cpp`, `RELEASE_READINESS.md` | `tools/run_rt_showcase_smoke.ps1 -NoBuild -IsolatedLogs` via release gate | Latest RT showcase passes visual stats: `luma=68.99 center_luma=70.19 dark=0.677/0.68 sat=0.004/0.12`. | Subjective presentation polish can continue; no objective blocker. |
 
@@ -664,6 +667,7 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_visual_probe_validation.ps1
    powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_build_entrypoint_contract_tests.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_repo_hygiene_tests.ps1
    ```
 
    No focused gate script is currently missing from this section.

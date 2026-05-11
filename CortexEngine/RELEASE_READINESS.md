@@ -16,6 +16,7 @@ The current verified local gate covers:
 
 - Release rebuild,
 - build entrypoint contract for the scripted CMake rebuild path,
+- repository hygiene checks for whitespace and generated artifacts,
 - temporal validation smoke,
 - temporal camera-cut RT history invalidation smoke,
 - full RT showcase smoke,
@@ -49,12 +50,14 @@ Result:
 - build_release: passed;
 - build entrypoint contract: passed; `rebuild.ps1` / `cmake --build` path
   verified, with no raw Ninja call in rebuild/release validation;
-- temporal validation: `gpu_ms=2.688`, `warnings=0`,
+- repository hygiene: passed; `git diff --check` and generated-artifact guards
+  verified;
+- temporal validation: `gpu_ms=2.001`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
   `invalidated_frame=20`;
-- RT showcase: `gpu_ms=1.632/16.7`, `material_issues=0`,
+- RT showcase: `gpu_ms=1.865/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -84,7 +87,7 @@ Result:
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_200725_214_152168_21d385a0
+CortexEngine/build/bin/logs/runs/release_validation_20260510_201154_452_149044_31b10f97
 ```
 
 ## Renderer Scope

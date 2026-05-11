@@ -322,10 +322,16 @@ struct FrameContract {
         bool executed = false;
         bool publicRuntimePath = false;
         bool gpuParticlePublicPath = false;
+        bool cpuSimulationPath = false;
+        bool gpuSimulationPath = false;
+        bool gpuSortPath = false;
+        bool gpuDrawPath = false;
         bool simulationBudgetTracked = false;
         bool instanceMapFailed = false;
         bool capped = false;
         std::string runtimeBackend = "disabled";
+        std::string simulationBackend = "disabled";
+        std::string renderBackend = "disabled";
         float densityScale = 1.0f;
         float qualityScale = 1.0f;
         float bloomContribution = 1.0f;

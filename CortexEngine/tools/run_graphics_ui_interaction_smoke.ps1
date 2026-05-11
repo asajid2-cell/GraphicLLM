@@ -71,7 +71,7 @@ $settingsPath = Join-Path $LogDir "simulated_graphics_ui_settings.json"
   "atmosphere": {
     "fog": true,
     "fog_density": 0.018,
-    "fog_height": 0.0,
+    "fog_height": 3.5,
     "fog_falloff": 0.55
   },
   "water": {
@@ -147,6 +147,8 @@ if ($exitCode -ne 0) {
     Assert-Near "bloom_intensity" ([double]$fc.lighting.bloom_intensity) 0.19 0.03
     Assert-Near "background_exposure" ([double]$fc.environment.background_exposure) 0.72 0.03
     Assert-Near "background_blur" ([double]$fc.environment.background_blur) 0.36 0.03
+    Assert-Near "fog_height" ([double]$fc.lighting.fog_height) 3.5 0.08
+    Assert-Near "fog_falloff" ([double]$fc.lighting.fog_falloff) 0.55 0.04
     Assert-Near "particle_density" ([double]$fc.particles.density_scale) 0.43 0.03
     if ($null -eq $fc.water) {
         Add-Failure "water contract section was missing"

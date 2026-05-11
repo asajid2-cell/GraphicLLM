@@ -52,6 +52,8 @@ enum ControlIdGraphics : int {
     IDC_GFX_WATER_LENGTH = 9037,
     IDC_GFX_WATER_SPEED = 9038,
     IDC_GFX_WATER_SECONDARY = 9039,
+    IDC_GFX_FOG_HEIGHT = 9040,
+    IDC_GFX_FOG_FALLOFF = 9041,
 
     IDC_GFX_TAA = 9100,
     IDC_GFX_FXAA = 9101,
@@ -119,6 +121,8 @@ struct GraphicsSettingsState {
     SliderBinding ssaoRadius;
     SliderBinding ssaoIntensity;
     SliderBinding fogDensity;
+    SliderBinding fogHeight;
+    SliderBinding fogFalloff;
     SliderBinding waterWave;
     SliderBinding waterLength;
     SliderBinding waterSpeed;
@@ -236,6 +240,8 @@ void SyncStateFromSliders() {
     g_gfx.tuning.screenSpace.ssaoRadius = SliderToFloat(g_gfx.ssaoRadius);
     g_gfx.tuning.screenSpace.ssaoIntensity = SliderToFloat(g_gfx.ssaoIntensity);
     g_gfx.tuning.atmosphere.fogDensity = SliderToFloat(g_gfx.fogDensity);
+    g_gfx.tuning.atmosphere.fogHeight = SliderToFloat(g_gfx.fogHeight);
+    g_gfx.tuning.atmosphere.fogFalloff = SliderToFloat(g_gfx.fogFalloff);
     g_gfx.tuning.water.waveAmplitude = SliderToFloat(g_gfx.waterWave);
     g_gfx.tuning.water.waveLength = SliderToFloat(g_gfx.waterLength);
     g_gfx.tuning.water.waveSpeed = SliderToFloat(g_gfx.waterSpeed);
@@ -294,6 +300,8 @@ void RefreshControlsFromRenderer() {
     SetSliderFromFloat(g_gfx.ssaoRadius, g_gfx.tuning.screenSpace.ssaoRadius);
     SetSliderFromFloat(g_gfx.ssaoIntensity, g_gfx.tuning.screenSpace.ssaoIntensity);
     SetSliderFromFloat(g_gfx.fogDensity, g_gfx.tuning.atmosphere.fogDensity);
+    SetSliderFromFloat(g_gfx.fogHeight, g_gfx.tuning.atmosphere.fogHeight);
+    SetSliderFromFloat(g_gfx.fogFalloff, g_gfx.tuning.atmosphere.fogFalloff);
     SetSliderFromFloat(g_gfx.waterWave, g_gfx.tuning.water.waveAmplitude);
     SetSliderFromFloat(g_gfx.waterLength, g_gfx.tuning.water.waveLength);
     SetSliderFromFloat(g_gfx.waterSpeed, g_gfx.tuning.water.waveSpeed);
@@ -578,6 +586,8 @@ void RegisterGraphicsSettingsClass() {
             makeSlider(IDC_GFX_SSAO_RADIUS, L"SSAO Radius", g_gfx.ssaoRadius, 0.01f, 5.0f);
             makeSlider(IDC_GFX_SSAO_INTENSITY, L"SSAO Intensity", g_gfx.ssaoIntensity, 0.0f, 5.0f);
             makeSlider(IDC_GFX_FOG_DENSITY, L"Fog Density", g_gfx.fogDensity, 0.0f, 0.1f);
+            makeSlider(IDC_GFX_FOG_HEIGHT, L"Fog Height", g_gfx.fogHeight, -100.0f, 100.0f);
+            makeSlider(IDC_GFX_FOG_FALLOFF, L"Fog Falloff", g_gfx.fogFalloff, 0.01f, 10.0f);
 
             makeSection(L"Showcase Effects");
             g_gfx.chkParticles = makeCheckbox(IDC_GFX_PARTICLES, L"Particles");

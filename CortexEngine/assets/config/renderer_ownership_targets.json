@@ -43,6 +43,16 @@
       "future_extension": "Keep future RT temporal copy mechanics in RTHistoryCopyPass or an adjacent RT history pass helper instead of duplicating barrier/copy code in Renderer_FrameEnd.cpp"
     },
     {
+      "id": "rt_denoise_resource_transitions",
+      "owner": "RT denoiser",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_RTDenoise.cpp still owns denoise policy, normal-source selection, dispatch descriptors, and history-valid bookkeeping, but common input SRV transitions plus current/history signal transitions, history UAV barriers, and history return-to-SRV mechanics are owned by RTDenoiser",
+      "validated_contracts": ["renderer_ownership", "temporal_validation", "rt_showcase"],
+      "target_files": ["RTDenoiser.h", "RTDenoiser.cpp", "Renderer_RTDenoise.cpp"],
+      "renderer_state_members": ["m_rtDenoiseState", "m_rtShadowTargets", "m_rtReflectionTargets", "m_rtGITargets", "m_temporalMaskState"],
+      "future_extension": "Keep future RT denoise resource-state mechanics in RTDenoiser or declarative render-graph declarations instead of rebuilding direct barriers in Renderer_RTDenoise.cpp"
+    },
+    {
       "id": "end_frame_shader_resource_transitions",
       "owner": "End-frame shader-resource state",
       "status": "release_boundary_validated",

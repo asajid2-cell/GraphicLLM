@@ -1,5 +1,7 @@
 #include "Graphics/RTDenoiser.h"
 
+#include "Graphics/RendererGeometryUtils.h"
+
 #include <algorithm>
 #include <array>
 #include <string>
@@ -15,6 +17,8 @@ constexpr uint32_t kUavSlots = 4;
 constexpr UINT kFrameConstantsRoot = 1;
 constexpr UINT kSrvTableRoot = 3;
 constexpr UINT kUavTableRoot = 6;
+constexpr D3D12_RESOURCE_STATES kShaderResourceState =
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
 Result<std::unique_ptr<DX12ComputePipeline>> CreatePipeline(ID3D12Device* device,
                                                             ID3D12RootSignature* rootSignature,
@@ -83,6 +87,34 @@ void WriteTexture2DUAV(ID3D12Device* device, ID3D12Resource* resource, D3D12_CPU
     device->CreateUnorderedAccessView(resource, nullptr, &uavDesc, dst);
 }
 
+void TransitionResource(ID3D12GraphicsCommandList* cmdList,
+                        const RTDenoiser::ResourceStateRef& target,
+                        D3D12_RESOURCE_STATES desired) {
+    if (!cmdList || !target.resource || !target.state || *target.state == desired) {
+        return;
+    }
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = target.resource;
+    barrier.Transition.StateBefore = *target.state;
+    barrier.Transition.StateAfter = desired;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &barrier);
+    *target.state = desired;
+}
+
+void InsertUAVBarrier(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* resource) {
+    if (!cmdList || !resource) {
+        return;
+    }
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    barrier.UAV.pResource = resource;
+    cmdList->ResourceBarrier(1, &barrier);
+}
+
 } // namespace
 
 Result<void> RTDenoiser::Initialize(ID3D12Device* device, ID3D12RootSignature* rootSignature) {
@@ -120,6 +152,39 @@ bool RTDenoiser::IsReady() const {
            m_reflectionTemporalPipeline &&
            m_giSeedPipeline &&
            m_giTemporalPipeline;
+}
+
+bool RTDenoiser::PrepareCommonResources(const CommonResourceContext& context) {
+    if (!context.commandList) {
+        return false;
+    }
+
+    TransitionResource(context.commandList, context.depth, kDepthSampleState);
+    TransitionResource(context.commandList, context.normalRoughness, kShaderResourceState);
+    TransitionResource(context.commandList, context.velocity, kShaderResourceState);
+    TransitionResource(context.commandList, context.temporalMask, kShaderResourceState);
+    return true;
+}
+
+bool RTDenoiser::PrepareSignalResources(const SignalResourceContext& context) {
+    if (!context.commandList || !context.current.resource || !context.current.state ||
+        !context.history.resource || !context.history.state) {
+        return false;
+    }
+
+    TransitionResource(context.commandList, context.current, kShaderResourceState);
+    TransitionResource(context.commandList, context.history, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    return true;
+}
+
+bool RTDenoiser::FinalizeSignalResources(const SignalResourceContext& context) {
+    if (!context.commandList || !context.history.resource || !context.history.state) {
+        return false;
+    }
+
+    InsertUAVBarrier(context.commandList, context.history.resource);
+    TransitionResource(context.commandList, context.history, kShaderResourceState);
+    return true;
 }
 
 ID3D12PipelineState* RTDenoiser::SelectPipeline(Signal signal, bool historyValid) const {

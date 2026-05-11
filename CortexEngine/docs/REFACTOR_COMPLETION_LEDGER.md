@@ -1037,6 +1037,25 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       `PARTIAL` because RT denoise/reflection/shadow/GI dispatch mechanics,
       visibility-buffer internals, graph orchestration, and other renderer pass
       mechanics still need the same ownership treatment.
+    - The current RT denoise resource checkpoint moves common denoise input
+      transitions, current-signal SRV transitions, history UAV transitions,
+      history UAV barriers, and history return-to-SRV transitions into
+      `RTDenoiser::PrepareCommonResources`,
+      `RTDenoiser::PrepareSignalResources`, and
+      `RTDenoiser::FinalizeSignalResources`. `Renderer_RTDenoise.cpp` still
+      owns denoise policy, normal-source selection, dispatch descriptors, and
+      history-valid bookkeeping, and now has no direct
+      `D3D12_RESOURCE_BARRIER`, `ResourceBarrier`, or
+      `D3D12_RESOURCE_STATE_UNORDERED_ACCESS` calls. Release rebuild passed,
+      renderer ownership tests passed with `targets=30`, renderer full
+      ownership audit passed with `renderer_members=48 expected_members=48`,
+      temporal validation passed at
+      `temporal_validation_20260511_122844_608_90660_f31c34e9`, and RT
+      showcase passed at `rt_showcase_20260511_122844_467_99640_56e3f1c8`
+      with valid raw/history reflection signal metrics. The broader ownership
+      rows remain `PARTIAL` because RT reflection/shadow/GI dispatch mechanics,
+      visibility-buffer internals, graph orchestration, and other renderer pass
+      mechanics still need extraction.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

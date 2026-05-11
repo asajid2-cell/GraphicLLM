@@ -83,6 +83,16 @@
       "future_extension": "Keep new post effects inside these state files first; extract orchestration helpers only when a concrete new pass requires it"
     },
     {
+      "id": "postprocess_target_transitions",
+      "owner": "Post-process inputs and output target",
+      "status": "release_boundary_validated",
+      "release_boundary": "Renderer_PostProcess.cpp still decides post-process draw policy and optional RT reflection debug clear, but regular post-process input SRV transitions and backbuffer render-target transition are owned by PostProcessTargetPass",
+      "validated_contracts": ["renderer_ownership", "visual_probe", "rt_showcase", "temporal_validation"],
+      "target_files": ["Passes/PostProcessTargetPass.h", "Passes/PostProcessTargetPass.cpp", "Renderer_PostProcess.cpp"],
+      "renderer_state_members": ["m_mainTargets", "m_ssaoResources", "m_ssrResources", "m_hzbResources", "m_temporalScreenState", "m_rtReflectionTargets", "m_frameLifecycle"],
+      "future_extension": "Keep future regular post-process input/output target-state setup in PostProcessTargetPass instead of adding large resource-barrier batches in Renderer_PostProcess.cpp"
+    },
+    {
       "id": "taa_copy_transitions",
       "owner": "TAA copy/history transitions",
       "status": "release_boundary_validated",

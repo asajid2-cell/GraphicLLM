@@ -878,6 +878,21 @@ Minimum gate before claiming `phase2.md` and `phase3.md` complete:
       The broader ownership rows remain `PARTIAL` because motion-vector policy,
       graph orchestration, and other renderer pass mechanics still live in
       renderer orchestration files.
+    - The current post-process target checkpoint moves the regular HDR, SSAO,
+      SSR, HZB-debug, velocity, TAA-intermediate, RT-reflection color, and
+      RT-reflection history input transitions plus the backbuffer
+      render-target transition into `PostProcessTargetPass`. Release rebuild
+      passed, renderer ownership tests passed with `targets=20`, renderer full
+      ownership audit passed with `renderer_members=48 expected_members=48`,
+      visual probe validation passed at
+      `visual_probe_validation_20260511_114514_139_85156_8b53271c`, temporal
+      validation passed at
+      `temporal_validation_20260511_114541_995_94124_c8685a39`, and RT
+      showcase passed at `rt_showcase_20260511_114542_030_95840_4711b310`.
+      The broader ownership rows remain `PARTIAL` because optional RT
+      reflection debug-clear mechanics, post-process draw policy, graph
+      orchestration, and other renderer pass mechanics still live in renderer
+      orchestration files.
 
 4. Decide explicitly whether the following are still Phase 2 requirements or
    are user-deferred:

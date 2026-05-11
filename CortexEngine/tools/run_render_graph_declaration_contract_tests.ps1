@@ -213,10 +213,13 @@ foreach ($marker in @(
 }
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "Clear(context.clear)"
 Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "RasterizeVisibility(context.visibility)"
+Assert-Contains "VisibilityBufferGraphPass.cpp" $vb "ResolveMaterials(context.materialResolve)"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> clear"
 Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> visibility"
+Assert-NotContains "VisibilityBufferGraphPass.h" $vbHeader "std::function<void()> materialResolve"
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "ClearVisibilityBuffer("
 Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RasterizeVisibilityBuffer("
+Assert-NotContains "Renderer_RenderGraphVisibilityBuffer.cpp" $rendererVB "RenderVisibilityBufferMaterialResolveStage("
 
 if ($failures.Count -gt 0) {
     Write-Host "Render graph declaration contract tests failed:" -ForegroundColor Red

@@ -57,6 +57,18 @@ struct VisibilityContext {
     StageFailureContext failure;
 };
 
+struct MaterialResolveContext {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    ID3D12Resource* depthBuffer = nullptr;
+    D3D12_CPU_DESCRIPTOR_HANDLE depthSRV{};
+    const glm::mat4* viewProjection = nullptr;
+    const std::vector<VisibilityBufferRenderer::VBMeshDrawInfo>* meshDraws = nullptr;
+    D3D12_GPU_VIRTUAL_ADDRESS biomeMaterialsAddress = 0;
+    D3D12_RESOURCE_STATES* depthState = nullptr;
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -68,7 +80,7 @@ struct GraphContext {
     bool clusterGraphOwned = false;
     ClearContext clear;
     VisibilityContext visibility;
-    std::function<void()> materialResolve;
+    MaterialResolveContext materialResolve;
     std::function<void()> debugBlit;
     std::function<void()> brdfLut;
     std::function<void()> clusteredLights;
@@ -78,6 +90,7 @@ struct GraphContext {
 
 [[nodiscard]] bool Clear(const ClearContext& context);
 [[nodiscard]] bool RasterizeVisibility(const VisibilityContext& context);
+[[nodiscard]] bool ResolveMaterials(const MaterialResolveContext& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

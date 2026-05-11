@@ -132,31 +132,16 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.visibility.contractMeshes = &m_frameDiagnostics.contract.drawCounts.visibilityBufferMeshes;
         vbGraphContext.visibility.contractDrawBatches = &m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches;
         vbGraphContext.visibility.failure = vbFailure;
-        vbGraphContext.materialResolve = [&]() {
-            if (vbStageFailed) return;
-            m_depthResources.resources.resourceState = kDepthSampleState;
-
-            auto states = m_services.visibilityBuffer->GetResourceStateSnapshot();
-            states.visibility = kVBShaderResourceState;
-            states.albedo = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.normalRoughness = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.emissiveMetallic = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.materialExt0 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.materialExt1 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            states.materialExt2 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            m_services.visibilityBuffer->ApplyResourceStateSnapshot(states);
-
-            auto controls = m_services.visibilityBuffer->GetTransitionSkipControls();
-            const auto previousControls = controls;
-            controls.materialResolve = true;
-            m_services.visibilityBuffer->SetTransitionSkipControls(controls);
-            bool completedPath = false;
-            const bool resolved = RenderVisibilityBufferMaterialResolveStage(kVBDebugNone, completedPath);
-            m_services.visibilityBuffer->SetTransitionSkipControls(previousControls);
-            if (!resolved || completedPath) {
-                markStageFailure("material_resolve", resolved ? "unexpected debug completion" : "material resolve failed");
-            }
-        };
+        vbGraphContext.materialResolve.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.materialResolve.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.materialResolve.depthBuffer = m_depthResources.resources.buffer.Get();
+        vbGraphContext.materialResolve.depthSRV = m_depthResources.descriptors.srv.cpu;
+        vbGraphContext.materialResolve.viewProjection = &m_constantBuffers.frameCPU.viewProjectionMatrix;
+        vbGraphContext.materialResolve.meshDraws = &m_visibilityBufferState.meshDraws;
+        vbGraphContext.materialResolve.biomeMaterialsAddress =
+            m_constantBuffers.biomeMaterialsValid ? m_constantBuffers.biomeMaterials.gpuAddress : 0;
+        vbGraphContext.materialResolve.depthState = &m_depthResources.resources.resourceState;
+        vbGraphContext.materialResolve.failure = vbFailure;
         vbGraphContext.debugBlit = [&]() {
             if (vbStageFailed) return;
 

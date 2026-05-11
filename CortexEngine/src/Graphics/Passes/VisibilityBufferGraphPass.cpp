@@ -4,6 +4,13 @@ namespace Cortex::Graphics::VisibilityBufferGraphPass {
 
 namespace {
 
+inline constexpr D3D12_RESOURCE_STATES kVBShaderResourceState =
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+inline constexpr D3D12_RESOURCE_STATES kDepthSampleState =
+    D3D12_RESOURCE_STATE_DEPTH_READ |
+    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
 void Fail(const GraphContext& context, const char* stage) {
     if (context.failStage) {
         context.failStage(stage);
@@ -48,6 +55,14 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
 }
 
 [[nodiscard]] bool IsValid(const VisibilityContext& context) {
+    return context.renderer &&
+           context.commandList &&
+           context.depthBuffer &&
+           context.viewProjection &&
+           context.meshDraws;
+}
+
+[[nodiscard]] bool IsValid(const MaterialResolveContext& context) {
     return context.renderer &&
            context.commandList &&
            context.depthBuffer &&
@@ -136,6 +151,48 @@ bool RasterizeVisibility(const VisibilityContext& context) {
     return true;
 }
 
+bool ResolveMaterials(const MaterialResolveContext& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "material_resolve", "visibility-buffer material resolve context incomplete");
+        return false;
+    }
+
+    if (context.depthState) {
+        *context.depthState = kDepthSampleState;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.visibility = kVBShaderResourceState;
+    states.albedo = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.normalRoughness = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.emissiveMetallic = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.materialExt0 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.materialExt1 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    states.materialExt2 = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.materialResolve = true;
+    context.renderer->SetTransitionSkipControls(controls);
+    auto resolveResult = context.renderer->ResolveMaterials(
+        context.commandList,
+        context.depthBuffer,
+        context.depthSRV,
+        *context.meshDraws,
+        *context.viewProjection,
+        context.biomeMaterialsAddress);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (resolveResult.IsErr()) {
+        RecordFailure(context.failure, "material_resolve", resolveResult.Error());
+        return false;
+    }
+    return true;
+}
+
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
     if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
@@ -146,7 +203,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
         Fail(context, "visibility_buffer_deferred_contract");
         return false;
     }
-    if (context.needsMaterialResolve && (!HasGBufferResources(resources) || !context.materialResolve)) {
+    if (context.needsMaterialResolve && (!HasGBufferResources(resources) || !IsValid(context.materialResolve))) {
         Fail(context, "visibility_buffer_material_resolve_contract");
         return false;
     }
@@ -191,7 +248,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 builder.Write(resources.materialExt2, RGResourceUsage::UnorderedAccess);
             },
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-                context.materialResolve();
+                (void)ResolveMaterials(context.materialResolve);
             });
     }
 

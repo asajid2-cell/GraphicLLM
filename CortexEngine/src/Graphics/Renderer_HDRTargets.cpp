@@ -24,6 +24,30 @@ Result<void> Renderer::CreateHDRTarget() {
         return Result<void>::Err("Window size is zero; cannot create HDR target");
     }
 
+    auto hdrResult = m_mainTargets.hdr.CreateTarget(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height,
+        scale,
+        [this](HRESULT hr) {
+            CORTEX_REPORT_DEVICE_REMOVED("CreateHDRTarget", hr);
+        });
+    if (hdrResult.IsErr()) {
+        return hdrResult;
+    }
+
+    spdlog::info("HDR target created: {}x{} (scale {:.2f})", width, height, scale);
+
+    auto normalRoughnessResult = m_mainTargets.normalRoughness.CreateTarget(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (normalRoughnessResult.IsErr()) {
+        spdlog::warn("{}", normalRoughnessResult.Error());
+    }
+
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     desc.Width = width;
@@ -34,155 +58,8 @@ Result<void> Renderer::CreateHDRTarget() {
     desc.SampleDesc.Count = 1;
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
-    D3D12_CLEAR_VALUE clearValue = {};
-    clearValue.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    clearValue.Color[0] = 0.0f;
-    clearValue.Color[1] = 0.0f;
-    clearValue.Color[2] = 0.0f;
-    clearValue.Color[3] = 1.0f;
-
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    HRESULT hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &desc,
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        &clearValue,
-        IID_PPV_ARGS(&m_mainTargets.hdr.resources.color)
-    );
-
-    if (FAILED(hr)) {
-        m_mainTargets.hdr.resources.color.Reset();
-        m_mainTargets.hdr.descriptors.rtv = {};
-        m_mainTargets.hdr.descriptors.srv = {};
-
-        CORTEX_REPORT_DEVICE_REMOVED("CreateHDRTarget", hr);
-
-        char buf[64];
-        sprintf_s(buf, "0x%08X", static_cast<unsigned int>(hr));
-        char dim[64];
-        sprintf_s(dim, "%ux%u", width, height);
-        return Result<void>::Err(std::string("Failed to create HDR color target (")
-                                 + dim + ", scale=" + std::to_string(scale)
-                                 + ", hr=" + buf + ")");
-    }
-
-    m_mainTargets.hdr.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-    // RTV. Reuse the descriptor slot across render-scale resizes.
-    if (!m_mainTargets.hdr.descriptors.rtv.IsValid()) {
-        auto rtvResult = m_services.descriptorManager->AllocateRTV();
-        if (rtvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate RTV for HDR target: " + rtvResult.Error());
-        }
-        m_mainTargets.hdr.descriptors.rtv = rtvResult.Value();
-    }
-
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-    m_services.device->GetDevice()->CreateRenderTargetView(
-        m_mainTargets.hdr.resources.color.Get(),
-        &rtvDesc,
-        m_mainTargets.hdr.descriptors.rtv.cpu
-    );
-
-    // SRV - use staging heap for persistent descriptors
-    if (!m_mainTargets.hdr.descriptors.srv.IsValid()) {
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate staging SRV for HDR target: " + srvResult.Error());
-        }
-        m_mainTargets.hdr.descriptors.srv = srvResult.Value();
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    m_services.device->GetDevice()->CreateShaderResourceView(
-        m_mainTargets.hdr.resources.color.Get(),
-        &srvDesc,
-        m_mainTargets.hdr.descriptors.srv.cpu
-    );
-
-    spdlog::info("HDR target created: {}x{} (scale {:.2f})", width, height, scale);
-
-    // Normal/roughness G-buffer target (full resolution, matched to HDR)
-    m_mainTargets.normalRoughness.resources.texture.Reset();
-    m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_COMMON;
-
-    D3D12_RESOURCE_DESC gbufDesc = desc;
-    gbufDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-    D3D12_CLEAR_VALUE gbufClear = {};
-    gbufClear.Format = gbufDesc.Format;
-    gbufClear.Color[0] = 0.5f; // Encoded normal (0,0,1) -> (0.5,0.5,1.0)
-    gbufClear.Color[1] = 0.5f;
-    gbufClear.Color[2] = 1.0f;
-    gbufClear.Color[3] = 1.0f; // Roughness default
-
-    hr = m_services.device->GetDevice()->CreateCommittedResource(
-        &heapProps,
-        D3D12_HEAP_FLAG_NONE,
-        &gbufDesc,
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        &gbufClear,
-        IID_PPV_ARGS(&m_mainTargets.normalRoughness.resources.texture)
-    );
-
-    if (FAILED(hr)) {
-        spdlog::warn("Failed to create normal/roughness G-buffer target");
-    } else {
-        m_mainTargets.normalRoughness.resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-        // RTV for G-buffer
-        auto gbufRtvResult = m_services.descriptorManager->AllocateRTV();
-        if (gbufRtvResult.IsErr()) {
-            spdlog::warn("Failed to allocate RTV for normal/roughness G-buffer: {}", gbufRtvResult.Error());
-        } else {
-            m_mainTargets.normalRoughness.descriptors.rtv = gbufRtvResult.Value();
-
-            D3D12_RENDER_TARGET_VIEW_DESC gbufRtvDesc = {};
-            gbufRtvDesc.Format = gbufDesc.Format;
-            gbufRtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-            m_services.device->GetDevice()->CreateRenderTargetView(
-                m_mainTargets.normalRoughness.resources.texture.Get(),
-                &gbufRtvDesc,
-                m_mainTargets.normalRoughness.descriptors.rtv.cpu
-            );
-        }
-
-        // SRV for sampling G-buffer in SSR/post - use staging heap for persistent descriptors
-        auto gbufSrvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
-        if (gbufSrvResult.IsErr()) {
-            spdlog::warn("Failed to allocate staging SRV for normal/roughness G-buffer: {}", gbufSrvResult.Error());
-        } else {
-            m_mainTargets.normalRoughness.descriptors.srv = gbufSrvResult.Value();
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC gbufSrvDesc = {};
-            gbufSrvDesc.Format = gbufDesc.Format;
-            gbufSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            gbufSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            gbufSrvDesc.Texture2D.MipLevels = 1;
-
-            m_services.device->GetDevice()->CreateShaderResourceView(
-                m_mainTargets.normalRoughness.resources.texture.Get(),
-                &gbufSrvDesc,
-                m_mainTargets.normalRoughness.descriptors.srv.cpu
-            );
-        }
-    }
+    const auto heapProps = MainTargetDefaultHeapProperties();
+    HRESULT hr = S_OK;
 
     // (Re)create history color buffer for temporal AA in HDR space. This
     // matches the main HDR target format so TAA operates on linear lighting

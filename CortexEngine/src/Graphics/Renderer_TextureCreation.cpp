@@ -27,27 +27,6 @@ std::shared_ptr<DX12Texture> Renderer::GetPlaceholderRoughness() const {
     return m_materialFallbacks.roughness;
 }
 
-namespace {
-bool WriteTexture2DSRV(ID3D12Device* device,
-                       const std::shared_ptr<DX12Texture>& texture,
-                       D3D12_CPU_DESCRIPTOR_HANDLE dst) {
-    if (!device || !texture || !texture->GetResource()) {
-        return false;
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = texture->GetFormat();
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = texture->GetMipLevels();
-    srvDesc.Texture2D.MostDetailedMip = 0;
-
-    device->CreateShaderResourceView(texture->GetResource(), &srvDesc, dst);
-    return true;
-}
-
-} // namespace
-
 Result<std::shared_ptr<DX12Texture>> Renderer::CreateTextureFromRGBA(
     const uint8_t* data,
     uint32_t width,
@@ -130,14 +109,13 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
         out = std::make_shared<DX12Texture>(std::move(texResult.Value()));
 
-        auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
+        auto srvResult = TextureDescriptorState::CreateStagingSRV(
+            m_services.device->GetDevice(),
+            m_services.descriptorManager.get(),
+            *out,
+            "placeholder");
         if (srvResult.IsErr()) {
-            return Result<void>::Err("Failed to allocate staging SRV for placeholder: " + srvResult.Error());
-        }
-
-        auto createSRVResult = out->CreateSRV(m_services.device->GetDevice(), srvResult.Value());
-        if (createSRVResult.IsErr()) {
-            return createSRVResult;
+            return Result<void>::Err(srvResult.Error());
         }
         return Result<void>::Ok();
     };
@@ -164,17 +142,17 @@ Result<void> Renderer::CreatePlaceholderTexture() {
             m_materialFallbacks.roughness
         };
 
-        for (int i = 0; i < 4; ++i) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                return Result<void>::Err("Failed to allocate fallback material descriptor: " + handleResult.Error());
-            }
-            m_materialFallbacks.descriptorTable[i] = handleResult.Value();
+        auto tableResult = TextureDescriptorState::AllocateFallbackDescriptorTable(
+            m_services.descriptorManager.get(),
+            m_materialFallbacks.descriptorTable);
+        if (tableResult.IsErr()) {
+            return tableResult;
         }
 
-        for (int i = 0; i < 4; ++i) {
-            WriteTexture2DSRV(m_services.device->GetDevice(), sources[i], m_materialFallbacks.descriptorTable[i].cpu);
-        }
+        TextureDescriptorState::WriteTexture2DSRVTable(
+            m_services.device->GetDevice(),
+            sources,
+            m_materialFallbacks.descriptorTable);
     }
 
     if (m_services.bindlessManager) {
@@ -195,7 +173,7 @@ Result<void> Renderer::CreatePlaceholderTexture() {
 
         auto copyToReserved = [this](const std::shared_ptr<DX12Texture>& tex, uint32_t reservedIndex) {
             D3D12_CPU_DESCRIPTOR_HANDLE dst = m_services.bindlessManager->GetCPUHandle(reservedIndex);
-            WriteTexture2DSRV(m_services.device->GetDevice(), tex, dst);
+            TextureDescriptorState::WriteTexture2DSRV(m_services.device->GetDevice(), tex, dst);
         };
         copyToReserved(m_materialFallbacks.albedo, BindlessResourceManager::kPlaceholderAlbedoIndex);
         copyToReserved(m_materialFallbacks.normal, BindlessResourceManager::kPlaceholderNormalIndex);

@@ -16,15 +16,13 @@ Result<std::shared_ptr<DX12Texture>> Renderer::PublishTexture(TextureUploadTicke
         return Result<std::shared_ptr<DX12Texture>>::Err("Renderer is not initialized for texture publication");
     }
 
-    auto srvResult = m_services.descriptorManager->AllocateStagingCBV_SRV_UAV();
+    auto srvResult = TextureDescriptorState::CreateStagingSRV(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        ticket.texture,
+        ticket.publishContext);
     if (srvResult.IsErr()) {
-        return Result<std::shared_ptr<DX12Texture>>::Err(
-            "Failed to allocate staging SRV for " + ticket.publishContext + ": " + srvResult.Error());
-    }
-
-    auto createResult = ticket.texture.CreateSRV(m_services.device->GetDevice(), srvResult.Value());
-    if (createResult.IsErr()) {
-        return Result<std::shared_ptr<DX12Texture>>::Err(createResult.Error());
+        return Result<std::shared_ptr<DX12Texture>>::Err(srvResult.Error());
     }
 
     auto texPtr = std::make_shared<DX12Texture>(std::move(ticket.texture));

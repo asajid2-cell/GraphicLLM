@@ -56,6 +56,25 @@ void Fail(const StandaloneBloomContext& context, const char* stage) {
     }
 }
 
+void MarkHdrShaderResource(const FusedBloomContext& context) {
+    if (context.hdrResourceState) {
+        *context.hdrResourceState = context.hdrShaderResourceState;
+    }
+}
+
+void MarkHdrShaderResource(const StandaloneBloomContext& context) {
+    if (context.hdrResourceState) {
+        *context.hdrResourceState = context.hdrShaderResourceState;
+    }
+}
+
+void MarkBloomRan(const FusedBloomContext& context) {
+    if (context.bloomRan) {
+        const bool failed = context.bloomStageFailed && *context.bloomStageFailed;
+        *context.bloomRan = !failed;
+    }
+}
+
 void DeclareTransients(RGPassBuilder& builder, const FusedBloomContext& context) {
     if (!context.useTransients) {
         return;
@@ -115,9 +134,7 @@ RGResourceHandle AddFusedBloom(RenderGraph& graph, const FusedBloomContext& cont
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            if (context.markHdrShaderResource) {
-                context.markHdrShaderResource();
-            }
+            MarkHdrShaderResource(context);
             if (!BloomPass::RenderFullscreen(context.fullscreen,
                                              graph.GetResource(context.bloomA[0]),
                                              context.downsamplePipeline,
@@ -214,9 +231,7 @@ RGResourceHandle AddFusedBloom(RenderGraph& graph, const FusedBloomContext& cont
                 Fail(context, "composite");
                 return;
             }
-            if (context.markBloomRan) {
-                context.markBloomRan();
-            }
+            MarkBloomRan(context);
         });
 
     return context.bloomB[context.baseLevel];
@@ -237,9 +252,7 @@ RGResourceHandle AddStandaloneBloom(RenderGraph& graph, const StandaloneBloomCon
             builder.Write(context.bloomA[0], RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            if (context.markHdrShaderResource) {
-                context.markHdrShaderResource();
-            }
+            MarkHdrShaderResource(context);
             if (!BloomPass::RenderFullscreen(context.fullscreen,
                                              graph.GetResource(context.bloomA[0]),
                                              context.downsamplePipeline,

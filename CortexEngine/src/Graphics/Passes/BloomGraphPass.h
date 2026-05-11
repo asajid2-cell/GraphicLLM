@@ -27,9 +27,11 @@ struct FusedBloomContext {
     uint32_t stageLevels = 0;
     uint32_t baseLevel = 0;
     bool useTransients = true;
-    std::function<void()> markHdrShaderResource;
+    D3D12_RESOURCE_STATES* hdrResourceState = nullptr;
+    D3D12_RESOURCE_STATES hdrShaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     std::function<void(const char*)> failStage;
-    std::function<void()> markBloomRan;
+    bool* bloomRan = nullptr;
+    const bool* bloomStageFailed = nullptr;
 };
 
 struct StandaloneBloomContext {
@@ -48,7 +50,8 @@ struct StandaloneBloomContext {
     uint32_t stageLevels = 0;
     uint32_t baseLevel = 0;
     bool useTransients = true;
-    std::function<void()> markHdrShaderResource;
+    D3D12_RESOURCE_STATES* hdrResourceState = nullptr;
+    D3D12_RESOURCE_STATES hdrShaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     std::function<void(const char*)> failStage;
 };
 

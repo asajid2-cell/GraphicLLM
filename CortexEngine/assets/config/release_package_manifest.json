@@ -67,6 +67,7 @@
   "required_release_validation_steps": [
     "build_release",
     "repo_hygiene",
+    "launcher_native_widget",
     "graphics_native_widget",
     "graphics_material_controls",
     "material_editor_native_widget",

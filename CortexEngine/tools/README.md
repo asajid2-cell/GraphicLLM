@@ -89,6 +89,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_native_widget_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_material_controls_smoke.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_launcher_native_widget_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
@@ -227,6 +228,10 @@ The graphics material-controls smoke opens the same Win32 graphics settings
 window, drives the focused material preset and advanced material sliders, applies
 them to a focused Material Lab entity, and verifies the resulting frame-report
 material state.
+
+The launcher native-widget smoke opens the actual Win32 launcher, selects the
+Safe Startup graphics preset, clicks Launch Demo, and verifies the launched
+frame report uses the preset's low-cost/no-RT settings.
 
 The effects gallery test uses the Effects Showcase scene and asserts that the
 advanced graphics catalog is release-foundation validated, the public particle

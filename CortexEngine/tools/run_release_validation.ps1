@@ -337,6 +337,15 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "launcher_native_widget" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_launcher_native_widget_smoke.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "showcase_scene_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

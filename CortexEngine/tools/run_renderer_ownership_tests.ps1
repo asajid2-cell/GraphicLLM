@@ -87,6 +87,8 @@ $shadowDrawPassPath = Join-Path $root "src/Graphics/Renderer_ShadowPass.cpp"
 $waterSurfacesPath = Join-Path $root "src/Graphics/Renderer_WaterSurfaces.cpp"
 $transparentGeometryPath = Join-Path $root "src/Graphics/Renderer_TransparentGeometry.cpp"
 $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cpp"
+$voxelPassPath = Join-Path $root "src/Graphics/Passes/VoxelPass.cpp"
+$voxelRendererPath = Join-Path $root "src/Graphics/Renderer_Voxel.cpp"
 
 if ([int]$doc.schema -ne 1) {
     Add-Failure "renderer ownership schema must be 1"
@@ -495,6 +497,32 @@ foreach ($target in $doc.targets) {
                     Add-Failure "mesh_draw_submission missing MeshDrawPass::DrawIndexedMesh in $($pathInfo.Label)"
                 }
             }
+        }
+    }
+
+    if ($id -eq "voxel_pass_submission") {
+        if (Test-Path $voxelPassPath) {
+            $voxelPass = Get-Content $voxelPassPath -Raw
+            foreach ($required in @("namespace Cortex::Graphics::VoxelPass", "DrawContext", "ResourceBarrier", "OMSetRenderTargets", "FullscreenPass::DrawTriangle")) {
+                if ($voxelPass.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "voxel_pass_submission missing VoxelPass marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "voxel_pass_submission missing VoxelPass.cpp"
+        }
+        if (Test-Path $voxelRendererPath) {
+            $voxelRenderer = Get-Content $voxelRendererPath -Raw
+            foreach ($directCall in @("ResourceBarrier", "OMSetRenderTargets", "DrawInstanced", "RSSetViewports", "RSSetScissorRects")) {
+                if ($voxelRenderer.IndexOf($directCall, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "voxel_pass_submission still performs pass submission directly in Renderer_Voxel.cpp: $directCall"
+                }
+            }
+            if ($voxelRenderer.IndexOf("VoxelPass::Draw", [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "voxel_pass_submission missing VoxelPass::Draw in Renderer_Voxel.cpp"
+            }
+        } else {
+            Add-Failure "voxel_pass_submission missing Renderer_Voxel.cpp"
         }
     }
 }

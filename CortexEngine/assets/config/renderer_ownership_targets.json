@@ -3,6 +3,16 @@
   "purpose": "Release-validated pass-owned renderer state/resource boundaries.",
   "targets": [
     {
+      "id": "voxel_pass_submission",
+      "owner": "Voxel backend",
+      "status": "release_boundary_validated",
+      "release_boundary": "Voxel backend scene/grid preparation remains in Renderer_Voxel.cpp, but backbuffer transition, render-target binding, viewport/scissor, pipeline binding, descriptor binding, and fullscreen draw submission are owned by VoxelPass",
+      "validated_contracts": ["renderer_ownership", "voxel_backend"],
+      "target_files": ["Passes/VoxelPass.h", "Passes/VoxelPass.cpp", "Renderer_Voxel.cpp"],
+      "renderer_state_members": ["m_voxelState"],
+      "future_extension": "Move future voxel fullscreen/backend draw submission into VoxelPass before expanding the experimental backend"
+    },
+    {
       "id": "rt_reflection_stats",
       "owner": "RT reflections",
       "status": "release_boundary_validated",

@@ -12,28 +12,6 @@
 
 namespace Cortex::Graphics {
 
-namespace {
-
-bool WriteTexture2DSRV(ID3D12Device* device,
-                       const std::shared_ptr<DX12Texture>& texture,
-                       D3D12_CPU_DESCRIPTOR_HANDLE dst) {
-    if (!device || !texture || !texture->GetResource()) {
-        return false;
-    }
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = texture->GetFormat();
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = texture->GetMipLevels();
-    srvDesc.Texture2D.MostDetailedMip = 0;
-
-    device->CreateShaderResourceView(texture->GetResource(), &srvDesc, dst);
-    return true;
-}
-
-} // namespace
-
 bool Renderer::IsBiomeMaterialsValid() const {
     return m_constantBuffers.biomeMaterialsValid.load(std::memory_order_acquire);
 }
@@ -258,81 +236,23 @@ void Renderer::RefreshMaterialDescriptors(Scene::RenderableComponent& renderable
         tex.specularColor
     };
 
-    if (!state.descriptorsAllocated) {
-        for (uint32_t i = 0; i < MaterialGPUState::kSlotCount; ++i) {
-            auto handleResult = m_services.descriptorManager->AllocateCBV_SRV_UAV();
-            if (handleResult.IsErr()) {
-                state.descriptorsReady = false;
-                spdlog::warn("Failed to allocate persistent material descriptor slot {}: {}", i, handleResult.Error());
-                return;
-            }
-            state.descriptors[i] = handleResult.Value();
+    std::array<std::shared_ptr<DX12Texture>, MaterialGPUState::kSlotCount> fallbacks = {};
+    fallbacks[0] = m_materialFallbacks.albedo;
+    fallbacks[1] = m_materialFallbacks.normal;
+    fallbacks[2] = m_materialFallbacks.metallic;
+    fallbacks[3] = m_materialFallbacks.roughness;
 
-            if (i > 0 && state.descriptors[i].index != state.descriptors[i - 1].index + 1) {
-                state.descriptorsReady = false;
-                spdlog::warn("Persistent material descriptor table is not contiguous; material will not be shader-bindable");
-                return;
-            }
-        }
-        state.descriptorsAllocated = true;
+    auto refreshResult = TextureDescriptorState::RefreshMaterialDescriptorTable(
+        device,
+        m_services.descriptorManager.get(),
+        state,
+        sources,
+        fallbacks);
+    if (refreshResult.IsErr()) {
         state.descriptorsReady = false;
-    }
-
-    bool descriptorsChanged = !state.descriptorsReady;
-    for (size_t i = 0; i < sources.size(); ++i) {
-        if (state.sourceTextures[i].lock() != sources[i]) {
-            descriptorsChanged = true;
-            break;
-        }
-    }
-
-    if (!descriptorsChanged) {
+        spdlog::warn("{}", refreshResult.Error());
         return;
     }
-
-    for (size_t i = 0; i < sources.size(); ++i) {
-        std::shared_ptr<DX12Texture> fallback;
-        if (i == 0) {
-            fallback = m_materialFallbacks.albedo;
-        } else if (i == 1) {
-            fallback = m_materialFallbacks.normal;
-        } else if (i == 2) {
-            fallback = m_materialFallbacks.metallic;
-        } else if (i == 3) {
-            fallback = m_materialFallbacks.roughness;
-        }
-
-        std::shared_ptr<DX12Texture> texture;
-        if (sources[i] && sources[i]->GetResource()) {
-            texture = sources[i];
-        } else if (fallback && fallback->GetResource()) {
-            texture = fallback;
-        }
-
-        if (!WriteTexture2DSRV(device, texture, state.descriptors[i].cpu)) {
-            // No real or placeholder texture available: create a null SRV so
-            // shaders can safely sample without dereferencing an invalid
-            // descriptor. Use a simple 2D RGBA8 layout, which is compatible
-            // with how placeholder textures are normally created.
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MipLevels = 1;
-            srvDesc.Texture2D.MostDetailedMip = 0;
-
-            device->CreateShaderResourceView(
-                nullptr,
-                &srvDesc,
-                state.descriptors[i].cpu
-            );
-        }
-    }
-
-    for (size_t i = 0; i < sources.size(); ++i) {
-        state.sourceTextures[i] = sources[i];
-    }
-    state.descriptorsReady = true;
 }
 
 

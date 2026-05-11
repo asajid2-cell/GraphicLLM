@@ -163,6 +163,16 @@
       "future_extension": "Keep future texture descriptor allocation/write helpers in TextureDescriptorState or a dedicated texture-publication service before expanding texture residency policy"
     },
     {
+      "id": "material_descriptor_tables",
+      "owner": "Material descriptor tables",
+      "status": "release_boundary_validated",
+      "release_boundary": "TextureDescriptorState owns persistent per-material descriptor-table allocation, contiguity validation, texture/null SRV writes, source tracking, and readiness updates; Renderer_Materials.cpp keeps material texture policy, deferred texture admission, and bindless index packing",
+      "validated_contracts": ["renderer_ownership", "material_lab", "material_path_equivalence", "rt_showcase", "temporal_validation"],
+      "target_files": ["RendererMaterialTextureState.h", "Renderer_Materials.cpp"],
+      "renderer_state_members": ["m_materialFallbacks", "m_services"],
+      "future_extension": "Keep future material descriptor-table publication in TextureDescriptorState or a dedicated material descriptor service before adding new material texture slots"
+    },
+    {
       "id": "postprocess_resources",
       "owner": "Post process and cinematic controls",
       "status": "release_boundary_validated",

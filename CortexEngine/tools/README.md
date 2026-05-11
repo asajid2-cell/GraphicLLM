@@ -88,6 +88,7 @@ powershell -ExecutionPolicy Bypass -File tools/run_ibl_asset_policy_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_contract_tests.ps1
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_ui_interaction_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_graphics_native_widget_smoke.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File tools/run_graphics_material_controls_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_llm_renderer_command_smoke.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_dreamer_positive_runtime_tests.ps1 -NoBuild
 powershell -ExecutionPolicy Bypass -File tools/run_hud_mode_contract_tests.ps1 -NoBuild
@@ -221,6 +222,11 @@ window via `CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP=1`, drives child HWND
 trackbars/buttons with Win32 messages, and verifies the resulting frame report
 for dirty UI state, slider values, color/tone presets, and lighting-rig
 selection.
+
+The graphics material-controls smoke opens the same Win32 graphics settings
+window, drives the focused material preset and advanced material sliders, applies
+them to a focused Material Lab entity, and verifies the resulting frame-report
+material state.
 
 The effects gallery test uses the Effects Showcase scene and asserts that the
 advanced graphics catalog is release-foundation validated, the public particle

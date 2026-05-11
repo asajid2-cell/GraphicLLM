@@ -7,6 +7,7 @@
 #include "Graphics/EnvironmentManifest.h"
 #include "Graphics/RendererLightingRigControl.h"
 #include "Graphics/RendererTuningState.h"
+#include "LLM/SceneCommands.h"
 #include "Scene/ParticleEffectLibrary.h"
 
 #include <commctrl.h>
@@ -86,6 +87,20 @@ enum ControlIdGraphics : int {
     IDC_GFX_MOTION_BLUR_ENABLED = 9223,
     IDC_GFX_DOF_ENABLED = 9224,
     IDC_GFX_PARTICLE_QUALITY_SELECT = 9225,
+    IDC_GFX_MATERIAL_PRESET = 9226,
+    IDC_GFX_MATERIAL_METALLIC = 9227,
+    IDC_GFX_MATERIAL_ROUGHNESS = 9228,
+    IDC_GFX_MATERIAL_CLEARCOAT = 9229,
+    IDC_GFX_MATERIAL_COAT_ROUGHNESS = 9230,
+    IDC_GFX_MATERIAL_TRANSMISSION = 9231,
+    IDC_GFX_MATERIAL_EMISSIVE = 9232,
+    IDC_GFX_MATERIAL_SHEEN = 9233,
+    IDC_GFX_MATERIAL_SUBSURFACE = 9234,
+    IDC_GFX_MATERIAL_ANISOTROPY = 9235,
+    IDC_GFX_MATERIAL_WETNESS = 9236,
+    IDC_GFX_MATERIAL_EMISSIVE_BLOOM = 9237,
+    IDC_GFX_MATERIAL_PROCEDURAL = 9238,
+    IDC_GFX_APPLY_FOCUSED_MATERIAL = 9239,
     IDC_GFX_WARM = 9035,
     IDC_GFX_COOL = 9036,
     IDC_GFX_WATER_LENGTH = 9037,
@@ -218,6 +233,18 @@ struct GraphicsSettingsState {
     SliderBinding particleBloom;
     SliderBinding particleSoftDepth;
     SliderBinding particleWind;
+    SliderBinding materialMetallic;
+    SliderBinding materialRoughness;
+    SliderBinding materialClearcoat;
+    SliderBinding materialCoatRoughness;
+    SliderBinding materialTransmission;
+    SliderBinding materialEmissive;
+    SliderBinding materialSheen;
+    SliderBinding materialSubsurface;
+    SliderBinding materialAnisotropy;
+    SliderBinding materialWetness;
+    SliderBinding materialEmissiveBloom;
+    SliderBinding materialProcedural;
 
     HWND chkTAA = nullptr;
     HWND chkFXAA = nullptr;
@@ -242,6 +269,7 @@ struct GraphicsSettingsState {
     HWND cmbEnvironment = nullptr;
     HWND cmbParticleEffect = nullptr;
     HWND cmbParticleQuality = nullptr;
+    HWND cmbMaterialPreset = nullptr;
     std::string environmentBudgetFilter = "all";
     std::vector<std::string> qualityPresetIds;
     std::vector<std::string> environmentIds;
@@ -253,6 +281,28 @@ struct GraphicsSettingsState {
 
 GraphicsSettingsState g_gfx;
 const wchar_t* kGraphicsSettingsClassName = L"CortexGraphicsSettingsWindow";
+const wchar_t* kGraphicsMaterialPresetLabels[] = {
+    L"<Default>",
+    L"chrome",
+    L"polished_metal",
+    L"brushed_metal",
+    L"plastic",
+    L"painted_plastic",
+    L"matte",
+    L"brick",
+    L"concrete",
+    L"wood_floor",
+    L"backdrop",
+    L"glass",
+    L"glass_panel",
+    L"mirror",
+    L"water",
+    L"emissive_panel",
+    L"skin",
+    L"skin_ish",
+    L"cloth",
+    L"velvet",
+};
 
 std::wstring ToWide(const std::string& text) {
     if (text.empty()) {
@@ -264,6 +314,19 @@ std::wstring ToWide(const std::string& text) {
     }
     std::wstring out(static_cast<size_t>(count), L'\0');
     MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count);
+    return out;
+}
+
+std::string ToUtf8(const std::wstring& text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int count = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    if (count <= 0) {
+        return {};
+    }
+    std::string out(static_cast<size_t>(count), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count, nullptr, nullptr);
     return out;
 }
 
@@ -533,6 +596,18 @@ void LoadParticleQualityOptions() {
     SendMessageW(g_gfx.cmbParticleQuality, CB_SETCURSEL, 1, 0);
 }
 
+void LoadMaterialPresetOptions() {
+    if (!g_gfx.cmbMaterialPreset) {
+        return;
+    }
+
+    SendMessageW(g_gfx.cmbMaterialPreset, CB_RESETCONTENT, 0, 0);
+    for (const auto* label : kGraphicsMaterialPresetLabels) {
+        SendMessageW(g_gfx.cmbMaterialPreset, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
+    }
+    SendMessageW(g_gfx.cmbMaterialPreset, CB_SETCURSEL, 0, 0);
+}
+
 void SyncParticleQualityComboFromRenderer() {
     if (!g_gfx.cmbParticleQuality) {
         return;
@@ -541,6 +616,61 @@ void SyncParticleQualityComboFromRenderer() {
                  CB_SETCURSEL,
                  static_cast<WPARAM>(ParticleQualityIndexForScale(g_gfx.tuning.particles.qualityScale)),
                  0);
+}
+
+void ApplyFocusedMaterialFromGraphicsUI() {
+    auto* engine = Cortex::ServiceLocator::GetEngine();
+    if (!engine) {
+        return;
+    }
+
+    const std::string target = engine->GetFocusTarget();
+    if (target.empty()) {
+        SetWindowTextW(g_gfx.txtWarning, L"Focused material apply skipped: no focused entity");
+        return;
+    }
+
+    auto cmd = std::make_shared<LLM::ModifyMaterialCommand>();
+    cmd->targetName = target;
+
+    const int materialIndex = g_gfx.cmbMaterialPreset
+        ? static_cast<int>(SendMessageW(g_gfx.cmbMaterialPreset, CB_GETCURSEL, 0, 0))
+        : 0;
+    if (materialIndex > 0 &&
+        materialIndex < static_cast<int>(sizeof(kGraphicsMaterialPresetLabels) / sizeof(kGraphicsMaterialPresetLabels[0]))) {
+        cmd->setPreset = true;
+        cmd->presetName = ToUtf8(kGraphicsMaterialPresetLabels[materialIndex]);
+    }
+
+    cmd->setMetallic = true;
+    cmd->metallic = SliderToFloat(g_gfx.materialMetallic);
+    cmd->setRoughness = true;
+    cmd->roughness = SliderToFloat(g_gfx.materialRoughness);
+    cmd->setClearcoat = true;
+    cmd->clearcoat = SliderToFloat(g_gfx.materialClearcoat);
+    cmd->setClearcoatRoughness = true;
+    cmd->clearcoatRoughness = SliderToFloat(g_gfx.materialCoatRoughness);
+    cmd->setTransmission = true;
+    cmd->transmission = SliderToFloat(g_gfx.materialTransmission);
+    cmd->setEmissiveStrength = true;
+    cmd->emissiveStrength = SliderToFloat(g_gfx.materialEmissive);
+    cmd->setSheen = true;
+    cmd->sheen = SliderToFloat(g_gfx.materialSheen);
+    cmd->setSubsurface = true;
+    cmd->subsurface = SliderToFloat(g_gfx.materialSubsurface);
+    cmd->setAnisotropy = true;
+    cmd->anisotropy = SliderToFloat(g_gfx.materialAnisotropy);
+    cmd->setWetness = true;
+    cmd->wetness = SliderToFloat(g_gfx.materialWetness);
+    cmd->setEmissiveBloom = true;
+    cmd->emissiveBloom = SliderToFloat(g_gfx.materialEmissiveBloom);
+    cmd->setProceduralMask = true;
+    cmd->proceduralMask = SliderToFloat(g_gfx.materialProcedural);
+    cmd->setAO = false;
+
+    engine->EnqueueSceneCommand(std::move(cmd));
+    const std::wstring status = L"Focused material queued for " + ToWide(target);
+    SetWindowTextW(g_gfx.txtWarning, status.c_str());
 }
 
 void SyncSelectedParticleEffectToState() {
@@ -1269,6 +1399,24 @@ void RegisterGraphicsSettingsClass() {
                 y += 24 + rowGap;
             }
 
+            makeSection(L"Focused Material");
+            g_gfx.cmbMaterialPreset = makeCombo(IDC_GFX_MATERIAL_PRESET, L"Material Preset");
+            LoadMaterialPresetOptions();
+            makeSlider(IDC_GFX_MATERIAL_METALLIC, L"Material Metallic", g_gfx.materialMetallic, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_ROUGHNESS, L"Material Roughness", g_gfx.materialRoughness, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_CLEARCOAT, L"Material Clearcoat", g_gfx.materialClearcoat, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_COAT_ROUGHNESS, L"Coat Roughness", g_gfx.materialCoatRoughness, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_TRANSMISSION, L"Material Transmission", g_gfx.materialTransmission, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_EMISSIVE, L"Material Emissive", g_gfx.materialEmissive, 0.0f, 16.0f);
+            makeSlider(IDC_GFX_MATERIAL_SHEEN, L"Material Sheen", g_gfx.materialSheen, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_SUBSURFACE, L"Material Subsurface", g_gfx.materialSubsurface, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_ANISOTROPY, L"Material Anisotropy", g_gfx.materialAnisotropy, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_WETNESS, L"Material Wetness", g_gfx.materialWetness, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_EMISSIVE_BLOOM, L"Emissive Bloom", g_gfx.materialEmissiveBloom, 0.0f, 1.0f);
+            makeSlider(IDC_GFX_MATERIAL_PROCEDURAL, L"Procedural Mask", g_gfx.materialProcedural, 0.0f, 1.0f);
+            makeButton(IDC_GFX_APPLY_FOCUSED_MATERIAL, L"Apply Focused Material", margin, y, width - margin * 2);
+            y += 24 + rowGap;
+
             makeSection(L"Actions");
             {
                 const int buttonWidth = (width - margin * 2 - 12) / 3;
@@ -1484,6 +1632,9 @@ void RegisterGraphicsSettingsClass() {
                 }
                 break;
             }
+            case IDC_GFX_APPLY_FOCUSED_MATERIAL:
+                ApplyFocusedMaterialFromGraphicsUI();
+                break;
             case IDC_GFX_SAVE: {
                 SyncStateFromToggles();
                 SyncStateFromSliders();

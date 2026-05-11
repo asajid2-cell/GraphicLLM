@@ -78,7 +78,7 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "rt_gi") return resourceBytes(m_rtGITargets.color.Get());
         if (resource == "rt_reflection") return resourceBytes(m_rtReflectionTargets.color.Get());
         if (resource == "shadow_map") return resourceBytes(m_shadowResources.map.Get());
-        if (resource == "hzb") return resourceBytes(m_hzbResources.texture.Get());
+        if (resource == "hzb") return resourceBytes(m_hzbResources.resources.texture.Get());
         if (resource == "back_buffer" && m_services.window) return resourceBytes(m_services.window->GetCurrentBackBuffer());
         if (resource == "bloom") {
             double total = 0.0;

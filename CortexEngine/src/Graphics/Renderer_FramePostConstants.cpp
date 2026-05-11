@@ -25,8 +25,8 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     float debugParamZ = selectedNorm;
     if (m_debugViewState.mode == 32u) {
         // HZB debug view: repurpose debugMode.z as a normalized mip selector.
-        if (m_hzbResources.mipCount > 1) {
-            debugParamZ = glm::clamp(static_cast<float>(m_hzbResources.debugMip) / static_cast<float>(m_hzbResources.mipCount - 1u), 0.0f, 1.0f);
+        if (m_hzbResources.resources.mipCount > 1) {
+            debugParamZ = glm::clamp(static_cast<float>(m_hzbResources.debug.debugMip) / static_cast<float>(m_hzbResources.resources.mipCount - 1u), 0.0f, 1.0f);
         } else {
             debugParamZ = 0.0f;
         }

@@ -47,7 +47,7 @@ Renderer::QualityState Renderer::GetQualityState() const {
     state.renderScale = m_qualityRuntimeState.renderScale;
     state.shadowsEnabled = m_shadowResources.enabled;
     state.debugViewMode = static_cast<int>(m_debugViewState.mode);
-    state.hzbDebugMip = m_hzbResources.debugMip;
+    state.hzbDebugMip = m_hzbResources.debug.debugMip;
     state.shadowBias = m_shadowResources.bias;
     state.shadowPCFRadius = m_shadowResources.pcfRadius;
     state.cascadeSplitLambda = m_shadowResources.cascadeSplitLambda;

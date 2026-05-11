@@ -222,9 +222,9 @@ namespace Cortex::Graphics {
 
         bool useHzbOcclusion = false;
         if (!s_disableGpuCullHzb &&
-            m_hzbResources.valid && m_hzbResources.captureValid && m_hzbResources.texture && m_hzbResources.mipCount > 0) {
+            m_hzbResources.resources.valid && m_hzbResources.capture.captureValid && m_hzbResources.resources.texture && m_hzbResources.resources.mipCount > 0) {
             // Require the HZB capture to be from the immediately previous frame.
-            if (m_hzbResources.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter) {
+            if (m_hzbResources.capture.captureFrameCounter + 1u == m_frameLifecycle.renderFrameCounter) {
                 const bool strictGate = (std::getenv("CORTEX_GPUCULL_HZB_STRICT_GATE") != nullptr);
                 if (!strictGate) {
                     // Motion robustness is handled conservatively in the shader
@@ -232,9 +232,9 @@ namespace Cortex::Graphics {
                     // occlusion on camera movement by default.
                     useHzbOcclusion = true;
                 } else {
-                    const float dist = glm::length(m_cameraState.positionWS - m_hzbResources.captureCameraPosWS);
+                    const float dist = glm::length(m_cameraState.positionWS - m_hzbResources.capture.captureCameraPosWS);
                     const glm::vec3 fwdNow = glm::normalize(m_cameraState.forwardWS);
-                    const glm::vec3 fwdThen = glm::normalize(m_hzbResources.captureCameraForwardWS);
+                    const glm::vec3 fwdThen = glm::normalize(m_hzbResources.capture.captureCameraForwardWS);
                     const float dotFwd = glm::clamp(glm::dot(fwdNow, fwdThen), -1.0f, 1.0f);
                     // Conservative gates: allow only small camera movement/rotation.
                     constexpr float kMaxHzbDist = 0.35f;          // meters/units
@@ -254,29 +254,29 @@ namespace Cortex::Graphics {
         m_gpuCullingState.hzbOcclusionUsedThisFrame = useHzbOcclusion;
 
         m_services.gpuCulling->SetHZBForOcclusion(
-            useHzbOcclusion ? m_hzbResources.texture.Get() : nullptr,
-            m_hzbResources.width,
-            m_hzbResources.height,
-            m_hzbResources.mipCount,
-            m_hzbResources.captureViewMatrix,
-            m_hzbResources.captureViewProjMatrix,
-            m_hzbResources.captureCameraPosWS,
-            m_hzbResources.captureNearPlane,
-            m_hzbResources.captureFarPlane,
+            useHzbOcclusion ? m_hzbResources.resources.texture.Get() : nullptr,
+            m_hzbResources.resources.width,
+            m_hzbResources.resources.height,
+            m_hzbResources.resources.mipCount,
+            m_hzbResources.capture.captureViewMatrix,
+            m_hzbResources.capture.captureViewProjMatrix,
+            m_hzbResources.capture.captureCameraPosWS,
+            m_hzbResources.capture.captureNearPlane,
+            m_hzbResources.capture.captureFarPlane,
             useHzbOcclusion);
 
         {
             // Ensure the HZB resource is in an SRV-readable state for compute.
             if (useHzbOcclusion &&
-                (m_hzbResources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
+                (m_hzbResources.resources.resourceState & D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) == 0) {
                 D3D12_RESOURCE_BARRIER barrier{};
                 barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = m_hzbResources.texture.Get();
-                barrier.Transition.StateBefore = m_hzbResources.resourceState;
+                barrier.Transition.pResource = m_hzbResources.resources.texture.Get();
+                barrier.Transition.StateBefore = m_hzbResources.resources.resourceState;
                 barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
                 barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
                 m_commandResources.graphicsList->ResourceBarrier(1, &barrier);
-                m_hzbResources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+                m_hzbResources.resources.resourceState = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
             }
 
             auto cullResult = m_services.gpuCulling->DispatchCulling(

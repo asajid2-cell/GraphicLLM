@@ -27,7 +27,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     const bool canRunRg = (m_services.renderGraph && m_services.device && m_commandResources.graphicsList && m_services.descriptorManager);
     const bool wantsRgHzbThisFrame =
         inputs.hzbPending && inputs.useRenderGraphHZB && canRunRg && m_depthResources.buffer &&
-        m_depthResources.srv.IsValid() && m_hzbResources.texture;
+        m_depthResources.srv.IsValid() && m_hzbResources.resources.texture;
     const bool wantsRgPostThisFrame =
         inputs.runPostProcess && inputs.useRenderGraphPost && canRunRg && m_pipelineState.postProcess &&
         m_mainTargets.hdrColor && m_services.window && m_services.window->GetCurrentBackBuffer();
@@ -53,7 +53,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle hzbHandle{};
     if (wantsRgHzbThisFrame) {
         depthHandle = m_services.renderGraph->ImportResource(m_depthResources.buffer.Get(), m_depthResources.resourceState, "Depth");
-        hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.texture.Get(), m_hzbResources.resourceState, "HZB");
+        hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB");
         AddHZBFromDepthPasses_RG(*m_services.renderGraph, depthHandle, hzbHandle);
     }
 
@@ -243,8 +243,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             "BackBuffer");
 
         const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
-        if (wantsHzbDebug && m_hzbResources.texture && !hzbHandle.IsValid()) {
-            hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.texture.Get(), m_hzbResources.resourceState, "HZB_Debug");
+        if (wantsHzbDebug && m_hzbResources.resources.texture && !hzbHandle.IsValid()) {
+            hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB_Debug");
         }
 
         const PostProcessGraphPass::ResourceHandles postProcessResources{
@@ -332,17 +332,17 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (wantsRgHzbThisFrame) {
         m_depthResources.resourceState = m_services.renderGraph->GetResourceState(depthHandle);
-        m_hzbResources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
-        m_hzbResources.valid = true;
+        m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
+        m_hzbResources.resources.valid = true;
 
-        m_hzbResources.captureViewMatrix = m_constantBuffers.frameCPU.viewMatrix;
-        m_hzbResources.captureViewProjMatrix = m_constantBuffers.frameCPU.viewProjectionMatrix;
-        m_hzbResources.captureCameraPosWS = m_cameraState.positionWS;
-        m_hzbResources.captureCameraForwardWS = glm::normalize(m_cameraState.forwardWS);
-        m_hzbResources.captureNearPlane = m_cameraState.nearPlane;
-        m_hzbResources.captureFarPlane = m_cameraState.farPlane;
-        m_hzbResources.captureFrameCounter = m_frameLifecycle.renderFrameCounter;
-        m_hzbResources.captureValid = true;
+        m_hzbResources.capture.captureViewMatrix = m_constantBuffers.frameCPU.viewMatrix;
+        m_hzbResources.capture.captureViewProjMatrix = m_constantBuffers.frameCPU.viewProjectionMatrix;
+        m_hzbResources.capture.captureCameraPosWS = m_cameraState.positionWS;
+        m_hzbResources.capture.captureCameraForwardWS = glm::normalize(m_cameraState.forwardWS);
+        m_hzbResources.capture.captureNearPlane = m_cameraState.nearPlane;
+        m_hzbResources.capture.captureFarPlane = m_cameraState.farPlane;
+        m_hzbResources.capture.captureFrameCounter = m_frameLifecycle.renderFrameCounter;
+        m_hzbResources.capture.captureValid = true;
         result.ranHZB = true;
         RecordFramePass("HZB", true, true, 0,
                         {"depth"},
@@ -385,7 +385,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (taaHandle.IsValid()) m_temporalScreenState.taaIntermediateState = m_services.renderGraph->GetResourceState(taaHandle);
         if (rtReflHandle.IsValid()) m_rtReflectionTargets.colorState = m_services.renderGraph->GetResourceState(rtReflHandle);
         if (rtReflHistHandle.IsValid()) m_rtReflectionTargets.historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
-        if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
+        if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
             for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
                 if (bloomA[level].IsValid()) {

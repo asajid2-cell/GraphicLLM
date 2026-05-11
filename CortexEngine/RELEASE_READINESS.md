@@ -69,12 +69,12 @@ Result:
   counters verified;
 - editor frame contract: passed; editor renderer hooks and explicit frame
   sequence verified;
-- temporal validation: `gpu_ms=1.401`, `warnings=0`,
+- temporal validation: `gpu_ms=1.695`, `warnings=0`,
   `object_motion=0.0731`;
 - temporal camera cut: `frames=53`, `cut_frame=20`,
   `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=3.103`;
-- RT showcase: `gpu_ms=2.611/16.7`, `material_issues=0`,
+  `invalidated_frame=20`, `gpu_ms=3.140`;
+- RT showcase: `gpu_ms=1.641/16.7`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
@@ -108,17 +108,18 @@ Result:
 - Phase 3 visual matrix passed across temporal validation, RT Showcase,
   Material Lab, Glass and Water Courtyard, Effects Showcase, and uncapped IBL
   Gallery;
+- IBL asset policy passed with five runtime assets under budget-class caps;
 - IBL gallery passed all five enabled runtime environments:
   `studio`, `warm_gallery`, `sunset_courtyard`, `cool_overcast`,
   `night_city`;
 - budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
   release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=18.119`, `avg_luma=116.9`, `nonblack=1`.
+- voxel backend: `gpu_ms=17.413`, `avg_luma=116.9`, `nonblack=1`.
 
 Aggregate logs:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260510_232645_290_31604_c17d1470
+CortexEngine/build/bin/logs/runs/release_validation_20260510_233128_383_15348_330e05eb
 ```
 
 ## Renderer Scope

@@ -136,6 +136,8 @@ $overlayGeometryPath = Join-Path $root "src/Graphics/Renderer_OverlayGeometry.cp
 $voxelPassPath = Join-Path $root "src/Graphics/Passes/VoxelPass.cpp"
 $voxelRendererPath = Join-Path $root "src/Graphics/Renderer_Voxel.cpp"
 $voxelStatePath = Join-Path $root "src/Graphics/RendererVoxelState.h"
+$vegetationRendererPath = Join-Path $root "src/Graphics/Renderer_Vegetation.cpp"
+$vegetationStatePath = Join-Path $root "src/Graphics/RendererVegetationState.h"
 $minimalFramePassPath = Join-Path $root "src/Graphics/Passes/MinimalFramePass.cpp"
 $framePlanningPath = Join-Path $root "src/Graphics/Renderer_FramePlanning.cpp"
 
@@ -1745,6 +1747,40 @@ foreach ($target in $doc.targets) {
             }
         } else {
             Add-Failure "voxel_grid_resources missing Renderer_Voxel.cpp"
+        }
+    }
+
+    if ($id -eq "vegetation_instance_resources") {
+        if (Test-Path $vegetationStatePath) {
+            $vegetationState = Get-Content $vegetationStatePath -Raw
+            foreach ($required in @("struct VegetationInstanceBufferState", "CreateStructuredUploadBuffer", "Upload", "CreateCommittedResource", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "Map(0", "Unmap(0", "D3D12_HEAP_TYPE_UPLOAD")) {
+                if ($vegetationState.IndexOf($required, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "vegetation_instance_resources missing RendererVegetationState.h marker: $required"
+                }
+            }
+        } else {
+            Add-Failure "vegetation_instance_resources missing RendererVegetationState.h"
+        }
+        if (Test-Path $vegetationRendererPath) {
+            $vegetationRenderer = Get-Content $vegetationRendererPath -Raw
+            foreach ($requiredRoute in @(
+                "m_vegetationState.meshInstances.CreateStructuredUploadBuffer",
+                "m_vegetationState.billboardInstances.CreateStructuredUploadBuffer",
+                "m_vegetationState.grassInstances.CreateStructuredUploadBuffer",
+                "m_vegetationState.meshInstances.Upload",
+                "m_vegetationState.billboardInstances.Upload",
+                "m_vegetationState.grassInstances.Upload")) {
+                if ($vegetationRenderer.IndexOf($requiredRoute, [StringComparison]::Ordinal) -lt 0) {
+                    Add-Failure "vegetation_instance_resources missing state delegation in Renderer_Vegetation.cpp: $requiredRoute"
+                }
+            }
+            foreach ($removedLocal in @("CreateCommittedResource", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "Map(0", "Unmap(0", "D3D12_HEAP_TYPE_UPLOAD")) {
+                if ($vegetationRenderer.IndexOf($removedLocal, [StringComparison]::Ordinal) -ge 0) {
+                    Add-Failure "vegetation_instance_resources still has direct vegetation resource/upload mechanics in Renderer_Vegetation.cpp: $removedLocal"
+                }
+            }
+        } else {
+            Add-Failure "vegetation_instance_resources missing Renderer_Vegetation.cpp"
         }
     }
 

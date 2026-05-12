@@ -7,6 +7,7 @@
 
 #include <glm/glm.hpp>
 #include "Graphics/Renderer_ConstantBuffer.h"
+#include "Graphics/RHI/DescriptorHeap.h"
 
 namespace Cortex::Graphics {
 
@@ -88,6 +89,12 @@ struct ParticleRenderResources {
     UINT gpuSourceCapacity = 0;
     ComPtr<ID3D12Resource> gpuInstanceBuffer;
     D3D12_RESOURCE_STATES gpuInstanceState = D3D12_RESOURCE_STATE_COMMON;
+    DescriptorHandle gpuSourceSrv{};
+    UINT gpuSourceSrvCapacity = 0;
+    DescriptorHandle gpuEmitterSrv{};
+    UINT gpuEmitterSrvCapacity = 0;
+    DescriptorHandle gpuInstanceUav{};
+    UINT gpuInstanceUavCapacity = 0;
     ConstantBuffer<ParticleGpuPrepareConstants> gpuPrepareConstants;
     ConstantBuffer<ParticleGpuLifecycleConstants> gpuLifecycleConstants;
     bool gpuPrepareConstantsInitialized = false;
@@ -210,6 +217,8 @@ struct ParticleRenderResources {
         gpuInstanceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         instanceCapacity = newCapacity;
         gpuSourceCapacity = newCapacity;
+        gpuSourceSrvCapacity = 0;
+        gpuInstanceUavCapacity = 0;
         gpuPreparedThisFrame = false;
         return S_OK;
     }
@@ -258,7 +267,80 @@ struct ParticleRenderResources {
 
         gpuEmitterBuffer = emitterBuffer;
         gpuEmitterCapacity = newCapacity;
+        gpuEmitterSrvCapacity = 0;
         return S_OK;
+    }
+
+    [[nodiscard]] HRESULT EnsureGpuPrepareDescriptors(ID3D12Device* device,
+                                                      DescriptorHeapManager* descriptorManager) {
+        if (!device || !descriptorManager || !gpuSourceBuffer || !gpuInstanceBuffer ||
+            gpuSourceCapacity == 0 || instanceCapacity == 0) {
+            return E_INVALIDARG;
+        }
+
+        if (!gpuSourceSrv.IsValid()) {
+            auto srvResult = descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                return E_FAIL;
+            }
+            gpuSourceSrv = srvResult.Value();
+            gpuSourceSrvCapacity = 0;
+        }
+        if (!gpuInstanceUav.IsValid()) {
+            auto uavResult = descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) {
+                return E_FAIL;
+            }
+            gpuInstanceUav = uavResult.Value();
+            gpuInstanceUavCapacity = 0;
+        }
+
+        if (gpuSourceSrvCapacity != gpuSourceCapacity) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = gpuSourceCapacity;
+            srvDesc.Buffer.StructureByteStride = sizeof(ParticleGpuSource);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            device->CreateShaderResourceView(gpuSourceBuffer.Get(), &srvDesc, gpuSourceSrv.cpu);
+            gpuSourceSrvCapacity = gpuSourceCapacity;
+        }
+
+        return EnsureGpuInstanceUav(device, descriptorManager);
+    }
+
+    [[nodiscard]] HRESULT EnsureGpuLifecycleDescriptors(ID3D12Device* device,
+                                                        DescriptorHeapManager* descriptorManager) {
+        if (!device || !descriptorManager || !gpuEmitterBuffer || !gpuInstanceBuffer ||
+            gpuEmitterCapacity == 0 || instanceCapacity == 0) {
+            return E_INVALIDARG;
+        }
+
+        if (!gpuEmitterSrv.IsValid()) {
+            auto srvResult = descriptorManager->AllocateCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                return E_FAIL;
+            }
+            gpuEmitterSrv = srvResult.Value();
+            gpuEmitterSrvCapacity = 0;
+        }
+
+        if (gpuEmitterSrvCapacity != gpuEmitterCapacity) {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = gpuEmitterCapacity;
+            srvDesc.Buffer.StructureByteStride = sizeof(ParticleGpuEmitter);
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+            device->CreateShaderResourceView(gpuEmitterBuffer.Get(), &srvDesc, gpuEmitterSrv.cpu);
+            gpuEmitterSrvCapacity = gpuEmitterCapacity;
+        }
+
+        return EnsureGpuInstanceUav(device, descriptorManager);
     }
 
     [[nodiscard]] HRESULT UploadInstances(const ParticleInstance* instances,
@@ -431,6 +513,12 @@ struct ParticleRenderResources {
         gpuSourceCapacity = 0;
         gpuInstanceBuffer.Reset();
         gpuInstanceState = D3D12_RESOURCE_STATE_COMMON;
+        gpuSourceSrv = {};
+        gpuSourceSrvCapacity = 0;
+        gpuEmitterSrv = {};
+        gpuEmitterSrvCapacity = 0;
+        gpuInstanceUav = {};
+        gpuInstanceUavCapacity = 0;
         if (gpuPrepareConstants.buffer && gpuPrepareConstants.mappedBytes) {
             gpuPrepareConstants.buffer->Unmap(0, nullptr);
             gpuPrepareConstants.mappedBytes = nullptr;
@@ -459,6 +547,38 @@ struct ParticleRenderResources {
         gpuLifecycleConstantsInitialized = false;
         gpuPreparedThisFrame = false;
         quadVertexBuffer.Reset();
+    }
+
+private:
+    [[nodiscard]] HRESULT EnsureGpuInstanceUav(ID3D12Device* device,
+                                               DescriptorHeapManager* descriptorManager) {
+        if (!device || !descriptorManager || !gpuInstanceBuffer || instanceCapacity == 0) {
+            return E_INVALIDARG;
+        }
+
+        if (!gpuInstanceUav.IsValid()) {
+            auto uavResult = descriptorManager->AllocateCBV_SRV_UAV();
+            if (uavResult.IsErr()) {
+                return E_FAIL;
+            }
+            gpuInstanceUav = uavResult.Value();
+            gpuInstanceUavCapacity = 0;
+        }
+
+        if (gpuInstanceUavCapacity != instanceCapacity) {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uavDesc.Buffer.FirstElement = 0;
+            uavDesc.Buffer.NumElements = instanceCapacity;
+            uavDesc.Buffer.StructureByteStride = sizeof(ParticleInstance);
+            uavDesc.Buffer.CounterOffsetInBytes = 0;
+            uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+            device->CreateUnorderedAccessView(gpuInstanceBuffer.Get(), nullptr, &uavDesc, gpuInstanceUav.cpu);
+            gpuInstanceUavCapacity = instanceCapacity;
+        }
+
+        return S_OK;
     }
 };
 

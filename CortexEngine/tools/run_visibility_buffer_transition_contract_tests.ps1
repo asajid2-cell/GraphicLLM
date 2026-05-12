@@ -34,6 +34,7 @@ function Assert-MinCount([string]$Name, [string]$Text, [string]$Pattern, [int]$M
 $visibilityHeader = Read-Text "src/Graphics/VisibilityBuffer.h"
 $vbGraph = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp"
 $vbHelpers = Read-Text "src/Graphics/Renderer_RenderGraphVisibilityBufferHelpers.h"
+$vbGraphPass = Read-Text "src/Graphics/Passes/VisibilityBufferGraphPass.cpp"
 $resolve = Read-Text "src/Graphics/VisibilityBuffer_Resolve.cpp"
 $visibilityPass = Read-Text "src/Graphics/VisibilityBuffer_VisibilityPass.cpp"
 $debugBlit = Read-Text "src/Graphics/VisibilityBuffer_DebugBlit.cpp"
@@ -48,7 +49,7 @@ foreach ($field in @(
     "deferredLighting"
 )) {
     Assert-Matches "VisibilityBuffer.h" $visibilityHeader "bool\s+$field\s*=\s*false"
-    Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "controls\.$field\s*=\s*true"
+    Assert-Matches "VisibilityBufferGraphPass.cpp" $vbGraphPass "controls\.$field\s*=\s*true"
 }
 
 Assert-Matches "VisibilityBuffer.h" $visibilityHeader "struct\s+TransitionSkipControls"
@@ -74,11 +75,13 @@ foreach ($resource in @(
     Assert-Matches "Renderer_RenderGraphVisibilityBufferHelpers.h" $vbHelpers "initialStates\.$resource"
 }
 
-Assert-MinCount "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "GetResourceStateSnapshot\(\)" 8
-Assert-MinCount "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "ApplyResourceStateSnapshot\(states\)" 7
-Assert-MinCount "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "GetTransitionSkipControls\(\)" 7
-Assert-MinCount "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "SetTransitionSkipControls\(controls\)" 7
-Assert-MinCount "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "SetTransitionSkipControls\(previousControls\)" 7
+Assert-MinCount "VisibilityBufferGraphPass.cpp" $vbGraphPass "GetResourceStateSnapshot\(\)" 7
+Assert-MinCount "VisibilityBufferGraphPass.cpp" $vbGraphPass "ApplyResourceStateSnapshot\(states\)" 7
+Assert-MinCount "VisibilityBufferGraphPass.cpp" $vbGraphPass "GetTransitionSkipControls\(\)" 7
+Assert-MinCount "VisibilityBufferGraphPass.cpp" $vbGraphPass "SetTransitionSkipControls\(controls\)" 7
+Assert-MinCount "VisibilityBufferGraphPass.cpp" $vbGraphPass "SetTransitionSkipControls\(previousControls\)" 7
+Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "VisibilityBufferGraphPass::AddStagedPath"
+Assert-Matches "Renderer_RenderGraphVisibilityBuffer.cpp" $vbGraph "ApplyResourceStateSnapshot\(finalStates\)"
 
 foreach ($state in @(
     "finalStates\.visibility\s*=\s*m_services\.renderGraph->GetResourceState\(vbResources\.visibility\)",

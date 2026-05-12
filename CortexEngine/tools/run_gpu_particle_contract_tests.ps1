@@ -29,10 +29,13 @@ $catalogPath = Join-Path $root "assets/config/advanced_graphics_catalog.json"
 
 Assert-File "src/Graphics/GPUParticles.h"
 Assert-File "src/Graphics/GPUParticles.cpp"
+Assert-File "src/Graphics/Passes/ParticleGpuPreparePass.h"
+Assert-File "src/Graphics/Passes/ParticleGpuPreparePass.cpp"
 Assert-File "assets/shaders/ParticleEmit.hlsl"
 Assert-File "assets/shaders/ParticleSimulate.hlsl"
 Assert-File "assets/shaders/ParticleSort.hlsl"
 Assert-File "assets/shaders/ParticleRender.hlsl"
+Assert-File "assets/shaders/ParticleInstancePrepare.hlsl"
 
 $cmake = if (Test-Path $cmakePath) { Get-Content $cmakePath -Raw } else { "" }
 $header = if (Test-Path $headerPath) { Get-Content $headerPath -Raw } else { "" }
@@ -40,6 +43,7 @@ $cpp = if (Test-Path $cppPath) { Get-Content $cppPath -Raw } else { "" }
 $catalogRaw = if (Test-Path $catalogPath) { Get-Content $catalogPath -Raw } else { "" }
 
 Assert-Contains $cmake "src/Graphics/GPUParticles.cpp" "GPUParticles.cpp is not part of the CortexEngine build."
+Assert-Contains $cmake "src/Graphics/Passes/ParticleGpuPreparePass.cpp" "ParticleGpuPreparePass.cpp is not part of the CortexEngine build."
 Assert-Contains $header "class GPUParticleSystem" "GPUParticleSystem class declaration is missing."
 Assert-Contains $header "ParticleEmitterConfig" "ParticleEmitterConfig is missing."
 Assert-Contains $header "ParticleStats" "ParticleStats is missing."
@@ -49,6 +53,9 @@ Assert-Contains $cpp "GPUParticleSystem::Render" "GPUParticleSystem Render const
 Assert-Contains $cpp "CreateFireEmitter" "Default fire GPU particle emitter is missing."
 Assert-Contains $cpp "CreateSmokeEmitter" "Default smoke GPU particle emitter is missing."
 Assert-Contains $cpp "CreateSparkEmitter" "Default spark GPU particle emitter is missing."
+Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Renderer_GeometryPipelineSetup.cpp") -Raw) "ParticleInstancePrepare.hlsl" "Renderer does not compile the public GPU particle prepare shader."
+Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Passes/ParticleGpuPreparePass.cpp") -Raw) "SetComputeRootSignature" "ParticleGpuPreparePass does not dispatch the GPU prepare pass."
+Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Renderer_FrameContractSnapshot.cpp") -Raw) "ecs_cpu_lifecycle_gpu_prepare_sort_dx12_instanced_billboard" "Frame contract does not report the public GPU particle backend."
 
 if (-not [string]::IsNullOrWhiteSpace($catalogRaw)) {
     $catalog = $catalogRaw | ConvertFrom-Json
@@ -63,10 +70,13 @@ if (-not [string]::IsNullOrWhiteSpace($catalogRaw)) {
         foreach ($requiredEntry in @(
             "src/Graphics/GPUParticles.h",
             "src/Graphics/GPUParticles.cpp",
+            "src/Graphics/Passes/ParticleGpuPreparePass.h",
+            "src/Graphics/Passes/ParticleGpuPreparePass.cpp",
             "assets/shaders/ParticleEmit.hlsl",
             "assets/shaders/ParticleSimulate.hlsl",
             "assets/shaders/ParticleSort.hlsl",
-            "assets/shaders/ParticleRender.hlsl")) {
+            "assets/shaders/ParticleRender.hlsl",
+            "assets/shaders/ParticleInstancePrepare.hlsl")) {
             if (-not $entries.ContainsKey($requiredEntry)) {
                 Add-Failure "particles catalog entry missing '$requiredEntry'"
             }

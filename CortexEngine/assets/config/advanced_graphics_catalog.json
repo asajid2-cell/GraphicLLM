@@ -34,6 +34,8 @@
       "existing_entry_points": [
         "src/Graphics/Renderer_Particles.cpp",
         "src/Graphics/RendererParticleState.h",
+        "src/Graphics/Passes/ParticleGpuPreparePass.h",
+        "src/Graphics/Passes/ParticleGpuPreparePass.cpp",
         "src/Scene/ParticleEffectLibrary.h",
         "src/Scene/ParticleEffectLibrary.cpp",
         "src/Graphics/GPUParticles.h",
@@ -42,9 +44,10 @@
         "assets/shaders/ParticleEmit.hlsl",
         "assets/shaders/ParticleSimulate.hlsl",
         "assets/shaders/ParticleSort.hlsl",
-        "assets/shaders/ParticleRender.hlsl"
+        "assets/shaders/ParticleRender.hlsl",
+        "assets/shaders/ParticleInstancePrepare.hlsl"
       ],
-      "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "dust_motes", "sparks", "embers", "mist", "rain", "snow", "density_scale", "frame_contract_stats", "runtime_backend_stats", "backend_stage_stats", "cpu_simulation_backend", "dx12_instanced_draw_backend", "simulation_budget_stats", "budgeted_zero_cost_disabled_path", "procedural_billboard_fallback"],
+      "validated_features": ["ecs_billboard_emitters", "fire", "smoke", "dust_motes", "sparks", "embers", "mist", "rain", "snow", "density_scale", "frame_contract_stats", "runtime_backend_stats", "backend_stage_stats", "cpu_simulation_backend", "gpu_particle_public_backend", "gpu_frame_prepare_backend", "gpu_depth_sort_backend", "dx12_instanced_draw_backend", "simulation_budget_stats", "budgeted_zero_cost_disabled_path", "procedural_billboard_fallback"],
       "validation_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
       "first_validation_scene": "effects_showcase",
       "fallback_policy": {

@@ -16,6 +16,23 @@ struct ParticleInstance {
     glm::vec4 color;
 };
 
+struct ParticleGpuSource {
+    glm::vec4 positionSize;
+    glm::vec4 velocityAge;
+    glm::vec4 color;
+    glm::vec4 params;
+};
+
+struct alignas(16) ParticleGpuPrepareConstants {
+    uint32_t count = 0;
+    float deltaTime = 0.0f;
+    float bloomContribution = 1.0f;
+    float softDepthFade = 0.5f;
+    float windInfluence = 0.0f;
+    glm::vec3 padding0{0.0f};
+    glm::vec4 cameraPosition{0.0f};
+};
+
 struct ParticleRenderControls {
     bool enabledForScene = true;
     float densityScale = 1.0f;
@@ -44,10 +61,17 @@ struct ParticleRenderControls {
 struct ParticleRenderResources {
     ComPtr<ID3D12Resource> instanceBuffer;
     UINT instanceCapacity = 0;
+    ComPtr<ID3D12Resource> gpuSourceBuffer;
+    UINT gpuSourceCapacity = 0;
+    ComPtr<ID3D12Resource> gpuInstanceBuffer;
+    D3D12_RESOURCE_STATES gpuInstanceState = D3D12_RESOURCE_STATE_COMMON;
+    ConstantBuffer<ParticleGpuPrepareConstants> gpuPrepareConstants;
+    bool gpuPrepareConstantsInitialized = false;
+    bool gpuPreparedThisFrame = false;
     ComPtr<ID3D12Resource> quadVertexBuffer;
 
     [[nodiscard]] bool NeedsInstanceCapacity(UINT requiredCapacity) const {
-        return !instanceBuffer || instanceCapacity < requiredCapacity;
+        return !instanceBuffer || !gpuSourceBuffer || !gpuInstanceBuffer || instanceCapacity < requiredCapacity || gpuSourceCapacity < requiredCapacity;
     }
 
     [[nodiscard]] HRESULT EnsureInstanceBuffer(ID3D12Device* device,
@@ -57,6 +81,13 @@ struct ParticleRenderResources {
             return E_INVALIDARG;
         }
         if (!NeedsInstanceCapacity(requiredCapacity)) {
+            if (!gpuPrepareConstantsInitialized) {
+                auto cbResult = gpuPrepareConstants.Initialize(device, 16);
+                if (cbResult.IsErr()) {
+                    return E_FAIL;
+                }
+                gpuPrepareConstantsInitialized = true;
+            }
             return S_OK;
         }
 
@@ -80,20 +111,67 @@ struct ParticleRenderResources {
         desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        ComPtr<ID3D12Resource> buffer;
-        const HRESULT hr = device->CreateCommittedResource(
+        ComPtr<ID3D12Resource> uploadInstances;
+        HRESULT hr = device->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &desc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&buffer));
+            IID_PPV_ARGS(&uploadInstances));
         if (FAILED(hr)) {
             return hr;
         }
 
-        instanceBuffer = buffer;
+        desc.Width = static_cast<UINT64>(newCapacity) * sizeof(ParticleGpuSource);
+        ComPtr<ID3D12Resource> sourceBuffer;
+        hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&sourceBuffer));
+        if (FAILED(hr)) {
+            return hr;
+        }
+
+        D3D12_HEAP_PROPERTIES defaultHeapProps = {};
+        defaultHeapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+        defaultHeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        defaultHeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        defaultHeapProps.CreationNodeMask = 1;
+        defaultHeapProps.VisibleNodeMask = 1;
+
+        desc.Width = static_cast<UINT64>(newCapacity) * sizeof(ParticleInstance);
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        ComPtr<ID3D12Resource> gpuInstances;
+        hr = device->CreateCommittedResource(
+            &defaultHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            nullptr,
+            IID_PPV_ARGS(&gpuInstances));
+        if (FAILED(hr)) {
+            return hr;
+        }
+
+        if (!gpuPrepareConstantsInitialized) {
+            auto cbResult = gpuPrepareConstants.Initialize(device, 16);
+            if (cbResult.IsErr()) {
+                return E_FAIL;
+            }
+            gpuPrepareConstantsInitialized = true;
+        }
+
+        instanceBuffer = uploadInstances;
+        gpuSourceBuffer = sourceBuffer;
+        gpuInstanceBuffer = gpuInstances;
+        gpuInstanceState = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         instanceCapacity = newCapacity;
+        gpuSourceCapacity = newCapacity;
+        gpuPreparedThisFrame = false;
         return S_OK;
     }
 
@@ -116,6 +194,34 @@ struct ParticleRenderResources {
         std::memcpy(mapped, instances, bytesWritten);
         instanceBuffer->Unmap(0, nullptr);
         return S_OK;
+    }
+
+    [[nodiscard]] HRESULT UploadGpuSources(const ParticleGpuSource* sources,
+                                           UINT sourceCount,
+                                           UINT& bytesWritten) {
+        bytesWritten = 0;
+        if (!gpuSourceBuffer || !sources || sourceCount == 0) {
+            return E_INVALIDARG;
+        }
+
+        void* mapped = nullptr;
+        D3D12_RANGE readRange{0, 0};
+        bytesWritten = sourceCount * sizeof(ParticleGpuSource);
+        const HRESULT hr = gpuSourceBuffer->Map(0, &readRange, &mapped);
+        if (FAILED(hr)) {
+            bytesWritten = 0;
+            return hr;
+        }
+        std::memcpy(mapped, sources, bytesWritten);
+        gpuSourceBuffer->Unmap(0, nullptr);
+        return S_OK;
+    }
+
+    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS WriteGpuPrepareConstants(const ParticleGpuPrepareConstants& constants) {
+        if (!gpuPrepareConstantsInitialized) {
+            return 0;
+        }
+        return gpuPrepareConstants.AllocateAndWrite(constants);
     }
 
     [[nodiscard]] HRESULT EnsureQuadVertexBuffer(ID3D12Device* device,
@@ -174,10 +280,11 @@ struct ParticleRenderResources {
     [[nodiscard]] D3D12_VERTEX_BUFFER_VIEW InstanceBufferView(UINT instanceCount,
                                                              UINT instanceBytes) const {
         D3D12_VERTEX_BUFFER_VIEW view{};
-        if (!instanceBuffer || instanceCount == 0 || instanceBytes == 0) {
+        ID3D12Resource* buffer = gpuPreparedThisFrame ? gpuInstanceBuffer.Get() : instanceBuffer.Get();
+        if (!buffer || instanceCount == 0 || instanceBytes == 0) {
             return view;
         }
-        view.BufferLocation = instanceBuffer->GetGPUVirtualAddress();
+        view.BufferLocation = buffer->GetGPUVirtualAddress();
         view.StrideInBytes = sizeof(ParticleInstance);
         view.SizeInBytes = instanceBytes;
         return view;
@@ -196,12 +303,31 @@ struct ParticleRenderResources {
     }
 
     [[nodiscard]] uint64_t InstanceBufferBytes() const {
-        return static_cast<uint64_t>(instanceCapacity) * sizeof(ParticleInstance);
+        return static_cast<uint64_t>(instanceCapacity) * sizeof(ParticleInstance) +
+               static_cast<uint64_t>(gpuSourceCapacity) * sizeof(ParticleGpuSource);
     }
 
     void Reset() {
         instanceBuffer.Reset();
         instanceCapacity = 0;
+        gpuSourceBuffer.Reset();
+        gpuSourceCapacity = 0;
+        gpuInstanceBuffer.Reset();
+        gpuInstanceState = D3D12_RESOURCE_STATE_COMMON;
+        if (gpuPrepareConstants.buffer && gpuPrepareConstants.mappedBytes) {
+            gpuPrepareConstants.buffer->Unmap(0, nullptr);
+            gpuPrepareConstants.mappedBytes = nullptr;
+        }
+        gpuPrepareConstants.buffer.Reset();
+        gpuPrepareConstants.gpuAddress = 0;
+        gpuPrepareConstants.bufferSize = 0;
+        gpuPrepareConstants.alignedSize = 0;
+        gpuPrepareConstants.offset = 0;
+        gpuPrepareConstants.perFrameSize = 0;
+        gpuPrepareConstants.frameRegionStart = 0;
+        gpuPrepareConstants.frameRegionEnd = 0;
+        gpuPrepareConstantsInitialized = false;
+        gpuPreparedThisFrame = false;
         quadVertexBuffer.Reset();
     }
 };
@@ -221,6 +347,11 @@ struct ParticleFrameStats {
     uint32_t framePresetMismatchedEmitters = 0;
     bool frameCapped = false;
     bool frameExecuted = false;
+    bool frameGpuPrepared = false;
+    bool frameGpuSimulationDispatched = false;
+    bool frameGpuSortDispatched = false;
+    uint32_t frameGpuDispatchGroups = 0;
+    uint64_t frameUploadBytes = 0;
 
     void Reset(const ParticleRenderControls& controls) {
         frameEmitterCount = 0;
@@ -237,6 +368,11 @@ struct ParticleFrameStats {
         framePresetMismatchedEmitters = 0;
         frameCapped = false;
         frameExecuted = false;
+        frameGpuPrepared = false;
+        frameGpuSimulationDispatched = false;
+        frameGpuSortDispatched = false;
+        frameGpuDispatchGroups = 0;
+        frameUploadBytes = 0;
     }
 };
 

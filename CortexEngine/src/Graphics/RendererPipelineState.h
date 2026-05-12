@@ -44,6 +44,7 @@ struct RendererPipelineReadiness {
     bool water = false;
     bool waterOverlay = false;
     bool particle = false;
+    bool particlePrepareCompute = false;
     bool voxel = false;
 };
 
@@ -85,6 +86,7 @@ struct RendererPipelineState {
     std::unique_ptr<DX12Pipeline> water;
     std::unique_ptr<DX12Pipeline> waterOverlay;
     std::unique_ptr<DX12Pipeline> particle;
+    std::unique_ptr<DX12ComputePipeline> particlePrepareCompute;
     std::unique_ptr<DX12Pipeline> voxel;
 
     [[nodiscard]] RendererPipelineReadiness GetReadiness() const {
@@ -121,6 +123,7 @@ struct RendererPipelineState {
         readiness.water = water != nullptr;
         readiness.waterOverlay = waterOverlay != nullptr;
         readiness.particle = particle != nullptr;
+        readiness.particlePrepareCompute = particlePrepareCompute != nullptr;
         readiness.voxel = voxel != nullptr;
         return readiness;
     }
@@ -155,6 +158,7 @@ struct RendererPipelineState {
         water.reset();
         waterOverlay.reset();
         particle.reset();
+        particlePrepareCompute.reset();
         voxel.reset();
         singleSrvUavComputeRootSignature.Reset();
         computeRootSignature.reset();

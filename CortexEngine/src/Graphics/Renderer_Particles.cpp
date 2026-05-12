@@ -1,6 +1,7 @@
 ﻿#include "Renderer.h"
 
 #include "Graphics/Passes/ParticleBillboardPass.h"
+#include "Graphics/Passes/ParticleGpuPreparePass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
@@ -53,8 +54,10 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    std::vector<ParticleInstance> instances;
-    instances.reserve(1024);
+    std::vector<ParticleInstance> fallbackInstances;
+    std::vector<ParticleGpuSource> gpuSources;
+    fallbackInstances.reserve(1024);
+    gpuSources.reserve(1024);
 
     const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_constantBuffers.frameCPU.viewProjectionNoJitter);
 
@@ -98,7 +101,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
                 }
             }
 
-            if (instances.size() >= scaledMaxInstances) {
+            if (fallbackInstances.size() >= scaledMaxInstances) {
                 frame.frameCapped = true;
                 break;
             }
@@ -121,15 +124,23 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
                 continue;
             }
 
-            instances.push_back(inst);
+            ParticleGpuSource source{};
+            source.positionSize = glm::vec4(emitter.localSpace ? (emitterWorldPos + p.position) : p.position,
+                                            p.size);
+            source.velocityAge = glm::vec4(p.velocity, p.age);
+            source.color = p.color;
+            source.params = glm::vec4(p.lifetime, 0.0f, 0.0f, 0.0f);
+
+            fallbackInstances.push_back(inst);
+            gpuSources.push_back(source);
         }
 
-        if (instances.size() >= scaledMaxInstances) {
+        if (fallbackInstances.size() >= scaledMaxInstances) {
             break;
         }
     }
 
-    if (instances.empty()) {
+    if (fallbackInstances.empty()) {
         return;
     }
 
@@ -138,9 +149,9 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    const UINT instanceCount = static_cast<UINT>(instances.size());
+    const UINT instanceCount = static_cast<UINT>(fallbackInstances.size());
     frame.frameSubmittedInstances = instanceCount;
-    const UINT requiredCapacity = instanceCount;
+    const UINT requiredCapacity = std::min<UINT>(scaledMaxInstances, instanceCount + 64u);
     const UINT minCapacity = 256;
 
     if (resources.NeedsInstanceCapacity(requiredCapacity) && resources.instanceBuffer) {
@@ -154,17 +165,59 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    UINT bufferSize = 0;
-    const HRESULT mapHr = resources.UploadInstances(instances.data(), instanceCount, bufferSize);
-    if (FAILED(mapHr)) {
-        spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
-                     static_cast<unsigned int>(mapHr));
-        // Map failures are one of the first places a hung device surfaces.
-        // Capture rich diagnostics so we can see which pass/frame triggered
-        // device removal.
-        CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapInstanceBuffer", mapHr);
-        m_particleState.instanceMapFailed = true;
-        return;
+    UINT bufferSize = instanceCount * sizeof(ParticleInstance);
+    resources.gpuPreparedThisFrame = false;
+
+    bool gpuPrepareSucceeded = false;
+    if (m_pipelineState.particlePrepareCompute &&
+        m_pipelineState.singleSrvUavComputeRootSignature &&
+        resources.gpuSourceBuffer &&
+        resources.gpuInstanceBuffer &&
+        resources.gpuPrepareConstantsInitialized) {
+        ParticleGpuPrepareConstants constants{};
+        constants.count = instanceCount;
+        constants.deltaTime = m_constantBuffers.frameCPU.timeAndExposure.y;
+        constants.bloomContribution = bloomContribution;
+        constants.softDepthFade = softDepthFade;
+        constants.windInfluence = windInfluence;
+        constants.cameraPosition = m_constantBuffers.frameCPU.cameraPosition;
+
+        ParticleGpuPreparePass::PrepareContext prepareContext{};
+        prepareContext.device = device;
+        prepareContext.commandList = m_commandResources.graphicsList.Get();
+        prepareContext.rootSignature = m_pipelineState.singleSrvUavComputeRootSignature.Get();
+        prepareContext.pipeline = m_pipelineState.particlePrepareCompute.get();
+        prepareContext.descriptorManager = m_services.descriptorManager.get();
+        prepareContext.resources = &resources;
+        prepareContext.sources = gpuSources.data();
+        prepareContext.sourceCount = instanceCount;
+        prepareContext.constants = &constants;
+
+        const ParticleGpuPreparePass::PrepareResult prepareResult =
+            ParticleGpuPreparePass::Dispatch(prepareContext);
+        if (prepareResult.executed) {
+            frame.frameGpuPrepared = true;
+            frame.frameGpuSimulationDispatched = true;
+            frame.frameGpuSortDispatched = true;
+            frame.frameGpuDispatchGroups = prepareResult.dispatchGroups;
+            frame.frameUploadBytes = prepareResult.sourceBytes;
+            gpuPrepareSucceeded = true;
+        }
+    }
+
+    if (!gpuPrepareSucceeded) {
+        const HRESULT mapHr = resources.UploadInstances(fallbackInstances.data(), instanceCount, bufferSize);
+        if (FAILED(mapHr)) {
+            spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
+                         static_cast<unsigned int>(mapHr));
+            // Map failures are one of the first places a hung device surfaces.
+            // Capture rich diagnostics so we can see which pass/frame triggered
+            // device removal.
+            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapInstanceBuffer", mapHr);
+            m_particleState.instanceMapFailed = true;
+            return;
+        }
+        frame.frameUploadBytes = bufferSize;
     }
 
     // Persistent quad vertex buffer in an upload heap; tiny and self-contained.

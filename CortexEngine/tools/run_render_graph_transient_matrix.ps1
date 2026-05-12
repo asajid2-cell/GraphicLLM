@@ -165,8 +165,20 @@ foreach ($case in $cases) {
             Add-Failure "$($case.Name): bloom transients disabled but final transient bytes were requested=$($renderGraph.transient_requested_bytes) used=$($renderGraph.transient_heap_used_bytes)"
         }
     }
-    if ([int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total -ne 0) {
-        Add-Failure "$($case.Name): transient descriptor delta is $($report.frame_contract.pass_budget_summary.transient_descriptor_delta_total), expected 0"
+    if ($null -ne $report.frame_contract.pass_budget_summary) {
+        $transientDescriptorDelta = [int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total
+        $particleTransientDelta = 0
+        foreach ($entry in @($report.frame_contract.pass_budget_summary.top_transient_descriptor_passes)) {
+            if ([string]$entry.name -eq "Particles") {
+                $particleTransientDelta += [int]$entry.transient_descriptor_delta
+            }
+        }
+        if ($transientDescriptorDelta -ne $particleTransientDelta) {
+            Add-Failure "$($case.Name): unexpected non-particle transient descriptor delta: total=$transientDescriptorDelta particles=$particleTransientDelta"
+        }
+        if ([bool]$report.frame_contract.particles.gpu_particle_public_path -and $particleTransientDelta -lt 2) {
+            Add-Failure "$($case.Name): GPU particle path reported public but particle transient descriptor delta was $particleTransientDelta, expected >= 2"
+        }
     }
     if ($report.frame_contract.warnings.Count -gt 0) {
         Add-Failure "$($case.Name): frame contract warnings were reported: $($report.frame_contract.warnings -join ', ')"

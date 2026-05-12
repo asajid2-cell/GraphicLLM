@@ -308,8 +308,20 @@ if ($null -eq $lighting) {
         Add-Failure "RT showcase lighting intensity contract is not positive"
     }
 }
-if ([int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total -ne 0) {
-    Add-Failure "transient descriptor delta is $($report.frame_contract.pass_budget_summary.transient_descriptor_delta_total), expected 0"
+if ($null -ne $report.frame_contract.pass_budget_summary) {
+    $transientDescriptorDelta = [int]$report.frame_contract.pass_budget_summary.transient_descriptor_delta_total
+    $particleTransientDelta = 0
+    foreach ($entry in @($report.frame_contract.pass_budget_summary.top_transient_descriptor_passes)) {
+        if ([string]$entry.name -eq "Particles") {
+            $particleTransientDelta += [int]$entry.transient_descriptor_delta
+        }
+    }
+    if ($transientDescriptorDelta -ne $particleTransientDelta) {
+        Add-Failure "unexpected non-particle transient descriptor delta: total=$transientDescriptorDelta particles=$particleTransientDelta"
+    }
+    if ([bool]$report.frame_contract.particles.gpu_particle_public_path -and $particleTransientDelta -lt 2) {
+        Add-Failure "GPU particle path reported public but particle transient descriptor delta was $particleTransientDelta, expected >= 2"
+    }
 }
 if (-not [bool]$report.camera.active) {
     Add-Failure "diagnostics report does not contain an active camera"

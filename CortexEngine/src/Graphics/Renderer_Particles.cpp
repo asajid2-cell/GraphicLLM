@@ -1,12 +1,13 @@
 ﻿#include "Renderer.h"
 
 #include "Graphics/Passes/ParticleBillboardPass.h"
-#include "Graphics/Passes/ParticleGpuPreparePass.h"
+#include "Graphics/Passes/ParticleGpuLifecyclePass.h"
 #include "Graphics/RendererGeometryUtils.h"
 #include "Scene/ECS_Registry.h"
 #include "Scene/Components.h"
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -54,10 +55,9 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    std::vector<ParticleInstance> fallbackInstances;
-    std::vector<ParticleGpuSource> gpuSources;
-    fallbackInstances.reserve(1024);
-    gpuSources.reserve(1024);
+    std::vector<ParticleGpuEmitter> gpuEmitters;
+    gpuEmitters.reserve(32);
+    uint32_t particleOffset = 0;
 
     const FrustumPlanes frustum = ExtractFrustumPlanesCPU(m_constantBuffers.frameCPU.viewProjectionNoJitter);
 
@@ -87,60 +87,41 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
             }
         }
 
-        for (const auto& p : emitter.particles) {
-            if (p.age >= p.lifetime) {
-                continue;
-            }
-            ++frame.frameLiveParticles;
-
-            if (densityScale < 1.0f) {
-                const float samplePhase = static_cast<float>(frame.frameLiveParticles) * densityScale;
-                const float previousPhase = static_cast<float>(frame.frameLiveParticles - 1u) * densityScale;
-                if (static_cast<uint32_t>(samplePhase) == static_cast<uint32_t>(previousPhase)) {
-                    continue;
-                }
-            }
-
-            if (fallbackInstances.size() >= scaledMaxInstances) {
-                frame.frameCapped = true;
-                break;
-            }
-
-            ParticleInstance inst{};
-            inst.position = emitter.localSpace ? (emitterWorldPos + p.position) : p.position;
-            if (windInfluence > 0.0f) {
-                const float ageT = (p.lifetime > 0.0f) ? std::clamp(p.age / p.lifetime, 0.0f, 1.0f) : 0.0f;
-                inst.position += glm::vec3(windInfluence * ageT * 0.22f, 0.0f, windInfluence * ageT * 0.08f);
-            }
-            inst.size     = p.size;
-            inst.color    = p.color;
-            inst.color.r *= bloomContribution;
-            inst.color.g *= bloomContribution;
-            inst.color.b *= bloomContribution;
-            inst.color.a *= std::clamp(1.0f - softDepthFade * 0.18f, 0.55f, 1.0f);
-
-            if (!SphereIntersectsFrustumCPU(frustum, inst.position, glm::max(0.01f, inst.size))) {
-                ++frame.frameFrustumCulled;
-                continue;
-            }
-
-            ParticleGpuSource source{};
-            source.positionSize = glm::vec4(emitter.localSpace ? (emitterWorldPos + p.position) : p.position,
-                                            p.size);
-            source.velocityAge = glm::vec4(p.velocity, p.age);
-            source.color = p.color;
-            source.params = glm::vec4(p.lifetime, 0.0f, 0.0f, 0.0f);
-
-            fallbackInstances.push_back(inst);
-            gpuSources.push_back(source);
+        const float emitterBudget = glm::max(1.0f, glm::max(emitter.rate, 0.0f) * glm::max(emitter.lifetime, 0.1f) * qualityScale);
+        uint32_t emitterCount = static_cast<uint32_t>(std::ceil(emitterBudget));
+        const uint32_t remainingBudget = scaledMaxInstances - particleOffset;
+        if (emitterCount > remainingBudget) {
+            emitterCount = remainingBudget;
+            frame.frameCapped = true;
+        }
+        if (emitterCount == 0) {
+            break;
         }
 
-        if (fallbackInstances.size() >= scaledMaxInstances) {
+        ParticleGpuEmitter gpuEmitter{};
+        gpuEmitter.positionRate = glm::vec4(emitterWorldPos, glm::max(emitter.rate, 0.001f));
+        gpuEmitter.initialVelocityLifetime = glm::vec4(emitter.initialVelocity, glm::max(emitter.lifetime, 0.1f));
+        gpuEmitter.velocityRandomGravity = glm::vec4(emitter.velocityRandom, emitter.gravity);
+        gpuEmitter.sizeLocalType = glm::vec4(emitter.sizeStart,
+                                             emitter.sizeEnd,
+                                             emitter.localSpace ? 1.0f : 0.0f,
+                                             static_cast<float>(static_cast<uint32_t>(emitter.type)));
+        gpuEmitter.colorStart = emitter.colorStart;
+        gpuEmitter.colorEnd = emitter.colorEnd;
+        gpuEmitter.offsetCountSeed = glm::vec4(static_cast<float>(particleOffset),
+                                               static_cast<float>(emitterCount),
+                                               static_cast<float>(entt::to_integral(entity) & 0xffffu),
+                                               0.0f);
+        gpuEmitters.push_back(gpuEmitter);
+        particleOffset += emitterCount;
+        frame.frameLiveParticles += emitterCount;
+
+        if (particleOffset >= scaledMaxInstances) {
             break;
         }
     }
 
-    if (fallbackInstances.empty()) {
+    if (gpuEmitters.empty() || particleOffset == 0) {
         return;
     }
 
@@ -149,7 +130,7 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
         return;
     }
 
-    const UINT instanceCount = static_cast<UINT>(fallbackInstances.size());
+    const UINT instanceCount = static_cast<UINT>(particleOffset);
     frame.frameSubmittedInstances = instanceCount;
     const UINT requiredCapacity = std::min<UINT>(scaledMaxInstances, instanceCount + 64u);
     const UINT minCapacity = 256;
@@ -168,56 +149,58 @@ void Renderer::RenderParticles(Scene::ECS_Registry* registry) {
     UINT bufferSize = instanceCount * sizeof(ParticleInstance);
     resources.gpuPreparedThisFrame = false;
 
-    bool gpuPrepareSucceeded = false;
-    if (m_pipelineState.particlePrepareCompute &&
+    const HRESULT emitterHr =
+        resources.EnsureGpuEmitterBuffer(device, static_cast<UINT>(gpuEmitters.size()), 16);
+    if (FAILED(emitterHr)) {
+        spdlog::warn("RenderParticles: failed to allocate GPU emitter buffer (hr=0x{:08X})",
+                     static_cast<unsigned int>(emitterHr));
+        CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_CreateEmitterBuffer", emitterHr);
+        return;
+    }
+
+    bool gpuLifecycleSucceeded = false;
+    if (m_pipelineState.particleLifecycleCompute &&
         m_pipelineState.singleSrvUavComputeRootSignature &&
-        resources.gpuSourceBuffer &&
+        resources.gpuEmitterBuffer &&
         resources.gpuInstanceBuffer &&
-        resources.gpuPrepareConstantsInitialized) {
-        ParticleGpuPrepareConstants constants{};
-        constants.count = instanceCount;
-        constants.deltaTime = m_constantBuffers.frameCPU.timeAndExposure.y;
+        resources.gpuLifecycleConstantsInitialized) {
+        ParticleGpuLifecycleConstants constants{};
+        constants.emitterCount = static_cast<uint32_t>(gpuEmitters.size());
+        constants.particleCount = instanceCount;
+        constants.time = m_constantBuffers.frameCPU.timeAndExposure.x;
         constants.bloomContribution = bloomContribution;
         constants.softDepthFade = softDepthFade;
         constants.windInfluence = windInfluence;
         constants.cameraPosition = m_constantBuffers.frameCPU.cameraPosition;
 
-        ParticleGpuPreparePass::PrepareContext prepareContext{};
-        prepareContext.device = device;
-        prepareContext.commandList = m_commandResources.graphicsList.Get();
-        prepareContext.rootSignature = m_pipelineState.singleSrvUavComputeRootSignature.Get();
-        prepareContext.pipeline = m_pipelineState.particlePrepareCompute.get();
-        prepareContext.descriptorManager = m_services.descriptorManager.get();
-        prepareContext.resources = &resources;
-        prepareContext.sources = gpuSources.data();
-        prepareContext.sourceCount = instanceCount;
-        prepareContext.constants = &constants;
+        ParticleGpuLifecyclePass::DispatchContext lifecycleContext{};
+        lifecycleContext.device = device;
+        lifecycleContext.commandList = m_commandResources.graphicsList.Get();
+        lifecycleContext.rootSignature = m_pipelineState.singleSrvUavComputeRootSignature.Get();
+        lifecycleContext.pipeline = m_pipelineState.particleLifecycleCompute.get();
+        lifecycleContext.descriptorManager = m_services.descriptorManager.get();
+        lifecycleContext.resources = &resources;
+        lifecycleContext.emitters = gpuEmitters.data();
+        lifecycleContext.emitterCount = static_cast<UINT>(gpuEmitters.size());
+        lifecycleContext.particleCount = instanceCount;
+        lifecycleContext.constants = &constants;
 
-        const ParticleGpuPreparePass::PrepareResult prepareResult =
-            ParticleGpuPreparePass::Dispatch(prepareContext);
-        if (prepareResult.executed) {
+        const ParticleGpuLifecyclePass::DispatchResult lifecycleResult =
+            ParticleGpuLifecyclePass::Dispatch(lifecycleContext);
+        if (lifecycleResult.executed) {
             frame.frameGpuPrepared = true;
+            frame.frameGpuLifecycleDispatched = true;
             frame.frameGpuSimulationDispatched = true;
             frame.frameGpuSortDispatched = true;
-            frame.frameGpuDispatchGroups = prepareResult.dispatchGroups;
-            frame.frameUploadBytes = prepareResult.sourceBytes;
-            gpuPrepareSucceeded = true;
+            frame.frameGpuDispatchGroups = lifecycleResult.dispatchGroups;
+            frame.frameUploadBytes = lifecycleResult.uploadBytes;
+            gpuLifecycleSucceeded = true;
         }
     }
 
-    if (!gpuPrepareSucceeded) {
-        const HRESULT mapHr = resources.UploadInstances(fallbackInstances.data(), instanceCount, bufferSize);
-        if (FAILED(mapHr)) {
-            spdlog::warn("RenderParticles: failed to map instance buffer (hr=0x{:08X}); disabling particles for this run",
-                         static_cast<unsigned int>(mapHr));
-            // Map failures are one of the first places a hung device surfaces.
-            // Capture rich diagnostics so we can see which pass/frame triggered
-            // device removal.
-            CORTEX_REPORT_DEVICE_REMOVED("RenderParticles_MapInstanceBuffer", mapHr);
-            m_particleState.instanceMapFailed = true;
-            return;
-        }
-        frame.frameUploadBytes = bufferSize;
+    if (!gpuLifecycleSucceeded) {
+        spdlog::warn("RenderParticles: GPU lifecycle path unavailable; particles skipped for public path");
+        return;
     }
 
     // Persistent quad vertex buffer in an upload heap; tiny and self-contained.

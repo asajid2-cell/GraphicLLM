@@ -282,6 +282,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"public_runtime_path", contract.particles.publicRuntimePath},
             {"gpu_particle_public_path", contract.particles.gpuParticlePublicPath},
             {"cpu_simulation_path", contract.particles.cpuSimulationPath},
+            {"gpu_lifecycle_path", contract.particles.gpuLifecyclePath},
             {"gpu_simulation_path", contract.particles.gpuSimulationPath},
             {"gpu_sort_path", contract.particles.gpuSortPath},
             {"gpu_draw_path", contract.particles.gpuDrawPath},

@@ -402,12 +402,17 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.executed = m_particleState.frame.frameExecuted;
     contract.particles.publicRuntimePath = featurePlan.runParticles;
     contract.particles.gpuParticlePublicPath = m_particleState.frame.frameGpuPrepared;
-    contract.particles.cpuSimulationPath = featurePlan.runParticles;
+    contract.particles.cpuSimulationPath = featurePlan.runParticles && !m_particleState.frame.frameGpuLifecycleDispatched;
+    contract.particles.gpuLifecyclePath = m_particleState.frame.frameGpuLifecycleDispatched;
     contract.particles.gpuSimulationPath = m_particleState.frame.frameGpuSimulationDispatched;
     contract.particles.gpuSortPath = m_particleState.frame.frameGpuSortDispatched;
     contract.particles.gpuDrawPath = featurePlan.runParticles;
     contract.particles.simulationBudgetTracked = featurePlan.runParticles;
-    if (m_particleState.frame.frameGpuPrepared) {
+    if (m_particleState.frame.frameGpuLifecycleDispatched) {
+        contract.particles.runtimeBackend = "gpu_emitter_lifecycle_sort_dx12_instanced_billboard";
+        contract.particles.simulationBackend = "gpu_emitter_lifecycle_compute";
+        contract.particles.renderBackend = "gpu_sorted_dx12_instanced_billboard";
+    } else if (m_particleState.frame.frameGpuPrepared) {
         contract.particles.runtimeBackend = "ecs_cpu_lifecycle_gpu_prepare_sort_dx12_instanced_billboard";
         contract.particles.simulationBackend = "ecs_cpu_lifecycle_gpu_frame_prepare";
         contract.particles.renderBackend = "gpu_sorted_dx12_instanced_billboard";

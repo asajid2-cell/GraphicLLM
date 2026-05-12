@@ -170,6 +170,11 @@ const std::string& Renderer::GetParticleEffectPreset() const {
     return m_particleState.controls.effectPreset;
 }
 
+bool Renderer::UsesGpuParticleLifecycle() const {
+    return m_pipelineState.particleLifecycleCompute != nullptr &&
+           m_pipelineState.singleSrvUavComputeRootSignature != nullptr;
+}
+
 void Renderer::SetSSREnabled(bool enabled) {
     if (m_ssrResources.controls.enabled == enabled) {
         return;

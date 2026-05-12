@@ -142,7 +142,8 @@ if ($systems.ContainsKey("particles")) {
         $features[[string]$feature] = $true
     }
     foreach ($requiredParticleFeature in @(
-        "ecs_billboard_emitters",
+        "gpu_emitter_lifecycle_backend",
+        "gpu_lifecycle_frame_contract",
         "fire",
         "smoke",
         "dust_motes",
@@ -155,7 +156,6 @@ if ($systems.ContainsKey("particles")) {
         "frame_contract_stats",
         "runtime_backend_stats",
         "backend_stage_stats",
-        "cpu_simulation_backend",
         "gpu_particle_public_backend",
         "gpu_frame_prepare_backend",
         "gpu_depth_sort_backend",

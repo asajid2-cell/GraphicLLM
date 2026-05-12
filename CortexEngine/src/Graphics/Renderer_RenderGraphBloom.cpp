@@ -33,13 +33,7 @@ Renderer::ExecuteBloomInRenderGraph() {
     }
 
     bool stageFailed = false;
-    std::string stageError;
-    auto failStage = [&](const char* stage) {
-        if (!stageFailed) {
-            stageError = stage;
-        }
-        stageFailed = true;
-    };
+    const char* graphStageError = nullptr;
 
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
@@ -95,7 +89,8 @@ Renderer::ExecuteBloomInRenderGraph() {
     bloomContext.stageLevels = kBloomLevels;
     bloomContext.baseLevel = baseLevel;
     bloomContext.useTransients = useTransientBloom;
-    bloomContext.failStage = failStage;
+    bloomContext.status.failed = &stageFailed;
+    bloomContext.status.stage = &graphStageError;
     bloomContext.hdrResourceState = &m_mainTargets.hdr.resources.state;
     bloomContext.hdrShaderResourceState = kBloomGraphShaderResourceState;
     (void)BloomGraphPass::AddStandaloneBloom(*m_services.renderGraph, bloomContext);
@@ -108,7 +103,11 @@ Renderer::ExecuteBloomInRenderGraph() {
         result.fallbackReason = execResult.Error();
     } else if (stageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "bloom_graph_stage_failed: " + stageError;
+        result.fallbackReason = "bloom_graph_stage_failed";
+        if (graphStageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += graphStageError;
+        }
     } else {
         m_mainTargets.hdr.resources.state = m_services.renderGraph->GetResourceState(hdrHandle);
         const D3D12_RESOURCE_STATES combinedState = m_services.renderGraph->GetResourceState(bloomA[baseLevel]);

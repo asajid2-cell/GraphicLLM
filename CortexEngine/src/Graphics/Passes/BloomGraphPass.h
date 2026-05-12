@@ -6,10 +6,14 @@
 
 #include <array>
 #include <cstdint>
-#include <functional>
 #include <span>
 
 namespace Cortex::Graphics::BloomGraphPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct FusedBloomContext {
     RGResourceHandle hdr;
@@ -29,7 +33,7 @@ struct FusedBloomContext {
     bool useTransients = true;
     D3D12_RESOURCE_STATES* hdrResourceState = nullptr;
     D3D12_RESOURCE_STATES hdrShaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
     bool* bloomRan = nullptr;
     const bool* bloomStageFailed = nullptr;
 };
@@ -52,7 +56,7 @@ struct StandaloneBloomContext {
     bool useTransients = true;
     D3D12_RESOURCE_STATES* hdrResourceState = nullptr;
     D3D12_RESOURCE_STATES hdrShaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 [[nodiscard]] RGResourceHandle AddFusedBloom(RenderGraph& graph, const FusedBloomContext& context);

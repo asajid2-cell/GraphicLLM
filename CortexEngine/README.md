@@ -1,243 +1,167 @@
-# Project Cortex: Neural-Native Rendering Engine
+# Project Cortex
 
-Project Cortex is a real-time DirectX 12 renderer with integrated AI tooling.
-It is designed as a portfolio-quality engine that demonstrates:
+Project Cortex is a real-time DirectX 12 hybrid renderer. It combines a
+visibility-buffer raster path with ray-traced shadows, reflections, GI targets,
+temporal denoising, physically classified materials, image-based lighting,
+particles, cinematic post controls, and repeatable release validation.
 
-- Hybrid raster + ray tracing rendering on DX12
-- Physically based material and surface classification
-- Frame contracts, resource contracts, and repeatable smoke validation
-- Visibility-buffer rendering, GPU culling, TAA, SSAO, SSR, bloom, and IBL
-- RT shadows, reflections, GI targets, denoising, and signal-quality diagnostics
-- Phase 3 public showcase scenes, graphics presets, HUD modes, and renderer UI controls
-- Environment/IBL manifests with procedural fallback behavior
-- Advanced material, particle, lighting-rig, and cinematic-post release foundations
-- EnTT-based Entity Component System
-- Natural-language scene control via Llama.cpp
-- Asynchronous diffusion-based texture generation (TensorRT)
-- CUDA and DX12 interop for AI-generated content
+The project also includes optional LLM and diffusion-texture tooling, but the
+main artifact is the renderer: measurable frames, public showcase scenes,
+runtime contracts, and package checks that can be rebuilt and rerun locally.
 
----
+## Screenshots
+
+These captures were generated at 1920x1080 with the `public_high` graphics
+preset:
+
+| RT Showcase | Material Lab |
+|---|---|
+| ![RT Showcase](docs/media/rt_showcase_hero.png) | ![Material Lab](docs/media/material_lab_hero.png) |
+
+| Glass and Water | Effects Showcase |
+|---|---|
+| ![Glass and Water Courtyard](docs/media/glass_water_courtyard_hero.png) | ![Effects Showcase](docs/media/effects_showcase_hero.png) |
+
+| Outdoor Sunset Beach | IBL Gallery |
+|---|---|
+| ![Outdoor Sunset Beach](docs/media/outdoor_sunset_beach_hero.png) | ![IBL Gallery](docs/media/ibl_gallery_sweep.png) |
+
+The capture manifest is [docs/media/gallery_manifest.json](docs/media/gallery_manifest.json).
+Regenerate it with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -OutputDir CortexEngine/docs/media
+```
+
+## What It Shows
+
+- Hybrid DX12 rendering: visibility buffer, forward fallback, GPU culling,
+  HZB, TAA, SSAO, SSR, bloom, tone mapping, and debug views.
+- Ray tracing with contracts: scheduler intent, TLAS/material readiness,
+  reflection dispatch readiness, raw reflection signal, and denoised history
+  signal.
+- Material coverage: mirror, glass, water, brushed metal, emissive, wet,
+  anisotropic, clearcoat, transmission, sheen, and procedural-mask presets.
+- Environment/IBL policy: manifest-driven environments, budget classes,
+  runtime fallback behavior, and gallery validation.
+- Public scenes: RT Showcase, Material Lab, Glass and Water Courtyard,
+  Effects Showcase, Outdoor Sunset Beach, and IBL Gallery.
+- Release discipline: frame contracts, resource contracts, visual probes,
+  package manifest checks, staged package launch smoke, and repo hygiene gates.
+
+## Current Metrics
+
+Source run:
+`CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_132733_943_27296_0d962fbc`
+
+| Scene | GPU ms | Capture | Render scale | Avg luma | Nonblack | RT signal/history |
+|---|---:|---:|---:|---:|---:|---:|
+| RT Showcase | 4.53 | 1920x1080 | 1.00 | 70.34 | 1.000 | 0.0228 / 0.0295 |
+| Material Lab | 4.17 | 1920x1080 | 1.00 | 183.15 | 1.000 | 0.0214 / 0.0224 |
+| Glass and Water | 5.06 | 1920x1080 | 1.00 | 180.85 | 1.000 | 0.0392 / 0.0404 |
+| Effects Showcase | 4.75 | 1920x1080 | 1.00 | 110.52 | 1.000 | 0.0042 / 0.0042 |
+| Outdoor Sunset Beach | 3.38 | 1920x1080 | 1.00 | 169.95 | 1.000 | 0.0048 / 0.0048 |
+| IBL Gallery | 4.65 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
+
+Release validation also checks descriptor pressure, memory budgets, RT budget
+profiles, visual probes, and package launch behavior. See
+[RELEASE_READINESS.md](RELEASE_READINESS.md) for the current gate summary.
 
 ## Quick Start
 
-From the `CortexEngine` directory:
+From the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+powershell -ExecutionPolicy Bypass -File CortexEngine/setup.ps1
+powershell -ExecutionPolicy Bypass -File CortexEngine/run.ps1
+```
+
+From `CortexEngine`, the usual local run is:
+
+```powershell
 .\run.ps1
 ```
 
-`setup.ps1` installs dependencies, configures CMake, builds the engine, and verifies that
-the executable and shader assets are present.
+## Run Modes
 
-For more detail:
-- `SCRIPTS.md` documents all helper scripts.
-- `BUILD.md` contains manual build instructions.
-- `tools/README.md` documents repeatable renderer validation tools.
-- `RELEASE_READINESS.md` summarizes the current verified release gate.
+Default startup is meant to be robust on a wider range of machines. Public
+captures and validation use explicit presets so the output is reproducible.
 
----
+```powershell
+# Safe startup profile used by package launch smoke
+.\build\bin\CortexEngine.exe --scene temporal_validation --graphics-preset safe_startup --environment studio --no-llm --no-dreamer --no-launcher
 
-## Release Validation
+# Release showcase profile used by runtime gates
+.\build\bin\CortexEngine.exe --scene rt_showcase --camera-bookmark hero --graphics-preset release_showcase --environment studio --no-llm --no-dreamer --no-launcher
+
+# High-resolution public capture profile
+.\build\bin\CortexEngine.exe --scene rt_showcase --camera-bookmark hero --graphics-preset public_high --environment studio --window-width 1920 --window-height 1080 --no-llm --no-dreamer --no-launcher
+```
+
+## Validation
 
 Run the full local release gate from the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
-The gate builds Release, then runs the current public renderer suite:
+The gate rebuilds Release and runs renderer contracts, temporal/RT smokes,
+visual probes, graphics UI tests, material and IBL checks, effects checks,
+ownership audits, package manifest validation, staged package launch smoke,
+budget profiles, and repo hygiene.
 
-- temporal validation and full RT showcase smokes,
-- build entrypoint contract for the scripted CMake rebuild path,
-- repository hygiene checks for whitespace and generated artifacts,
-- source-list contract checks for CMake renderer split coverage,
-- render-graph boundary contract checks,
-- visibility-buffer transition-skip ownership checks,
-- debug primitive ownership contract checks,
-- editor frame path contract checks,
-- temporal camera-cut history invalidation smoke,
-- visibility-buffer debug view runtime checks,
-- render-graph transient alias/no-alias matrix,
-- graphics settings persistence, graphics UI contract/runtime interaction, HUD mode, material editor, and preset contracts,
-- LLM/Architect renderer-command runtime smoke,
-- public showcase scene, material lab, conductor-energy, vegetation-state, reflection-probe, glass/water courtyard, effects showcase, visual baseline, and screenshot negative checks,
-- visual probe validation across all public baseline cases,
-- Phase 3 visual matrix, IBL gallery, and fallback matrix validation,
-- descriptor/memory stress scene for the historical persistent-descriptor budget,
-- renderer ownership/full ownership audit, fatal error, environment manifest, advanced graphics catalog, and effects gallery contracts,
-- particle-disabled zero-cost and RT reflection firefly/outlier gates,
-- release package manifest/contract checks and staged launch smoke for the public-review payload,
-- RT budget profile matrix and voxel backend smoke.
-
-Use `-NoBuild` only when `build/bin/CortexEngine.exe` is already current.
-Each step writes isolated logs under `build/bin/logs/runs`.
-
-To validate just the public-review package manifest and staged package launch
-against an existing Release build, run:
+Useful focused gates:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_contract_tests.ps1 -NoBuild
-powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_launch_smoke.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_visual_probe_validation.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_phase3_visual_matrix.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_contract_tests.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_launch_smoke.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_readme_contract_tests.ps1
 ```
 
----
+## Architecture
 
-## High-Level Architecture
+- `src/Core`: engine loop, startup preflight, windowing, camera automation,
+  frame reports, and release diagnostics.
+- `src/Graphics`: DX12 renderer, RHI, render graph passes, RT scheduling,
+  material resolution, environment/IBL, particles, post processing, and
+  frame/resource contracts.
+- `src/Scene`: EnTT-based scene registry and components.
+- `src/UI`: native graphics controls, material controls, performance views,
+  and editor-facing tools.
+- `src/AI`: optional LLM scene commands and optional diffusion texture
+  generation paths.
+- `tools`: repeatable build, validation, screenshot, package, and release
+  readiness scripts.
 
-### Core subsystems
+## Packaging
 
-- **Core**
-  - `Engine` - main loop, frame timing, and orchestration.
-  - `Window` - SDL3 windowing, input, and DX12 swapchain creation.
-  - `ServiceLocator` - central registry for engine-wide services.
+The public-review payload is manifest-driven by
+`assets/config/release_package_manifest.json`.
 
-- **Graphics**
-  - DirectX 12 RHI (`DX12Device`, `DX12CommandQueue`, `DX12Texture`,
-    `DX12Pipeline`, `DescriptorHeap`).
-  - `Renderer` - orchestrates explicit state/service aggregates for frame
-    planning, diagnostics, RT, pass resources, texture admission, command
-    resources, and presentation.
-  - Render graph infrastructure for HZB, shadows, visibility buffer, temporal
-    passes, SSAO, SSR, bloom, and end-frame composition.
-  - Frame/resource contracts that record pass reads/writes, budgets, histories,
-    material parity, RT scheduling, descriptor pressure, and visual metrics.
-  - HLSL shaders in `assets/shaders` for PBR, visibility-buffer lighting, RT
-    composition, SSAO, SSR, TAA, post-process, motion vectors, and debug views.
-
-- **Scene**
-  - EnTT-based `ECS_Registry` and component set:
-    `TransformComponent`, `RenderableComponent`, `CameraComponent`,
-    `LightComponent`, tagging and utility components.
-
-- **AI / LLM**
-  - `LLMService` - wraps Llama.cpp and runs on a background thread.
-  - `CommandQueue` and `SceneCommands` - parse JSON commands from the model
-    and apply them to the ECS (spawn entities, adjust lights, change materials).
-  - `RegressionTests` - automated command sequences for validation.
-
-- **AI / Vision (Diffusion)**
-  - `DiffusionEngine` - TensorRT or CPU stub for SDXL-Turbo.
-  - `DreamerService` - asynchronous texture generation and hand-off into GPU textures.
-
----
-
-## Render Pipeline Overview
-
-The default real-time path combines explicit frame planning, raster passes, and
-optional RT work:
-
-1. Builds a scene snapshot and renderer budget plan.
-2. Updates frame, lighting, temporal, and post-process constants.
-3. Runs depth, shadow, motion-vector, HZB, and visibility-buffer work.
-4. Runs GPU culling and indirect draw setup where enabled.
-5. Executes material resolve and deferred/forward lighting.
-6. Schedules RT shadows, reflections, and GI based on budget and readiness.
-7. Denoises RT outputs and records raw/history reflection signal quality.
-8. Runs temporal rejection, TAA, SSAO, SSR, bloom, tone mapping, and debug views.
-9. Exports a frame contract and presents the final swapchain image.
-
-Image-based lighting (IBL) uses:
-- Diffuse irradiance from low-frequency environment maps.
-- Specular reflections from roughness-controlled mips of the environment.
-
-The RT showcase scene is the main renderer validation target. Its smoke test
-fails if reflections are scheduled but missing required inputs, if RT material
-parity breaks, if raw/history reflection signal becomes empty, if visual metrics
-fall outside budget, or if descriptor/memory limits regress.
-
----
-
-## Directory Structure (CortexEngine/)
-
-```text
-assets/             # Shaders and sample textures (large HDR/EXR IBL assets are git-ignored)
-  shaders/
-
-models/             # LLM and diffusion models (gguf, TensorRT engines; git-ignored)
-
-src/
-  Core/             # Engine, Window, ServiceLocator
-  Graphics/         # Renderer, RHI, shaders, post-processing
-    RHI/            # DX12 device, command queue, pipeline, texture, descriptor heap
-  AI/
-    LLM/            # LLMService, CommandQueue, SceneCommands, RegressionTests
-    Vision/         # DiffusionEngine, DreamerService
-  Scene/            # ECS_Registry and components
-  UI/               # Debug HUD and prompt/console UI
-  Utils/            # FileUtils, MeshGenerator, Result<T>, GLTF loader
-
-vendor/             # Third-party libraries (llama.cpp, stb, TinyEXR, etc.)
-build/              # CMake build directory (git-ignored)
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_create_release_package.ps1 -NoBuild
 ```
 
----
+The package scripts exclude local models, logs, build caches, debug artifacts,
+and source HDR/EXR environment files. The staged package launch smoke copies the
+selected runtime payload to an isolated directory and launches it from there.
 
-## Building Manually
+## Limitations
 
-### Prerequisites
-
-- Windows 10/11 with Windows SDK
-- Visual Studio 2022 (or newer) with C++ desktop workload
-- CMake 3.20 or later
-- vcpkg for dependency management
-
-### Dependencies (via vcpkg)
-
-- SDL3 - windowing and input
-- EnTT - ECS
-- GLM - math
-- spdlog - logging
-- nlohmann-json - JSON parsing
-- DirectX-Headers - DX12 headers
-- DirectXTK12 - helper utilities for DX12
-
-### Example build commands
-
-```bat
-set VCPKG_ROOT=C:\path\to\vcpkg
-
-cmake -B build -S . ^
-  -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
-
-cmake --build build --config Release
-
-build\bin\Release\CortexEngine.exe
-```
-
----
-
-## Phase Roadmap (Abbreviated)
-
-- **Phase 1 - Iron Foundation**
-  - Bring up DX12 renderer, ECS, and PBR shading on a spinning test mesh.
-
-- **Phase 2 - Renderer Architecture and Contracts**
-  - Stabilize the renderer around measurement-first contracts, explicit pass
-    state, resource/budget validation, RT scheduling, temporal validation, and
-    repeatable showcase gates.
-
-- **Phase 3 - Public Renderer Surface**
-  - Validate the public graphics control surface, environment/IBL policy,
-    polished showcase scenes, material editor checks, clean HUD modes, advanced
-    material/effects foundations, and pass-owned renderer state boundaries.
-
-- **Architect / LLM Control**
-  - Integrate Llama.cpp, define a constrained JSON command format, and drive
-    the scene from natural-language prompts without blocking the render loop.
-
-- **Dream Pipeline**
-  - Integrate SDXL-Turbo via TensorRT, generate textures asynchronously,
-    and stream them into the renderer without stalling the frame.
-
-Current active polish is post-release hardening: keep validation reproducible,
-avoid reintroducing loose renderer ownership, and grow future effects only
-behind the same preset, budget, frame-contract, and visual-validation gates.
-
----
+- Validation numbers are hardware dependent. The current local evidence was
+  produced on a Windows/DX12 machine with an NVIDIA RTX 3070 Ti.
+- The LLM and Dreamer texture paths are optional. Most renderer gates run with
+  `--no-llm --no-dreamer`.
+- The voxel backend is experimental and smoke-tested; it is not the main
+  renderer path.
+- Materials, effects, and cinematic post are validated as public foundations,
+  but further parity matrices and stress scenes are tracked in
+  `docs/MATERIALS_GRAPHICS_ROBUSTNESS_LEDGER.md`.
 
 ## License and Usage
 
-Project Cortex is a learning and research project.
-Please review the licenses of the bundled third-party libraries and models
-(llama.cpp, SDXL-Turbo, etc.) before using it in commercial contexts.
+Project Cortex is a learning and research project. Review the licenses of
+third-party libraries and models before using it commercially.

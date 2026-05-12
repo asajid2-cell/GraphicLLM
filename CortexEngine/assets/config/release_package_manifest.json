@@ -8,7 +8,15 @@
     "BUILD.md",
     "SCRIPTS.md",
     "RELEASE_READINESS.md",
-    "tools/README.md"
+    "tools/README.md",
+    "docs/RELEASE_CLEANUP_COMPLETION_LEDGER.md",
+    "docs/media/gallery_manifest.json",
+    "docs/media/rt_showcase_hero.png",
+    "docs/media/material_lab_hero.png",
+    "docs/media/glass_water_courtyard_hero.png",
+    "docs/media/effects_showcase_hero.png",
+    "docs/media/outdoor_sunset_beach_hero.png",
+    "docs/media/ibl_gallery_sweep.png"
   ],
   "required_source_files": [
     "assets/config/release_package_manifest.json"

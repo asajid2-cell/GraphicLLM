@@ -73,6 +73,76 @@
       }
     },
     {
+      "id": "public_high",
+      "display_name": "Public High",
+      "quality": {
+        "render_scale": 1.0,
+        "taa": true,
+        "fxaa": true,
+        "gpu_culling": true
+      },
+      "environment": {
+        "environment_id": "studio",
+        "ibl_enabled": true,
+        "diffuse_intensity": 1.05,
+        "specular_intensity": 0.78,
+        "background_visible": true,
+        "background_exposure": 1.0,
+        "background_blur": 0.0
+      },
+      "lighting": {
+        "exposure": 1.12,
+        "bloom_intensity": 0.12,
+        "sun_intensity": 6.0,
+        "god_ray_intensity": 0.42
+      },
+      "screen_space": {
+        "ssao": true,
+        "ssao_radius": 0.2,
+        "ssao_bias": 0.04,
+        "ssao_intensity": 0.22,
+        "ssr": true
+      },
+      "ray_tracing": {
+        "enabled": true,
+        "reflections": true,
+        "gi": true,
+        "gi_strength": 0.10,
+        "gi_ray_distance": 5.0
+      },
+      "atmosphere": {
+        "fog": true,
+        "fog_density": 0.012,
+        "fog_start_distance": 8.0,
+        "fog_height": 0.0,
+        "fog_falloff": 0.55
+      },
+      "particles": {
+        "enabled": true,
+        "density": 1.0,
+        "quality": "balanced",
+        "bloom_contribution": 1.1,
+        "soft_depth_fade": 0.45,
+        "wind_influence": 0.25,
+        "effect_preset": "gallery_mix"
+      },
+      "cinematic_post": {
+        "enabled": true,
+        "preset": "clean_filmic",
+        "tone_mapper_preset": "aces",
+        "bloom_threshold": 1.0,
+        "bloom_soft_knee": 0.5,
+        "vignette": 0.12,
+        "lens_dirt": 0.18,
+        "motion_blur_enabled": true,
+        "depth_of_field_enabled": true,
+        "motion_blur": 0.08,
+        "depth_of_field": 0.12,
+        "dof_focus_distance": 18.0,
+        "dof_aperture": 2.2
+      }
+    },
+    {
       "id": "safe_startup",
       "display_name": "Safe Startup",
       "quality": {

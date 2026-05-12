@@ -401,21 +401,27 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.planned = featurePlan.runParticles;
     contract.particles.executed = m_particleState.frame.frameExecuted;
     contract.particles.publicRuntimePath = featurePlan.runParticles;
-    contract.particles.gpuParticlePublicPath = false;
+    contract.particles.gpuParticlePublicPath = m_particleState.frame.frameGpuPrepared;
     contract.particles.cpuSimulationPath = featurePlan.runParticles;
-    contract.particles.gpuSimulationPath = false;
-    contract.particles.gpuSortPath = false;
+    contract.particles.gpuSimulationPath = m_particleState.frame.frameGpuSimulationDispatched;
+    contract.particles.gpuSortPath = m_particleState.frame.frameGpuSortDispatched;
     contract.particles.gpuDrawPath = featurePlan.runParticles;
     contract.particles.simulationBudgetTracked = featurePlan.runParticles;
-    contract.particles.runtimeBackend = featurePlan.runParticles
-        ? "ecs_cpu_sim_dx12_instanced_billboard"
-        : (m_particleState.controls.enabledForScene ? "ecs_cpu_sim_idle" : "disabled");
-    contract.particles.simulationBackend = featurePlan.runParticles
-        ? "ecs_cpu"
-        : (m_particleState.controls.enabledForScene ? "ecs_cpu_idle" : "disabled");
-    contract.particles.renderBackend = featurePlan.runParticles
-        ? "dx12_instanced_billboard"
-        : (m_particleState.controls.enabledForScene ? "dx12_instanced_billboard_idle" : "disabled");
+    if (m_particleState.frame.frameGpuPrepared) {
+        contract.particles.runtimeBackend = "ecs_cpu_lifecycle_gpu_prepare_sort_dx12_instanced_billboard";
+        contract.particles.simulationBackend = "ecs_cpu_lifecycle_gpu_frame_prepare";
+        contract.particles.renderBackend = "gpu_sorted_dx12_instanced_billboard";
+    } else {
+        contract.particles.runtimeBackend = featurePlan.runParticles
+            ? "ecs_cpu_sim_dx12_instanced_billboard"
+            : (m_particleState.controls.enabledForScene ? "ecs_cpu_sim_idle" : "disabled");
+        contract.particles.simulationBackend = featurePlan.runParticles
+            ? "ecs_cpu"
+            : (m_particleState.controls.enabledForScene ? "ecs_cpu_idle" : "disabled");
+        contract.particles.renderBackend = featurePlan.runParticles
+            ? "dx12_instanced_billboard"
+            : (m_particleState.controls.enabledForScene ? "dx12_instanced_billboard_idle" : "disabled");
+    }
     contract.particles.instanceMapFailed = m_particleState.instanceMapFailed;
     contract.particles.capped = m_particleState.frame.frameCapped;
     contract.particles.densityScale = m_particleState.controls.densityScale;
@@ -437,7 +443,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.particles.simulationBudgetBytes =
         static_cast<uint64_t>(m_particleState.frame.frameMaxInstances) * sizeof(ParticleInstance);
     contract.particles.uploadBytesThisFrame =
-        static_cast<uint64_t>(m_particleState.frame.frameSubmittedInstances) * sizeof(ParticleInstance);
+        m_particleState.frame.frameUploadBytes;
 
     contract.water.levelY = m_waterState.levelY;
     contract.water.waveAmplitude = m_waterState.waveAmplitude;

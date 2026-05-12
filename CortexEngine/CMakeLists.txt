@@ -157,6 +157,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/MotionVectorTargetPass.cpp
     src/Graphics/Passes/MotionVectorPass.cpp
     src/Graphics/Passes/ParticleBillboardPass.cpp
+    src/Graphics/Passes/ParticleGpuPreparePass.cpp
     src/Graphics/Passes/PostProcessGraphPass.cpp
     src/Graphics/Passes/PostProcessTargetPass.cpp
     src/Graphics/Passes/PostProcessPass.cpp

@@ -536,11 +536,11 @@
       "id": "particle_resources",
       "owner": "Particles",
       "status": "release_boundary_validated",
-      "release_boundary": "ECS CPU-simulated particles with DX12-instanced billboard rendering are the public Phase 3 path, with controls/resources/frame stats split into pass-owned bundles. ParticleRenderResources owns instance/quad buffer allocation, upload, and vertex-buffer view creation; ParticleBillboardPass owns render-target barriers, pipeline binding, and draw submission; renderer ownership tests reject moving that GPU resource/draw work back into Renderer_Particles.cpp. Backend-stage frame-contract stats and effects showcase validation keep GPUParticleSystem non-public until GPU simulation/sort/render are runtime-validated",
+      "release_boundary": "ECS-owned particle lifecycle with GPU frame preparation, GPU depth ordering, and DX12-instanced billboard rendering is the public Phase 3 path, with controls/resources/frame stats split into pass-owned bundles. ParticleRenderResources owns instance/source/quad buffer allocation, upload, constant-buffer slices, and vertex-buffer view creation; ParticleGpuPreparePass owns compute descriptors, barriers, pipeline binding, and dispatch; ParticleBillboardPass owns render-target barriers, pipeline binding, and draw submission; renderer ownership tests reject moving that GPU resource/draw work back into Renderer_Particles.cpp.",
       "validated_contracts": ["effects_gallery", "phase3_visual_matrix", "renderer_ownership"],
-      "target_files": ["RendererParticleState.h", "Renderer_Particles.cpp", "Passes/ParticleBillboardPass.h", "GPUParticles.h"],
+      "target_files": ["RendererParticleState.h", "Renderer_Particles.cpp", "Passes/ParticleBillboardPass.h", "Passes/ParticleGpuPreparePass.h", "GPUParticles.h"],
       "renderer_state_members": ["m_particleState"],
-      "future_extension": "Keep GPU particle migration explicit and separate from the public billboard contract until it has equivalent budget and visual validation"
+      "future_extension": "A fully GPU-resident emitter lifecycle remains a separate implementation step; keep future GPU spawn/compaction work pass-owned and runtime-validated before changing contract claims."
     },
     {
       "id": "debug_line_resources",
@@ -558,7 +558,7 @@
       "status": "release_boundary_validated",
       "release_boundary": "Renderer_*.cpp files may choose policy, prepare frame data, and delegate to services/pass helpers, but direct D3D12 resource/view allocation, descriptor allocation, Map/Unmap, resource barriers, target binding, pipeline/root binding, viewport/scissor setup, and draw/indirect submission are release-forbidden at the renderer boundary",
       "validated_contracts": ["renderer_ownership"],
-      "target_files": ["Renderer_RenderOrchestration.cpp", "Passes/DescriptorTable.cpp", "Passes/ReadbackBuffer.cpp", "Passes/MeshDrawPass.cpp", "Passes/ParticleBillboardPass.cpp", "Passes/MainPassTargetPass.cpp", "Passes/PostProcessTargetPass.cpp", "Passes/BackBufferPresentPass.cpp"],
+      "target_files": ["Renderer_RenderOrchestration.cpp", "Passes/DescriptorTable.cpp", "Passes/ReadbackBuffer.cpp", "Passes/MeshDrawPass.cpp", "Passes/ParticleBillboardPass.cpp", "Passes/ParticleGpuPreparePass.cpp", "Passes/MainPassTargetPass.cpp", "Passes/PostProcessTargetPass.cpp", "Passes/BackBufferPresentPass.cpp"],
       "renderer_state_members": ["m_commandResources", "m_services"],
       "future_extension": "If a future renderer module needs low-level GPU mechanics, introduce or extend a pass/state/service helper and add that helper to this boundary instead of adding the mechanics to Renderer_*.cpp"
     }

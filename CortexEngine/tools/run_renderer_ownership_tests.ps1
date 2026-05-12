@@ -70,6 +70,11 @@ if (-not (Test-Path $particlePassPath)) {
     throw "ParticleBillboardPass.cpp not found: $particlePassPath"
 }
 $particlePass = Get-Content $particlePassPath -Raw
+$particleGpuPreparePassPath = Join-Path $root "src/Graphics/Passes/ParticleGpuPreparePass.cpp"
+if (-not (Test-Path $particleGpuPreparePassPath)) {
+    throw "ParticleGpuPreparePass.cpp not found: $particleGpuPreparePassPath"
+}
+$particleGpuPreparePass = Get-Content $particleGpuPreparePassPath -Raw
 $debugLineStatePath = Join-Path $root "src/Graphics/RendererDebugLineState.h"
 $debugLineRendererPath = Join-Path $root "src/Graphics/Renderer_DebugLines.cpp"
 $debugLinePassPath = Join-Path $root "src/Graphics/Passes/DebugLinePass.cpp"
@@ -588,6 +593,11 @@ foreach ($target in $doc.targets) {
         foreach ($passMarker in @("namespace Cortex::Graphics::ParticleBillboardPass", "TargetBindings", "DrawContext", "ResourceBarrier", "OMSetRenderTargets", "DrawInstanced")) {
             if ($particlePass.IndexOf($passMarker, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "particle_resources missing ParticleBillboardPass marker: $passMarker"
+            }
+        }
+        foreach ($prepareMarker in @("namespace Cortex::Graphics::ParticleGpuPreparePass", "PrepareContext", "CreateShaderResourceView", "CreateUnorderedAccessView", "SetComputeRootSignature", "Dispatch")) {
+            if ($particleGpuPreparePass.IndexOf($prepareMarker, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "particle_resources missing ParticleGpuPreparePass marker: $prepareMarker"
             }
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {
@@ -2159,6 +2169,7 @@ foreach ($target in $doc.targets) {
             "Passes/ReadbackBuffer.cpp",
             "Passes/MeshDrawPass.cpp",
             "Passes/ParticleBillboardPass.cpp",
+            "Passes/ParticleGpuPreparePass.cpp",
             "Passes/MainPassTargetPass.cpp",
             "Passes/PostProcessTargetPass.cpp",
             "Passes/BackBufferPresentPass.cpp"

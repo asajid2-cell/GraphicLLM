@@ -202,6 +202,11 @@ Result<void> Renderer::CreateGeometryPipelineStates(const RendererCompiledShader
     if (particlePsResult.IsErr()) {
         spdlog::warn("Failed to compile particle pixel shader: {}", particlePsResult.Error());
     }
+    auto particlePrepareCsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/ParticleInstancePrepare.hlsl", "CSMain", "cs_5_1");
+    if (particlePrepareCsResult.IsErr()) {
+        spdlog::warn("Failed to compile particle GPU prepare compute shader: {}", particlePrepareCsResult.Error());
+    }
 
     if (particleVsResult.IsOk() && particlePsResult.IsOk()) {
         m_pipelineState.particle = std::make_unique<DX12Pipeline>();
@@ -262,6 +267,21 @@ Result<void> Renderer::CreateGeometryPipelineStates(const RendererCompiledShader
             spdlog::warn("Failed to create particle pipeline: {}", particlePipelineResult.Error());
             m_pipelineState.particle.reset();
         }
+    }
+
+    if (particlePrepareCsResult.IsOk() && m_pipelineState.singleSrvUavComputeRootSignature) {
+        m_pipelineState.particlePrepareCompute = std::make_unique<DX12ComputePipeline>();
+        auto preparePipelineResult = m_pipelineState.particlePrepareCompute->Initialize(
+            m_services.device->GetDevice(),
+            m_pipelineState.singleSrvUavComputeRootSignature.Get(),
+            particlePrepareCsResult.Value());
+        if (preparePipelineResult.IsErr()) {
+            spdlog::warn("Failed to create particle GPU prepare compute pipeline: {}",
+                         preparePipelineResult.Error());
+            m_pipelineState.particlePrepareCompute.reset();
+        }
+    } else {
+        m_pipelineState.particlePrepareCompute.reset();
     }
 
     if (shaders.skyboxVS && shaders.skyboxPS) {

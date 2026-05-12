@@ -3,7 +3,9 @@ param()
 $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $root "..")
 $readmePath = Join-Path $root "README.md"
+$repoReadmePath = Join-Path $repoRoot "README.md"
 $releasePath = Join-Path $root "RELEASE_READINESS.md"
 $manifestPath = Join-Path $root "docs/media/gallery_manifest.json"
 $packageManifestPath = Join-Path $root "assets/config/release_package_manifest.json"
@@ -20,11 +22,13 @@ function Require-Contains([string]$Name, [string]$Text, [string]$Needle) {
 }
 
 if (-not (Test-Path $readmePath)) { throw "README missing: $readmePath" }
+if (-not (Test-Path $repoReadmePath)) { throw "Repository README missing: $repoReadmePath" }
 if (-not (Test-Path $releasePath)) { throw "RELEASE_READINESS missing: $releasePath" }
 if (-not (Test-Path $manifestPath)) { Add-Failure "Gallery manifest missing: $manifestPath" }
 if (-not (Test-Path $packageManifestPath)) { throw "Package manifest missing: $packageManifestPath" }
 
 $readme = Get-Content $readmePath -Raw
+$repoReadme = Get-Content $repoReadmePath -Raw
 $release = Get-Content $releasePath -Raw
 $packageManifest = Get-Content $packageManifestPath -Raw | ConvertFrom-Json
 
@@ -39,6 +43,7 @@ foreach ($section in @(
     "## Limitations"
 )) {
     Require-Contains "README.md" $readme $section
+    Require-Contains "repository README.md" $repoReadme $section
 }
 
 foreach ($token in @(
@@ -55,6 +60,18 @@ foreach ($token in @(
     Require-Contains "README.md" $readme $token
 }
 
+foreach ($token in @(
+    "real-time DirectX 12 hybrid renderer",
+    "CortexEngine/docs/media/rt_showcase_hero.png",
+    "CortexEngine/docs/media/gallery_manifest.json",
+    "run_public_capture_gallery.ps1",
+    "run_release_validation.ps1",
+    "public_high",
+    "release_showcase"
+)) {
+    Require-Contains "repository README.md" $repoReadme $token
+}
+
 foreach ($banned in @(
     "Neural-Native",
     "portfolio-quality",
@@ -64,6 +81,9 @@ foreach ($banned in @(
 )) {
     if ($readme.IndexOf($banned, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
         Add-Failure "README.md still contains banned public wording '$banned'"
+    }
+    if ($repoReadme.IndexOf($banned, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        Add-Failure "repository README.md still contains banned public wording '$banned'"
     }
 }
 
@@ -86,6 +106,7 @@ if (Test-Path $manifestPath) {
             Add-Failure "gallery image missing: $image"
         }
         Require-Contains "README.md" $readme $image
+        Require-Contains "repository README.md" $repoReadme ("CortexEngine/" + $image)
         if ([int]$entry.capture_width -lt 1600 -or [int]$entry.capture_height -lt 900) {
             Add-Failure "gallery image '$image' is not high resolution: $($entry.capture_width)x$($entry.capture_height)"
         }

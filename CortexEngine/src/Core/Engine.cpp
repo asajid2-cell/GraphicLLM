@@ -141,6 +141,22 @@ namespace {
         return static_cast<uint64_t>(parsed);
     }
 
+    std::optional<float> ReadOptionalEnvFloat(const char* name) {
+        const char* raw = std::getenv(name);
+        if (!raw || *raw == '\0') {
+            return std::nullopt;
+        }
+
+        char* end = nullptr;
+        const float parsed = std::strtof(raw, &end);
+        if (end == raw || (end && *end != '\0') || !std::isfinite(parsed)) {
+            spdlog::warn("Ignoring invalid {} value '{}'; expected a finite float", name, raw);
+            return std::nullopt;
+        }
+
+        return parsed;
+    }
+
     bool InitialPresetUsesRTShowcase(const std::string& preset) {
         if (preset.empty()) {
             return true;
@@ -445,6 +461,20 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
             spdlog::info("Smoke automation: camera cut at frame {} to bookmark '{}'",
                          static_cast<unsigned long long>(m_cameraCutAutomationFrame),
                          m_cameraCutAutomationBookmark);
+        }
+    }
+    if (const auto motionFrames = ReadOptionalEnvUInt64("CORTEX_CAMERA_MOTION_FRAMES")) {
+        if (*motionFrames > 0) {
+            m_cameraMotionAutomationEnabled = true;
+            m_cameraMotionAutomationFrames = *motionFrames;
+            m_cameraMotionSideAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_SIDE_AMPLITUDE").value_or(0.85f);
+            m_cameraMotionForwardAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_FORWARD_AMPLITUDE").value_or(0.55f);
+            m_cameraMotionLookAmplitude = ReadOptionalEnvFloat("CORTEX_CAMERA_MOTION_LOOK_AMPLITUDE").value_or(0.35f);
+            spdlog::info("Smoke automation: camera motion frames={} side={} forward={} look={}",
+                         static_cast<unsigned long long>(m_cameraMotionAutomationFrames),
+                         m_cameraMotionSideAmplitude,
+                         m_cameraMotionForwardAmplitude,
+                         m_cameraMotionLookAmplitude);
         }
     }
     if (m_maxFrames > 0 || m_exitAfterVisualValidationCapture || m_simulateDeviceRemovedFrame > 0) {
@@ -1412,6 +1442,7 @@ void Engine::Update(float deltaTime) {
     // Update active camera (fly controls) and optional auto-demo orbit
     UpdateCameraController(deltaTime);
     UpdateAutoDemo(deltaTime);
+    UpdateCameraMotionAutomation(deltaTime);
 
     // Update play mode (terrain collision, interaction) if active
     UpdatePlayMode(deltaTime);
@@ -1954,7 +1985,16 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         {"max_frames", m_maxFrames},
         {"simulate_device_removed_frame", m_simulateDeviceRemovedFrame},
         {"total_frames", m_totalFrameCount},
-        {"exit_after_visual_validation_capture", m_exitAfterVisualValidationCapture}
+        {"exit_after_visual_validation_capture", m_exitAfterVisualValidationCapture},
+        {"camera_motion", {
+            {"enabled", m_cameraMotionAutomationEnabled},
+            {"initialized", m_cameraMotionAutomationInitialized},
+            {"applied", m_cameraMotionAutomationApplied},
+            {"frames", m_cameraMotionAutomationFrames},
+            {"side_amplitude", m_cameraMotionSideAmplitude},
+            {"forward_amplitude", m_cameraMotionForwardAmplitude},
+            {"look_amplitude", m_cameraMotionLookAmplitude}
+        }}
     };
     const bool hudVisible = m_hudMode != EngineHudMode::Off;
     const bool settingsOverlayOpen = m_settingsOverlayVisible;

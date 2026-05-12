@@ -259,9 +259,20 @@ private:
     uint64_t m_maxFrames = 0;
     uint64_t m_simulateDeviceRemovedFrame = 0;
     uint64_t m_cameraCutAutomationFrame = 0;
+    uint64_t m_cameraMotionAutomationFrames = 0;
     bool m_exitAfterVisualValidationCapture = false;
     bool m_cameraCutAutomationApplied = false;
     std::string m_cameraCutAutomationBookmark;
+    bool m_cameraMotionAutomationEnabled = false;
+    bool m_cameraMotionAutomationInitialized = false;
+    bool m_cameraMotionAutomationApplied = false;
+    float m_cameraMotionSideAmplitude = 0.0f;
+    float m_cameraMotionForwardAmplitude = 0.0f;
+    float m_cameraMotionLookAmplitude = 0.0f;
+    glm::vec3 m_cameraMotionBasePosition{0.0f};
+    glm::vec3 m_cameraMotionBaseForward{0.0f, 0.0f, 1.0f};
+    glm::vec3 m_cameraMotionBaseRight{1.0f, 0.0f, 0.0f};
+    glm::vec3 m_cameraMotionBaseUp{0.0f, 1.0f, 0.0f};
     bool m_startupArchitectCommandSubmitted = false;
     std::string m_startupArchitectCommandJson;
 
@@ -279,6 +290,7 @@ private:
 
     // Camera control state
     void ShowCameraHelpOverlay();
+    void UpdateCameraMotionAutomation(float deltaTime);
 
     bool m_cameraControlActive = false;
     bool m_cameraControllerInitialized = false;

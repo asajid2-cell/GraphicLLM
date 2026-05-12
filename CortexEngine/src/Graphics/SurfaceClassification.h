@@ -39,12 +39,26 @@ enum class SurfaceClass : uint32_t {
     return material.materialType > expectedType - 0.5f && material.materialType < expectedType + 0.5f;
 }
 
+[[nodiscard]] inline bool SurfacePresetIsLiquid(const MaterialModel& material) {
+    return SurfacePresetContains(material, "water") ||
+           SurfacePresetContains(material, "lava") ||
+           SurfacePresetContains(material, "honey") ||
+           SurfacePresetContains(material, "molasses");
+}
+
+[[nodiscard]] inline bool SurfacePresetIsLiquid(const Scene::RenderableComponent& renderable) {
+    return SurfacePresetContains(renderable, "water") ||
+           SurfacePresetContains(renderable, "lava") ||
+           SurfacePresetContains(renderable, "honey") ||
+           SurfacePresetContains(renderable, "molasses");
+}
+
 [[nodiscard]] inline SurfaceClass ClassifySurface(const MaterialModel& material) {
     const float emissiveLuminance =
         glm::dot(material.emissiveColor, glm::vec3(0.2126f, 0.7152f, 0.0722f)) *
         std::max(material.emissiveStrength, 0.0f);
 
-    if (SurfacePresetContains(material, "water")) {
+    if (SurfacePresetIsLiquid(material)) {
         return SurfaceClass::Water;
     }
     if (material.transmissionFactor > 0.01f ||
@@ -91,7 +105,7 @@ enum class SurfaceClass : uint32_t {
 }
 
 [[nodiscard]] inline SurfaceClass ClassifySurface(const Scene::RenderableComponent& renderable) {
-    if (SurfacePresetContains(renderable, "water")) {
+    if (SurfacePresetIsLiquid(renderable)) {
         return SurfaceClass::Water;
     }
     if (renderable.transmissionFactor > 0.01f || SurfacePresetContains(renderable, "glass")) {

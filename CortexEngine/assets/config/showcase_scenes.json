@@ -172,6 +172,43 @@
       "polish_gaps": []
     },
     {
+      "id": "liquid_gallery",
+      "display_name": "Liquid Gallery",
+      "current_status": "public_showcase_validated",
+      "target_status": "public_showcase_validated",
+      "default_environment": "warm_gallery",
+      "default_lighting_rig": "liquid_gallery",
+      "required_bookmarks": ["hero", "water_lava", "viscous_pair"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Liquid material hero",
+          "position": [0.0, 2.65, -10.2],
+          "target": [0.0, 0.65, 0.0],
+          "fov": 54.0,
+          "validation": true
+        },
+        {
+          "id": "water_lava",
+          "label": "Water and lava response",
+          "position": [-1.2, 1.55, -5.0],
+          "target": [-1.4, 0.38, -1.15],
+          "fov": 43.0,
+          "validation": false
+        },
+        {
+          "id": "viscous_pair",
+          "label": "Honey and molasses closeup",
+          "position": [-1.1, 1.45, -1.4],
+          "target": [-1.4, 0.40, 2.25],
+          "fov": 42.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["water", "lava", "honey", "molasses", "emissive_liquid", "viscous_liquid"],
+      "polish_gaps": []
+    },
+    {
       "id": "effects_showcase",
       "display_name": "Effects Showcase",
       "current_status": "public_showcase_validated",

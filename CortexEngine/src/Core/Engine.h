@@ -76,6 +76,7 @@ struct EngineConfig {
     // default (currently the RT showcase gallery). Accepted values include
     // "dragon", "rt_showcase", "ibl_gallery", "material_lab",
     // "material_gallery", "glass_water_courtyard", "outdoor_sunset_beach",
+    // "liquid_gallery",
     // "effects_showcase", "temporal_validation", and "cornell".
     std::string initialScenePreset;
     std::string initialEnvironmentPreset;
@@ -164,6 +165,7 @@ private:
         GlassWaterCourtyard = 8,
         IBLGallery        = 9,
         OutdoorSunsetBeach = 10,
+        LiquidGallery     = 11,
     };
 
     void ProcessInput();
@@ -181,6 +183,7 @@ private:
     void BuildRTShowcaseScene();
     void BuildMaterialLabScene();
     void BuildEffectsShowcaseScene();
+    void BuildLiquidGalleryScene();
     void BuildGlassWaterCourtyardScene();
     void BuildOutdoorSunsetBeachScene();
     void BuildGodRaysScene();

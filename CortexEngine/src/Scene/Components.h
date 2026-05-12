@@ -291,6 +291,19 @@ struct WaterSurfaceComponent {
     // Higher priority surfaces can be preferred when sampling height in
     // scenes with multiple overlapping water bodies in the future.
     float priority = 0.0f;
+    enum class LiquidType : uint32_t {
+        Water = 0,
+        Lava = 1,
+        Honey = 2,
+        Molasses = 3
+    };
+    LiquidType liquidType = LiquidType::Water;
+    float absorption = 0.45f;
+    float foamStrength = 0.70f;
+    float viscosity = 0.20f;
+    float emissiveHeat = 0.0f;
+    glm::vec3 shallowTint = glm::vec3(0.12f, 0.48f, 0.72f);
+    glm::vec3 deepTint = glm::vec3(0.01f, 0.08f, 0.20f);
 };
 
 // Simple buoyancy data for objects that should float on water. Vertical

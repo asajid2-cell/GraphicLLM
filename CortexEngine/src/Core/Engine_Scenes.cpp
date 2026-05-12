@@ -144,6 +144,9 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::OutdoorSunsetBeach:
         BuildOutdoorSunsetBeachScene();
         break;
+    case ScenePreset::LiquidGallery:
+        BuildLiquidGalleryScene();
+        break;
     case ScenePreset::EffectsShowcase:
         BuildEffectsShowcaseScene();
         break;
@@ -168,6 +171,7 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::MaterialLab:       presetName = "Material Lab"; break;
     case ScenePreset::GlassWaterCourtyard:presetName = "Glass and Water Courtyard"; break;
     case ScenePreset::OutdoorSunsetBeach:presetName = "Outdoor Sunset Beach"; break;
+    case ScenePreset::LiquidGallery:     presetName = "Liquid Gallery"; break;
     case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
@@ -1068,9 +1072,15 @@ void Engine::BuildGlassWaterCourtyardScene() {
                                    glm::vec3(0.0f, -0.02f, -0.25f),
                                    glm::vec3(0.92f),
                                    glm::vec3(0.0f),
-                                   glm::vec4(0.04f, 0.16f, 0.22f, 0.66f),
+                                   glm::vec4(0.08f, 0.42f, 0.72f, 0.74f),
                                    0.0f, 0.045f, "water");
-        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, Scene::WaterSurfaceComponent{0.0f});
+        Scene::WaterSurfaceComponent waterSurface{};
+        waterSurface.absorption = 0.40f;
+        waterSurface.foamStrength = 0.92f;
+        waterSurface.viscosity = 0.12f;
+        waterSurface.shallowTint = glm::vec3(0.10f, 0.55f, 0.85f);
+        waterSurface.deepTint = glm::vec3(0.005f, 0.065f, 0.22f);
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, waterSurface);
     }
 
     if (columnMesh && columnMesh->gpuBuffers) {
@@ -1261,10 +1271,10 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     if (sandPlane && sandPlane->gpuBuffers) {
         auto sand = addRenderable("OutdoorBeach_SandShelf", sandPlane,
                                   glm::vec3(0.0f, 0.0f, -2.8f),
-                                  glm::vec3(1.0f),
-                                  glm::vec3(0.0f),
-                                  glm::vec4(0.78f, 0.66f, 0.48f, 1.0f),
-                                  0.0f, 0.82f, "concrete");
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.58f, 0.47f, 0.30f, 1.0f),
+                                   0.0f, 0.82f, "concrete");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sand);
         r.doubleSided = true;
         r.normalScale = 0.18f;
@@ -1275,9 +1285,15 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                    glm::vec3(0.0f, -0.035f, 4.9f),
                                    glm::vec3(1.0f),
                                    glm::vec3(0.0f),
-                                   glm::vec4(0.04f, 0.20f, 0.28f, 0.68f),
+                                   glm::vec4(0.03f, 0.28f, 0.78f, 0.94f),
                                    0.0f, 0.035f, "water");
-        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, Scene::WaterSurfaceComponent{0.0f});
+        Scene::WaterSurfaceComponent tide{};
+        tide.absorption = 0.36f;
+        tide.foamStrength = 1.0f;
+        tide.viscosity = 0.10f;
+        tide.shallowTint = glm::vec3(0.13f, 0.58f, 0.88f);
+        tide.deepTint = glm::vec3(0.004f, 0.08f, 0.25f);
+        m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, tide);
     }
 
     if (cubeMesh && cubeMesh->gpuBuffers) {
@@ -1287,7 +1303,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                       glm::vec3(x, 0.08f, -5.7f + 0.22f * static_cast<float>(i % 2)),
                                       glm::vec3(2.2f, 0.18f, 0.9f),
                                       glm::vec3(0.0f, 0.16f * static_cast<float>(i), 0.0f),
-                                      glm::vec4(0.68f, 0.56f, 0.38f, 1.0f),
+                                      glm::vec4(0.54f, 0.42f, 0.24f, 1.0f),
                                       0.0f, 0.86f, "concrete");
             m_registry->GetComponent<Scene::RenderableComponent>(dune).doubleSided = true;
         }
@@ -1387,6 +1403,281 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     addLight("OutdoorBeach_WaterGlint", Scene::LightType::Point,
              glm::vec3(0.0f, 0.75f, 2.8f), glm::vec3(0.0f),
              glm::vec3(0.95f, 0.78f, 0.48f), 1.4f, 10.0f);
+}
+
+void Engine::BuildLiquidGalleryScene() {
+    spdlog::info("Building public scene: Liquid Gallery");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        Graphics::ApplyLiquidGallerySceneControls(*renderer);
+    }
+
+    auto floorPlane = Utils::MeshGenerator::CreatePlane(18.0f, 12.0f);
+    auto wallPlane = Utils::MeshGenerator::CreatePlane(18.0f, 6.0f);
+    auto liquidPlane = Utils::MeshGenerator::CreatePlane(3.1f, 3.1f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto quadMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+
+    if (renderer) {
+        auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
+            if (!mesh) return true;
+            auto res = renderer->UploadMesh(mesh);
+            if (res.IsErr()) {
+                spdlog::warn("Failed to upload LiquidGallery {} mesh: {}", label, res.Error());
+                return false;
+            }
+            if (renderer->IsDeviceRemoved()) {
+                spdlog::error("DX12 device was removed while uploading LiquidGallery {} mesh", label);
+                return false;
+            }
+            return true;
+        };
+
+        if (!uploadMesh(floorPlane, "floor") ||
+            !uploadMesh(wallPlane, "wall") ||
+            !uploadMesh(liquidPlane, "liquid") ||
+            !uploadMesh(cubeMesh, "cube") ||
+            !uploadMesh(sphereMesh, "sphere") ||
+            !uploadMesh(quadMesh, "quad")) {
+            return;
+        }
+    }
+
+    {
+        entt::entity camEntity = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
+        t.position = glm::vec3(0.0f, 2.65f, -10.2f);
+        const glm::vec3 target(0.0f, 0.65f, 0.0f);
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = 54.0f;
+        ConfigureShowcaseCameraClip(cam, 160.0f);
+        cam.isActive = true;
+        m_activeCameraEntity = camEntity;
+    }
+
+    auto addRenderable = [&](const std::string& tag,
+                             const std::shared_ptr<Scene::MeshData>& mesh,
+                             const glm::vec3& position,
+                             const glm::vec3& scale,
+                             const glm::vec3& euler,
+                             const glm::vec4& color,
+                             float metallic,
+                             float roughness,
+                             const char* preset) -> entt::entity {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.scale = scale;
+        t.rotation = glm::quat(euler);
+
+        auto& r = m_registry->AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = color;
+        r.metallic = metallic;
+        r.roughness = roughness;
+        r.ao = 1.0f;
+        r.presetName = preset;
+        return e;
+    };
+
+    if (floorPlane && floorPlane->gpuBuffers) {
+        auto floor = addRenderable("LiquidGallery_Floor", floorPlane,
+                                   glm::vec3(0.0f, -0.02f, 0.0f),
+                                   glm::vec3(1.0f),
+                                   glm::vec3(0.0f),
+                                   glm::vec4(0.25f, 0.24f, 0.22f, 1.0f),
+                                   0.0f, 0.58f, "wet_stone");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
+        r.doubleSided = true;
+        r.wetnessFactor = 0.42f;
+    }
+
+    if (wallPlane && wallPlane->gpuBuffers) {
+        auto wall = addRenderable("LiquidGallery_BackWall", wallPlane,
+                                  glm::vec3(0.0f, 3.0f, 4.9f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
+                                  glm::vec4(0.36f, 0.32f, 0.28f, 1.0f),
+                                  0.0f, 0.64f, "masonry");
+        m_registry->GetComponent<Scene::RenderableComponent>(wall).doubleSided = true;
+    }
+
+    struct LiquidVat {
+        const char* name;
+        Scene::WaterSurfaceComponent::LiquidType type;
+        glm::vec3 center;
+        glm::vec4 surfaceColor;
+        glm::vec3 shallow;
+        glm::vec3 deep;
+        float absorption;
+        float foam;
+        float viscosity;
+        float emissiveHeat;
+        float roughness;
+        const char* preset;
+    };
+
+    const LiquidVat vats[] = {
+        {"Water", Scene::WaterSurfaceComponent::LiquidType::Water,
+         {-4.2f, 0.0f, -1.15f}, {0.08f, 0.42f, 0.72f, 0.72f},
+         {0.10f, 0.56f, 0.84f}, {0.005f, 0.06f, 0.23f}, 0.42f, 0.95f, 0.12f, 0.0f, 0.032f, "water"},
+        {"Lava", Scene::WaterSurfaceComponent::LiquidType::Lava,
+         {1.35f, 0.0f, -1.15f}, {1.0f, 0.25f, 0.04f, 0.96f},
+         {1.0f, 0.42f, 0.06f}, {0.18f, 0.025f, 0.008f}, 0.95f, 0.0f, 0.78f, 5.2f, 0.24f, "lava"},
+        {"Honey", Scene::WaterSurfaceComponent::LiquidType::Honey,
+         {-4.2f, 0.0f, 2.25f}, {1.0f, 0.62f, 0.14f, 0.82f},
+         {1.0f, 0.75f, 0.20f}, {0.46f, 0.20f, 0.035f}, 0.58f, 0.08f, 0.78f, 0.0f, 0.16f, "honey"},
+        {"Molasses", Scene::WaterSurfaceComponent::LiquidType::Molasses,
+         {1.35f, 0.0f, 2.25f}, {0.15f, 0.065f, 0.025f, 0.88f},
+         {0.25f, 0.11f, 0.04f}, {0.025f, 0.010f, 0.004f}, 0.90f, 0.02f, 0.95f, 0.0f, 0.10f, "molasses"},
+    };
+
+    for (const LiquidVat& vat : vats) {
+        if (cubeMesh && cubeMesh->gpuBuffers) {
+            auto basin = addRenderable(std::string("LiquidGallery_") + vat.name + "_Basin",
+                                       cubeMesh,
+                                       vat.center + glm::vec3(0.0f, 0.02f, 0.0f),
+                                       glm::vec3(1.95f, 0.20f, 1.95f),
+                                       glm::vec3(0.0f),
+                                       glm::vec4(0.36f, 0.34f, 0.30f, 1.0f),
+                                       0.0f, 0.50f, "wet_stone");
+            auto& basinR = m_registry->GetComponent<Scene::RenderableComponent>(basin);
+            basinR.wetnessFactor = 0.35f;
+
+            addRenderable(std::string("LiquidGallery_") + vat.name + "_BackLip",
+                          cubeMesh,
+                          vat.center + glm::vec3(0.0f, 0.35f, 1.75f),
+                          glm::vec3(2.15f, 0.30f, 0.18f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
+                          0.0f, 0.48f, "wet_stone");
+            addRenderable(std::string("LiquidGallery_") + vat.name + "_FrontLip",
+                          cubeMesh,
+                          vat.center + glm::vec3(0.0f, 0.35f, -1.75f),
+                          glm::vec3(2.15f, 0.30f, 0.18f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
+                          0.0f, 0.48f, "wet_stone");
+            addRenderable(std::string("LiquidGallery_") + vat.name + "_LeftLip",
+                          cubeMesh,
+                          vat.center + glm::vec3(-1.75f, 0.35f, 0.0f),
+                          glm::vec3(0.18f, 0.30f, 2.15f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
+                          0.0f, 0.48f, "wet_stone");
+            addRenderable(std::string("LiquidGallery_") + vat.name + "_RightLip",
+                          cubeMesh,
+                          vat.center + glm::vec3(1.75f, 0.35f, 0.0f),
+                          glm::vec3(0.18f, 0.30f, 2.15f),
+                          glm::vec3(0.0f),
+                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
+                          0.0f, 0.48f, "wet_stone");
+        }
+
+        if (liquidPlane && liquidPlane->gpuBuffers) {
+            auto liquid = addRenderable(std::string("LiquidGallery_") + vat.name + "_Surface",
+                                        liquidPlane,
+                                        vat.center + glm::vec3(0.0f, 0.24f, 0.0f),
+                                        glm::vec3(1.0f),
+                                        glm::vec3(0.0f),
+                                        vat.surfaceColor,
+                                        0.0f, vat.roughness, vat.preset);
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(liquid);
+            r.transmissionFactor = (vat.type == Scene::WaterSurfaceComponent::LiquidType::Water ||
+                                    vat.type == Scene::WaterSurfaceComponent::LiquidType::Honey) ? 0.35f : 0.0f;
+            r.ior = (vat.type == Scene::WaterSurfaceComponent::LiquidType::Honey) ? 1.47f : 1.33f;
+            if (vat.emissiveHeat > 0.0f) {
+                r.emissiveColor = vat.shallow;
+                r.emissiveStrength = vat.emissiveHeat;
+                r.emissiveBloomFactor = 0.8f;
+            }
+
+            Scene::WaterSurfaceComponent liquidComponent{};
+            liquidComponent.liquidType = vat.type;
+            liquidComponent.absorption = vat.absorption;
+            liquidComponent.foamStrength = vat.foam;
+            liquidComponent.viscosity = vat.viscosity;
+            liquidComponent.emissiveHeat = vat.emissiveHeat;
+            liquidComponent.shallowTint = vat.shallow;
+            liquidComponent.deepTint = vat.deep;
+            m_registry->AddComponent<Scene::WaterSurfaceComponent>(liquid, liquidComponent);
+        }
+    }
+
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        addRenderable("LiquidGallery_ChromeProbe", sphereMesh,
+                      glm::vec3(-1.35f, 0.92f, -3.0f),
+                      glm::vec3(0.72f),
+                      glm::vec3(0.0f),
+                      glm::vec4(0.86f, 0.86f, 0.90f, 1.0f),
+                      1.0f, 0.08f, "mirror");
+        addRenderable("LiquidGallery_GlassProbe", sphereMesh,
+                      glm::vec3(4.3f, 0.88f, 0.65f),
+                      glm::vec3(0.62f),
+                      glm::vec3(0.0f),
+                      glm::vec4(0.70f, 0.88f, 1.0f, 1.0f),
+                      0.0f, 0.035f, "glass");
+    }
+
+    if (quadMesh && quadMesh->gpuBuffers) {
+        auto labelGlow = addRenderable("LiquidGallery_WarmReflectionPanel", quadMesh,
+                                       glm::vec3(-1.25f, 3.1f, 4.65f),
+                                       glm::vec3(4.0f, 0.85f, 1.0f),
+                                       glm::vec3(0.0f),
+                                       glm::vec4(1.0f, 0.52f, 0.22f, 1.0f),
+                                       0.0f, 0.20f, "emissive_panel");
+        auto& panel = m_registry->GetComponent<Scene::RenderableComponent>(labelGlow);
+        panel.emissiveColor = glm::vec3(1.0f, 0.45f, 0.16f);
+        panel.emissiveStrength = 2.2f;
+        panel.doubleSided = true;
+    }
+
+    AddParticleEffect(*m_registry, "LiquidGallery_LavaEmbers", "embers", glm::vec3(1.35f, 0.80f, -1.15f));
+    AddParticleEffect(*m_registry, "LiquidGallery_WaterMist", "mist", glm::vec3(-4.2f, 0.62f, -1.15f));
+
+    auto addLight = [&](const char* tag,
+                        Scene::LightType type,
+                        const glm::vec3& position,
+                        const glm::vec3& direction,
+                        const glm::vec3& color,
+                        float intensity,
+                        float range) {
+        entt::entity e = m_registry->CreateEntity();
+        m_registry->AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = m_registry->AddComponent<TransformComponent>(e);
+        t.position = position;
+        if (glm::length(direction) > 0.001f) {
+            t.rotation = glm::quatLookAtLH(glm::normalize(direction), glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        auto& l = m_registry->AddComponent<Scene::LightComponent>(e);
+        l.type = type;
+        l.color = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.castsShadows = type != Scene::LightType::Point;
+        if (type == Scene::LightType::Spot) {
+            l.innerConeDegrees = 24.0f;
+            l.outerConeDegrees = 44.0f;
+        } else if (type == Scene::LightType::AreaRect) {
+            l.areaSize = glm::vec2(5.5f, 2.2f);
+        }
+    };
+
+    addLight("LiquidGallery_KeySoftbox", Scene::LightType::AreaRect,
+             glm::vec3(-3.5f, 4.4f, -4.4f), glm::vec3(0.45f, -0.72f, 0.42f),
+             glm::vec3(1.0f, 0.86f, 0.68f), 3.8f, 28.0f);
+    addLight("LiquidGallery_CoolRim", Scene::LightType::Spot,
+             glm::vec3(4.8f, 3.8f, -3.6f), glm::vec3(-0.58f, -0.54f, 0.62f),
+             glm::vec3(0.54f, 0.72f, 1.0f), 4.5f, 24.0f);
+    addLight("LiquidGallery_LavaFill", Scene::LightType::Point,
+             glm::vec3(1.35f, 1.0f, -1.15f), glm::vec3(0.0f),
+             glm::vec3(1.0f, 0.34f, 0.08f), 3.2f, 9.0f);
 }
 
 void Engine::BuildEffectsShowcaseScene() {
@@ -3320,6 +3611,9 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::OutdoorSunsetBeach) {
         pos = glm::vec3(0.0f, 3.1f, -12.0f);
         target = glm::vec3(0.0f, 0.85f, -0.8f);
+    } else if (m_currentScenePreset == ScenePreset::LiquidGallery) {
+        pos = glm::vec3(0.0f, 2.65f, -10.2f);
+        target = glm::vec3(0.0f, 0.65f, 0.0f);
     } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
         pos = glm::vec3(0.0f, 2.3f, -6.4f);
         target = glm::vec3(0.0f, 1.0f, 0.1f);

@@ -3,6 +3,7 @@
 #include "Graphics/Passes/ForwardTargetBindingPass.h"
 #include "Graphics/Passes/FullscreenPass.h"
 #include "Graphics/Passes/MeshDrawPass.h"
+#include "Graphics/MaterialPresetRegistry.h"
 #include "Graphics/MaterialState.h"
 #include "Graphics/RenderableClassification.h"
 #include "Graphics/RendererGeometryUtils.h"
@@ -14,6 +15,67 @@
 #include <string>
 #include <vector>
 namespace Cortex::Graphics {
+
+namespace {
+
+using LiquidType = Scene::WaterSurfaceComponent::LiquidType;
+
+LiquidType LiquidTypeFromPreset(const Scene::RenderableComponent& renderable) {
+    if (MaterialPresetRegistry::ContainsToken(renderable.presetName, "lava")) {
+        return LiquidType::Lava;
+    }
+    if (MaterialPresetRegistry::ContainsToken(renderable.presetName, "honey")) {
+        return LiquidType::Honey;
+    }
+    if (MaterialPresetRegistry::ContainsToken(renderable.presetName, "molasses")) {
+        return LiquidType::Molasses;
+    }
+    return LiquidType::Water;
+}
+
+Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::RenderableComponent& renderable) {
+    Scene::WaterSurfaceComponent profile{};
+    profile.liquidType = LiquidTypeFromPreset(renderable);
+
+    switch (profile.liquidType) {
+    case LiquidType::Lava:
+        profile.absorption = 0.95f;
+        profile.foamStrength = 0.0f;
+        profile.viscosity = 0.82f;
+        profile.emissiveHeat = 4.8f;
+        profile.shallowTint = glm::vec3(1.0f, 0.38f, 0.05f);
+        profile.deepTint = glm::vec3(0.22f, 0.035f, 0.01f);
+        break;
+    case LiquidType::Honey:
+        profile.absorption = 0.62f;
+        profile.foamStrength = 0.08f;
+        profile.viscosity = 0.76f;
+        profile.emissiveHeat = 0.0f;
+        profile.shallowTint = glm::vec3(1.0f, 0.72f, 0.18f);
+        profile.deepTint = glm::vec3(0.52f, 0.24f, 0.035f);
+        break;
+    case LiquidType::Molasses:
+        profile.absorption = 0.88f;
+        profile.foamStrength = 0.02f;
+        profile.viscosity = 0.95f;
+        profile.emissiveHeat = 0.0f;
+        profile.shallowTint = glm::vec3(0.26f, 0.12f, 0.045f);
+        profile.deepTint = glm::vec3(0.035f, 0.012f, 0.006f);
+        break;
+    case LiquidType::Water:
+    default:
+        profile.absorption = 0.42f;
+        profile.foamStrength = 0.82f;
+        profile.viscosity = 0.18f;
+        profile.emissiveHeat = 0.0f;
+        profile.shallowTint = glm::vec3(0.10f, 0.50f, 0.78f);
+        profile.deepTint = glm::vec3(0.005f, 0.07f, 0.22f);
+        break;
+    }
+    return profile;
+}
+
+} // namespace
 
 void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
     if (!m_pipelineState.waterOverlay || !m_mainTargets.hdr.resources.color || !m_depthResources.resources.buffer) {
@@ -91,6 +153,11 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
 
         EnsureMaterialTextures(renderable);
 
+        Scene::WaterSurfaceComponent liquidProfile = LiquidProfileFromRenderable(renderable);
+        if (registry && registry->HasComponent<Scene::WaterSurfaceComponent>(entry.entity)) {
+            liquidProfile = registry->GetComponent<Scene::WaterSurfaceComponent>(entry.entity);
+        }
+
         MaterialConstants materialData{};
         materialData.albedo    = renderable.albedoColor;
         materialData.metallic  = 0.0f;
@@ -99,8 +166,30 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         materialData._pad0     = 0.0f;
         materialData.mapFlags  = glm::uvec4(0u);
         materialData.mapFlags2 = glm::uvec4(0u);
+        materialData.emissiveFactorStrength =
+            glm::vec4(glm::max(liquidProfile.shallowTint, glm::vec3(0.0f)),
+                      glm::max(liquidProfile.emissiveHeat, 0.0f));
+        materialData.extraParams =
+            glm::vec4(glm::clamp(liquidProfile.absorption, 0.0f, 1.0f),
+                      glm::clamp(liquidProfile.foamStrength, 0.0f, 2.0f),
+                      glm::clamp(liquidProfile.viscosity, 0.0f, 1.0f),
+                      static_cast<float>(liquidProfile.liquidType));
+        materialData.fractalParams0 =
+            glm::vec4(glm::max(liquidProfile.shallowTint, glm::vec3(0.0f)),
+                      glm::clamp(renderable.albedoColor.a, 0.0f, 1.0f));
+        materialData.fractalParams1 =
+            glm::vec4(glm::max(liquidProfile.deepTint, glm::vec3(0.0f)),
+                      glm::max(liquidProfile.emissiveHeat, 0.0f));
+        materialData.transmissionParams =
+            glm::vec4(glm::clamp(renderable.transmissionFactor, 0.0f, 1.0f),
+                      glm::max(renderable.ior, 1.0f),
+                      glm::max(liquidProfile.emissiveHeat, 0.0f),
+                      0.0f);
         materialData.specularParams =
-            glm::vec4(glm::clamp(m_waterState.fresnelStrength, 0.0f, 3.0f), 0.0f, 0.0f, 0.0f);
+            glm::vec4(glm::clamp(m_waterState.fresnelStrength, 0.0f, 3.0f),
+                      glm::clamp(liquidProfile.foamStrength, 0.0f, 2.0f),
+                      glm::clamp(liquidProfile.absorption, 0.0f, 1.0f),
+                      static_cast<float>(liquidProfile.liquidType));
 
         glm::mat4 modelMatrix = entry.worldMatrix;
         const uint32_t stableKey = static_cast<uint32_t>(entry.entity);

@@ -130,8 +130,8 @@ PSInput WaterVS(VSInput input)
     float2 dir2 = float2(-dir.y, dir.x);
     float phase1 = dot(dir2, xzBase) * k * 1.3f + speed * 0.8f * t;
 
-    // Vertical displacement matches the CPU SampleWaterHeightAt() helper so
-    // that buoyancy queries line up with the visible surface.
+    // Vertical displacement preserves the authored surface transform and adds
+    // the global water level as a scene-wide offset.
     float h0 = amplitude * sin(phase0);
     float h1 = secondaryAmp * sin(phase1);
     float height = h0 + h1;
@@ -147,7 +147,7 @@ PSInput WaterVS(VSInput input)
     float2 xzDisplaced = xzBase + disp0 + disp1;
 
     worldPos.xz = xzDisplaced;
-    worldPos.y = waterY + height;
+    worldPos.y = worldPos.y + waterY + height;
     output.worldPos = worldPos.xyz;
 
     float4 clipPos = mul(g_ViewProjectionMatrix, worldPos);
@@ -200,6 +200,39 @@ float GeometrySmith(float NdotV, float NdotL, float roughness)
     return ggx1 * ggx2;
 }
 
+float Hash21(float2 p)
+{
+    p = frac(p * float2(123.34f, 456.21f));
+    p += dot(p, p + 45.32f);
+    return frac(p.x * p.y);
+}
+
+float ValueNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0f - 2.0f * f);
+    float a = Hash21(i);
+    float b = Hash21(i + float2(1.0f, 0.0f));
+    float c = Hash21(i + float2(0.0f, 1.0f));
+    float d = Hash21(i + float2(1.0f, 1.0f));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float FBM(float2 p)
+{
+    float value = 0.0f;
+    float amp = 0.5f;
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        value += ValueNoise(p) * amp;
+        p = p * 2.07f + 17.13f;
+        amp *= 0.5f;
+    }
+    return value;
+}
+
 float4 WaterPS(PSInput input) : SV_TARGET
 {
     float3 N = normalize(input.normal);
@@ -215,16 +248,41 @@ float4 WaterPS(PSInput input) : SV_TARGET
         return float4(heightVis, slope, foamRamp, 1.0f);
     }
 
+    uint liquidType = (uint)round(g_ExtraParams.w);
+    float absorption = saturate(g_ExtraParams.x);
+    float foamStrength = saturate(g_ExtraParams.y);
+    float viscosity = saturate(g_ExtraParams.z);
+    float emissiveHeat = max(g_FractalParams1.w, g_TransmissionParams.z);
+
     // Keep water relatively smooth by default; the hybrid SSR/RT reflection
-    // pass adds the high-frequency mirror component.
-    float roughness = max(g_Roughness, 0.03f);
+    // pass adds the high-frequency mirror component. Viscous liquids keep broad,
+    // slower highlights instead of noisy ripples.
+    float roughness = max(g_Roughness, lerp(0.03f, 0.11f, viscosity));
     float metallic  = 0.0f;
 
-    // Base water color: slightly tinted, low albedo. Start from a neutral
-    // deep color and bias towards the material albedo so artists can nudge
-    // tint without fighting the shader.
-    float3 deepColor  = float3(0.01f, 0.03f, 0.06f);
-    float3 baseColor  = lerp(deepColor, g_Albedo.rgb, 0.4f);
+    float3 shallowProfile = max(g_FractalParams0.rgb, 0.0f);
+    float3 deepProfile = max(g_FractalParams1.rgb, 0.0f);
+    if (dot(shallowProfile, float3(1.0f, 1.0f, 1.0f)) <= 0.001f)
+    {
+        shallowProfile = float3(0.10f, 0.50f, 0.78f);
+    }
+    if (dot(deepProfile, float3(1.0f, 1.0f, 1.0f)) <= 0.001f)
+    {
+        deepProfile = float3(0.005f, 0.07f, 0.22f);
+    }
+
+    float2 liquidUv = input.texCoord;
+    float edgeDistance = min(min(liquidUv.x, 1.0f - liquidUv.x), min(liquidUv.y, 1.0f - liquidUv.y));
+    float edgeFoam = saturate((0.085f - edgeDistance) * 13.0f);
+    float basinDepth = saturate(edgeDistance * 2.6f);
+    float waveDepth = saturate(input.waveHeight * 0.30f + 0.55f);
+    float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f);
+
+    float t = g_TimeAndExposure.x;
+    float flowNoise = FBM(input.worldPos.xz * lerp(0.17f, 0.32f, 1.0f - viscosity) +
+                          float2(t * 0.035f, -t * 0.025f));
+    float3 baseColor = lerp(shallowProfile, deepProfile, depthMix);
+    baseColor = lerp(baseColor, g_Albedo.rgb, liquidType == 0u ? 0.16f : 0.08f);
 
     float fresnelStrength = clamp(g_SpecularParams.x, 0.0f, 3.0f);
     if (fresnelStrength <= 0.0f)
@@ -261,19 +319,39 @@ float4 WaterPS(PSInput input) : SV_TARGET
 
     float3 lighting = (diffuse + specular) * radiance * NdotL;
 
-    // Depth / distance-based tint: treat water further from the camera as
-    // optically deeper and bias toward the deepColor. This is a lightweight
-    // approximation that does not require sampling the scene depth buffer.
-    float  camDist = length(input.worldPos - g_CameraPosition.xyz);
-    float  depthFactor = saturate(camDist * 0.05f); // ~0..1 over a few dozen units
-    float3 shallowColor = lerp(baseColor, float3(0.15f, 0.20f, 0.22f), 0.3f);
-    float3 depthTint   = lerp(shallowColor, deepColor, depthFactor);
+    float3 depthTint = baseColor;
+    if (liquidType == 0u)
+    {
+        float skyFacing = saturate(N.y * 0.65f + pow(1.0f - NdotV, 2.0f) * 0.35f);
+        depthTint = lerp(baseColor, float3(0.06f, 0.34f, 0.68f), 0.20f * skyFacing);
+    }
+    else if (liquidType == 1u)
+    {
+        float veins = smoothstep(0.48f, 0.92f, FBM(input.worldPos.xz * 1.15f + float2(t * 0.10f, -t * 0.06f)));
+        float crust = smoothstep(0.22f, 0.72f, FBM(input.worldPos.xz * 2.35f - float2(t * 0.035f, t * 0.025f)));
+        float3 hot = float3(1.0f, 0.42f, 0.055f) * (1.0f + veins * 1.45f);
+        float3 crustColor = float3(0.09f, 0.025f, 0.012f);
+        depthTint = lerp(hot, crustColor, crust * 0.72f);
+    }
+    else if (liquidType == 2u)
+    {
+        float swirl = FBM(input.worldPos.xz * 0.82f + float2(t * 0.018f, t * 0.012f));
+        depthTint = lerp(float3(1.0f, 0.68f, 0.16f), float3(0.56f, 0.25f, 0.035f), depthMix);
+        depthTint = lerp(depthTint, float3(1.0f, 0.86f, 0.32f), swirl * 0.25f);
+    }
+    else
+    {
+        float ribbon = FBM(input.worldPos.xz * 0.60f + float2(-t * 0.010f, t * 0.016f));
+        depthTint = lerp(float3(0.18f, 0.075f, 0.025f), float3(0.018f, 0.008f, 0.004f), depthMix);
+        depthTint += ribbon * 0.035f;
+    }
 
     // Foam: use local slope magnitude as a heuristic for wave crests. Higher
-    // slopes get more foam; keep the ramp soft so it blends naturally.
+    // slopes get more foam; edge foam makes pools and shorelines read clearly.
     float slope = input.slopeMag;
-    float foamRamp = saturate((slope - 0.08f) * 4.0f);
-    float3 foamColor = float3(0.90f, 0.95f, 1.0f);
+    float foamRamp = saturate((slope - 0.06f) * 5.0f);
+    float3 foamColor = liquidType == 0u ? float3(0.90f, 0.97f, 1.0f) :
+                       (liquidType == 2u ? float3(1.0f, 0.82f, 0.34f) : depthTint);
 
     float3 ambient = g_AmbientColor.rgb * depthTint;
     float3 color = ambient + lighting;
@@ -281,8 +359,50 @@ float4 WaterPS(PSInput input) : SV_TARGET
     // Blend foam over the lit surface; modulate slightly by viewing angle so
     // foam is more visible at grazing angles.
     float foamViewBoost = pow(1.0f - NdotV, 2.0f);
-    float foamAmount = saturate(foamRamp * (0.6f + 0.4f * foamViewBoost));
+    float foamAmount = saturate((foamRamp + edgeFoam * 0.85f) * foamStrength * (0.6f + 0.4f * foamViewBoost));
     color = lerp(color, foamColor, foamAmount);
 
-    return float4(color, g_Albedo.a);
+    float3 fresnelGlow = F * pow(1.0f - NdotV, 1.5f) * (liquidType == 0u ? float3(0.14f, 0.32f, 0.55f) : depthTint);
+    color += fresnelGlow;
+
+    if (liquidType == 0u)
+    {
+        float3 blueBody = depthTint * (0.95f + 0.25f * NdotL) + float3(0.0f, 0.055f, 0.14f);
+        color = lerp(color, blueBody + specular * 0.35f, 0.48f);
+    }
+    else if (liquidType == 1u)
+    {
+        float heatPulse = 0.65f + 0.35f * sin(t * 1.7f + flowNoise * 6.28318f);
+        color += depthTint * max(emissiveHeat, 1.0f) * heatPulse;
+    }
+    else if (liquidType == 2u)
+    {
+        color = lerp(color, depthTint * 1.22f + specular * 0.25f, 0.62f);
+        color += float3(0.18f, 0.11f, 0.02f) * (1.0f - depthMix) * (0.35f + flowNoise * 0.25f);
+    }
+    else if (liquidType == 3u)
+    {
+        color = max(color, float3(0.018f, 0.010f, 0.006f));
+        color += specular * 0.75f;
+    }
+
+    float alpha = g_Albedo.a;
+    if (liquidType == 0u)
+    {
+        alpha = max(alpha, 0.88f);
+    }
+    else if (liquidType == 1u)
+    {
+        alpha = 1.0f;
+    }
+    else if (liquidType == 2u)
+    {
+        alpha = max(alpha, 0.90f);
+    }
+    else
+    {
+        alpha = max(alpha, 0.95f);
+    }
+
+    return float4(color, alpha);
 }

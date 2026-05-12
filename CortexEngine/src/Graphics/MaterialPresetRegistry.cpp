@@ -21,6 +21,9 @@ const std::vector<MaterialPresetDescriptor>& MaterialPresetRegistry::CanonicalPr
         {"glass_panel", "Glass Panel", "glass", true, true},
         {"mirror", "Mirror", "mirror", true, true},
         {"water", "Water", "water", true, true},
+        {"lava", "Lava", "water", true, true},
+        {"honey", "Honey", "water", true, true},
+        {"molasses", "Molasses", "water", true, true},
         {"emissive_panel", "Emissive Panel", "emissive", true, true},
         {"skin", "Skin", "default", true, true},
         {"skin_ish", "Skin-ish Wax", "default", true, true},
@@ -83,6 +86,9 @@ std::string MaterialPresetRegistry::Canonicalize(std::string_view presetName) {
         {"emissive", "emissive_panel"},
         {"ceramic", "matte"},
         {"matte_ceramic", "matte"},
+        {"magma", "lava"},
+        {"liquid_gold", "honey"},
+        {"syrup", "molasses"},
     };
 
     for (const Alias alias : aliases) {
@@ -178,6 +184,46 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.defaultSpecularFactor = 1.35f;
         info.hasDefaultSpecularColor = true;
         info.defaultSpecularColorFactor = glm::vec3(0.75f, 0.92f, 1.0f);
+    } else if (contains("lava")) {
+        info.materialType = 5.0f;
+        info.emissive = true;
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.28f;
+        info.hasDefaultEmissiveStrength = true;
+        info.defaultEmissiveStrength = 4.5f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.85f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(1.0f, 0.45f, 0.12f);
+    } else if (contains("honey")) {
+        info.transmissive = true;
+        info.clearcoat = true;
+        info.clearcoatFactor = 0.65f;
+        info.clearcoatRoughnessFactor = 0.10f;
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.18f;
+        info.hasDefaultTransmission = true;
+        info.defaultTransmission = 0.35f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 1.15f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(1.0f, 0.72f, 0.28f);
+    } else if (contains("molasses")) {
+        info.clearcoat = true;
+        info.clearcoatFactor = 0.85f;
+        info.clearcoatRoughnessFactor = 0.08f;
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.12f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 1.05f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(0.42f, 0.22f, 0.10f);
     }
 
     if (contains("painted_plastic") || contains("plastic")) {

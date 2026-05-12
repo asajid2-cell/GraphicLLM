@@ -38,7 +38,7 @@ Latest inspected full validation run:
 
 ```text
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine\tools\run_release_validation.ps1
-logs=CortexEngine/build/bin/logs/runs/release_validation_20260511_063406_415_56724_cf5c4654
+logs=CortexEngine/build/bin/logs/runs/release_validation_20260511_194346_910_201064_3e282fc7
 ```
 
 Key evidence from that run:
@@ -59,26 +59,26 @@ Key evidence from that run:
   counters are covered.
 - Editor frame contract: passed; editor renderer hooks and explicit editor frame
   sequence are covered.
-- Temporal validation: `gpu_ms=1.638`, `disocclusion=0.006668`,
-  `high_motion=0.005176`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
+- Temporal validation: `gpu_ms=1.637`, `disocclusion=0.006908`,
+  `high_motion=0.005236`, `object_motion=0.0731`, `visible=7`, `warnings=0`.
 - Temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `gpu_ms=2.998`,
+  `camera=reflection_closeup`, `gpu_ms=2.898`,
   `rt_reflection_reset=camera_cut`, `invalidated_frame=20`.
-- RT showcase: `frames=33`, `gpu_ms=1.646/16.7`,
-  `dxgi_mb=408.46/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
+- RT showcase: `frames=33`, `gpu_ms=2.066/16.7`,
+  `dxgi_mb=408.52/512`, `est_mb=190.52/256`, `rt_mb=114.63/160`,
   `write_mb=107.75/128`, `material_issues=0`,
   `rt_refl_ready=True/ready`,
   `rt_signal=0.0225/0.1424/10.3398/0.0084`,
   `rt_hist=0.0314/0.1433/7.3008/0.0089`,
   `transient_delta=0`, `rt_budget=8gb_balanced`, `startup_realloc=0`,
-  `temporal_diff=mean=0.012/2.5 changed=0.000/0.08`,
+  `temporal_diff=mean=0.138/2.5 changed=0.004/0.08`,
   `surface_debug=view=41 colorful=0.358 nonblack=1.000`.
 - VB debug views: `vb_depth` view 34 nonblack `0.851`, colorful `0.001`,
   luma `168.88`; `vb_gbuffer_albedo` view 35 nonblack `0.851`,
   colorful `0.251`, luma `148.49`.
-- Descriptor/memory stress: `persistent_descriptors=988/1024`,
+- Descriptor/memory stress: `persistent_descriptors=990/1024`,
   `staging=78/128`, `transient_budget=81920`, `transient_delta=0`,
-  `dxgi_mb=408.46/512`, `estimated_mb=190.52/256`,
+  `dxgi_mb=408.52/512`, `estimated_mb=190.52/256`,
   `write_mb=107.75/128`, `rt_signal_avg=0.0225`,
   `rt_history_avg=0.0314`.
 - Visual probe: all four public baseline cases passed; minimum observed
@@ -90,7 +90,7 @@ Key evidence from that run:
   reported 0 aliased resources/barriers/saved bytes, and bloom-transients-off
   reported 0 final transient resources with validation still run.
 
-Latest focused checkpoint after the inspected full validation:
+Descriptor-focused checkpoint now covered by the inspected full validation:
 
 - GPU particle compute descriptors now live in `ParticleRenderResources` as
   persistent pass-owned SRV/UAV handles. `ParticleGpuPreparePass` and
@@ -1038,7 +1038,7 @@ Latest checkpoint note for `REM-08`, `P3-REM-08`, `P3-GLOBAL-08`, `P3-WS-10`, an
 
 ## Completion Gate
 
-Completion Gate Status: SATISFIED. Every ledger status row is now DONE_VERIFIED or DEFERRED_BY_USER_ONLY, subject to the final release-validation command recorded below.
+Completion Gate Status: SATISFIED. Every ledger status row is now DONE_VERIFIED or DEFERRED_BY_USER_ONLY, and the final release-validation command passed at `release_validation_20260511_194346_910_201064_3e282fc7`.
 
 Minimum gate before claiming `phase2.md` and `phase3.md` complete:
 

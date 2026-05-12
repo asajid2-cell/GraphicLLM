@@ -24,10 +24,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_creat
 
 ## Latest Verified Gate
 
-Latest full integrated gate from the renderer refactor checkpoint:
+Latest full integrated gate:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260512_020250_531_184976_bf618209/release_validation_summary.json
+CortexEngine/build/bin/logs/runs/release_validation_20260512_133827_609_2236_0286ad00/release_validation_summary.json
 ```
 
 Result:
@@ -40,10 +40,19 @@ Result:
   effects gallery, renderer ownership, budget matrix, and voxel backend smoke
   passed
 
-This cleanup phase adds public-facing documentation, high-resolution screenshot
-evidence, README/package contracts, and final package creation. After those
-changes are committed, the full gate must be rerun and this section must be
-updated to the new final run path.
+Final package artifact from the same cleanup state:
+
+```text
+CortexEngine/release/cortex-public-review_6de5ffd_20260512_134536.zip
+```
+
+Package summary:
+
+```text
+CortexEngine/release/cortex-public-review_6de5ffd_20260512_134536_summary.json
+```
+
+Package size: `83,395,208` bytes, below the `536,870,912` byte manifest cap.
 
 ## Public Capture Evidence
 

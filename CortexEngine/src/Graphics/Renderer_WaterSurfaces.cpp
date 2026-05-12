@@ -102,9 +102,16 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         materialData.specularParams =
             glm::vec4(glm::clamp(m_waterState.fresnelStrength, 0.0f, 3.0f), 0.0f, 0.0f, 0.0f);
 
+        glm::mat4 modelMatrix = entry.worldMatrix;
+        const uint32_t stableKey = static_cast<uint32_t>(entry.entity);
+        const AutoDepthSeparation sep =
+            ComputeAutoDepthSeparationForThinSurfaces(renderable, modelMatrix, stableKey);
+        ApplyAutoDepthOffset(modelMatrix, sep.worldOffset);
+
         ObjectConstants objectData{};
-        objectData.modelMatrix  = entry.worldMatrix;
+        objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = entry.normalMatrix;
+        objectData.depthBiasNdc = sep.depthBiasNdc;
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);

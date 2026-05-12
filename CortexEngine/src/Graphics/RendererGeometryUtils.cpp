@@ -83,10 +83,6 @@ AutoDepthSeparation ComputeAutoDepthSeparationForThinSurfaces(
         return sep;
     }
 
-    if (renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Blend) {
-        return sep;
-    }
-
     const glm::vec3 ext = glm::max(renderable.mesh->boundsMax - renderable.mesh->boundsMin, glm::vec3(0.0f));
     const float maxDim = std::max(ext.x, std::max(ext.y, ext.z));
     if (!(maxDim > 0.0f)) {
@@ -114,9 +110,12 @@ AutoDepthSeparation ComputeAutoDepthSeparationForThinSurfaces(
     }
     axisWS /= std::sqrt(axisLen2);
 
-    constexpr float kUpDot = 0.92f;
-    if (std::abs(glm::dot(axisWS, glm::vec3(0.0f, 1.0f, 0.0f))) < kUpDot) {
-        return sep;
+    // Separate along the actual thin axis in world space so vertical panels,
+    // glass, water, and floor decals all get deterministic z-fight relief.
+    const glm::vec3 boundsCenterWS =
+        glm::vec3(modelMatrix * glm::vec4(renderable.mesh->boundsCenter, 1.0f));
+    if (glm::dot(axisWS, boundsCenterWS) < 0.0f) {
+        axisWS = -axisWS;
     }
 
     const float maxScale = GetMaxWorldScale(modelMatrix);
@@ -129,10 +128,11 @@ AutoDepthSeparation ComputeAutoDepthSeparationForThinSurfaces(
     uint32_t layer = (h >> 29u) & 7u;
     float layerScale = 1.0f + static_cast<float>(layer) * 0.10f;
 
-    const float direction =
-        (renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay) ? 1.0f : -1.0f;
-
-    sep.worldOffset = glm::vec3(0.0f, direction * eps * layerScale, 0.0f);
+    const bool forwardLayer =
+        renderable.renderLayer == Scene::RenderableComponent::RenderLayer::Overlay ||
+        renderable.alphaMode == Scene::RenderableComponent::AlphaMode::Blend;
+    const float direction = forwardLayer ? 1.0f : -1.0f;
+    sep.worldOffset = axisWS * (direction * eps * layerScale);
 
     if (renderable.renderLayer != Scene::RenderableComponent::RenderLayer::Overlay) {
         constexpr float kNdcBiasBase = 2.5e-5f;

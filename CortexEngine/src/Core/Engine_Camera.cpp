@@ -245,6 +245,73 @@ bool Engine::ApplyShowcaseCameraBookmark(const std::string& bookmarkId) {
     return true;
 }
 
+void Engine::UpdateCameraMotionAutomation(float /*deltaTime*/) {
+    if (!m_cameraMotionAutomationEnabled || m_cameraMotionAutomationFrames == 0 ||
+        !m_registry || m_activeCameraEntity == entt::null ||
+        !m_registry->HasComponent<Scene::TransformComponent>(m_activeCameraEntity) ||
+        !m_registry->HasComponent<Scene::CameraComponent>(m_activeCameraEntity)) {
+        return;
+    }
+
+    auto& transform = m_registry->GetComponent<Scene::TransformComponent>(m_activeCameraEntity);
+
+    if (!m_cameraMotionAutomationInitialized) {
+        m_cameraMotionAutomationInitialized = true;
+        m_cameraMotionBasePosition = transform.position;
+        m_cameraMotionBaseForward = transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        if (glm::length2(m_cameraMotionBaseForward) < 1e-6f) {
+            m_cameraMotionBaseForward = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        m_cameraMotionBaseForward = glm::normalize(m_cameraMotionBaseForward);
+        m_cameraMotionBaseUp = transform.rotation * glm::vec3(0.0f, 1.0f, 0.0f);
+        if (glm::length2(m_cameraMotionBaseUp) < 1e-6f ||
+            std::abs(glm::dot(glm::normalize(m_cameraMotionBaseUp), m_cameraMotionBaseForward)) > 0.98f) {
+            m_cameraMotionBaseUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+        m_cameraMotionBaseUp = glm::normalize(m_cameraMotionBaseUp);
+        m_cameraMotionBaseRight = glm::cross(m_cameraMotionBaseUp, m_cameraMotionBaseForward);
+        if (glm::length2(m_cameraMotionBaseRight) < 1e-6f) {
+            m_cameraMotionBaseRight = glm::vec3(1.0f, 0.0f, 0.0f);
+        }
+        m_cameraMotionBaseRight = glm::normalize(m_cameraMotionBaseRight);
+        m_cameraMotionBaseUp = glm::normalize(glm::cross(m_cameraMotionBaseForward, m_cameraMotionBaseRight));
+        spdlog::info("Smoke automation initialized camera motion from ({:.3f}, {:.3f}, {:.3f})",
+                     m_cameraMotionBasePosition.x,
+                     m_cameraMotionBasePosition.y,
+                     m_cameraMotionBasePosition.z);
+    }
+
+    const float frame = static_cast<float>(std::min<uint64_t>(m_totalFrameCount, m_cameraMotionAutomationFrames));
+    const float denom = std::max(1.0f, static_cast<float>(m_cameraMotionAutomationFrames));
+    const float t = glm::clamp(frame / denom, 0.0f, 1.0f);
+    constexpr float kPi = 3.14159265358979323846f;
+
+    const float side = std::sin(t * kPi * 0.5f) * m_cameraMotionSideAmplitude;
+    const float forward = (1.0f - std::cos(t * kPi)) * 0.5f * m_cameraMotionForwardAmplitude;
+    const float lift = std::sin(t * kPi) * 0.08f;
+    const float lookSide = std::sin(t * kPi) * m_cameraMotionLookAmplitude;
+
+    transform.position =
+        m_cameraMotionBasePosition +
+        m_cameraMotionBaseRight * side +
+        m_cameraMotionBaseForward * forward +
+        m_cameraMotionBaseUp * lift;
+
+    const glm::vec3 target =
+        m_cameraMotionBasePosition +
+        m_cameraMotionBaseForward * 8.0f -
+        m_cameraMotionBaseRight * lookSide;
+    glm::vec3 newForward = target - transform.position;
+    if (glm::length2(newForward) > 1e-6f) {
+        newForward = glm::normalize(newForward);
+        transform.rotation = glm::quatLookAtLH(newForward, m_cameraMotionBaseUp);
+        m_cameraYaw = std::atan2(newForward.x, newForward.z);
+        m_cameraPitch = std::asin(glm::clamp(newForward.y, -1.0f, 1.0f));
+    }
+    m_cameraVelocity = glm::vec3(0.0f);
+    m_cameraMotionAutomationApplied = m_cameraMotionAutomationApplied || t > 0.0f;
+}
+
 bool Engine::ComputeCameraRayFromMouse(float mouseX, float mouseY,
                                        glm::vec3& outOrigin,
                                        glm::vec3& outDirection) {

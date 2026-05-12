@@ -204,6 +204,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "depth_stability_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_depth_stability_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "editor_frame_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
@@ -227,6 +235,16 @@ if ($failures.Count -eq 0) {
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $PSScriptRoot "run_temporal_camera_cut_validation.ps1"),
+        "-NoBuild",
+        "-IsolatedLogs"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "camera_motion_stability" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_camera_motion_stability_smoke.ps1"),
         "-NoBuild",
         "-IsolatedLogs"
     )

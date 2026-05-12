@@ -28,6 +28,11 @@ namespace {
     constexpr float kCornellHeight     = 3.0f;
     constexpr float kHeroPoolZ         = -3.0f;
 
+    void ConfigureShowcaseCameraClip(Scene::CameraComponent& camera, float farPlane) {
+        camera.nearPlane = 0.25f;
+        camera.farPlane = farPlane;
+    }
+
     void AddParticleEffect(Scene::ECS_Registry& registry,
                            const char* tag,
                            std::string_view effectId,
@@ -250,6 +255,7 @@ void Engine::BuildCornellScene() {
 
     auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
     camera.fov = 50.0f;
+    ConfigureShowcaseCameraClip(camera, 80.0f);
     camera.isActive = true;
 
     if (renderer) {
@@ -767,6 +773,7 @@ void Engine::BuildMaterialLabScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 54.0f;
+        ConfigureShowcaseCameraClip(cam, 120.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -978,6 +985,7 @@ void Engine::BuildGlassWaterCourtyardScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 54.0f;
+        ConfigureShowcaseCameraClip(cam, 140.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -1219,6 +1227,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 57.0f;
+        ConfigureShowcaseCameraClip(cam, 180.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -1434,6 +1443,7 @@ void Engine::BuildEffectsShowcaseScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 55.0f;
+        ConfigureShowcaseCameraClip(cam, 140.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -1695,6 +1705,7 @@ void Engine::BuildRTShowcaseScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 56.0f;
+        ConfigureShowcaseCameraClip(cam, 180.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -2460,6 +2471,7 @@ void Engine::BuildTemporalValidationScene() {
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
         cam.fov = 54.0f;
+        ConfigureShowcaseCameraClip(cam, 120.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
     }
@@ -2631,6 +2643,7 @@ void Engine::BuildGodRaysScene() {
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
         cam.fov = 55.0f;
+        ConfigureShowcaseCameraClip(cam, 160.0f);
         cam.isActive = true;
     }
 
@@ -2968,6 +2981,7 @@ void Engine::BuildDragonStudioScene() {
 
     auto& camera = m_registry->AddComponent<Scene::CameraComponent>(cameraEntity);
     camera.fov = 55.0f;  // Slightly wider FOV for full scene framing
+    ConfigureShowcaseCameraClip(camera, 140.0f);
     camera.isActive = true;
 
     if (m_renderer) {

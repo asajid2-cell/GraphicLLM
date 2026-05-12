@@ -1,175 +1,139 @@
 # Cortex Engine Release Readiness
 
-This note summarizes the current public-release posture of Cortex after the
-Phase 3 renderer overhaul.
+This document records the current public-review posture for Project Cortex.
+Cortex is presented as a real-time DirectX 12 hybrid renderer with validation
+evidence, high-resolution screenshots, package checks, and a staged launch
+smoke.
 
 ## Status
 
-The renderer is ready for a local public-review build when the release
-validation gate passes on the target machine:
+The renderer is release-ready for local public review only when the full gate
+passes from the committed state:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
 ```
 
-The current verified local gate covers:
+The release package is manifest-driven:
 
-- Release rebuild,
-- build entrypoint contract for the scripted CMake rebuild path,
-- repository hygiene checks for whitespace and generated artifacts,
-- source-list contract checks for CMake renderer split coverage,
-- render-graph boundary contract checks,
-- visibility-buffer transition-skip ownership checks,
-- debug primitive ownership contract checks,
-- editor frame path contract checks,
-- temporal validation smoke,
-- temporal camera-cut RT history invalidation smoke,
-- full RT showcase smoke,
-- visibility-buffer debug view runtime checks,
-- render-graph transient alias/no-alias matrix,
-- graphics settings persistence, unified graphics UI contracts, and runtime
-  graphics settings application,
-- deterministic LLM/Architect renderer-command runtime smoke,
-- positive Dreamer startup/runtime texture-generation smoke,
-- HUD mode, graphics preset, material editor, and showcase scene contracts,
-- Material Lab, conductor-energy, lighting-energy, vegetation-state,
-  reflection-probe, Glass and
-  Water Courtyard, Effects Showcase, visual baseline smokes, and screenshot negative gates,
-- visual probe validation across all public baseline cases,
-- Phase 3 visual matrix,
-- descriptor/memory stress for the historical persistent-descriptor ceiling,
-- renderer ownership, full ownership audit, and fatal error contracts,
-- advanced graphics catalog and effects gallery contracts,
-- environment manifest, IBL gallery validation, and Phase 3 fallback matrix,
-- particle-disabled zero-cost and RT firefly/outlier gates,
-- release package contract validation and staged launch smoke for the public-review payload,
-- RT budget profile matrix,
-- voxel backend smoke.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_contract_tests.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_package_launch_smoke.ps1 -NoBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_create_release_package.ps1 -NoBuild
+```
 
 ## Latest Verified Gate
 
-Latest local release validation:
+Latest full integrated gate from the renderer refactor checkpoint:
 
 ```text
-powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1
+CortexEngine/build/bin/logs/runs/release_validation_20260512_020250_531_184976_bf618209/release_validation_summary.json
 ```
 
 Result:
 
-- build_release: passed;
-- build entrypoint contract: passed; `rebuild.ps1` / `cmake --build` path
-  verified, with no raw Ninja call in rebuild/release validation;
-- repository hygiene: passed; `git diff --check` and generated-artifact guards
-  verified;
-- source-list contract: passed; explicit CMake sources and renderer split
-  coverage verified;
-- render-graph boundary contract: passed; validation module and VB graph
-  boundaries verified;
-- visibility-buffer transition contract: passed; graph-owned VB stage
-  transition-skip controls, state snapshots, and final state writeback verified;
-- debug primitive contract: passed; debug-line state ownership and draw-contract
-  counters verified;
-- editor frame contract: passed; editor renderer hooks and explicit frame
-  sequence verified;
-- temporal validation: `gpu_ms=1.638`, `warnings=0`,
-  `object_motion=0.0731`;
-- temporal camera cut: `frames=53`, `cut_frame=20`,
-  `camera=reflection_closeup`, `rt_reflection_reset=camera_cut`,
-  `invalidated_frame=20`, `gpu_ms=2.998`;
-- RT showcase: `gpu_ms=1.646/16.7`, `material_issues=0`,
-  `rt_refl_ready=True/ready`,
-  `rt_signal=0.0225/0.1424/10.3398/0.0084`,
-  `rt_hist=0.0314/0.1433/7.3008/0.0089`,
-  `transient_delta=0`, `temporal_diff=mean=0.012/2.5 changed=0.000/0.08`;
-- RT reflection tuning: frame contract reports shader-packed denoise alpha and
-  composition strength, and graphics settings persistence/interaction smokes
-  verify round-trip application;
-- VB debug views: depth view 34 and material-albedo view 35 passed with
-  nonblack ratio `0.851` for both captures;
-- descriptor/memory stress: `persistent_descriptors=988/1024`,
-  `staging=78/128`, `transient_delta=0`, `dxgi_mb=408.46/512`,
-  `estimated_mb=190.52/256`;
-- visual probe: 4/4 public baseline cases passed; minimum edge ratio
-  `0.0066`, maximum pure dominant-color ratio `0.0066`;
-- render-graph transient matrix: aliasing-on, aliasing-off, and bloom-transients-off rows passed;
-- LLM renderer command smoke: passed; deterministic Architect command applied
-  `exposure=1.35`, `shadows=False`, `fog_density=0.031`, and
-  `studio_three_point/renderer_rig`;
-- conductor energy contract: passed; forward/deferred energy split present,
-  full conductors preserved in Material Lab, and overbright visual stats bounded;
-- lighting energy budget: passed across RT Showcase, Material Lab,
-  Glass/Water Courtyard, and Effects Showcase with bounded scene light energy,
-  exposure, bloom, near-white, and saturation metrics;
-- vegetation state contract: passed; extracted vegetation state is frame-contract
-  visible and public validation scenes report dormant vegetation draw pipelines;
-- reflection probe contract: passed; RT Showcase local probes upload into VB
-  deferred lighting, frame-contract reporting shows two probes with zero skips,
-  and debug view 42 captures probe weights;
-- temporal camera-cut, render-graph transient, graphics UI contract/runtime interaction, LLM renderer command, HUD, preset, material editor,
-  showcase, ownership, fatal error,
-  environment manifest, advanced graphics catalog, and effects gallery contracts passed;
-- renderer full ownership audit: 48/48 `Renderer` members are named
-  state/service aggregates, with no loose GPU resource/descriptors in
-  `Renderer.h`;
-- screenshot negative gates, particle-disabled zero-cost, six-case Phase 3
-  fallback matrix, RT firefly/outlier gates, and the release package contract
-  passed;
-- Phase 3 visual matrix passed across temporal validation, RT Showcase,
-  Material Lab, Glass and Water Courtyard, Effects Showcase, uncapped IBL
-  Gallery, and fallback matrix rows;
-- particle effect library: passed; public ECS effects cover fire, smoke, dust,
-  sparks, embers, mist, rain, snow, and procedural billboard fallback, with
-  Effects Gallery reporting `emitters=8` and `particles=70`;
-- IBL asset policy passed with five runtime assets under budget-class caps;
-- IBL gallery passed all five enabled runtime environments:
-  `studio`, `warm_gallery`, `sunset_courtyard`, `cool_overcast`,
-  `night_city`;
-- budget matrix: 4 GB and 2 GB RT compatibility profiles passed inside the
-  release gate, with RT Showcase covering the balanced profile;
-- voxel backend: `gpu_ms=22.627`, `avg_luma=116.9`, `nonblack=1`.
+- `status=passed`
+- `step_count=64`
+- `failure_count=0`
+- release package contract and staged package launch smoke passed
+- RT showcase, temporal validation, material lab, visual probes, IBL gallery,
+  effects gallery, renderer ownership, budget matrix, and voxel backend smoke
+  passed
 
-Aggregate logs:
+This cleanup phase adds public-facing documentation, high-resolution screenshot
+evidence, README/package contracts, and final package creation. After those
+changes are committed, the full gate must be rerun and this section must be
+updated to the new final run path.
+
+## Public Capture Evidence
+
+High-resolution public captures were generated with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -OutputDir CortexEngine/docs/media -Width 1920 -Height 1080
+```
+
+Capture manifest:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260511_002324_075_33920_28d7fa20
+CortexEngine/docs/media/gallery_manifest.json
 ```
+
+Capture run:
+
+```text
+CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_132733_943_27296_0d962fbc
+```
+
+The gallery uses the `public_high` graphics preset and records scene, camera,
+environment, render scale, capture size, GPU frame time, luma metrics, and RT
+reflection signal/history values for each public screenshot.
+
+## Release Gate Coverage
+
+The full gate covers:
+
+- Release rebuild and build-entrypoint contract.
+- Repository hygiene and source-list coverage.
+- Render-graph boundary, declaration, transient, and ownership contracts.
+- Visibility-buffer, debug primitive, editor frame, and depth-stability
+  contracts.
+- Temporal validation and temporal camera-cut history invalidation.
+- RT showcase, RT reflection history quality, RT GI signal, RT firefly, and RT
+  overbright clamp tests.
+- Graphics settings persistence, native graphics UI, material controls, HUD,
+  presets, and launcher smokes.
+- Material editor, material robustness, Material Lab, material path
+  equivalence, conductor-energy, lighting-energy, and reflection-probe gates.
+- Showcase scene contracts, visual baseline contract, visual probe validation,
+  screenshot negative gates, and Phase 3 visual matrix.
+- Environment manifest, IBL asset policy, fallback matrix, and IBL gallery.
+- Advanced graphics catalog, GPU particle contract, effects gallery, and
+  particle-disabled zero-cost path.
+- Public package manifest contract, staged package launch smoke, budget profile
+  matrix, fatal error contract, and voxel backend smoke.
+
+## Package Policy
+
+The public-review payload is controlled by
+`assets/config/release_package_manifest.json`.
+
+Included:
+
+- Runtime executable, required DLLs, shaders, config files, compressed runtime
+  textures, and environment manifests.
+- Public docs, release readiness notes, cleanup ledger, and screenshot gallery
+  media.
+
+Excluded:
+
+- Local models, generated logs, build directories, cache directories, debug
+  artifacts, PDB/OBJ/LIB files, source HDR/EXR environment files, and local
+  Blender assets.
 
 ## Renderer Scope
 
-Cortex is currently best presented as a real-time hybrid renderer, not an
+Cortex is best presented as a real-time hybrid renderer, not as an
 infinite-world engine. The validated path emphasizes:
 
-- explicit renderer service/state ownership,
 - frame and resource contracts,
+- explicit renderer state ownership,
 - render graph diagnostics,
 - material and surface classification,
-- RT scheduling and readiness contracts,
-- raw and denoised RT reflection signal metrics,
-- temporal validation and RT budget profiles,
-- unified graphics settings and preset persistence,
-- environment/IBL manifest policy with procedural fallback,
-- public showcase scenes with stable camera bookmarks and lighting rigs,
-- reusable public ECS billboard particle effects with procedural fallback,
-- advanced material, particle, and cinematic-post release foundations.
+- RT scheduling and signal-quality reporting,
+- visual validation and public showcase scenes,
+- graphics UI/preset persistence,
+- environment/IBL manifest policy,
+- package creation and staged launch validation.
 
 ## Known Limitations
 
-- Validation numbers are hardware dependent. The latest local run used an
-  NVIDIA GeForce RTX 3070 Ti.
-- The Dreamer texture-generation service is optional. Most scene smokes run with
-  `--no-dreamer`, and the release gate also includes a positive Dreamer runtime
-  test that uses deterministic Architect mock input and the CPU procedural
-  fallback when TensorRT runtime support is unavailable.
-- The voxel backend is a smoke-tested experimental backend, not the primary
-  renderer path.
-- Future effects work should extend the validated Phase 3 foundations rather
-  than creating parallel systems. The current validation gates protect the
-  renderer from silent RT reflection, material parity, visual metric, budget,
-  descriptor, environment, graphics UI, particle, and post-process regressions.
-- Public-review packaging is manifest-driven by
-  `assets/config/release_package_manifest.json`; the contract validates the
-  planned payload and excludes local models, logs, generated build artifacts,
-  and source HDR/EXR environment files. The staged launch smoke copies the
-  manifest-selected runtime payload to an isolated directory and launches a
-  short `safe_startup` run from that directory, requiring a clean exit and a
-  valid frame report from the staged working directory.
+- Validation numbers depend on the GPU, driver, Windows SDK, and display mode.
+  The current local evidence was produced on an NVIDIA RTX 3070 Ti.
+- The LLM and Dreamer texture-generation paths are optional. Most renderer
+  validation runs with `--no-llm --no-dreamer`.
+- The voxel backend is an experimental backend with a smoke test, not the
+  primary renderer path.
+- The separate materials/graphics robustness ledger still tracks deeper future
+  work such as a full material-path parity matrix, advanced stress scenes, and
+  motion-camera effects readability.

@@ -5,6 +5,7 @@ TensorRT/
 CortexEngine/build/
 CortexEngine/vcpkg_installed/
 CortexEngine/build/bin/
+CortexEngine/release/
 CortexEngine/rebuild_log.txt
 .claude/
 debug_logs/

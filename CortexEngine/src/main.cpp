@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <utility>
+#include <limits>
 #include <nlohmann/json.hpp>
 
 using namespace Cortex;
@@ -65,6 +66,34 @@ bool EnvTruthy(const char* name) {
            normalized != "false" &&
            normalized != "off" &&
            normalized != "no";
+}
+
+bool TryParsePositiveUInt(const std::string& text, uint32_t& outValue) {
+    if (text.empty()) {
+        return false;
+    }
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(text.c_str(), &end, 10);
+    if (end == text.c_str() || *end != '\0' || parsed == 0ul ||
+        parsed > static_cast<unsigned long>(std::numeric_limits<uint32_t>::max())) {
+        return false;
+    }
+    outValue = static_cast<uint32_t>(parsed);
+    return true;
+}
+
+void ApplyWindowDimensionOverride(EngineConfig& config, const std::string& name, const std::string& value) {
+    uint32_t parsed = 0;
+    if (!TryParsePositiveUInt(value, parsed)) {
+        spdlog::warn("Ignoring invalid {} '{}'", name, value);
+        return;
+    }
+
+    if (name == "width") {
+        config.window.width = parsed;
+    } else if (name == "height") {
+        config.window.height = parsed;
+    }
 }
 
 struct FatalDialogDecision {
@@ -736,6 +765,12 @@ int main(int argc, char* argv[]) {
         config.window.width = 1280;
         config.window.height = 720;
         config.window.vsync = true;
+        if (const char* envWidth = std::getenv("CORTEX_WINDOW_WIDTH")) {
+            ApplyWindowDimensionOverride(config, "width", envWidth);
+        }
+        if (const char* envHeight = std::getenv("CORTEX_WINDOW_HEIGHT")) {
+            ApplyWindowDimensionOverride(config, "height", envHeight);
+        }
         // Enable the DX12 debug layer by default so we get validation + DRED breadcrumbs.
         // Force GPU-based validation OFF (it is CPU-write-only descriptor copy-incompatible and
         // can crash on some drivers). You can opt out of the debug layer entirely via
@@ -794,6 +829,7 @@ int main(int argc, char* argv[]) {
         //   --environment <manifest_id>
         //   --graphics-preset <preset_id>
         //   --camera-bookmark <bookmark_id>
+        //   --window-width <pixels> / --window-height <pixels>
         //   --mode  <default|conservative>
         //   --backend <raster|voxel>
         //   --hud <off|minimal|performance|renderer_health|full_debug>
@@ -817,6 +853,14 @@ int main(int argc, char* argv[]) {
                 config.initialCameraBookmark = argv[++i];
             } else if (arg.rfind("--camera-bookmark=", 0) == 0) {
                 config.initialCameraBookmark = arg.substr(std::string("--camera-bookmark=").size());
+            } else if (arg == "--window-width" && i + 1 < argc) {
+                ApplyWindowDimensionOverride(config, "width", argv[++i]);
+            } else if (arg.rfind("--window-width=", 0) == 0) {
+                ApplyWindowDimensionOverride(config, "width", arg.substr(std::string("--window-width=").size()));
+            } else if (arg == "--window-height" && i + 1 < argc) {
+                ApplyWindowDimensionOverride(config, "height", argv[++i]);
+            } else if (arg.rfind("--window-height=", 0) == 0) {
+                ApplyWindowDimensionOverride(config, "height", arg.substr(std::string("--window-height=").size()));
             } else if (arg == "--hud" && i + 1 < argc) {
                 const std::string hud = argv[++i];
                 if (!TrySetHudMode(config, hud)) {

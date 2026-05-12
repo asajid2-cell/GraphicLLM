@@ -78,6 +78,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomA{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomB{};
     bool bloomStageFailed = false;
+    const char* bloomGraphStageError = nullptr;
     std::string bloomStageError;
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
     bool hasVBPostStates = false;
@@ -181,7 +182,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             bloomContext.useTransients = useFusedBloomTransients;
             bloomContext.hdrResourceState = &m_mainTargets.hdr.resources.state;
             bloomContext.hdrShaderResourceState = kRenderGraphShaderResourceState;
-            bloomContext.failStage = failBloomStage;
+            bloomContext.status.failed = &bloomStageFailed;
+            bloomContext.status.stage = &bloomGraphStageError;
             bloomContext.bloomRan = &result.ranBloom;
             bloomContext.bloomStageFailed = &bloomStageFailed;
 
@@ -375,7 +377,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     if (wantsFusedBloomThisFrame && bloomStageFailed) {
         result.fallbackUsed = true;
-        result.fallbackReason = "fused_bloom_graph_stage_failed: " + bloomStageError;
+        result.fallbackReason = "fused_bloom_graph_stage_failed";
+        if (!bloomStageError.empty()) {
+            result.fallbackReason += ": " + bloomStageError;
+        } else if (bloomGraphStageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += bloomGraphStageError;
+        }
         result.ranBloom = false;
         result.ranPostProcess = false;
         spdlog::warn("RenderGraph end-of-frame: {} (graph path did not execute)", result.fallbackReason);

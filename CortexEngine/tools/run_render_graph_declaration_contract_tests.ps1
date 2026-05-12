@@ -90,6 +90,7 @@ Assert-Contains "BloomGraphPass.cpp" $bloomGraph "MarkHdrShaderResource(context)
 Assert-Contains "BloomGraphPass.cpp" $bloomGraph "MarkBloomRan(context)"
 Assert-NotContains "BloomGraphPass.h" $bloomHeader "markHdrShaderResource"
 Assert-NotContains "BloomGraphPass.h" $bloomHeader "markBloomRan"
+Assert-NotContains "BloomGraphPass.h" $bloomHeader "std::function<void(const char*)> failStage"
 Assert-NotContains "Renderer_RenderGraphBloom.cpp" $rendererBloom "declareBloomTransients"
 Assert-NotContains "Renderer_RenderGraphBloom.cpp" $rendererBloom "builder.CreateTransient"
 Assert-NotContains "Renderer_RenderGraphBloom.cpp" $rendererBloom "RenderBloomDownsample"

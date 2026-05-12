@@ -45,14 +45,20 @@ namespace {
 }
 
 void Fail(const FusedBloomContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
+    if (context.status.failed) {
+        *context.status.failed = true;
+    }
+    if (context.status.stage && !*context.status.stage) {
+        *context.status.stage = stage ? stage : "unknown";
     }
 }
 
 void Fail(const StandaloneBloomContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
+    if (context.status.failed) {
+        *context.status.failed = true;
+    }
+    if (context.status.stage && !*context.status.stage) {
+        *context.status.stage = stage ? stage : "unknown";
     }
 }
 

@@ -62,13 +62,13 @@ Package size: `83,395,208` bytes / `536,870,912` byte cap.
 
 | Key | Files and systems |
 |---|---|
-| DOC-README | `CortexEngine/README.md`, `CortexEngine/RELEASE_READINESS.md`, `CortexEngine/tools/README.md`, `CortexEngine/BUILD.md`, `CortexEngine/SCRIPTS.md` |
-| DOC-MEDIA | `CortexEngine/docs/media/`, `docs/media/gallery_manifest.json` |
+| DOC-README | root `README.md`, `CortexEngine/README.md`, `CortexEngine/RELEASE_READINESS.md`, `CortexEngine/tools/README.md`, `CortexEngine/BUILD.md`, `CortexEngine/SCRIPTS.md` |
+| DOC-MEDIA | `CortexEngine/docs/media/`, `CortexEngine/docs/media/gallery_manifest.json` |
 | DOC-METRICS | `frame_report_last.json`, `release_validation_summary.json`, gallery manifest |
 | CAPTURE | `tools/run_public_capture_gallery.ps1`, visual validation scripts |
 | PACKAGE | `assets/config/release_package_manifest.json`, package contract, launch smoke, package creation script |
 | VALIDATION | `tools/run_release_validation.ps1`, public README contract, cleanup ledger contract |
-| BRANCH | `main` handoff and `cortex-public-review-2026-05-12` tag |
+| BRANCH | `main` handoff and `cortex-public-review-clean-2026-05-12` tag |
 
 ## Ledger Items
 
@@ -92,14 +92,15 @@ Package size: `83,395,208` bytes / `536,870,912` byte cap.
 | RC-16 | Preserve existing validation while adding presentation assets. | DONE_VERIFIED | VALIDATION, DOC-MEDIA | `run_release_validation.ps1`; `git diff --check` | Full release validation passed after README/media/package tooling changes. | None. |
 | RC-17 | Commit cleanup in reviewable checkpoints. | DONE_VERIFIED | BRANCH | `git log --oneline`; `git status --short --branch --ignore-submodules=all` | Cleanup landed in ledger, tooling/media, gallery refresh, and final evidence commits. | None. |
 | RC-18 | Merge or fast-forward the final cleanup state into `main`. | DONE_VERIFIED | BRANCH | `git branch --show-current`; `git status --short --branch --ignore-submodules=all` | Final ledger closure is being committed on `main`; remote handoff is `git push -u origin main`. | None. |
-| RC-19 | Create final release tag or named checkpoint if requested. | DONE_VERIFIED | BRANCH | `git tag --list cortex-public-review-2026-05-12` | Final checkpoint tag: `cortex-public-review-2026-05-12`. | None. |
+| RC-19 | Create final release tag or named checkpoint if requested. | DONE_VERIFIED | BRANCH | `git tag --list cortex-public-review-clean-2026-05-12` | Final checkpoint tag: `cortex-public-review-clean-2026-05-12`. | None. |
 | RC-20 | Final public-review handoff summary. | DONE_VERIFIED | DOC-README, PACKAGE, VALIDATION, BRANCH | all completion gate commands | README, release readiness, package artifact, gallery manifest, release validation, main handoff, and tag are all recorded. | None. |
+| RC-21 | Keep the repository root public-facing: root README present, screenshots visible from GitHub, and old root scratch/planning/debug files removed from the public branch. | DONE_VERIFIED | root `README.md`, root tree | `run_public_readme_contract_tests.ps1`; `git ls-tree --name-only HEAD` | Root README links the committed CortexEngine screenshot gallery and the tracked root is limited to the public entrypoint plus the engine tree and repo metadata. | None. |
 
 ## Final Handoff
 
 Public branch: `main`
 
-Release tag: `cortex-public-review-2026-05-12`
+Release tag: `cortex-public-review-clean-2026-05-12`
 
 Primary commands:
 

@@ -59,8 +59,26 @@ Assert-Contains $cpp "CreateSmokeEmitter" "Default smoke GPU particle emitter is
 Assert-Contains $cpp "CreateSparkEmitter" "Default spark GPU particle emitter is missing."
 Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Renderer_GeometryPipelineSetup.cpp") -Raw) "ParticleInstancePrepare.hlsl" "Renderer does not compile the public GPU particle prepare shader."
 Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Renderer_GeometryPipelineSetup.cpp") -Raw) "ParticleEmitterLifecycle.hlsl" "Renderer does not compile the public GPU particle lifecycle shader."
-Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Passes/ParticleGpuPreparePass.cpp") -Raw) "SetComputeRootSignature" "ParticleGpuPreparePass does not dispatch the GPU prepare pass."
-Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Passes/ParticleGpuLifecyclePass.cpp") -Raw) "SetComputeRootSignature" "ParticleGpuLifecyclePass does not dispatch the GPU lifecycle pass."
+$particleState = Get-Content (Join-Path $root "src/Graphics/RendererParticleState.h") -Raw
+$particlePreparePass = Get-Content (Join-Path $root "src/Graphics/Passes/ParticleGpuPreparePass.cpp") -Raw
+$particleLifecyclePass = Get-Content (Join-Path $root "src/Graphics/Passes/ParticleGpuLifecyclePass.cpp") -Raw
+Assert-Contains $particleState "EnsureGpuPrepareDescriptors" "ParticleRenderResources does not own persistent prepare descriptors."
+Assert-Contains $particleState "EnsureGpuLifecycleDescriptors" "ParticleRenderResources does not own persistent lifecycle descriptors."
+Assert-Contains $particleState "AllocateCBV_SRV_UAV" "ParticleRenderResources does not allocate persistent shader-visible descriptors."
+Assert-Contains $particleState "CreateShaderResourceView" "ParticleRenderResources does not publish particle SRVs."
+Assert-Contains $particleState "CreateUnorderedAccessView" "ParticleRenderResources does not publish the particle instance UAV."
+Assert-Contains $particlePreparePass "SetComputeRootSignature" "ParticleGpuPreparePass does not dispatch the GPU prepare pass."
+Assert-Contains $particlePreparePass "EnsureGpuPrepareDescriptors" "ParticleGpuPreparePass does not bind persistent prepare descriptors."
+Assert-Contains $particleLifecyclePass "SetComputeRootSignature" "ParticleGpuLifecyclePass does not dispatch the GPU lifecycle pass."
+Assert-Contains $particleLifecyclePass "EnsureGpuLifecycleDescriptors" "ParticleGpuLifecyclePass does not bind persistent lifecycle descriptors."
+foreach ($transientDescriptorCall in @("AllocateTransientCBV_SRV_UAV", "AllocateTransientCBV_SRV_UAVRange")) {
+    if ($particlePreparePass.IndexOf($transientDescriptorCall, [StringComparison]::Ordinal) -ge 0) {
+        Add-Failure "ParticleGpuPreparePass still allocates transient descriptors: $transientDescriptorCall"
+    }
+    if ($particleLifecyclePass.IndexOf($transientDescriptorCall, [StringComparison]::Ordinal) -ge 0) {
+        Add-Failure "ParticleGpuLifecyclePass still allocates transient descriptors: $transientDescriptorCall"
+    }
+}
 Assert-Contains (Get-Content (Join-Path $root "src/Graphics/Renderer_FrameContractSnapshot.cpp") -Raw) "gpu_emitter_lifecycle_sort_dx12_instanced_billboard" "Frame contract does not report the GPU lifecycle particle backend."
 Assert-Contains (Get-Content (Join-Path $root "src/Graphics/FrameContractJson.cpp") -Raw) "gpu_lifecycle_path" "Frame contract JSON does not expose gpu_lifecycle_path."
 Assert-Contains (Get-Content (Join-Path $root "src/Core/Engine.cpp") -Raw) "UsesGpuParticleLifecycle" "Engine CPU particle update is not gated by the GPU particle lifecycle path."

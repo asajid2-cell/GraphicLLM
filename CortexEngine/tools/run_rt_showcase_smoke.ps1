@@ -316,11 +316,11 @@ if ($null -ne $report.frame_contract.pass_budget_summary) {
             $particleTransientDelta += [int]$entry.transient_descriptor_delta
         }
     }
-    if ($transientDescriptorDelta -ne $particleTransientDelta) {
-        Add-Failure "unexpected non-particle transient descriptor delta: total=$transientDescriptorDelta particles=$particleTransientDelta"
+    if ($transientDescriptorDelta -ne 0) {
+        Add-Failure "unexpected frame-end transient descriptor delta: total=$transientDescriptorDelta particles=$particleTransientDelta"
     }
-    if ([bool]$report.frame_contract.particles.gpu_particle_public_path -and $particleTransientDelta -lt 2) {
-        Add-Failure "GPU particle path reported public but particle transient descriptor delta was $particleTransientDelta, expected >= 2"
+    if ([bool]$report.frame_contract.particles.gpu_particle_public_path -and $particleTransientDelta -ne 0) {
+        Add-Failure "GPU particle path reported public but particle transient descriptor delta was $particleTransientDelta, expected 0 because particle compute descriptors are persistent"
     }
 }
 if (-not [bool]$report.camera.active) {

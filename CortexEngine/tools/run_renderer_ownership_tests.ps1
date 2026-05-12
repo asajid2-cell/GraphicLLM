@@ -600,14 +600,27 @@ foreach ($target in $doc.targets) {
                 Add-Failure "particle_resources missing ParticleBillboardPass marker: $passMarker"
             }
         }
-        foreach ($prepareMarker in @("namespace Cortex::Graphics::ParticleGpuPreparePass", "PrepareContext", "CreateShaderResourceView", "CreateUnorderedAccessView", "SetComputeRootSignature", "Dispatch")) {
+        foreach ($descriptorMarker in @("gpuSourceSrv", "gpuEmitterSrv", "gpuInstanceUav", "EnsureGpuPrepareDescriptors", "EnsureGpuLifecycleDescriptors", "EnsureGpuInstanceUav", "AllocateCBV_SRV_UAV", "CreateShaderResourceView", "CreateUnorderedAccessView")) {
+            if ($particleState.IndexOf($descriptorMarker, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "particle_resources missing persistent GPU descriptor marker in RendererParticleState.h: $descriptorMarker"
+            }
+        }
+        foreach ($prepareMarker in @("namespace Cortex::Graphics::ParticleGpuPreparePass", "PrepareContext", "EnsureGpuPrepareDescriptors", "SetComputeRootSignature", "Dispatch")) {
             if ($particleGpuPreparePass.IndexOf($prepareMarker, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "particle_resources missing ParticleGpuPreparePass marker: $prepareMarker"
             }
         }
-        foreach ($lifecycleMarker in @("namespace Cortex::Graphics::ParticleGpuLifecyclePass", "DispatchContext", "CreateShaderResourceView", "CreateUnorderedAccessView", "SetComputeRootSignature", "Dispatch")) {
+        foreach ($lifecycleMarker in @("namespace Cortex::Graphics::ParticleGpuLifecyclePass", "DispatchContext", "EnsureGpuLifecycleDescriptors", "SetComputeRootSignature", "Dispatch")) {
             if ($particleGpuLifecyclePass.IndexOf($lifecycleMarker, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "particle_resources missing ParticleGpuLifecyclePass marker: $lifecycleMarker"
+            }
+        }
+        foreach ($transientDescriptorCall in @("AllocateTransientCBV_SRV_UAV", "AllocateTransientCBV_SRV_UAVRange")) {
+            if ($particleGpuPreparePass.IndexOf($transientDescriptorCall, [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "particle_resources ParticleGpuPreparePass still allocates transient descriptors: $transientDescriptorCall"
+            }
+            if ($particleGpuLifecyclePass.IndexOf($transientDescriptorCall, [StringComparison]::Ordinal) -ge 0) {
+                Add-Failure "particle_resources ParticleGpuLifecyclePass still allocates transient descriptors: $transientDescriptorCall"
             }
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {

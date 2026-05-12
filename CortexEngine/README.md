@@ -52,16 +52,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_publi
 ## Current Metrics
 
 Source run:
-`CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_132733_943_27296_0d962fbc`
+`CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_133541_420_18928_97a03e95`
 
 | Scene | GPU ms | Capture | Render scale | Avg luma | Nonblack | RT signal/history |
 |---|---:|---:|---:|---:|---:|---:|
-| RT Showcase | 4.53 | 1920x1080 | 1.00 | 70.34 | 1.000 | 0.0228 / 0.0295 |
+| RT Showcase | 4.38 | 1920x1080 | 1.00 | 70.31 | 1.000 | 0.0228 / 0.0295 |
 | Material Lab | 4.17 | 1920x1080 | 1.00 | 183.15 | 1.000 | 0.0214 / 0.0224 |
-| Glass and Water | 5.06 | 1920x1080 | 1.00 | 180.85 | 1.000 | 0.0392 / 0.0404 |
-| Effects Showcase | 4.75 | 1920x1080 | 1.00 | 110.52 | 1.000 | 0.0042 / 0.0042 |
-| Outdoor Sunset Beach | 3.38 | 1920x1080 | 1.00 | 169.95 | 1.000 | 0.0048 / 0.0048 |
-| IBL Gallery | 4.65 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
+| Glass and Water | 4.29 | 1920x1080 | 1.00 | 180.85 | 1.000 | 0.0392 / 0.0404 |
+| Effects Showcase | 4.90 | 1920x1080 | 1.00 | 110.56 | 1.000 | 0.0042 / 0.0042 |
+| Outdoor Sunset Beach | 3.41 | 1920x1080 | 1.00 | 169.96 | 1.000 | 0.0048 / 0.0048 |
+| IBL Gallery | 4.60 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
 
 Release validation also checks descriptor pressure, memory budgets, RT budget
 profiles, visual probes, and package launch behavior. See

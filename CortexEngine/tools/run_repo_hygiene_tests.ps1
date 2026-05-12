@@ -47,6 +47,31 @@ try {
     } elseif ($trackedGenerated.Count -gt 0) {
         Add-Failure "Generated build/cache artifacts are tracked:`n$($trackedGenerated -join [Environment]::NewLine)"
     }
+
+    $trackedRoot = @(& git ls-files | Where-Object { $_ -notmatch "/" })
+    foreach ($rootFile in $trackedRoot) {
+        if ($rootFile -notin @(".gitignore", "README.md")) {
+            Add-Failure "Unexpected public root file is tracked: $rootFile"
+        }
+    }
+
+    $forbiddenTracked = @(& git ls-files `
+        "phase*.md" `
+        "findingplan.Md" `
+        "nextphase.md" `
+        "CortexEngine/*.py" `
+        "CortexEngine/debug_menu_state.json" `
+        "CortexEngine/PHASE*.md" `
+        "CortexEngine/*ENHANCEMENTS.md" `
+        "CortexEngine/*IMPLEMENTATION.md" `
+        "CortexEngine/MATERIAL_SYSTEM.md" `
+        "CortexEngine/docs/*LEDGER.md" `
+        "CortexEngine/assets/polyhaven/*.blend" 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        Add-Failure "git ls-files public-noise scan failed: $($forbiddenTracked -join ' ')"
+    } elseif ($forbiddenTracked.Count -gt 0) {
+        Add-Failure "Public-noise planning/generated/source-asset files are tracked:`n$($forbiddenTracked -join [Environment]::NewLine)"
+    }
 } finally {
     Pop-Location
 }

@@ -8,6 +8,7 @@ $readmePath = Join-Path $root "README.md"
 $repoReadmePath = Join-Path $repoRoot "README.md"
 $releasePath = Join-Path $root "RELEASE_READINESS.md"
 $manifestPath = Join-Path $root "docs/media/gallery_manifest.json"
+$videoManifestPath = Join-Path $root "docs/media/video_manifest.json"
 $packageManifestPath = Join-Path $root "assets/config/release_package_manifest.json"
 $failures = New-Object System.Collections.Generic.List[string]
 
@@ -25,6 +26,7 @@ if (-not (Test-Path $readmePath)) { throw "README missing: $readmePath" }
 if (-not (Test-Path $repoReadmePath)) { throw "Repository README missing: $repoReadmePath" }
 if (-not (Test-Path $releasePath)) { throw "RELEASE_READINESS missing: $releasePath" }
 if (-not (Test-Path $manifestPath)) { Add-Failure "Gallery manifest missing: $manifestPath" }
+if (-not (Test-Path $videoManifestPath)) { Add-Failure "Video manifest missing: $videoManifestPath" }
 if (-not (Test-Path $packageManifestPath)) { throw "Package manifest missing: $packageManifestPath" }
 
 $readme = Get-Content $readmePath -Raw
@@ -49,6 +51,7 @@ foreach ($section in @(
 foreach ($token in @(
     "real-time DirectX 12 hybrid renderer",
     "run_public_capture_gallery.ps1",
+    "run_public_gallery_reel.ps1",
     "run_release_validation.ps1",
     "run_release_package_contract_tests.ps1",
     "run_release_package_launch_smoke.ps1",
@@ -64,7 +67,9 @@ foreach ($token in @(
     "real-time DirectX 12 hybrid renderer",
     "CortexEngine/docs/media/rt_showcase_hero.png",
     "CortexEngine/docs/media/gallery_manifest.json",
+    "CortexEngine/docs/media/cortex_gallery_reel.mp4",
     "run_public_capture_gallery.ps1",
+    "run_public_gallery_reel.ps1",
     "run_release_validation.ps1",
     "public_high",
     "release_showcase"
@@ -92,8 +97,8 @@ if (Test-Path $manifestPath) {
     if ([int]$manifest.schema -ne 1) {
         Add-Failure "gallery_manifest.json schema is not 1"
     }
-    if (@($manifest.entries).Count -lt 6) {
-        Add-Failure "gallery_manifest.json must contain at least six public captures"
+    if (@($manifest.entries).Count -lt 12) {
+        Add-Failure "gallery_manifest.json must contain at least twelve public captures"
     }
     foreach ($entry in $manifest.entries) {
         $image = [string]$entry.image
@@ -116,14 +121,44 @@ if (Test-Path $manifestPath) {
     }
 }
 
+if (Test-Path $videoManifestPath) {
+    $videoManifest = Get-Content $videoManifestPath -Raw | ConvertFrom-Json
+    if ([int]$videoManifest.schema -ne 1) {
+        Add-Failure "video_manifest.json schema is not 1"
+    }
+    $videoPath = Join-Path $root (([string]$videoManifest.output) -replace "/", "\")
+    if (-not (Test-Path $videoPath -PathType Leaf)) {
+        Add-Failure "public video missing: $($videoManifest.output)"
+    } elseif ((Get-Item $videoPath).Length -lt 1024) {
+        Add-Failure "public video is unexpectedly small: $($videoManifest.output)"
+    }
+    Require-Contains "README.md" $readme ([string]$videoManifest.output)
+    Require-Contains "repository README.md" $repoReadme ("CortexEngine/" + [string]$videoManifest.output)
+    if ([int]$videoManifest.source_image_count -lt 12) {
+        Add-Failure "video manifest must use at least twelve gallery images"
+    }
+}
+
 foreach ($doc in @(
     "docs/media/gallery_manifest.json",
+    "docs/media/video_manifest.json",
     "docs/media/rt_showcase_hero.png",
+    "docs/media/rt_showcase_reflection_closeup.png",
+    "docs/media/rt_showcase_material_overview.png",
     "docs/media/material_lab_hero.png",
+    "docs/media/material_lab_metal_closeup.png",
+    "docs/media/material_lab_glass_emissive.png",
     "docs/media/glass_water_courtyard_hero.png",
+    "docs/media/glass_water_courtyard_water_closeup.png",
+    "docs/media/glass_water_courtyard_glass_canopy.png",
     "docs/media/effects_showcase_hero.png",
+    "docs/media/effects_showcase_particles_closeup.png",
+    "docs/media/effects_showcase_neon_materials.png",
     "docs/media/outdoor_sunset_beach_hero.png",
-    "docs/media/ibl_gallery_sweep.png"
+    "docs/media/outdoor_sunset_beach_waterline.png",
+    "docs/media/ibl_gallery_hero.png",
+    "docs/media/ibl_gallery_sweep.png",
+    "docs/media/cortex_gallery_reel.mp4"
 )) {
     $found = $false
     foreach ($requiredDoc in $packageManifest.required_docs) {

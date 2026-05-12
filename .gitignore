@@ -23,6 +23,7 @@ nul
 # Local generated diagnostics
 *.log
 *.mp4
+!CortexEngine/docs/media/*.mp4
 *.avi
 *.mov
 

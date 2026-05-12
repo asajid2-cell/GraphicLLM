@@ -157,7 +157,7 @@ echo.
 echo Documentation:
 echo   README.md          - Project overview
 echo   BUILD.md           - Build instructions
-echo   PHASE1_COMPLETE.md - Implementation details
+echo   RELEASE_READINESS.md - Validation summary
 echo.
 
 pause

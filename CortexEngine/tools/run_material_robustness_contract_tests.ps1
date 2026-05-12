@@ -30,7 +30,8 @@ $basic = Read-Text "assets/shaders/Basic.hlsl"
 $resolve = Read-Text "assets/shaders/MaterialResolve.hlsl"
 $deferred = Read-Text "assets/shaders/DeferredLighting.hlsl"
 $release = Read-Text "tools/run_release_validation.ps1"
-$ledger = Read-Text "docs/MATERIALS_GRAPHICS_ROBUSTNESS_LEDGER.md"
+$showcaseScenes = Read-Text "assets/config/showcase_scenes.json"
+$advancedCatalog = Read-Text "assets/config/advanced_graphics_catalog.json"
 
 Require-Contains $registryHeader "Canonicalize" `
     "MaterialPresetRegistry does not expose Canonicalize for UI/config-safe preset names"
@@ -130,8 +131,25 @@ Require-Contains $release "material_robustness_contract" `
 Require-Contains $release "run_material_robustness_contract_tests.ps1" `
     "Release validation must invoke run_material_robustness_contract_tests.ps1"
 
-foreach ($id in @("MR-01", "MR-02", "MR-03", "GR-03", "GR-07")) {
-    Require-Contains $ledger $id "Materials/graphics robustness ledger missing item $id"
+foreach ($token in @(
+    "material_lab",
+    "glass_water_courtyard",
+    "effects_showcase",
+    "required_features",
+    "advanced_materials",
+    "particles",
+    "cinematic_post"
+)) {
+    Require-Contains $showcaseScenes $token "Showcase scene manifest missing material/graphics coverage token '$token'"
+}
+
+foreach ($token in @(
+    "advanced_materials",
+    "lighting_rigs",
+    "particles",
+    "cinematic_post"
+)) {
+    Require-Contains $advancedCatalog $token "Advanced graphics catalog missing coverage token '$token'"
 }
 
 if ($failures.Count -gt 0) {

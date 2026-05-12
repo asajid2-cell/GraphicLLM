@@ -32,11 +32,21 @@ Add-Type -AssemblyName System.Drawing
 $preset = if ($Quality -eq "High") { "public_high" } else { "release_showcase" }
 $cases = @(
     @{ id = "rt_showcase"; title = "RT Showcase"; scene = "rt_showcase"; bookmark = "hero"; environment = "studio"; frames = 260; image = "rt_showcase_hero.png" },
+    @{ id = "rt_showcase_reflection_closeup"; title = "RT Reflection Closeup"; scene = "rt_showcase"; bookmark = "reflection_closeup"; environment = "studio"; frames = 180; image = "rt_showcase_reflection_closeup.png" },
+    @{ id = "rt_showcase_material_overview"; title = "RT Material Overview"; scene = "rt_showcase"; bookmark = "material_overview"; environment = "warm_gallery"; frames = 180; image = "rt_showcase_material_overview.png" },
     @{ id = "material_lab"; title = "Material Lab"; scene = "material_lab"; bookmark = "hero"; environment = "cool_overcast"; frames = 180; image = "material_lab_hero.png" },
+    @{ id = "material_lab_metal_closeup"; title = "Material Lab Metal Closeup"; scene = "material_lab"; bookmark = "metal_closeup"; environment = "studio"; frames = 160; image = "material_lab_metal_closeup.png" },
+    @{ id = "material_lab_glass_emissive"; title = "Material Lab Glass and Emissive"; scene = "material_lab"; bookmark = "glass_emissive"; environment = "night_city"; frames = 160; image = "material_lab_glass_emissive.png" },
     @{ id = "glass_water_courtyard"; title = "Glass and Water Courtyard"; scene = "glass_water_courtyard"; bookmark = "hero"; environment = "sunset_courtyard"; frames = 180; image = "glass_water_courtyard_hero.png" },
+    @{ id = "glass_water_courtyard_water_closeup"; title = "Water Reflection Closeup"; scene = "glass_water_courtyard"; bookmark = "water_closeup"; environment = "sunset_courtyard"; frames = 160; image = "glass_water_courtyard_water_closeup.png" },
+    @{ id = "glass_water_courtyard_glass_canopy"; title = "Glass Canopy Rim Light"; scene = "glass_water_courtyard"; bookmark = "glass_canopy"; environment = "warm_gallery"; frames = 160; image = "glass_water_courtyard_glass_canopy.png" },
     @{ id = "effects_showcase"; title = "Effects Showcase"; scene = "effects_showcase"; bookmark = "hero"; environment = "night_city"; frames = 220; image = "effects_showcase_hero.png" },
+    @{ id = "effects_showcase_particles_closeup"; title = "Particle and Bloom Closeup"; scene = "effects_showcase"; bookmark = "particles_closeup"; environment = "night_city"; frames = 180; image = "effects_showcase_particles_closeup.png" },
+    @{ id = "effects_showcase_neon_materials"; title = "Neon Materials"; scene = "effects_showcase"; bookmark = "neon_materials"; environment = "night_city"; frames = 180; image = "effects_showcase_neon_materials.png" },
     @{ id = "outdoor_sunset_beach"; title = "Outdoor Sunset Beach"; scene = "outdoor_sunset_beach"; bookmark = "hero"; environment = "sunset_courtyard"; frames = 180; image = "outdoor_sunset_beach_hero.png" },
-    @{ id = "ibl_gallery"; title = "IBL Gallery"; scene = "ibl_gallery"; bookmark = "environment_sweep"; environment = "warm_gallery"; frames = 180; image = "ibl_gallery_sweep.png" }
+    @{ id = "outdoor_sunset_beach_waterline"; title = "Outdoor Waterline"; scene = "outdoor_sunset_beach"; bookmark = "waterline"; environment = "sunset_courtyard"; frames = 160; image = "outdoor_sunset_beach_waterline.png" },
+    @{ id = "ibl_gallery_hero"; title = "IBL Gallery Hero"; scene = "ibl_gallery"; bookmark = "hero"; environment = "warm_gallery"; frames = 160; image = "ibl_gallery_hero.png" },
+    @{ id = "ibl_gallery"; title = "IBL Gallery Sweep"; scene = "ibl_gallery"; bookmark = "environment_sweep"; environment = "warm_gallery"; frames = 180; image = "ibl_gallery_sweep.png" }
 )
 
 $runId = "public_capture_gallery_{0}_{1}_{2}" -f `
@@ -80,11 +90,13 @@ foreach ($case in $cases) {
     $oldCapture = $env:CORTEX_CAPTURE_VISUAL_VALIDATION
     $oldDebugLayer = $env:CORTEX_DISABLE_DEBUG_LAYER
     $oldMinFrame = $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME
+    $oldPublicClean = $env:CORTEX_PUBLIC_CAPTURE_CLEAN
     try {
         $env:CORTEX_LOG_DIR = $caseLogDir
         $env:CORTEX_CAPTURE_VISUAL_VALIDATION = "1"
         $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
         $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = "30"
+        $env:CORTEX_PUBLIC_CAPTURE_CLEAN = "1"
 
         $frames = [Math]::Max($SmokeFrames, [int]$case.frames)
         Push-Location (Split-Path -Parent $exe)
@@ -112,6 +124,7 @@ foreach ($case in $cases) {
         if ($null -eq $oldCapture) { Remove-Item Env:\CORTEX_CAPTURE_VISUAL_VALIDATION -ErrorAction SilentlyContinue } else { $env:CORTEX_CAPTURE_VISUAL_VALIDATION = $oldCapture }
         if ($null -eq $oldDebugLayer) { Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue } else { $env:CORTEX_DISABLE_DEBUG_LAYER = $oldDebugLayer }
         if ($null -eq $oldMinFrame) { Remove-Item Env:\CORTEX_VISUAL_VALIDATION_MIN_FRAME -ErrorAction SilentlyContinue } else { $env:CORTEX_VISUAL_VALIDATION_MIN_FRAME = $oldMinFrame }
+        if ($null -eq $oldPublicClean) { Remove-Item Env:\CORTEX_PUBLIC_CAPTURE_CLEAN -ErrorAction SilentlyContinue } else { $env:CORTEX_PUBLIC_CAPTURE_CLEAN = $oldPublicClean }
     }
 
     if ($exitCode -ne 0) {

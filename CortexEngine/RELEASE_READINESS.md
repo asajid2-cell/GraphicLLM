@@ -1,9 +1,9 @@
 # Cortex Engine Release Readiness
 
-This document records the current public-review posture for Project Cortex.
-Cortex is presented as a real-time DirectX 12 hybrid renderer with validation
-evidence, high-resolution screenshots, package checks, and a staged launch
-smoke.
+This document records the current public-review posture for Project Cortex:
+a real-time DirectX 12 hybrid renderer with validation evidence,
+high-resolution screenshots, a short gallery reel, package checks, and a staged
+launch smoke.
 
 ## Status
 
@@ -27,20 +27,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_creat
 Latest full integrated gate:
 
 ```text
-CortexEngine/build/bin/logs/runs/release_validation_20260512_133827_609_2236_0286ad00/release_validation_summary.json
+CortexEngine/build/bin/logs/runs/release_validation_20260512_153337_590_21416_37e45f02/release_validation_summary.json
 ```
 
 Result:
 
 - `status=passed`
-- `step_count=64`
+- `step_count=62`
 - `failure_count=0`
-- release package contract and staged package launch smoke passed
+- public README contract, release package contract, and staged package launch
+  smoke passed
 - RT showcase, temporal validation, material lab, visual probes, IBL gallery,
   effects gallery, renderer ownership, budget matrix, and voxel backend smoke
   passed
 
-Final package artifact from the same cleanup state:
+Previous package artifact from the cleanup state:
 
 ```text
 CortexEngine/release/cortex-public-review_6de5ffd_20260512_134536.zip
@@ -56,27 +57,31 @@ Package size: `83,395,208` bytes, below the `536,870,912` byte manifest cap.
 
 ## Public Capture Evidence
 
-High-resolution public captures were generated with:
+High-resolution public captures and the public reel are generated with:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -OutputDir CortexEngine/docs/media -Width 1920 -Height 1080
+powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_gallery_reel.ps1
 ```
 
-Capture manifest:
+Media manifests:
 
 ```text
 CortexEngine/docs/media/gallery_manifest.json
+CortexEngine/docs/media/video_manifest.json
 ```
 
 Capture run:
 
 ```text
-CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_133541_420_18928_97a03e95
+CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_151920_699_36360_0cb5c88e
 ```
 
 The gallery uses the `public_high` graphics preset and records scene, camera,
 environment, render scale, capture size, GPU frame time, luma metrics, and RT
-reflection signal/history values for each public screenshot.
+reflection signal/history values for each public screenshot. The current public
+gallery has 16 committed 1920x1080 screenshots. The MP4 reel is a derived
+public media asset generated from those committed screenshots.
 
 ## Release Gate Coverage
 
@@ -111,8 +116,8 @@ Included:
 
 - Runtime executable, required DLLs, shaders, config files, compressed runtime
   textures, and environment manifests.
-- Public docs, release readiness notes, cleanup ledger, and screenshot gallery
-  media.
+- Public docs, release readiness notes, screenshot gallery media, and the
+  generated public reel.
 
 Excluded:
 
@@ -143,6 +148,5 @@ infinite-world engine. The validated path emphasizes:
   validation runs with `--no-llm --no-dreamer`.
 - The voxel backend is an experimental backend with a smoke test, not the
   primary renderer path.
-- The separate materials/graphics robustness ledger still tracks deeper future
-  work such as a full material-path parity matrix, advanced stress scenes, and
-  motion-camera effects readability.
+- Larger authored content sets, deeper material-path parity matrices, and
+  longer camera-motion videos are still future renderer/content work.

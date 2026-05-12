@@ -69,8 +69,11 @@ depending on generator) and runs it:
 ### Other helper scripts
 
 - `full-build.ps1` - convenience wrapper that runs setup and then build.
-- `swap.ps1`, `convert_and_clean.py`, `smart_convert.py`, etc. - tools used for
-  model and asset conversion; see comments in each script for details.
+- `tools\run_release_validation.ps1` - full public release validation.
+- `tools\run_public_capture_gallery.ps1` - regenerates committed public
+  screenshots and the gallery manifest.
+- `tools\run_public_gallery_reel.ps1` - regenerates the short public media reel
+  from committed gallery screenshots.
 
 ---
 

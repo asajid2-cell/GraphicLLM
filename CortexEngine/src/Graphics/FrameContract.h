@@ -323,6 +323,7 @@ struct FrameContract {
         bool publicRuntimePath = false;
         bool gpuParticlePublicPath = false;
         bool cpuSimulationPath = false;
+        bool gpuLifecyclePath = false;
         bool gpuSimulationPath = false;
         bool gpuSortPath = false;
         bool gpuDrawPath = false;

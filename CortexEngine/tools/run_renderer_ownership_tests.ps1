@@ -75,6 +75,11 @@ if (-not (Test-Path $particleGpuPreparePassPath)) {
     throw "ParticleGpuPreparePass.cpp not found: $particleGpuPreparePassPath"
 }
 $particleGpuPreparePass = Get-Content $particleGpuPreparePassPath -Raw
+$particleGpuLifecyclePassPath = Join-Path $root "src/Graphics/Passes/ParticleGpuLifecyclePass.cpp"
+if (-not (Test-Path $particleGpuLifecyclePassPath)) {
+    throw "ParticleGpuLifecyclePass.cpp not found: $particleGpuLifecyclePassPath"
+}
+$particleGpuLifecyclePass = Get-Content $particleGpuLifecyclePassPath -Raw
 $debugLineStatePath = Join-Path $root "src/Graphics/RendererDebugLineState.h"
 $debugLineRendererPath = Join-Path $root "src/Graphics/Renderer_DebugLines.cpp"
 $debugLinePassPath = Join-Path $root "src/Graphics/Passes/DebugLinePass.cpp"
@@ -598,6 +603,11 @@ foreach ($target in $doc.targets) {
         foreach ($prepareMarker in @("namespace Cortex::Graphics::ParticleGpuPreparePass", "PrepareContext", "CreateShaderResourceView", "CreateUnorderedAccessView", "SetComputeRootSignature", "Dispatch")) {
             if ($particleGpuPreparePass.IndexOf($prepareMarker, [StringComparison]::Ordinal) -lt 0) {
                 Add-Failure "particle_resources missing ParticleGpuPreparePass marker: $prepareMarker"
+            }
+        }
+        foreach ($lifecycleMarker in @("namespace Cortex::Graphics::ParticleGpuLifecyclePass", "DispatchContext", "CreateShaderResourceView", "CreateUnorderedAccessView", "SetComputeRootSignature", "Dispatch")) {
+            if ($particleGpuLifecyclePass.IndexOf($lifecycleMarker, [StringComparison]::Ordinal) -lt 0) {
+                Add-Failure "particle_resources missing ParticleGpuLifecyclePass marker: $lifecycleMarker"
             }
         }
         if ($particleRenderer.IndexOf("View<Scene::ParticleEmitterComponent, Scene::TransformComponent>", [StringComparison]::Ordinal) -lt 0) {
@@ -2169,6 +2179,7 @@ foreach ($target in $doc.targets) {
             "Passes/ReadbackBuffer.cpp",
             "Passes/MeshDrawPass.cpp",
             "Passes/ParticleBillboardPass.cpp",
+            "Passes/ParticleGpuLifecyclePass.cpp",
             "Passes/ParticleGpuPreparePass.cpp",
             "Passes/MainPassTargetPass.cpp",
             "Passes/PostProcessTargetPass.cpp",

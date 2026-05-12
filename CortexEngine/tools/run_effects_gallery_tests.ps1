@@ -111,14 +111,17 @@ if ($null -eq $particles) {
     if ([int]$particles.instance_capacity -lt [int]$particles.submitted_instances) {
         Add-Failure "particle instance capacity is smaller than submitted instances"
     }
-    if ([string]$particles.runtime_backend -ne "ecs_cpu_lifecycle_gpu_prepare_sort_dx12_instanced_billboard") {
-        Add-Failure "particle runtime_backend was '$($particles.runtime_backend)', expected ecs_cpu_lifecycle_gpu_prepare_sort_dx12_instanced_billboard"
+    if ([string]$particles.runtime_backend -ne "gpu_emitter_lifecycle_sort_dx12_instanced_billboard") {
+        Add-Failure "particle runtime_backend was '$($particles.runtime_backend)', expected gpu_emitter_lifecycle_sort_dx12_instanced_billboard"
     }
     if (-not [bool]$particles.public_runtime_path) {
         Add-Failure "particles.public_runtime_path is false"
     }
-    if (-not [bool]$particles.cpu_simulation_path) {
-        Add-Failure "particles.cpu_simulation_path is false for the current ECS simulation path"
+    if ([bool]$particles.cpu_simulation_path) {
+        Add-Failure "particles.cpu_simulation_path is true; public particles should not use ECS particle storage"
+    }
+    if (-not [bool]$particles.gpu_lifecycle_path) {
+        Add-Failure "particles.gpu_lifecycle_path is false"
     }
     if (-not [bool]$particles.gpu_simulation_path) {
         Add-Failure "particles.gpu_simulation_path is false; effects gallery should use the public GPU prepare path"
@@ -129,8 +132,8 @@ if ($null -eq $particles) {
     if (-not [bool]$particles.gpu_draw_path) {
         Add-Failure "particles.gpu_draw_path is false; particles should still render through DX12 instancing"
     }
-    if ([string]$particles.simulation_backend -ne "ecs_cpu_lifecycle_gpu_frame_prepare") {
-        Add-Failure "particle simulation_backend was '$($particles.simulation_backend)', expected ecs_cpu_lifecycle_gpu_frame_prepare"
+    if ([string]$particles.simulation_backend -ne "gpu_emitter_lifecycle_compute") {
+        Add-Failure "particle simulation_backend was '$($particles.simulation_backend)', expected gpu_emitter_lifecycle_compute"
     }
     if ([string]$particles.render_backend -ne "gpu_sorted_dx12_instanced_billboard") {
         Add-Failure "particle render_backend was '$($particles.render_backend)', expected gpu_sorted_dx12_instanced_billboard"

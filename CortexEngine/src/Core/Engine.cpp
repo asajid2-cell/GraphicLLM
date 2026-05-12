@@ -1497,7 +1497,7 @@ void Engine::Update(float deltaTime) {
     // smoke / fire effects. Simulation runs in lockstep with the main update
     // so that render and physics stay in sync without introducing additional
     // threading complexity.
-    if (m_registry) {
+    if (m_registry && (!m_renderer || !m_renderer->UsesGpuParticleLifecycle())) {
         auto view = m_registry->View<Scene::ParticleEmitterComponent, Scene::TransformComponent>();
         for (auto entity : view) {
             auto& emitter   = view.get<Scene::ParticleEmitterComponent>(entity);

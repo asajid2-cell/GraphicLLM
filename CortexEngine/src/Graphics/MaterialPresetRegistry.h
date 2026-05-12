@@ -44,6 +44,7 @@ class MaterialPresetRegistry {
 public:
     [[nodiscard]] static const std::vector<MaterialPresetDescriptor>& CanonicalPresets();
     [[nodiscard]] static std::string Normalize(std::string_view presetName);
+    [[nodiscard]] static std::string Canonicalize(std::string_view presetName);
     [[nodiscard]] static bool ContainsToken(std::string_view presetName, std::string_view token);
     [[nodiscard]] static MaterialPresetInfo Resolve(std::string_view presetName);
 };

@@ -36,18 +36,69 @@ const std::vector<MaterialPresetDescriptor>& MaterialPresetRegistry::CanonicalPr
 }
 
 std::string MaterialPresetRegistry::Normalize(std::string_view presetName) {
-    std::string value(presetName);
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::string value;
+    value.reserve(presetName.size());
+
+    bool lastWasSeparator = true;
+    for (unsigned char c : presetName) {
+        if (std::isalnum(c)) {
+            value.push_back(static_cast<char>(std::tolower(c)));
+            lastWasSeparator = false;
+        } else if (!lastWasSeparator) {
+            value.push_back('_');
+            lastWasSeparator = true;
+        }
+    }
+    while (!value.empty() && value.back() == '_') {
+        value.pop_back();
+    }
     return value;
+}
+
+std::string MaterialPresetRegistry::Canonicalize(std::string_view presetName) {
+    const std::string normalized = Normalize(presetName);
+    if (normalized.empty()) {
+        return {};
+    }
+
+    for (const auto& preset : CanonicalPresets()) {
+        if (normalized == Normalize(preset.id) ||
+            normalized == Normalize(preset.displayName)) {
+            return preset.id;
+        }
+    }
+
+    struct Alias {
+        std::string_view alias;
+        std::string_view id;
+    };
+    static constexpr Alias aliases[] = {
+        {"car_paint", "anisotropic_car_paint"},
+        {"auto_paint", "anisotropic_car_paint"},
+        {"gold", "brushed_gold"},
+        {"metal_gold", "brushed_gold"},
+        {"stone_wet", "wet_stone"},
+        {"marble", "procedural_marble"},
+        {"neon", "neon_tube"},
+        {"emissive", "emissive_panel"},
+        {"ceramic", "matte"},
+        {"matte_ceramic", "matte"},
+    };
+
+    for (const Alias alias : aliases) {
+        if (normalized == alias.alias) {
+            return std::string(alias.id);
+        }
+    }
+
+    return normalized;
 }
 
 bool MaterialPresetRegistry::ContainsToken(std::string_view presetName, std::string_view token) {
     if (presetName.empty() || token.empty()) {
         return false;
     }
-    return Normalize(presetName).find(token) != std::string::npos;
+    return Normalize(presetName).find(Normalize(token)) != std::string::npos;
 }
 
 MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) {
@@ -56,7 +107,7 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         return info;
     }
 
-    const std::string presetLower = Normalize(presetName);
+    const std::string presetLower = Canonicalize(presetName);
     auto contains = [&](std::string_view token) {
         return presetLower.find(token) != std::string::npos;
     };

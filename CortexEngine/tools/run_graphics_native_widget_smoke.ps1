@@ -134,9 +134,11 @@ $arguments = @(
 $oldLogDir = $env:CORTEX_LOG_DIR
 $oldOpenSettings = $env:CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP
 $oldDisableDebugLayer = $env:CORTEX_DISABLE_DEBUG_LAYER
+$oldDisablePerfGovernor = $env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR
 $env:CORTEX_LOG_DIR = $LogDir
 $env:CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP = "1"
 $env:CORTEX_DISABLE_DEBUG_LAYER = "1"
+$env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR = "1"
 
 try {
     $process = Start-Process `
@@ -150,6 +152,7 @@ try {
     if ($null -eq $oldLogDir) { Remove-Item Env:\CORTEX_LOG_DIR -ErrorAction SilentlyContinue } else { $env:CORTEX_LOG_DIR = $oldLogDir }
     if ($null -eq $oldOpenSettings) { Remove-Item Env:\CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP -ErrorAction SilentlyContinue } else { $env:CORTEX_OPEN_GRAPHICS_SETTINGS_ON_STARTUP = $oldOpenSettings }
     if ($null -eq $oldDisableDebugLayer) { Remove-Item Env:\CORTEX_DISABLE_DEBUG_LAYER -ErrorAction SilentlyContinue } else { $env:CORTEX_DISABLE_DEBUG_LAYER = $oldDisableDebugLayer }
+    if ($null -eq $oldDisablePerfGovernor) { Remove-Item Env:\CORTEX_DISABLE_PERF_QUALITY_GOVERNOR -ErrorAction SilentlyContinue } else { $env:CORTEX_DISABLE_PERF_QUALITY_GOVERNOR = $oldDisablePerfGovernor }
 }
 
 $failures = New-Object System.Collections.Generic.List[string]
@@ -239,7 +242,10 @@ try {
     } else {
         Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 1
         Select-ComboIndex $window $IDC_GFX_QUALITY_PRESET_SELECT 0
-        Set-Trackbar $window $IDC_GFX_RENDER_SCALE 68
+        # Render scale slider range is 0.50..1.00, so position 40 requests
+        # 0.70 explicitly. Earlier versions requested 0.84 while expecting
+        # 0.75, which made the smoke depend on budget-plan clamping.
+        Set-Trackbar $window $IDC_GFX_RENDER_SCALE 40
         Set-CheckboxState $window $IDC_GFX_SAFE_LIGHTING $false
         Set-Trackbar $window $IDC_GFX_SSR_DISTANCE 47
         Set-Trackbar $window $IDC_GFX_SSR_THICKNESS 28
@@ -350,7 +356,7 @@ if (-not (Test-Path $reportPath)) {
     if ([string]$fc.graphics_preset.id -ne "release_showcase") {
         Add-Failure "graphics_preset.id was '$($fc.graphics_preset.id)', expected release_showcase after quality preset dropdown"
     }
-    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.75 0.04
+    Assert-Near "render_scale" ([double]$fc.graphics_preset.render_scale) 0.70 0.04
     if ([bool]$fc.lighting.safe_rig_on_low_vram) {
         Add-Failure "lighting.safe_rig_on_low_vram remained true after native safe-lighting toggle"
     }

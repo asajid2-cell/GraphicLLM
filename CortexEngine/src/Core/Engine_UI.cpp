@@ -137,6 +137,13 @@ void Engine::ApplyPerfQualityGovernor() {
 
     m_perfScaleReduced = false;
 
+    if (const char* disableGovernor = std::getenv("CORTEX_DISABLE_PERF_QUALITY_GOVERNOR")) {
+        if (disableGovernor[0] != '\0' && disableGovernor[0] != '0') {
+            m_avgFrameTimeMs = 0.0f;
+            return;
+        }
+    }
+
     // Startup frames include shader warmup, texture uploads, BLAS/TLAS setup,
     // and optional visual-validation readback. Those are not steady-state
     // rendering cost, so do not let them resize render targets and create the

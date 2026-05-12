@@ -143,6 +143,8 @@ Assert-Contains "PostProcessGraphPass.cpp" $post "PostProcessPass::UpdateDescrip
 Assert-Contains "PostProcessGraphPass.cpp" $post "PostProcessPass::Draw"
 Assert-NotContains "PostProcessGraphPass.h" $postHeader "renderWithBloomOverride"
 Assert-NotContains "PostProcessGraphPass.h" $postHeader "renderDefault"
+Assert-NotContains "PostProcessGraphPass.h" $postHeader "std::function<void(const char*)> failStage"
+Assert-NotContains "PostProcessGraphPass.h" $postHeader "std::function<void(const char*)> failBloomStage"
 Assert-NotContains "Renderer_RenderGraphEndFrame.cpp" $rendererEndFrame "RenderPostProcess();"
 
 $validation = Read-Text "src/Graphics/Passes/RenderGraphValidationPass.cpp"

@@ -4,9 +4,12 @@
 #include "Graphics/Passes/RTReflectionDebugClearPass.h"
 #include "Graphics/RenderGraph.h"
 
-#include <functional>
-
 namespace Cortex::Graphics::PostProcessGraphPass {
+
+struct GraphStatus {
+    bool* failed = nullptr;
+    const char** stage = nullptr;
+};
 
 struct ResourceHandles {
     RGResourceHandle hdr;
@@ -36,14 +39,14 @@ struct ExecuteContext {
     bool* backBufferUsedAsRenderTarget = nullptr;
     bool runRtReflectionDebugClear = false;
     RTReflectionDebugClearPass::ClearContext rtReflectionDebugClear;
-    std::function<void(const char*)> failBloomStage;
+    GraphStatus status;
     bool* ranPostProcess = nullptr;
 };
 
 struct GraphContext {
     ResourceHandles resources;
     ExecuteContext execute;
-    std::function<void(const char*)> failStage;
+    GraphStatus status;
 };
 
 void Declare(RGPassBuilder& builder, const ResourceHandles& resources);

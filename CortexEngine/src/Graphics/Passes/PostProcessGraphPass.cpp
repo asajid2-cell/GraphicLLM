@@ -4,10 +4,17 @@ namespace Cortex::Graphics::PostProcessGraphPass {
 
 namespace {
 
-void Fail(const GraphContext& context, const char* stage) {
-    if (context.failStage) {
-        context.failStage(stage);
+void Fail(GraphStatus status, const char* stage) {
+    if (status.failed) {
+        *status.failed = true;
     }
+    if (status.stage && !*status.stage) {
+        *status.stage = stage ? stage : "unknown";
+    }
+}
+
+void Fail(const GraphContext& context, const char* stage) {
+    Fail(context.status, stage);
 }
 
 [[nodiscard]] bool IsUsable(const GraphContext& context) {
@@ -58,9 +65,7 @@ void Execute(const RenderGraph& graph, const ExecuteContext& context) {
     if (context.useBloomOverride && context.bloom.IsValid()) {
         ID3D12Resource* bloomOverride = graph.GetResource(context.bloom);
         if (!bloomOverride) {
-            if (context.failBloomStage) {
-                context.failBloomStage("bind_post_process_bloom");
-            }
+            Fail(context.status, "bind_post_process_bloom");
             return;
         }
         descriptorUpdate.bloomOverride = bloomOverride;
@@ -71,16 +76,12 @@ void Execute(const RenderGraph& graph, const ExecuteContext& context) {
     }
 
     if (!PostProcessPass::UpdateDescriptorTable(descriptorUpdate)) {
-        if (context.failBloomStage) {
-            context.failBloomStage("post_process_descriptor_table");
-        }
+        Fail(context.status, "post_process_descriptor_table");
         return;
     }
 
     if (!PostProcessPass::Draw(context.draw)) {
-        if (context.failBloomStage) {
-            context.failBloomStage("post_process_draw");
-        }
+        Fail(context.status, "post_process_draw");
         return;
     }
 

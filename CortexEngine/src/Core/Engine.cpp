@@ -449,6 +449,15 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
     m_hudMode = config.initialHudMode;
     m_startupArchitectCommandJson = config.startupArchitectCommandJson;
     m_startupArchitectCommandSubmitted = false;
+    if (const char* publicCaptureClean = std::getenv("CORTEX_PUBLIC_CAPTURE_CLEAN")) {
+        const std::string value = publicCaptureClean;
+        if (!value.empty() && value != "0" && value != "false" && value != "FALSE") {
+            m_showOriginAxes = false;
+            m_showGizmos = false;
+            m_selectedEntity = entt::null;
+            spdlog::info("Public capture clean mode enabled: editor gizmos and origin axes are hidden");
+        }
+    }
     if (const auto cutFrame = ReadOptionalEnvUInt64("CORTEX_CAMERA_CUT_FRAME")) {
         if (*cutFrame > 0) {
             m_cameraCutAutomationFrame = *cutFrame;

@@ -293,7 +293,8 @@ Write-Host "     .\CortexEngine.exe" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  3. Read the docs:" -ForegroundColor White
 Write-Host "     QUICKSTART.md      - Quick start guide" -ForegroundColor Gray
-Write-Host "     PHASE1_COMPLETE.md - Architecture details" -ForegroundColor Gray
+Write-Host "     README.md          - Renderer overview" -ForegroundColor Gray
+Write-Host "     RELEASE_READINESS.md - Validation summary" -ForegroundColor Gray
 Write-Host ""
 
 Write-Host "Happy coding! 🚀" -ForegroundColor Green

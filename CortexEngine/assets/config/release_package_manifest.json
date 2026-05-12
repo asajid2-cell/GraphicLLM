@@ -9,14 +9,25 @@
     "SCRIPTS.md",
     "RELEASE_READINESS.md",
     "tools/README.md",
-    "docs/RELEASE_CLEANUP_COMPLETION_LEDGER.md",
     "docs/media/gallery_manifest.json",
+    "docs/media/video_manifest.json",
     "docs/media/rt_showcase_hero.png",
+    "docs/media/rt_showcase_reflection_closeup.png",
+    "docs/media/rt_showcase_material_overview.png",
     "docs/media/material_lab_hero.png",
+    "docs/media/material_lab_metal_closeup.png",
+    "docs/media/material_lab_glass_emissive.png",
     "docs/media/glass_water_courtyard_hero.png",
+    "docs/media/glass_water_courtyard_water_closeup.png",
+    "docs/media/glass_water_courtyard_glass_canopy.png",
     "docs/media/effects_showcase_hero.png",
+    "docs/media/effects_showcase_particles_closeup.png",
+    "docs/media/effects_showcase_neon_materials.png",
     "docs/media/outdoor_sunset_beach_hero.png",
-    "docs/media/ibl_gallery_sweep.png"
+    "docs/media/outdoor_sunset_beach_waterline.png",
+    "docs/media/ibl_gallery_hero.png",
+    "docs/media/ibl_gallery_sweep.png",
+    "docs/media/cortex_gallery_reel.mp4"
   ],
   "required_source_files": [
     "assets/config/release_package_manifest.json"

@@ -79,20 +79,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomB{};
     bool bloomStageFailed = false;
     const char* bloomGraphStageError = nullptr;
-    std::string bloomStageError;
+    const char* postProcessGraphStageError = nullptr;
     VisibilityBufferRenderer::ResourceStateSnapshot vbPostInitialStates{};
     bool hasVBPostStates = false;
     ID3D12Resource* postNormalResource = nullptr;
     ID3D12Resource* postEmissiveMetallicResource = nullptr;
     ID3D12Resource* postMaterialExt1Resource = nullptr;
     ID3D12Resource* postMaterialExt2Resource = nullptr;
-
-    auto failBloomStage = [&](const char* stage) {
-        if (!bloomStageFailed) {
-            bloomStageError = stage ? stage : "unknown";
-        }
-        bloomStageFailed = true;
-    };
 
     if (useFusedBloomTransients) {
         for (uint32_t level = 0; level < kBloomLevels; ++level) {
@@ -343,17 +336,19 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 executeContext.rtReflectionDebugClear.clearMode = s_rtReflPostClearMode;
             }
         }
-        executeContext.failBloomStage = failBloomStage;
+        executeContext.status.failed = &bloomStageFailed;
+        executeContext.status.stage = &postProcessGraphStageError;
         executeContext.ranPostProcess = &result.ranPostProcess;
 
         PostProcessGraphPass::GraphContext postProcessContext{};
         postProcessContext.resources = postProcessResources;
         postProcessContext.execute = std::move(executeContext);
-        postProcessContext.failStage = failBloomStage;
+        postProcessContext.status.failed = &bloomStageFailed;
+        postProcessContext.status.stage = &postProcessGraphStageError;
         const RGResourceHandle postProcessResult =
             PostProcessGraphPass::AddToGraph(*m_services.renderGraph, postProcessContext);
         if (!postProcessResult.IsValid()) {
-            failBloomStage("post_process_graph_contract");
+            bloomStageFailed = true;
         }
     }
 
@@ -378,11 +373,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     if (wantsFusedBloomThisFrame && bloomStageFailed) {
         result.fallbackUsed = true;
         result.fallbackReason = "fused_bloom_graph_stage_failed";
-        if (!bloomStageError.empty()) {
-            result.fallbackReason += ": " + bloomStageError;
-        } else if (bloomGraphStageError) {
+        if (bloomGraphStageError) {
             result.fallbackReason += ": ";
             result.fallbackReason += bloomGraphStageError;
+        } else if (postProcessGraphStageError) {
+            result.fallbackReason += ": ";
+            result.fallbackReason += postProcessGraphStageError;
         }
         result.ranBloom = false;
         result.ranPostProcess = false;

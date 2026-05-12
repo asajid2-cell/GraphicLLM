@@ -62,7 +62,7 @@ CortexEngine/docs/media/gallery_manifest.json
 Capture run:
 
 ```text
-CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_132733_943_27296_0d962fbc
+CortexEngine/build/bin/logs/runs/public_capture_gallery_20260512_133541_420_18928_97a03e95
 ```
 
 The gallery uses the `public_high` graphics preset and records scene, camera,

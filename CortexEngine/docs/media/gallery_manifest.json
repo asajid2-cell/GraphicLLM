@@ -1,12 +1,12 @@
-﻿{
+{
     "schema":  1,
-    "generated_utc":  "2026-05-12T19:27:47.6255701Z",
-    "commit":  "6ab921b",
+    "generated_utc":  "2026-05-12T19:35:55.4555974Z",
+    "commit":  "ad1aa4c",
     "quality":  "High",
     "graphics_preset":  "public_high",
     "requested_width":  1920,
     "requested_height":  1080,
-    "run_log_dir":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc",
+    "run_log_dir":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95",
     "entries":  [
                     {
                         "id":  "rt_showcase",
@@ -22,16 +22,16 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  4.5281280000000006,
-                        "avg_luma":  70.336095484872359,
-                        "center_avg_luma":  71.272538389549709,
+                        "gpu_frame_ms":  4.375552,
+                        "avg_luma":  70.313393765349872,
+                        "center_avg_luma":  71.203498823257078,
                         "nonblack_ratio":  1,
-                        "saturated_ratio":  0.0024025848765432097,
+                        "saturated_ratio":  0.002368827160493827,
                         "near_white_ratio":  0.010233892746913579,
                         "rt_reflection_signal_avg_luma":  0.022837335243821144,
                         "rt_reflection_history_avg_luma":  0.029497386887669563,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\rt_showcase\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\rt_showcase\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\rt_showcase\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\rt_showcase\\visual_validation_rt_showcase.bmp"
                     },
                     {
                         "id":  "material_lab",
@@ -47,7 +47,7 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  4.170752,
+                        "gpu_frame_ms":  4.173824,
                         "avg_luma":  183.15424949854241,
                         "center_avg_luma":  183.12010130678516,
                         "nonblack_ratio":  1,
@@ -55,8 +55,8 @@
                         "near_white_ratio":  0.010335165895061728,
                         "rt_reflection_signal_avg_luma":  0.021373659372329712,
                         "rt_reflection_history_avg_luma":  0.022446718066930771,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\material_lab\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\material_lab\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\material_lab\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\material_lab\\visual_validation_rt_showcase.bmp"
                     },
                     {
                         "id":  "glass_water_courtyard",
@@ -72,16 +72,16 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  5.057536,
-                        "avg_luma":  180.853839185606,
-                        "center_avg_luma":  190.8631379583573,
+                        "gpu_frame_ms":  4.294656,
+                        "avg_luma":  180.85424442711823,
+                        "center_avg_luma":  190.86442720154139,
                         "nonblack_ratio":  1,
                         "saturated_ratio":  0.0043349729938271606,
-                        "near_white_ratio":  0.052849151234567904,
+                        "near_white_ratio":  0.052860243055555554,
                         "rt_reflection_signal_avg_luma":  0.039154332131147385,
                         "rt_reflection_history_avg_luma":  0.040358375757932663,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\glass_water_courtyard\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\glass_water_courtyard\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\glass_water_courtyard\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\glass_water_courtyard\\visual_validation_rt_showcase.bmp"
                     },
                     {
                         "id":  "effects_showcase",
@@ -97,16 +97,16 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  4.750336,
-                        "avg_luma":  110.51808283648364,
-                        "center_avg_luma":  106.47935871540918,
+                        "gpu_frame_ms":  4.895744,
+                        "avg_luma":  110.56149356594229,
+                        "center_avg_luma":  106.51345775476224,
                         "nonblack_ratio":  1,
-                        "saturated_ratio":  0.0091695601851851834,
-                        "near_white_ratio":  0.0031852816358024691,
+                        "saturated_ratio":  0.0091796875,
+                        "near_white_ratio":  0.0031640625,
                         "rt_reflection_signal_avg_luma":  0.0042053600773215294,
                         "rt_reflection_history_avg_luma":  0.0042383265681564808,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\effects_showcase\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\effects_showcase\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\effects_showcase\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\effects_showcase\\visual_validation_rt_showcase.bmp"
                     },
                     {
                         "id":  "outdoor_sunset_beach",
@@ -122,16 +122,16 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  3.381248,
-                        "avg_luma":  169.94911648048353,
-                        "center_avg_luma":  165.32505398952091,
+                        "gpu_frame_ms":  3.414016,
+                        "avg_luma":  169.95721503854907,
+                        "center_avg_luma":  165.34703268904718,
                         "nonblack_ratio":  1,
                         "saturated_ratio":  0.00963011188271605,
                         "near_white_ratio":  0,
                         "rt_reflection_signal_avg_luma":  0.00475670350715518,
                         "rt_reflection_history_avg_luma":  0.0047542168758809566,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\outdoor_sunset_beach\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\outdoor_sunset_beach\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\outdoor_sunset_beach\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\outdoor_sunset_beach\\visual_validation_rt_showcase.bmp"
                     },
                     {
                         "id":  "ibl_gallery",
@@ -147,16 +147,16 @@
                         "capture_width":  1920,
                         "capture_height":  1080,
                         "render_scale":  1,
-                        "gpu_frame_ms":  4.6479360000000005,
-                        "avg_luma":  107.89146828177184,
-                        "center_avg_luma":  103.34567348491952,
+                        "gpu_frame_ms":  4.596736,
+                        "avg_luma":  107.88815279720298,
+                        "center_avg_luma":  103.34408945135476,
                         "nonblack_ratio":  1,
-                        "saturated_ratio":  6.0763888888888887E-05,
+                        "saturated_ratio":  3.3275462962962965E-05,
                         "near_white_ratio":  0.001904417438271605,
                         "rt_reflection_signal_avg_luma":  0.033476728945970535,
                         "rt_reflection_history_avg_luma":  0.033596530556678772,
-                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\ibl_gallery\\frame_report_last.json",
-                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_132733_943_27296_0d962fbc\\ibl_gallery\\visual_validation_rt_showcase.bmp"
+                        "report":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\ibl_gallery\\frame_report_last.json",
+                        "source_bmp":  "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\bin\\logs\\runs\\public_capture_gallery_20260512_133541_420_18928_97a03e95\\ibl_gallery\\visual_validation_rt_showcase.bmp"
                     }
                 ],
     "failures":  [

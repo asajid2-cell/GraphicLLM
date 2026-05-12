@@ -182,7 +182,9 @@ $manifest = [ordered]@{
     failures = @($failures.ToArray())
 }
 $manifestPath = Join-Path $OutputDir "gallery_manifest.json"
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $manifestPath
+$manifestJson = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson + "`n", $utf8NoBom)
 
 if ($failures.Count -gt 0) {
     Write-Host "Public capture gallery failed:" -ForegroundColor Red

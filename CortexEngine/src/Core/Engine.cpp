@@ -175,6 +175,8 @@ namespace {
                normalized == "glasswatercourtyard" || normalized == "courtyard" ||
                normalized == "outdoor_sunset_beach" ||
                normalized == "outdoorsunsetbeach" || normalized == "sunset_beach" ||
+               normalized == "liquid_gallery" || normalized == "liquidgallery" ||
+               normalized == "liquids" ||
                normalized == "god_rays" ||
                normalized == "godrays" || normalized == "temporal" ||
                normalized == "temporalvalidation" ||
@@ -589,6 +591,10 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                    sceneLower == "sunset_beach" ||
                    sceneLower == "beach") {
             m_currentScenePreset = ScenePreset::OutdoorSunsetBeach;
+        } else if (sceneLower == "liquid_gallery" ||
+                   sceneLower == "liquidgallery" ||
+                   sceneLower == "liquids") {
+            m_currentScenePreset = ScenePreset::LiquidGallery;
         } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
             m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
@@ -1065,6 +1071,9 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::OutdoorSunsetBeach;
         break;
     case ScenePreset::OutdoorSunsetBeach:
+        next = ScenePreset::LiquidGallery;
+        break;
+    case ScenePreset::LiquidGallery:
         next = ScenePreset::EffectsShowcase;
         break;
     case ScenePreset::EffectsShowcase:
@@ -1712,6 +1721,7 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::MaterialLab: return "material_lab";
         case ScenePreset::GlassWaterCourtyard: return "glass_water_courtyard";
         case ScenePreset::OutdoorSunsetBeach: return "outdoor_sunset_beach";
+        case ScenePreset::LiquidGallery: return "liquid_gallery";
         case ScenePreset::EffectsShowcase: return "effects_showcase";
         case ScenePreset::GodRays: return "god_rays";
         case ScenePreset::TemporalValidation: return "temporal_validation";
@@ -2100,6 +2110,7 @@ void Engine::InitializeScene() {
     case ScenePreset::MaterialLab:
     case ScenePreset::GlassWaterCourtyard:
     case ScenePreset::OutdoorSunsetBeach:
+    case ScenePreset::LiquidGallery:
     case ScenePreset::EffectsShowcase:
     case ScenePreset::GodRays:
     case ScenePreset::TemporalValidation:

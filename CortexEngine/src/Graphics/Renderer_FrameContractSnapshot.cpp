@@ -458,6 +458,49 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.water.steepness = m_waterState.steepness;
     contract.water.roughness = m_waterState.roughness;
     contract.water.fresnelStrength = m_waterState.fresnelStrength;
+    if (registry) {
+        float absorptionSum = 0.0f;
+        float foamSum = 0.0f;
+        float viscositySum = 0.0f;
+        auto view = registry->GetRegistry().view<Scene::WaterSurfaceComponent, Scene::RenderableComponent>();
+        for (auto entity : view) {
+            const auto& water = view.get<Scene::WaterSurfaceComponent>(entity);
+            const auto& renderable = view.get<Scene::RenderableComponent>(entity);
+            if (!renderable.visible) {
+                continue;
+            }
+            ++contract.water.surfaceCount;
+            absorptionSum += std::clamp(water.absorption, 0.0f, 1.0f);
+            foamSum += std::clamp(water.foamStrength, 0.0f, 2.0f);
+            viscositySum += std::clamp(water.viscosity, 0.0f, 1.0f);
+            contract.water.maxEmissiveHeat =
+                std::max(contract.water.maxEmissiveHeat, std::max(water.emissiveHeat, 0.0f));
+            if (water.emissiveHeat > 0.01f) {
+                ++contract.water.emissiveLiquidCount;
+            }
+            switch (water.liquidType) {
+            case Scene::WaterSurfaceComponent::LiquidType::Lava:
+                ++contract.water.lavaCount;
+                break;
+            case Scene::WaterSurfaceComponent::LiquidType::Honey:
+                ++contract.water.honeyCount;
+                break;
+            case Scene::WaterSurfaceComponent::LiquidType::Molasses:
+                ++contract.water.molassesCount;
+                break;
+            case Scene::WaterSurfaceComponent::LiquidType::Water:
+            default:
+                ++contract.water.waterCount;
+                break;
+            }
+        }
+        if (contract.water.surfaceCount > 0) {
+            const float invCount = 1.0f / static_cast<float>(contract.water.surfaceCount);
+            contract.water.avgAbsorption = absorptionSum * invCount;
+            contract.water.avgFoamStrength = foamSum * invCount;
+            contract.water.avgViscosity = viscositySum * invCount;
+        }
+    }
 
     contract.vegetation.enabled = m_vegetationState.enabled;
     contract.vegetation.meshPipelineReady = static_cast<bool>(m_vegetationState.meshPipeline);

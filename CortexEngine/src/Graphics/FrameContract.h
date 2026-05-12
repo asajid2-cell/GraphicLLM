@@ -362,6 +362,16 @@ struct FrameContract {
         float steepness = 0.0f;
         float roughness = 0.03f;
         float fresnelStrength = 1.0f;
+        uint32_t surfaceCount = 0;
+        uint32_t waterCount = 0;
+        uint32_t lavaCount = 0;
+        uint32_t honeyCount = 0;
+        uint32_t molassesCount = 0;
+        uint32_t emissiveLiquidCount = 0;
+        float avgAbsorption = 0.0f;
+        float avgFoamStrength = 0.0f;
+        float avgViscosity = 0.0f;
+        float maxEmissiveHeat = 0.0f;
     };
 
     struct VegetationInfo {

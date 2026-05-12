@@ -156,6 +156,9 @@ foreach ($doc in @(
     "docs/media/effects_showcase_neon_materials.png",
     "docs/media/outdoor_sunset_beach_hero.png",
     "docs/media/outdoor_sunset_beach_waterline.png",
+    "docs/media/liquid_gallery_hero.png",
+    "docs/media/liquid_gallery_water_lava.png",
+    "docs/media/liquid_gallery_viscous_pair.png",
     "docs/media/ibl_gallery_hero.png",
     "docs/media/ibl_gallery_sweep.png",
     "docs/media/cortex_gallery_reel.mp4"

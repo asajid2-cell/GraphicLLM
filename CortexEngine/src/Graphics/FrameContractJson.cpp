@@ -319,7 +319,17 @@ json FrameContractToJson(const FrameContract& contract) {
             {"secondary_amplitude", contract.water.secondaryAmplitude},
             {"steepness", contract.water.steepness},
             {"roughness", contract.water.roughness},
-            {"fresnel_strength", contract.water.fresnelStrength}
+            {"fresnel_strength", contract.water.fresnelStrength},
+            {"surface_count", contract.water.surfaceCount},
+            {"water_count", contract.water.waterCount},
+            {"lava_count", contract.water.lavaCount},
+            {"honey_count", contract.water.honeyCount},
+            {"molasses_count", contract.water.molassesCount},
+            {"emissive_liquid_count", contract.water.emissiveLiquidCount},
+            {"avg_absorption", contract.water.avgAbsorption},
+            {"avg_foam_strength", contract.water.avgFoamStrength},
+            {"avg_viscosity", contract.water.avgViscosity},
+            {"max_emissive_heat", contract.water.maxEmissiveHeat}
         }},
         {"vegetation", {
             {"enabled", contract.vegetation.enabled},

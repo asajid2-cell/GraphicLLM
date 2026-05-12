@@ -45,6 +45,9 @@ $cases = @(
     @{ id = "effects_showcase_neon_materials"; title = "Neon Materials"; scene = "effects_showcase"; bookmark = "neon_materials"; environment = "night_city"; frames = 180; image = "effects_showcase_neon_materials.png" },
     @{ id = "outdoor_sunset_beach"; title = "Outdoor Sunset Beach"; scene = "outdoor_sunset_beach"; bookmark = "hero"; environment = "sunset_courtyard"; frames = 180; image = "outdoor_sunset_beach_hero.png" },
     @{ id = "outdoor_sunset_beach_waterline"; title = "Outdoor Waterline"; scene = "outdoor_sunset_beach"; bookmark = "waterline"; environment = "sunset_courtyard"; frames = 160; image = "outdoor_sunset_beach_waterline.png" },
+    @{ id = "liquid_gallery"; title = "Liquid Gallery"; scene = "liquid_gallery"; bookmark = "hero"; environment = "warm_gallery"; frames = 190; image = "liquid_gallery_hero.png" },
+    @{ id = "liquid_gallery_water_lava"; title = "Water and Lava"; scene = "liquid_gallery"; bookmark = "water_lava"; environment = "warm_gallery"; frames = 170; image = "liquid_gallery_water_lava.png" },
+    @{ id = "liquid_gallery_viscous_pair"; title = "Honey and Molasses"; scene = "liquid_gallery"; bookmark = "viscous_pair"; environment = "warm_gallery"; frames = 170; image = "liquid_gallery_viscous_pair.png" },
     @{ id = "ibl_gallery_hero"; title = "IBL Gallery Hero"; scene = "ibl_gallery"; bookmark = "hero"; environment = "warm_gallery"; frames = 160; image = "ibl_gallery_hero.png" },
     @{ id = "ibl_gallery"; title = "IBL Gallery Sweep"; scene = "ibl_gallery"; bookmark = "environment_sweep"; environment = "warm_gallery"; frames = 180; image = "ibl_gallery_sweep.png" }
 )

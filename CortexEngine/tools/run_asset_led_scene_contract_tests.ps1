@@ -13,6 +13,7 @@ $engineHeaderPath = Join-Path $root "src/Core/Engine.h"
 $enginePath = Join-Path $root "src/Core/Engine.cpp"
 $engineCameraPath = Join-Path $root "src/Core/Engine_Camera.cpp"
 $engineScenesPath = Join-Path $root "src/Core/Engine_Scenes.cpp"
+$runtimeLayoutContractsPath = Join-Path $root "assets/scenes/hand_authored/runtime_layout_contracts.json"
 $requiredScenes = @(
     "coastal_cliff_foundry",
     "rain_glass_pavilion",
@@ -44,6 +45,15 @@ $showcase = Get-Content $showcasePath -Raw | ConvertFrom-Json
 $showcaseById = @{}
 foreach ($scene in @($showcase.scenes)) {
     $showcaseById[[string]$scene.id] = $scene
+}
+$layoutById = @{}
+if (Test-Path $runtimeLayoutContractsPath) {
+    $layoutContracts = Get-Content $runtimeLayoutContractsPath -Raw | ConvertFrom-Json
+    foreach ($contract in @($layoutContracts.scenes)) {
+        $layoutById[[string]$contract.id] = $contract
+    }
+} else {
+    Add-Failure "runtime layout contracts missing: $runtimeLayoutContractsPath"
 }
 
 foreach ($scene in $requiredScenes) {
@@ -130,6 +140,13 @@ if ($failures.Count -eq 0) {
                 $json = Get-Content $report -Raw | ConvertFrom-Json
                 if ([string]$json.scene -ne $scene) {
                     Add-Failure "$scene runtime report scene was '$($json.scene)'"
+                }
+                if ($layoutById.ContainsKey($scene)) {
+                    $minRenderables = [int]$layoutById[$scene].min_runtime_renderables
+                    $actualRenderables = [int]$json.frame_contract.renderables.total
+                    if ($actualRenderables -lt $minRenderables) {
+                        Add-Failure "$scene runtime renderable count $actualRenderables is below layout contract minimum $minRenderables"
+                    }
                 }
             }
         }

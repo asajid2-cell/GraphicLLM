@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "purpose": "Source-bound runtime composition contracts for hand-authored asset-led scenes.",
+  "scenes": [
+    {
+      "id": "coastal_cliff_foundry",
+      "builder": "Engine::BuildCoastalCliffFoundryScene",
+      "min_runtime_renderables": 45,
+      "required_tag_tokens": [
+        "CoastalFoundry_OceanPlane",
+        "CoastalFoundry_WetBasaltDeck",
+        "CoastalFoundry_CliffBackdrop",
+        "CoastalFoundry_LavaSurface",
+        "CoastalFoundry_ChannelNorthWall",
+        "CoastalFoundry_ChannelSouthWall",
+        "CoastalFoundry_LeftRailRun",
+        "CoastalFoundry_RightRailRun",
+        "CoastalFoundry_LeftLowerRail",
+        "CoastalFoundry_RightLowerRail",
+        "CoastalFoundry_RailPost",
+        "CoastalFoundry_RailFoot",
+        "CoastalFoundry_BoulderAnchor",
+        "CoastalFoundry_GroundedBarrel",
+        "CoastalFoundry_ShoreFoamBand"
+      ],
+      "support_groups": [
+        {
+          "id": "foundry_channel",
+          "support_tokens": ["RailPost", "RailFoot", "ChannelNorthWall", "ChannelSouthWall"],
+          "mounted_tokens": ["LeftRailRun", "RightRailRun", "LeftLowerRail", "RightLowerRail"],
+          "liquid_tokens": ["LavaSurface"]
+        }
+      ],
+      "round_prop_checks": [
+        {"tag": "CoastalFoundry_GroundedBarrel", "max_horizontal_axis_ratio": 1.12}
+      ]
+    },
+    {
+      "id": "rain_glass_pavilion",
+      "builder": "Engine::BuildRainGlassPavilionScene",
+      "min_runtime_renderables": 28,
+      "required_tag_tokens": [
+        "RainPavilion_TiledFloor",
+        "RainPavilion_ExtendedWetTerrace",
+        "RainPavilion_GlassWallLeft",
+        "RainPavilion_GlassWallRight",
+        "RainPavilion_RearGlassWall",
+        "RainPavilion_LeftGlassBaseRail",
+        "RainPavilion_RightGlassBaseRail",
+        "RainPavilion_RearGlassBaseRail",
+        "RainPavilion_RoofFrame",
+        "RainPavilion_RoofMullion",
+        "RainPavilion_FloorChannel",
+        "RainPavilion_ChromeDrain",
+        "RainPavilion_GroundedLantern"
+      ],
+      "support_groups": [
+        {
+          "id": "pavilion_frame",
+          "support_tokens": ["GlassBaseRail", "RoofMullion", "FloorChannel", "RoofFrame"],
+          "mounted_tokens": ["GlassWallLeft", "GlassWallRight", "RearGlassWall"],
+          "liquid_tokens": ["PuddleSheet"]
+        }
+      ],
+      "round_prop_checks": [
+        {"tag": "RainPavilion_ChromeDrain", "max_horizontal_axis_ratio": 1.08},
+        {"tag": "RainPavilion_GroundedLantern", "max_horizontal_axis_ratio": 1.12}
+      ]
+    },
+    {
+      "id": "desert_relic_gallery",
+      "builder": "Engine::BuildDesertRelicGalleryScene",
+      "min_runtime_renderables": 26,
+      "required_tag_tokens": [
+        "DesertRelic_SandFloor",
+        "DesertRelic_DuneBackdrop",
+        "DesertRelic_MainPlinth",
+        "DesertRelic_PlinthStepFront",
+        "DesertRelic_PlinthStepRear",
+        "DesertRelic_BronzeRing",
+        "DesertRelic_GlassInlay",
+        "DesertRelic_CeramicVesselLeft",
+        "DesertRelic_CeramicVesselRight",
+        "DesertRelic_BronzePedestal",
+        "DesertRelic_SandDriftFront",
+        "DesertRelic_ArchColumn",
+        "DesertRelic_RoundColumnCore",
+        "DesertRelic_ArchLintel",
+        "DesertRelic_BrokenArchCapLeft",
+        "DesertRelic_BrokenArchCapRight"
+      ],
+      "support_groups": [
+        {
+          "id": "ruin_arch",
+          "support_tokens": ["ArchColumn", "RoundColumnCore"],
+          "mounted_tokens": ["ArchLintel", "BrokenArchCapLeft", "BrokenArchCapRight"],
+          "liquid_tokens": []
+        }
+      ],
+      "round_prop_checks": [
+        {"tag": "DesertRelic_CeramicVesselLeft", "max_horizontal_axis_ratio": 1.08},
+        {"tag": "DesertRelic_CeramicVesselRight", "max_horizontal_axis_ratio": 1.08},
+        {"tag": "DesertRelic_BronzePedestal", "max_horizontal_axis_ratio": 1.08}
+      ]
+    },
+    {
+      "id": "neon_alley_material_market",
+      "builder": "Engine::BuildNeonAlleyMaterialMarketScene",
+      "min_runtime_renderables": 16,
+      "required_tag_tokens": [
+        "NeonMarket_WetAlleyPlane",
+        "NeonMarket_LeftCurbStrip",
+        "NeonMarket_RightCurbStrip",
+        "NeonMarket_RearAlleyWall",
+        "NeonMarket_LeftStorefront",
+        "NeonMarket_RightStorefront",
+        "NeonMarket_MountedPinkSign",
+        "NeonMarket_MountedCyanSign",
+        "NeonMarket_PinkSignBracketTop",
+        "NeonMarket_PinkSignBracketBottom",
+        "NeonMarket_CyanSignBracketTop",
+        "NeonMarket_CyanSignBracketBottom",
+        "NeonMarket_DisplayGlass",
+        "NeonMarket_DisplayChromeTrim",
+        "NeonMarket_DisplayBase",
+        "NeonMarket_GroundedMarketTable",
+        "NeonMarket_GroundedBarrel"
+      ],
+      "support_groups": [
+        {
+          "id": "storefront_signs",
+          "support_tokens": ["PinkSignBracketTop", "PinkSignBracketBottom", "CyanSignBracketTop", "CyanSignBracketBottom", "LeftStorefront", "RightStorefront"],
+          "mounted_tokens": ["MountedPinkSign", "MountedCyanSign"],
+          "liquid_tokens": []
+        }
+      ],
+      "round_prop_checks": [
+        {"tag": "NeonMarket_GroundedBarrel", "max_horizontal_axis_ratio": 1.12}
+      ]
+    },
+    {
+      "id": "forest_creek_shrine",
+      "builder": "Engine::BuildForestCreekShrineScene",
+      "min_runtime_renderables": 34,
+      "required_tag_tokens": [
+        "ForestShrine_GroundBank",
+        "ForestShrine_LeftRaisedBank",
+        "ForestShrine_RightRaisedBank",
+        "ForestShrine_CreekSheet",
+        "ForestShrine_CreekLeftFoamEdge",
+        "ForestShrine_CreekRightFoamEdge",
+        "ForestShrine_ShrineBase",
+        "ForestShrine_Capstone",
+        "ForestShrine_FrontStep",
+        "ForestShrine_BackStoneSilhouette",
+        "ForestShrine_LeftShrinePost",
+        "ForestShrine_RightShrinePost",
+        "ForestShrine_MossRoof",
+        "ForestShrine_FallenTrunk",
+        "ForestShrine_LeftBankRock",
+        "ForestShrine_RightBankRock",
+        "ForestShrine_FernCluster",
+        "ForestShrine_BranchArchLeft",
+        "ForestShrine_BranchArchRight",
+        "ForestShrine_GrassBankCluster"
+      ],
+      "support_groups": [
+        {
+          "id": "shrine_cluster",
+          "support_tokens": ["ShrineBase", "LeftShrinePost", "RightShrinePost", "FrontStep"],
+          "mounted_tokens": ["Capstone", "MossRoof", "BackStoneSilhouette"],
+          "liquid_tokens": ["CreekSheet", "CreekLeftFoamEdge", "CreekRightFoamEdge"]
+        }
+      ],
+      "round_prop_checks": []
+    }
+  ]
+}

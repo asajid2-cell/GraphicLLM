@@ -191,20 +191,27 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-004: Scene Composition Stability Contracts
 
-- Status: `PARTIAL`
+- Status: `DONE_VERIFIED`
 - Requirement: automated tests must catch disconnected geometry, floating bars, oversized gaps, squashed props, and wrong orientation before screenshots are published.
 - Source files/functions:
-  - New: `CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+  - `CortexEngine/assets/scenes/hand_authored/runtime_layout_contracts.json`
+  - `CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+  - `CortexEngine/tools/run_asset_led_scene_contract_tests.ps1`
+  - `CortexEngine/tools/run_screenshot_negative_gates.ps1`
   - Existing: `CortexEngine/tools/run_scene_polish_contract_tests.ps1`
   - Existing: `CortexEngine/src/Core/Engine_Scenes.cpp`
   - Existing: `CortexEngine/assets/config/showcase_scenes.json`
-  - Future: `CortexEngine/assets/scenes/hand_authored/*/scene_seed.json`
-- Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+  - Existing: `CortexEngine/assets/scenes/hand_authored/*/scene_seed.json`
+- Validation commands:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_screenshot_negative_gates.ps1 -NoBuild -RuntimeSmoke`
 - Evidence:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1` passed with `seeds=5`.
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed with `scenes=5`.
-- Remaining work:
-  - Extend checks from seed metadata into built entity transforms, model bounds, and screenshot negative gates.
+  - Scene composition stability passed with `seeds=5`.
+  - Asset-led scene contracts passed with `scenes=5`; runtime smoke now enforces layout-contract minimum renderable counts in addition to scene identity.
+  - Screenshot negative gates passed and ran a runtime visual baseline sample with `cases=7`.
+  - Runtime layout contracts now require constructed support/mounted/liquid tag groups per scene and parse round-prop scale from `Engine_Scenes.cpp` to reject horizontally squashed round props.
+- Remaining work: none for automated composition stability gates. Scene-specific art quality fixes remain tracked by ALS-006 through ALS-014.
 
 ### ALS-005: Lighting Direction and Tinted World Shaders
 

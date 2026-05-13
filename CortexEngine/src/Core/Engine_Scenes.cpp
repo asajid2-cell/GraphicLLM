@@ -4756,7 +4756,7 @@ void Engine::BuildRainGlassPavilionScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-2.1f, 1.02f, -2.5f), glm::vec3(-0.12f, 0.74f, 0.92f), 32.0f, 120.0f);
+        glm::vec3(-1.45f, 0.76f, -1.12f), glm::vec3(-0.10f, 0.48f, 1.08f), 30.0f, 120.0f);
 
     const AssetLedMaterialSettings wetTile{glm::vec4(0.12f, 0.13f, 0.15f, 1.0f), 0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.78f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings gardenMat{glm::vec4(0.050f, 0.075f, 0.070f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.55f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
@@ -4766,6 +4766,7 @@ void Engine::BuildRainGlassPavilionScene() {
     const AssetLedMaterialSettings chrome{glm::vec4(0.78f, 0.84f, 0.90f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.50f, 0.10f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
     const AssetLedMaterialSettings wetWood{glm::vec4(0.25f, 0.18f, 0.12f, 1.0f), 0.0f, 0.48f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.42f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.62f, 0.32f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.52f, 0.20f), 2.2f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings warmMat{glm::vec4(0.13f, 0.085f, 0.055f, 1.0f), 0.0f, 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.12f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
     AddAssetLedRenderable(*m_registry, "RainPavilion_ExtendedWetTerrace", cubeMesh, glm::vec3(0.0f, -0.08f, 1.6f), glm::vec3(11.0f, 0.08f, 6.4f), glm::vec3(0.0f), wetTile);
@@ -4778,12 +4779,22 @@ void Engine::BuildRainGlassPavilionScene() {
     AddAssetLedRenderable(*m_registry, "RainPavilion_RightGardenMass", cubeMesh, glm::vec3(4.65f, 0.36f, 1.05f), glm::vec3(0.18f, 0.72f, 4.5f), glm::vec3(0.0f), gardenMat);
     AddAssetLedRenderable(*m_registry, "RainPavilion_RearPlanterLeft", cubeMesh, glm::vec3(-2.15f, 0.18f, 3.34f), glm::vec3(1.72f, 0.36f, 0.38f), glm::vec3(0.0f), wetTile);
     AddAssetLedRenderable(*m_registry, "RainPavilion_RearPlanterRight", cubeMesh, glm::vec3(1.95f, 0.18f, 3.28f), glm::vec3(1.92f, 0.36f, 0.38f), glm::vec3(0.0f), wetTile);
+    for (const float x : {-1.08f, 0.98f}) {
+        AddAssetLedRenderable(*m_registry, "RainPavilion_RearWoodScreen", cubeMesh, glm::vec3(x, 0.25f, 2.00f), glm::vec3(0.92f, 0.30f, 0.06f), glm::vec3(0.0f), warmMat);
+        AddAssetLedRenderable(*m_registry, "RainPavilion_RearWoodScreenCap", cubeMesh, glm::vec3(x, 0.44f, 1.96f), glm::vec3(1.04f, 0.055f, 0.11f), glm::vec3(0.0f), wetWood);
+    }
+    for (int i = 0; i < 6; ++i) {
+        const float x = -1.62f + static_cast<float>(i) * 0.64f;
+        const float height = (i % 2 == 0) ? 0.64f : 0.52f;
+        AddAssetLedRenderable(*m_registry, "RainPavilion_RearWoodScreenSlat", cubeMesh, glm::vec3(x, 0.48f + height * 0.5f, 1.91f), glm::vec3(0.04f, height, 0.07f), glm::vec3(0.0f), wetWood);
+    }
     for (int i = 0; i < 11; ++i) {
         const float x = -4.0f + static_cast<float>(i) * 0.8f;
         const float height = (i % 3 == 0) ? 1.08f : 0.92f;
         AddAssetLedRenderable(*m_registry, "RainPavilion_GardenScreenSlat", cubeMesh, glm::vec3(x, 0.56f + height * 0.5f, 3.82f), glm::vec3(0.055f, height, 0.07f), glm::vec3(0.0f), gardenMat);
     }
     AddAssetLedRenderable(*m_registry, "RainPavilion_PuddleSheet_A", planeMesh, glm::vec3(-0.9f, 0.012f, -1.3f), glm::vec3(2.4f, 1.0f, 1.1f), glm::vec3(0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmMat", cubeMesh, glm::vec3(-0.10f, 0.025f, 1.06f), glm::vec3(1.92f, 0.035f, 1.02f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), warmMat);
     AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallLeft", cubeMesh, glm::vec3(-2.2f, 1.00f, 0.0f), glm::vec3(0.055f, 1.86f, 4.2f), glm::vec3(0.0f), glass);
     AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallRight", cubeMesh, glm::vec3(2.2f, 1.00f, 0.0f), glm::vec3(0.055f, 1.86f, 4.2f), glm::vec3(0.0f), glass);
     AddAssetLedRenderable(*m_registry, "RainPavilion_RearGlassWall", cubeMesh, glm::vec3(0.0f, 1.00f, 2.08f), glm::vec3(4.4f, 1.86f, 0.055f), glm::vec3(0.0f), glass);
@@ -4794,6 +4805,7 @@ void Engine::BuildRainGlassPavilionScene() {
     AddAssetLedRenderable(*m_registry, "RainPavilion_RoofRearBeam", cubeMesh, glm::vec3(0.0f, 2.18f, 2.12f), glm::vec3(4.45f, 0.055f, 0.08f), glm::vec3(0.0f), frameMetal);
     AddAssetLedRenderable(*m_registry, "RainPavilion_RoofLeftBeam", cubeMesh, glm::vec3(-2.25f, 2.18f, 0.0f), glm::vec3(0.08f, 0.055f, 4.2f), glm::vec3(0.0f), frameMetal);
     AddAssetLedRenderable(*m_registry, "RainPavilion_RoofRightBeam", cubeMesh, glm::vec3(2.25f, 2.18f, 0.0f), glm::vec3(0.08f, 0.055f, 4.2f), glm::vec3(0.0f), frameMetal);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_GlassRoofPanel", cubeMesh, glm::vec3(0.0f, 2.14f, 0.02f), glm::vec3(4.18f, 0.035f, 4.05f), glm::vec3(0.0f), glass);
     for (const float x : {-2.25f, 2.25f}) {
         for (const float z : {-2.08f, 2.08f}) {
             AddAssetLedRenderable(*m_registry, "RainPavilion_CornerPost", cubeMesh, glm::vec3(x, 1.10f, z), glm::vec3(0.08f, 2.08f, 0.08f), glm::vec3(0.0f), frameMetal);
@@ -4808,10 +4820,10 @@ void Engine::BuildRainGlassPavilionScene() {
     AddAssetLedRenderable(*m_registry, "RainPavilion_ChromeDrain", cylinderMesh, glm::vec3(0.9f, 0.04f, -1.7f), glm::vec3(0.42f, 1.0f, 0.42f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "RainPavilion_WarmInteriorStrip", cubeMesh, glm::vec3(0.0f, 1.82f, 1.96f), glm::vec3(2.05f, 0.035f, 0.045f), glm::vec3(0.0f), warmLight);
     if (lanternMesh && lanternMesh->gpuBuffers) {
-        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedLantern", "Lantern_01", lanternMesh, glm::vec3(-1.2f, 0.42f, 1.1f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
+        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedLantern", "Lantern_01", lanternMesh, glm::vec3(-0.84f, 0.40f, 1.02f), glm::vec3(0.42f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
     }
     if (tableMesh && tableMesh->gpuBuffers) {
-        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedInteriorTable", "WoodenTable_01", tableMesh, glm::vec3(-0.12f, 0.32f, 1.24f), glm::vec3(0.46f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), wetWood);
+        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedInteriorTable", "WoodenTable_01", tableMesh, glm::vec3(-0.10f, 0.33f, 1.10f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), wetWood);
     }
     if (bushMesh && bushMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenBush", "wild_rooibos_bush", bushMesh, glm::vec3(-2.05f, 0.32f, 2.92f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), vegetation);
@@ -4822,8 +4834,8 @@ void Engine::BuildRainGlassPavilionScene() {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenFern", "fern_02", fernMesh, glm::vec3(-1.72f, 0.06f, 2.32f), glm::vec3(0.56f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), vegetation);
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenFern", "fern_02", fernMesh, glm::vec3(1.56f, 0.06f, 2.38f), glm::vec3(0.50f), glm::vec3(0.0f, glm::radians(-16.0f), 0.0f), vegetation);
     }
-    AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(0.55f, 2.7f, 0.85f));
-    AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(2.4f, 0.32f, 1.75f));
+    AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(1.35f, 2.7f, 1.55f));
+    AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(3.0f, 0.32f, 1.95f));
     AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.55f, 1.55f), glm::vec3(1.0f, 0.58f, 0.30f), 2.5f, 4.2f);
     AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.25f, 0.46f, 0.95f), 3.2f, 12.0f, false);
 }

@@ -317,9 +317,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the segmented-screen iteration.
   - Focused capture `CortexEngine/build/bin/logs/rain_review20_final_checkpoint/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=4.118`, `avg_luma=71.066`, `rt_reflection_signal_avg_luma=0.05278`, `rt_reflection_history_signal_avg_luma=0.05276`, and texture uploads `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
   - Manual review rejected `rain_review20_final_checkpoint` for public media: the giant slab regression is gone and the table/floor/reflection focal read is better, but the cloudy HDRI band, procedural rear posts/slats, and blockout side panel remain visible.
+  - Rain downward-interior iteration changed the hero to a higher downward camera to prioritize wet floor, table, lantern, glass rails/channels, and reflection detail over the cloudy horizon.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the downward-interior iteration.
+  - Focused capture `CortexEngine/build/bin/logs/rain_review21_downward_interior/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=4.043`, `avg_luma=41.498`, `rt_reflection_signal_avg_luma=0.07714`, `rt_reflection_history_signal_avg_luma=0.07711`, and texture uploads `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
+  - Manual review rejected `rain_review21_downward_interior` for public media: the sky/HDRI band is substantially reduced, but the table now dominates the composition and rear/blockout elements remain visible.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace the remaining procedural rear enclosure/slat silhouette and cloudy horizon band with stronger authored garden/architectural geometry, a better rain-specific environment, or a more decisive close-up composition.
+  - Replace the remaining procedural rear enclosure/slat silhouette and table-heavy composition with stronger authored garden/architectural geometry, a better rain-specific environment, or a more decisive close-up composition.
   - Run visual review and fix glass/refraction/material defects found in screenshots.
   - Add material controls for glass tint/refraction readability without hiding background objects.
 
@@ -509,6 +513,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused desert captures `desert_review11`, `desert_review12`, and `desert_review13_lintel_grounding`; the relic focal read and tile breakup improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused forest captures `forest_review6` and `forest_review7_downward`; shrine scale and creek focus improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused coastal captures `coastal_review14` and `coastal_review15_rebalanced_rocks`; the floating crown and foreground-rock failures improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused rain capture `rain_review21_downward_interior`; the sky/HDRI band improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

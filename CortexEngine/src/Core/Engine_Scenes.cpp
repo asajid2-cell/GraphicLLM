@@ -4735,19 +4735,21 @@ void Engine::BuildRainGlassPavilionScene() {
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 0.12f, 32);
     auto lanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
+    auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
     auto bushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
     auto fernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
     if (!UploadAssetLedMesh(renderer, planeMesh, "plane") ||
         !UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
         !UploadAssetLedMesh(renderer, cylinderMesh, "cylinder") ||
         !UploadAssetLedMesh(renderer, lanternMesh, "Lantern_01") ||
+        !UploadAssetLedMesh(renderer, tableMesh, "WoodenTable_01") ||
         !UploadAssetLedMesh(renderer, bushMesh, "wild_rooibos_bush") ||
         !UploadAssetLedMesh(renderer, fernMesh, "fern_02")) {
         return;
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-2.35f, 1.08f, -2.75f), glm::vec3(0.48f, 0.76f, 0.10f), 34.0f, 120.0f);
+        glm::vec3(-2.1f, 1.02f, -2.5f), glm::vec3(-0.12f, 0.74f, 0.92f), 32.0f, 120.0f);
 
     const AssetLedMaterialSettings wetTile{glm::vec4(0.12f, 0.13f, 0.15f, 1.0f), 0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.78f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings gardenMat{glm::vec4(0.050f, 0.075f, 0.070f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.55f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
@@ -4755,6 +4757,7 @@ void Engine::BuildRainGlassPavilionScene() {
     const AssetLedMaterialSettings glass{glm::vec4(0.18f, 0.30f, 0.42f, 0.18f), 0.0f, 0.045f, 0.72f, 1.45f, glm::vec3(0.0f), 1.0f, 0.12f, 0.05f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
     const AssetLedMaterialSettings frameMetal{glm::vec4(0.42f, 0.48f, 0.52f, 1.0f), 1.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.34f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "oxidized_metal"};
     const AssetLedMaterialSettings chrome{glm::vec4(0.78f, 0.84f, 0.90f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.50f, 0.10f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
+    const AssetLedMaterialSettings wetWood{glm::vec4(0.25f, 0.18f, 0.12f, 1.0f), 0.0f, 0.48f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.42f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.62f, 0.32f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.52f, 0.20f), 2.2f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
@@ -4799,6 +4802,9 @@ void Engine::BuildRainGlassPavilionScene() {
     AddAssetLedRenderable(*m_registry, "RainPavilion_WarmInteriorStrip", cubeMesh, glm::vec3(0.0f, 1.82f, 1.96f), glm::vec3(2.05f, 0.035f, 0.045f), glm::vec3(0.0f), warmLight);
     if (lanternMesh && lanternMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedLantern", "Lantern_01", lanternMesh, glm::vec3(-1.2f, 0.42f, 1.1f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
+    }
+    if (tableMesh && tableMesh->gpuBuffers) {
+        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedInteriorTable", "WoodenTable_01", tableMesh, glm::vec3(-0.12f, 0.32f, 1.24f), glm::vec3(0.46f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), wetWood);
     }
     if (bushMesh && bushMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenBush", "wild_rooibos_bush", bushMesh, glm::vec3(-2.05f, 0.32f, 2.92f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), vegetation);

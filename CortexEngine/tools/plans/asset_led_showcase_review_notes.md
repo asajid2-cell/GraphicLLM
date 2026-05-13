@@ -470,6 +470,52 @@ Decision:
 - Keep `ALS-010` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Forest Low-Creek Material Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/forest_review8_current_prepass/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_review9_low_creek/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_review10_low_material/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_review11_shrine_attachment/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_review12_creek_material/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the forest creek shrine remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Reduced broad ground/bank/platform geometry and narrowed creek/foam strips.
+- Added scanned boulder cladding around the shrine base and required those cladding tokens in the runtime layout contract.
+- Lowered the hero camera through several attempts, ending on a creek/material-biased frame after the wide shrine shot continued to fail.
+- Reduced the toy roof/upper stone silhouette and tree-pole heights after the low camera exposed a floating-block read.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `forest_review12_creek_material` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=5.153`, `avg_luma=83.475`, `rt_reflection_signal_avg_luma=0.07028`, and `rt_reflection_history_signal_avg_luma=0.07024`.
+- Texture uploads in `forest_review12_creek_material` completed with `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+
+Findings:
+
+- The lower material framing reduces some of the wide rectangular diorama read.
+- The scene still fails public review: sky/background exposure is still dominant, the banks remain visibly rectangular, and the shrine remains block-built despite the cladding.
+- Further camera tuning is not the right fix; this scene needs authored terrain/shrine meshes or a different macro-material showcase design.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Segmented-Screen Checkpoint
 
 Commands:

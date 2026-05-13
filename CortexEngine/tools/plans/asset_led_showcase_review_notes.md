@@ -207,6 +207,46 @@ Decision:
 - Do not publish the coastal captures.
 - Keep `ALS-006` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-13 Rain Downward Interior Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused capture:
+  - `CortexEngine/build/bin/logs/rain_review21_downward_interior/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the rain glass pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Changed the hero camera to a higher downward interior angle.
+- The new framing prioritizes wet floor, table, lantern, glass channels, and reflection response instead of the cloudy horizon.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `rain_review21_downward_interior` rendered 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=4.043`, `avg_luma=41.498`, `rt_reflection_signal_avg_luma=0.07714`, and `rt_reflection_history_signal_avg_luma=0.07711`.
+- Texture uploads in `rain_review21_downward_interior` completed with `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
+
+Findings:
+
+- The sky/HDRI band is much less dominant than `rain_review20_final_checkpoint`.
+- Wet floor and glass/reflection response are easier to judge.
+- The scene is still rejected for public media: the table dominates the frame, the lighting is too dark, and rear/blockout geometry is still visible around the pavilion.
+
+Decision:
+
+- Do not publish the rain captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
 - Treat this as validated WIP evidence that the scene now has stronger contracts and more detailed foreground anchors, not as visual acceptance.
 
 ## 2026-05-13 Forest Asset-Kit Scale and Camera Iteration

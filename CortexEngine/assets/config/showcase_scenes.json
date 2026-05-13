@@ -289,9 +289,9 @@
         {
           "id": "hero",
           "label": "Rain pavilion hero",
-          "position": [-1.45, 0.76, -1.12],
-          "target": [-0.10, 0.48, 1.08],
-          "fov": 30.0,
+          "position": [-0.92, 1.18, -0.82],
+          "target": [-0.04, 0.24, 0.88],
+          "fov": 32.0,
           "validation": true
         },
         {

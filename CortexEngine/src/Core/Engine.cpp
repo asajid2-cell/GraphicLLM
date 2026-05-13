@@ -177,6 +177,21 @@ namespace {
                normalized == "outdoorsunsetbeach" || normalized == "sunset_beach" ||
                normalized == "liquid_gallery" || normalized == "liquidgallery" ||
                normalized == "liquids" ||
+               normalized == "coastal_cliff_foundry" ||
+               normalized == "coastalclifffoundry" ||
+               normalized == "foundry" ||
+               normalized == "rain_glass_pavilion" ||
+               normalized == "rainglasspavilion" ||
+               normalized == "pavilion" ||
+               normalized == "desert_relic_gallery" ||
+               normalized == "desertrelicgallery" ||
+               normalized == "relic_gallery" ||
+               normalized == "neon_alley_material_market" ||
+               normalized == "neonalley" ||
+               normalized == "neon_market" ||
+               normalized == "forest_creek_shrine" ||
+               normalized == "forestcreekshrine" ||
+               normalized == "creek_shrine" ||
                normalized == "god_rays" ||
                normalized == "godrays" || normalized == "temporal" ||
                normalized == "temporalvalidation" ||
@@ -595,6 +610,26 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
                    sceneLower == "liquidgallery" ||
                    sceneLower == "liquids") {
             m_currentScenePreset = ScenePreset::LiquidGallery;
+        } else if (sceneLower == "coastal_cliff_foundry" ||
+                   sceneLower == "coastalclifffoundry" ||
+                   sceneLower == "foundry") {
+            m_currentScenePreset = ScenePreset::CoastalCliffFoundry;
+        } else if (sceneLower == "rain_glass_pavilion" ||
+                   sceneLower == "rainglasspavilion" ||
+                   sceneLower == "pavilion") {
+            m_currentScenePreset = ScenePreset::RainGlassPavilion;
+        } else if (sceneLower == "desert_relic_gallery" ||
+                   sceneLower == "desertrelicgallery" ||
+                   sceneLower == "relic_gallery") {
+            m_currentScenePreset = ScenePreset::DesertRelicGallery;
+        } else if (sceneLower == "neon_alley_material_market" ||
+                   sceneLower == "neonalley" ||
+                   sceneLower == "neon_market") {
+            m_currentScenePreset = ScenePreset::NeonAlleyMaterialMarket;
+        } else if (sceneLower == "forest_creek_shrine" ||
+                   sceneLower == "forestcreekshrine" ||
+                   sceneLower == "creek_shrine") {
+            m_currentScenePreset = ScenePreset::ForestCreekShrine;
         } else if (sceneLower == "effects_showcase" || sceneLower == "effectsshowcase" || sceneLower == "effects") {
             m_currentScenePreset = ScenePreset::EffectsShowcase;
         } else if (sceneLower == "temporal" ||
@@ -1074,6 +1109,21 @@ void Engine::ToggleScenePreset() {
         next = ScenePreset::LiquidGallery;
         break;
     case ScenePreset::LiquidGallery:
+        next = ScenePreset::CoastalCliffFoundry;
+        break;
+    case ScenePreset::CoastalCliffFoundry:
+        next = ScenePreset::RainGlassPavilion;
+        break;
+    case ScenePreset::RainGlassPavilion:
+        next = ScenePreset::DesertRelicGallery;
+        break;
+    case ScenePreset::DesertRelicGallery:
+        next = ScenePreset::NeonAlleyMaterialMarket;
+        break;
+    case ScenePreset::NeonAlleyMaterialMarket:
+        next = ScenePreset::ForestCreekShrine;
+        break;
+    case ScenePreset::ForestCreekShrine:
         next = ScenePreset::EffectsShowcase;
         break;
     case ScenePreset::EffectsShowcase:
@@ -1722,6 +1772,11 @@ void Engine::WriteFrameDiagnosticsReport(bool shutdownSnapshot) {
         case ScenePreset::GlassWaterCourtyard: return "glass_water_courtyard";
         case ScenePreset::OutdoorSunsetBeach: return "outdoor_sunset_beach";
         case ScenePreset::LiquidGallery: return "liquid_gallery";
+        case ScenePreset::CoastalCliffFoundry: return "coastal_cliff_foundry";
+        case ScenePreset::RainGlassPavilion: return "rain_glass_pavilion";
+        case ScenePreset::DesertRelicGallery: return "desert_relic_gallery";
+        case ScenePreset::NeonAlleyMaterialMarket: return "neon_alley_material_market";
+        case ScenePreset::ForestCreekShrine: return "forest_creek_shrine";
         case ScenePreset::EffectsShowcase: return "effects_showcase";
         case ScenePreset::GodRays: return "god_rays";
         case ScenePreset::TemporalValidation: return "temporal_validation";
@@ -2111,6 +2166,11 @@ void Engine::InitializeScene() {
     case ScenePreset::GlassWaterCourtyard:
     case ScenePreset::OutdoorSunsetBeach:
     case ScenePreset::LiquidGallery:
+    case ScenePreset::CoastalCliffFoundry:
+    case ScenePreset::RainGlassPavilion:
+    case ScenePreset::DesertRelicGallery:
+    case ScenePreset::NeonAlleyMaterialMarket:
+    case ScenePreset::ForestCreekShrine:
     case ScenePreset::EffectsShowcase:
     case ScenePreset::GodRays:
     case ScenePreset::TemporalValidation:

@@ -166,6 +166,11 @@ private:
         IBLGallery        = 9,
         OutdoorSunsetBeach = 10,
         LiquidGallery     = 11,
+        CoastalCliffFoundry = 12,
+        RainGlassPavilion = 13,
+        DesertRelicGallery = 14,
+        NeonAlleyMaterialMarket = 15,
+        ForestCreekShrine = 16,
     };
 
     void ProcessInput();
@@ -186,6 +191,11 @@ private:
     void BuildLiquidGalleryScene();
     void BuildGlassWaterCourtyardScene();
     void BuildOutdoorSunsetBeachScene();
+    void BuildCoastalCliffFoundryScene();
+    void BuildRainGlassPavilionScene();
+    void BuildDesertRelicGalleryScene();
+    void BuildNeonAlleyMaterialMarketScene();
+    void BuildForestCreekShrineScene();
     void BuildGodRaysScene();
     void BuildTemporalValidationScene();
 

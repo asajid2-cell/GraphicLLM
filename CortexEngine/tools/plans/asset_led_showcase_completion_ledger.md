@@ -20,7 +20,7 @@ Current base evidence:
 
 ## Completion Gate
 
-Current status: `NOT COMPLETE`. The first implementation checkpoint adds seed/schema/asset-kit/world-palette/composition contracts, but the new scenes are not runtime builders yet and public captures have not been regenerated.
+Current status: `NOT COMPLETE`. The current implementation has seed/schema/asset-kit/world-palette/composition contracts plus runtime builders for the five asset-led scenes. The scenes are not public-release complete because visual baselines, high-quality public captures, gallery media, and harsh screenshot review are still pending.
 
 The asset-led showcase pass is complete only when every ledger item below is `DONE_VERIFIED` or `DEFERRED_BY_USER_ONLY`.
 
@@ -189,10 +189,11 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Existing: `CortexEngine/assets/config/showcase_scenes.json`
   - Future: `CortexEngine/assets/scenes/hand_authored/*/scene_seed.json`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
-- Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1` passed with `seeds=5`.
+- Evidence:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1` passed with `seeds=5`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed with `scenes=5`.
 - Remaining work:
-  - Add runtime composition checks or rendered-scene probes once the hand-authored scene builders exist.
-  - Extend checks from seed metadata into built entity transforms, model bounds, and screenshots.
+  - Extend checks from seed metadata into built entity transforms, model bounds, and screenshot negative gates.
 
 ### ALS-005: Lighting Direction and Tinted World Shaders
 
@@ -230,11 +231,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Validation commands:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId coastal_cliff_foundry`
   - `CortexEngine/build/bin/Release/CortexEngine.exe --scene coastal_cliff_foundry --smoke-frames 180 --visual-validation`
-- Evidence: `scene_seed.json` and `art_bible.md` created; `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId coastal_cliff_foundry` is covered by the all-scene pass.
+- Evidence:
+  - `scene_seed.json` and `art_bible.md` created.
+  - `Engine::BuildCoastalCliffFoundryScene` implemented and registered.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
 - Remaining work:
-  - Implement `Engine::BuildCoastalCliffFoundryScene`.
-  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
-  - Use actual asset-kit rocks/wood/metal props where appropriate at runtime.
+  - Add visual baseline case and high-quality public captures.
+  - Run visual review and fix composition/shader defects found in screenshots.
   - Capture high-resolution public screenshots after harsh review.
 
 ### ALS-007: Rain Glass Pavilion Scene
@@ -252,11 +255,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Validation commands:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId rain_glass_pavilion`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_rt_showcase_smoke.ps1`
-- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
+- Evidence:
+  - `scene_seed.json` and `art_bible.md` created.
+  - `Engine::BuildRainGlassPavilionScene` implemented and registered.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
 - Remaining work:
-  - Implement `Engine::BuildRainGlassPavilionScene`.
-  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
-  - Author pavilion frame, connected glass panes, wet ground, puddles, chrome fixtures, rain/mist particles, and reflection-view cameras in runtime scene code.
+  - Add visual baseline case and high-quality public captures.
+  - Run visual review and fix glass/refraction/material defects found in screenshots.
   - Add material controls for glass tint/refraction readability without hiding background objects.
 
 ### ALS-008: Desert Relic Gallery Scene
@@ -270,11 +275,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/src/Graphics/MaterialPresetRegistry.cpp`
   - `CortexEngine/assets/shaders/MaterialResolve.hlsl`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId desert_relic_gallery`
-- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
+- Evidence:
+  - `scene_seed.json` and `art_bible.md` created.
+  - `Engine::BuildDesertRelicGalleryScene` implemented and registered.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
 - Remaining work:
-  - Implement `Engine::BuildDesertRelicGalleryScene`.
-  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
-  - Author ruins/plinths with real supports, clear contact, natural prop grouping, sand buildup, stone wear, and camera bookmarks in runtime scene code.
+  - Add visual baseline case and high-quality public captures.
+  - Run visual review and fix scale/material/framing defects found in screenshots.
   - Prove material palette is not a single-color theme.
 
 ### ALS-009: Neon Alley Material Market Scene
@@ -293,11 +300,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_effects_showcase_smoke.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_gpu_particle_contract_tests.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId neon_alley_material_market`
-- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
+- Evidence:
+  - `scene_seed.json` and `art_bible.md` created.
+  - `Engine::BuildNeonAlleyMaterialMarketScene` implemented and registered.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
 - Remaining work:
-  - Implement `Engine::BuildNeonAlleyMaterialMarketScene`.
-  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
-  - Author alley geometry with readable storefronts, sign mounts, cabling/supports, wet surfaces, smoke/steam/rain particles, and multiple detail cameras in runtime scene code.
+  - Add visual baseline case and high-quality public captures.
+  - Run visual review and fix bloom/particle/framing defects found in screenshots.
 
 ### ALS-010: Forest Creek Shrine Scene
 
@@ -310,11 +319,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/src/Graphics/Renderer_Vegetation.cpp`
   - `CortexEngine/src/Graphics/Renderer_WaterSurfaces.cpp`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId forest_creek_shrine`
-- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
+- Evidence:
+  - `scene_seed.json` and `art_bible.md` created.
+  - `Engine::BuildForestCreekShrineScene` implemented and registered.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
 - Remaining work:
-  - Implement `Engine::BuildForestCreekShrineScene`.
-  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
-  - Author creek banks, rocks, foliage clusters, shrine focal object, and low-angle cameras in runtime scene code.
+  - Add visual baseline case and high-quality public captures.
+  - Run visual review and fix vegetation/water/framing defects found in screenshots.
 
 ### ALS-011: Existing Scene Re-Authoring Pass
 
@@ -366,7 +377,9 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/assets/config/release_package_manifest.json`
   - New scripts: `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_world_shader_contract_tests.ps1`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1`
-- Evidence: `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, and `run_world_shader_contract_tests.ps1` now exist and pass targeted validation.
+- Evidence:
+  - `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, and `run_world_shader_contract_tests.ps1` now exist and pass targeted validation.
+  - `cmd.exe /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'` passed.
 - Remaining work:
   - Add new release validation steps when scripts are meaningful.
   - Do not add empty placeholder scripts just to satisfy the ledger.

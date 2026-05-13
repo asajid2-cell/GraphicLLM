@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <filesystem>
 
+#include <glm/geometric.hpp>
+
 namespace Cortex {
 
 using Graphics::Renderer;
@@ -85,6 +87,135 @@ namespace {
 
         spdlog::warn("Naturalistic showcase mesh not found: {}", relativeGltf);
         return nullptr;
+    }
+
+    struct AssetLedMaterialSettings {
+        glm::vec4 color{1.0f};
+        float metallic = 0.0f;
+        float roughness = 0.55f;
+        float transmission = 0.0f;
+        float ior = 1.5f;
+        glm::vec3 emissive{0.0f};
+        float emissiveStrength = 1.0f;
+        float wetness = 0.0f;
+        float proceduralMask = 0.0f;
+        bool doubleSided = false;
+        Scene::RenderableComponent::AlphaMode alphaMode = Scene::RenderableComponent::AlphaMode::Opaque;
+        Scene::RenderableComponent::RenderLayer layer = Scene::RenderableComponent::RenderLayer::Opaque;
+        const char* preset = "masonry";
+    };
+
+    bool UploadAssetLedMesh(Renderer* renderer,
+                            const std::shared_ptr<Scene::MeshData>& mesh,
+                            const char* label) {
+        if (!renderer || !mesh) {
+            return true;
+        }
+        auto res = renderer->UploadMesh(mesh);
+        if (res.IsErr()) {
+            spdlog::warn("Failed to upload asset-led {} mesh: {}", label, res.Error());
+            return false;
+        }
+        if (renderer->IsDeviceRemoved()) {
+            spdlog::error("DX12 device was removed while uploading asset-led {} mesh", label);
+            return false;
+        }
+        return true;
+    }
+
+    entt::entity AddAssetLedRenderable(Scene::ECS_Registry& registry,
+                                       const char* tag,
+                                       const std::shared_ptr<Scene::MeshData>& mesh,
+                                       const glm::vec3& position,
+                                       const glm::vec3& scale,
+                                       const glm::vec3& eulerRadians,
+                                       const AssetLedMaterialSettings& material) {
+        entt::entity e = registry.CreateEntity();
+        registry.AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = registry.AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.scale = scale;
+        t.rotation = glm::quat(eulerRadians);
+
+        auto& r = registry.AddComponent<Scene::RenderableComponent>(e);
+        r.mesh = mesh;
+        r.albedoColor = material.color;
+        r.metallic = material.metallic;
+        r.roughness = material.roughness;
+        r.ao = 1.0f;
+        r.transmissionFactor = material.transmission;
+        r.ior = material.ior;
+        r.emissiveColor = material.emissive;
+        r.emissiveStrength = material.emissiveStrength;
+        r.emissiveBloomFactor = glm::length(material.emissive) > 0.0f ? 0.55f : 0.0f;
+        r.wetnessFactor = material.wetness;
+        r.proceduralMaskStrength = material.proceduralMask;
+        r.doubleSided = material.doubleSided;
+        r.alphaMode = material.alphaMode;
+        r.renderLayer = material.layer;
+        r.presetName = material.preset;
+        return e;
+    }
+
+    entt::entity AddAssetLedCamera(Scene::ECS_Registry& registry,
+                                   const glm::vec3& position,
+                                   const glm::vec3& target,
+                                   float fov,
+                                   float farPlane) {
+        entt::entity camEntity = registry.CreateEntity();
+        registry.AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
+        auto& t = registry.AddComponent<TransformComponent>(camEntity);
+        t.position = position;
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& cam = registry.AddComponent<Scene::CameraComponent>(camEntity);
+        cam.fov = fov;
+        ConfigureShowcaseCameraClip(cam, farPlane);
+        cam.isActive = true;
+        return camEntity;
+    }
+
+    void AddAssetLedPointLight(Scene::ECS_Registry& registry,
+                               const char* tag,
+                               const glm::vec3& position,
+                               const glm::vec3& color,
+                               float intensity,
+                               float range) {
+        entt::entity e = registry.CreateEntity();
+        registry.AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = registry.AddComponent<TransformComponent>(e);
+        t.position = position;
+
+        auto& l = registry.AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Point;
+        l.color = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.castsShadows = false;
+    }
+
+    void AddAssetLedSpotLight(Scene::ECS_Registry& registry,
+                              const char* tag,
+                              const glm::vec3& position,
+                              const glm::vec3& target,
+                              const glm::vec3& color,
+                              float intensity,
+                              float range,
+                              bool castsShadows) {
+        entt::entity e = registry.CreateEntity();
+        registry.AddComponent<Scene::TagComponent>(e, tag);
+        auto& t = registry.AddComponent<TransformComponent>(e);
+        t.position = position;
+        t.rotation = glm::quatLookAtLH(glm::normalize(target - position), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto& l = registry.AddComponent<Scene::LightComponent>(e);
+        l.type = Scene::LightType::Spot;
+        l.color = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.innerConeDegrees = 26.0f;
+        l.outerConeDegrees = 48.0f;
+        l.castsShadows = castsShadows;
     }
 }
 
@@ -183,6 +314,21 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::LiquidGallery:
         BuildLiquidGalleryScene();
         break;
+    case ScenePreset::CoastalCliffFoundry:
+        BuildCoastalCliffFoundryScene();
+        break;
+    case ScenePreset::RainGlassPavilion:
+        BuildRainGlassPavilionScene();
+        break;
+    case ScenePreset::DesertRelicGallery:
+        BuildDesertRelicGalleryScene();
+        break;
+    case ScenePreset::NeonAlleyMaterialMarket:
+        BuildNeonAlleyMaterialMarketScene();
+        break;
+    case ScenePreset::ForestCreekShrine:
+        BuildForestCreekShrineScene();
+        break;
     case ScenePreset::EffectsShowcase:
         BuildEffectsShowcaseScene();
         break;
@@ -208,6 +354,11 @@ void Engine::RebuildScene(ScenePreset preset) {
     case ScenePreset::GlassWaterCourtyard:presetName = "Glass and Water Courtyard"; break;
     case ScenePreset::OutdoorSunsetBeach:presetName = "Outdoor Sunset Beach"; break;
     case ScenePreset::LiquidGallery:     presetName = "Liquid Gallery"; break;
+    case ScenePreset::CoastalCliffFoundry:presetName = "Coastal Cliff Foundry"; break;
+    case ScenePreset::RainGlassPavilion: presetName = "Rain Glass Pavilion"; break;
+    case ScenePreset::DesertRelicGallery:presetName = "Desert Relic Gallery"; break;
+    case ScenePreset::NeonAlleyMaterialMarket:presetName = "Neon Alley Material Market"; break;
+    case ScenePreset::ForestCreekShrine: presetName = "Forest Creek Shrine"; break;
     case ScenePreset::EffectsShowcase:   presetName = "Effects Showcase"; break;
     case ScenePreset::GodRays:           presetName = "God Rays Atrium"; break;
     case ScenePreset::TemporalValidation:presetName = "Temporal Validation Lab"; break;
@@ -4331,6 +4482,342 @@ void Engine::BuildDragonStudioScene() {
 
 }
 
+void Engine::BuildCoastalCliffFoundryScene() {
+    spdlog::info("Building asset-led scene: Coastal Cliff Foundry");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        renderer->SetLightingRigContract("coastal_foundry_dusk", "scene_preset", false);
+        renderer->SetEnvironmentPreset("outdoor_sunset");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.72f, 0.98f);
+        renderer->SetBackgroundPresentation(true, 0.95f, 0.08f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.42f, 0.48f, 0.25f)));
+        renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.28f));
+        renderer->SetSunIntensity(2.4f);
+        renderer->SetRenderScale(0.85f);
+        renderer->SetExposure(0.92f);
+        renderer->SetBloomIntensity(0.30f);
+        renderer->SetBloomShape(0.90f, 0.48f, 1.90f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetFXAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.018f, 0.0f, 0.46f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetRTReflectionsEnabled(true);
+        renderer->SetWaterParams(-0.03f, 0.09f, 8.0f, 0.75f, 0.85f, 0.28f, 0.045f, 0.65f);
+    }
+
+    auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 24);
+    auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+    auto barrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+    if (!UploadAssetLedMesh(renderer, planeMesh, "plane") ||
+        !UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
+        !UploadAssetLedMesh(renderer, sphereMesh, "sphere") ||
+        !UploadAssetLedMesh(renderer, boulderMesh, "boulder_01") ||
+        !UploadAssetLedMesh(renderer, barrelMesh, "Barrel_01")) {
+        return;
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry,
+        glm::vec3(-6.8f, 2.4f, -7.2f), glm::vec3(0.8f, 1.0f, 0.4f), 48.0f, 180.0f);
+
+    const AssetLedMaterialSettings wetBasalt{glm::vec4(0.08f, 0.105f, 0.11f, 1.0f), 0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.85f, 0.46f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings ocean{glm::vec4(0.025f, 0.18f, 0.26f, 0.78f), 0.0f, 0.07f, 0.35f, 1.333f, glm::vec3(0.0f), 1.0f, 1.0f, 0.2f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "water"};
+    const AssetLedMaterialSettings lava{glm::vec4(1.0f, 0.56f, 0.06f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.36f, 0.08f), 5.8f, 0.2f, 0.62f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "lava"};
+    const AssetLedMaterialSettings iron{glm::vec4(0.23f, 0.19f, 0.15f, 1.0f), 0.85f, 0.31f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.35f, 0.28f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "brushed_metal"};
+    const AssetLedMaterialSettings foam{glm::vec4(0.72f, 0.86f, 0.88f, 0.64f), 0.0f, 0.45f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.6f, 0.1f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Overlay, "water_foam"};
+
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_OceanPlane", planeMesh, glm::vec3(-0.6f, -0.04f, 2.6f), glm::vec3(10.5f, 1.0f, 5.0f), glm::vec3(0.0f), ocean);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_WetBasaltDeck", cubeMesh, glm::vec3(-0.8f, -0.09f, -0.65f), glm::vec3(7.2f, 0.18f, 4.2f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_LavaSurface", cubeMesh, glm::vec3(0.7f, 0.42f, -0.10f), glm::vec3(4.8f, 0.04f, 1.25f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), lava);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_ChannelNorthWall", cubeMesh, glm::vec3(0.55f, 0.58f, -0.86f), glm::vec3(5.1f, 0.34f, 0.18f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_ChannelSouthWall", cubeMesh, glm::vec3(0.85f, 0.58f, 0.66f), glm::vec3(5.1f, 0.34f, 0.18f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_LeftRailRun", cubeMesh, glm::vec3(-0.40f, 0.96f, -1.22f), glm::vec3(4.6f, 0.08f, 0.08f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_RightRailRun", cubeMesh, glm::vec3(1.05f, 0.96f, 0.98f), glm::vec3(4.6f, 0.08f, 0.08f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+    for (int i = 0; i < 7; ++i) {
+        const float x = -2.0f + static_cast<float>(i) * 0.78f;
+        AddAssetLedRenderable(*m_registry, "CoastalFoundry_RailPost", cubeMesh, glm::vec3(x, 0.70f, -1.26f), glm::vec3(0.10f, 0.70f, 0.10f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+        AddAssetLedRenderable(*m_registry, "CoastalFoundry_RailPost", cubeMesh, glm::vec3(x + 0.25f, 0.70f, 1.03f), glm::vec3(0.10f, 0.70f, 0.10f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
+    }
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_ShoreFoamBand", planeMesh, glm::vec3(-1.4f, 0.02f, 1.05f), glm::vec3(7.4f, 1.0f, 0.22f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), foam);
+    if (boulderMesh && boulderMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "CoastalFoundry_BoulderAnchor", boulderMesh, glm::vec3(-2.7f, 0.20f, 1.8f), glm::vec3(1.35f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), wetBasalt);
+    }
+    if (barrelMesh && barrelMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "CoastalFoundry_GroundedBarrel", barrelMesh, glm::vec3(2.8f, 0.50f, -1.55f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-24.0f), 0.0f), iron);
+    }
+    AddParticleEffect(*m_registry, "CoastalFoundry_EmberColumn", "embers", glm::vec3(0.55f, 0.92f, -0.05f));
+    AddParticleEffect(*m_registry, "CoastalFoundry_SmokeColumn", "smoke", glm::vec3(0.15f, 1.08f, -0.05f));
+    AddAssetLedPointLight(*m_registry, "CoastalFoundry_LavaLight", glm::vec3(0.5f, 0.72f, -0.05f), glm::vec3(1.0f, 0.36f, 0.10f), 7.5f, 8.0f);
+    AddAssetLedSpotLight(*m_registry, "CoastalFoundry_CoolSkyRim", glm::vec3(-4.6f, 4.2f, 3.8f), glm::vec3(0.0f, 0.45f, -0.2f), glm::vec3(0.32f, 0.48f, 0.72f), 4.5f, 18.0f, false);
+}
+
+void Engine::BuildRainGlassPavilionScene() {
+    spdlog::info("Building asset-led scene: Rain Glass Pavilion");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        renderer->SetLightingRigContract("rain_pavilion_night", "scene_preset", false);
+        renderer->SetEnvironmentPreset("cool_overcast");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.65f, 1.35f);
+        renderer->SetBackgroundPresentation(true, 0.72f, 0.22f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.18f, 0.72f, 0.50f)));
+        renderer->SetSunColor(glm::vec3(0.25f, 0.46f, 0.95f));
+        renderer->SetSunIntensity(1.25f);
+        renderer->SetExposure(0.78f);
+        renderer->SetBloomIntensity(0.20f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetFXAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.022f, 0.0f, 0.45f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetRTReflectionsEnabled(true);
+        renderer->SetWaterParams(0.03f, 0.035f, 4.6f, 0.65f, 0.55f, 0.18f, 0.018f, 0.55f);
+    }
+
+    auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 0.12f, 32);
+    auto lanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
+    if (!UploadAssetLedMesh(renderer, planeMesh, "plane") ||
+        !UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
+        !UploadAssetLedMesh(renderer, cylinderMesh, "cylinder") ||
+        !UploadAssetLedMesh(renderer, lanternMesh, "Lantern_01")) {
+        return;
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry,
+        glm::vec3(-5.2f, 1.7f, -5.6f), glm::vec3(0.0f, 1.05f, 0.1f), 45.0f, 120.0f);
+
+    const AssetLedMaterialSettings wetTile{glm::vec4(0.12f, 0.13f, 0.15f, 1.0f), 0.0f, 0.32f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.92f, 0.50f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings glass{glm::vec4(0.58f, 0.75f, 0.92f, 0.34f), 0.0f, 0.03f, 0.72f, 1.45f, glm::vec3(0.0f), 1.0f, 0.15f, 0.1f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
+    const AssetLedMaterialSettings chrome{glm::vec4(0.78f, 0.84f, 0.90f, 1.0f), 1.0f, 0.06f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.55f, 0.12f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
+    const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.68f, 0.36f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.62f, 0.26f), 4.8f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_PuddleSheet_A", planeMesh, glm::vec3(-0.9f, 0.012f, -1.3f), glm::vec3(2.4f, 1.0f, 1.1f), glm::vec3(0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallLeft", cubeMesh, glm::vec3(-2.2f, 1.22f, 0.0f), glm::vec3(0.08f, 2.4f, 4.2f), glm::vec3(0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallRight", cubeMesh, glm::vec3(2.2f, 1.22f, 0.0f), glm::vec3(0.08f, 2.4f, 4.2f), glm::vec3(0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_RearGlassWall", cubeMesh, glm::vec3(0.0f, 1.22f, 2.08f), glm::vec3(4.4f, 2.4f, 0.08f), glm::vec3(0.0f), glass);
+    for (int i = 0; i < 5; ++i) {
+        const float x = -2.2f + static_cast<float>(i) * 1.1f;
+        AddAssetLedRenderable(*m_registry, "RainPavilion_RoofMullion", cubeMesh, glm::vec3(x, 2.52f, 0.0f), glm::vec3(0.07f, 0.08f, 4.45f), glm::vec3(0.0f), chrome);
+        AddAssetLedRenderable(*m_registry, "RainPavilion_FloorChannel", cubeMesh, glm::vec3(x, 0.10f, 0.0f), glm::vec3(0.06f, 0.08f, 4.3f), glm::vec3(0.0f), chrome);
+    }
+    AddAssetLedRenderable(*m_registry, "RainPavilion_ChromeDrain", cylinderMesh, glm::vec3(0.9f, 0.04f, -1.7f), glm::vec3(0.42f, 1.0f, 0.42f), glm::vec3(0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_WarmInteriorStrip", cubeMesh, glm::vec3(0.0f, 2.18f, 1.95f), glm::vec3(3.6f, 0.08f, 0.08f), glm::vec3(0.0f), warmLight);
+    if (lanternMesh && lanternMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "RainPavilion_GroundedLantern", lanternMesh, glm::vec3(-1.2f, 0.42f, 1.1f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
+    }
+    AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(0.0f, 2.6f, -0.2f));
+    AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(0.4f, 0.35f, -1.5f));
+    AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.8f, 1.6f), glm::vec3(1.0f, 0.72f, 0.38f), 5.5f, 7.0f);
+    AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.25f, 0.46f, 0.95f), 4.0f, 14.0f, false);
+}
+
+void Engine::BuildDesertRelicGalleryScene() {
+    spdlog::info("Building asset-led scene: Desert Relic Gallery");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        renderer->SetLightingRigContract("desert_relic_sun", "scene_preset", false);
+        renderer->SetEnvironmentPreset("outdoor_sunset");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.82f, 0.78f);
+        renderer->SetBackgroundPresentation(true, 1.08f, 0.04f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(0.58f, 0.68f, 0.22f)));
+        renderer->SetSunColor(glm::vec3(1.0f, 0.82f, 0.52f));
+        renderer->SetSunIntensity(3.6f);
+        renderer->SetExposure(1.04f);
+        renderer->SetBloomIntensity(0.08f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetFXAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.010f, 0.0f, 0.58f);
+        renderer->SetParticlesEnabled(false);
+    }
+
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto torusMesh = Utils::MeshGenerator::CreateTorus(0.52f, 0.12f, 32, 12);
+    auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+    if (!UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
+        !UploadAssetLedMesh(renderer, torusMesh, "torus") ||
+        !UploadAssetLedMesh(renderer, planeMesh, "plane")) {
+        return;
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry,
+        glm::vec3(-5.8f, 2.0f, -6.2f), glm::vec3(0.15f, 0.9f, 0.1f), 46.0f, 180.0f);
+
+    const AssetLedMaterialSettings stone{glm::vec4(0.70f, 0.62f, 0.48f, 1.0f), 0.0f, 0.72f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.55f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
+    const AssetLedMaterialSettings sand{glm::vec4(0.84f, 0.67f, 0.42f, 1.0f), 0.0f, 0.86f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.38f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "sand"};
+    const AssetLedMaterialSettings bronze{glm::vec4(0.76f, 0.46f, 0.22f, 1.0f), 0.88f, 0.24f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.28f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "brushed_metal"};
+    const AssetLedMaterialSettings glass{glm::vec4(0.35f, 0.68f, 0.92f, 0.48f), 0.0f, 0.05f, 0.45f, 1.45f, glm::vec3(0.0f), 1.0f, 0.0f, 0.12f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
+
+    AddAssetLedRenderable(*m_registry, "DesertRelic_SandFloor", planeMesh, glm::vec3(0.0f, -0.02f, 0.0f), glm::vec3(12.0f, 1.0f, 10.0f), glm::vec3(0.0f), sand);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_MainPlinth", cubeMesh, glm::vec3(0.0f, 0.30f, 0.0f), glm::vec3(2.2f, 0.60f, 1.2f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BronzeRing", torusMesh, glm::vec3(0.15f, 0.95f, 0.0f), glm::vec3(0.82f), glm::vec3(glm::radians(74.0f), glm::radians(18.0f), 0.0f), bronze);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_GlassInlay", cubeMesh, glm::vec3(-0.65f, 0.68f, 0.03f), glm::vec3(0.42f, 0.08f, 0.42f), glm::vec3(0.0f, glm::radians(22.0f), 0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_SandDriftFront", cubeMesh, glm::vec3(-0.6f, 0.04f, -1.15f), glm::vec3(2.4f, 0.08f, 0.48f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), sand);
+    for (int i = 0; i < 3; ++i) {
+        const float x = -3.2f + static_cast<float>(i) * 3.2f;
+        AddAssetLedRenderable(*m_registry, "DesertRelic_ArchColumn", cubeMesh, glm::vec3(x, 1.0f, 2.2f), glm::vec3(0.36f, 2.0f, 0.42f), glm::vec3(0.0f), stone);
+    }
+    AddAssetLedRenderable(*m_registry, "DesertRelic_ArchLintel", cubeMesh, glm::vec3(0.0f, 2.08f, 2.2f), glm::vec3(6.9f, 0.32f, 0.45f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackWallLow", cubeMesh, glm::vec3(0.0f, 0.75f, 2.55f), glm::vec3(7.2f, 1.5f, 0.22f), glm::vec3(0.0f), stone);
+    AddAssetLedSpotLight(*m_registry, "DesertRelic_WarmKey", glm::vec3(-3.2f, 5.0f, -3.5f), glm::vec3(0.0f, 0.55f, 0.0f), glm::vec3(1.0f, 0.82f, 0.52f), 5.5f, 20.0f, false);
+}
+
+void Engine::BuildNeonAlleyMaterialMarketScene() {
+    spdlog::info("Building asset-led scene: Neon Alley Material Market");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        renderer->SetLightingRigContract("neon_market_rain", "scene_preset", false);
+        renderer->SetEnvironmentPreset("studio");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.45f, 1.25f);
+        renderer->SetBackgroundPresentation(true, 0.65f, 0.22f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.16f, 0.72f, 0.38f)));
+        renderer->SetSunColor(glm::vec3(0.12f, 0.42f, 0.88f));
+        renderer->SetSunIntensity(0.9f);
+        renderer->SetExposure(0.70f);
+        renderer->SetBloomIntensity(0.42f);
+        renderer->SetBloomShape(0.75f, 0.58f, 2.25f);
+        renderer->SetCinematicPostEnabled(true);
+        renderer->SetCinematicPost(0.18f, 0.24f);
+        renderer->SetToneMapperPreset("filmic_soft");
+        renderer->SetColorGrade(0.10f, 0.22f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetFXAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.026f, 0.0f, 0.42f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetRTReflectionsEnabled(true);
+    }
+
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+    auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
+    auto barrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+    if (!UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
+        !UploadAssetLedMesh(renderer, planeMesh, "plane") ||
+        !UploadAssetLedMesh(renderer, tableMesh, "WoodenTable_01") ||
+        !UploadAssetLedMesh(renderer, barrelMesh, "Barrel_01")) {
+        return;
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry,
+        glm::vec3(-4.4f, 1.55f, -6.4f), glm::vec3(0.4f, 1.1f, 0.4f), 44.0f, 120.0f);
+
+    const AssetLedMaterialSettings wetAsphalt{glm::vec4(0.035f, 0.038f, 0.045f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 1.0f, 0.58f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings neonPink{glm::vec4(1.0f, 0.18f, 0.58f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.18f, 0.58f), 5.2f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings neonCyan{glm::vec4(0.15f, 1.0f, 0.78f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.15f, 1.0f, 0.78f), 4.8f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings glass{glm::vec4(0.45f, 0.68f, 0.82f, 0.36f), 0.0f, 0.04f, 0.52f, 1.45f, glm::vec3(0.0f), 1.0f, 0.4f, 0.1f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
+    const AssetLedMaterialSettings chrome{glm::vec4(0.72f, 0.82f, 0.86f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.55f, 0.2f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
+
+    AddAssetLedRenderable(*m_registry, "NeonMarket_WetAlleyPlane", cubeMesh, glm::vec3(0.0f, -0.04f, -0.25f), glm::vec3(5.8f, 0.08f, 8.2f), glm::vec3(0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_LeftStorefront", cubeMesh, glm::vec3(-2.25f, 1.1f, -0.05f), glm::vec3(0.38f, 2.2f, 4.6f), glm::vec3(0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightStorefront", cubeMesh, glm::vec3(2.25f, 1.05f, 0.2f), glm::vec3(0.34f, 2.1f, 4.4f), glm::vec3(0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_MountedPinkSign", cubeMesh, glm::vec3(-2.02f, 2.1f, -0.85f), glm::vec3(0.10f, 0.38f, 1.35f), glm::vec3(0.0f), neonPink);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_MountedCyanSign", cubeMesh, glm::vec3(2.02f, 1.72f, 0.95f), glm::vec3(0.10f, 0.32f, 1.15f), glm::vec3(0.0f), neonCyan);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayGlass", cubeMesh, glm::vec3(0.6f, 0.66f, -1.2f), glm::vec3(1.3f, 0.68f, 0.55f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayChromeTrim", cubeMesh, glm::vec3(0.6f, 1.04f, -1.2f), glm::vec3(1.4f, 0.06f, 0.62f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
+    if (tableMesh && tableMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "NeonMarket_GroundedMarketTable", tableMesh, glm::vec3(-0.85f, 0.40f, 1.0f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), wetAsphalt);
+    }
+    if (barrelMesh && barrelMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "NeonMarket_GroundedBarrel", barrelMesh, glm::vec3(1.55f, 0.45f, -2.0f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), chrome);
+    }
+    AddParticleEffect(*m_registry, "NeonMarket_SteamPuffs", "steam", glm::vec3(-0.2f, 0.22f, -1.6f));
+    AddParticleEffect(*m_registry, "NeonMarket_Rain", "rain", glm::vec3(0.0f, 2.8f, -0.3f));
+    AddAssetLedPointLight(*m_registry, "NeonMarket_PinkLight", glm::vec3(-1.9f, 1.8f, -0.7f), glm::vec3(1.0f, 0.18f, 0.58f), 5.5f, 6.5f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_CyanLight", glm::vec3(1.9f, 1.65f, 0.9f), glm::vec3(0.15f, 1.0f, 0.78f), 4.8f, 6.0f);
+}
+
+void Engine::BuildForestCreekShrineScene() {
+    spdlog::info("Building asset-led scene: Forest Creek Shrine");
+
+    auto* renderer = m_renderer.get();
+    if (renderer) {
+        renderer->SetLightingRigContract("forest_creek_mist", "scene_preset", false);
+        renderer->SetEnvironmentPreset("cool_overcast");
+        renderer->SetIBLEnabled(true);
+        renderer->SetIBLIntensity(0.72f, 0.82f);
+        renderer->SetBackgroundPresentation(true, 0.78f, 0.30f);
+        renderer->SetSunDirection(glm::normalize(glm::vec3(-0.25f, 0.80f, 0.36f)));
+        renderer->SetSunColor(glm::vec3(0.72f, 0.88f, 0.62f));
+        renderer->SetSunIntensity(1.9f);
+        renderer->SetExposure(0.86f);
+        renderer->SetBloomIntensity(0.08f);
+        renderer->SetTAAEnabled(true);
+        renderer->SetFXAAEnabled(true);
+        renderer->SetSSREnabled(true);
+        renderer->SetSSAOEnabled(true);
+        renderer->SetFogEnabled(true);
+        renderer->SetFogParams(0.024f, 0.0f, 0.42f);
+        renderer->SetParticlesEnabled(true);
+        renderer->SetWaterParams(0.05f, 0.035f, 4.8f, 0.45f, 0.55f, 0.18f, 0.018f, 0.35f);
+    }
+
+    auto cubeMesh = Utils::MeshGenerator::CreateCube();
+    auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
+    auto boulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+    auto trunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
+    auto fernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
+    if (!UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
+        !UploadAssetLedMesh(renderer, planeMesh, "plane") ||
+        !UploadAssetLedMesh(renderer, boulderMesh, "boulder_01") ||
+        !UploadAssetLedMesh(renderer, trunkMesh, "dead_tree_trunk") ||
+        !UploadAssetLedMesh(renderer, fernMesh, "fern_02")) {
+        return;
+    }
+
+    m_activeCameraEntity = AddAssetLedCamera(*m_registry,
+        glm::vec3(-4.2f, 1.25f, -5.1f), glm::vec3(0.2f, 0.75f, 0.65f), 44.0f, 140.0f);
+
+    const AssetLedMaterialSettings mossStone{glm::vec4(0.28f, 0.34f, 0.24f, 1.0f), 0.0f, 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.72f, 0.62f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "mossy_masonry"};
+    const AssetLedMaterialSettings creek{glm::vec4(0.08f, 0.22f, 0.18f, 0.68f), 0.0f, 0.08f, 0.42f, 1.333f, glm::vec3(0.0f), 1.0f, 1.0f, 0.2f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "water"};
+    const AssetLedMaterialSettings wetBark{glm::vec4(0.19f, 0.12f, 0.08f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.65f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
+    const AssetLedMaterialSettings vegetation{glm::vec4(0.16f, 0.32f, 0.17f, 1.0f), 0.0f, 0.72f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.45f, 0.48f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "vegetation"};
+
+    AddAssetLedRenderable(*m_registry, "ForestShrine_GroundBank", cubeMesh, glm::vec3(0.0f, -0.08f, 0.0f), glm::vec3(7.0f, 0.16f, 6.0f), glm::vec3(0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_CreekSheet", planeMesh, glm::vec3(-0.7f, 0.05f, -1.4f), glm::vec3(2.8f, 1.0f, 3.4f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), creek);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_ShrineBase", cubeMesh, glm::vec3(0.0f, 0.25f, 0.35f), glm::vec3(1.4f, 0.50f, 1.0f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_Capstone", cubeMesh, glm::vec3(0.0f, 0.82f, 0.35f), glm::vec3(1.65f, 0.18f, 1.15f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
+    if (trunkMesh && trunkMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "ForestShrine_FallenTrunk", trunkMesh, glm::vec3(-1.2f, 0.24f, 0.9f), glm::vec3(0.95f), glm::vec3(glm::radians(6.0f), glm::radians(-22.0f), 0.0f), wetBark);
+    }
+    if (boulderMesh && boulderMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "ForestShrine_LeftBankRock", boulderMesh, glm::vec3(-1.6f, 0.12f, -0.55f), glm::vec3(0.75f), glm::vec3(0.0f, glm::radians(15.0f), 0.0f), mossStone);
+        AddAssetLedRenderable(*m_registry, "ForestShrine_RightBankRock", boulderMesh, glm::vec3(1.25f, 0.10f, -1.2f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-35.0f), 0.0f), mossStone);
+    }
+    if (fernMesh && fernMesh->gpuBuffers) {
+        for (int i = 0; i < 6; ++i) {
+            const float side = (i % 2 == 0) ? -1.0f : 1.0f;
+            AddAssetLedRenderable(*m_registry, "ForestShrine_FernCluster", fernMesh,
+                                  glm::vec3(side * (1.6f + 0.2f * i), 0.05f, -0.8f + 0.52f * i),
+                                  glm::vec3(0.45f + 0.04f * i),
+                                  glm::vec3(0.0f, glm::radians(24.0f * i), 0.0f),
+                                  vegetation);
+        }
+    }
+    AddParticleEffect(*m_registry, "ForestShrine_GroundMist", "mist", glm::vec3(-0.4f, 0.18f, -0.8f));
+    AddAssetLedSpotLight(*m_registry, "ForestShrine_FilteredSun", glm::vec3(-3.2f, 4.4f, -2.6f), glm::vec3(0.0f, 0.45f, 0.2f), glm::vec3(0.72f, 0.88f, 0.62f), 4.0f, 16.0f, false);
+}
+
 void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     glm::vec3 pos;
     glm::vec3 target;
@@ -4351,6 +4838,21 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
     } else if (m_currentScenePreset == ScenePreset::LiquidGallery) {
         pos = glm::vec3(0.0f, 2.65f, -10.2f);
         target = glm::vec3(0.0f, 0.65f, 0.0f);
+    } else if (m_currentScenePreset == ScenePreset::CoastalCliffFoundry) {
+        pos = glm::vec3(-6.8f, 2.4f, -7.2f);
+        target = glm::vec3(0.8f, 1.0f, 0.4f);
+    } else if (m_currentScenePreset == ScenePreset::RainGlassPavilion) {
+        pos = glm::vec3(-5.2f, 1.7f, -5.6f);
+        target = glm::vec3(0.0f, 1.05f, 0.1f);
+    } else if (m_currentScenePreset == ScenePreset::DesertRelicGallery) {
+        pos = glm::vec3(-5.8f, 2.0f, -6.2f);
+        target = glm::vec3(0.15f, 0.9f, 0.1f);
+    } else if (m_currentScenePreset == ScenePreset::NeonAlleyMaterialMarket) {
+        pos = glm::vec3(-4.4f, 1.55f, -6.4f);
+        target = glm::vec3(0.4f, 1.1f, 0.4f);
+    } else if (m_currentScenePreset == ScenePreset::ForestCreekShrine) {
+        pos = glm::vec3(-4.2f, 1.25f, -5.1f);
+        target = glm::vec3(0.2f, 0.75f, 0.65f);
     } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
         pos = glm::vec3(0.0f, 2.3f, -6.4f);
         target = glm::vec3(0.0f, 1.0f, 0.1f);

@@ -241,6 +241,191 @@
       "polish_gaps": []
     },
     {
+      "id": "coastal_cliff_foundry",
+      "display_name": "Coastal Cliff Foundry",
+      "current_status": "seeded_runtime_wip",
+      "target_status": "public_showcase_validated",
+      "default_environment": "outdoor_sunset",
+      "default_lighting_rig": "coastal_foundry_dusk",
+      "required_bookmarks": ["hero", "material_closeup", "atmosphere"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Ocean-to-foundry hero",
+          "position": [-6.8, 2.4, -7.2],
+          "target": [0.8, 1.0, 0.4],
+          "fov": 48.0,
+          "validation": true
+        },
+        {
+          "id": "material_closeup",
+          "label": "Wet basalt, metal, lava, and water",
+          "position": [-2.2, 1.35, -3.4],
+          "target": [1.7, 0.8, -0.25],
+          "fov": 36.0,
+          "validation": false
+        },
+        {
+          "id": "atmosphere",
+          "label": "Sparks, smoke, and tinted mist",
+          "position": [4.8, 2.0, -4.6],
+          "target": [0.3, 1.15, 0.5],
+          "fov": 42.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["water", "lava", "particles", "tinted_lighting", "wet_materials"],
+      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+    },
+    {
+      "id": "rain_glass_pavilion",
+      "display_name": "Rain Glass Pavilion",
+      "current_status": "seeded_runtime_wip",
+      "target_status": "public_showcase_validated",
+      "default_environment": "cool_overcast",
+      "default_lighting_rig": "rain_pavilion_night",
+      "required_bookmarks": ["hero", "glass_closeup", "puddle_chrome"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Rain pavilion hero",
+          "position": [-5.2, 1.7, -5.6],
+          "target": [0.0, 1.05, 0.1],
+          "fov": 45.0,
+          "validation": true
+        },
+        {
+          "id": "glass_closeup",
+          "label": "Glass transmission closeup",
+          "position": [-2.4, 1.35, -2.0],
+          "target": [1.2, 1.05, 0.3],
+          "fov": 34.0,
+          "validation": false
+        },
+        {
+          "id": "puddle_chrome",
+          "label": "Puddles and chrome",
+          "position": [1.8, 0.82, -3.1],
+          "target": [0.2, 0.38, 0.8],
+          "fov": 36.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["glass", "wet_ground", "chrome", "particles", "tinted_lighting"],
+      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+    },
+    {
+      "id": "desert_relic_gallery",
+      "display_name": "Desert Relic Gallery",
+      "current_status": "seeded_runtime_wip",
+      "target_status": "public_showcase_validated",
+      "default_environment": "outdoor_sunset",
+      "default_lighting_rig": "desert_relic_sun",
+      "required_bookmarks": ["hero", "stone_metal_closeup", "arch_depth"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Sunlit relic hero",
+          "position": [-5.8, 2.0, -6.2],
+          "target": [0.15, 0.9, 0.1],
+          "fov": 46.0,
+          "validation": true
+        },
+        {
+          "id": "stone_metal_closeup",
+          "label": "Stone, sand, and metal",
+          "position": [-1.6, 1.1, -2.7],
+          "target": [0.8, 0.72, -0.2],
+          "fov": 35.0,
+          "validation": false
+        },
+        {
+          "id": "arch_depth",
+          "label": "Ruin arch depth",
+          "position": [3.8, 1.8, -4.9],
+          "target": [0.0, 1.1, 1.1],
+          "fov": 42.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["world_shaders", "sand", "brushed_metal", "glass", "tinted_lighting"],
+      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+    },
+    {
+      "id": "neon_alley_material_market",
+      "display_name": "Neon Alley Material Market",
+      "current_status": "seeded_runtime_wip",
+      "target_status": "public_showcase_validated",
+      "default_environment": "studio",
+      "default_lighting_rig": "neon_market_rain",
+      "required_bookmarks": ["hero", "materials", "particles"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Wet neon alley hero",
+          "position": [-4.4, 1.55, -6.4],
+          "target": [0.4, 1.1, 0.4],
+          "fov": 44.0,
+          "validation": true
+        },
+        {
+          "id": "materials",
+          "label": "Chrome, glass, and neon",
+          "position": [-1.2, 1.05, -2.2],
+          "target": [1.15, 0.9, -0.1],
+          "fov": 34.0,
+          "validation": false
+        },
+        {
+          "id": "particles",
+          "label": "Steam and rain",
+          "position": [2.9, 1.7, -4.4],
+          "target": [-0.2, 1.2, 0.7],
+          "fov": 40.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["particles", "emissive_bloom", "wet_ground", "glass", "cinematic_post"],
+      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+    },
+    {
+      "id": "forest_creek_shrine",
+      "display_name": "Forest Creek Shrine",
+      "current_status": "seeded_runtime_wip",
+      "target_status": "public_showcase_validated",
+      "default_environment": "cool_overcast",
+      "default_lighting_rig": "forest_creek_mist",
+      "required_bookmarks": ["hero", "moss_water", "shrine_depth"],
+      "camera_bookmarks": [
+        {
+          "id": "hero",
+          "label": "Creek shrine hero",
+          "position": [-4.2, 1.25, -5.1],
+          "target": [0.2, 0.75, 0.65],
+          "fov": 44.0,
+          "validation": true
+        },
+        {
+          "id": "moss_water",
+          "label": "Moss and water detail",
+          "position": [-1.6, 0.72, -2.0],
+          "target": [0.6, 0.42, -0.1],
+          "fov": 34.0,
+          "validation": false
+        },
+        {
+          "id": "shrine_depth",
+          "label": "Shrine and vegetation depth",
+          "position": [2.8, 1.45, -3.6],
+          "target": [0.0, 0.9, 0.5],
+          "fov": 40.0,
+          "validation": false
+        }
+      ],
+      "required_features": ["water", "vegetation", "world_shaders", "fog", "tinted_lighting"],
+      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+    },
+    {
       "id": "effects_showcase",
       "display_name": "Effects Showcase",
       "current_status": "public_showcase_validated",

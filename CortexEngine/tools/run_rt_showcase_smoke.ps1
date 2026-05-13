@@ -130,6 +130,25 @@ function Add-Failure([string]$message) {
     $script:failures.Add($message)
 }
 
+function Get-ShowcaseBookmark([string]$SceneId, [string]$BookmarkId) {
+    $showcasePath = Join-Path $script:root "assets/config/showcase_scenes.json"
+    if (-not (Test-Path $showcasePath)) {
+        return $null
+    }
+    $showcase = Get-Content $showcasePath -Raw | ConvertFrom-Json
+    foreach ($scene in $showcase.scenes) {
+        if ([string]$scene.id -ne $SceneId) {
+            continue
+        }
+        foreach ($bookmark in $scene.camera_bookmarks) {
+            if ([string]$bookmark.id -eq $BookmarkId) {
+                return $bookmark
+            }
+        }
+    }
+    return $null
+}
+
 function Get-FrameContractResource([object]$reportObject, [string]$name) {
     if ($null -eq $reportObject.frame_contract.resources) {
         return $null
@@ -330,10 +349,16 @@ if (-not [bool]$report.camera.active) {
         [string]$report.camera.bookmark -ne $CameraBookmark) {
         Add-Failure "RT showcase camera bookmark is '$($report.camera.bookmark)', expected '$CameraBookmark'"
     }
+    $expectedBookmark = Get-ShowcaseBookmark "rt_showcase" $CameraBookmark
+    $expectedPosition = if ($null -ne $expectedBookmark) {
+        $expectedBookmark.position
+    } else {
+        @(-14.0, 2.05, -6.8)
+    }
     $cameraError = [Math]::Sqrt(
-        [Math]::Pow([double]$report.camera.position.x - (-14.0), 2.0) +
-        [Math]::Pow([double]$report.camera.position.y - 2.05, 2.0) +
-        [Math]::Pow([double]$report.camera.position.z - (-6.8), 2.0))
+        [Math]::Pow([double]$report.camera.position.x - [double]$expectedPosition[0], 2.0) +
+        [Math]::Pow([double]$report.camera.position.y - [double]$expectedPosition[1], 2.0) +
+        [Math]::Pow([double]$report.camera.position.z - [double]$expectedPosition[2], 2.0))
     if ($cameraError -gt $MaxCameraPositionError) {
         Add-Failure "RT showcase camera drifted from the validation view: error=$cameraError, budget <= $MaxCameraPositionError, position=($($report.camera.position.x), $($report.camera.position.y), $($report.camera.position.z))"
     }

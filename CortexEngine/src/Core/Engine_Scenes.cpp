@@ -13,6 +13,7 @@
 #include "Graphics/Renderer.h"
 #include "Scene/ParticleEffectLibrary.h"
 
+#include <cmath>
 #include <cstdlib>
 
 namespace Cortex {
@@ -1013,12 +1014,12 @@ void Engine::BuildGlassWaterCourtyardScene() {
         entt::entity camEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
-        t.position = glm::vec3(0.0f, 2.55f, -8.8f);
-        const glm::vec3 target(0.0f, 1.05f, -0.35f);
+        t.position = glm::vec3(-3.2f, 2.15f, -7.2f);
+        const glm::vec3 target(0.0f, 0.95f, -0.35f);
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
-        cam.fov = 54.0f;
+        cam.fov = 50.0f;
         ConfigureShowcaseCameraClip(cam, 140.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
@@ -1090,14 +1091,6 @@ void Engine::BuildGlassWaterCourtyardScene() {
     }
 
     if (poolPlane && poolPlane->gpuBuffers) {
-        auto rim = addRenderable("GlassWaterCourtyard_PoolRim", poolPlane,
-                                 glm::vec3(0.0f, 0.003f, -0.25f),
-                                 glm::vec3(1.15f),
-                                 glm::vec3(0.0f),
-                                 glm::vec4(0.72f, 0.68f, 0.62f, 1.0f),
-                                 0.0f, 0.7f, "masonry");
-        m_registry->GetComponent<Scene::RenderableComponent>(rim).doubleSided = true;
-
         auto water = addRenderable("GlassWaterCourtyard_WaterSurface", poolPlane,
                                    glm::vec3(0.0f, -0.02f, -0.25f),
                                    glm::vec3(0.92f),
@@ -1117,6 +1110,30 @@ void Engine::BuildGlassWaterCourtyardScene() {
         m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, waterSurface);
     }
 
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        const struct CourtyardBlock {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+            const char* preset;
+            float roughness;
+        } blocks[] = {
+            {"GlassWaterCourtyard_PoolCoping_North", glm::vec3(0.0f, 0.10f,  2.78f), glm::vec3(4.35f, 0.20f, 0.18f), glm::vec4(0.74f, 0.69f, 0.61f, 1.0f), "masonry", 0.62f},
+            {"GlassWaterCourtyard_PoolCoping_South", glm::vec3(0.0f, 0.10f, -3.28f), glm::vec3(4.35f, 0.20f, 0.18f), glm::vec4(0.74f, 0.69f, 0.61f, 1.0f), "masonry", 0.62f},
+            {"GlassWaterCourtyard_PoolCoping_West",  glm::vec3(-4.25f, 0.10f, -0.25f), glm::vec3(0.18f, 0.20f, 3.18f), glm::vec4(0.74f, 0.69f, 0.61f, 1.0f), "masonry", 0.62f},
+            {"GlassWaterCourtyard_PoolCoping_East",  glm::vec3( 4.25f, 0.10f, -0.25f), glm::vec3(0.18f, 0.20f, 3.18f), glm::vec4(0.74f, 0.69f, 0.61f, 1.0f), "masonry", 0.62f},
+            {"GlassWaterCourtyard_BackWall_LowerTrim", glm::vec3(0.0f, 0.62f, 5.55f), glm::vec3(8.2f, 0.12f, 0.10f), glm::vec4(0.44f, 0.37f, 0.32f, 1.0f), "masonry", 0.68f},
+            {"GlassWaterCourtyard_BackWall_UpperTrim", glm::vec3(0.0f, 2.85f, 5.54f), glm::vec3(7.4f, 0.10f, 0.10f), glm::vec4(0.43f, 0.36f, 0.31f, 1.0f), "masonry", 0.70f},
+            {"GlassWaterCourtyard_FloorInlay_Left", glm::vec3(-3.65f, 0.025f, -0.25f), glm::vec3(0.10f, 0.035f, 3.60f), glm::vec4(0.25f, 0.23f, 0.22f, 1.0f), "stone", 0.54f},
+            {"GlassWaterCourtyard_FloorInlay_Right", glm::vec3( 3.65f, 0.025f, -0.25f), glm::vec3(0.10f, 0.035f, 3.60f), glm::vec4(0.25f, 0.23f, 0.22f, 1.0f), "stone", 0.54f}
+        };
+        for (const auto& block : blocks) {
+            addRenderable(block.tag, cubeMesh, block.position, block.scale, glm::vec3(0.0f),
+                          block.color, 0.0f, block.roughness, block.preset);
+        }
+    }
+
     if (columnMesh && columnMesh->gpuBuffers) {
         const glm::vec3 columnPositions[] = {
             {-4.8f, 1.6f, -2.8f},
@@ -1132,6 +1149,22 @@ void Engine::BuildGlassWaterCourtyardScene() {
                           glm::vec3(0.0f),
                           glm::vec4(0.70f, 0.64f, 0.56f, 1.0f),
                           0.0f, 0.42f, "masonry");
+            if (cubeMesh && cubeMesh->gpuBuffers) {
+                addRenderable(("GlassWaterCourtyard_ColumnBase_" + std::to_string(i)).c_str(),
+                              cubeMesh,
+                              glm::vec3(columnPositions[i].x, 0.16f, columnPositions[i].z),
+                              glm::vec3(0.74f, 0.32f, 0.74f),
+                              glm::vec3(0.0f),
+                              glm::vec4(0.62f, 0.55f, 0.48f, 1.0f),
+                              0.0f, 0.52f, "masonry");
+                addRenderable(("GlassWaterCourtyard_ColumnCap_" + std::to_string(i)).c_str(),
+                              cubeMesh,
+                              glm::vec3(columnPositions[i].x, 3.12f, columnPositions[i].z),
+                              glm::vec3(0.82f, 0.22f, 0.82f),
+                              glm::vec3(0.0f),
+                              glm::vec4(0.66f, 0.59f, 0.50f, 1.0f),
+                              0.0f, 0.48f, "masonry");
+            }
         }
     }
 
@@ -1147,6 +1180,26 @@ void Engine::BuildGlassWaterCourtyardScene() {
         roofR.ior = 1.50f;
         roofR.specularFactor = 1.35f;
         roofR.doubleSided = true;
+
+        if (cubeMesh && cubeMesh->gpuBuffers) {
+            const struct CanopyFrame {
+                const char* tag;
+                glm::vec3 position;
+                glm::vec3 scale;
+            } framePieces[] = {
+                {"GlassWaterCourtyard_CanopyFrame_North", glm::vec3(0.0f, 3.18f, 2.10f), glm::vec3(6.8f, 0.06f, 0.08f)},
+                {"GlassWaterCourtyard_CanopyFrame_South", glm::vec3(0.0f, 3.18f, -2.60f), glm::vec3(6.8f, 0.06f, 0.08f)},
+                {"GlassWaterCourtyard_CanopyFrame_West",  glm::vec3(-3.35f, 3.18f, -0.25f), glm::vec3(0.08f, 0.06f, 4.7f)},
+                {"GlassWaterCourtyard_CanopyFrame_East",  glm::vec3( 3.35f, 3.18f, -0.25f), glm::vec3(0.08f, 0.06f, 4.7f)},
+                {"GlassWaterCourtyard_CanopyFrame_CenterA", glm::vec3(0.0f, 3.19f, -0.25f), glm::vec3(6.5f, 0.045f, 0.055f)},
+                {"GlassWaterCourtyard_CanopyFrame_CenterB", glm::vec3(0.0f, 3.20f, -0.25f), glm::vec3(0.055f, 0.045f, 4.4f)}
+            };
+            for (const auto& piece : framePieces) {
+                addRenderable(piece.tag, cubeMesh, piece.position, piece.scale, glm::vec3(0.0f),
+                              glm::vec4(0.22f, 0.24f, 0.25f, 1.0f),
+                              1.0f, 0.24f, "brushed_metal");
+            }
+        }
 
         auto warmPanel = addRenderable("GlassWaterCourtyard_SunsetPanel", quadMesh,
                                        glm::vec3(-3.2f, 2.5f, 5.65f),
@@ -1171,6 +1224,28 @@ void Engine::BuildGlassWaterCourtyardScene() {
         r.transmissionFactor = 0.76f;
         r.ior = 1.52f;
         r.specularFactor = 1.38f;
+
+        const struct GlassScreen {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } screens[] = {
+            {"GlassWaterCourtyard_GlassScreen_Left", glm::vec3(-2.8f, 0.95f, 1.55f), glm::vec3(0.08f, 1.25f, 1.15f), 0.18f},
+            {"GlassWaterCourtyard_GlassScreen_Right", glm::vec3(2.25f, 0.95f, 1.45f), glm::vec3(0.08f, 1.20f, 1.05f), -0.24f}
+        };
+        for (const auto& screen : screens) {
+            auto screenEntity = addRenderable(screen.tag, cubeMesh,
+                                              screen.position,
+                                              screen.scale,
+                                              glm::vec3(0.0f, screen.yaw, 0.0f),
+                                              glm::vec4(0.56f, 0.82f, 1.0f, 1.0f),
+                                              0.0f, 0.035f, "glass_panel");
+            auto& screenR = m_registry->GetComponent<Scene::RenderableComponent>(screenEntity);
+            screenR.transmissionFactor = 0.72f;
+            screenR.ior = 1.49f;
+            screenR.specularFactor = 1.32f;
+        }
     }
 
     if (sphereMesh && sphereMesh->gpuBuffers) {
@@ -1234,6 +1309,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto trunkMesh = Utils::MeshGenerator::CreateCylinder(0.18f, 3.2f, 18);
+    auto coneMesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, 32);
     auto leafMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
 
     if (renderer) {
@@ -1256,6 +1332,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             !uploadMesh(cubeMesh, "cube") ||
             !uploadMesh(sphereMesh, "sphere") ||
             !uploadMesh(trunkMesh, "trunk") ||
+            !uploadMesh(coneMesh, "cone") ||
             !uploadMesh(leafMesh, "leaf")) {
             return;
         }
@@ -1265,12 +1342,12 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         entt::entity camEntity = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(camEntity, "MainCamera");
         auto& t = m_registry->AddComponent<TransformComponent>(camEntity);
-        t.position = glm::vec3(0.0f, 3.1f, -12.0f);
-        const glm::vec3 target(0.0f, 0.85f, -0.8f);
+        t.position = glm::vec3(-2.2f, 2.15f, -8.4f);
+        const glm::vec3 target(0.35f, 0.55f, 1.25f);
         t.rotation = glm::quatLookAtLH(glm::normalize(target - t.position), glm::vec3(0.0f, 1.0f, 0.0f));
 
         auto& cam = m_registry->AddComponent<Scene::CameraComponent>(camEntity);
-        cam.fov = 57.0f;
+        cam.fov = 50.0f;
         ConfigureShowcaseCameraClip(cam, 180.0f);
         cam.isActive = true;
         m_activeCameraEntity = camEntity;
@@ -1304,11 +1381,11 @@ void Engine::BuildOutdoorSunsetBeachScene() {
 
     if (sandPlane && sandPlane->gpuBuffers) {
         auto sand = addRenderable("OutdoorBeach_SandShelf", sandPlane,
-                                  glm::vec3(0.0f, 0.0f, -2.8f),
-                                   glm::vec3(1.0f),
-                                   glm::vec3(0.0f),
-                                   glm::vec4(0.58f, 0.47f, 0.30f, 1.0f),
-                                   0.0f, 0.82f, "concrete");
+                                  glm::vec3(0.0f, 0.0f, -2.55f),
+                                  glm::vec3(1.0f),
+                                  glm::vec3(0.0f),
+                                  glm::vec4(0.49f, 0.39f, 0.25f, 1.0f),
+                                  0.0f, 0.86f, "concrete");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sand);
         r.doubleSided = true;
         r.normalScale = 0.18f;
@@ -1316,7 +1393,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
 
     if (waterPlane && waterPlane->gpuBuffers) {
         auto water = addRenderable("OutdoorBeach_TideWater", waterPlane,
-                                   glm::vec3(0.0f, -0.035f, 4.9f),
+                                   glm::vec3(0.0f, -0.035f, 4.45f),
                                    glm::vec3(1.0f),
                                    glm::vec3(0.0f),
                                    glm::vec4(0.03f, 0.28f, 0.78f, 0.94f),
@@ -1330,74 +1407,250 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, tide);
     }
 
+    if (leafMesh && leafMesh->gpuBuffers) {
+        auto sky = addRenderable("OutdoorBeach_SkyBackdrop", leafMesh,
+                                 glm::vec3(0.0f, 6.0f, 7.85f),
+                                 glm::vec3(500.0f, 18.0f, 1.0f),
+                                 glm::vec3(0.0f),
+                                 glm::vec4(0.36f, 0.48f, 0.63f, 1.0f),
+                                 0.0f, 0.92f, "emissive_panel");
+        auto& skyR = m_registry->GetComponent<Scene::RenderableComponent>(sky);
+        skyR.doubleSided = true;
+        skyR.emissiveColor = glm::vec3(0.24f, 0.34f, 0.50f);
+        skyR.emissiveStrength = 0.12f;
+
+        auto horizon = addRenderable("OutdoorBeach_OceanHorizon", leafMesh,
+                                     glm::vec3(0.0f, 0.82f, 7.78f),
+                                     glm::vec3(500.0f, 1.42f, 1.0f),
+                                     glm::vec3(0.0f),
+                                     glm::vec4(0.06f, 0.30f, 0.54f, 1.0f),
+                                     0.0f, 0.34f, "emissive_panel");
+        auto& horizonR = m_registry->GetComponent<Scene::RenderableComponent>(horizon);
+        horizonR.doubleSided = true;
+        horizonR.emissiveColor = glm::vec3(0.035f, 0.18f, 0.32f);
+        horizonR.emissiveStrength = 0.18f;
+
+        auto haze = addRenderable("OutdoorBeach_WarmHorizonHaze", leafMesh,
+                                  glm::vec3(0.0f, 1.68f, 7.74f),
+                                  glm::vec3(500.0f, 0.42f, 1.0f),
+                                  glm::vec3(0.0f),
+                                  glm::vec4(0.76f, 0.46f, 0.28f, 1.0f),
+                                  0.0f, 0.82f, "emissive_panel");
+        auto& hazeR = m_registry->GetComponent<Scene::RenderableComponent>(haze);
+        hazeR.doubleSided = true;
+        hazeR.emissiveColor = glm::vec3(0.74f, 0.38f, 0.18f);
+        hazeR.emissiveStrength = 0.10f;
+    }
+
     if (cubeMesh && cubeMesh->gpuBuffers) {
+        const struct FoamStrip {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } foamStrips[] = {
+            {glm::vec3(-5.8f, 0.032f, 0.82f), glm::vec3(3.2f, 0.018f, 0.055f), -0.08f},
+            {glm::vec3(-1.6f, 0.034f, 0.58f), glm::vec3(3.8f, 0.018f, 0.050f),  0.05f},
+            {glm::vec3( 3.4f, 0.033f, 0.74f), glm::vec3(4.1f, 0.018f, 0.060f), -0.04f},
+            {glm::vec3( 6.8f, 0.035f, 1.10f), glm::vec3(2.3f, 0.016f, 0.045f),  0.10f}
+        };
+        for (int i = 0; i < 4; ++i) {
+            auto foam = addRenderable("OutdoorBeach_ShoreFoam_" + std::to_string(i), cubeMesh,
+                                      foamStrips[i].position,
+                                      foamStrips[i].scale,
+                                      glm::vec3(0.0f, foamStrips[i].yaw, 0.0f),
+                                      glm::vec4(0.86f, 0.93f, 0.88f, 1.0f),
+                                      0.0f, 0.38f, "matte");
+            m_registry->GetComponent<Scene::RenderableComponent>(foam).doubleSided = true;
+        }
+
+        const struct BeachLog {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } logs[] = {
+            {glm::vec3(-2.9f, 0.12f, -1.55f), glm::vec3(1.45f, 0.10f, 0.14f), 0.25f},
+            {glm::vec3( 2.7f, 0.10f, -1.05f), glm::vec3(1.10f, 0.09f, 0.13f), -0.38f}
+        };
+        for (int i = 0; i < 2; ++i) {
+            addRenderable("OutdoorBeach_Driftwood_" + std::to_string(i), cubeMesh,
+                          logs[i].position,
+                          logs[i].scale,
+                          glm::vec3(0.0f, logs[i].yaw, 0.0f),
+                          glm::vec4(0.34f, 0.20f, 0.10f, 1.0f),
+                          0.0f, 0.74f, "wood");
+        }
+
+        const struct SurfLine {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } surfLines[] = {
+            {glm::vec3(-7.2f, 0.038f, 0.18f), glm::vec3(1.25f, 0.014f, 0.026f),  0.18f, glm::vec4(0.70f, 0.86f, 0.92f, 1.0f)},
+            {glm::vec3(-4.6f, 0.039f, 0.08f), glm::vec3(1.00f, 0.014f, 0.024f), -0.16f, glm::vec4(0.68f, 0.84f, 0.90f, 1.0f)},
+            {glm::vec3(-1.2f, 0.040f, 0.02f), glm::vec3(1.35f, 0.014f, 0.025f),  0.12f, glm::vec4(0.72f, 0.88f, 0.94f, 1.0f)},
+            {glm::vec3( 2.4f, 0.039f, 0.10f), glm::vec3(1.15f, 0.014f, 0.025f), -0.18f, glm::vec4(0.70f, 0.86f, 0.92f, 1.0f)},
+            {glm::vec3( 5.4f, 0.040f, 0.30f), glm::vec3(1.45f, 0.014f, 0.026f),  0.10f, glm::vec4(0.72f, 0.88f, 0.94f, 1.0f)}
+        };
         for (int i = 0; i < 5; ++i) {
-            const float x = -9.0f + static_cast<float>(i) * 4.5f;
-            auto dune = addRenderable("OutdoorBeach_Dune_" + std::to_string(i), cubeMesh,
-                                      glm::vec3(x, 0.08f, -5.7f + 0.22f * static_cast<float>(i % 2)),
-                                      glm::vec3(2.2f, 0.18f, 0.9f),
-                                      glm::vec3(0.0f, 0.16f * static_cast<float>(i), 0.0f),
-                                      glm::vec4(0.54f, 0.42f, 0.24f, 1.0f),
-                                      0.0f, 0.86f, "concrete");
-            m_registry->GetComponent<Scene::RenderableComponent>(dune).doubleSided = true;
+            auto line = addRenderable("OutdoorBeach_SurfLine_" + std::to_string(i), cubeMesh,
+                                      surfLines[i].position,
+                                      surfLines[i].scale,
+                                      glm::vec3(0.0f, surfLines[i].yaw, 0.0f),
+                                      surfLines[i].color,
+                                      0.0f, 0.44f, "matte");
+            m_registry->GetComponent<Scene::RenderableComponent>(line).doubleSided = true;
+        }
+
+        for (int i = 0; i < 11; ++i) {
+            const float x = -2.7f + static_cast<float>(i) * 0.72f;
+            addRenderable("OutdoorBeach_DuneFence_Post_" + std::to_string(i), cubeMesh,
+                          glm::vec3(x, 0.38f, -2.92f + 0.04f * static_cast<float>(i % 2)),
+                          glm::vec3(0.060f, 0.46f, 0.060f),
+                          glm::vec3(0.0f, 0.10f, 0.04f),
+                          glm::vec4(0.34f, 0.20f, 0.10f, 1.0f),
+                          0.0f, 0.70f, "wood");
+        }
+        for (int i = 0; i < 2; ++i) {
+            addRenderable("OutdoorBeach_DuneFence_Rail_" + std::to_string(i), cubeMesh,
+                          glm::vec3(0.15f, 0.36f + 0.18f * static_cast<float>(i), -2.92f),
+                          glm::vec3(4.05f, 0.040f, 0.050f),
+                          glm::vec3(0.0f, 0.03f, 0.0f),
+                          glm::vec4(0.40f, 0.25f, 0.13f, 1.0f),
+                          0.0f, 0.66f, "wood");
+        }
+
+        const struct BeachProp {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+            const char* preset;
+            float roughness;
+        } props[] = {
+            {"OutdoorBeach_Towel_Base", glm::vec3(-3.65f, 0.055f, -2.35f), glm::vec3(1.12f, 0.025f, 0.48f), -0.18f, glm::vec4(0.86f, 0.28f, 0.20f, 1.0f), "matte", 0.72f},
+            {"OutdoorBeach_Towel_StripeA", glm::vec3(-3.92f, 0.082f, -2.30f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
+            {"OutdoorBeach_Towel_StripeB", glm::vec3(-3.38f, 0.083f, -2.40f), glm::vec3(0.08f, 0.012f, 0.50f), -0.18f, glm::vec4(0.98f, 0.88f, 0.54f, 1.0f), "matte", 0.60f},
+            {"OutdoorBeach_LoungeSeat", glm::vec3(-1.35f, 0.22f, -2.15f), glm::vec3(0.92f, 0.08f, 0.34f), 0.22f, glm::vec4(0.78f, 0.58f, 0.36f, 1.0f), "wood", 0.58f},
+            {"OutdoorBeach_LoungeBack", glm::vec3(-0.95f, 0.45f, -2.26f), glm::vec3(0.10f, 0.46f, 0.34f), 0.22f, glm::vec4(0.66f, 0.43f, 0.23f, 1.0f), "wood", 0.55f},
+            {"OutdoorBeach_UmbrellaPole", glm::vec3(-3.05f, 0.82f, -2.25f), glm::vec3(0.10f, 0.50f, 0.10f), 0.0f, glm::vec4(0.36f, 0.24f, 0.16f, 1.0f), "wood", 0.48f}
+        };
+        for (const auto& prop : props) {
+            addRenderable(prop.tag, cubeMesh,
+                          prop.position,
+                          prop.scale,
+                          glm::vec3(0.0f, prop.yaw, 0.0f),
+                          prop.color,
+                          0.0f, prop.roughness, prop.preset);
+        }
+    }
+
+    if (coneMesh && coneMesh->gpuBuffers) {
+        auto canopy = addRenderable("OutdoorBeach_UmbrellaCanopy", coneMesh,
+                                    glm::vec3(-3.05f, 1.52f, -2.25f),
+                                    glm::vec3(1.65f, 0.48f, 1.65f),
+                                    glm::vec3(0.0f, glm::radians(28.0f), glm::radians(180.0f)),
+                                    glm::vec4(0.95f, 0.30f, 0.20f, 1.0f),
+                                    0.0f, 0.46f, "matte");
+        m_registry->GetComponent<Scene::RenderableComponent>(canopy).doubleSided = true;
+
+        for (int i = 0; i < 6; ++i) {
+            const float yaw = glm::radians(60.0f * static_cast<float>(i));
+            auto rib = addRenderable("OutdoorBeach_UmbrellaRib_" + std::to_string(i), cubeMesh,
+                                     glm::vec3(-3.05f + std::sin(yaw) * 0.34f, 1.33f, -2.25f + std::cos(yaw) * 0.34f),
+                                     glm::vec3(0.035f, 0.035f, 0.78f),
+                                     glm::vec3(0.0f, yaw, glm::radians(-12.0f)),
+                                     glm::vec4(0.98f, 0.86f, 0.58f, 1.0f),
+                                     0.0f, 0.38f, "matte");
+            m_registry->GetComponent<Scene::RenderableComponent>(rib).doubleSided = true;
         }
     }
 
     if (sphereMesh && sphereMesh->gpuBuffers) {
-        const glm::vec3 rocks[] = {
-            {-5.8f, 0.28f, -0.8f},
-            {-4.9f, 0.22f, -0.2f},
-            { 5.5f, 0.32f, -1.3f},
-            { 6.4f, 0.24f, -0.4f}
+        const struct SandMound {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } dunes[] = {
+            {glm::vec3(-8.4f, 0.09f, -6.6f), glm::vec3(1.8f, 0.16f, 0.55f), -0.24f},
+            {glm::vec3(-4.5f, 0.08f, -6.2f), glm::vec3(1.5f, 0.14f, 0.48f), 0.18f},
+            {glm::vec3( 0.2f, 0.09f, -6.8f), glm::vec3(2.0f, 0.15f, 0.52f), 0.05f},
+            {glm::vec3( 5.2f, 0.08f, -6.4f), glm::vec3(1.7f, 0.14f, 0.50f), -0.15f},
+            {glm::vec3( 8.6f, 0.08f, -6.0f), glm::vec3(1.4f, 0.13f, 0.44f), 0.28f}
         };
-        for (int i = 0; i < 4; ++i) {
-            addRenderable("OutdoorBeach_Rock_" + std::to_string(i), sphereMesh,
-                          rocks[i],
-                          glm::vec3(1.2f, 0.45f, 0.8f),
-                          glm::vec3(0.0f),
-                          glm::vec4(0.34f, 0.31f, 0.28f, 1.0f),
-                          0.0f, 0.62f, "stone");
+        for (int i = 0; i < 5; ++i) {
+            auto dune = addRenderable("OutdoorBeach_SandMound_" + std::to_string(i), sphereMesh,
+                                      dunes[i].position,
+                                      dunes[i].scale,
+                                      glm::vec3(0.0f, dunes[i].yaw, 0.0f),
+                                      glm::vec4(0.61f, 0.49f, 0.30f, 1.0f),
+                                      0.0f, 0.88f, "concrete");
+            m_registry->GetComponent<Scene::RenderableComponent>(dune).doubleSided = true;
+        }
+
+        const struct BeachRock {
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+        } rocks[] = {
+            {glm::vec3(-6.4f, 0.19f, -0.35f), glm::vec3(0.62f, 0.30f, 0.44f), glm::vec4(0.30f, 0.28f, 0.25f, 1.0f)},
+            {glm::vec3(-5.5f, 0.15f,  0.12f), glm::vec3(0.42f, 0.23f, 0.34f), glm::vec4(0.38f, 0.34f, 0.29f, 1.0f)},
+            {glm::vec3(-4.8f, 0.13f, -0.48f), glm::vec3(0.35f, 0.19f, 0.28f), glm::vec4(0.27f, 0.25f, 0.23f, 1.0f)},
+            {glm::vec3( 5.8f, 0.21f, -0.55f), glm::vec3(0.66f, 0.32f, 0.45f), glm::vec4(0.32f, 0.30f, 0.27f, 1.0f)},
+            {glm::vec3( 6.7f, 0.15f, -0.02f), glm::vec3(0.44f, 0.22f, 0.30f), glm::vec4(0.43f, 0.37f, 0.30f, 1.0f)},
+            {glm::vec3( 7.3f, 0.12f, -0.62f), glm::vec3(0.32f, 0.18f, 0.26f), glm::vec4(0.26f, 0.25f, 0.24f, 1.0f)}
+        };
+        for (int i = 0; i < 6; ++i) {
+            addRenderable("OutdoorBeach_RockCluster_" + std::to_string(i), sphereMesh,
+                          rocks[i].position,
+                          rocks[i].scale,
+                          glm::vec3(0.0f, 0.37f * static_cast<float>(i), 0.0f),
+                          rocks[i].color,
+                          0.0f, 0.68f, "stone");
         }
     }
 
     if (trunkMesh && trunkMesh->gpuBuffers && leafMesh && leafMesh->gpuBuffers) {
         const glm::vec3 palmBases[] = {
-            {-8.2f, 1.55f, -3.8f},
-            { 8.0f, 1.55f, -3.2f}
+            {-7.8f, 0.99f, -3.8f},
+            { 7.2f, 0.99f, -3.2f}
         };
         for (int p = 0; p < 2; ++p) {
             addRenderable("OutdoorBeach_PalmTrunk_" + std::to_string(p), trunkMesh,
                           palmBases[p],
-                          glm::vec3(1.0f),
+                          glm::vec3(0.62f),
                           glm::vec3(0.0f, 0.0f, (p == 0) ? -0.16f : 0.14f),
                           glm::vec4(0.42f, 0.25f, 0.12f, 1.0f),
                           0.0f, 0.58f, "wood");
 
-            for (int i = 0; i < 5; ++i) {
-                const float yaw = glm::radians(72.0f * static_cast<float>(i));
+            for (int i = 0; i < 10; ++i) {
+                const float yaw = glm::radians(36.0f * static_cast<float>(i) + 11.0f * static_cast<float>(p));
+                const float length = (i % 2 == 0) ? 1.45f : 1.16f;
+                const glm::vec3 crownOffset(glm::sin(yaw) * 0.24f, -0.05f - 0.025f * static_cast<float>(i % 3), glm::cos(yaw) * 0.24f);
                 auto leaf = addRenderable("OutdoorBeach_PalmLeaf_" + std::to_string(p) + "_" + std::to_string(i),
                                           leafMesh,
-                                          palmBases[p] + glm::vec3(0.0f, 1.85f, 0.0f),
-                                          glm::vec3(2.5f, 0.42f, 1.0f),
-                                          glm::vec3(glm::radians(70.0f), yaw, 0.0f),
-                                          glm::vec4(0.12f, 0.34f, 0.16f, 1.0f),
+                                          palmBases[p] + glm::vec3(0.0f, 1.18f, 0.0f) + crownOffset,
+                                          glm::vec3(length, 0.19f, 1.0f),
+                                          glm::vec3(glm::radians(62.0f), yaw, glm::radians((i % 2 == 0) ? -7.0f : 6.0f)),
+                                          glm::vec4(0.08f, 0.36f, 0.14f, 1.0f),
                                           0.0f, 0.52f, "wood");
                 m_registry->GetComponent<Scene::RenderableComponent>(leaf).doubleSided = true;
             }
-        }
-    }
 
-    if (leafMesh && leafMesh->gpuBuffers) {
-        auto sunPanel = addRenderable("OutdoorBeach_SunsetGlowPanel", leafMesh,
-                                      glm::vec3(0.0f, 3.4f, 6.5f),
-                                      glm::vec3(4.0f, 1.6f, 1.0f),
-                                      glm::vec3(0.0f),
-                                      glm::vec4(1.0f, 0.46f, 0.18f, 1.0f),
-                                      0.0f, 0.25f, "emissive_panel");
-        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sunPanel);
-        r.emissiveColor = glm::vec3(1.0f, 0.42f, 0.16f);
-        r.emissiveStrength = 2.0f;
-        r.doubleSided = true;
+            if (sphereMesh && sphereMesh->gpuBuffers) {
+                for (int i = 0; i < 3; ++i) {
+                    const float yaw = glm::radians(120.0f * static_cast<float>(i) + 20.0f * static_cast<float>(p));
+                    addRenderable("OutdoorBeach_Coconut_" + std::to_string(p) + "_" + std::to_string(i),
+                                  sphereMesh,
+                                  palmBases[p] + glm::vec3(glm::sin(yaw) * 0.12f, 1.08f - 0.035f * static_cast<float>(i), glm::cos(yaw) * 0.12f),
+                                  glm::vec3(0.13f),
+                                  glm::vec3(0.0f),
+                                  glm::vec4(0.22f, 0.12f, 0.055f, 1.0f),
+                                  0.0f, 0.74f, "wood");
+                }
+            }
+        }
     }
 
     auto addLight = [&](const char* tag,
@@ -2402,6 +2655,7 @@ void Engine::BuildRTShowcaseScene() {
         auto& dt = m_registry->AddComponent<TransformComponent>(de);
         dt.position = glm::vec3(galleryX, 1.0f, 1.2f);
         dt.scale = glm::vec3(0.38f);
+        dt.rotation = glm::quat(glm::vec3(0.0f, glm::radians(180.0f), 0.0f));
 
         auto& dr = m_registry->AddComponent<Scene::RenderableComponent>(de);
         dr.mesh = dragonMesh;
@@ -2410,6 +2664,37 @@ void Engine::BuildRTShowcaseScene() {
         dr.roughness = 0.36f;
         dr.ao = 1.0f;
         dr.presetName = "brushed_metal";
+
+        if (quadPanel && quadPanel->gpuBuffers) {
+            const struct DragonBackdropPanel {
+                const char* tag;
+                glm::vec3 position;
+                glm::vec3 scale;
+                glm::vec3 color;
+                float strength;
+            } panels[] = {
+                {"RTGallery_DragonReflectionPanel_Warm", glm::vec3(galleryX - 1.75f, 1.65f, 2.48f), glm::vec3(1.6f, 0.45f, 1.0f), glm::vec3(1.0f, 0.58f, 0.24f), 2.4f},
+                {"RTGallery_DragonReflectionPanel_Cool", glm::vec3(galleryX + 1.75f, 1.78f, 2.46f), glm::vec3(1.6f, 0.42f, 1.0f), glm::vec3(0.35f, 0.58f, 1.0f), 1.8f}
+            };
+            for (const auto& panel : panels) {
+                entt::entity panelEntity = m_registry->CreateEntity();
+                m_registry->AddComponent<Scene::TagComponent>(panelEntity, panel.tag);
+                auto& panelT = m_registry->AddComponent<TransformComponent>(panelEntity);
+                panelT.position = panel.position;
+                panelT.scale = panel.scale;
+
+                auto& panelR = m_registry->AddComponent<Scene::RenderableComponent>(panelEntity);
+                panelR.mesh = quadPanel;
+                panelR.albedoColor = glm::vec4(panel.color, 1.0f);
+                panelR.metallic = 0.0f;
+                panelR.roughness = 0.22f;
+                panelR.ao = 1.0f;
+                panelR.presetName = "emissive_panel";
+                panelR.emissiveColor = panel.color;
+                panelR.emissiveStrength = panel.strength;
+                panelR.doubleSided = true;
+            }
+        }
     }
 
     if (smallSphere && smallSphere->gpuBuffers && cubeMesh && cubeMesh->gpuBuffers) {

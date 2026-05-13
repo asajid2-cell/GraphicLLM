@@ -27,7 +27,7 @@
     "warm_cool_contrast": 0.82,
     "world_shader_palette": "neon_market_rain"
   },
-  "environment": {"ibl": "studio", "fallback": "procedural_sky"},
+  "environment": {"ibl": "night_city", "fallback": "procedural_sky"},
   "cameras": [
     {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-4.4, 1.55, -6.4], "target": [0.4, 1.1, 0.4], "fov": 44.0, "art_reason": "Low lens uses puddle reflections as foreground while preserving mounted signs."},
     {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-1.2, 1.05, -2.2], "target": [1.15, 0.9, -0.1], "fov": 34.0, "art_reason": "Judges material separation under colored light."},

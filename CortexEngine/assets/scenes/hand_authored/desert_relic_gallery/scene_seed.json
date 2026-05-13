@@ -27,7 +27,7 @@
     "warm_cool_contrast": 0.42,
     "world_shader_palette": "desert_relic_sun"
   },
-  "environment": {"ibl": "outdoor_sunset", "fallback": "procedural_sky"},
+  "environment": {"ibl": "sunset_courtyard", "fallback": "procedural_sky"},
   "cameras": [
     {"id": "hero", "role": "Ruins, relic plinths, sand, and shadow pattern.", "position": [-5.8, 2.0, -6.2], "target": [0.15, 0.9, 0.1], "fov": 46.0, "art_reason": "Sun angle creates clear long shadows and leads eye through plinths."},
     {"id": "stone_metal_closeup", "role": "Stone edge wear, sand, and oxidized metal response.", "position": [-1.6, 1.1, -2.7], "target": [0.8, 0.72, -0.2], "fov": 35.0, "art_reason": "Close enough to judge material palette without flattening the ruin."},

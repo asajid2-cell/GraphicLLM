@@ -245,16 +245,16 @@
       "display_name": "Coastal Cliff Foundry",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "sunset_courtyard",
+      "default_environment": "cool_overcast",
       "default_lighting_rig": "coastal_foundry_dusk",
       "required_bookmarks": ["hero", "material_closeup", "atmosphere"],
       "camera_bookmarks": [
         {
           "id": "hero",
           "label": "Ocean-to-foundry hero",
-          "position": [-2.35, 1.28, -3.35],
-          "target": [0.92, 0.68, 0.08],
-          "fov": 38.0,
+          "position": [-3.05, 1.08, -2.95],
+          "target": [0.25, 0.62, -0.02],
+          "fov": 34.0,
           "validation": true
         },
         {

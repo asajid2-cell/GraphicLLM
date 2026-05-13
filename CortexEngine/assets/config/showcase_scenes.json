@@ -400,9 +400,9 @@
         {
           "id": "hero",
           "label": "Creek shrine hero",
-          "position": [-2.05, 1.05, -3.25],
-          "target": [0.20, 0.36, 0.42],
-          "fov": 38.0,
+          "position": [-1.42, 1.18, -2.18],
+          "target": [0.26, 0.24, 0.58],
+          "fov": 34.0,
           "validation": true
         },
         {

@@ -81,29 +81,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_publi
 ## Current Metrics
 
 Source run:
-`Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\bin\logs\runs\public_capture_gallery_20260512_164536_672_5036_9f597bee`
+`Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\bin\logs\runs\public_capture_gallery_20260512_194246_140_58592_c8cfe18a`
 
 | Scene | GPU ms | Capture | Render scale | Avg luma | Nonblack | RT signal/history |
 |---|---:|---:|---:|---:|---:|---:|
-| RT Showcase | 4.19 | 1920x1080 | 1.00 | 70.34 | 1.000 | 0.0228 / 0.0295 |
-| RT Reflection Closeup | 7.85 | 1920x1080 | 1.00 | 55.78 | 1.000 | 0.0293 / 0.0294 |
-| RT Material Overview | 4.24 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
-| Material Lab | 3.68 | 1920x1080 | 1.00 | 183.16 | 1.000 | 0.0214 / 0.0224 |
-| Material Lab Metal Closeup | 3.40 | 1920x1080 | 1.00 | 134.23 | 1.000 | 0.0752 / 0.0765 |
-| Material Lab Glass and Emissive | 3.65 | 1920x1080 | 1.00 | 169.42 | 1.000 | 0.0942 / 0.0956 |
-| Glass and Water Courtyard | 3.83 | 1920x1080 | 1.00 | 180.58 | 1.000 | 0.0392 / 0.0404 |
-| Water Reflection Closeup | 3.73 | 1920x1080 | 1.00 | 196.46 | 1.000 | 0.0553 / 0.0582 |
-| Glass Canopy Rim Light | 3.62 | 1920x1080 | 1.00 | 141.14 | 1.000 | 0.0172 / 0.0182 |
-| Effects Showcase | 4.28 | 1920x1080 | 1.00 | 110.56 | 1.000 | 0.0042 / 0.0042 |
-| Particle and Bloom Closeup | 3.99 | 1920x1080 | 1.00 | 92.95 | 1.000 | 0.0288 / 0.0290 |
-| Neon Materials | 4.04 | 1920x1080 | 1.00 | 94.56 | 1.000 | 0.0110 / 0.0111 |
-| Outdoor Sunset Beach | 3.03 | 1920x1080 | 1.00 | 166.38 | 1.000 | 0.0048 / 0.0048 |
-| Outdoor Waterline | 2.94 | 1920x1080 | 1.00 | 178.64 | 1.000 | 0.0162 / 0.0162 |
-| Liquid Gallery | 3.35 | 1920x1080 | 1.00 | 146.92 | 1.000 | 0.1350 / 0.1359 |
-| Water and Lava | 3.89 | 1920x1080 | 1.00 | 154.94 | 1.000 | 0.2587 / 0.2621 |
-| Honey and Molasses | 4.98 | 1920x1080 | 1.00 | 133.08 | 1.000 | 0.2260 / 0.2259 |
-| IBL Gallery Hero | 3.74 | 1920x1080 | 1.00 | 101.72 | 1.000 | 0.0420 / 0.0423 |
-| IBL Gallery Sweep | 4.06 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
+| RT Showcase | 8.95 | 1920x1080 | 1.00 | 70.35 | 1.000 | 0.0228 / 0.0295 |
+| RT Reflection Closeup | 7.83 | 1920x1080 | 1.00 | 55.78 | 1.000 | 0.0293 / 0.0294 |
+| RT Material Overview | 7.96 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
+| Material Lab | 3.70 | 1920x1080 | 1.00 | 183.46 | 1.000 | 0.0225 / 0.0236 |
+| Material Lab Metal Closeup | 7.39 | 1920x1080 | 1.00 | 136.49 | 1.000 | 0.0815 / 0.0829 |
+| Material Lab Glass and Emissive | 3.40 | 1920x1080 | 1.00 | 169.42 | 1.000 | 0.0942 / 0.0956 |
+| Glass and Water Courtyard | 5.50 | 1920x1080 | 1.00 | 181.56 | 1.000 | 0.0392 / 0.0404 |
+| Water Reflection Closeup | 4.43 | 1920x1080 | 1.00 | 198.31 | 1.000 | 0.0553 / 0.0582 |
+| Glass Canopy Rim Light | 4.19 | 1920x1080 | 1.00 | 146.04 | 1.000 | 0.0172 / 0.0182 |
+| Effects Showcase | 7.73 | 1920x1080 | 1.00 | 111.37 | 1.000 | 0.0042 / 0.0042 |
+| Particle and Bloom Closeup | 7.22 | 1920x1080 | 1.00 | 95.55 | 1.000 | 0.0288 / 0.0290 |
+| Neon Materials | 9.52 | 1920x1080 | 1.00 | 99.72 | 1.000 | 0.0110 / 0.0111 |
+| Outdoor Sunset Beach | 3.34 | 1920x1080 | 1.00 | 166.40 | 1.000 | 0.0048 / 0.0048 |
+| Outdoor Waterline | 3.20 | 1920x1080 | 1.00 | 178.15 | 1.000 | 0.0162 / 0.0162 |
+| Liquid Gallery | 3.59 | 1920x1080 | 1.00 | 146.88 | 1.000 | 0.1348 / 0.1354 |
+| Water and Lava | 10.00 | 1920x1080 | 1.00 | 153.65 | 1.000 | 0.2524 / 0.2555 |
+| Honey and Molasses | 4.08 | 1920x1080 | 1.00 | 133.76 | 1.000 | 0.2167 / 0.2172 |
+| IBL Gallery Hero | 8.50 | 1920x1080 | 1.00 | 101.75 | 1.000 | 0.0420 / 0.0423 |
+| IBL Gallery Sweep | 4.54 | 1920x1080 | 1.00 | 107.90 | 1.000 | 0.0335 / 0.0336 |
 
 Release validation also checks descriptor pressure, memory budgets, RT budget
 profiles, visual probes, and package launch behavior. See

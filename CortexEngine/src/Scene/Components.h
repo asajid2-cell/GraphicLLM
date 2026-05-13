@@ -302,6 +302,13 @@ struct WaterSurfaceComponent {
     float foamStrength = 0.70f;
     float viscosity = 0.20f;
     float emissiveHeat = 0.0f;
+    // Visual body controls used by the water/liquid shader. bodyThickness is a
+    // normalized optical/depth cue, sloshStrength drives local motion, and
+    // meniscusStrength raises/tints edges so contained liquids read as volume.
+    float bodyThickness = 0.45f;
+    float sloshStrength = 0.18f;
+    float meniscusStrength = 0.35f;
+    float flowSpeed = 1.0f;
     glm::vec3 shallowTint = glm::vec3(0.12f, 0.48f, 0.72f);
     glm::vec3 deepTint = glm::vec3(0.01f, 0.08f, 0.20f);
 };

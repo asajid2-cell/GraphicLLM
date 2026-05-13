@@ -43,6 +43,10 @@ Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::Renderable
         profile.foamStrength = 0.0f;
         profile.viscosity = 0.82f;
         profile.emissiveHeat = 4.8f;
+        profile.bodyThickness = 0.82f;
+        profile.sloshStrength = 0.12f;
+        profile.meniscusStrength = 0.58f;
+        profile.flowSpeed = 0.48f;
         profile.shallowTint = glm::vec3(1.0f, 0.38f, 0.05f);
         profile.deepTint = glm::vec3(0.22f, 0.035f, 0.01f);
         break;
@@ -51,6 +55,10 @@ Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::Renderable
         profile.foamStrength = 0.08f;
         profile.viscosity = 0.76f;
         profile.emissiveHeat = 0.0f;
+        profile.bodyThickness = 0.76f;
+        profile.sloshStrength = 0.10f;
+        profile.meniscusStrength = 0.70f;
+        profile.flowSpeed = 0.34f;
         profile.shallowTint = glm::vec3(1.0f, 0.72f, 0.18f);
         profile.deepTint = glm::vec3(0.52f, 0.24f, 0.035f);
         break;
@@ -59,6 +67,10 @@ Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::Renderable
         profile.foamStrength = 0.02f;
         profile.viscosity = 0.95f;
         profile.emissiveHeat = 0.0f;
+        profile.bodyThickness = 0.92f;
+        profile.sloshStrength = 0.06f;
+        profile.meniscusStrength = 0.82f;
+        profile.flowSpeed = 0.18f;
         profile.shallowTint = glm::vec3(0.26f, 0.12f, 0.045f);
         profile.deepTint = glm::vec3(0.035f, 0.012f, 0.006f);
         break;
@@ -68,6 +80,10 @@ Scene::WaterSurfaceComponent LiquidProfileFromRenderable(const Scene::Renderable
         profile.foamStrength = 0.82f;
         profile.viscosity = 0.18f;
         profile.emissiveHeat = 0.0f;
+        profile.bodyThickness = 0.46f;
+        profile.sloshStrength = 0.30f;
+        profile.meniscusStrength = 0.40f;
+        profile.flowSpeed = 1.0f;
         profile.shallowTint = glm::vec3(0.10f, 0.50f, 0.78f);
         profile.deepTint = glm::vec3(0.005f, 0.07f, 0.22f);
         break;
@@ -190,6 +206,11 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
                       glm::clamp(liquidProfile.foamStrength, 0.0f, 2.0f),
                       glm::clamp(liquidProfile.absorption, 0.0f, 1.0f),
                       static_cast<float>(liquidProfile.liquidType));
+        materialData.coatParams =
+            glm::vec4(glm::clamp(liquidProfile.bodyThickness, 0.0f, 1.5f),
+                      glm::clamp(liquidProfile.meniscusStrength, 0.0f, 1.5f),
+                      glm::clamp(liquidProfile.sloshStrength, 0.0f, 1.5f),
+                      glm::max(liquidProfile.flowSpeed, 0.0f));
 
         glm::mat4 modelMatrix = entry.worldMatrix;
         const uint32_t stableKey = static_cast<uint32_t>(entry.entity);
@@ -201,6 +222,10 @@ void Renderer::RenderWaterSurfaces(Scene::ECS_Registry* registry) {
         objectData.modelMatrix  = modelMatrix;
         objectData.normalMatrix = entry.normalMatrix;
         objectData.depthBiasNdc = sep.depthBiasNdc;
+        objectData._pad0 = glm::vec3(
+            glm::clamp(liquidProfile.bodyThickness, 0.0f, 1.5f),
+            glm::clamp(liquidProfile.sloshStrength, 0.0f, 1.5f),
+            glm::clamp(liquidProfile.meniscusStrength, 0.0f, 1.5f));
 
         D3D12_GPU_VIRTUAL_ADDRESS objectCB = m_constantBuffers.object.AllocateAndWrite(objectData);
         D3D12_GPU_VIRTUAL_ADDRESS materialCB = m_constantBuffers.material.AllocateAndWrite(materialData);

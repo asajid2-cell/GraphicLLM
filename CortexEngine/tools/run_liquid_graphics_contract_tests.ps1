@@ -37,7 +37,7 @@ $engine = Read-Text "src/Core/Engine.cpp"
 $camera = Read-Text "src/Core/Engine_Camera.cpp"
 $showcase = Read-Text "assets/config/showcase_scenes.json"
 
-foreach ($token in @("LiquidType", "Lava", "Honey", "Molasses", "absorption", "foamStrength", "viscosity", "emissiveHeat", "shallowTint", "deepTint")) {
+foreach ($token in @("LiquidType", "Lava", "Honey", "Molasses", "absorption", "foamStrength", "viscosity", "emissiveHeat", "bodyThickness", "sloshStrength", "meniscusStrength", "flowSpeed", "shallowTint", "deepTint")) {
     Require-Contains $components $token "WaterSurfaceComponent missing liquid schema token '$token'"
 }
 
@@ -48,21 +48,21 @@ Require-Contains $surface "SurfacePresetIsLiquid" "Surface classification does n
 Require-Contains $surface "SurfacePresetContains(material, `"lava`")" "Lava is not classified as liquid/water surface"
 Require-Contains $surface "SurfacePresetContains(renderable, `"molasses`")" "Molasses renderables are not classified as liquid/water surface"
 
-foreach ($needle in @("liquidProfile.absorption", "liquidProfile.foamStrength", "liquidProfile.viscosity", "liquidProfile.emissiveHeat", "materialData.fractalParams0", "materialData.fractalParams1", "static_cast<float>(liquidProfile.liquidType)")) {
+foreach ($needle in @("liquidProfile.absorption", "liquidProfile.foamStrength", "liquidProfile.viscosity", "liquidProfile.emissiveHeat", "liquidProfile.bodyThickness", "liquidProfile.sloshStrength", "liquidProfile.meniscusStrength", "materialData.fractalParams0", "materialData.fractalParams1", "materialData.coatParams", "static_cast<float>(liquidProfile.liquidType)")) {
     Require-Contains $renderer $needle "Renderer_WaterSurfaces.cpp does not pack '$needle' into material constants"
 }
 
-foreach ($needle in @("uint liquidType", "edgeFoam", "FBM", "emissiveHeat", "liquidType == 1u", "liquidType == 2u", "liquidType == 3u")) {
+foreach ($needle in @("uint liquidType", "edgeFoam", "FBM", "emissiveHeat", "bodyThickness", "meniscusStrength", "sloshStrength", "liquidType == 1u", "liquidType == 2u", "liquidType == 3u")) {
     Require-Contains $shader $needle "Water.hlsl missing liquid shader feature '$needle'"
 }
 
-foreach ($needle in @("waterCount", "lavaCount", "honeyCount", "molassesCount", "avgAbsorption", "avgViscosity", "maxEmissiveHeat")) {
+foreach ($needle in @("waterCount", "lavaCount", "honeyCount", "molassesCount", "avgAbsorption", "avgViscosity", "maxEmissiveHeat", "avgBodyThickness", "thickLiquidCount", "movingLiquidCount")) {
     Require-Contains $frameContract $needle "FrameContract water metrics missing '$needle'"
 }
-foreach ($jsonKey in @('"water_count"', '"lava_count"', '"honey_count"', '"molasses_count"', '"avg_absorption"', '"avg_viscosity"', '"max_emissive_heat"')) {
+foreach ($jsonKey in @('"water_count"', '"lava_count"', '"honey_count"', '"molasses_count"', '"avg_absorption"', '"avg_viscosity"', '"max_emissive_heat"', '"avg_body_thickness"', '"thick_liquid_count"', '"moving_liquid_count"')) {
     Require-Contains $frameJson $jsonKey "FrameContractJson missing water metric key $jsonKey"
 }
-foreach ($needle in @("contract.water.lavaCount", "contract.water.honeyCount", "contract.water.molassesCount", "contract.water.avgAbsorption")) {
+foreach ($needle in @("contract.water.lavaCount", "contract.water.honeyCount", "contract.water.molassesCount", "contract.water.avgAbsorption", "contract.water.avgBodyThickness", "contract.water.thickLiquidCount", "contract.water.movingLiquidCount")) {
     Require-Contains $snapshot $needle "Frame contract snapshot does not fill '$needle'"
 }
 

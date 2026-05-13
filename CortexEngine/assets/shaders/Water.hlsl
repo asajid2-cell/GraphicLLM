@@ -119,6 +119,11 @@ PSInput WaterVS(VSInput input)
     // sine waves, ~0.6 = moderately choppy). This is kept modest so that
     // buoyancy queries using the CPU mirror remain visually consistent.
     float steepness = saturate(g_WaterParams1.w);
+    float bodyThickness = saturate(_pad0.x);
+    float sloshStrength = saturate(_pad0.y);
+    float meniscusStrength = saturate(_pad0.z);
+    float flowSpeed = max(speed, 0.0f);
+    float viscosity = saturate(1.0f - sloshStrength * 2.5f);
 
     float k = 2.0f * PI / waveLen;
     float t = g_TimeAndExposure.x;
@@ -135,6 +140,21 @@ PSInput WaterVS(VSInput input)
     float h0 = amplitude * sin(phase0);
     float h1 = secondaryAmp * sin(phase1);
     float height = h0 + h1;
+
+    // Per-liquid body motion. Thin water can slosh quickly; viscous liquids
+    // move slower and keep stronger edge mass so they do not read as flat
+    // transparent sheets in contained gallery basins.
+    float edgeDistance = min(min(input.texCoord.x, 1.0f - input.texCoord.x),
+                             min(input.texCoord.y, 1.0f - input.texCoord.y));
+    float edgeMass = pow(saturate(1.0f - edgeDistance * 4.5f), 2.0f);
+    float viscousMotion = lerp(1.0f, 0.22f, viscosity);
+    float localPhase =
+        (input.texCoord.x - 0.5f) * 7.0f +
+        (input.texCoord.y - 0.5f) * 5.0f +
+        t * flowSpeed * viscousMotion;
+    float slosh = sin(localPhase) * cos(localPhase * 0.63f + t * 0.37f);
+    height += slosh * sloshStrength * (0.025f + 0.055f * bodyThickness) * viscousMotion;
+    height += edgeMass * meniscusStrength * (0.018f + 0.070f * bodyThickness);
 
     // Gerstner-style horizontal chop for richer silhouettes. We keep the
     // steepness relatively low and base the displacement on xzBase so the
@@ -160,6 +180,9 @@ PSInput WaterVS(VSInput input)
     float c1 = cos(phase1);
     float dhdx = amplitude * c0 * k * dir.x + secondaryAmp * c1 * k * 1.3f * dir2.x;
     float dhdz = amplitude * c0 * k * dir.y + secondaryAmp * c1 * k * 1.3f * dir2.y;
+    float sloshSlope = sloshStrength * viscousMotion * (0.020f + 0.035f * bodyThickness);
+    dhdx += cos(localPhase) * 7.0f * sloshSlope;
+    dhdz += -sin(localPhase * 0.63f + t * 0.37f) * 5.0f * sloshSlope;
     float3 worldNormal = normalize(float3(-dhdx, 1.0f, -dhdz));
     output.normal = worldNormal;
     output.texCoord = input.texCoord;
@@ -253,6 +276,10 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float foamStrength = saturate(g_ExtraParams.y);
     float viscosity = saturate(g_ExtraParams.z);
     float emissiveHeat = max(g_FractalParams1.w, g_TransmissionParams.z);
+    float bodyThickness = saturate(g_CoatParams.x);
+    float meniscusStrength = saturate(g_CoatParams.y);
+    float sloshStrength = saturate(g_CoatParams.z);
+    float flowSpeed = max(g_CoatParams.w, 0.0f);
 
     // Keep water relatively smooth by default; the hybrid SSR/RT reflection
     // pass adds the high-frequency mirror component. Viscous liquids keep broad,
@@ -273,14 +300,16 @@ float4 WaterPS(PSInput input) : SV_TARGET
 
     float2 liquidUv = input.texCoord;
     float edgeDistance = min(min(liquidUv.x, 1.0f - liquidUv.x), min(liquidUv.y, 1.0f - liquidUv.y));
-    float edgeFoam = saturate((0.085f - edgeDistance) * 13.0f);
+    float meniscus = pow(saturate(1.0f - edgeDistance * 5.0f), 2.0f) * meniscusStrength;
+    float edgeFoam = saturate((0.085f - edgeDistance) * 13.0f + meniscus * 0.45f);
     float basinDepth = saturate(edgeDistance * 2.6f);
     float waveDepth = saturate(input.waveHeight * 0.30f + 0.55f);
-    float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f);
+    float thicknessDepth = saturate(bodyThickness * 0.42f + meniscus * 0.35f);
+    float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f + thicknessDepth);
 
     float t = g_TimeAndExposure.x;
     float flowNoise = FBM(input.worldPos.xz * lerp(0.17f, 0.32f, 1.0f - viscosity) +
-                          float2(t * 0.035f, -t * 0.025f));
+                          float2(t * 0.035f, -t * 0.025f) * max(flowSpeed, 0.1f));
     float3 baseColor = lerp(shallowProfile, deepProfile, depthMix);
     baseColor = lerp(baseColor, g_Albedo.rgb, liquidType == 0u ? 0.16f : 0.08f);
 
@@ -361,6 +390,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float foamViewBoost = pow(1.0f - NdotV, 2.0f);
     float foamAmount = saturate((foamRamp + edgeFoam * 0.85f) * foamStrength * (0.6f + 0.4f * foamViewBoost));
     color = lerp(color, foamColor, foamAmount);
+    color = lerp(color, color * (0.72f + depthTint * 0.55f), saturate(meniscus * 0.65f + bodyThickness * 0.12f));
 
     float3 fresnelGlow = F * pow(1.0f - NdotV, 1.5f) * (liquidType == 0u ? float3(0.14f, 0.32f, 0.55f) : depthTint);
     color += fresnelGlow;
@@ -403,6 +433,7 @@ float4 WaterPS(PSInput input) : SV_TARGET
     {
         alpha = max(alpha, 0.95f);
     }
+    alpha = saturate(alpha + bodyThickness * 0.06f + meniscus * 0.08f);
 
     return float4(color, alpha);
 }

@@ -38,11 +38,27 @@ function Require-Vector3([object]$Value, [string]$Context) {
 if (-not (Test-Path $ManifestPath)) { throw "Asset manifest missing: $ManifestPath" }
 $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
 $assetRoot = Split-Path -Parent $ManifestPath
+$engineScenesPath = Join-Path $root "src/Core/Engine_Scenes.cpp"
+$engineScenesSource = ""
+if (Test-Path $engineScenesPath) {
+    $engineScenesSource = Get-Content $engineScenesPath -Raw
+} else {
+    Add-Failure "Engine_Scenes.cpp missing: $engineScenesPath"
+}
 
 if ([int]$manifest.schema -ne 1) { Add-Failure "asset manifest schema must be 1" }
 if (-not [bool]$manifest.policy.orientation_contract_required) { Add-Failure "policy.orientation_contract_required must be true" }
 if (-not [bool]$manifest.policy.contact_policy_required) { Add-Failure "policy.contact_policy_required must be true" }
 if (-not [bool]$manifest.policy.pbr_texture_status_required) { Add-Failure "policy.pbr_texture_status_required must be true" }
+if ($manifest.policy.notes -match "future PBR material hookup|geometry only") {
+    Add-Failure "policy.notes still describe naturalistic assets as geometry-only/future PBR hookup"
+}
+
+foreach ($bindingToken in @("GetNaturalisticAssetTextureSet", "ApplyNaturalisticAssetTextures", "AddAssetLedNaturalisticRenderable")) {
+    if ($engineScenesSource -notmatch [regex]::Escape($bindingToken)) {
+        Add-Failure "Engine_Scenes.cpp missing runtime naturalistic texture binding token '$bindingToken'"
+    }
+}
 
 $allowedUp = @($manifest.policy.allowed_up_axes)
 $allowedForward = @($manifest.policy.allowed_forward_axes)
@@ -98,12 +114,22 @@ foreach ($asset in @($manifest.assets)) {
         if (-not (Test-Path $texPath)) {
             Add-Failure "$ctx material texture '$texProp' missing: $texPath"
         }
+
+        $runtimeTexPath = "assets/models/naturalistic_showcase/$id/$texRel"
+        if ($engineScenesSource -notmatch [regex]::Escape($runtimeTexPath)) {
+            Add-Failure "$ctx runtime binding missing texture path '$runtimeTexPath' in Engine_Scenes.cpp"
+        }
     }
     if ([string]::IsNullOrWhiteSpace([string]$asset.material_textures.status)) {
         Add-Failure "$ctx material_textures.status must be set"
+    } elseif ([string]$asset.material_textures.status -ne "available_bound_runtime") {
+        Add-Failure "$ctx material_textures.status must be available_bound_runtime"
     }
     if ([string]::IsNullOrWhiteSpace([string]$asset.material_textures.fallback)) {
-        Add-Failure "$ctx material_textures.fallback must be set until runtime PBR binding is complete"
+        Add-Failure "$ctx material_textures.fallback must be set"
+    }
+    if ($engineScenesSource -notmatch [regex]::Escape("id == `"$id`"")) {
+        Add-Failure "$ctx missing asset id runtime binding in Engine_Scenes.cpp"
     }
 }
 

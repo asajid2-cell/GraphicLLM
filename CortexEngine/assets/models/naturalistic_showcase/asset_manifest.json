@@ -16,7 +16,7 @@
     "allowed_up_axes": ["Y"],
     "allowed_forward_axes": ["Z", "-Z", "X", "-X"],
     "allowed_pivot_policies": ["asset_origin_authored", "floor_aligned_runtime", "centered_scan_runtime"],
-    "notes": "The current Cortex glTF loader imports geometry only. Textures are kept with the assets for policy/source completeness and future PBR material hookup."
+    "notes": "Naturalistic runtime assets are loaded through the Cortex scene builders. Geometry still comes from the glTF loader, while committed PBR texture paths are bound explicitly through the asset-led runtime material table."
   },
   "assets": [
     {
@@ -37,12 +37,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["hero_rock_anchor", "shoreline_breakup", "creek_bank"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/boulder_01_diff_1k.jpg",
         "normal": "textures/boulder_01_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/boulder_01_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -63,12 +63,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["driftwood", "natural_bridge", "foreground_anchor"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/dead_tree_trunk_diff_1k.jpg",
         "normal": "textures/dead_tree_trunk_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/dead_tree_trunk_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -89,12 +89,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["ground_debris", "bank_detail"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/dry_branches_medium_01_diff_1k.jpg",
         "normal": "textures/dry_branches_medium_01_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/dry_branches_medium_01_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -115,12 +115,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["vegetation_cluster", "foreground_detail"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/fern_02_diff_1k.jpg",
         "normal": "textures/fern_02_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/fern_02_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -141,12 +141,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["ground_cover", "background_bank"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/grass_bermuda_01_diff_1k.jpg",
         "normal": "textures/grass_bermuda_01_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/grass_bermuda_01_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -167,12 +167,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["warm_fixture", "glass_metal_prop", "scale_reference"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/Lantern_01_brass_diff_1k.jpg",
         "normal": "textures/Lantern_01_brass_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/Lantern_01_brass_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -193,12 +193,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["grounded_table", "market_display", "scale_reference"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/WoodenTable_01_diff_1k.jpg",
         "normal": "textures/WoodenTable_01_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/WoodenTable_01_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     },
     {
@@ -219,12 +219,12 @@
       "thumbnail_capture": "pending_generated",
       "intended_scene_roles": ["industrial_prop", "round_scale_reference", "foreground_detail"],
       "material_textures": {
-        "status": "available_unbound_runtime",
+        "status": "available_bound_runtime",
         "base_color": "textures/Barrel_01_explosive_diff_1k.jpg",
         "normal": "textures/Barrel_01_explosive_nor_gl_1k.jpg",
         "roughness_metallic_ao": "textures/Barrel_01_explosive_arm_1k.jpg",
         "emissive": null,
-        "fallback": "material_override_until_pbr_binding"
+        "fallback": "renderer_material_fallback_if_missing"
       }
     }
   ]

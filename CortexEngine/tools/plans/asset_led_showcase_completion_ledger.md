@@ -20,7 +20,7 @@ Current base evidence:
 
 ## Completion Gate
 
-Current status: `NOT COMPLETE`. The current implementation has seed/schema/asset-kit/world-palette/composition contracts, runtime builders for the five asset-led scenes, focused asset-led capture filtering, and a first scene-art tightening pass. The scenes are not public-release complete because visual baselines, high-quality public captures, gallery media, and harsh screenshot review still show unresolved art defects.
+Current status: `NOT COMPLETE`. The current implementation has seed/schema/asset-kit/world-palette/composition contracts, runtime builders for the five asset-led scenes, focused asset-led capture filtering, runtime PBR texture binding for naturalistic assets, and a first scene-art tightening pass. The scenes are not public-release complete because visual baselines, high-quality public captures, gallery media, and harsh screenshot review still show unresolved art defects.
 
 The asset-led showcase pass is complete only when every ledger item below is `DONE_VERIFIED` or `DEFERRED_BY_USER_ONLY`.
 
@@ -157,26 +157,37 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Evidence:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1` passed with `assets=8`.
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1` passed with `assets=8 bytes=19075769/52428800`.
-- Remaining work: runtime PBR texture binding remains tracked by ALS-003.
+- Remaining work: none for manifest/orientation policy. Runtime material binding is now tracked as verified by ALS-003.
 
 ### ALS-003: PBR Texture Binding for Imported Assets
 
-- Status: `PARTIAL`
+- Status: `DONE_VERIFIED`
 - Requirement: imported glTF assets should use their committed PBR textures where available instead of geometry-only placeholder material overrides.
 - Source files/functions:
-  - `CortexEngine/src/Core/Engine_Scenes.cpp`: `LoadNaturalisticShowcaseMesh`, asset upload call sites.
+  - `CortexEngine/src/Core/Engine_Scenes.cpp`: `LoadNaturalisticShowcaseMesh`, `GetNaturalisticAssetTextureSet`, `ApplyNaturalisticAssetTextures`, `AddAssetLedNaturalisticRenderable`, `Engine::BuildMaterialLabScene`, `Engine::BuildOutdoorSunsetBeachScene`, `Engine::BuildEffectsShowcaseScene`, `Engine::BuildCoastalCliffFoundryScene`, `Engine::BuildRainGlassPavilionScene`, `Engine::BuildNeonAlleyMaterialMarketScene`, `Engine::BuildForestCreekShrineScene`.
+  - `CortexEngine/assets/models/naturalistic_showcase/asset_manifest.json`
+  - `CortexEngine/tools/run_asset_kit_policy_tests.ps1`
   - `CortexEngine/src/Graphics/Renderer_Materials.cpp`
   - `CortexEngine/src/Graphics/Renderer_TextureCreation.cpp`
   - `CortexEngine/src/Graphics/Renderer_TexturePublication.cpp`
   - `CortexEngine/src/Graphics/MaterialModel.cpp`
   - `CortexEngine/src/Graphics/MaterialPresetRegistry.cpp`
   - `CortexEngine/src/Graphics/RHI/DX12Raytracing_Materials.cpp`
-- Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_material_path_equivalence_tests.ps1`
-- Evidence: existing material and RT parity tests cover material constants and surface classes, but current naturalistic asset manifest notes geometry-only loader behavior.
-- Remaining work:
-  - Bind base color, normal, roughness, metallic, AO, and emissive maps from asset kit metadata.
-  - Require fallback textures if a channel is missing.
-  - Prove raster and RT material paths see compatible imported material data.
+- Validation commands:
+  - `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_material_path_equivalence_tests.ps1 -NoBuild -SmokeFrames 80`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/asset_led_pbr_review -SmokeFrames 90`
+- Evidence:
+  - Release target rebuilt successfully after binding changes.
+  - Asset kit policy passed with `assets=8`; it now rejects unbound material status, stale geometry-only notes, missing binding helpers, missing asset IDs, and missing runtime texture-path strings.
+  - Naturalistic asset policy passed with `assets=8 bytes=19075769/52428800`.
+  - Material path equivalence passed with `vb_luma=179.62 forward_luma=178.80 vb_rendered=True/False`.
+  - Asset-led runtime smoke passed with `scenes=5`.
+  - Focused high-quality asset-led capture passed with `captures=15 size=1920x1080 preset=public_high`.
+- Remaining work: none for binding committed naturalistic asset textures. Public visual quality remains tracked by scene-specific ALS-006 through ALS-014 items.
 
 ### ALS-004: Scene Composition Stability Contracts
 

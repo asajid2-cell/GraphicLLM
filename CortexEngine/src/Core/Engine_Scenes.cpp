@@ -105,6 +105,78 @@ namespace {
         const char* preset = "masonry";
     };
 
+    struct AssetLedTextureSet {
+        const char* albedo = nullptr;
+        const char* normal = nullptr;
+        const char* arm = nullptr;
+    };
+
+    AssetLedTextureSet GetNaturalisticAssetTextureSet(const char* assetId) {
+        const std::string id = assetId ? assetId : "";
+        if (id == "boulder_01") {
+            return {
+                "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/boulder_01/textures/boulder_01_arm_1k.jpg"};
+        }
+        if (id == "dead_tree_trunk") {
+            return {
+                "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/dead_tree_trunk/textures/dead_tree_trunk_arm_1k.jpg"};
+        }
+        if (id == "dry_branches_medium_01") {
+            return {
+                "assets/models/naturalistic_showcase/dry_branches_medium_01/textures/dry_branches_medium_01_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/dry_branches_medium_01/textures/dry_branches_medium_01_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/dry_branches_medium_01/textures/dry_branches_medium_01_arm_1k.jpg"};
+        }
+        if (id == "fern_02") {
+            return {
+                "assets/models/naturalistic_showcase/fern_02/textures/fern_02_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/fern_02/textures/fern_02_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/fern_02/textures/fern_02_arm_1k.jpg"};
+        }
+        if (id == "grass_bermuda_01") {
+            return {
+                "assets/models/naturalistic_showcase/grass_bermuda_01/textures/grass_bermuda_01_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/grass_bermuda_01/textures/grass_bermuda_01_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/grass_bermuda_01/textures/grass_bermuda_01_arm_1k.jpg"};
+        }
+        if (id == "Lantern_01") {
+            return {
+                "assets/models/naturalistic_showcase/Lantern_01/textures/Lantern_01_brass_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/Lantern_01/textures/Lantern_01_brass_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/Lantern_01/textures/Lantern_01_brass_arm_1k.jpg"};
+        }
+        if (id == "WoodenTable_01") {
+            return {
+                "assets/models/naturalistic_showcase/WoodenTable_01/textures/WoodenTable_01_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/WoodenTable_01/textures/WoodenTable_01_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/WoodenTable_01/textures/WoodenTable_01_arm_1k.jpg"};
+        }
+        if (id == "Barrel_01") {
+            return {
+                "assets/models/naturalistic_showcase/Barrel_01/textures/Barrel_01_explosive_diff_1k.jpg",
+                "assets/models/naturalistic_showcase/Barrel_01/textures/Barrel_01_explosive_nor_gl_1k.jpg",
+                "assets/models/naturalistic_showcase/Barrel_01/textures/Barrel_01_explosive_arm_1k.jpg"};
+        }
+        return {};
+    }
+
+    void ApplyNaturalisticAssetTextures(Scene::RenderableComponent& renderable, const char* assetId) {
+        const AssetLedTextureSet textures = GetNaturalisticAssetTextureSet(assetId);
+        if (!textures.albedo || !textures.normal || !textures.arm) {
+            return;
+        }
+
+        renderable.textures.albedoPath = textures.albedo;
+        renderable.textures.normalPath = textures.normal;
+        renderable.textures.roughnessPath = textures.arm;
+        renderable.textures.metallicPath = textures.arm;
+        renderable.textures.occlusionPath = textures.arm;
+    }
+
     bool UploadAssetLedMesh(Renderer* renderer,
                             const std::shared_ptr<Scene::MeshData>& mesh,
                             const char* label) {
@@ -155,6 +227,22 @@ namespace {
         r.renderLayer = material.layer;
         r.presetName = material.preset;
         return e;
+    }
+
+    entt::entity AddAssetLedNaturalisticRenderable(Scene::ECS_Registry& registry,
+                                                   const char* tag,
+                                                   const char* assetId,
+                                                   const std::shared_ptr<Scene::MeshData>& mesh,
+                                                   const glm::vec3& position,
+                                                   const glm::vec3& scale,
+                                                   const glm::vec3& eulerRadians,
+                                                   const AssetLedMaterialSettings& material) {
+        entt::entity entity = AddAssetLedRenderable(registry, tag, mesh, position, scale, eulerRadians, material);
+        if (registry.HasComponent<Scene::RenderableComponent>(entity)) {
+            auto& renderable = registry.GetComponent<Scene::RenderableComponent>(entity);
+            ApplyNaturalisticAssetTextures(renderable, assetId);
+        }
+        return entity;
     }
 
     entt::entity AddAssetLedCamera(Scene::ECS_Registry& registry,
@@ -1106,12 +1194,13 @@ void Engine::BuildMaterialLabScene() {
     }
 
     if (scannedTableMesh && scannedTableMesh->gpuBuffers) {
-        addRenderable("MaterialLab_ScannedWoodenTable", scannedTableMesh,
-                      glm::vec3(3.62f, 0.20f, -0.20f),
-                      glm::vec3(1.00f),
-                      glm::vec3(0.0f, -0.38f, 0.0f),
-                      glm::vec4(0.43f, 0.25f, 0.12f, 1.0f),
-                      0.0f, 0.62f, "wood");
+        auto table = addRenderable("MaterialLab_ScannedWoodenTable", scannedTableMesh,
+                                   glm::vec3(3.62f, 0.20f, -0.20f),
+                                   glm::vec3(1.00f),
+                                   glm::vec3(0.0f, -0.38f, 0.0f),
+                                   glm::vec4(0.43f, 0.25f, 0.12f, 1.0f),
+                                   0.0f, 0.62f, "wood");
+        ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(table), "WoodenTable_01");
     }
 
     if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
@@ -1122,6 +1211,7 @@ void Engine::BuildMaterialLabScene() {
                                      glm::vec4(0.78f, 0.55f, 0.30f, 1.0f),
                                      1.0f, 0.24f, "brushed_metal");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(lantern);
+        ApplyNaturalisticAssetTextures(r, "Lantern_01");
         r.clearcoatFactor = 0.35f;
         r.specularFactor = 1.22f;
     }
@@ -1135,7 +1225,9 @@ void Engine::BuildMaterialLabScene() {
                                       glm::vec3(0.0f, 0.45f - 0.8f * static_cast<float>(i), 0.0f),
                                       glm::vec4(0.08f, 0.28f, 0.12f, 1.0f),
                                       0.0f, 0.58f, "wood");
-            m_registry->GetComponent<Scene::RenderableComponent>(fern).doubleSided = true;
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(fern);
+            ApplyNaturalisticAssetTextures(r, "fern_02");
+            r.doubleSided = true;
         }
     }
 
@@ -1919,12 +2011,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {glm::vec3( 6.12f, 0.02f, 0.72f), glm::vec3(0.26f), -0.18f, glm::vec4(0.43f, 0.38f, 0.31f, 1.0f)}
         };
         for (int i = 0; i < 4; ++i) {
-            addRenderable("OutdoorBeach_ScannedBoulder_" + std::to_string(i), scannedBoulderMesh,
-                          boulders[i].position,
-                          boulders[i].scale,
-                          glm::vec3(0.0f, boulders[i].yaw, 0.0f),
-                          boulders[i].color,
-                          0.0f, 0.74f, "stone");
+            auto boulder = addRenderable("OutdoorBeach_ScannedBoulder_" + std::to_string(i), scannedBoulderMesh,
+                                         boulders[i].position,
+                                         boulders[i].scale,
+                                         glm::vec3(0.0f, boulders[i].yaw, 0.0f),
+                                         boulders[i].color,
+                                         0.0f, 0.74f, "stone");
+            ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(boulder), "boulder_01");
         }
     }
 
@@ -1938,12 +2031,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {glm::vec3( 2.55f, 0.05f, 0.62f), glm::vec3(0.64f), -0.44f}
         };
         for (int i = 0; i < 2; ++i) {
-            addRenderable("OutdoorBeach_ScannedDriftwood_" + std::to_string(i), scannedTrunkMesh,
-                          trunks[i].position,
-                          trunks[i].scale,
-                          glm::vec3(0.0f, trunks[i].yaw, 0.03f),
-                          glm::vec4(0.32f, 0.19f, 0.10f, 1.0f),
-                          0.0f, 0.82f, "wood");
+            auto trunk = addRenderable("OutdoorBeach_ScannedDriftwood_" + std::to_string(i), scannedTrunkMesh,
+                                       trunks[i].position,
+                                       trunks[i].scale,
+                                       glm::vec3(0.0f, trunks[i].yaw, 0.03f),
+                                       glm::vec4(0.32f, 0.19f, 0.10f, 1.0f),
+                                       0.0f, 0.82f, "wood");
+            ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(trunk), "dead_tree_trunk");
         }
     }
 
@@ -1958,12 +2052,13 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             {glm::vec3( 6.25f, 0.08f, -0.75f), glm::vec3(1.18f), 0.16f}
         };
         for (int i = 0; i < 3; ++i) {
-            addRenderable("OutdoorBeach_ScannedBranchDebris_" + std::to_string(i), scannedBranchesMesh,
-                          branches[i].position,
-                          branches[i].scale,
-                          glm::vec3(0.0f, branches[i].yaw, 0.0f),
-                          glm::vec4(0.28f, 0.18f, 0.10f, 1.0f),
-                          0.0f, 0.76f, "wood");
+            auto branch = addRenderable("OutdoorBeach_ScannedBranchDebris_" + std::to_string(i), scannedBranchesMesh,
+                                        branches[i].position,
+                                        branches[i].scale,
+                                        glm::vec3(0.0f, branches[i].yaw, 0.0f),
+                                        glm::vec4(0.28f, 0.18f, 0.10f, 1.0f),
+                                        0.0f, 0.76f, "wood");
+            ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(branch), "dry_branches_medium_01");
         }
     }
 
@@ -1984,7 +2079,9 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                              glm::vec3(0.0f, grass[i].yaw, 0.0f),
                                              glm::vec4(0.16f, 0.34f, 0.12f, 1.0f),
                                              0.0f, 0.62f, "wood");
-            m_registry->GetComponent<Scene::RenderableComponent>(grassEntity).doubleSided = true;
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(grassEntity);
+            ApplyNaturalisticAssetTextures(r, "grass_bermuda_01");
+            r.doubleSided = true;
         }
     }
 
@@ -2004,7 +2101,9 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                       glm::vec3(0.0f, ferns[i].yaw, 0.0f),
                                       glm::vec4(0.10f, 0.30f, 0.13f, 1.0f),
                                       0.0f, 0.58f, "wood");
-            m_registry->GetComponent<Scene::RenderableComponent>(fern).doubleSided = true;
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(fern);
+            ApplyNaturalisticAssetTextures(r, "fern_02");
+            r.doubleSided = true;
         }
     }
 
@@ -2660,6 +2759,7 @@ void Engine::BuildEffectsShowcaseScene() {
                                         glm::vec4(0.56f, 0.13f, 0.08f, 1.0f),
                                         0.65f, 0.38f, "brushed_metal");
             auto& r = m_registry->GetComponent<Scene::RenderableComponent>(barrel);
+            ApplyNaturalisticAssetTextures(r, "Barrel_01");
             r.clearcoatFactor = 0.28f;
             r.specularFactor = 1.12f;
         }
@@ -2673,6 +2773,7 @@ void Engine::BuildEffectsShowcaseScene() {
                                      glm::vec4(0.82f, 0.56f, 0.30f, 1.0f),
                                      1.0f, 0.22f, "brushed_metal");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(lantern);
+        ApplyNaturalisticAssetTextures(r, "Lantern_01");
         r.clearcoatFactor = 0.4f;
         r.specularFactor = 1.25f;
     }
@@ -4557,12 +4658,12 @@ void Engine::BuildCoastalCliffFoundryScene() {
     }
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_ShoreFoamBand", planeMesh, glm::vec3(-1.4f, 0.02f, 1.05f), glm::vec3(7.4f, 1.0f, 0.22f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), foam);
     if (boulderMesh && boulderMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "CoastalFoundry_BoulderAnchor", boulderMesh, glm::vec3(-2.7f, 0.20f, 1.8f), glm::vec3(1.35f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), wetBasalt);
-        AddAssetLedRenderable(*m_registry, "CoastalFoundry_ForegroundRockMass", boulderMesh, glm::vec3(-1.65f, 0.18f, -2.05f), glm::vec3(0.95f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), wetBasalt);
-        AddAssetLedRenderable(*m_registry, "CoastalFoundry_RightShoreRockMass", boulderMesh, glm::vec3(3.65f, 0.16f, 1.35f), glm::vec3(0.85f), glm::vec3(0.0f, glm::radians(54.0f), 0.0f), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_BoulderAnchor", "boulder_01", boulderMesh, glm::vec3(-2.7f, 0.20f, 1.8f), glm::vec3(1.35f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_ForegroundRockMass", "boulder_01", boulderMesh, glm::vec3(-1.65f, 0.18f, -2.05f), glm::vec3(0.95f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RightShoreRockMass", "boulder_01", boulderMesh, glm::vec3(3.65f, 0.16f, 1.35f), glm::vec3(0.85f), glm::vec3(0.0f, glm::radians(54.0f), 0.0f), wetBasalt);
     }
     if (barrelMesh && barrelMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "CoastalFoundry_GroundedBarrel", barrelMesh, glm::vec3(2.8f, 0.50f, -1.55f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-24.0f), 0.0f), iron);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_GroundedBarrel", "Barrel_01", barrelMesh, glm::vec3(2.8f, 0.50f, -1.55f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-24.0f), 0.0f), iron);
     }
     AddParticleEffect(*m_registry, "CoastalFoundry_EmberColumn", "embers", glm::vec3(0.55f, 0.92f, -0.05f));
     AddParticleEffect(*m_registry, "CoastalFoundry_SmokeColumn", "smoke", glm::vec3(0.15f, 1.08f, -0.05f));
@@ -4640,7 +4741,7 @@ void Engine::BuildRainGlassPavilionScene() {
     AddAssetLedRenderable(*m_registry, "RainPavilion_ChromeDrain", cylinderMesh, glm::vec3(0.9f, 0.04f, -1.7f), glm::vec3(0.42f, 1.0f, 0.42f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "RainPavilion_WarmInteriorStrip", cubeMesh, glm::vec3(0.0f, 2.18f, 1.95f), glm::vec3(3.6f, 0.08f, 0.08f), glm::vec3(0.0f), warmLight);
     if (lanternMesh && lanternMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "RainPavilion_GroundedLantern", lanternMesh, glm::vec3(-1.2f, 0.42f, 1.1f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
+        AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedLantern", "Lantern_01", lanternMesh, glm::vec3(-1.2f, 0.42f, 1.1f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
     }
     AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(0.0f, 2.6f, -0.2f));
     AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(0.4f, 0.35f, -1.5f));
@@ -4793,10 +4894,10 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayChromeTrim", cubeMesh, glm::vec3(0.6f, 1.04f, -1.2f), glm::vec3(1.4f, 0.06f, 0.62f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayBase", cubeMesh, glm::vec3(0.6f, 0.22f, -1.2f), glm::vec3(1.48f, 0.44f, 0.72f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetAsphalt);
     if (tableMesh && tableMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "NeonMarket_GroundedMarketTable", tableMesh, glm::vec3(-0.85f, 0.40f, 1.0f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), wetAsphalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "NeonMarket_GroundedMarketTable", "WoodenTable_01", tableMesh, glm::vec3(-0.85f, 0.40f, 1.0f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), wetAsphalt);
     }
     if (barrelMesh && barrelMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "NeonMarket_GroundedBarrel", barrelMesh, glm::vec3(1.55f, 0.45f, -2.0f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), chrome);
+        AddAssetLedNaturalisticRenderable(*m_registry, "NeonMarket_GroundedBarrel", "Barrel_01", barrelMesh, glm::vec3(1.55f, 0.45f, -2.0f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), chrome);
     }
     AddParticleEffect(*m_registry, "NeonMarket_SteamPuffs", "steam", glm::vec3(-0.2f, 0.22f, -1.6f));
     AddParticleEffect(*m_registry, "NeonMarket_Rain", "rain", glm::vec3(0.0f, 2.8f, -0.3f));
@@ -4876,35 +4977,35 @@ void Engine::BuildForestCreekShrineScene() {
     AddAssetLedRenderable(*m_registry, "ForestShrine_RightShrinePost", cylinderMesh, glm::vec3(0.62f, 0.64f, 0.32f), glm::vec3(0.13f, 0.78f, 0.13f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), wetBark);
     AddAssetLedRenderable(*m_registry, "ForestShrine_MossRoof", coneMesh, glm::vec3(0.02f, 1.36f, 0.54f), glm::vec3(1.05f, 0.58f, 0.82f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
     if (trunkMesh && trunkMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "ForestShrine_FallenTrunk", trunkMesh, glm::vec3(-1.2f, 0.24f, 0.9f), glm::vec3(0.95f), glm::vec3(glm::radians(6.0f), glm::radians(-22.0f), 0.0f), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FallenTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(-1.2f, 0.24f, 0.9f), glm::vec3(0.95f), glm::vec3(glm::radians(6.0f), glm::radians(-22.0f), 0.0f), wetBark);
     }
     if (boulderMesh && boulderMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "ForestShrine_LeftBankRock", boulderMesh, glm::vec3(-1.6f, 0.12f, -0.55f), glm::vec3(0.75f), glm::vec3(0.0f, glm::radians(15.0f), 0.0f), mossStone);
-        AddAssetLedRenderable(*m_registry, "ForestShrine_RightBankRock", boulderMesh, glm::vec3(1.25f, 0.10f, -1.2f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-35.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_LeftBankRock", "boulder_01", boulderMesh, glm::vec3(-1.6f, 0.12f, -0.55f), glm::vec3(0.75f), glm::vec3(0.0f, glm::radians(15.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_RightBankRock", "boulder_01", boulderMesh, glm::vec3(1.25f, 0.10f, -1.2f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-35.0f), 0.0f), mossStone);
     }
     if (fernMesh && fernMesh->gpuBuffers) {
         for (int i = 0; i < 6; ++i) {
             const float side = (i % 2 == 0) ? -1.0f : 1.0f;
-            AddAssetLedRenderable(*m_registry, "ForestShrine_FernCluster", fernMesh,
-                                  glm::vec3(side * (1.6f + 0.2f * i), 0.05f, -0.8f + 0.52f * i),
-                                  glm::vec3(0.45f + 0.04f * i),
-                                  glm::vec3(0.0f, glm::radians(24.0f * i), 0.0f),
-                                  vegetation);
+            AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FernCluster", "fern_02", fernMesh,
+                                              glm::vec3(side * (1.6f + 0.2f * i), 0.05f, -0.8f + 0.52f * i),
+                                              glm::vec3(0.45f + 0.04f * i),
+                                              glm::vec3(0.0f, glm::radians(24.0f * i), 0.0f),
+                                              vegetation);
         }
     }
     if (branchMesh && branchMesh->gpuBuffers) {
-        AddAssetLedRenderable(*m_registry, "ForestShrine_BranchArchLeft", branchMesh, glm::vec3(-2.15f, 0.46f, 0.35f), glm::vec3(0.78f), glm::vec3(glm::radians(4.0f), glm::radians(42.0f), glm::radians(-8.0f)), wetBark);
-        AddAssetLedRenderable(*m_registry, "ForestShrine_BranchArchRight", branchMesh, glm::vec3(1.78f, 0.42f, 0.15f), glm::vec3(0.66f), glm::vec3(glm::radians(0.0f), glm::radians(-28.0f), glm::radians(7.0f)), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BranchArchLeft", "dry_branches_medium_01", branchMesh, glm::vec3(-2.15f, 0.46f, 0.35f), glm::vec3(0.78f), glm::vec3(glm::radians(4.0f), glm::radians(42.0f), glm::radians(-8.0f)), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BranchArchRight", "dry_branches_medium_01", branchMesh, glm::vec3(1.78f, 0.42f, 0.15f), glm::vec3(0.66f), glm::vec3(glm::radians(0.0f), glm::radians(-28.0f), glm::radians(7.0f)), wetBark);
     }
     if (grassMesh && grassMesh->gpuBuffers) {
         for (int i = 0; i < 8; ++i) {
             const float x = -2.2f + 0.62f * static_cast<float>(i);
             const float z = (i % 2 == 0) ? -1.72f : -0.12f;
-            AddAssetLedRenderable(*m_registry, "ForestShrine_GrassBankCluster", grassMesh,
-                                  glm::vec3(x, 0.05f, z),
-                                  glm::vec3(0.34f + 0.02f * static_cast<float>(i % 3)),
-                                  glm::vec3(0.0f, glm::radians(19.0f * static_cast<float>(i)), 0.0f),
-                                  vegetation);
+            AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_GrassBankCluster", "grass_bermuda_01", grassMesh,
+                                              glm::vec3(x, 0.05f, z),
+                                              glm::vec3(0.34f + 0.02f * static_cast<float>(i % 3)),
+                                              glm::vec3(0.0f, glm::radians(19.0f * static_cast<float>(i)), 0.0f),
+                                              vegetation);
         }
     }
     AddParticleEffect(*m_registry, "ForestShrine_GroundMist", "mist", glm::vec3(-0.4f, 0.18f, -0.8f));

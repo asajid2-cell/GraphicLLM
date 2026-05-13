@@ -370,7 +370,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-013: Runtime Validation Integration
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: new asset-led tests must become part of release validation once the first asset-led scene lands.
 - Source files/functions:
   - `CortexEngine/tools/run_release_validation.ps1`
@@ -394,10 +394,11 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/docs/media/gallery_manifest.json`
   - New review notes: `CortexEngine/tools/plans/asset_led_showcase_review_notes.md`
 - Validation command: manual review plus `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_screenshot_negative_gates.ps1`
-- Evidence: none for the new asset-led standard.
+- Evidence:
+  - High-quality capture command passed with `captures=38 size=1920x1080 preset=public_high`.
+  - Manual review recorded in `CortexEngine/tools/plans/asset_led_showcase_review_notes.md`.
 - Remaining work:
-  - Open every new screenshot.
-  - Record defects by scene and bookmark.
+  - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.
 
 ## Implementation Order

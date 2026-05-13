@@ -28,7 +28,7 @@
     "world_shader_palette": "coastal_foundry_dusk"
   },
   "environment": {
-    "ibl": "outdoor_sunset",
+    "ibl": "sunset_courtyard",
     "fallback": "procedural_sky"
   },
   "cameras": [

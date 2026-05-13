@@ -4488,10 +4488,10 @@ void Engine::BuildCoastalCliffFoundryScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("coastal_foundry_dusk", "scene_preset", false);
-        renderer->SetEnvironmentPreset("outdoor_sunset");
+        renderer->SetEnvironmentPreset("sunset_courtyard");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.72f, 0.98f);
-        renderer->SetBackgroundPresentation(true, 0.95f, 0.08f);
+        renderer->SetBackgroundPresentation(false, 0.95f, 0.08f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.42f, 0.48f, 0.25f)));
         renderer->SetSunColor(glm::vec3(1.0f, 0.56f, 0.28f));
         renderer->SetSunIntensity(2.4f);
@@ -4534,6 +4534,9 @@ void Engine::BuildCoastalCliffFoundryScene() {
 
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_OceanPlane", planeMesh, glm::vec3(-0.6f, -0.04f, 2.6f), glm::vec3(10.5f, 1.0f, 5.0f), glm::vec3(0.0f), ocean);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_WetBasaltDeck", cubeMesh, glm::vec3(-0.8f, -0.09f, -0.65f), glm::vec3(7.2f, 0.18f, 4.2f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_CliffBackdrop", cubeMesh, glm::vec3(0.8f, 1.75f, 4.35f), glm::vec3(11.5f, 3.5f, 0.32f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_LeftCliffReturn", cubeMesh, glm::vec3(-5.35f, 1.05f, 1.65f), glm::vec3(0.35f, 2.1f, 5.2f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_RightIndustrialSilhouette", cubeMesh, glm::vec3(4.75f, 1.0f, 1.2f), glm::vec3(0.42f, 2.0f, 4.2f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_LavaSurface", cubeMesh, glm::vec3(0.7f, 0.42f, -0.10f), glm::vec3(4.8f, 0.04f, 1.25f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), lava);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_ChannelNorthWall", cubeMesh, glm::vec3(0.55f, 0.58f, -0.86f), glm::vec3(5.1f, 0.34f, 0.18f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_ChannelSouthWall", cubeMesh, glm::vec3(0.85f, 0.58f, 0.66f), glm::vec3(5.1f, 0.34f, 0.18f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
@@ -4566,7 +4569,7 @@ void Engine::BuildRainGlassPavilionScene() {
         renderer->SetEnvironmentPreset("cool_overcast");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.65f, 1.35f);
-        renderer->SetBackgroundPresentation(true, 0.72f, 0.22f);
+        renderer->SetBackgroundPresentation(false, 0.72f, 0.22f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.18f, 0.72f, 0.50f)));
         renderer->SetSunColor(glm::vec3(0.25f, 0.46f, 0.95f));
         renderer->SetSunIntensity(1.25f);
@@ -4603,6 +4606,10 @@ void Engine::BuildRainGlassPavilionScene() {
     const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.68f, 0.36f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.62f, 0.26f), 4.8f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_ExtendedWetTerrace", cubeMesh, glm::vec3(0.0f, -0.08f, 1.6f), glm::vec3(11.0f, 0.08f, 6.4f), glm::vec3(0.0f), wetTile);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_DarkGardenBackdrop", cubeMesh, glm::vec3(0.0f, 1.05f, 4.1f), glm::vec3(10.8f, 2.1f, 0.20f), glm::vec3(0.0f), wetTile);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_LeftGardenMass", cubeMesh, glm::vec3(-5.1f, 0.85f, 1.4f), glm::vec3(0.24f, 1.7f, 5.6f), glm::vec3(0.0f), wetTile);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_RightGardenMass", cubeMesh, glm::vec3(5.1f, 0.85f, 1.4f), glm::vec3(0.24f, 1.7f, 5.6f), glm::vec3(0.0f), wetTile);
     AddAssetLedRenderable(*m_registry, "RainPavilion_PuddleSheet_A", planeMesh, glm::vec3(-0.9f, 0.012f, -1.3f), glm::vec3(2.4f, 1.0f, 1.1f), glm::vec3(0.0f), glass);
     AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallLeft", cubeMesh, glm::vec3(-2.2f, 1.22f, 0.0f), glm::vec3(0.08f, 2.4f, 4.2f), glm::vec3(0.0f), glass);
     AddAssetLedRenderable(*m_registry, "RainPavilion_GlassWallRight", cubeMesh, glm::vec3(2.2f, 1.22f, 0.0f), glm::vec3(0.08f, 2.4f, 4.2f), glm::vec3(0.0f), glass);
@@ -4629,10 +4636,10 @@ void Engine::BuildDesertRelicGalleryScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("desert_relic_sun", "scene_preset", false);
-        renderer->SetEnvironmentPreset("outdoor_sunset");
+        renderer->SetEnvironmentPreset("sunset_courtyard");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.82f, 0.78f);
-        renderer->SetBackgroundPresentation(true, 1.08f, 0.04f);
+        renderer->SetBackgroundPresentation(false, 1.08f, 0.04f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(0.58f, 0.68f, 0.22f)));
         renderer->SetSunColor(glm::vec3(1.0f, 0.82f, 0.52f));
         renderer->SetSunIntensity(3.6f);
@@ -4665,6 +4672,9 @@ void Engine::BuildDesertRelicGalleryScene() {
     const AssetLedMaterialSettings glass{glm::vec4(0.35f, 0.68f, 0.92f, 0.48f), 0.0f, 0.05f, 0.45f, 1.45f, glm::vec3(0.0f), 1.0f, 0.0f, 0.12f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
 
     AddAssetLedRenderable(*m_registry, "DesertRelic_SandFloor", planeMesh, glm::vec3(0.0f, -0.02f, 0.0f), glm::vec3(12.0f, 1.0f, 10.0f), glm::vec3(0.0f), sand);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_DuneBackdrop", cubeMesh, glm::vec3(0.0f, 1.65f, 4.2f), glm::vec3(12.5f, 3.3f, 0.30f), glm::vec3(0.0f), sand);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_LeftRuinReturn", cubeMesh, glm::vec3(-5.7f, 1.0f, 1.2f), glm::vec3(0.35f, 2.0f, 5.5f), glm::vec3(0.0f, glm::radians(7.0f), 0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_RightRuinReturn", cubeMesh, glm::vec3(5.7f, 0.85f, 1.4f), glm::vec3(0.30f, 1.7f, 4.8f), glm::vec3(0.0f, glm::radians(-7.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_MainPlinth", cubeMesh, glm::vec3(0.0f, 0.30f, 0.0f), glm::vec3(2.2f, 0.60f, 1.2f), glm::vec3(0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_BronzeRing", torusMesh, glm::vec3(0.15f, 0.95f, 0.0f), glm::vec3(0.82f), glm::vec3(glm::radians(74.0f), glm::radians(18.0f), 0.0f), bronze);
     AddAssetLedRenderable(*m_registry, "DesertRelic_GlassInlay", cubeMesh, glm::vec3(-0.65f, 0.68f, 0.03f), glm::vec3(0.42f, 0.08f, 0.42f), glm::vec3(0.0f, glm::radians(22.0f), 0.0f), glass);
@@ -4684,10 +4694,10 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("neon_market_rain", "scene_preset", false);
-        renderer->SetEnvironmentPreset("studio");
+        renderer->SetEnvironmentPreset("night_city");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.45f, 1.25f);
-        renderer->SetBackgroundPresentation(true, 0.65f, 0.22f);
+        renderer->SetBackgroundPresentation(false, 0.65f, 0.22f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.16f, 0.72f, 0.38f)));
         renderer->SetSunColor(glm::vec3(0.12f, 0.42f, 0.88f));
         renderer->SetSunIntensity(0.9f);
@@ -4729,6 +4739,8 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     const AssetLedMaterialSettings chrome{glm::vec4(0.72f, 0.82f, 0.86f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.55f, 0.2f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
 
     AddAssetLedRenderable(*m_registry, "NeonMarket_WetAlleyPlane", cubeMesh, glm::vec3(0.0f, -0.04f, -0.25f), glm::vec3(5.8f, 0.08f, 8.2f), glm::vec3(0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RearAlleyWall", cubeMesh, glm::vec3(0.0f, 1.25f, 3.55f), glm::vec3(5.4f, 2.5f, 0.28f), glm::vec3(0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_OverheadCableTray", cubeMesh, glm::vec3(0.0f, 2.55f, -0.2f), glm::vec3(4.8f, 0.12f, 4.8f), glm::vec3(0.0f), wetAsphalt);
     AddAssetLedRenderable(*m_registry, "NeonMarket_LeftStorefront", cubeMesh, glm::vec3(-2.25f, 1.1f, -0.05f), glm::vec3(0.38f, 2.2f, 4.6f), glm::vec3(0.0f), wetAsphalt);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RightStorefront", cubeMesh, glm::vec3(2.25f, 1.05f, 0.2f), glm::vec3(0.34f, 2.1f, 4.4f), glm::vec3(0.0f), wetAsphalt);
     AddAssetLedRenderable(*m_registry, "NeonMarket_MountedPinkSign", cubeMesh, glm::vec3(-2.02f, 2.1f, -0.85f), glm::vec3(0.10f, 0.38f, 1.35f), glm::vec3(0.0f), neonPink);
@@ -4756,7 +4768,7 @@ void Engine::BuildForestCreekShrineScene() {
         renderer->SetEnvironmentPreset("cool_overcast");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.72f, 0.82f);
-        renderer->SetBackgroundPresentation(true, 0.78f, 0.30f);
+        renderer->SetBackgroundPresentation(false, 0.78f, 0.30f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.25f, 0.80f, 0.36f)));
         renderer->SetSunColor(glm::vec3(0.72f, 0.88f, 0.62f));
         renderer->SetSunIntensity(1.9f);
@@ -4794,6 +4806,9 @@ void Engine::BuildForestCreekShrineScene() {
     const AssetLedMaterialSettings vegetation{glm::vec4(0.16f, 0.32f, 0.17f, 1.0f), 0.0f, 0.72f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.45f, 0.48f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "vegetation"};
 
     AddAssetLedRenderable(*m_registry, "ForestShrine_GroundBank", cubeMesh, glm::vec3(0.0f, -0.08f, 0.0f), glm::vec3(7.0f, 0.16f, 6.0f), glm::vec3(0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyMass", cubeMesh, glm::vec3(0.0f, 1.55f, 3.35f), glm::vec3(8.2f, 3.1f, 0.35f), glm::vec3(0.0f), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftTreeWall", cubeMesh, glm::vec3(-3.65f, 1.2f, 0.55f), glm::vec3(0.35f, 2.4f, 5.2f), glm::vec3(0.0f, glm::radians(5.0f), 0.0f), wetBark);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_RightTreeWall", cubeMesh, glm::vec3(3.65f, 1.2f, 0.55f), glm::vec3(0.35f, 2.4f, 5.2f), glm::vec3(0.0f, glm::radians(-5.0f), 0.0f), wetBark);
     AddAssetLedRenderable(*m_registry, "ForestShrine_CreekSheet", planeMesh, glm::vec3(-0.7f, 0.05f, -1.4f), glm::vec3(2.8f, 1.0f, 3.4f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), creek);
     AddAssetLedRenderable(*m_registry, "ForestShrine_ShrineBase", cubeMesh, glm::vec3(0.0f, 0.25f, 0.35f), glm::vec3(1.4f, 0.50f, 1.0f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
     AddAssetLedRenderable(*m_registry, "ForestShrine_Capstone", cubeMesh, glm::vec3(0.0f, 0.82f, 0.35f), glm::vec3(1.65f, 0.18f, 1.15f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);

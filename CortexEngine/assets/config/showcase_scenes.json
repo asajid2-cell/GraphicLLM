@@ -245,7 +245,7 @@
       "display_name": "Coastal Cliff Foundry",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "outdoor_sunset",
+      "default_environment": "sunset_courtyard",
       "default_lighting_rig": "coastal_foundry_dusk",
       "required_bookmarks": ["hero", "material_closeup", "atmosphere"],
       "camera_bookmarks": [
@@ -319,7 +319,7 @@
       "display_name": "Desert Relic Gallery",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "outdoor_sunset",
+      "default_environment": "sunset_courtyard",
       "default_lighting_rig": "desert_relic_sun",
       "required_bookmarks": ["hero", "stone_metal_closeup", "arch_depth"],
       "camera_bookmarks": [
@@ -356,7 +356,7 @@
       "display_name": "Neon Alley Material Market",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "studio",
+      "default_environment": "night_city",
       "default_lighting_rig": "neon_market_rain",
       "required_bookmarks": ["hero", "materials", "particles"],
       "camera_bookmarks": [

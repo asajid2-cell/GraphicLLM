@@ -302,6 +302,48 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Desert Relic Asset Breakup and Environment Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/desert_review9/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/desert_review10/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the desert scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added scanned `boulder_01` clusters and `dry_branches_medium_01` debris to break up the primitive plinth/ruin silhouette.
+- Added darker crevice/shadow strips on the plinth and ground to reduce the single-tan material read.
+- Switched `desert_relic_gallery` from `sunset_courtyard` to `cool_overcast` because the sunset environment exposed city/courtyard buildings behind the ruin.
+- Reframed the hero camera wider after `desert_review9` showed a bad cropped lintel and city HDRI.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `desert_review10` loaded `cool_overcast`, rendered at 1920x1080 with `renderScale=1.000`, and loaded scanned boulder/branch textures with `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The city-environment mismatch is fixed in `desert_review10`.
+- The scanned rocks/branches help scale and contact, but the scene still reads as blockout architecture: large flat walls, plank-like lintels, and a huge rectangular plinth dominate the frame.
+- The material palette is less single-note than before, but it still needs authored ruin geometry, better stone breakup, and more deliberate prop scale before publication.
+
+Decision:
+
+- Do not publish the desert captures.
+- Keep `ALS-008` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Interior Focal-Point Iteration
 
 Commands:

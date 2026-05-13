@@ -332,6 +332,9 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Harsh review recorded: closer framing helps the relic read, but it is still a blocky tan plinth scene.
   - Mesh-variety pass added cylinder columns, cones, ceramic vessels, and bronze pedestal detail; `asset_led_review3` capture passed, but hero composition remains rejected.
   - Startup-reapply/high-ruin pass restored authored lighting under public-high capture and added required high ruin/lintel geometry; `asset_led_review8` capture passed, but harsh review still rejected the scene as a tan block construction with weak material/art direction.
+  - Desert asset-breakup pass added scanned `boulder_01` clusters, `dry_branches_medium_01` debris, darker plinth/ground shadow strips, and moved the scene to `cool_overcast` to avoid the city/courtyard HDRI mismatch.
+  - Release build, seed, composition, showcase-scene, and asset-led runtime contracts passed after the desert pass.
+  - Focused captures `desert_review9` and `desert_review10` were manually reviewed: `desert_review10` fixes the city backdrop and adds better scale anchors, but large flat block walls/lintels and a rectangular plinth still dominate, so the scene remains rejected for public media.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Add authored ruin meshes/stone breakup/sand piles and fix scale/material/framing defects found in screenshots.
@@ -475,6 +478,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion capture `rain_review12`; the interior focal point improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

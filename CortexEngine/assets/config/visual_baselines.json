@@ -443,7 +443,7 @@
                       "id":  "desert_relic_gallery_hero_release",
                       "scene":  "desert_relic_gallery",
                       "camera_bookmark":  "hero",
-                      "environment":  "sunset_courtyard",
+                      "environment":  "cool_overcast",
                       "graphics_preset":  "release_showcase",
                       "lighting_rig":  "desert_relic_sun",
                       "required":  true,

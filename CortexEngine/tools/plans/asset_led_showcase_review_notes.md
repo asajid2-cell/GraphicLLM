@@ -646,6 +646,49 @@ Decision:
 - Keep `ALS-008` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Desert Relic Blockout-Reduction Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/desert_review14_wall_breakup/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/desert_review15_plinth_breakup/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/desert_review16_recessed_blockout/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, and the visible blockout defects are reduced, but the desert scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Widened/raised the hero camera after the closer relic crop made the foreground sand lip and plinth face too dominant.
+- Reduced the foreground sand lip, sand drift, and sand ramps so they no longer read as giant tan boards.
+- Shortened the right/left ruin returns, rear wall blocks, high lintels, and broken arch caps to reduce floating-bar and flat-wall reads.
+- Added front plinth chip overlays to break up the large rectangular face.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `desert_review16_recessed_blockout` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=3.644`, `avg_luma=137.017`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The huge right wall and foreground plank are materially smaller than `desert_review13`.
+- The image still reads as a primitive plinth/blockout ruin, with cube/cylinder architecture dominating over naturalistic authored mesh quality.
+- The scene needs real stone/ruin mesh assets or a more decisive close-up composition before publication.
+
+Decision:
+
+- Do not publish the desert captures.
+- Keep `ALS-008` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Interior Focal-Point Iteration
 
 Commands:

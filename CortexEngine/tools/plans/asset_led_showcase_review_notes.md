@@ -347,6 +347,47 @@ Decision:
 - Keep `ALS-009` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Coastal Foundry Rail and Furnace Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/coastal_review12/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/coastal_review13/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the coastal foundry remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Aligned showcase metadata and visual baseline environment to `cool_overcast`.
+- Lowered/tightened the hero bookmark to favor foreground basalt and furnace structure.
+- Darkened the metal/furnace materials, added diagonal furnace braces and channel grate slats, reduced rail repetition, and reduced the most dominant upper beam/foreground boulder scale.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `coastal_review13` rendered at 1920x1080 with `renderScale=0.850`, `VB renderedThisFrame=true`, `instances=61`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- `coastal_review12` still had a giant rail/beam across the top of the frame and foreground rocks blocking the scene.
+- `coastal_review13` improves that specific defect, but the composition is still visibly primitive: flat rear walls, repeated rail pieces, a floating-looking upper boulder, and rectangular industrial silhouettes dominate.
+- This needs a stronger redesign with authored cliff/foundry meshes or a much more decisive close-up that hides the primitive blockout.
+
+Decision:
+
+- Do not publish the coastal captures.
+- Keep `ALS-006` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Desert Relic Asset Breakup and Environment Iteration
 
 Commands:

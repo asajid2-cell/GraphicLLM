@@ -273,9 +273,11 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Startup-reapply pass prevents public graphics/environment presets from overriding asset-led lighting/background controls; `asset_led_review8` capture passed, but harsh review still rejected the coastal hero because the HDRI dependency and flat wall/beam silhouettes remain visible.
   - Coastal backdrop/grounding iteration moved the scene to the committed `cool_overcast` environment, reduced upper cliff mass scale, lowered the barrel, rebuilt Release, and passed scene-seed, composition-stability, and asset-led runtime contracts.
   - Focused capture `coastal_review11` was manually reviewed: the city HDRI mismatch is fixed, but box-platform construction, rail/post repetition, and flat cliff blocks remain visible, so the scene is still rejected for public media.
+  - Coastal rail/furnace iteration aligned public metadata and visual baseline to `cool_overcast`, darkened furnace metals, added diagonal braces and channel grate slats, reduced rail repetition, tightened the hero camera, rebuilt Release, and passed scene-seed, composition-stability, showcase-scene, and asset-led runtime contracts.
+  - Focused captures `coastal_review12` and `coastal_review13` were manually reviewed: the top beam/rail defect is reduced, but flat rear walls, repeated rail pieces, a floating-looking upper boulder, and rectangular industrial silhouettes still reject the scene for public media.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace the remaining flat cliff/industrial box backdrops with better authored cliff/structure geometry or a redesigned composition.
+  - Replace the remaining flat cliff/industrial box backdrops with better authored cliff/structure geometry or a redesigned close-up composition.
   - Fix composition/shader defects found in screenshots.
   - Capture high-resolution public screenshots after harsh review.
 
@@ -484,6 +486,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion capture `rain_review12`; the interior focal point improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused neon captures `neon_review8`, `neon_review9`, `neon_review10`, and `neon_review11`; the city-HDRI billboard failure is reduced and the signage/detail tokens render, but the scene remains WIP and should not be published.
+  - Manual review recorded focused coastal captures `coastal_review12` and `coastal_review13`; the rail/beam defect is reduced, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.

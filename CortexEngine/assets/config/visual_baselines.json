@@ -403,7 +403,7 @@
                       "id":  "coastal_cliff_foundry_hero_release",
                       "scene":  "coastal_cliff_foundry",
                       "camera_bookmark":  "hero",
-                      "environment":  "sunset_courtyard",
+                      "environment":  "cool_overcast",
                       "graphics_preset":  "release_showcase",
                       "lighting_rig":  "coastal_foundry_dusk",
                       "required":  true,

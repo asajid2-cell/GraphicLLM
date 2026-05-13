@@ -27,9 +27,9 @@
     "warm_cool_contrast": 0.74,
     "world_shader_palette": "rain_pavilion_night"
   },
-  "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
+  "environment": {"ibl": "night_city", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Whole pavilion with readable glass framing and wet floor.", "position": [-5.2, 1.7, -5.6], "target": [0.0, 1.05, 0.1], "fov": 45.0, "art_reason": "Diagonal view shows glass thickness, mullion contact, and puddle reflections."},
+    {"id": "hero", "role": "Whole pavilion with readable glass framing and wet floor.", "position": [-2.35, 1.08, -2.75], "target": [0.48, 0.76, 0.10], "fov": 34.0, "art_reason": "Closer night diagonal view keeps the mounted glass, wet terrace edges, and puddle reflections dominant instead of exposing a floating tile."},
     {"id": "glass_closeup", "role": "Glass tint/refraction with background object displacement.", "position": [-2.4, 1.35, -2.0], "target": [1.2, 1.05, 0.3], "fov": 34.0, "art_reason": "Close camera shows the thing behind glass changing without losing frame context."},
     {"id": "puddle_chrome", "role": "Wet tile, chrome, and rain ripples.", "position": [1.8, 0.82, -3.1], "target": [0.2, 0.38, 0.8], "fov": 36.0, "art_reason": "Low view makes reflections and surface normals visible."}
   ],

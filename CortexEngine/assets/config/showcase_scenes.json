@@ -252,9 +252,9 @@
         {
           "id": "hero",
           "label": "Ocean-to-foundry hero",
-          "position": [-6.8, 2.4, -7.2],
-          "target": [0.8, 1.0, 0.4],
-          "fov": 48.0,
+          "position": [-1.65, 1.08, -2.35],
+          "target": [1.35, 0.66, -0.22],
+          "fov": 32.0,
           "validation": true
         },
         {
@@ -282,16 +282,16 @@
       "display_name": "Rain Glass Pavilion",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "cool_overcast",
+      "default_environment": "night_city",
       "default_lighting_rig": "rain_pavilion_night",
       "required_bookmarks": ["hero", "glass_closeup", "puddle_chrome"],
       "camera_bookmarks": [
         {
           "id": "hero",
           "label": "Rain pavilion hero",
-          "position": [-5.2, 1.7, -5.6],
-          "target": [0.0, 1.05, 0.1],
-          "fov": 45.0,
+          "position": [-2.35, 1.08, -2.75],
+          "target": [0.48, 0.76, 0.10],
+          "fov": 34.0,
           "validation": true
         },
         {
@@ -326,9 +326,9 @@
         {
           "id": "hero",
           "label": "Sunlit relic hero",
-          "position": [-5.8, 2.0, -6.2],
-          "target": [0.15, 0.9, 0.1],
-          "fov": 46.0,
+          "position": [-1.35, 0.98, -2.25],
+          "target": [0.28, 0.78, -0.05],
+          "fov": 32.0,
           "validation": true
         },
         {
@@ -363,9 +363,9 @@
         {
           "id": "hero",
           "label": "Wet neon alley hero",
-          "position": [-4.4, 1.55, -6.4],
-          "target": [0.4, 1.1, 0.4],
-          "fov": 44.0,
+          "position": [-1.85, 1.02, -3.15],
+          "target": [0.62, 0.82, -0.10],
+          "fov": 36.0,
           "validation": true
         },
         {
@@ -400,9 +400,9 @@
         {
           "id": "hero",
           "label": "Creek shrine hero",
-          "position": [-4.2, 1.25, -5.1],
-          "target": [0.2, 0.75, 0.65],
-          "fov": 44.0,
+          "position": [-1.35, 0.66, -2.15],
+          "target": [0.10, 0.38, -0.05],
+          "fov": 32.0,
           "validation": true
         },
         {

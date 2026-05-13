@@ -29,7 +29,7 @@
   },
   "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Creek leading line into shrine and vegetation layers.", "position": [-4.2, 1.25, -5.1], "target": [0.2, 0.75, 0.65], "fov": 44.0, "art_reason": "Low creek angle ties water, rocks, and shrine into one composition."},
+    {"id": "hero", "role": "Creek leading line into shrine and vegetation layers.", "position": [-1.35, 0.66, -2.15], "target": [0.10, 0.38, -0.05], "fov": 32.0, "art_reason": "Tight creek-level framing keeps banks, water edges, shrine steps, and vegetation massing connected while hiding diorama edges."},
     {"id": "moss_water", "role": "Moss, wet rock, and shallow water detail.", "position": [-1.6, 0.72, -2.0], "target": [0.6, 0.42, -0.1], "fov": 34.0, "art_reason": "Checks wetness and material blend without losing contact."},
     {"id": "shrine_depth", "role": "Shrine grounding and background vegetation depth.", "position": [2.8, 1.45, -3.6], "target": [0.0, 0.9, 0.5], "fov": 40.0, "art_reason": "Shows shrine base, rocks, and foliage layers."}
   ],

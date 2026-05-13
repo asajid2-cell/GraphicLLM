@@ -35,10 +35,10 @@
     {
       "id": "hero",
       "role": "Read the full ocean-to-foundry story with clear foreground, midground, and background.",
-      "position": [-6.8, 2.4, -7.2],
-      "target": [0.8, 1.0, 0.4],
-      "fov": 48.0,
-      "art_reason": "Low diagonal angle keeps rail attachments visible and frames the lava channel against ocean fill."
+      "position": [-1.65, 1.08, -2.35],
+      "target": [1.35, 0.66, -0.22],
+      "fov": 32.0,
+      "art_reason": "Tight low diagonal angle keeps rail attachments, lava containment, wet ledge, and ocean fill in frame while avoiding the flat backdrop read."
     },
     {
       "id": "material_closeup",

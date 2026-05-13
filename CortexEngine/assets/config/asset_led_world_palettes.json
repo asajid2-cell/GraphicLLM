@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "purpose": "World-shader and lighting palettes for hand-authored asset-led showcase scenes.",
+  "required_shader_modes": [
+    "wet_ground",
+    "dry_sand",
+    "basalt_rock",
+    "moss_vegetation",
+    "stained_tile",
+    "oxidized_metal",
+    "soot_grime",
+    "glass_tint",
+    "lava_crust"
+  ],
+  "palettes": [
+    {
+      "id": "coastal_foundry_dusk",
+      "scene": "coastal_cliff_foundry",
+      "lighting_script": "coastal_foundry_dusk",
+      "shader_modes": ["wet_ground", "basalt_rock", "oxidized_metal", "soot_grime", "lava_crust"],
+      "key_color": [1.0, 0.56, 0.28],
+      "fill_color": [0.32, 0.48, 0.72],
+      "rim_color": [1.0, 0.34, 0.12],
+      "fog_tint": [0.42, 0.53, 0.62],
+      "exposure": 0.92,
+      "bloom_ceiling": 1.9,
+      "warm_cool_contrast": 0.68,
+      "notes": "Cold ocean and wet basalt contrast against hot lava/foundry emissive light."
+    },
+    {
+      "id": "rain_pavilion_night",
+      "scene": "rain_glass_pavilion",
+      "lighting_script": "rain_pavilion_night",
+      "shader_modes": ["wet_ground", "stained_tile", "glass_tint", "oxidized_metal"],
+      "key_color": [0.25, 0.46, 0.95],
+      "fill_color": [0.08, 0.13, 0.22],
+      "rim_color": [1.0, 0.72, 0.38],
+      "fog_tint": [0.18, 0.24, 0.34],
+      "exposure": 0.78,
+      "bloom_ceiling": 1.6,
+      "warm_cool_contrast": 0.74,
+      "notes": "Blue rain ambience with warm interior rim light through glass."
+    },
+    {
+      "id": "desert_relic_sun",
+      "scene": "desert_relic_gallery",
+      "lighting_script": "desert_relic_sun",
+      "shader_modes": ["dry_sand", "stained_tile", "oxidized_metal", "soot_grime", "glass_tint"],
+      "key_color": [1.0, 0.82, 0.52],
+      "fill_color": [0.48, 0.62, 0.86],
+      "rim_color": [0.9, 0.48, 0.22],
+      "fog_tint": [0.68, 0.57, 0.42],
+      "exposure": 1.04,
+      "bloom_ceiling": 1.35,
+      "warm_cool_contrast": 0.42,
+      "notes": "Hard warm sun, cooler sky fill, and dusty material breakup."
+    },
+    {
+      "id": "neon_market_rain",
+      "scene": "neon_alley_material_market",
+      "lighting_script": "neon_market_rain",
+      "shader_modes": ["wet_ground", "glass_tint", "oxidized_metal", "soot_grime"],
+      "key_color": [0.95, 0.18, 0.58],
+      "fill_color": [0.12, 0.42, 0.88],
+      "rim_color": [0.15, 1.0, 0.78],
+      "fog_tint": [0.18, 0.12, 0.22],
+      "exposure": 0.7,
+      "bloom_ceiling": 2.25,
+      "warm_cool_contrast": 0.82,
+      "notes": "Emissive signage, wet pavement, and dense colored haze."
+    },
+    {
+      "id": "forest_creek_mist",
+      "scene": "forest_creek_shrine",
+      "lighting_script": "forest_creek_mist",
+      "shader_modes": ["wet_ground", "basalt_rock", "moss_vegetation", "stained_tile", "soot_grime"],
+      "key_color": [0.72, 0.88, 0.62],
+      "fill_color": [0.22, 0.32, 0.28],
+      "rim_color": [0.9, 0.78, 0.48],
+      "fog_tint": [0.34, 0.42, 0.36],
+      "exposure": 0.86,
+      "bloom_ceiling": 1.25,
+      "warm_cool_contrast": 0.36,
+      "notes": "Soft filtered light through vegetation with moss and shallow creek reflections."
+    }
+  ]
+}

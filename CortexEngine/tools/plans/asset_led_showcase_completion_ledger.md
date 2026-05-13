@@ -20,6 +20,8 @@ Current base evidence:
 
 ## Completion Gate
 
+Current status: `NOT COMPLETE`. The first implementation checkpoint adds seed/schema/asset-kit/world-palette/composition contracts, but the new scenes are not runtime builders yet and public captures have not been regenerated.
+
 The asset-led showcase pass is complete only when every ledger item below is `DONE_VERIFIED` or `DEFERRED_BY_USER_ONLY`.
 
 Required final validation:
@@ -130,7 +132,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-001: Asset-Led Scene Schema
 
-- Status: `NOT_STARTED`
+- Status: `DONE_VERIFIED`
 - Requirement: define a structured scene seed schema for hand-authored showcase scenes.
 - Source files/functions:
   - New: `CortexEngine/assets/scenes/hand_authored/schema/scene_seed.schema.json`
@@ -138,15 +140,12 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Existing: `CortexEngine/assets/config/showcase_scenes.json`
   - Future C++ loader target: `Engine::BuildSceneFromPreset`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
-- Evidence: none yet.
-- Remaining work:
-  - Add schema fields for scene intent, asset groups, transforms, contacts, lighting, materials, cameras, and validation tolerances.
-  - Require explicit `art_reason` on each authored group and camera.
-  - Reject seed files that rely on unnamed random scatter for primary scene construction.
+- Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1` passed with `seeds=5`.
+- Remaining work: none for the schema/data contract. Runtime scene loading remains tracked by ALS-006 through ALS-013.
 
 ### ALS-002: Asset Kit Manifest and Orientation Policy
 
-- Status: `PARTIAL`
+- Status: `DONE_VERIFIED`
 - Requirement: expand the existing naturalistic asset manifest into a real asset-kit policy with scale, orientation, pivot, floor contact, bounds, material texture status, and license/source records.
 - Source files/functions:
   - Existing: `CortexEngine/assets/models/naturalistic_showcase/asset_manifest.json`
@@ -155,11 +154,10 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Existing loader: `LoadNaturalisticShowcaseMesh` in `CortexEngine/src/Core/Engine_Scenes.cpp`
   - Existing glTF loader: `Utils::LoadGLTFMesh`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1`
-- Evidence: `run_naturalistic_asset_policy_tests.ps1` currently validates the original naturalistic asset policy, but does not validate pivot/orientation/contact readiness.
-- Remaining work:
-  - Add per-asset `up_axis`, `forward_axis`, `scale_to_meters`, `pivot_policy`, `floor_y`, `bounds`, `thumbnail_capture`, and `intended_scene_roles`.
-  - Add policy rejecting model usage unless orientation and ground contact are declared.
-  - Prevent another dragon-on-its-back class of failure by requiring per-scene orientation notes for non-trivial meshes.
+- Evidence:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1` passed with `assets=8`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1` passed with `assets=8 bytes=19075769/52428800`.
+- Remaining work: runtime PBR texture binding remains tracked by ALS-003.
 
 ### ALS-003: PBR Texture Binding for Imported Assets
 
@@ -182,7 +180,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-004: Scene Composition Stability Contracts
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: automated tests must catch disconnected geometry, floating bars, oversized gaps, squashed props, and wrong orientation before screenshots are published.
 - Source files/functions:
   - New: `CortexEngine/tools/run_scene_composition_stability_tests.ps1`
@@ -191,11 +189,10 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Existing: `CortexEngine/assets/config/showcase_scenes.json`
   - Future: `CortexEngine/assets/scenes/hand_authored/*/scene_seed.json`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
-- Evidence: existing scene polish contract checks named tokens and some camera framing, but not general authored contact/gap rules.
+- Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1` passed with `seeds=5`.
 - Remaining work:
-  - Add declarative `contact_rules` to scene seeds.
-  - Validate group adjacency: rails have posts, countertops have supports, panels attach to frames, water/lava surfaces sit inside containers.
-  - Add scale sanity checks for props that should be round, upright, or grounded.
+  - Add runtime composition checks or rendered-scene probes once the hand-authored scene builders exist.
+  - Extend checks from seed metadata into built entity transforms, model bounds, and screenshots.
 
 ### ALS-005: Lighting Direction and Tinted World Shaders
 
@@ -212,15 +209,14 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/assets/shaders/RaytracingMaterials.hlsli`
   - New: `CortexEngine/tools/run_world_shader_contract_tests.ps1`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1`
-- Evidence: `run_lighting_energy_budget_tests.ps1` exists, and scene presets apply named lighting rigs, but there is no authored world-shader palette contract.
+- Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1` passed with `palettes=5 modes=9`.
 - Remaining work:
-  - Add world material modes: wet ground, dry sand, basalt rock, moss/vegetation undergrowth, stained tile, oxidized metal, soot, grime, glass tint, lava crust.
-  - Add per-scene color keys: warm/cool contrast, fog tint, IBL choice, exposure, bloom ceiling.
+  - Implement shader/runtime use of the authored world palettes.
   - Add frame-contract reporting for active world shader palette and lighting script id.
 
 ### ALS-006: Coastal Cliff Foundry Scene
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: hand-author a new scene where ocean water, wet cliffs, lava/foundry glow, metal rails, sparks, smoke, and dusk lighting form one cohesive composition.
 - Source files/functions:
   - New seed: `CortexEngine/assets/scenes/hand_authored/coastal_cliff_foundry/scene_seed.json`
@@ -234,15 +230,16 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Validation commands:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId coastal_cliff_foundry`
   - `CortexEngine/build/bin/Release/CortexEngine.exe --scene coastal_cliff_foundry --smoke-frames 180 --visual-validation`
-- Evidence: none yet.
+- Evidence: `scene_seed.json` and `art_bible.md` created; `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId coastal_cliff_foundry` is covered by the all-scene pass.
 - Remaining work:
-  - Author blockout with cliffs, foundry trough, attached railings/supports, ocean plane, wet rocks, sparks, smoke, and camera bookmarks.
-  - Use actual asset-kit rocks/wood/metal props where appropriate.
+  - Implement `Engine::BuildCoastalCliffFoundryScene`.
+  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
+  - Use actual asset-kit rocks/wood/metal props where appropriate at runtime.
   - Capture high-resolution public screenshots after harsh review.
 
 ### ALS-007: Rain Glass Pavilion Scene
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: hand-author a night/rain scene centered on glass, chrome, wet pavement, puddles, reflections, refraction, and cool/warm tinted lighting.
 - Source files/functions:
   - New seed: `CortexEngine/assets/scenes/hand_authored/rain_glass_pavilion/scene_seed.json`
@@ -255,14 +252,16 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Validation commands:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId rain_glass_pavilion`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_rt_showcase_smoke.ps1`
-- Evidence: none yet.
+- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
 - Remaining work:
-  - Author pavilion frame, connected glass panes, wet ground, puddles, chrome fixtures, rain/mist particles, and reflection-view cameras.
+  - Implement `Engine::BuildRainGlassPavilionScene`.
+  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
+  - Author pavilion frame, connected glass panes, wet ground, puddles, chrome fixtures, rain/mist particles, and reflection-view cameras in runtime scene code.
   - Add material controls for glass tint/refraction readability without hiding background objects.
 
 ### ALS-008: Desert Relic Gallery Scene
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: hand-author a warm exterior material scene with stone, sand, brushed metals, ceramic/glass accents, strong sun, long shadows, and visible world-shader variation.
 - Source files/functions:
   - New seed: `CortexEngine/assets/scenes/hand_authored/desert_relic_gallery/scene_seed.json`
@@ -271,14 +270,16 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/src/Graphics/MaterialPresetRegistry.cpp`
   - `CortexEngine/assets/shaders/MaterialResolve.hlsl`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId desert_relic_gallery`
-- Evidence: none yet.
+- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
 - Remaining work:
-  - Author ruins/plinths with real supports, clear contact, natural prop grouping, sand buildup, stone wear, and camera bookmarks.
+  - Implement `Engine::BuildDesertRelicGalleryScene`.
+  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
+  - Author ruins/plinths with real supports, clear contact, natural prop grouping, sand buildup, stone wear, and camera bookmarks in runtime scene code.
   - Prove material palette is not a single-color theme.
 
 ### ALS-009: Neon Alley Material Market Scene
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: hand-author a dense night scene with emissive signage, glass, chrome, wet asphalt, particles, bloom, and cinematic post as a cohesive street-market shot.
 - Source files/functions:
   - New seed: `CortexEngine/assets/scenes/hand_authored/neon_alley_material_market/scene_seed.json`
@@ -292,13 +293,15 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_effects_showcase_smoke.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_gpu_particle_contract_tests.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId neon_alley_material_market`
-- Evidence: none yet.
+- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
 - Remaining work:
-  - Author alley geometry with readable storefronts, sign mounts, cabling/supports, wet surfaces, smoke/steam/rain particles, and multiple detail cameras.
+  - Implement `Engine::BuildNeonAlleyMaterialMarketScene`.
+  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
+  - Author alley geometry with readable storefronts, sign mounts, cabling/supports, wet surfaces, smoke/steam/rain particles, and multiple detail cameras in runtime scene code.
 
 ### ALS-010: Forest Creek Shrine Scene
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: optionally hand-author a natural scene that proves vegetation, creek water, rock, moss, wood, soft fog, and filtered light can be cohesive without looking randomly scattered.
 - Source files/functions:
   - New seed: `CortexEngine/assets/scenes/hand_authored/forest_creek_shrine/scene_seed.json`
@@ -307,10 +310,11 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/src/Graphics/Renderer_Vegetation.cpp`
   - `CortexEngine/src/Graphics/Renderer_WaterSurfaces.cpp`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId forest_creek_shrine`
-- Evidence: none yet.
+- Evidence: `scene_seed.json` and `art_bible.md` created; all-scene asset-led contract pass covers seed/composition/world-palette metadata.
 - Remaining work:
-  - Confirm whether this scene is in scope for the next pass or should be `DEFERRED_BY_USER_ONLY`.
-  - If included, author creek banks, rocks, foliage clusters, shrine focal object, and low-angle cameras.
+  - Implement `Engine::BuildForestCreekShrineScene`.
+  - Register command-line scene alias, showcase metadata, bookmarks, and visual baseline.
+  - Author creek banks, rocks, foliage clusters, shrine focal object, and low-angle cameras in runtime scene code.
 
 ### ALS-011: Existing Scene Re-Authoring Pass
 
@@ -333,7 +337,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-012: Public Gallery Expansion
 
-- Status: `NOT_STARTED`
+- Status: `PARTIAL`
 - Requirement: update the public README/gallery after the new hand-authored scenes exist, with high-resolution screenshots and a gallery reel that shows rendering strengths.
 - Source files/functions:
   - `CortexEngine/README.md`
@@ -362,7 +366,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/assets/config/release_package_manifest.json`
   - New scripts: `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_world_shader_contract_tests.ps1`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1`
-- Evidence: current release validation includes scene polish and naturalistic asset policy, but not asset-led seed/schema/composition/world-shader contracts.
+- Evidence: `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, and `run_world_shader_contract_tests.ps1` now exist and pass targeted validation.
 - Remaining work:
   - Add new release validation steps when scripts are meaningful.
   - Do not add empty placeholder scripts just to satisfy the ledger.

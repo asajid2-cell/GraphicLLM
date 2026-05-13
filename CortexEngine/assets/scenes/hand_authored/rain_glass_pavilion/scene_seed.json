@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "rain_glass_pavilion",
+  "version": 1,
+  "status": "seeded_not_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "intent": {
+    "one_sentence": "A glass pavilion in rain with wet pavement, chrome fixtures, and warm interior light.",
+    "art_goal": "Make glass/refraction, chrome, puddles, rain particles, and tinted lighting readable from authored cameras.",
+    "foreground_midground_background": {
+      "foreground": "Puddled tile and chrome drain edge.",
+      "midground": "Glass walls, mullions, bench, and reflected warm interior.",
+      "background": "Dark garden silhouettes and cool rain haze."
+    },
+    "forbidden_reads": ["brown transparent wall", "floating panes", "unframed glass sheets", "featureless wet floor"]
+  },
+  "lighting": {
+    "script_id": "rain_pavilion_night",
+    "rig": "rain_pavilion_night",
+    "key": "Cool rain-blue key from above and outside.",
+    "fill": "Low night fill from garden side.",
+    "rim": "Warm interior fixtures through glass edges.",
+    "fog": "Thin blue rain mist with warm interior scattering.",
+    "exposure": 0.78,
+    "bloom_ceiling": 1.6,
+    "warm_cool_contrast": 0.74,
+    "world_shader_palette": "rain_pavilion_night"
+  },
+  "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
+  "cameras": [
+    {"id": "hero", "role": "Whole pavilion with readable glass framing and wet floor.", "position": [-5.2, 1.7, -5.6], "target": [0.0, 1.05, 0.1], "fov": 45.0, "art_reason": "Diagonal view shows glass thickness, mullion contact, and puddle reflections."},
+    {"id": "glass_closeup", "role": "Glass tint/refraction with background object displacement.", "position": [-2.4, 1.35, -2.0], "target": [1.2, 1.05, 0.3], "fov": 34.0, "art_reason": "Close camera shows the thing behind glass changing without losing frame context."},
+    {"id": "puddle_chrome", "role": "Wet tile, chrome, and rain ripples.", "position": [1.8, 0.82, -3.1], "target": [0.2, 0.38, 0.8], "fov": 36.0, "art_reason": "Low view makes reflections and surface normals visible."}
+  ],
+  "material_palette": [
+    {"id": "rain_glass", "surface_class": "glass", "shader_mode": "glass_tint", "description": "Slight blue-gray glass with strong edge highlights and readable transmission."},
+    {"id": "wet_tile", "surface_class": "masonry", "shader_mode": "stained_tile", "description": "Wet stone tile with puddle masks and dark grout."},
+    {"id": "polished_chrome", "surface_class": "mirror_metal", "shader_mode": "oxidized_metal", "description": "Clean chrome fixtures with rain streak contrast."},
+    {"id": "rain_puddle", "surface_class": "water", "shader_mode": "wet_ground", "description": "Thin water film and puddles reflecting warm/cool light."}
+  ],
+  "assets": [
+    {"id": "pavilion_floor", "role": "ground_plane", "source": "primitive:tiled_floor", "transform": {"position": [0.0, 0.0, 0.0], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [7.0, 0.08, 5.2]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "wet_tile", "art_reason": "Stable tile base anchors every glass frame and puddle."},
+    {"id": "glass_wall_left", "role": "framed_glass_panel", "source": "primitive:glass_panel", "transform": {"position": [-2.2, 1.2, 0.0], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [0.08, 2.4, 4.2]}, "contact": "mounted", "anchor": "pavilion_floor", "material_override": "rain_glass", "art_reason": "Glass is framed and mounted into the floor channel."},
+    {"id": "chrome_drain", "role": "round_prop", "source": "primitive:cylinder", "transform": {"position": [0.9, 0.06, -1.7], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [0.42, 0.05, 0.42]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "polished_chrome", "art_reason": "Round prop gives chrome a close reflection target and is checked for unsquashed scale."}
+  ],
+  "authored_groups": [
+    {"id": "pavilion_frame_group", "primary": true, "art_reason": "Frames make every glass panel read as installed architecture.", "parts": ["glass_wall_left", "glass_wall_right", "rear_glass_wall", "floor_channels", "roof_mullions"], "contact_rules": {"requires_supports": true, "max_gap_m": 0.08}},
+    {"id": "wet_floor_group", "primary": true, "art_reason": "Puddles, drains, and tile seams make the rain surface physically grounded.", "parts": ["pavilion_floor", "chrome_drain", "puddle_sheets", "tile_grout"], "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.05}},
+    {"id": "rain_light_group", "primary": false, "art_reason": "Rain particles and warm fixtures show transmission/reflection behavior.", "parts": ["rain_emitter", "interior_warm_strip", "garden_fog"], "contact_rules": {"requires_anchor": "pavilion_frame_group", "max_gap_m": 0.1}}
+  ],
+  "seeded_random_groups": [
+    {"id": "rain_splashes", "seed": 22091, "count": 24, "bounds": [-3.1, 0.04, -2.4, 3.1, 0.08, 2.2], "min_spacing": 0.22, "anchor": "wet_floor_group", "art_reason": "Secondary splash detail, not scene layout."}
+  ],
+  "validation": {"contact_tolerance_m": 0.05, "max_gap_m": 0.1, "min_authored_groups": 3, "max_round_prop_axis_ratio": 1.15, "require_foreground_midground_background": true, "palette_required": true}
+}

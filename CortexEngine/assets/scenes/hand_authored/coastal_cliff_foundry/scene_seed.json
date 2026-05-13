@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "id": "coastal_cliff_foundry",
+  "version": 1,
+  "status": "seeded_not_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "intent": {
+    "one_sentence": "Cold ocean cliff meets hot foundry runoff at dusk.",
+    "art_goal": "Prove water, lava, wet stone, metal, sparks, smoke, and tinted dusk lighting in one intentional exterior composition.",
+    "foreground_midground_background": {
+      "foreground": "Wet basalt ledge, safety rail, and ocean spray.",
+      "midground": "Foundry channel with contained lava, metal supports, and ember particles.",
+      "background": "Ocean horizon, cliff wall, and warm industrial silhouette."
+    },
+    "forbidden_reads": ["disconnected rails", "floating lava tray", "flat white gallery lighting", "random rock scatter"]
+  },
+  "lighting": {
+    "script_id": "coastal_foundry_dusk",
+    "rig": "coastal_foundry_dusk",
+    "key": "Low warm sun from rear-left grazing wet stone.",
+    "fill": "Cool ocean sky fill from camera-right.",
+    "rim": "Lava and furnace emissive on rail edges and smoke.",
+    "fog": "Salt mist over water plus warmer smoke over foundry channel.",
+    "exposure": 0.92,
+    "bloom_ceiling": 1.9,
+    "warm_cool_contrast": 0.68,
+    "world_shader_palette": "coastal_foundry_dusk"
+  },
+  "environment": {
+    "ibl": "outdoor_sunset",
+    "fallback": "procedural_sky"
+  },
+  "cameras": [
+    {
+      "id": "hero",
+      "role": "Read the full ocean-to-foundry story with clear foreground, midground, and background.",
+      "position": [-6.8, 2.4, -7.2],
+      "target": [0.8, 1.0, 0.4],
+      "fov": 48.0,
+      "art_reason": "Low diagonal angle keeps rail attachments visible and frames the lava channel against ocean fill."
+    },
+    {
+      "id": "material_closeup",
+      "role": "Wet basalt, chrome rail, lava crust, and water reflection response.",
+      "position": [-2.2, 1.35, -3.4],
+      "target": [1.7, 0.8, -0.25],
+      "fov": 36.0,
+      "art_reason": "Close enough to judge shader separation without losing the rail/contact construction."
+    },
+    {
+      "id": "atmosphere",
+      "role": "Sparks, smoke, colored fog, and dusk silhouettes.",
+      "position": [4.8, 2.0, -4.6],
+      "target": [0.3, 1.15, 0.5],
+      "fov": 42.0,
+      "art_reason": "Looks back through particles toward the warm source and cool sky edge."
+    }
+  ],
+  "material_palette": [
+    {"id": "wet_basalt", "surface_class": "masonry", "shader_mode": "basalt_rock", "description": "Dark wet rock with roughness breakup and cool sky reflection."},
+    {"id": "foundry_iron", "surface_class": "brushed_metal", "shader_mode": "oxidized_metal", "description": "Worn dark metal rails with warm lava rim highlights."},
+    {"id": "lava_core", "surface_class": "emissive_liquid", "shader_mode": "lava_crust", "description": "Contained liquid emissive with crust islands and bloom ceiling."},
+    {"id": "ocean_water", "surface_class": "water", "shader_mode": "wet_ground", "description": "Blue-green water plane with reflected dusk sky."}
+  ],
+  "assets": [
+    {
+      "id": "cliff_boulder_anchor",
+      "role": "hero_rock_anchor",
+      "source": "asset_kit:boulder_01",
+      "transform": {"position": [-2.7, 0.0, 1.8], "rotation_degrees": [0.0, 28.0, 0.0], "scale": [1.35, 1.35, 1.35]},
+      "contact": "grounded",
+      "expected_surface_y": 0.0,
+      "material_override": "wet_basalt",
+      "art_reason": "Large grounded scan breaks up the cliff edge and gives the waterline scale."
+    },
+    {
+      "id": "foundry_channel",
+      "role": "contained_liquid",
+      "source": "primitive:box_trough_and_plane",
+      "transform": {"position": [0.7, 0.42, -0.1], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [4.8, 0.46, 1.25]},
+      "contact": "contained_liquid",
+      "expected_surface_y": 0.42,
+      "material_override": "lava_core",
+      "art_reason": "Central lava path is physically contained by attached trough walls."
+    },
+    {
+      "id": "left_rail_run",
+      "role": "attached_rail",
+      "source": "primitive:metal_rail_group",
+      "transform": {"position": [-0.4, 0.82, -1.05], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [4.6, 0.18, 0.12]},
+      "contact": "mounted",
+      "anchor": "foundry_channel",
+      "material_override": "foundry_iron",
+      "art_reason": "Rail explicitly runs parallel to the trough and is mounted by posts, avoiding the old floating-bar look."
+    }
+  ],
+  "authored_groups": [
+    {
+      "id": "foundry_channel_group",
+      "primary": true,
+      "art_reason": "The lava container is a built object with walls, supports, lip, drain, and rail attachments.",
+      "parts": ["foundry_channel", "left_rail_run", "right_rail_run", "front_support_posts", "rear_support_posts", "lava_surface"],
+      "contact_rules": {"requires_supports": true, "max_gap_m": 0.12, "must_contain_liquid": true}
+    },
+    {
+      "id": "cliff_edge_group",
+      "primary": true,
+      "art_reason": "Grounded rocks and wet ledges create natural contact from waterline to foundry floor.",
+      "parts": ["cliff_boulder_anchor", "wet_ledge", "shoreline_foam", "ocean_plane"],
+      "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.16}
+    },
+    {
+      "id": "atmosphere_group",
+      "primary": false,
+      "art_reason": "Particles and fog reinforce hot/cold contrast without becoming random decoration.",
+      "parts": ["ember_column", "smoke_column", "salt_mist_band"],
+      "contact_rules": {"requires_anchor": "foundry_channel", "max_gap_m": 0.16}
+    }
+  ],
+  "seeded_random_groups": [
+    {
+      "id": "small_wet_stones",
+      "seed": 14031,
+      "count": 18,
+      "bounds": [-4.8, 0.0, -2.8, 1.5, 0.25, 2.8],
+      "min_spacing": 0.35,
+      "anchor": "cliff_edge_group",
+      "art_reason": "Secondary contact detail only; not the primary composition."
+    }
+  ],
+  "validation": {
+    "contact_tolerance_m": 0.05,
+    "max_gap_m": 0.16,
+    "min_authored_groups": 3,
+    "max_round_prop_axis_ratio": 1.2,
+    "require_foreground_midground_background": true,
+    "palette_required": true
+  }
+}

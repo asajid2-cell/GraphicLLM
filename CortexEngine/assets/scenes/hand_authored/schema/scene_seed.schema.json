@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "id": "cortex.hand_authored_scene_seed",
+  "description": "Contract for asset-led Cortex showcase scenes. The PowerShell scene seed contract tests enforce this schema in CI without requiring a JSON Schema runtime.",
+  "required_top_level": [
+    "schema",
+    "id",
+    "version",
+    "status",
+    "units",
+    "coordinate_system",
+    "intent",
+    "lighting",
+    "environment",
+    "cameras",
+    "material_palette",
+    "assets",
+    "authored_groups",
+    "validation"
+  ],
+  "allowed_status": [
+    "seeded_not_runtime",
+    "runtime_registered",
+    "public_showcase_validated"
+  ],
+  "required_intent": [
+    "one_sentence",
+    "art_goal",
+    "foreground_midground_background",
+    "forbidden_reads"
+  ],
+  "required_lighting": [
+    "script_id",
+    "rig",
+    "key",
+    "fill",
+    "rim",
+    "fog",
+    "exposure",
+    "bloom_ceiling",
+    "warm_cool_contrast",
+    "world_shader_palette"
+  ],
+  "required_camera": [
+    "id",
+    "role",
+    "position",
+    "target",
+    "fov",
+    "art_reason"
+  ],
+  "required_asset": [
+    "id",
+    "role",
+    "source",
+    "transform",
+    "contact",
+    "art_reason"
+  ],
+  "required_transform": [
+    "position",
+    "rotation_degrees",
+    "scale"
+  ],
+  "allowed_contacts": [
+    "grounded",
+    "mounted",
+    "contained_liquid",
+    "suspended_authored",
+    "background"
+  ],
+  "required_authored_group": [
+    "id",
+    "primary",
+    "art_reason",
+    "parts",
+    "contact_rules"
+  ],
+  "seeded_random_group_policy": {
+    "primary_groups_may_be_random": false,
+    "required_fields": [
+      "id",
+      "seed",
+      "count",
+      "bounds",
+      "min_spacing",
+      "anchor",
+      "art_reason"
+    ]
+  },
+  "validation_defaults": {
+    "contact_tolerance_m": 0.05,
+    "max_gap_m": 0.18,
+    "min_authored_groups": 3,
+    "max_round_prop_axis_ratio": 1.2
+  }
+}

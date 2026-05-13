@@ -213,6 +213,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.features = featurePlan.active;
     contract.lighting.rigId = m_lightingState.activeRigId;
     contract.lighting.rigSource = m_lightingState.activeRigSource;
+    contract.lighting.worldShaderPaletteId = m_lightingState.activeWorldShaderPaletteId;
+    contract.lighting.lightingScriptId = m_lightingState.activeLightingScriptId;
     contract.lighting.safeRigOnLowVRAM = m_lightingState.useSafeRigOnLowVRAM;
     contract.lighting.safeRigVariantActive = m_lightingState.safeRigVariantActive;
     contract.lighting.exposure = m_qualityRuntimeState.exposure;

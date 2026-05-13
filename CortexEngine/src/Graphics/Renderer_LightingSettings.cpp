@@ -73,6 +73,17 @@ void Renderer::SetLightingRigContract(std::string rigId, std::string source, boo
     m_lightingState.safeRigVariantActive = safeVariantActive;
 }
 
+void Renderer::SetWorldShaderPaletteContract(std::string paletteId, std::string lightingScriptId) {
+    if (paletteId.empty()) {
+        paletteId = "default";
+    }
+    if (lightingScriptId.empty()) {
+        lightingScriptId = m_lightingState.activeRigId.empty() ? "custom" : m_lightingState.activeRigId;
+    }
+    m_lightingState.activeWorldShaderPaletteId = std::move(paletteId);
+    m_lightingState.activeLightingScriptId = std::move(lightingScriptId);
+}
+
 void Renderer::ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry) {
     if (!registry) {
         spdlog::warn("ApplyLightingRig called with null registry");

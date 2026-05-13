@@ -20,6 +20,19 @@ if (-not (Test-Path $PalettePath)) { throw "World palette manifest missing: $Pal
 $palettes = Get-Content $PalettePath -Raw | ConvertFrom-Json
 if ([int]$palettes.schema -ne 1) { Add-Failure "world palette schema must be 1" }
 
+$engineScenesPath = Join-Path $root "src/Core/Engine_Scenes.cpp"
+$rendererHeaderPath = Join-Path $root "src/Graphics/Renderer.h"
+$frameContractJsonPath = Join-Path $root "src/Graphics/FrameContractJson.cpp"
+$engineScenes = if (Test-Path $engineScenesPath) { Get-Content $engineScenesPath -Raw } else { "" }
+$rendererHeader = if (Test-Path $rendererHeaderPath) { Get-Content $rendererHeaderPath -Raw } else { "" }
+$frameContractJson = if (Test-Path $frameContractJsonPath) { Get-Content $frameContractJsonPath -Raw } else { "" }
+if ($rendererHeader -notmatch "SetWorldShaderPaletteContract") {
+    Add-Failure "Renderer.h missing SetWorldShaderPaletteContract"
+}
+if ($frameContractJson -notmatch "world_shader_palette_id" -or $frameContractJson -notmatch "lighting_script_id") {
+    Add-Failure "FrameContractJson.cpp missing world shader palette / lighting script fields"
+}
+
 $coveredModes = @{}
 $paletteById = @{}
 foreach ($palette in @($palettes.palettes)) {
@@ -33,6 +46,15 @@ foreach ($palette in @($palettes.palettes)) {
     if ([double]$palette.exposure -le 0.0) { Add-Failure "palette '$id' exposure must be positive" }
     if ([double]$palette.bloom_ceiling -le 0.0) { Add-Failure "palette '$id' bloom_ceiling must be positive" }
     if ([double]$palette.warm_cool_contrast -le 0.0) { Add-Failure "palette '$id' warm_cool_contrast must be positive" }
+    $lightingScript = [string]$palette.lighting_script
+    $expectedCall = "SetWorldShaderPaletteContract(`"$id`", `"$lightingScript`")"
+    if ($engineScenes -notmatch [regex]::Escape($expectedCall)) {
+        Add-Failure "scene runtime missing world palette contract call '$expectedCall'"
+    }
+    $exposureText = ([double]$palette.exposure).ToString("0.00", [Globalization.CultureInfo]::InvariantCulture)
+    if ($engineScenes -notmatch "SetExposure\($([regex]::Escape($exposureText))f\)") {
+        Add-Failure "scene runtime missing authored exposure $exposureText for palette '$id'"
+    }
 }
 
 foreach ($required in @($palettes.required_shader_modes)) {

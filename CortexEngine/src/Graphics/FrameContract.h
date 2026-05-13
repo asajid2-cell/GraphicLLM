@@ -233,6 +233,8 @@ struct FrameContract {
     struct LightingInfo {
         std::string rigId = "custom";
         std::string rigSource = "manual";
+        std::string worldShaderPaletteId = "default";
+        std::string lightingScriptId = "custom";
         bool safeRigOnLowVRAM = false;
         bool safeRigVariantActive = false;
         float exposure = 1.0f;

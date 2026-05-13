@@ -264,6 +264,8 @@ struct RendererLightingState {
     float ambientIntensity = 1.0f;
     std::string activeRigId = "custom";
     std::string activeRigSource = "manual";
+    std::string activeWorldShaderPaletteId = "default";
+    std::string activeLightingScriptId = "custom";
     bool useSafeRigOnLowVRAM = false;
     bool safeRigVariantActive = false;
     float areaLightSizeScale = 1.0f;

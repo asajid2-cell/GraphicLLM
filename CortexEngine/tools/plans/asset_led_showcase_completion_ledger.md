@@ -215,23 +215,36 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 
 ### ALS-005: Lighting Direction and Tinted World Shaders
 
-- Status: `PARTIAL`
+- Status: `DONE_VERIFIED`
 - Requirement: each public and new scene needs deliberate lighting and world shader direction, not generic white gallery light.
 - Source files/functions:
+  - `CortexEngine/assets/config/asset_led_world_palettes.json`
+  - `CortexEngine/src/Core/Engine_Scenes.cpp`: `Engine::BuildCoastalCliffFoundryScene`, `Engine::BuildRainGlassPavilionScene`, `Engine::BuildDesertRelicGalleryScene`, `Engine::BuildNeonAlleyMaterialMarketScene`, `Engine::BuildForestCreekShrineScene`.
+  - `CortexEngine/src/Graphics/Renderer.h`: `Renderer::SetWorldShaderPaletteContract`
+  - `CortexEngine/src/Graphics/Renderer_LightingSettings.cpp`: `Renderer::SetWorldShaderPaletteContract`
+  - `CortexEngine/src/Graphics/Renderer_DiagnosticsTypes.h`: `RendererLightingState`
+  - `CortexEngine/src/Graphics/FrameContract.h`: `FrameContract::LightingInfo`
+  - `CortexEngine/src/Graphics/FrameContractJson.cpp`
+  - `CortexEngine/src/Graphics/Renderer_FrameContractSnapshot.cpp`
+  - `CortexEngine/src/Graphics/FrameContractValidation.cpp`
   - `CortexEngine/src/Graphics/RendererControlApplier_ScenePresets.cpp`
   - `CortexEngine/src/Graphics/Renderer_Environment.cpp`
-  - `CortexEngine/src/Graphics/Renderer_FrameContract.cpp`
   - `CortexEngine/assets/config/graphics_presets.json`
   - `CortexEngine/assets/config/showcase_scenes.json`
   - `CortexEngine/assets/shaders/ForwardPass.hlsl`
   - `CortexEngine/assets/shaders/MaterialResolve.hlsl`
   - `CortexEngine/assets/shaders/RaytracingMaterials.hlsli`
-  - New: `CortexEngine/tools/run_world_shader_contract_tests.ps1`
-- Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1`
-- Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1` passed with `palettes=5 modes=9`.
-- Remaining work:
-  - Implement shader/runtime use of the authored world palettes.
-  - Add frame-contract reporting for active world shader palette and lighting script id.
+  - `CortexEngine/tools/run_world_shader_contract_tests.ps1`
+  - `CortexEngine/tools/run_asset_led_scene_contract_tests.ps1`
+- Validation commands:
+  - `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Evidence:
+  - Release target rebuilt successfully after frame-contract and scene-control changes.
+  - `run_world_shader_contract_tests.ps1` passed with `palettes=5 modes=9`; it now requires `SetWorldShaderPaletteContract`, frame-contract JSON fields, per-palette runtime contract calls, and authored scene exposure values.
+  - `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed with `scenes=5`; runtime smoke now compares each scene report's `frame_contract.lighting.world_shader_palette_id` and `lighting_script_id` against `asset_led_world_palettes.json`.
+- Remaining work: none for palette/script reporting and scene runtime use. Further lighting art direction remains scene-specific polish under ALS-006 through ALS-014.
 
 ### ALS-006: Coastal Cliff Foundry Scene
 

@@ -252,6 +252,12 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.lighting.rigSource.empty()) {
         warn("lighting_rig_source_missing");
     }
+    if (contract.lighting.worldShaderPaletteId.empty()) {
+        warn("lighting_world_shader_palette_missing");
+    }
+    if (contract.lighting.lightingScriptId.empty()) {
+        warn("lighting_script_id_missing");
+    }
     if (contract.lighting.safeRigVariantActive && contract.lighting.rigId == "custom") {
         warn("lighting_safe_variant_active_for_custom_rig");
     }

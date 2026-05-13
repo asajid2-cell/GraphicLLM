@@ -200,6 +200,8 @@ json FrameContractToJson(const FrameContract& contract) {
         {"lighting", {
             {"rig_id", contract.lighting.rigId},
             {"rig_source", contract.lighting.rigSource},
+            {"world_shader_palette_id", contract.lighting.worldShaderPaletteId},
+            {"lighting_script_id", contract.lighting.lightingScriptId},
             {"safe_rig_on_low_vram", contract.lighting.safeRigOnLowVRAM},
             {"safe_rig_variant_active", contract.lighting.safeRigVariantActive},
             {"exposure", contract.lighting.exposure},

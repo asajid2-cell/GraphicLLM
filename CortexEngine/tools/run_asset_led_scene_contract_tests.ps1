@@ -14,6 +14,7 @@ $enginePath = Join-Path $root "src/Core/Engine.cpp"
 $engineCameraPath = Join-Path $root "src/Core/Engine_Camera.cpp"
 $engineScenesPath = Join-Path $root "src/Core/Engine_Scenes.cpp"
 $runtimeLayoutContractsPath = Join-Path $root "assets/scenes/hand_authored/runtime_layout_contracts.json"
+$worldPalettePath = Join-Path $root "assets/config/asset_led_world_palettes.json"
 $requiredScenes = @(
     "coastal_cliff_foundry",
     "rain_glass_pavilion",
@@ -54,6 +55,15 @@ if (Test-Path $runtimeLayoutContractsPath) {
     }
 } else {
     Add-Failure "runtime layout contracts missing: $runtimeLayoutContractsPath"
+}
+$paletteByScene = @{}
+if (Test-Path $worldPalettePath) {
+    $worldPalettes = Get-Content $worldPalettePath -Raw | ConvertFrom-Json
+    foreach ($palette in @($worldPalettes.palettes)) {
+        $paletteByScene[[string]$palette.scene] = $palette
+    }
+} else {
+    Add-Failure "world palette manifest missing: $worldPalettePath"
 }
 
 foreach ($scene in $requiredScenes) {
@@ -140,6 +150,18 @@ if ($failures.Count -eq 0) {
                 $json = Get-Content $report -Raw | ConvertFrom-Json
                 if ([string]$json.scene -ne $scene) {
                     Add-Failure "$scene runtime report scene was '$($json.scene)'"
+                }
+                if ($paletteByScene.ContainsKey($scene)) {
+                    $expectedPalette = [string]$paletteByScene[$scene].id
+                    $expectedScript = [string]$paletteByScene[$scene].lighting_script
+                    $actualPalette = [string]$json.frame_contract.lighting.world_shader_palette_id
+                    $actualScript = [string]$json.frame_contract.lighting.lighting_script_id
+                    if ($actualPalette -ne $expectedPalette) {
+                        Add-Failure "$scene runtime world palette '$actualPalette', expected '$expectedPalette'"
+                    }
+                    if ($actualScript -ne $expectedScript) {
+                        Add-Failure "$scene runtime lighting script '$actualScript', expected '$expectedScript'"
+                    }
                 }
                 if ($layoutById.ContainsKey($scene)) {
                     $minRenderables = [int]$layoutById[$scene].min_runtime_renderables

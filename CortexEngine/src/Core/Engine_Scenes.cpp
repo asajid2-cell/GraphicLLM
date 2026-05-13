@@ -4589,6 +4589,7 @@ void Engine::BuildCoastalCliffFoundryScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("coastal_foundry_dusk", "scene_preset", false);
+        renderer->SetWorldShaderPaletteContract("coastal_foundry_dusk", "coastal_foundry_dusk");
         renderer->SetEnvironmentPreset("sunset_courtyard");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.72f, 0.98f);
@@ -4677,6 +4678,7 @@ void Engine::BuildRainGlassPavilionScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("rain_pavilion_night", "scene_preset", false);
+        renderer->SetWorldShaderPaletteContract("rain_pavilion_night", "rain_pavilion_night");
         renderer->SetEnvironmentPreset("night_city");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.65f, 1.35f);
@@ -4755,6 +4757,7 @@ void Engine::BuildDesertRelicGalleryScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("desert_relic_sun", "scene_preset", false);
+        renderer->SetWorldShaderPaletteContract("desert_relic_sun", "desert_relic_sun");
         renderer->SetEnvironmentPreset("sunset_courtyard");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.82f, 0.78f);
@@ -4833,6 +4836,7 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("neon_market_rain", "scene_preset", false);
+        renderer->SetWorldShaderPaletteContract("neon_market_rain", "neon_market_rain");
         renderer->SetEnvironmentPreset("night_city");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.45f, 1.25f);
@@ -4911,6 +4915,7 @@ void Engine::BuildForestCreekShrineScene() {
     auto* renderer = m_renderer.get();
     if (renderer) {
         renderer->SetLightingRigContract("forest_creek_mist", "scene_preset", false);
+        renderer->SetWorldShaderPaletteContract("forest_creek_mist", "forest_creek_mist");
         renderer->SetEnvironmentPreset("cool_overcast");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.72f, 0.82f);
@@ -4918,7 +4923,7 @@ void Engine::BuildForestCreekShrineScene() {
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.25f, 0.80f, 0.36f)));
         renderer->SetSunColor(glm::vec3(0.72f, 0.88f, 0.62f));
         renderer->SetSunIntensity(1.25f);
-        renderer->SetExposure(0.70f);
+        renderer->SetExposure(0.86f);
         renderer->SetBloomIntensity(0.08f);
         renderer->SetTAAEnabled(true);
         renderer->SetFXAAEnabled(true);

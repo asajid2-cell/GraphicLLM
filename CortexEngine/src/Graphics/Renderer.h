@@ -188,6 +188,7 @@ public:
 
     void ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry);
     void SetLightingRigContract(std::string rigId, std::string source, bool safeVariantActive);
+    void SetWorldShaderPaletteContract(std::string paletteId, std::string lightingScriptId);
     // Image-based lighting / environment controls
     void SetEnvironmentPreset(const std::string& name);
     // Manually load a limited number of deferred environment maps from disk

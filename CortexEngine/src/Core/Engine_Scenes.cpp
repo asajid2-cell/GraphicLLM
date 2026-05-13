@@ -4885,10 +4885,12 @@ void Engine::BuildDesertRelicGalleryScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-3.10f, 1.52f, -5.10f), glm::vec3(0.08f, 0.76f, 0.48f), 42.0f, 180.0f);
+        glm::vec3(-2.55f, 1.16f, -3.45f), glm::vec3(0.04f, 0.64f, 0.02f), 35.0f, 180.0f);
 
     const AssetLedMaterialSettings stone{glm::vec4(0.64f, 0.58f, 0.46f, 1.0f), 0.0f, 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.62f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
     const AssetLedMaterialSettings shadowStone{glm::vec4(0.34f, 0.30f, 0.24f, 1.0f), 0.0f, 0.82f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.72f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
+    const AssetLedMaterialSettings warmStone{glm::vec4(0.70f, 0.52f, 0.30f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.66f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
+    const AssetLedMaterialSettings tileBlue{glm::vec4(0.12f, 0.33f, 0.40f, 1.0f), 0.0f, 0.36f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.06f, 0.28f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "stained_tile"};
     const AssetLedMaterialSettings sand{glm::vec4(0.80f, 0.64f, 0.40f, 1.0f), 0.0f, 0.88f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.46f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "sand"};
     const AssetLedMaterialSettings dryBrush{glm::vec4(0.34f, 0.24f, 0.15f, 1.0f), 0.0f, 0.76f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.35f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
     const AssetLedMaterialSettings bronze{glm::vec4(0.76f, 0.46f, 0.22f, 1.0f), 0.88f, 0.24f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.28f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "brushed_metal"};
@@ -4901,11 +4903,21 @@ void Engine::BuildDesertRelicGalleryScene() {
     AddAssetLedRenderable(*m_registry, "DesertRelic_LeftRuinReturn", cubeMesh, glm::vec3(-5.7f, 1.0f, 1.2f), glm::vec3(0.35f, 2.0f, 5.5f), glm::vec3(0.0f, glm::radians(7.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_RightRuinReturn", cubeMesh, glm::vec3(5.7f, 0.85f, 1.4f), glm::vec3(0.30f, 1.7f, 4.8f), glm::vec3(0.0f, glm::radians(-7.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_MainPlinth", cubeMesh, glm::vec3(0.0f, 0.30f, 0.0f), glm::vec3(2.2f, 0.60f, 1.2f), glm::vec3(0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepFront", cubeMesh, glm::vec3(0.0f, 0.12f, -0.98f), glm::vec3(2.75f, 0.24f, 0.36f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepFront", cubeMesh, glm::vec3(0.0f, 0.12f, -0.98f), glm::vec3(2.75f, 0.24f, 0.36f), glm::vec3(0.0f), warmStone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepRear", cubeMesh, glm::vec3(0.0f, 0.18f, 0.88f), glm::vec3(2.45f, 0.26f, 0.28f), glm::vec3(0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthCreviceA", cubeMesh, glm::vec3(-0.52f, 0.615f, -0.18f), glm::vec3(0.035f, 0.025f, 0.96f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), shadowStone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthCreviceB", cubeMesh, glm::vec3(0.72f, 0.618f, 0.20f), glm::vec3(0.030f, 0.025f, 0.72f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), shadowStone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthEdgeShadow", cubeMesh, glm::vec3(0.0f, 0.622f, -0.58f), glm::vec3(1.72f, 0.022f, 0.035f), glm::vec3(0.0f), shadowStone);
+    for (int i = 0; i < 7; ++i) {
+        const float x = -0.92f + static_cast<float>(i) * 0.28f;
+        const AssetLedMaterialSettings& tileMat = (i % 3 == 1) ? warmStone : tileBlue;
+        AddAssetLedRenderable(*m_registry, "DesertRelic_FrontMosaicBand", cubeMesh, glm::vec3(x, 0.38f, -0.622f), glm::vec3(0.18f, 0.095f, 0.025f), glm::vec3(0.0f), tileMat);
+    }
+    for (int i = 0; i < 6; ++i) {
+        const float x = -0.94f + static_cast<float>(i) * 0.32f;
+        const AssetLedMaterialSettings& chipMat = (i % 2 == 0) ? warmStone : shadowStone;
+        AddAssetLedRenderable(*m_registry, "DesertRelic_FrontStoneChip", cubeMesh, glm::vec3(x, 0.64f, -0.56f), glm::vec3(0.11f, 0.035f, 0.045f), glm::vec3(0.0f, glm::radians(static_cast<float>(i) * 9.0f), 0.0f), chipMat);
+    }
     AddAssetLedRenderable(*m_registry, "DesertRelic_LeftBrokenBlock", cubeMesh, glm::vec3(-1.55f, 0.18f, 0.58f), glm::vec3(0.74f, 0.36f, 0.46f), glm::vec3(0.0f, glm::radians(16.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_RightBrokenBlock", cubeMesh, glm::vec3(1.55f, 0.16f, -0.65f), glm::vec3(0.62f, 0.32f, 0.42f), glm::vec3(0.0f, glm::radians(-20.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_BronzeRing", torusMesh, glm::vec3(0.15f, 0.95f, 0.0f), glm::vec3(0.82f), glm::vec3(glm::radians(74.0f), glm::radians(18.0f), 0.0f), bronze);
@@ -4923,9 +4935,10 @@ void Engine::BuildDesertRelicGalleryScene() {
     AddAssetLedRenderable(*m_registry, "DesertRelic_RightFallenColumn", cylinderMesh, glm::vec3(2.34f, 0.23f, -0.18f), glm::vec3(0.24f, 1.36f, 0.24f), glm::vec3(glm::radians(86.0f), glm::radians(-24.0f), glm::radians(0.0f)), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_BackBrokenWallLeft", cubeMesh, glm::vec3(-2.45f, 0.80f, 1.45f), glm::vec3(1.25f, 1.6f, 0.32f), glm::vec3(0.0f, glm::radians(10.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_BackBrokenWallRight", cubeMesh, glm::vec3(2.45f, 0.70f, 1.58f), glm::vec3(1.1f, 1.4f, 0.30f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighRuinLeft", cubeMesh, glm::vec3(-2.95f, 1.72f, 2.92f), glm::vec3(1.75f, 2.35f, 0.32f), glm::vec3(0.0f, glm::radians(7.0f), glm::radians(-3.0f)), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighRuinRight", cubeMesh, glm::vec3(2.95f, 1.58f, 2.88f), glm::vec3(1.6f, 2.05f, 0.30f), glm::vec3(0.0f, glm::radians(-7.0f), glm::radians(4.0f)), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighLintel", cubeMesh, glm::vec3(0.05f, 2.72f, 2.96f), glm::vec3(4.2f, 0.34f, 0.34f), glm::vec3(0.0f, glm::radians(1.5f), glm::radians(2.0f)), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighRuinLeft", cubeMesh, glm::vec3(-2.95f, 1.42f, 2.92f), glm::vec3(1.22f, 1.72f, 0.28f), glm::vec3(0.0f, glm::radians(7.0f), glm::radians(-3.0f)), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighRuinRight", cubeMesh, glm::vec3(2.95f, 1.30f, 2.88f), glm::vec3(1.12f, 1.48f, 0.28f), glm::vec3(0.0f, glm::radians(-7.0f), glm::radians(4.0f)), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighLintel", cubeMesh, glm::vec3(-0.78f, 1.88f, 2.96f), glm::vec3(1.70f, 0.18f, 0.30f), glm::vec3(0.0f, glm::radians(1.5f), glm::radians(2.0f)), warmStone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackHighLintelBrokenRight", cubeMesh, glm::vec3(1.72f, 1.66f, 2.92f), glm::vec3(0.70f, 0.15f, 0.28f), glm::vec3(0.0f, glm::radians(-5.0f), glm::radians(-4.0f)), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_LeftShadowAlcove", cubeMesh, glm::vec3(-3.55f, 0.88f, 0.35f), glm::vec3(0.36f, 1.75f, 1.55f), glm::vec3(0.0f, glm::radians(14.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_RightShadowAlcove", cubeMesh, glm::vec3(3.46f, 0.82f, 0.18f), glm::vec3(0.34f, 1.62f, 1.48f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), stone);
     for (int i = 0; i < 3; ++i) {
@@ -4933,16 +4946,17 @@ void Engine::BuildDesertRelicGalleryScene() {
         AddAssetLedRenderable(*m_registry, "DesertRelic_ArchColumn", cubeMesh, glm::vec3(x, 1.0f, 2.2f), glm::vec3(0.36f, 2.0f, 0.42f), glm::vec3(0.0f), stone);
         AddAssetLedRenderable(*m_registry, "DesertRelic_RoundColumnCore", cylinderMesh, glm::vec3(x, 1.05f, 2.0f), glm::vec3(0.34f, 2.05f, 0.34f), glm::vec3(0.0f), stone);
     }
-    AddAssetLedRenderable(*m_registry, "DesertRelic_ArchLintel", cubeMesh, glm::vec3(0.0f, 2.08f, 2.2f), glm::vec3(6.9f, 0.32f, 0.45f), glm::vec3(0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BrokenArchCapLeft", cubeMesh, glm::vec3(-2.55f, 2.38f, 2.15f), glm::vec3(1.25f, 0.22f, 0.50f), glm::vec3(0.0f, glm::radians(-7.0f), 0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BrokenArchCapRight", cubeMesh, glm::vec3(2.55f, 2.30f, 2.15f), glm::vec3(1.05f, 0.20f, 0.48f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_ArchLintel", cubeMesh, glm::vec3(0.0f, 1.78f, 2.2f), glm::vec3(4.55f, 0.18f, 0.36f), glm::vec3(0.0f), warmStone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BrokenArchCapLeft", cubeMesh, glm::vec3(-2.42f, 1.98f, 2.15f), glm::vec3(0.92f, 0.18f, 0.46f), glm::vec3(0.0f, glm::radians(-7.0f), 0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BrokenArchCapRight", cubeMesh, glm::vec3(2.36f, 1.90f, 2.15f), glm::vec3(0.82f, 0.17f, 0.44f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_DistantSpireLeft", coneMesh, glm::vec3(-4.6f, 1.62f, 3.3f), glm::vec3(0.55f, 1.35f, 0.55f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_DistantSpireRight", coneMesh, glm::vec3(4.45f, 1.35f, 3.45f), glm::vec3(0.42f, 1.05f, 0.42f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_BackWallLow", cubeMesh, glm::vec3(0.0f, 0.62f, 2.55f), glm::vec3(7.2f, 1.05f, 0.22f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_BackWallLow", cubeMesh, glm::vec3(0.0f, 0.48f, 2.55f), glm::vec3(6.2f, 0.74f, 0.20f), glm::vec3(0.0f), shadowStone);
     if (boulderMesh && boulderMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "DesertRelic_GroundedBoulderClusterLeft", "boulder_01", boulderMesh, glm::vec3(-2.15f, 0.05f, -1.12f), glm::vec3(0.26f), glm::vec3(0.0f, glm::radians(34.0f), 0.0f), stone);
         AddAssetLedNaturalisticRenderable(*m_registry, "DesertRelic_GroundedBoulderClusterRight", "boulder_01", boulderMesh, glm::vec3(2.16f, 0.04f, 0.95f), glm::vec3(0.22f), glm::vec3(0.0f, glm::radians(-42.0f), 0.0f), stone);
         AddAssetLedNaturalisticRenderable(*m_registry, "DesertRelic_ForegroundStoneScatter", "boulder_01", boulderMesh, glm::vec3(-1.42f, 0.02f, -1.42f), glm::vec3(0.11f), glm::vec3(0.0f, glm::radians(70.0f), 0.0f), stone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "DesertRelic_PlinthStoneAnchor", "boulder_01", boulderMesh, glm::vec3(1.36f, 0.08f, -0.72f), glm::vec3(0.24f), glm::vec3(0.0f, glm::radians(8.0f), glm::radians(-5.0f)), stone);
     }
     if (branchMesh && branchMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "DesertRelic_DryBrushCluster", "dry_branches_medium_01", branchMesh, glm::vec3(-2.72f, 0.08f, 0.42f), glm::vec3(0.42f), glm::vec3(glm::radians(2.0f), glm::radians(28.0f), glm::radians(-4.0f)), dryBrush);

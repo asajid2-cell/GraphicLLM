@@ -302,6 +302,50 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Desert Relic Focal-Read Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/desert_review11_relic_focus/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/desert_review12_tile_breakup/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/desert_review13_lintel_grounding/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the desert relic gallery remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Tightened the hero camera around the relic/plinth so the ring, glass inlay, vessels, tile detail, sand, and scanned stones carry more of the frame.
+- Reduced high ruin/lintel massing and lowered broken cap pieces to avoid the worst disconnected geometry.
+- Replaced the single solid blue plinth strip with individual mosaic tile blocks.
+- Added front stone chips, warmer stone variation, and a scanned `DesertRelic_PlinthStoneAnchor`.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `desert_review13_lintel_grounding` rendered 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=8.181`, `avg_luma=130.359`, `rt_reflection_signal_avg_luma=0.01525`, and `rt_reflection_history_signal_avg_luma=0.01523`.
+- Texture uploads in `desert_review13_lintel_grounding` completed with `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The relic and material accents are more readable than `desert_review10`.
+- The blue accent now reads as tiles instead of one huge flat stripe.
+- The scene still has public-release blockers: the upper caps/lintels remain primitive, the right wall is a flat slab, the foreground planks still dominate, and the overall architecture still reads as blockout rather than authored ruin geometry.
+
+Decision:
+
+- Do not publish the desert captures.
+- Keep `ALS-008` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Segmented-Screen Checkpoint
 
 Commands:

@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "purpose": "Licensed naturalistic runtime assets used by Cortex public showcase scenes.",
+  "policy": {
+    "normal_startup_downloads": false,
+    "license_required": "CC0",
+    "source": "Poly Haven",
+    "source_license_url": "https://polyhaven.com/license",
+    "api_url": "https://api.polyhaven.com",
+    "runtime_resolution": "1k",
+    "max_total_bytes": 52428800,
+    "max_single_asset_bytes": 8388608,
+    "notes": "The current Cortex glTF loader imports geometry only. Textures are kept with the assets for policy/source completeness and future PBR material hookup."
+  },
+  "assets": [
+    {
+      "id": "boulder_01",
+      "display_name": "Boulder 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/boulder_01",
+      "runtime_gltf": "boulder_01/boulder_01_1k.gltf",
+      "expected_polycount": 123976,
+      "budget_class": "hero_natural",
+      "scene_uses": ["outdoor_sunset_beach"],
+      "tags": ["coastal", "rock", "scan"]
+    },
+    {
+      "id": "dead_tree_trunk",
+      "display_name": "Dead Tree Trunk",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/dead_tree_trunk",
+      "runtime_gltf": "dead_tree_trunk/dead_tree_trunk_1k.gltf",
+      "expected_polycount": 101802,
+      "budget_class": "hero_natural",
+      "scene_uses": ["outdoor_sunset_beach"],
+      "tags": ["driftwood", "trunk", "scan"]
+    },
+    {
+      "id": "dry_branches_medium_01",
+      "display_name": "Dry Branches Medium 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/dry_branches_medium_01",
+      "runtime_gltf": "dry_branches_medium_01/dry_branches_medium_01_1k.gltf",
+      "expected_polycount": 16803,
+      "budget_class": "detail_natural",
+      "scene_uses": ["outdoor_sunset_beach"],
+      "tags": ["branches", "debris", "scan"]
+    },
+    {
+      "id": "fern_02",
+      "display_name": "Fern 02",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/fern_02",
+      "runtime_gltf": "fern_02/fern_02_1k.gltf",
+      "expected_polycount": 6232,
+      "budget_class": "detail_natural",
+      "scene_uses": ["outdoor_sunset_beach", "material_lab"],
+      "tags": ["plant", "vegetation", "scan"]
+    },
+    {
+      "id": "grass_bermuda_01",
+      "display_name": "Grass Bermuda 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/grass_bermuda_01",
+      "runtime_gltf": "grass_bermuda_01/grass_bermuda_01_1k.gltf",
+      "expected_polycount": 223596,
+      "budget_class": "hero_natural",
+      "scene_uses": ["outdoor_sunset_beach"],
+      "tags": ["grass", "vegetation", "scan"]
+    },
+    {
+      "id": "Lantern_01",
+      "display_name": "Lantern 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/Lantern_01",
+      "runtime_gltf": "Lantern_01/Lantern_01_1k.gltf",
+      "expected_polycount": 33902,
+      "budget_class": "detail_prop",
+      "scene_uses": ["material_lab", "effects_showcase"],
+      "tags": ["prop", "metal", "glass"]
+    },
+    {
+      "id": "WoodenTable_01",
+      "display_name": "Wooden Table 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/WoodenTable_01",
+      "runtime_gltf": "WoodenTable_01/WoodenTable_01_1k.gltf",
+      "expected_polycount": 952,
+      "budget_class": "detail_prop",
+      "scene_uses": ["material_lab"],
+      "tags": ["prop", "wood", "interior"]
+    },
+    {
+      "id": "Barrel_01",
+      "display_name": "Barrel 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/Barrel_01",
+      "runtime_gltf": "Barrel_01/Barrel_01_1k.gltf",
+      "expected_polycount": 2682,
+      "budget_class": "detail_prop",
+      "scene_uses": ["effects_showcase"],
+      "tags": ["prop", "industrial", "metal"]
+    }
+  ]
+}

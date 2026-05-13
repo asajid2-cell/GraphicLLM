@@ -162,8 +162,8 @@
         {
           "id": "waterline",
           "label": "Beach waterline and palms",
-          "position": [-4.6, 1.25, -3.9],
-          "target": [0.0, 0.18, 2.6],
+          "position": [2.45, 1.18, -4.65],
+          "target": [3.65, 0.22, 0.62],
           "fov": 42.0,
           "validation": false
         }

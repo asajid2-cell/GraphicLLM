@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 
 namespace Cortex {
 
@@ -50,6 +51,40 @@ namespace {
         }
         emitter.defaultEffectPresetId = emitter.effectPresetId;
         registry.AddComponent<Scene::ParticleEmitterComponent>(e, emitter);
+    }
+
+    std::shared_ptr<Scene::MeshData> LoadNaturalisticShowcaseMesh(const char* relativeGltf) {
+        namespace fs = std::filesystem;
+        const fs::path rel = fs::path("assets") / "models" / "naturalistic_showcase" / relativeGltf;
+        std::vector<fs::path> candidates;
+
+        fs::path cwd;
+        try {
+            cwd = fs::current_path();
+        } catch (...) {
+            cwd = fs::path(".");
+        }
+
+        candidates.push_back(cwd / rel);
+        candidates.push_back(cwd / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / rel);
+        candidates.push_back(cwd / ".." / ".." / ".." / "CortexEngine" / rel);
+
+        for (const auto& candidate : candidates) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec)) {
+                continue;
+            }
+            auto result = Utils::LoadGLTFMesh(candidate.string());
+            if (result.IsOk()) {
+                spdlog::info("Loaded naturalistic showcase mesh '{}'", candidate.string());
+                return result.Value();
+            }
+            spdlog::warn("Failed to load naturalistic showcase mesh '{}': {}", candidate.string(), result.Error());
+        }
+
+        spdlog::warn("Naturalistic showcase mesh not found: {}", relativeGltf);
+        return nullptr;
     }
 }
 
@@ -742,6 +777,9 @@ void Engine::BuildMaterialLabScene() {
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.32f, 1.3f, 32);
     auto torusMesh = Utils::MeshGenerator::CreateTorus(0.52f, 0.16f, 32, 16);
+    auto scannedLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
+    auto scannedTableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
+    auto scannedFernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -763,7 +801,10 @@ void Engine::BuildMaterialLabScene() {
             !uploadMesh(sphereMesh, "sphere") ||
             !uploadMesh(cubeMesh, "cube") ||
             !uploadMesh(cylinderMesh, "cylinder") ||
-            !uploadMesh(torusMesh, "torus")) {
+            !uploadMesh(torusMesh, "torus") ||
+            !uploadMesh(scannedLanternMesh, "naturalistic Lantern_01") ||
+            !uploadMesh(scannedTableMesh, "naturalistic WoodenTable_01") ||
+            !uploadMesh(scannedFernMesh, "naturalistic fern_02")) {
             return;
         }
     }
@@ -888,6 +929,40 @@ void Engine::BuildMaterialLabScene() {
             r.emissiveColor = glm::vec3(1.0f, 0.58f, 0.22f);
             r.emissiveStrength = 3.4f;
             r.emissiveBloomFactor = 0.6f;
+        }
+    }
+
+    if (scannedTableMesh && scannedTableMesh->gpuBuffers) {
+        addRenderable("MaterialLab_ScannedWoodenTable", scannedTableMesh,
+                      glm::vec3(4.75f, 0.10f, -0.25f),
+                      glm::vec3(1.08f),
+                      glm::vec3(0.0f, -0.58f, 0.0f),
+                      glm::vec4(0.43f, 0.25f, 0.12f, 1.0f),
+                      0.0f, 0.62f, "wood");
+    }
+
+    if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
+        auto lantern = addRenderable("MaterialLab_ScannedLantern", scannedLanternMesh,
+                                     glm::vec3(4.70f, 0.75f, -0.25f),
+                                     glm::vec3(2.85f),
+                                     glm::vec3(0.0f, -0.35f, 0.0f),
+                                     glm::vec4(0.78f, 0.55f, 0.30f, 1.0f),
+                                     1.0f, 0.24f, "brushed_metal");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(lantern);
+        r.clearcoatFactor = 0.35f;
+        r.specularFactor = 1.22f;
+    }
+
+    if (scannedFernMesh && scannedFernMesh->gpuBuffers) {
+        for (int i = 0; i < 2; ++i) {
+            auto fern = addRenderable(("MaterialLab_ScannedFern_" + std::to_string(i)).c_str(),
+                                      scannedFernMesh,
+                                      glm::vec3(3.78f + 1.72f * static_cast<float>(i), 0.08f, 0.85f),
+                                      glm::vec3(0.72f),
+                                      glm::vec3(0.0f, 0.45f - 0.8f * static_cast<float>(i), 0.0f),
+                                      glm::vec4(0.08f, 0.28f, 0.12f, 1.0f),
+                                      0.0f, 0.58f, "wood");
+            m_registry->GetComponent<Scene::RenderableComponent>(fern).doubleSided = true;
         }
     }
 
@@ -1311,6 +1386,11 @@ void Engine::BuildOutdoorSunsetBeachScene() {
     auto trunkMesh = Utils::MeshGenerator::CreateCylinder(0.18f, 3.2f, 18);
     auto coneMesh = Utils::MeshGenerator::CreateCone(0.5f, 1.0f, 32);
     auto leafMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+    auto scannedBoulderMesh = LoadNaturalisticShowcaseMesh("boulder_01/boulder_01_1k.gltf");
+    auto scannedTrunkMesh = LoadNaturalisticShowcaseMesh("dead_tree_trunk/dead_tree_trunk_1k.gltf");
+    auto scannedBranchesMesh = LoadNaturalisticShowcaseMesh("dry_branches_medium_01/dry_branches_medium_01_1k.gltf");
+    auto scannedFernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
+    auto scannedGrassMesh = LoadNaturalisticShowcaseMesh("grass_bermuda_01/grass_bermuda_01_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -1333,7 +1413,12 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             !uploadMesh(sphereMesh, "sphere") ||
             !uploadMesh(trunkMesh, "trunk") ||
             !uploadMesh(coneMesh, "cone") ||
-            !uploadMesh(leafMesh, "leaf")) {
+            !uploadMesh(leafMesh, "leaf") ||
+            !uploadMesh(scannedBoulderMesh, "naturalistic boulder_01") ||
+            !uploadMesh(scannedTrunkMesh, "naturalistic dead_tree_trunk") ||
+            !uploadMesh(scannedBranchesMesh, "naturalistic dry_branches_medium_01") ||
+            !uploadMesh(scannedFernMesh, "naturalistic fern_02") ||
+            !uploadMesh(scannedGrassMesh, "naturalistic grass_bermuda_01")) {
             return;
         }
     }
@@ -1384,7 +1469,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                   glm::vec3(0.0f, 0.0f, -2.55f),
                                   glm::vec3(1.0f),
                                   glm::vec3(0.0f),
-                                  glm::vec4(0.49f, 0.39f, 0.25f, 1.0f),
+                                  glm::vec4(0.39f, 0.32f, 0.22f, 1.0f),
                                   0.0f, 0.86f, "concrete");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(sand);
         r.doubleSided = true;
@@ -1412,18 +1497,18 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                  glm::vec3(0.0f, 6.0f, 7.85f),
                                  glm::vec3(500.0f, 18.0f, 1.0f),
                                  glm::vec3(0.0f),
-                                 glm::vec4(0.36f, 0.48f, 0.63f, 1.0f),
+                                 glm::vec4(0.28f, 0.40f, 0.56f, 1.0f),
                                  0.0f, 0.92f, "emissive_panel");
         auto& skyR = m_registry->GetComponent<Scene::RenderableComponent>(sky);
         skyR.doubleSided = true;
-        skyR.emissiveColor = glm::vec3(0.24f, 0.34f, 0.50f);
-        skyR.emissiveStrength = 0.12f;
+        skyR.emissiveColor = glm::vec3(0.18f, 0.28f, 0.42f);
+        skyR.emissiveStrength = 0.08f;
 
         auto horizon = addRenderable("OutdoorBeach_OceanHorizon", leafMesh,
                                      glm::vec3(0.0f, 0.82f, 7.78f),
                                      glm::vec3(500.0f, 1.42f, 1.0f),
                                      glm::vec3(0.0f),
-                                     glm::vec4(0.06f, 0.30f, 0.54f, 1.0f),
+                                     glm::vec4(0.04f, 0.24f, 0.43f, 1.0f),
                                      0.0f, 0.34f, "emissive_panel");
         auto& horizonR = m_registry->GetComponent<Scene::RenderableComponent>(horizon);
         horizonR.doubleSided = true;
@@ -1468,8 +1553,8 @@ void Engine::BuildOutdoorSunsetBeachScene() {
             glm::vec3 scale;
             float yaw;
         } logs[] = {
-            {glm::vec3(-2.9f, 0.12f, -1.55f), glm::vec3(1.45f, 0.10f, 0.14f), 0.25f},
-            {glm::vec3( 2.7f, 0.10f, -1.05f), glm::vec3(1.10f, 0.09f, 0.13f), -0.38f}
+            {glm::vec3(-4.05f, 0.045f, -1.72f), glm::vec3(0.42f, 0.035f, 0.060f), 0.25f},
+            {glm::vec3( 1.35f, 0.045f, -1.34f), glm::vec3(0.36f, 0.032f, 0.055f), -0.38f}
         };
         for (int i = 0; i < 2; ++i) {
             addRenderable("OutdoorBeach_Driftwood_" + std::to_string(i), cubeMesh,
@@ -1503,18 +1588,18 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         }
 
         for (int i = 0; i < 11; ++i) {
-            const float x = -2.7f + static_cast<float>(i) * 0.72f;
+            const float x = -7.15f + static_cast<float>(i) * 0.54f;
             addRenderable("OutdoorBeach_DuneFence_Post_" + std::to_string(i), cubeMesh,
-                          glm::vec3(x, 0.38f, -2.92f + 0.04f * static_cast<float>(i % 2)),
-                          glm::vec3(0.060f, 0.46f, 0.060f),
+                          glm::vec3(x, 0.27f, -3.95f + 0.04f * static_cast<float>(i % 2)),
+                          glm::vec3(0.052f, 0.31f, 0.052f),
                           glm::vec3(0.0f, 0.10f, 0.04f),
                           glm::vec4(0.34f, 0.20f, 0.10f, 1.0f),
                           0.0f, 0.70f, "wood");
         }
         for (int i = 0; i < 2; ++i) {
             addRenderable("OutdoorBeach_DuneFence_Rail_" + std::to_string(i), cubeMesh,
-                          glm::vec3(0.15f, 0.36f + 0.18f * static_cast<float>(i), -2.92f),
-                          glm::vec3(4.05f, 0.040f, 0.050f),
+                          glm::vec3(-4.55f, 0.25f + 0.13f * static_cast<float>(i), -3.95f),
+                          glm::vec3(3.10f, 0.034f, 0.046f),
                           glm::vec3(0.0f, 0.03f, 0.0f),
                           glm::vec4(0.40f, 0.25f, 0.13f, 1.0f),
                           0.0f, 0.66f, "wood");
@@ -1608,6 +1693,108 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                           glm::vec3(0.0f, 0.37f * static_cast<float>(i), 0.0f),
                           rocks[i].color,
                           0.0f, 0.68f, "stone");
+        }
+    }
+
+    if (scannedBoulderMesh && scannedBoulderMesh->gpuBuffers) {
+        const struct NaturalBoulder {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+            glm::vec4 color;
+        } boulders[] = {
+            {glm::vec3(-6.15f, 0.02f, 0.36f), glm::vec3(0.38f), -0.55f, glm::vec4(0.35f, 0.32f, 0.28f, 1.0f)},
+            {glm::vec3(-5.32f, 0.02f, 0.82f), glm::vec3(0.24f), 0.32f, glm::vec4(0.41f, 0.37f, 0.31f, 1.0f)},
+            {glm::vec3( 5.10f, 0.02f, 0.48f), glm::vec3(0.42f), 0.72f, glm::vec4(0.34f, 0.31f, 0.27f, 1.0f)},
+            {glm::vec3( 6.12f, 0.02f, 0.72f), glm::vec3(0.26f), -0.18f, glm::vec4(0.43f, 0.38f, 0.31f, 1.0f)}
+        };
+        for (int i = 0; i < 4; ++i) {
+            addRenderable("OutdoorBeach_ScannedBoulder_" + std::to_string(i), scannedBoulderMesh,
+                          boulders[i].position,
+                          boulders[i].scale,
+                          glm::vec3(0.0f, boulders[i].yaw, 0.0f),
+                          boulders[i].color,
+                          0.0f, 0.74f, "stone");
+        }
+    }
+
+    if (scannedTrunkMesh && scannedTrunkMesh->gpuBuffers) {
+        const struct NaturalTrunk {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } trunks[] = {
+            {glm::vec3(-3.05f, 0.05f, 0.24f), glm::vec3(0.72f), 0.18f},
+            {glm::vec3( 2.55f, 0.05f, 0.62f), glm::vec3(0.64f), -0.44f}
+        };
+        for (int i = 0; i < 2; ++i) {
+            addRenderable("OutdoorBeach_ScannedDriftwood_" + std::to_string(i), scannedTrunkMesh,
+                          trunks[i].position,
+                          trunks[i].scale,
+                          glm::vec3(0.0f, trunks[i].yaw, 0.03f),
+                          glm::vec4(0.32f, 0.19f, 0.10f, 1.0f),
+                          0.0f, 0.82f, "wood");
+        }
+    }
+
+    if (scannedBranchesMesh && scannedBranchesMesh->gpuBuffers) {
+        const struct NaturalBranch {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } branches[] = {
+            {glm::vec3(-4.25f, 0.08f, -1.85f), glm::vec3(1.35f), 0.78f},
+            {glm::vec3( 4.55f, 0.08f, -0.12f), glm::vec3(1.05f), -0.45f},
+            {glm::vec3( 6.25f, 0.08f, -0.75f), glm::vec3(1.18f), 0.16f}
+        };
+        for (int i = 0; i < 3; ++i) {
+            addRenderable("OutdoorBeach_ScannedBranchDebris_" + std::to_string(i), scannedBranchesMesh,
+                          branches[i].position,
+                          branches[i].scale,
+                          glm::vec3(0.0f, branches[i].yaw, 0.0f),
+                          glm::vec4(0.28f, 0.18f, 0.10f, 1.0f),
+                          0.0f, 0.76f, "wood");
+        }
+    }
+
+    if (scannedGrassMesh && scannedGrassMesh->gpuBuffers) {
+        const struct NaturalGrass {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } grass[] = {
+            {glm::vec3(-6.9f, 0.05f, -3.75f), glm::vec3(5.2f), 0.12f},
+            {glm::vec3( 5.75f, 0.05f, -3.55f), glm::vec3(4.8f), -0.44f},
+            {glm::vec3( 7.65f, 0.05f, -2.75f), glm::vec3(3.8f), 0.52f}
+        };
+        for (int i = 0; i < 3; ++i) {
+            auto grassEntity = addRenderable("OutdoorBeach_ScannedGrass_" + std::to_string(i), scannedGrassMesh,
+                                             grass[i].position,
+                                             grass[i].scale,
+                                             glm::vec3(0.0f, grass[i].yaw, 0.0f),
+                                             glm::vec4(0.16f, 0.34f, 0.12f, 1.0f),
+                                             0.0f, 0.62f, "wood");
+            m_registry->GetComponent<Scene::RenderableComponent>(grassEntity).doubleSided = true;
+        }
+    }
+
+    if (scannedFernMesh && scannedFernMesh->gpuBuffers) {
+        const struct NaturalFern {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } ferns[] = {
+            {glm::vec3(-7.45f, 0.07f, -3.10f), glm::vec3(0.78f), 0.38f},
+            {glm::vec3( 6.65f, 0.07f, -2.62f), glm::vec3(0.68f), -0.28f}
+        };
+        for (int i = 0; i < 2; ++i) {
+            auto fern = addRenderable("OutdoorBeach_ScannedFern_" + std::to_string(i), scannedFernMesh,
+                                      ferns[i].position,
+                                      ferns[i].scale,
+                                      glm::vec3(0.0f, ferns[i].yaw, 0.0f),
+                                      glm::vec4(0.10f, 0.30f, 0.13f, 1.0f),
+                                      0.0f, 0.58f, "wood");
+            m_registry->GetComponent<Scene::RenderableComponent>(fern).doubleSided = true;
         }
     }
 
@@ -2018,6 +2205,8 @@ void Engine::BuildEffectsShowcaseScene() {
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.22f, 2.4f, 32);
     auto torusMesh = Utils::MeshGenerator::CreateTorus(0.58f, 0.14f, 32, 16);
+    auto scannedBarrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+    auto scannedLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -2041,7 +2230,9 @@ void Engine::BuildEffectsShowcaseScene() {
             !uploadMesh(cubeMesh, "cube") ||
             !uploadMesh(sphereMesh, "sphere") ||
             !uploadMesh(cylinderMesh, "cylinder") ||
-            !uploadMesh(torusMesh, "torus")) {
+            !uploadMesh(torusMesh, "torus") ||
+            !uploadMesh(scannedBarrelMesh, "naturalistic Barrel_01") ||
+            !uploadMesh(scannedLanternMesh, "naturalistic Lantern_01")) {
             return;
         }
     }
@@ -2141,6 +2332,41 @@ void Engine::BuildEffectsShowcaseScene() {
                                      0.0f, 0.52f, "backdrop");
         (void)plinthA;
         (void)plinthB;
+    }
+
+    if (scannedBarrelMesh && scannedBarrelMesh->gpuBuffers) {
+        const struct BarrelProp {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } barrels[] = {
+            {glm::vec3(-5.85f, 0.02f, 0.95f), glm::vec3(1.25f), 0.34f},
+            {glm::vec3( 5.65f, 0.02f, 1.15f), glm::vec3(1.10f), -0.52f}
+        };
+        for (int i = 0; i < 2; ++i) {
+            auto barrel = addRenderable(("EffectsShowcase_ScannedBarrel_" + std::to_string(i)).c_str(),
+                                        scannedBarrelMesh,
+                                        barrels[i].position,
+                                        barrels[i].scale,
+                                        glm::vec3(0.0f, barrels[i].yaw, 0.0f),
+                                        glm::vec4(0.56f, 0.13f, 0.08f, 1.0f),
+                                        0.65f, 0.38f, "brushed_metal");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(barrel);
+            r.clearcoatFactor = 0.28f;
+            r.specularFactor = 1.12f;
+        }
+    }
+
+    if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
+        auto lantern = addRenderable("EffectsShowcase_ScannedLantern", scannedLanternMesh,
+                                     glm::vec3(4.35f, 0.64f, -1.25f),
+                                     glm::vec3(2.65f),
+                                     glm::vec3(0.0f, 0.42f, 0.0f),
+                                     glm::vec4(0.82f, 0.56f, 0.30f, 1.0f),
+                                     1.0f, 0.22f, "brushed_metal");
+        auto& r = m_registry->GetComponent<Scene::RenderableComponent>(lantern);
+        r.clearcoatFactor = 0.4f;
+        r.specularFactor = 1.25f;
     }
 
     if (sphereMesh && sphereMesh->gpuBuffers) {
@@ -2653,9 +2879,9 @@ void Engine::BuildRTShowcaseScene() {
         entt::entity de = m_registry->CreateEntity();
         m_registry->AddComponent<Scene::TagComponent>(de, "RTGallery_MetalDragon");
         auto& dt = m_registry->AddComponent<TransformComponent>(de);
-        dt.position = glm::vec3(galleryX, 1.0f, 1.2f);
-        dt.scale = glm::vec3(0.38f);
-        dt.rotation = glm::quat(glm::vec3(0.0f, glm::radians(180.0f), 0.0f));
+        dt.position = glm::vec3(galleryX, 0.82f, 1.2f);
+        dt.scale = glm::vec3(0.16f);
+        dt.rotation = glm::quat(glm::vec3(glm::radians(90.0f), glm::radians(180.0f), 0.0f));
 
         auto& dr = m_registry->AddComponent<Scene::RenderableComponent>(de);
         dr.mesh = dragonMesh;

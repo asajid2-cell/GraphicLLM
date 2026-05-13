@@ -418,6 +418,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "naturalistic_asset_policy" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_naturalistic_asset_policy_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "material_editor_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

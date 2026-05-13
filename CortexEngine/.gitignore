@@ -1,5 +1,8 @@
 # Large model / asset directories (kept locally, not in Git)
 models/
+!assets/models/
+!assets/models/naturalistic_showcase/
+!assets/models/naturalistic_showcase/**
 assets/**/*.hdr
 assets/**/*.exr
 

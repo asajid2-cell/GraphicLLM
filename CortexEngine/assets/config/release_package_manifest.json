@@ -48,6 +48,7 @@
     "assets/config/showcase_scenes.json",
     "assets/config/visual_baselines.json",
     "assets/environments/environments.json",
+    "assets/models/naturalistic_showcase/asset_manifest.json",
     "assets/shaders/RaytracedReflections.dxil",
     "assets/shaders/RaytracedShadows.dxil",
     "assets/shaders/RaytracedGI.dxil"
@@ -66,10 +67,10 @@
     "assets/shaders/*.hlsl",
     "assets/shaders/*.hlsli",
     "assets/shaders/*.dxil",
+    "assets/models/naturalistic_showcase/**",
     "assets/textures/rtshowcase/*.dds"
   ],
   "package_forbidden_globs": [
-    "models/*",
     "logs/*",
     "build/*",
     "vcpkg_installed/*",
@@ -89,6 +90,7 @@
   "required_release_validation_steps": [
     "build_release",
     "repo_hygiene",
+    "naturalistic_asset_policy",
     "launcher_native_widget",
     "graphics_native_widget",
     "graphics_material_controls",

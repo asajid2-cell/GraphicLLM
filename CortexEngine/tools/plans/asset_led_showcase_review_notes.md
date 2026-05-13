@@ -346,6 +346,48 @@ Decision:
 - Keep `ALS-008` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Forest Shrine Focal-Read Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/forest_review6_shrine_focus/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_review7_downward/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the forest creek shrine remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Enlarged the shrine base, capstone, roof, and posts so the focal prop is no longer tiny in the hero camera.
+- Increased rear bush massing using existing scanned `wild_rooibos_bush` placements.
+- Reframed the hero camera twice; the final checkpoint uses a higher downward view to emphasize creek rocks, water, and shrine scale while reducing the worst horizon exposure from the first close attempt.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `forest_review7_downward` rendered 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=10.195`, `avg_luma=92.704`, `rt_reflection_signal_avg_luma=0.08617`, and `rt_reflection_history_signal_avg_luma=0.08613`.
+- Texture uploads in `forest_review7_downward` completed with `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+
+Findings:
+
+- The shrine is more legible than `forest_assetkit_review5`.
+- The creek/rock foreground carries more of the image than before.
+- The scene is still rejected for public media: the sky/HDRI wall is dominant, the banks are rectangular platforms, the shrine is still block-built, and several branch/plant silhouettes feel scattered rather than naturally rooted.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Segmented-Screen Checkpoint
 
 Commands:

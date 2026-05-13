@@ -408,9 +408,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Forest asset-kit iteration added committed CC0 `tree_stump_01`, `rock_moss_set_01`, and `wild_rooibos_bush` assets, added runtime texture bindings, rebuilt Release, and passed asset-kit, naturalistic-asset, scene-seed, composition, world-shader, and asset-led runtime contracts.
   - Oversized `root_cluster_01` was rejected and removed because `run_naturalistic_asset_policy_tests.ps1` correctly failed it for exceeding `max_single_asset_bytes`.
   - Focused capture `forest_assetkit_review5` loaded the new forest textures with `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`, but manual review still rejected the scene for rectangular banks/platforms, weak shrine silhouette, sparse bush silhouettes, and procedural sky/background exposure.
+  - Forest shrine-focus iteration enlarged the shrine base/capstone/posts/roof, strengthened the rear bush mass, and changed the hero camera to a higher downward creek composition.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the forest shrine-focus iteration.
+  - Focused capture `CortexEngine/build/bin/logs/forest_review7_downward/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=10.195`, `avg_luma=92.704`, `rt_reflection_signal_avg_luma=0.08617`, `rt_reflection_history_signal_avg_luma=0.08613`, and texture uploads `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+  - Manual review rejected `forest_review7_downward` for public media: the shrine is larger and water/rock focus is better than `forest_assetkit_review5`, but the sky wall, rectangular platform banks, and block-built shrine are still public-release blockers.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace box shrine and flat vegetation walls with organic banks, a stronger shrine silhouette, tree massing, and better water readability.
+  - Replace box shrine and flat vegetation walls with organic banks, a stronger non-blockout shrine silhouette, denser tree massing/background coverage, and better water readability.
 
 ### ALS-011: Existing Scene Re-Authoring Pass
 
@@ -499,6 +503,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused coastal captures `coastal_review12` and `coastal_review13`; the rail/beam defect is reduced, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review11`, `desert_review12`, and `desert_review13_lintel_grounding`; the relic focal read and tile breakup improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused forest captures `forest_review6` and `forest_review7_downward`; shrine scale and creek focus improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

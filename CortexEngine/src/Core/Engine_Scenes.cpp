@@ -872,6 +872,28 @@ void Engine::BuildMaterialLabScene() {
         m_registry->GetComponent<Scene::RenderableComponent>(back).doubleSided = true;
     }
 
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        const struct LabContextBlock {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+            const char* preset;
+            float roughness;
+        } contextBlocks[] = {
+            {"MaterialLab_BackdropBaseRail", glm::vec3(0.0f, 0.54f, 4.02f), glm::vec3(9.35f, 0.16f, 0.10f), glm::vec4(0.45f, 0.46f, 0.44f, 1.0f), "masonry", 0.62f},
+            {"MaterialLab_BackdropTopRail", glm::vec3(0.0f, 2.70f, 4.00f), glm::vec3(8.90f, 0.10f, 0.10f), glm::vec4(0.48f, 0.49f, 0.47f, 1.0f), "masonry", 0.60f},
+            {"MaterialLab_LeftSideReturn", glm::vec3(-8.95f, 1.55f, 0.50f), glm::vec3(0.12f, 1.55f, 3.65f), glm::vec4(0.53f, 0.54f, 0.52f, 1.0f), "masonry", 0.70f},
+            {"MaterialLab_RightSideReturn", glm::vec3(8.95f, 1.55f, 0.50f), glm::vec3(0.12f, 1.55f, 3.65f), glm::vec4(0.53f, 0.54f, 0.52f, 1.0f), "masonry", 0.70f},
+            {"MaterialLab_CenterFloorRunway", glm::vec3(0.0f, 0.035f, -0.22f), glm::vec3(7.70f, 0.028f, 0.16f), glm::vec4(0.36f, 0.37f, 0.36f, 1.0f), "stone", 0.54f},
+            {"MaterialLab_RightPropPlatform", glm::vec3(3.65f, 0.18f, -0.10f), glm::vec3(1.75f, 0.20f, 1.25f), glm::vec4(0.55f, 0.50f, 0.44f, 1.0f), "wood", 0.58f}
+        };
+        for (const auto& block : contextBlocks) {
+            addRenderable(block.tag, cubeMesh, block.position, block.scale, glm::vec3(0.0f),
+                          block.color, 0.0f, block.roughness, block.preset);
+        }
+    }
+
     struct Swatch {
         const char* tag;
         const char* preset;
@@ -934,18 +956,18 @@ void Engine::BuildMaterialLabScene() {
 
     if (scannedTableMesh && scannedTableMesh->gpuBuffers) {
         addRenderable("MaterialLab_ScannedWoodenTable", scannedTableMesh,
-                      glm::vec3(4.75f, 0.10f, -0.25f),
-                      glm::vec3(1.08f),
-                      glm::vec3(0.0f, -0.58f, 0.0f),
+                      glm::vec3(3.62f, 0.20f, -0.20f),
+                      glm::vec3(1.00f),
+                      glm::vec3(0.0f, -0.38f, 0.0f),
                       glm::vec4(0.43f, 0.25f, 0.12f, 1.0f),
                       0.0f, 0.62f, "wood");
     }
 
     if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
         auto lantern = addRenderable("MaterialLab_ScannedLantern", scannedLanternMesh,
-                                     glm::vec3(4.70f, 0.75f, -0.25f),
-                                     glm::vec3(2.85f),
-                                     glm::vec3(0.0f, -0.35f, 0.0f),
+                                     glm::vec3(3.58f, 0.84f, -0.22f),
+                                     glm::vec3(2.62f),
+                                     glm::vec3(0.0f, -0.20f, 0.0f),
                                      glm::vec4(0.78f, 0.55f, 0.30f, 1.0f),
                                      1.0f, 0.24f, "brushed_metal");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(lantern);
@@ -957,8 +979,8 @@ void Engine::BuildMaterialLabScene() {
         for (int i = 0; i < 2; ++i) {
             auto fern = addRenderable(("MaterialLab_ScannedFern_" + std::to_string(i)).c_str(),
                                       scannedFernMesh,
-                                      glm::vec3(3.78f + 1.72f * static_cast<float>(i), 0.08f, 0.85f),
-                                      glm::vec3(0.72f),
+                                      glm::vec3(2.76f + 1.52f * static_cast<float>(i), 0.08f, 0.72f),
+                                      glm::vec3(0.66f),
                                       glm::vec3(0.0f, 0.45f - 0.8f * static_cast<float>(i), 0.0f),
                                       glm::vec4(0.08f, 0.28f, 0.12f, 1.0f),
                                       0.0f, 0.58f, "wood");
@@ -1201,11 +1223,25 @@ void Engine::BuildGlassWaterCourtyardScene() {
             {"GlassWaterCourtyard_BackWall_LowerTrim", glm::vec3(0.0f, 0.62f, 5.55f), glm::vec3(8.2f, 0.12f, 0.10f), glm::vec4(0.44f, 0.37f, 0.32f, 1.0f), "masonry", 0.68f},
             {"GlassWaterCourtyard_BackWall_UpperTrim", glm::vec3(0.0f, 2.85f, 5.54f), glm::vec3(7.4f, 0.10f, 0.10f), glm::vec4(0.43f, 0.36f, 0.31f, 1.0f), "masonry", 0.70f},
             {"GlassWaterCourtyard_FloorInlay_Left", glm::vec3(-3.65f, 0.025f, -0.25f), glm::vec3(0.10f, 0.035f, 3.60f), glm::vec4(0.25f, 0.23f, 0.22f, 1.0f), "stone", 0.54f},
-            {"GlassWaterCourtyard_FloorInlay_Right", glm::vec3( 3.65f, 0.025f, -0.25f), glm::vec3(0.10f, 0.035f, 3.60f), glm::vec4(0.25f, 0.23f, 0.22f, 1.0f), "stone", 0.54f}
+            {"GlassWaterCourtyard_FloorInlay_Right", glm::vec3( 3.65f, 0.025f, -0.25f), glm::vec3(0.10f, 0.035f, 3.60f), glm::vec4(0.25f, 0.23f, 0.22f, 1.0f), "stone", 0.54f},
+            {"GlassWaterCourtyard_PoolStep_ShallowA", glm::vec3(-2.15f, 0.045f, -2.42f), glm::vec3(1.35f, 0.055f, 0.22f), glm::vec4(0.60f, 0.67f, 0.66f, 1.0f), "wet_stone", 0.36f},
+            {"GlassWaterCourtyard_PoolStep_ShallowB", glm::vec3(-2.15f, 0.075f, -2.08f), glm::vec3(1.02f, 0.050f, 0.18f), glm::vec4(0.57f, 0.64f, 0.64f, 1.0f), "wet_stone", 0.34f},
+            {"GlassWaterCourtyard_WaterlineTile_North", glm::vec3(0.0f, 0.035f, 2.36f), glm::vec3(3.30f, 0.035f, 0.055f), glm::vec4(0.58f, 0.68f, 0.70f, 1.0f), "wet_stone", 0.32f},
+            {"GlassWaterCourtyard_WaterlineTile_South", glm::vec3(0.0f, 0.035f, -2.88f), glm::vec3(3.30f, 0.035f, 0.055f), glm::vec4(0.58f, 0.68f, 0.70f, 1.0f), "wet_stone", 0.32f},
+            {"GlassWaterCourtyard_PoolCorner_NW", glm::vec3(-4.25f, 0.16f, 2.78f), glm::vec3(0.34f, 0.28f, 0.34f), glm::vec4(0.66f, 0.60f, 0.52f, 1.0f), "masonry", 0.50f},
+            {"GlassWaterCourtyard_PoolCorner_NE", glm::vec3( 4.25f, 0.16f, 2.78f), glm::vec3(0.34f, 0.28f, 0.34f), glm::vec4(0.66f, 0.60f, 0.52f, 1.0f), "masonry", 0.50f},
+            {"GlassWaterCourtyard_PoolCorner_SW", glm::vec3(-4.25f, 0.16f, -3.28f), glm::vec3(0.34f, 0.28f, 0.34f), glm::vec4(0.66f, 0.60f, 0.52f, 1.0f), "masonry", 0.50f},
+            {"GlassWaterCourtyard_PoolCorner_SE", glm::vec3( 4.25f, 0.16f, -3.28f), glm::vec3(0.34f, 0.28f, 0.34f), glm::vec4(0.66f, 0.60f, 0.52f, 1.0f), "masonry", 0.50f},
+            {"GlassWaterCourtyard_CourtyardSkirt_Front", glm::vec3(0.0f, 0.08f, -4.82f), glm::vec3(7.4f, 0.12f, 0.16f), glm::vec4(0.48f, 0.43f, 0.37f, 1.0f), "masonry", 0.56f},
+            {"GlassWaterCourtyard_CourtyardSkirt_Left", glm::vec3(-5.15f, 0.08f, -0.25f), glm::vec3(0.15f, 0.12f, 4.45f), glm::vec4(0.48f, 0.43f, 0.37f, 1.0f), "masonry", 0.56f},
+            {"GlassWaterCourtyard_CourtyardSkirt_Right", glm::vec3(5.15f, 0.08f, -0.25f), glm::vec3(0.15f, 0.12f, 4.45f), glm::vec4(0.48f, 0.43f, 0.37f, 1.0f), "masonry", 0.56f}
         };
         for (const auto& block : blocks) {
-            addRenderable(block.tag, cubeMesh, block.position, block.scale, glm::vec3(0.0f),
-                          block.color, 0.0f, block.roughness, block.preset);
+            auto e = addRenderable(block.tag, cubeMesh, block.position, block.scale, glm::vec3(0.0f),
+                                   block.color, 0.0f, block.roughness, block.preset);
+            if (std::string(block.preset) == "wet_stone") {
+                m_registry->GetComponent<Scene::RenderableComponent>(e).wetnessFactor = 0.50f;
+            }
         }
     }
 
@@ -1325,8 +1361,8 @@ void Engine::BuildGlassWaterCourtyardScene() {
 
     if (sphereMesh && sphereMesh->gpuBuffers) {
         addRenderable("GlassWaterCourtyard_MirrorSphere", sphereMesh,
-                      glm::vec3(-2.7f, 0.78f, -1.2f),
-                      glm::vec3(1.05f),
+                      glm::vec3(-3.25f, 0.68f, -0.55f),
+                      glm::vec3(0.82f),
                       glm::vec3(0.0f),
                       glm::vec4(0.82f, 0.78f, 0.72f, 1.0f),
                       1.0f, 0.08f, "mirror");
@@ -1525,6 +1561,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
         hazeR.doubleSided = true;
         hazeR.emissiveColor = glm::vec3(0.74f, 0.38f, 0.18f);
         hazeR.emissiveStrength = 0.10f;
+
     }
 
     if (cubeMesh && cubeMesh->gpuBuffers) {
@@ -1585,6 +1622,27 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                                       surfLines[i].color,
                                       0.0f, 0.44f, "matte");
             m_registry->GetComponent<Scene::RenderableComponent>(line).doubleSided = true;
+        }
+
+        const struct WetSandPatch {
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } wetSand[] = {
+            {glm::vec3(-4.6f, 0.024f, 0.34f), glm::vec3(2.6f, 0.018f, 0.42f), -0.05f},
+            {glm::vec3(-0.2f, 0.023f, 0.22f), glm::vec3(3.2f, 0.018f, 0.38f), 0.03f},
+            {glm::vec3(4.2f, 0.024f, 0.40f), glm::vec3(2.9f, 0.018f, 0.44f), -0.04f}
+        };
+        for (int i = 0; i < 3; ++i) {
+            auto patch = addRenderable("OutdoorBeach_WetSandPatch_" + std::to_string(i), cubeMesh,
+                                       wetSand[i].position,
+                                       wetSand[i].scale,
+                                       glm::vec3(0.0f, wetSand[i].yaw, 0.0f),
+                                       glm::vec4(0.34f, 0.30f, 0.24f, 1.0f),
+                                       0.0f, 0.42f, "wet_stone");
+            auto& patchR = m_registry->GetComponent<Scene::RenderableComponent>(patch);
+            patchR.wetnessFactor = 0.58f;
+            patchR.doubleSided = true;
         }
 
         for (int i = 0; i < 11; ++i) {
@@ -1694,6 +1752,7 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                           rocks[i].color,
                           0.0f, 0.68f, "stone");
         }
+
     }
 
     if (scannedBoulderMesh && scannedBoulderMesh->gpuBuffers) {
@@ -1811,18 +1870,40 @@ void Engine::BuildOutdoorSunsetBeachScene() {
                           glm::vec4(0.42f, 0.25f, 0.12f, 1.0f),
                           0.0f, 0.58f, "wood");
 
+            if (cubeMesh && cubeMesh->gpuBuffers) {
+                for (int band = 0; band < 7; ++band) {
+                    const float y = 0.05f + 0.16f * static_cast<float>(band);
+                    addRenderable("OutdoorBeach_PalmTrunkBand_" + std::to_string(p) + "_" + std::to_string(band),
+                                  cubeMesh,
+                                  palmBases[p] + glm::vec3(0.0f, y, 0.0f),
+                                  glm::vec3(0.19f, 0.018f, 0.19f),
+                                  glm::vec3(0.0f, glm::radians(21.0f * static_cast<float>(band)), 0.0f),
+                                  glm::vec4(0.30f, 0.18f, 0.09f, 1.0f),
+                                  0.0f, 0.64f, "wood");
+                }
+            }
+
             for (int i = 0; i < 10; ++i) {
                 const float yaw = glm::radians(36.0f * static_cast<float>(i) + 11.0f * static_cast<float>(p));
-                const float length = (i % 2 == 0) ? 1.45f : 1.16f;
-                const glm::vec3 crownOffset(glm::sin(yaw) * 0.24f, -0.05f - 0.025f * static_cast<float>(i % 3), glm::cos(yaw) * 0.24f);
+                const float length = (i % 2 == 0) ? 1.65f : 1.28f;
+                const glm::vec3 crownOffset(glm::sin(yaw) * 0.36f, -0.08f - 0.035f * static_cast<float>(i % 3), glm::cos(yaw) * 0.36f);
                 auto leaf = addRenderable("OutdoorBeach_PalmLeaf_" + std::to_string(p) + "_" + std::to_string(i),
                                           leafMesh,
                                           palmBases[p] + glm::vec3(0.0f, 1.18f, 0.0f) + crownOffset,
-                                          glm::vec3(length, 0.19f, 1.0f),
-                                          glm::vec3(glm::radians(62.0f), yaw, glm::radians((i % 2 == 0) ? -7.0f : 6.0f)),
-                                          glm::vec4(0.08f, 0.36f, 0.14f, 1.0f),
+                                          glm::vec3(length, 0.28f, 1.0f),
+                                          glm::vec3(glm::radians(67.0f), yaw, glm::radians((i % 2 == 0) ? -11.0f : 9.0f)),
+                                          glm::vec4(0.06f, 0.32f, 0.12f, 1.0f),
                                           0.0f, 0.52f, "wood");
                 m_registry->GetComponent<Scene::RenderableComponent>(leaf).doubleSided = true;
+            }
+
+            if (sphereMesh && sphereMesh->gpuBuffers) {
+                addRenderable("OutdoorBeach_PalmCrownCore_" + std::to_string(p), sphereMesh,
+                              palmBases[p] + glm::vec3(0.0f, 1.16f, 0.0f),
+                              glm::vec3(0.22f, 0.16f, 0.22f),
+                              glm::vec3(0.0f),
+                              glm::vec4(0.13f, 0.22f, 0.08f, 1.0f),
+                              0.0f, 0.70f, "wood");
             }
 
             if (sphereMesh && sphereMesh->gpuBuffers) {
@@ -1977,9 +2058,57 @@ void Engine::BuildLiquidGalleryScene() {
                                   glm::vec3(0.0f, 3.0f, 4.9f),
                                   glm::vec3(1.0f),
                                   glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
-                                  glm::vec4(0.36f, 0.32f, 0.28f, 1.0f),
-                                  0.0f, 0.64f, "masonry");
+                                  glm::vec4(0.28f, 0.25f, 0.23f, 1.0f),
+                                  0.0f, 0.70f, "masonry");
         m_registry->GetComponent<Scene::RenderableComponent>(wall).doubleSided = true;
+    }
+
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        const struct GalleryTrim {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+            const char* preset;
+            float roughness;
+        } trims[] = {
+            {"LiquidGallery_BackWall_BaseTrim", glm::vec3(0.0f, 0.58f, 4.68f), glm::vec3(8.6f, 0.14f, 0.10f), glm::vec4(0.18f, 0.17f, 0.16f, 1.0f), "wet_stone", 0.50f},
+            {"LiquidGallery_BackWall_TopTrim", glm::vec3(0.0f, 2.78f, 4.66f), glm::vec3(7.8f, 0.10f, 0.10f), glm::vec4(0.22f, 0.20f, 0.18f, 1.0f), "wet_stone", 0.52f},
+            {"LiquidGallery_LeftAisleLine", glm::vec3(-2.72f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.13f, 0.16f, 0.18f, 1.0f), "wet_stone", 0.36f},
+            {"LiquidGallery_RightAisleLine", glm::vec3(3.90f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.13f, 0.16f, 0.18f, 1.0f), "wet_stone", 0.36f},
+            {"LiquidGallery_CenterDrainGrate", glm::vec3(-1.35f, 0.045f, 0.58f), glm::vec3(0.46f, 0.030f, 0.13f), glm::vec4(0.05f, 0.055f, 0.055f, 1.0f), "brushed_metal", 0.28f}
+        };
+        for (const auto& trim : trims) {
+            auto e = addRenderable(trim.tag, cubeMesh, trim.position, trim.scale, glm::vec3(0.0f),
+                                   trim.color, std::string(trim.preset) == "brushed_metal" ? 1.0f : 0.0f,
+                                   trim.roughness, trim.preset);
+            if (std::string(trim.preset) == "wet_stone") {
+                m_registry->GetComponent<Scene::RenderableComponent>(e).wetnessFactor = 0.48f;
+            }
+        }
+
+        const struct IntegratedDeckPiece {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            glm::vec4 color;
+            float metallic;
+            float roughness;
+            const char* preset;
+        } deckPieces[] = {
+            {"LiquidGallery_IntegratedCountertop", glm::vec3(-1.42f, 0.055f, 0.55f), glm::vec3(4.92f, 0.10f, 3.26f), glm::vec4(0.20f, 0.19f, 0.17f, 1.0f), 0.0f, 0.38f, "wet_stone"},
+            {"LiquidGallery_FrontApron", glm::vec3(-1.42f, 0.32f, -2.90f), glm::vec3(5.10f, 0.42f, 0.18f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_RearApron", glm::vec3(-1.42f, 0.32f, 3.98f), glm::vec3(5.10f, 0.42f, 0.18f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_LeftApron", glm::vec3(-6.68f, 0.32f, 0.55f), glm::vec3(0.18f, 0.42f, 3.48f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_RightApron", glm::vec3(3.84f, 0.32f, 0.55f), glm::vec3(0.18f, 0.42f, 3.48f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_CenterSpine", glm::vec3(-1.42f, 0.38f, 0.55f), glm::vec3(5.02f, 0.10f, 0.14f), glm::vec4(0.12f, 0.12f, 0.11f, 1.0f), 0.0f, 0.40f, "wet_stone"},
+            {"LiquidGallery_CrossSpine", glm::vec3(-1.42f, 0.39f, 0.55f), glm::vec3(0.14f, 0.10f, 3.30f), glm::vec4(0.12f, 0.12f, 0.11f, 1.0f), 0.0f, 0.40f, "wet_stone"}
+        };
+        for (const auto& piece : deckPieces) {
+            auto e = addRenderable(piece.tag, cubeMesh, piece.position, piece.scale, glm::vec3(0.0f),
+                                   piece.color, piece.metallic, piece.roughness, piece.preset);
+            m_registry->GetComponent<Scene::RenderableComponent>(e).wetnessFactor = 0.52f;
+        }
     }
 
     struct LiquidVat {
@@ -2024,42 +2153,59 @@ void Engine::BuildLiquidGalleryScene() {
         if (cubeMesh && cubeMesh->gpuBuffers) {
             auto basin = addRenderable(std::string("LiquidGallery_") + vat.name + "_Basin",
                                        cubeMesh,
-                                       vat.center + glm::vec3(0.0f, 0.02f, 0.0f),
-                                       glm::vec3(1.95f, 0.20f, 1.95f),
+                                       vat.center + glm::vec3(0.0f, 0.16f, 0.0f),
+                                       glm::vec3(1.82f, 0.30f, 1.82f),
                                        glm::vec3(0.0f),
-                                       glm::vec4(0.36f, 0.34f, 0.30f, 1.0f),
-                                       0.0f, 0.50f, "wet_stone");
+                                       glm::vec4(0.25f, 0.23f, 0.20f, 1.0f),
+                                       0.0f, 0.42f, "wet_stone");
             auto& basinR = m_registry->GetComponent<Scene::RenderableComponent>(basin);
-            basinR.wetnessFactor = 0.35f;
+            basinR.wetnessFactor = 0.56f;
 
             addRenderable(std::string("LiquidGallery_") + vat.name + "_BackLip",
                           cubeMesh,
-                          vat.center + glm::vec3(0.0f, 0.35f, 1.75f),
-                          glm::vec3(2.15f, 0.30f, 0.18f),
+                          vat.center + glm::vec3(0.0f, 0.48f, 1.68f),
+                          glm::vec3(2.05f, 0.36f, 0.28f),
                           glm::vec3(0.0f),
-                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
-                          0.0f, 0.48f, "wet_stone");
+                          glm::vec4(0.30f, 0.26f, 0.20f, 1.0f),
+                          0.0f, 0.40f, "wet_stone");
             addRenderable(std::string("LiquidGallery_") + vat.name + "_FrontLip",
                           cubeMesh,
-                          vat.center + glm::vec3(0.0f, 0.35f, -1.75f),
-                          glm::vec3(2.15f, 0.30f, 0.18f),
+                          vat.center + glm::vec3(0.0f, 0.48f, -1.68f),
+                          glm::vec3(2.05f, 0.36f, 0.28f),
                           glm::vec3(0.0f),
-                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
-                          0.0f, 0.48f, "wet_stone");
+                          glm::vec4(0.30f, 0.26f, 0.20f, 1.0f),
+                          0.0f, 0.40f, "wet_stone");
             addRenderable(std::string("LiquidGallery_") + vat.name + "_LeftLip",
                           cubeMesh,
-                          vat.center + glm::vec3(-1.75f, 0.35f, 0.0f),
-                          glm::vec3(0.18f, 0.30f, 2.15f),
+                          vat.center + glm::vec3(-1.68f, 0.48f, 0.0f),
+                          glm::vec3(0.28f, 0.36f, 2.05f),
                           glm::vec3(0.0f),
-                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
-                          0.0f, 0.48f, "wet_stone");
+                          glm::vec4(0.30f, 0.26f, 0.20f, 1.0f),
+                          0.0f, 0.40f, "wet_stone");
             addRenderable(std::string("LiquidGallery_") + vat.name + "_RightLip",
                           cubeMesh,
-                          vat.center + glm::vec3(1.75f, 0.35f, 0.0f),
-                          glm::vec3(0.18f, 0.30f, 2.15f),
+                          vat.center + glm::vec3(1.68f, 0.48f, 0.0f),
+                          glm::vec3(0.28f, 0.36f, 2.05f),
                           glm::vec3(0.0f),
-                          glm::vec4(0.42f, 0.38f, 0.32f, 1.0f),
-                          0.0f, 0.48f, "wet_stone");
+                          glm::vec4(0.30f, 0.26f, 0.20f, 1.0f),
+                          0.0f, 0.40f, "wet_stone");
+
+            const glm::vec3 cornerOffsets[] = {
+                {-1.68f, 0.50f, -1.68f},
+                { 1.68f, 0.50f, -1.68f},
+                {-1.68f, 0.50f,  1.68f},
+                { 1.68f, 0.50f,  1.68f}
+            };
+            for (int c = 0; c < 4; ++c) {
+                auto corner = addRenderable(std::string("LiquidGallery_") + vat.name + "_CornerPost_" + std::to_string(c),
+                                            cubeMesh,
+                                            vat.center + cornerOffsets[c],
+                                            glm::vec3(0.34f, 0.42f, 0.34f),
+                                            glm::vec3(0.0f),
+                                            glm::vec4(0.22f, 0.20f, 0.17f, 1.0f),
+                                            0.0f, 0.38f, "wet_stone");
+                m_registry->GetComponent<Scene::RenderableComponent>(corner).wetnessFactor = 0.58f;
+            }
         }
 
         if (liquidPlane && liquidPlane->gpuBuffers) {
@@ -2136,15 +2282,26 @@ void Engine::BuildLiquidGalleryScene() {
 
     if (quadMesh && quadMesh->gpuBuffers) {
         auto labelGlow = addRenderable("LiquidGallery_WarmReflectionPanel", quadMesh,
-                                       glm::vec3(-1.25f, 3.1f, 4.65f),
-                                       glm::vec3(4.0f, 0.85f, 1.0f),
+                                       glm::vec3(-1.25f, 2.70f, 4.62f),
+                                       glm::vec3(3.25f, 0.48f, 1.0f),
                                        glm::vec3(0.0f),
                                        glm::vec4(1.0f, 0.52f, 0.22f, 1.0f),
                                        0.0f, 0.20f, "emissive_panel");
         auto& panel = m_registry->GetComponent<Scene::RenderableComponent>(labelGlow);
         panel.emissiveColor = glm::vec3(1.0f, 0.45f, 0.16f);
-        panel.emissiveStrength = 2.2f;
+        panel.emissiveStrength = 1.55f;
         panel.doubleSided = true;
+
+        auto coolPanel = addRenderable("LiquidGallery_CoolReflectionPanel", quadMesh,
+                                       glm::vec3(2.38f, 2.52f, 4.61f),
+                                       glm::vec3(2.55f, 0.38f, 1.0f),
+                                       glm::vec3(0.0f),
+                                       glm::vec4(0.36f, 0.62f, 1.0f, 1.0f),
+                                       0.0f, 0.20f, "emissive_panel");
+        auto& coolPanelR = m_registry->GetComponent<Scene::RenderableComponent>(coolPanel);
+        coolPanelR.emissiveColor = glm::vec3(0.18f, 0.42f, 1.0f);
+        coolPanelR.emissiveStrength = 0.90f;
+        coolPanelR.doubleSided = true;
     }
 
     AddParticleEffect(*m_registry, "LiquidGallery_LavaEmbers", "embers", glm::vec3(1.35f, 0.80f, -1.15f));

@@ -51,25 +51,33 @@
         {
           "id": "hero",
           "label": "Material review hero",
-          "position": [0.0, 2.45, -8.2],
-          "target": [0.0, 1.05, -0.15],
-          "fov": 54.0,
+          "position": [-0.55, 2.35, -8.0],
+          "target": [0.65, 1.02, -0.05],
+          "fov": 50.0,
           "validation": true
         },
         {
           "id": "metal_closeup",
           "label": "Metal response closeup",
-          "position": [-3.8, 1.55, -4.2],
-          "target": [-4.2, 0.9, -1.2],
-          "fov": 42.0,
+          "position": [-4.95, 1.78, -5.05],
+          "target": [-3.05, 0.92, -1.35],
+          "fov": 38.0,
           "validation": false
         },
         {
           "id": "glass_emissive",
           "label": "Glass and emissive closeup",
-          "position": [3.7, 1.65, -3.9],
-          "target": [3.6, 0.92, 0.8],
-          "fov": 44.0,
+          "position": [3.20, 1.58, -4.35],
+          "target": [3.15, 0.98, 0.35],
+          "fov": 39.0,
+          "validation": false
+        },
+        {
+          "id": "prop_context",
+          "label": "Naturalistic prop material context",
+          "position": [2.15, 1.65, -5.25],
+          "target": [3.25, 0.92, -0.05],
+          "fov": 40.0,
           "validation": false
         }
       ],
@@ -125,9 +133,9 @@
         {
           "id": "water_closeup",
           "label": "Water reflection closeup",
-          "position": [-2.8, 1.35, -4.0],
-          "target": [-0.4, 0.25, -0.4],
-          "fov": 42.0,
+          "position": [0.20, 1.28, -4.65],
+          "target": [0.10, 0.22, -0.55],
+          "fov": 38.0,
           "validation": false
         },
         {
@@ -136,6 +144,14 @@
           "position": [3.8, 2.25, -4.4],
           "target": [0.15, 2.15, 0.15],
           "fov": 44.0,
+          "validation": false
+        },
+        {
+          "id": "pool_steps",
+          "label": "Pool coping and shallow steps",
+          "position": [-2.95, 1.10, -4.15],
+          "target": [-1.35, 0.18, -1.85],
+          "fov": 36.0,
           "validation": false
         }
       ],
@@ -154,17 +170,25 @@
         {
           "id": "hero",
           "label": "Outdoor sunset hero",
-          "position": [-2.2, 2.15, -8.4],
-          "target": [0.35, 0.55, 1.25],
-          "fov": 48.0,
+          "position": [-2.70, 2.05, -8.25],
+          "target": [-0.15, 0.50, 0.70],
+          "fov": 46.0,
           "validation": true
         },
         {
           "id": "waterline",
           "label": "Beach waterline and palms",
-          "position": [2.45, 1.18, -4.65],
-          "target": [3.65, 0.22, 0.62],
-          "fov": 42.0,
+          "position": [1.35, 0.88, -4.15],
+          "target": [2.80, 0.18, 0.42],
+          "fov": 38.0,
+          "validation": false
+        },
+        {
+          "id": "beach_life",
+          "label": "Umbrella, fence, and shoreline props",
+          "position": [-5.55, 1.35, -5.55],
+          "target": [-3.10, 0.55, -1.80],
+          "fov": 36.0,
           "validation": false
         }
       ],
@@ -183,25 +207,33 @@
         {
           "id": "hero",
           "label": "Liquid material hero",
-          "position": [0.0, 2.65, -10.2],
-          "target": [0.0, 0.65, 0.0],
-          "fov": 54.0,
+          "position": [-0.30, 2.45, -9.55],
+          "target": [-0.35, 0.62, 0.10],
+          "fov": 50.0,
           "validation": true
         },
         {
           "id": "water_lava",
           "label": "Water and lava response",
-          "position": [-1.2, 1.55, -5.0],
-          "target": [-1.4, 0.38, -1.15],
-          "fov": 43.0,
+          "position": [-1.85, 1.45, -5.55],
+          "target": [-1.45, 0.36, -1.05],
+          "fov": 38.0,
           "validation": false
         },
         {
           "id": "viscous_pair",
           "label": "Honey and molasses closeup",
-          "position": [-1.1, 1.45, -1.4],
-          "target": [-1.4, 0.40, 2.25],
-          "fov": 42.0,
+          "position": [4.45, 1.72, -2.40],
+          "target": [-1.20, 0.42, 2.15],
+          "fov": 40.0,
+          "validation": false
+        },
+        {
+          "id": "liquid_context",
+          "label": "Full vat gallery context",
+          "position": [3.85, 1.95, -6.60],
+          "target": [-0.30, 0.55, 0.42],
+          "fov": 44.0,
           "validation": false
         }
       ],
@@ -236,9 +268,9 @@
         {
           "id": "neon_materials",
           "label": "Neon and advanced materials",
-          "position": [3.8, 1.85, -4.0],
-          "target": [1.0, 1.45, 1.2],
-          "fov": 46.0,
+          "position": [3.15, 1.82, -4.45],
+          "target": [0.80, 1.42, 1.00],
+          "fov": 42.0,
           "validation": false
         }
       ],

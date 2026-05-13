@@ -40,6 +40,10 @@ Detail captures:
 |---|---|---|---|
 | ![RT Reflection Closeup](CortexEngine/docs/media/rt_showcase_reflection_closeup.png) | ![RT Material Overview](CortexEngine/docs/media/rt_showcase_material_overview.png) | ![Material Lab Metal Closeup](CortexEngine/docs/media/material_lab_metal_closeup.png) | ![Material Lab Glass and Emissive](CortexEngine/docs/media/material_lab_glass_emissive.png) |
 
+| Material Prop Context | Pool Steps | Beach Props | Liquid Context |
+|---|---|---|---|
+| ![Material Lab Prop Context](CortexEngine/docs/media/material_lab_prop_context.png) | ![Pool Steps and Coping](CortexEngine/docs/media/glass_water_courtyard_pool_steps.png) | ![Beach Props and Shoreline](CortexEngine/docs/media/outdoor_sunset_beach_life.png) | ![Liquid Gallery Context](CortexEngine/docs/media/liquid_gallery_context.png) |
+
 | Water | Glass Canopy | Particles | Neon Materials |
 |---|---|---|---|
 | ![Water Reflection Closeup](CortexEngine/docs/media/glass_water_courtyard_water_closeup.png) | ![Glass Canopy Rim Light](CortexEngine/docs/media/glass_water_courtyard_glass_canopy.png) | ![Particle and Bloom Closeup](CortexEngine/docs/media/effects_showcase_particles_closeup.png) | ![Neon Materials](CortexEngine/docs/media/effects_showcase_neon_materials.png) |
@@ -71,29 +75,33 @@ with metadata in
 ## Current Metrics
 
 Source run:
-`Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\bin\logs\runs\public_capture_gallery_20260512_164536_672_5036_9f597bee`
+`Z:\328\CMPUT328-A2\codexworks\301\graphics\CortexEngine\build\bin\logs\runs\public_capture_gallery_20260513_003829_299_81552_3267d292`
 
 | Scene | GPU ms | Capture | Render scale | Avg luma | Nonblack | RT signal/history |
 |---|---:|---:|---:|---:|---:|---:|
-| RT Showcase | 4.19 | 1920x1080 | 1.00 | 70.34 | 1.000 | 0.0228 / 0.0295 |
-| RT Reflection Closeup | 7.85 | 1920x1080 | 1.00 | 55.78 | 1.000 | 0.0293 / 0.0294 |
-| RT Material Overview | 4.24 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
-| Material Lab | 3.68 | 1920x1080 | 1.00 | 183.16 | 1.000 | 0.0214 / 0.0224 |
-| Material Lab Metal Closeup | 3.40 | 1920x1080 | 1.00 | 134.23 | 1.000 | 0.0752 / 0.0765 |
-| Material Lab Glass and Emissive | 3.65 | 1920x1080 | 1.00 | 169.42 | 1.000 | 0.0942 / 0.0956 |
-| Glass and Water Courtyard | 3.83 | 1920x1080 | 1.00 | 180.58 | 1.000 | 0.0392 / 0.0404 |
-| Water Reflection Closeup | 3.73 | 1920x1080 | 1.00 | 196.46 | 1.000 | 0.0553 / 0.0582 |
-| Glass Canopy Rim Light | 3.62 | 1920x1080 | 1.00 | 141.14 | 1.000 | 0.0172 / 0.0182 |
-| Effects Showcase | 4.28 | 1920x1080 | 1.00 | 110.56 | 1.000 | 0.0042 / 0.0042 |
-| Particle and Bloom Closeup | 3.99 | 1920x1080 | 1.00 | 92.95 | 1.000 | 0.0288 / 0.0290 |
-| Neon Materials | 4.04 | 1920x1080 | 1.00 | 94.56 | 1.000 | 0.0110 / 0.0111 |
-| Outdoor Sunset Beach | 3.03 | 1920x1080 | 1.00 | 166.38 | 1.000 | 0.0048 / 0.0048 |
-| Outdoor Waterline | 2.94 | 1920x1080 | 1.00 | 178.64 | 1.000 | 0.0162 / 0.0162 |
-| Liquid Gallery | 3.35 | 1920x1080 | 1.00 | 146.92 | 1.000 | 0.1350 / 0.1359 |
-| Water and Lava | 3.89 | 1920x1080 | 1.00 | 154.94 | 1.000 | 0.2587 / 0.2621 |
-| Honey and Molasses | 4.98 | 1920x1080 | 1.00 | 133.08 | 1.000 | 0.2260 / 0.2259 |
-| IBL Gallery Hero | 3.74 | 1920x1080 | 1.00 | 101.72 | 1.000 | 0.0420 / 0.0423 |
-| IBL Gallery Sweep | 4.06 | 1920x1080 | 1.00 | 107.89 | 1.000 | 0.0335 / 0.0336 |
+| RT Showcase | 4.26 | 1920x1080 | 1.00 | 73.03 | 1.000 | 0.0105 / 0.0124 |
+| RT Reflection Closeup | 5.22 | 1920x1080 | 1.00 | 72.70 | 1.000 | 0.0441 / 0.0479 |
+| RT Material Overview | 4.09 | 1920x1080 | 1.00 | 108.57 | 1.000 | 0.0309 / 0.0310 |
+| Material Lab | 4.00 | 1920x1080 | 1.00 | 179.72 | 1.000 | 0.0263 / 0.0273 |
+| Material Lab Metal Closeup | 8.61 | 1920x1080 | 1.00 | 123.48 | 1.000 | 0.0457 / 0.0477 |
+| Material Lab Glass and Emissive | 3.92 | 1920x1080 | 1.00 | 162.62 | 1.000 | 0.0814 / 0.0832 |
+| Material Lab Prop Context | 3.99 | 1920x1080 | 1.00 | 160.97 | 1.000 | 0.0510 / 0.0527 |
+| Glass and Water Courtyard | 15.20 | 1920x1080 | 1.00 | 182.80 | 1.000 | 0.0416 / 0.0419 |
+| Water Reflection Closeup | 3.85 | 1920x1080 | 1.00 | 185.98 | 1.000 | 0.0020 / 0.0020 |
+| Glass Canopy Rim Light | 3.89 | 1920x1080 | 1.00 | 144.11 | 1.000 | 0.0274 / 0.0275 |
+| Pool Steps and Coping | 3.60 | 1920x1080 | 1.00 | 192.58 | 1.000 | 0.0526 / 0.0527 |
+| Effects Showcase | 9.37 | 1920x1080 | 1.00 | 111.14 | 1.000 | 0.0055 / 0.0056 |
+| Particle and Bloom Closeup | 4.72 | 1920x1080 | 1.00 | 95.16 | 1.000 | 0.0298 / 0.0301 |
+| Neon Materials | 7.53 | 1920x1080 | 1.00 | 102.47 | 1.000 | 0.0142 / 0.0143 |
+| Outdoor Sunset Beach | 4.04 | 1920x1080 | 1.00 | 205.63 | 1.000 | 0.0752 / 0.0774 |
+| Outdoor Waterline | 4.37 | 1920x1080 | 1.00 | 205.35 | 1.000 | 0.1319 / 0.1351 |
+| Beach Props and Shoreline | 8.85 | 1920x1080 | 1.00 | 183.07 | 1.000 | 0.1259 / 0.1285 |
+| Liquid Gallery | 8.22 | 1920x1080 | 1.00 | 139.72 | 1.000 | 0.1540 / 0.1543 |
+| Water and Lava | 7.08 | 1920x1080 | 1.00 | 112.23 | 1.000 | 0.2242 / 0.2246 |
+| Honey and Molasses | 3.83 | 1920x1080 | 1.00 | 144.58 | 1.000 | 0.2158 / 0.2169 |
+| Liquid Gallery Context | 4.21 | 1920x1080 | 1.00 | 141.42 | 1.000 | 0.2000 / 0.2007 |
+| IBL Gallery Hero | 4.49 | 1920x1080 | 1.00 | 98.85 | 1.000 | 0.0419 / 0.0422 |
+| IBL Gallery Sweep | 5.37 | 1920x1080 | 1.00 | 108.56 | 1.000 | 0.0309 / 0.0310 |
 
 ## Quick Start
 

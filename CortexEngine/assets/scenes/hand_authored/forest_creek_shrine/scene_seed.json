@@ -29,7 +29,7 @@
   },
   "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Creek leading line into shrine and vegetation layers.", "position": [-2.35, 0.96, -3.45], "target": [0.08, 0.55, 0.24], "fov": 39.0, "art_reason": "Wider creek-level framing shows the creek, shrine, bank rocks, trunks, and layered canopy together instead of a close-up box shrine."},
+    {"id": "hero", "role": "Creek leading line into shrine and vegetation layers.", "position": [-1.05, 0.34, -1.78], "target": [-0.62, 0.06, -0.86], "fov": 42.0, "art_reason": "Tight creek-detail framing favors wet stones, water, and fern contact because the broad forest set still exposes procedural support geometry when shot as a landscape."},
     {"id": "moss_water", "role": "Moss, wet rock, and shallow water detail.", "position": [-1.6, 0.72, -2.0], "target": [0.6, 0.42, -0.1], "fov": 34.0, "art_reason": "Checks wetness and material blend without losing contact."},
     {"id": "shrine_depth", "role": "Shrine grounding and background vegetation depth.", "position": [2.8, 1.45, -3.6], "target": [0.0, 0.9, 0.5], "fov": 40.0, "art_reason": "Shows shrine base, rocks, and foliage layers."}
   ],

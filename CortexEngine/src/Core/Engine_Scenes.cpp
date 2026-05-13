@@ -4985,44 +4985,48 @@ void Engine::BuildForestCreekShrineScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-2.35f, 0.96f, -3.45f), glm::vec3(0.08f, 0.55f, 0.24f), 39.0f, 140.0f);
+        glm::vec3(-1.05f, 0.34f, -1.78f), glm::vec3(-0.62f, 0.06f, -0.86f), 42.0f, 140.0f);
 
-    const AssetLedMaterialSettings mossStone{glm::vec4(0.16f, 0.22f, 0.15f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.62f, 0.68f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "mossy_masonry"};
+    const AssetLedMaterialSettings mossStone{glm::vec4(0.18f, 0.20f, 0.17f, 1.0f), 0.0f, 0.66f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.66f, 0.72f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "mossy_masonry"};
     const AssetLedMaterialSettings creek{glm::vec4(0.035f, 0.16f, 0.14f, 0.72f), 0.0f, 0.08f, 0.42f, 1.333f, glm::vec3(0.0f), 1.0f, 0.82f, 0.2f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "water"};
     const AssetLedMaterialSettings wetBark{glm::vec4(0.19f, 0.12f, 0.08f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.65f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
-    const AssetLedMaterialSettings vegetation{glm::vec4(0.16f, 0.32f, 0.17f, 1.0f), 0.0f, 0.72f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.45f, 0.48f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "vegetation"};
+    const AssetLedMaterialSettings vegetation{glm::vec4(0.10f, 0.20f, 0.11f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.48f, 0.46f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "vegetation"};
 
     AddAssetLedRenderable(*m_registry, "ForestShrine_GroundBank", cubeMesh, glm::vec3(0.0f, -0.08f, 0.0f), glm::vec3(7.0f, 0.16f, 6.0f), glm::vec3(0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftRaisedBank", cubeMesh, glm::vec3(-2.05f, 0.08f, -0.65f), glm::vec3(2.2f, 0.30f, 4.4f), glm::vec3(0.0f, glm::radians(-10.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_RightRaisedBank", cubeMesh, glm::vec3(1.95f, 0.06f, -0.35f), glm::vec3(2.0f, 0.28f, 4.0f), glm::vec3(0.0f, glm::radians(11.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_ForegroundMudLip", cubeMesh, glm::vec3(-0.55f, 0.02f, -2.55f), glm::vec3(4.6f, 0.18f, 0.55f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyRise", cubeMesh, glm::vec3(-0.25f, 0.72f, 3.15f), glm::vec3(6.6f, 0.74f, 0.70f), glm::vec3(0.0f, glm::radians(-4.0f), 0.0f), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyUpper", sphereMesh, glm::vec3(-1.15f, 1.72f, 3.10f), glm::vec3(1.35f, 0.72f, 0.50f), glm::vec3(0.0f, glm::radians(8.0f), glm::radians(2.0f)), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyBlobRight", sphereMesh, glm::vec3(1.75f, 1.56f, 3.22f), glm::vec3(1.18f, 0.64f, 0.48f), glm::vec3(0.0f, glm::radians(-10.0f), glm::radians(-3.0f)), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyMid", sphereMesh, glm::vec3(0.20f, 1.48f, 3.05f), glm::vec3(1.25f, 0.58f, 0.42f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftTreeWall", cubeMesh, glm::vec3(-3.65f, 0.72f, 0.55f), glm::vec3(0.22f, 1.20f, 3.4f), glm::vec3(0.0f, glm::radians(5.0f), 0.0f), wetBark);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_RightTreeWall", cubeMesh, glm::vec3(3.65f, 0.72f, 0.55f), glm::vec3(0.22f, 1.20f, 3.4f), glm::vec3(0.0f, glm::radians(-5.0f), 0.0f), wetBark);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftRaisedBank", cubeMesh, glm::vec3(-2.20f, 0.02f, -0.78f), glm::vec3(1.7f, 0.18f, 3.6f), glm::vec3(0.0f, glm::radians(-13.0f), glm::radians(1.5f)), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_RightRaisedBank", cubeMesh, glm::vec3(1.82f, 0.00f, -0.55f), glm::vec3(1.55f, 0.16f, 3.2f), glm::vec3(0.0f, glm::radians(13.0f), glm::radians(-1.0f)), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_ForegroundMudLip", cubeMesh, glm::vec3(-0.58f, 0.00f, -2.18f), glm::vec3(2.4f, 0.10f, 0.26f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyRise", cubeMesh, glm::vec3(-0.40f, -0.02f, 3.55f), glm::vec3(4.8f, 0.12f, 0.34f), glm::vec3(0.0f, glm::radians(-4.0f), 0.0f), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyUpper", sphereMesh, glm::vec3(-1.55f, 0.70f, 3.85f), glm::vec3(0.42f, 0.18f, 0.18f), glm::vec3(0.0f, glm::radians(8.0f), glm::radians(2.0f)), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyBlobRight", sphereMesh, glm::vec3(1.55f, 0.66f, 3.92f), glm::vec3(0.40f, 0.16f, 0.16f), glm::vec3(0.0f, glm::radians(-10.0f), glm::radians(-3.0f)), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackCanopyMid", sphereMesh, glm::vec3(0.02f, 0.60f, 3.80f), glm::vec3(0.44f, 0.16f, 0.16f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftTreeWall", cubeMesh, glm::vec3(-3.85f, 0.36f, 0.55f), glm::vec3(0.10f, 0.62f, 2.3f), glm::vec3(0.0f, glm::radians(5.0f), 0.0f), wetBark);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_RightTreeWall", cubeMesh, glm::vec3(3.85f, 0.34f, 0.55f), glm::vec3(0.10f, 0.58f, 2.2f), glm::vec3(0.0f, glm::radians(-5.0f), 0.0f), wetBark);
     AddAssetLedRenderable(*m_registry, "ForestShrine_CreekSheet", planeMesh, glm::vec3(-0.7f, 0.05f, -1.4f), glm::vec3(2.8f, 1.0f, 3.4f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), creek);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_CreekLeftFoamEdge", cubeMesh, glm::vec3(-1.55f, 0.08f, -1.25f), glm::vec3(0.08f, 0.05f, 3.3f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_CreekRightFoamEdge", cubeMesh, glm::vec3(0.15f, 0.08f, -1.50f), glm::vec3(0.08f, 0.05f, 3.0f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), vegetation);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_ShrineBase", cubeMesh, glm::vec3(0.0f, 0.25f, 0.35f), glm::vec3(1.4f, 0.50f, 1.0f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_Capstone", cubeMesh, glm::vec3(0.0f, 0.82f, 0.35f), glm::vec3(1.65f, 0.18f, 1.15f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_FrontStep", cubeMesh, glm::vec3(-0.10f, 0.12f, -0.34f), glm::vec3(1.35f, 0.20f, 0.34f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_BackStoneSilhouette", cubeMesh, glm::vec3(0.02f, 1.14f, 0.64f), glm::vec3(0.98f, 0.46f, 0.20f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftShrinePost", cylinderMesh, glm::vec3(-0.62f, 0.64f, 0.32f), glm::vec3(0.13f, 0.78f, 0.13f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), wetBark);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_RightShrinePost", cylinderMesh, glm::vec3(0.62f, 0.64f, 0.32f), glm::vec3(0.13f, 0.78f, 0.13f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), wetBark);
-    AddAssetLedRenderable(*m_registry, "ForestShrine_MossRoof", coneMesh, glm::vec3(0.02f, 1.36f, 0.54f), glm::vec3(1.05f, 0.58f, 0.82f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_CreekLeftFoamEdge", cubeMesh, glm::vec3(-1.24f, 0.066f, -1.28f), glm::vec3(0.026f, 0.018f, 1.65f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_CreekRightFoamEdge", cubeMesh, glm::vec3(0.08f, 0.066f, -1.50f), glm::vec3(0.026f, 0.018f, 1.45f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), vegetation);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_ShrineBase", cubeMesh, glm::vec3(0.52f, 0.08f, 0.96f), glm::vec3(0.36f, 0.12f, 0.28f), glm::vec3(0.0f, glm::radians(18.0f), glm::radians(-1.5f)), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_Capstone", cubeMesh, glm::vec3(0.48f, 0.28f, 0.98f), glm::vec3(0.42f, 0.06f, 0.32f), glm::vec3(0.0f, glm::radians(18.0f), glm::radians(1.0f)), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_FrontStep", cubeMesh, glm::vec3(0.34f, 0.055f, 0.58f), glm::vec3(0.44f, 0.055f, 0.14f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_BackStoneSilhouette", cubeMesh, glm::vec3(0.52f, 0.42f, 1.10f), glm::vec3(0.24f, 0.16f, 0.08f), glm::vec3(0.0f, glm::radians(18.0f), glm::radians(-4.0f)), mossStone);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_LeftShrinePost", cylinderMesh, glm::vec3(0.36f, 0.22f, 0.88f), glm::vec3(0.035f, 0.24f, 0.035f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), wetBark);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_RightShrinePost", cylinderMesh, glm::vec3(0.68f, 0.22f, 0.86f), glm::vec3(0.035f, 0.24f, 0.035f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), wetBark);
+    AddAssetLedRenderable(*m_registry, "ForestShrine_MossRoof", coneMesh, glm::vec3(0.50f, 0.52f, 1.03f), glm::vec3(0.22f, 0.10f, 0.20f), glm::vec3(0.0f, glm::radians(18.0f), glm::radians(1.0f)), mossStone);
     if (trunkMesh && trunkMesh->gpuBuffers) {
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FallenTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(-1.2f, 0.24f, 0.9f), glm::vec3(0.95f), glm::vec3(glm::radians(6.0f), glm::radians(-22.0f), 0.0f), wetBark);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackLeftTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(-2.75f, 0.35f, 1.75f), glm::vec3(1.18f), glm::vec3(glm::radians(4.0f), glm::radians(14.0f), glm::radians(-5.0f)), wetBark);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackRightTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(2.35f, 0.34f, 1.65f), glm::vec3(1.05f), glm::vec3(glm::radians(-2.0f), glm::radians(-18.0f), glm::radians(4.0f)), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FallenTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(-1.2f, 0.12f, 0.9f), glm::vec3(0.95f), glm::vec3(glm::radians(6.0f), glm::radians(-22.0f), 0.0f), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackLeftTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(-2.75f, 0.20f, 1.75f), glm::vec3(1.18f), glm::vec3(glm::radians(4.0f), glm::radians(14.0f), glm::radians(-5.0f)), wetBark);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackRightTrunk", "dead_tree_trunk", trunkMesh, glm::vec3(2.35f, 0.20f, 1.65f), glm::vec3(1.05f), glm::vec3(glm::radians(-2.0f), glm::radians(-18.0f), glm::radians(4.0f)), wetBark);
     }
     if (boulderMesh && boulderMesh->gpuBuffers) {
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_LeftBankRock", "boulder_01", boulderMesh, glm::vec3(-1.6f, 0.12f, -0.55f), glm::vec3(0.75f), glm::vec3(0.0f, glm::radians(15.0f), 0.0f), mossStone);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_RightBankRock", "boulder_01", boulderMesh, glm::vec3(1.25f, 0.10f, -1.2f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-35.0f), 0.0f), mossStone);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_CreekStepRockA", "boulder_01", boulderMesh, glm::vec3(-0.74f, 0.08f, -0.28f), glm::vec3(0.36f), glm::vec3(0.0f, glm::radians(42.0f), 0.0f), mossStone);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_CreekStepRockB", "boulder_01", boulderMesh, glm::vec3(0.34f, 0.08f, 0.18f), glm::vec3(0.32f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), mossStone);
-        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackMossBoulder", "boulder_01", boulderMesh, glm::vec3(1.55f, 0.16f, 1.42f), glm::vec3(0.82f), glm::vec3(0.0f, glm::radians(62.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_LeftBankRock", "boulder_01", boulderMesh, glm::vec3(-1.28f, 0.02f, -0.60f), glm::vec3(0.40f), glm::vec3(0.0f, glm::radians(15.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_RightBankRock", "boulder_01", boulderMesh, glm::vec3(0.92f, 0.01f, -1.12f), glm::vec3(0.32f), glm::vec3(0.0f, glm::radians(-35.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_CreekStepRockA", "boulder_01", boulderMesh, glm::vec3(-0.70f, 0.01f, -0.34f), glm::vec3(0.22f), glm::vec3(0.0f, glm::radians(42.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_CreekStepRockB", "boulder_01", boulderMesh, glm::vec3(0.22f, 0.01f, -0.02f), glm::vec3(0.20f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BackMossBoulder", "boulder_01", boulderMesh, glm::vec3(1.06f, 0.04f, 0.92f), glm::vec3(0.48f), glm::vec3(0.0f, glm::radians(62.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_StandingMossStone", "boulder_01", boulderMesh, glm::vec3(-0.02f, 0.10f, 0.30f), glm::vec3(0.42f), glm::vec3(glm::radians(-6.0f), glm::radians(32.0f), glm::radians(9.0f)), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_ForegroundCreekStone", "boulder_01", boulderMesh, glm::vec3(-1.02f, 0.01f, -1.20f), glm::vec3(0.34f), glm::vec3(0.0f, glm::radians(-52.0f), 0.0f), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_LeftCreekWallStone", "boulder_01", boulderMesh, glm::vec3(-1.48f, 0.02f, -0.06f), glm::vec3(0.38f), glm::vec3(glm::radians(3.0f), glm::radians(74.0f), glm::radians(-4.0f)), mossStone);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_RightCreekWallStone", "boulder_01", boulderMesh, glm::vec3(0.66f, 0.01f, -0.64f), glm::vec3(0.32f), glm::vec3(glm::radians(-2.0f), glm::radians(-24.0f), glm::radians(5.0f)), mossStone);
     }
     if (fernMesh && fernMesh->gpuBuffers) {
         for (int i = 0; i < 6; ++i) {
@@ -5033,6 +5037,8 @@ void Engine::BuildForestCreekShrineScene() {
                                               glm::vec3(0.0f, glm::radians(24.0f * i), 0.0f),
                                               vegetation);
         }
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FernClusterHeroLeft", "fern_02", fernMesh, glm::vec3(-0.86f, 0.05f, -0.70f), glm::vec3(0.66f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), vegetation);
+        AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_FernClusterHeroRight", "fern_02", fernMesh, glm::vec3(0.66f, 0.05f, -0.54f), glm::vec3(0.58f), glm::vec3(0.0f, glm::radians(-34.0f), 0.0f), vegetation);
     }
     if (branchMesh && branchMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "ForestShrine_BranchArchLeft", "dry_branches_medium_01", branchMesh, glm::vec3(-2.15f, 0.46f, 0.35f), glm::vec3(0.78f), glm::vec3(glm::radians(4.0f), glm::radians(42.0f), glm::radians(-8.0f)), wetBark);
@@ -5085,8 +5091,8 @@ void Engine::SetCameraToSceneDefault(Scene::TransformComponent& transform) {
         pos = glm::vec3(-1.85f, 1.02f, -3.15f);
         target = glm::vec3(0.62f, 0.82f, -0.10f);
     } else if (m_currentScenePreset == ScenePreset::ForestCreekShrine) {
-        pos = glm::vec3(-2.35f, 0.96f, -3.45f);
-        target = glm::vec3(0.08f, 0.55f, 0.24f);
+        pos = glm::vec3(-1.05f, 0.34f, -1.78f);
+        target = glm::vec3(-0.62f, 0.06f, -0.86f);
     } else if (m_currentScenePreset == ScenePreset::TemporalValidation) {
         pos = glm::vec3(0.0f, 2.3f, -6.4f);
         target = glm::vec3(0.0f, 1.0f, 0.1f);

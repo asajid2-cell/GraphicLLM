@@ -176,7 +176,13 @@
         "ForestShrine_RightBankRock",
         "ForestShrine_CreekStepRockA",
         "ForestShrine_CreekStepRockB",
+        "ForestShrine_StandingMossStone",
+        "ForestShrine_ForegroundCreekStone",
+        "ForestShrine_LeftCreekWallStone",
+        "ForestShrine_RightCreekWallStone",
         "ForestShrine_FernCluster",
+        "ForestShrine_FernClusterHeroLeft",
+        "ForestShrine_FernClusterHeroRight",
         "ForestShrine_BranchArchLeft",
         "ForestShrine_BranchArchRight",
         "ForestShrine_GrassBankCluster"

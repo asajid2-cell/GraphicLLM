@@ -237,6 +237,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/asset_led_review2 -SmokeFrames 90` passed with `captures=15 size=1920x1080 preset=public_high`.
   - Harsh review recorded: rail contact improved, but the scene still reads as rails on a platform in front of an HDRI.
+  - Mesh-variety pass added extra coastal boulder anchors and `asset_led_review3` capture passed, but harsh review still rejected the scene as public media.
 - Remaining work:
   - Add visual baseline case and high-quality public captures.
   - Replace flat cliff/industrial box backdrops with authored cliff/structure geometry.
@@ -286,6 +287,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
   - Focused asset-led capture passed.
   - Harsh review recorded: closer framing helps the relic read, but it is still a blocky tan plinth scene.
+  - Mesh-variety pass added cylinder columns, cones, ceramic vessels, and bronze pedestal detail; `asset_led_review3` capture passed, but hero composition remains rejected.
 - Remaining work:
   - Add visual baseline case and high-quality public captures.
   - Add authored ruin meshes/stone breakup/sand piles and fix scale/material/framing defects found in screenshots.
@@ -334,6 +336,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
   - Focused asset-led capture passed.
   - Harsh review recorded: closer framing hides some edges, but the shrine remains box-built and vegetation/background are still flat walls.
+  - Mesh-variety pass added shrine posts, cone roof, branch assets, and grass clusters; `asset_led_review3` capture passed, but hero composition remains rejected.
 - Remaining work:
   - Add visual baseline case and high-quality public captures.
   - Replace box shrine and flat vegetation walls with organic banks, a stronger shrine silhouette, tree massing, and better water readability.
@@ -410,6 +413,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded in `CortexEngine/tools/plans/asset_led_showcase_review_notes.md`.
   - Focused asset-led capture command passed with `captures=15 size=1920x1080 preset=public_high`.
   - Manual review recorded the second-pass results and explicitly rejected the WIP screenshots for public media.
+  - Mesh-variety focused capture command passed with `captures=15 size=1920x1080 preset=public_high`.
+  - Manual review recorded that the third-pass screenshots remain WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

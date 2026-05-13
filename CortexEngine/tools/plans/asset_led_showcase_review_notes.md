@@ -301,3 +301,42 @@ Decision:
 - Do not publish the rain pavilion captures.
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-13 Rain Pavilion Interior Focal-Point Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused capture:
+  - `CortexEngine/build/bin/logs/rain_review12/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, and the hero is stronger, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added scanned `WoodenTable_01` as `RainPavilion_GroundedInteriorTable`.
+- Tightened the hero camera so the frame emphasizes glass panels, the lantern/table interior, warm strip light, and wet floor reflections instead of empty floor and the rear enclosure.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `rain_review12` loaded table, fern, bush, and lantern textures with `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
+
+Findings:
+
+- The table/lantern combination gives the glass pavilion a more believable interior focal point.
+- The tighter hero frame is materially better than `rain_review11`, but the rear screens and garden panels still read as procedural dark slabs/slats.
+- Do not publish this yet; a later pass should replace the rear architecture/garden with authored mesh work or a more decisive close-up composition.
+
+Decision:
+
+- Do not publish the rain pavilion captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

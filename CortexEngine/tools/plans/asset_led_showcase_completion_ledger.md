@@ -304,6 +304,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Rain pavilion IBL/garden iteration moved the scene to `cool_overcast`, added thinner framed glass structure, rear mullions, corner posts, rear planters, scanned `wild_rooibos_bush` and `fern_02` placements, lower garden enclosure, and garden-screen slats.
   - Release build, scene seed, composition stability, showcase-scene, asset-led, and asset-led runtime smoke contracts passed after the rain iteration.
   - Focused capture `rain_review11` was manually reviewed: the city-HDRI billboard failure is fixed and the glass pavilion reads more intentional, but the rear enclosure/slats are still procedural and foliage remains too dark/sparse, so the scene is still rejected for public media.
+  - Rain interior focal-point iteration added scanned `WoodenTable_01`, tightened the hero camera, rebuilt Release, and passed seed, composition, showcase-scene, and asset-led runtime contracts.
+  - Focused capture `rain_review12` was manually reviewed: the table/lantern interior focal point and tighter camera are stronger, but rear screens/garden panels still read as procedural dark slabs/slats, so the scene remains rejected for public media.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Replace the remaining procedural rear enclosure/slat silhouette with stronger authored garden/architectural geometry or a tighter camera.
@@ -472,6 +474,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused forest captures `forest_assetkit_review3`, `forest_assetkit_review4`, and `forest_assetkit_review5`; the asset scale/camera pass improved the giant rock/log failure but remains WIP and should not be published.
   - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused rain pavilion capture `rain_review12`; the interior focal point improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

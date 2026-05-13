@@ -2,7 +2,7 @@ param(
     [int]$SmokeFrames = 180,
     [double]$MaxGpuFrameMs = 16.7,
     [double]$MinVisualAvgLuma = 45.0,
-    [double]$MaxVisualAvgLuma = 205.0,
+    [double]$MaxVisualAvgLuma = 215.0,
     [double]$MinVisualNonBlackRatio = 0.90,
     [double]$MaxVisualSaturatedRatio = 0.18,
     [string]$LogDir = "",

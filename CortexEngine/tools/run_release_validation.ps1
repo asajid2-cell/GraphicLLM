@@ -410,6 +410,14 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_polish_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_polish_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "material_editor_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

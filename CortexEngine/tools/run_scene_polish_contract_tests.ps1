@@ -1,0 +1,151 @@
+param(
+    [string]$ScenePath = "",
+    [string]$ShowcasePath = "",
+    [string]$ReleaseValidationPath = ""
+)
+
+$ErrorActionPreference = "Stop"
+
+$root = Resolve-Path (Join-Path $PSScriptRoot "..")
+if ([string]::IsNullOrWhiteSpace($ScenePath)) {
+    $ScenePath = Join-Path $root "src/Core/Engine_Scenes.cpp"
+}
+if ([string]::IsNullOrWhiteSpace($ShowcasePath)) {
+    $ShowcasePath = Join-Path $root "assets/config/showcase_scenes.json"
+}
+if ([string]::IsNullOrWhiteSpace($ReleaseValidationPath)) {
+    $ReleaseValidationPath = Join-Path $root "tools/run_release_validation.ps1"
+}
+
+$failures = New-Object System.Collections.Generic.List[string]
+
+function Add-Failure([string]$Message) {
+    $script:failures.Add($Message)
+}
+
+function Read-Text([string]$Path) {
+    if (-not (Test-Path $Path)) {
+        throw "Required file missing: $Path"
+    }
+    return Get-Content $Path -Raw
+}
+
+function Get-Scene([object]$Doc, [string]$SceneId) {
+    foreach ($scene in $Doc.scenes) {
+        if ([string]$scene.id -eq $SceneId) {
+            return $scene
+        }
+    }
+    Add-Failure "showcase_scenes.json missing scene '$SceneId'"
+    return $null
+}
+
+function Get-Bookmark([object]$Scene, [string]$BookmarkId) {
+    if ($null -eq $Scene) { return $null }
+    foreach ($bookmark in $Scene.camera_bookmarks) {
+        if ([string]$bookmark.id -eq $BookmarkId) {
+            return $bookmark
+        }
+    }
+    Add-Failure "$($Scene.id) missing bookmark '$BookmarkId'"
+    return $null
+}
+
+function Assert-Contains([string]$Name, [string]$Text, [string]$Token) {
+    if ($Text.IndexOf($Token, [StringComparison]::Ordinal) -lt 0) {
+        Add-Failure "$Name missing token '$Token'"
+    }
+}
+
+function Assert-NotContains([string]$Name, [string]$Text, [string]$Token) {
+    if ($Text.IndexOf($Token, [StringComparison]::Ordinal) -ge 0) {
+        Add-Failure "$Name still contains forbidden token '$Token'"
+    }
+}
+
+$sceneSource = Read-Text $ScenePath
+$releaseSource = Read-Text $ReleaseValidationPath
+$showcase = Get-Content $ShowcasePath -Raw | ConvertFrom-Json
+
+foreach ($token in @(
+    "OutdoorBeach_ShoreFoam_",
+    "OutdoorBeach_SandMound_",
+    "OutdoorBeach_RockCluster_",
+    "OutdoorBeach_Driftwood_",
+    "OutdoorBeach_Coconut_",
+    "OutdoorBeach_SkyBackdrop",
+    "OutdoorBeach_OceanHorizon",
+    "for (int i = 0; i < 10; ++i)"
+)) {
+    Assert-Contains "Outdoor beach polish" $sceneSource $token
+}
+Assert-NotContains "Outdoor beach polish" $sceneSource "OutdoorBeach_SunsetGlowPanel"
+Assert-NotContains "Outdoor beach polish" $sceneSource "OutdoorBeach_Dune_"
+
+foreach ($token in @(
+    "GlassWaterCourtyard_PoolCoping_North",
+    "GlassWaterCourtyard_PoolCoping_South",
+    "GlassWaterCourtyard_CanopyFrame_North",
+    "GlassWaterCourtyard_CanopyFrame_CenterB",
+    "GlassWaterCourtyard_ColumnBase_",
+    "GlassWaterCourtyard_ColumnCap_",
+    "GlassWaterCourtyard_BackWall_LowerTrim",
+    "GlassWaterCourtyard_GlassScreen_Left"
+)) {
+    Assert-Contains "Glass courtyard polish" $sceneSource $token
+}
+
+foreach ($token in @(
+    "dt.rotation = glm::quat(glm::vec3(0.0f, glm::radians(180.0f), 0.0f))",
+    "RTGallery_DragonReflectionPanel_Warm",
+    "RTGallery_DragonReflectionPanel_Cool"
+)) {
+    Assert-Contains "RT showcase polish" $sceneSource $token
+}
+
+$beach = Get-Scene $showcase "outdoor_sunset_beach"
+$beachHero = Get-Bookmark $beach "hero"
+$beachWaterline = Get-Bookmark $beach "waterline"
+if ($beachHero -and ([double]$beachHero.fov -gt 52.0)) {
+    Add-Failure "outdoor_sunset_beach.hero fov should be tightened after polish"
+}
+if ($beachWaterline -and ([double]$beachWaterline.position[1] -gt 1.5)) {
+    Add-Failure "outdoor_sunset_beach.waterline should use a lower waterline camera"
+}
+
+$courtyard = Get-Scene $showcase "glass_water_courtyard"
+$courtyardHero = Get-Bookmark $courtyard "hero"
+$courtyardCanopy = Get-Bookmark $courtyard "glass_canopy"
+if ($courtyardHero -and ([double]$courtyardHero.fov -gt 52.0)) {
+    Add-Failure "glass_water_courtyard.hero fov should be tightened after polish"
+}
+if ($courtyardCanopy -and ([double]$courtyardCanopy.target[1] -lt 2.0)) {
+    Add-Failure "glass_water_courtyard.glass_canopy should target the canopy/frame area"
+}
+
+$rt = Get-Scene $showcase "rt_showcase"
+$reflectionCloseup = Get-Bookmark $rt "reflection_closeup"
+if ($reflectionCloseup) {
+    if ([double]$reflectionCloseup.position[0] -lt -15.0) {
+        Add-Failure "rt_showcase.reflection_closeup still uses the old far-left wall framing"
+    }
+    if ([double]$reflectionCloseup.fov -gt 44.0) {
+        Add-Failure "rt_showcase.reflection_closeup should be a tighter closeup"
+    }
+}
+
+Assert-Contains "release validation" $releaseSource "scene_polish_contract"
+Assert-Contains "release validation" $releaseSource "run_scene_polish_contract_tests.ps1"
+
+if ($failures.Count -gt 0) {
+    Write-Host "Scene polish contract failed:" -ForegroundColor Red
+    foreach ($failure in $failures) {
+        Write-Host " - $failure" -ForegroundColor Red
+    }
+    exit 1
+}
+
+Write-Host "Scene polish contract passed." -ForegroundColor Green
+Write-Host "  beach=shoreline/palms/props"
+Write-Host "  courtyard=coping/canopy/architecture"
+Write-Host "  rt_showcase=dragon/framing/reflection_closeup"

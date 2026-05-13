@@ -428,8 +428,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the forest shrine-focus iteration.
   - Focused capture `CortexEngine/build/bin/logs/forest_review7_downward/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=10.195`, `avg_luma=92.704`, `rt_reflection_signal_avg_luma=0.08617`, `rt_reflection_history_signal_avg_luma=0.08613`, and texture uploads `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
   - Manual review rejected `forest_review7_downward` for public media: the shrine is larger and water/rock focus is better than `forest_assetkit_review5`, but the sky wall, rectangular platform banks, and block-built shrine are still public-release blockers.
+  - Forest low-creek iteration lowered the hero camera, reduced broad bank/platform geometry, narrowed foam/creek strips, reduced the toy roof and tree-pole heights, added required shrine moss cladding stones, and tightened the runtime layout contract for those cladding tokens.
+  - Release build, seed, composition, showcase-scene, and asset-led runtime contracts passed after the low-creek iteration.
+  - Focused capture `CortexEngine/build/bin/logs/forest_review12_creek_material/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=5.153`, `avg_luma=83.475`, `rt_reflection_signal_avg_luma=0.07028`, `rt_reflection_history_signal_avg_luma=0.07024`, and texture uploads `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+  - Manual review rejected `forest_review12_creek_material` for public media: the lower creek/material frame reduces some wide-platform exposure, but the scene still reads as a procedural diorama with sky-wall dependency, rectangular bank edges, and a block-built shrine.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
+  - Replace the shrine and creek banks with real authored terrain/shrine meshes or a fundamentally different macro-material scene composition.
   - Replace box shrine and flat vegetation walls with organic banks, a stronger non-blockout shrine silhouette, denser tree massing/background coverage, and better water readability.
 
 ### ALS-011: Existing Scene Re-Authoring Pass
@@ -522,6 +527,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused desert captures `desert_review11`, `desert_review12`, and `desert_review13_lintel_grounding`; the relic focal read and tile breakup improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review14_wall_breakup`, `desert_review15_plinth_breakup`, and `desert_review16_recessed_blockout`; oversized right wall, sand plank, and lintel failures were reduced, but the scene remains WIP and should not be published.
   - Manual review recorded focused forest captures `forest_review6` and `forest_review7_downward`; shrine scale and creek focus improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused forest captures `forest_review8_current_prepass`, `forest_review9_low_creek`, `forest_review10_low_material`, `forest_review11_shrine_attachment`, and `forest_review12_creek_material`; the lower creek/material attempt reduced some wide-platform exposure but confirmed that real terrain/shrine assets are needed before publication.
   - Manual review recorded focused coastal captures `coastal_review14` and `coastal_review15_rebalanced_rocks`; the floating crown and foreground-rock failures improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain capture `rain_review21_downward_interior`; the sky/HDRI band improved, but the scene remains WIP and should not be published.
 - Remaining work:

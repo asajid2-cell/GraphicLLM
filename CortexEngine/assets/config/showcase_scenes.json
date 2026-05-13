@@ -275,7 +275,7 @@
         }
       ],
       "required_features": ["water", "lava", "particles", "tinted_lighting", "wet_materials"],
-      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+      "polish_gaps": ["public_capture_pending"]
     },
     {
       "id": "rain_glass_pavilion",
@@ -312,7 +312,7 @@
         }
       ],
       "required_features": ["glass", "wet_ground", "chrome", "particles", "tinted_lighting"],
-      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+      "polish_gaps": ["public_capture_pending"]
     },
     {
       "id": "desert_relic_gallery",
@@ -349,7 +349,7 @@
         }
       ],
       "required_features": ["world_shaders", "sand", "brushed_metal", "glass", "tinted_lighting"],
-      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+      "polish_gaps": ["public_capture_pending"]
     },
     {
       "id": "neon_alley_material_market",
@@ -386,7 +386,7 @@
         }
       ],
       "required_features": ["particles", "emissive_bloom", "wet_ground", "glass", "cinematic_post"],
-      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+      "polish_gaps": ["public_capture_pending"]
     },
     {
       "id": "forest_creek_shrine",
@@ -423,7 +423,7 @@
         }
       ],
       "required_features": ["water", "vegetation", "world_shaders", "fog", "tinted_lighting"],
-      "polish_gaps": ["visual_baseline_pending", "public_capture_pending"]
+      "polish_gaps": ["public_capture_pending"]
     },
     {
       "id": "effects_showcase",

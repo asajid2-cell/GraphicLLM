@@ -59,3 +59,35 @@ Decision:
 - Do not commit these WIP screenshots to `docs/media`.
 - Keep all five new scenes at `seeded_runtime_wip`.
 - Next implementation slice should replace the most obvious box silhouettes with authored mesh clusters or stronger procedural mesh primitives before more public-capture work.
+
+## 2026-05-13 Mesh-Variety Asset-Led Review
+
+Command:
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/asset_led_review3 -SmokeFrames 90`
+
+Latest reviewed run:
+
+`CortexEngine/build/bin/logs/runs/public_capture_gallery_20260513_040845_812_74892_4a86a226`
+
+Result: focused asset-led capture generation passed with `captures=15 size=1920x1080 preset=public_high`, but the scenes remain **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added extra coastal boulder anchors to break up the platform edge.
+- Added desert cylinders, cones, ceramic vessels, and a bronze pedestal so the scene is no longer only boxes plus a torus.
+- Added forest shrine posts, a cone roof, branch/grass assets, and more organic bank detail.
+
+Findings:
+
+- `coastal_cliff_foundry_hero`: extra rocks help foreground breakup, but the composition is still dominated by the HDRI/building background and a flat platform/rail silhouette. This probably needs a different composition, not just more props.
+- `desert_relic_gallery_hero`: material and silhouette variety improved slightly, but the camera still reads a clean block plinth against a flat wall. The next pass needs ruin geometry and sand/stone breakup that are visible from the hero camera.
+- `forest_creek_shrine_hero`: branch/grass additions help the background, but the foreground shrine still reads as stacked blocks in heavy rain. The next pass needs either a better camera around the organic assets or a substantially stronger shrine mesh.
+- `rain_glass_pavilion_hero`: still one of the stronger WIP scenes; needs strip-light/exposure control and less flat perimeter glass.
+- `neon_alley_material_market_hero`: still strongest; needs intentional sign graphics, denser storefront breakup, and less billboard-like background dependency.
+
+Decision:
+
+- Do not publish the WIP captures.
+- Keep ledger items ALS-006 through ALS-010 as `PARTIAL`.
+- Next meaningful jump should be a composition redesign for the weakest hero shots, starting with `coastal_cliff_foundry`, `desert_relic_gallery`, and `forest_creek_shrine`.

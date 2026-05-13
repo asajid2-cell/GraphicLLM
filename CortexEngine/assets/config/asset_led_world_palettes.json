@@ -31,7 +31,7 @@
       "id": "rain_pavilion_night",
       "scene": "rain_glass_pavilion",
       "lighting_script": "rain_pavilion_night",
-      "shader_modes": ["wet_ground", "stained_tile", "glass_tint", "oxidized_metal"],
+      "shader_modes": ["wet_ground", "stained_tile", "glass_tint", "oxidized_metal", "moss_vegetation"],
       "key_color": [0.25, 0.46, 0.95],
       "fill_color": [0.08, 0.13, 0.22],
       "rim_color": [1.0, 0.72, 0.38],

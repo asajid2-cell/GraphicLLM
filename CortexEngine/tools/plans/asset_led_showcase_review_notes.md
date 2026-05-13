@@ -255,3 +255,49 @@ Decision:
 - Do not publish the coastal captures.
 - Keep `ALS-006` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-13 Rain Pavilion IBL and Garden Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/rain_review9/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review10/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review11/visual_validation_rt_showcase.bmp`
+
+Result: build, contracts, and runtime smoke passed, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Replaced the rain pavilion's `night_city` IBL/default capture environment with `cool_overcast` because the city reflections made the scene read as a transparent box pasted over an unrelated skyline.
+- Reduced the glass wall height/thickness and introduced more corner posts, rear mullions, and thinner roof/floor members so the panes read as framed architecture.
+- Added rear planter blocks plus scanned `wild_rooibos_bush` and `fern_02` placements to replace the purely flat backdrop.
+- Added a lower rear enclosure and vertical garden-screen slats, reduced the warm strip scale/intensity, and moved rain/mist particles away from the foreground.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- World shader contract passed with `palettes=5 modes=9`.
+- Asset-led scene contract passed with `scenes=5`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `rain_review11` loaded `cool_overcast`, rendered 1920x1080 with `renderScale=1.000`, and loaded the added fern, bush, and lantern textures with `submitted=11 completed=11 failed=0 pending=0 uploaded=93.33MB`.
+
+Findings:
+
+- The old city-HDRI billboard failure is fixed; the latest frame reads more like a deliberate glass pavilion.
+- The scene is still visually WIP: the rear enclosure and slats remain too procedural, plant silhouettes are too dark/sparse, and the foreground floor still carries too much of the composition without enough authored object detail.
+- Glass framing, wet floor reflections, and rain particles are materially clearer than before, but this is not yet a public screenshot.
+
+Decision:
+
+- Do not publish the rain pavilion captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

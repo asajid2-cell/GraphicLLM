@@ -35,10 +35,10 @@
     {
       "id": "hero",
       "role": "Read the full ocean-to-foundry story with clear foreground, midground, and background.",
-      "position": [-3.05, 1.08, -2.95],
-      "target": [0.25, 0.62, -0.02],
-      "fov": 34.0,
-      "art_reason": "Lower diagonal angle emphasizes foreground basalt, lava containment, grates, and darker industrial structure while reducing the flat backdrop read."
+      "position": [-2.72, 1.02, -2.72],
+      "target": [0.25, 0.58, -0.12],
+      "fov": 33.0,
+      "art_reason": "Moderately close diagonal angle emphasizes foreground basalt, lava containment, grates, and darker industrial structure without letting the foreground rocks swallow the scene."
     },
     {
       "id": "material_closeup",

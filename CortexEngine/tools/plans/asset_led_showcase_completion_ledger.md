@@ -342,9 +342,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Desert asset-breakup pass added scanned `boulder_01` clusters, `dry_branches_medium_01` debris, darker plinth/ground shadow strips, and moved the scene to `cool_overcast` to avoid the city/courtyard HDRI mismatch.
   - Release build, seed, composition, showcase-scene, and asset-led runtime contracts passed after the desert pass.
   - Focused captures `desert_review9` and `desert_review10` were manually reviewed: `desert_review10` fixes the city backdrop and adds better scale anchors, but large flat block walls/lintels and a rectangular plinth still dominate, so the scene remains rejected for public media.
+  - Desert relic-focus iteration tightened the hero camera, reduced the high ruin/lintel massing, split the blue plinth accent into individual tile blocks, added front stone chips, added a warmer plinth step material, added `DesertRelic_BackHighLintelBrokenRight`, and added scanned `DesertRelic_PlinthStoneAnchor`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the desert relic-focus iteration.
+  - Focused capture `CortexEngine/build/bin/logs/desert_review13_lintel_grounding/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=8.181`, `avg_luma=130.359`, `rt_reflection_signal_avg_luma=0.01525`, `rt_reflection_history_signal_avg_luma=0.01523`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+  - Manual review rejected `desert_review13_lintel_grounding` for public media: the relic/material focal read and tile breakup are stronger than `desert_review10`, but the scene still has primitive cap/lintel pieces, a large flat right wall, and blockout foreground slabs.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Add authored ruin meshes/stone breakup/sand piles and fix scale/material/framing defects found in screenshots.
+  - Add authored ruin meshes/stone breakup/sand piles and fix the remaining primitive cap/lintel, right-wall, foreground-slab, material, and framing defects found in screenshots.
   - Prove material palette is not a single-color theme.
 
 ### ALS-009: Neon Alley Material Market Scene
@@ -494,6 +498,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused neon captures `neon_review8`, `neon_review9`, `neon_review10`, and `neon_review11`; the city-HDRI billboard failure is reduced and the signage/detail tokens render, but the scene remains WIP and should not be published.
   - Manual review recorded focused coastal captures `coastal_review12` and `coastal_review13`; the rail/beam defect is reduced, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused desert captures `desert_review11`, `desert_review12`, and `desert_review13_lintel_grounding`; the relic focal read and tile breakup improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

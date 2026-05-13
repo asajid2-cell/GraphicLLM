@@ -163,7 +163,7 @@
       "display_name": "Outdoor Sunset Beach",
       "current_status": "public_showcase_validated",
       "target_status": "public_showcase_validated",
-      "default_environment": "cool_overcast",
+      "default_environment": "sunset_courtyard",
       "default_lighting_rig": "sunset_rim",
       "required_bookmarks": ["hero", "waterline"],
       "camera_bookmarks": [
@@ -282,7 +282,7 @@
       "display_name": "Rain Glass Pavilion",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "night_city",
+      "default_environment": "cool_overcast",
       "default_lighting_rig": "rain_pavilion_night",
       "required_bookmarks": ["hero", "glass_closeup", "puddle_chrome"],
       "camera_bookmarks": [

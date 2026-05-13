@@ -298,11 +298,15 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `scene_seed.json` and `art_bible.md` created.
   - `Engine::BuildRainGlassPavilionScene` implemented and registered.
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed.
-  - Focused asset-led capture passed with `rain_glass_pavilion` using the `night_city` environment.
+  - Focused asset-led capture passed with `rain_glass_pavilion` using the original `night_city` environment.
   - Visual baseline case `rain_glass_pavilion_hero_release` added and validated by full 12-case runtime visual baseline and probe validation.
   - Harsh review recorded: glass/reflection read is stronger, but flat translucent walls, over-bright strip lighting, and weak exterior grounding remain.
+  - Rain pavilion IBL/garden iteration moved the scene to `cool_overcast`, added thinner framed glass structure, rear mullions, corner posts, rear planters, scanned `wild_rooibos_bush` and `fern_02` placements, lower garden enclosure, and garden-screen slats.
+  - Release build, scene seed, composition stability, showcase-scene, asset-led, and asset-led runtime smoke contracts passed after the rain iteration.
+  - Focused capture `rain_review11` was manually reviewed: the city-HDRI billboard failure is fixed and the glass pavilion reads more intentional, but the rear enclosure/slats are still procedural and foliage remains too dark/sparse, so the scene is still rejected for public media.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
+  - Replace the remaining procedural rear enclosure/slat silhouette with stronger authored garden/architectural geometry or a tighter camera.
   - Run visual review and fix glass/refraction/material defects found in screenshots.
   - Add material controls for glass tint/refraction readability without hiding background objects.
 
@@ -467,6 +471,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded the focused forest captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4`; all remain WIP and should not be published.
   - Manual review recorded focused forest captures `forest_assetkit_review3`, `forest_assetkit_review4`, and `forest_assetkit_review5`; the asset scale/camera pass improved the giant rock/log failure but remains WIP and should not be published.
   - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

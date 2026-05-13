@@ -270,9 +270,10 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Visual baseline case `coastal_cliff_foundry_hero_release` added and validated by full 12-case runtime visual baseline and probe validation.
   - Harsh review recorded: rail contact improved, but the scene still reads as rails on a platform in front of an HDRI.
   - Mesh-variety pass added extra coastal boulder anchors and `asset_led_review3` capture passed, but harsh review still rejected the scene as public media.
+  - Startup-reapply pass prevents public graphics/environment presets from overriding asset-led lighting/background controls; `asset_led_review8` capture passed, but harsh review still rejected the coastal hero because the HDRI dependency and flat wall/beam silhouettes remain visible.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace flat cliff/industrial box backdrops with authored cliff/structure geometry.
+  - Replace the remaining flat cliff/industrial box backdrops with better authored cliff/structure geometry or a redesigned composition.
   - Fix composition/shader defects found in screenshots.
   - Capture high-resolution public screenshots after harsh review.
 
@@ -322,6 +323,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Visual baseline case `desert_relic_gallery_hero_release` added and validated by full 12-case runtime visual baseline and probe validation.
   - Harsh review recorded: closer framing helps the relic read, but it is still a blocky tan plinth scene.
   - Mesh-variety pass added cylinder columns, cones, ceramic vessels, and bronze pedestal detail; `asset_led_review3` capture passed, but hero composition remains rejected.
+  - Startup-reapply/high-ruin pass restored authored lighting under public-high capture and added required high ruin/lintel geometry; `asset_led_review8` capture passed, but harsh review still rejected the scene as a tan block construction with weak material/art direction.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Add authored ruin meshes/stone breakup/sand piles and fix scale/material/framing defects found in screenshots.
@@ -373,6 +375,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Visual baseline case `forest_creek_shrine_hero_release` added and validated by full 12-case runtime visual baseline and probe validation.
   - Harsh review recorded: closer framing hides some edges, but the shrine remains box-built and vegetation/background are still flat walls.
   - Mesh-variety pass added shrine posts, cone roof, branch assets, and grass clusters; `asset_led_review3` capture passed, but hero composition remains rejected.
+  - Startup-reapply/canopy pass removed the foreground mist streaks and split the canopy into smaller masses; `asset_led_review8` capture passed, but harsh review still rejected the scene as procedural primitives around a box shrine.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Replace box shrine and flat vegetation walls with organic banks, a stronger shrine silhouette, tree massing, and better water readability.
@@ -431,6 +434,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, and `run_world_shader_contract_tests.ps1` now exist and pass targeted validation.
   - `run_release_validation.ps1` now invokes `asset_kit_policy`, `scene_seed_contract`, `scene_composition_stability`, `world_shader_contract`, and `asset_led_scene_contract -RuntimeSmoke -SmokeFrames 30` before the public showcase scene gate.
   - `cmd.exe /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'` passed.
+  - Asset-led startup reapply is implemented in `CortexEngine/src/Core/Engine.cpp` so public capture presets no longer silently override asset-led scene renderer controls; targeted asset-led runtime contracts passed after the change.
 - Remaining work:
   - Run full release validation after public-capture polish gaps are resolved.
   - Keep no-skip required gates for public release readiness.
@@ -451,6 +455,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded the second-pass results and explicitly rejected the WIP screenshots for public media.
   - Mesh-variety focused capture command passed with `captures=15 size=1920x1080 preset=public_high`.
   - Manual review recorded that the third-pass screenshots remain WIP and should not be published.
+  - Startup-reapply/backdrop focused capture command passed with `captures=15 size=1920x1080 preset=public_high`.
+  - Manual review recorded that `asset_led_review8` screenshots remain WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

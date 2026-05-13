@@ -953,6 +953,23 @@ Result<void> Engine::Initialize(const EngineConfig& config) {
         spdlog::info("Startup environment preset applied: '{}'", config.initialEnvironmentPreset);
     }
 
+    const bool assetLedStartupScene =
+        m_currentScenePreset == ScenePreset::CoastalCliffFoundry ||
+        m_currentScenePreset == ScenePreset::RainGlassPavilion ||
+        m_currentScenePreset == ScenePreset::DesertRelicGallery ||
+        m_currentScenePreset == ScenePreset::NeonAlleyMaterialMarket ||
+        m_currentScenePreset == ScenePreset::ForestCreekShrine;
+    if (assetLedStartupScene &&
+        (!config.initialGraphicsPreset.empty() || !config.initialEnvironmentPreset.empty())) {
+        RebuildScene(m_currentScenePreset);
+        if (!config.initialCameraBookmark.empty() &&
+            !ApplyShowcaseCameraBookmark(config.initialCameraBookmark)) {
+            spdlog::warn("Startup camera bookmark '{}' was not found after asset-led scene reapply",
+                         config.initialCameraBookmark);
+        }
+        spdlog::info("Asset-led scene controls reapplied after startup graphics/environment presets");
+    }
+
     if (const char* startupFocusTarget = std::getenv("CORTEX_FOCUS_TARGET")) {
         if (startupFocusTarget[0] != '\0') {
             SetFocusTarget(startupFocusTarget);

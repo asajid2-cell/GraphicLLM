@@ -91,3 +91,44 @@ Decision:
 - Do not publish the WIP captures.
 - Keep ledger items ALS-006 through ALS-010 as `PARTIAL`.
 - Next meaningful jump should be a composition redesign for the weakest hero shots, starting with `coastal_cliff_foundry`, `desert_relic_gallery`, and `forest_creek_shrine`.
+
+## 2026-05-13 Startup-Reapply and Backdrop Review
+
+Command:
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/asset_led_review8 -SmokeFrames 90`
+
+Latest reviewed run:
+
+`CortexEngine/build/bin/logs/runs/public_capture_gallery_20260513_121718_108_27588_dbc93a6b`
+
+Result: focused asset-led capture generation passed with `captures=15 size=1920x1080 preset=public_high`, but the scenes remain **not public-gallery ready**.
+
+Changes reviewed:
+
+- Startup now reapplies asset-led scene renderer controls after command-line graphics/environment presets, then reapplies the requested camera bookmark.
+- Coastal/desert/forest hero cameras remain widened from the previous pass.
+- Coastal gained required cliff wall/crown geometry and more upper basalt massing.
+- Desert gained required high ruin wall/lintel geometry.
+- Forest canopy blobs were reduced and split into smaller masses, and the foreground mist sheet was removed.
+
+Validation evidence:
+
+- Release target rebuild passed after the startup-reapply and scene-builder changes.
+- `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed with `scenes=5`.
+- `run_scene_composition_stability_tests.ps1` passed with `seeds=5`.
+- `run_world_shader_contract_tests.ps1` passed with `palettes=5 modes=9`.
+- `git diff --check --ignore-submodules=all` passed with line-ending warnings only.
+
+Findings:
+
+- `coastal_cliff_foundry_hero`: renderer controls now reapply correctly, but the hero still depends on the city/coast HDRI and has large flat wall/beam silhouettes. The added cliff wall improves coverage but reads as a slab, so this still needs a true composition redesign or better authored cliff/industrial meshes.
+- `desert_relic_gallery_hero`: high ruin geometry adds depth, but the shot still reads as a tan block construction with a city/coast HDRI behind it. The material palette and architecture are not yet strong enough for public screenshots.
+- `forest_creek_shrine_hero`: the mist streak issue is fixed, and the canopy is less oversized, but the scene still reads as procedural primitives around a box shrine. It needs a real shrine mesh/silhouette and organic bank/tree art.
+
+Decision:
+
+- Do not publish the WIP captures.
+- Keep ALS-006, ALS-008, and ALS-010 as `PARTIAL`.
+- Keep ALS-012 and ALS-014 as `PARTIAL`.
+- The startup-reapply fix is worth keeping because it prevents public graphics presets from silently overriding asset-led lighting/background contracts.

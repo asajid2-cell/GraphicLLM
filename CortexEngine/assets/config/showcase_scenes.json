@@ -252,9 +252,9 @@
         {
           "id": "hero",
           "label": "Ocean-to-foundry hero",
-          "position": [-1.65, 1.08, -2.35],
-          "target": [1.35, 0.66, -0.22],
-          "fov": 32.0,
+          "position": [-2.35, 1.28, -3.35],
+          "target": [0.92, 0.68, 0.08],
+          "fov": 38.0,
           "validation": true
         },
         {
@@ -326,9 +326,9 @@
         {
           "id": "hero",
           "label": "Sunlit relic hero",
-          "position": [-1.35, 0.98, -2.25],
-          "target": [0.28, 0.78, -0.05],
-          "fov": 32.0,
+          "position": [-2.55, 1.35, -4.05],
+          "target": [0.06, 0.84, 0.46],
+          "fov": 39.0,
           "validation": true
         },
         {
@@ -400,9 +400,9 @@
         {
           "id": "hero",
           "label": "Creek shrine hero",
-          "position": [-1.35, 0.66, -2.15],
-          "target": [0.10, 0.38, -0.05],
-          "fov": 32.0,
+          "position": [-2.35, 0.96, -3.45],
+          "target": [0.08, 0.55, 0.24],
+          "fov": 39.0,
           "validation": true
         },
         {

@@ -29,7 +29,7 @@
   },
   "environment": {"ibl": "sunset_courtyard", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Ruins, relic plinths, sand, and shadow pattern.", "position": [-1.35, 0.98, -2.25], "target": [0.28, 0.78, -0.05], "fov": 32.0, "art_reason": "Tight low view favors the relic, stepped plinth, and broken ruin blocks instead of the sparse tan stage."},
+    {"id": "hero", "role": "Ruins, relic plinths, sand, and shadow pattern.", "position": [-2.55, 1.35, -4.05], "target": [0.06, 0.84, 0.46], "fov": 39.0, "art_reason": "Wider low view keeps the relic readable while showing the arch, broken columns, sand ramps, and ruin walls as one authored space."},
     {"id": "stone_metal_closeup", "role": "Stone edge wear, sand, and oxidized metal response.", "position": [-1.6, 1.1, -2.7], "target": [0.8, 0.72, -0.2], "fov": 35.0, "art_reason": "Close enough to judge material palette without flattening the ruin."},
     {"id": "arch_depth", "role": "Foreground/midground/background depth through ruin arches.", "position": [3.8, 1.8, -4.9], "target": [0.0, 1.1, 1.1], "fov": 42.0, "art_reason": "Frames relics through architecture instead of isolated props."}
   ],

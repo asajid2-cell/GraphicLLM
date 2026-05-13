@@ -65,6 +65,7 @@ function Assert-NotContains([string]$Name, [string]$Text, [string]$Token) {
 
 $sceneSource = Read-Text $ScenePath
 $releaseSource = Read-Text $ReleaseValidationPath
+$captureGallerySource = Read-Text (Join-Path $root "tools/run_public_capture_gallery.ps1")
 $showcase = Get-Content $ShowcasePath -Raw | ConvertFrom-Json
 
 foreach ($token in @(
@@ -182,6 +183,9 @@ if ($reflectionCloseup) {
 
 Assert-Contains "release validation" $releaseSource "scene_polish_contract"
 Assert-Contains "release validation" $releaseSource "run_scene_polish_contract_tests.ps1"
+Assert-Contains "public capture gallery established filter" $captureGallerySource "[switch]`$EstablishedOnly"
+Assert-Contains "public capture gallery established filter" $captureGallerySource "-AssetLedOnly and -EstablishedOnly are mutually exclusive."
+Assert-Contains "public capture gallery established filter" $captureGallerySource '$assetLedScenes -notcontains $_.scene'
 
 Assert-Contains "rt showcase dragon display" $sceneSource "RTGallery_MetalDragon"
 Assert-Contains "rt showcase dragon upright rotation" $sceneSource "glm::radians(90.0f), glm::radians(180.0f)"

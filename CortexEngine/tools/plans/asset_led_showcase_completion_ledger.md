@@ -449,8 +449,12 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `CortexEngine/docs/media/video_manifest.json`
 - Validation commands:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_polish_contract_tests.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -OutputDir CortexEngine/docs/media`
-- Evidence: prior scene polish contracts and screenshots exist, but the latest critique shows the standard must become stricter and more holistic.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -EstablishedOnly -OutputDir CortexEngine/build/bin/logs/established_scene_review -Width 1920 -Height 1080 -SmokeFrames 90`
+- Evidence:
+  - `run_public_capture_gallery.ps1` now has an `-EstablishedOnly` filter so existing public scenes can be validated without publishing unfinished asset-led WIP screenshots.
+  - `run_scene_polish_contract_tests.ps1` now checks the established-scene filter and still passed.
+  - Established-scene high capture passed with `captures=23 size=1920x1080 preset=public_high`, manifest `CortexEngine/build/bin/logs/established_scene_review/gallery_manifest.json`, logs `CortexEngine/build/bin/logs/runs/public_capture_gallery_20260513_174449_832_46388_ac1b4bcd`.
+  - Manual spot review rejected marking ALS-011 done: `outdoor_sunset_beach_hero` still reads as a procedural beach diorama, `glass_water_courtyard_hero` remains boxy and over-bright, and `liquid_gallery_hero` still exposes disconnected tabletop/room-backdrop construction.
 - Remaining work:
   - Review each scene from every bookmark.
   - Convert procedural-looking sets into cohesive authored spaces.
@@ -530,6 +534,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused forest captures `forest_review8_current_prepass`, `forest_review9_low_creek`, `forest_review10_low_material`, `forest_review11_shrine_attachment`, and `forest_review12_creek_material`; the lower creek/material attempt reduced some wide-platform exposure but confirmed that real terrain/shrine assets are needed before publication.
   - Manual review recorded focused coastal captures `coastal_review14` and `coastal_review15_rebalanced_rocks`; the floating crown and foreground-rock failures improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain capture `rain_review21_downward_interior`; the sky/HDRI band improved, but the scene remains WIP and should not be published.
+  - Manual review spot-checked established-scene captures from `established_scene_review`; old public scenes pass legacy contracts but still show procedural/boxy art issues, so ALS-011 remains WIP and docs/media was not refreshed.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

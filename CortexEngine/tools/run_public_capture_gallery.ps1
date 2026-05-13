@@ -6,7 +6,8 @@ param(
     [int]$Width = 1920,
     [int]$Height = 1080,
     [int]$SmokeFrames = 220,
-    [switch]$AssetLedOnly
+    [switch]$AssetLedOnly,
+    [switch]$EstablishedOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -81,6 +82,19 @@ if ($AssetLedOnly) {
         "forest_creek_shrine"
     )
     $cases = @($cases | Where-Object { $assetLedScenes -contains $_.scene })
+}
+if ($EstablishedOnly) {
+    if ($AssetLedOnly) {
+        throw "-AssetLedOnly and -EstablishedOnly are mutually exclusive."
+    }
+    $assetLedScenes = @(
+        "coastal_cliff_foundry",
+        "rain_glass_pavilion",
+        "desert_relic_gallery",
+        "neon_alley_material_market",
+        "forest_creek_shrine"
+    )
+    $cases = @($cases | Where-Object { $assetLedScenes -notcontains $_.scene })
 }
 
 $runId = "public_capture_gallery_{0}_{1}_{2}" -f `

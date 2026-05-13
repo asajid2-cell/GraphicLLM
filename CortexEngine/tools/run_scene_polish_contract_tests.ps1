@@ -96,7 +96,6 @@ foreach ($token in @(
 }
 
 foreach ($token in @(
-    "dt.rotation = glm::quat(glm::vec3(0.0f, glm::radians(180.0f), 0.0f))",
     "RTGallery_DragonReflectionPanel_Warm",
     "RTGallery_DragonReflectionPanel_Cool"
 )) {
@@ -136,6 +135,11 @@ if ($reflectionCloseup) {
 
 Assert-Contains "release validation" $releaseSource "scene_polish_contract"
 Assert-Contains "release validation" $releaseSource "run_scene_polish_contract_tests.ps1"
+
+Assert-Contains "rt showcase dragon display" $sceneSource "RTGallery_MetalDragon"
+Assert-Contains "rt showcase dragon upright rotation" $sceneSource "glm::radians(90.0f), glm::radians(180.0f)"
+Assert-Contains "rt showcase dragon plinth scale" $sceneSource "dt.scale = glm::vec3(0.16f)"
+Assert-Contains "rt showcase dragon plinth seating" $sceneSource "dt.position = glm::vec3(galleryX, 0.82f, 1.2f)"
 
 if ($failures.Count -gt 0) {
     Write-Host "Scene polish contract failed:" -ForegroundColor Red

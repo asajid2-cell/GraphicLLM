@@ -27,6 +27,7 @@ nul
 *.avi
 *.mov
 CortexEngine/docs/*LEDGER.md
+!CortexEngine/docs/NATURALISTIC_SHOWCASE_COMPLETION_LEDGER.md
 
 # Large engine assets that can be downloaded/generated locally
 CortexEngine/models/

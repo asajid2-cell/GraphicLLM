@@ -462,6 +462,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         float absorptionSum = 0.0f;
         float foamSum = 0.0f;
         float viscositySum = 0.0f;
+        float bodyThicknessSum = 0.0f;
+        float sloshSum = 0.0f;
+        float meniscusSum = 0.0f;
+        float flowSpeedSum = 0.0f;
         auto view = registry->GetRegistry().view<Scene::WaterSurfaceComponent, Scene::RenderableComponent>();
         for (auto entity : view) {
             const auto& water = view.get<Scene::WaterSurfaceComponent>(entity);
@@ -473,6 +477,19 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
             absorptionSum += std::clamp(water.absorption, 0.0f, 1.0f);
             foamSum += std::clamp(water.foamStrength, 0.0f, 2.0f);
             viscositySum += std::clamp(water.viscosity, 0.0f, 1.0f);
+            const float bodyThickness = std::clamp(water.bodyThickness, 0.0f, 1.5f);
+            const float sloshStrength = std::clamp(water.sloshStrength, 0.0f, 1.5f);
+            const float meniscusStrength = std::clamp(water.meniscusStrength, 0.0f, 1.5f);
+            bodyThicknessSum += bodyThickness;
+            sloshSum += sloshStrength;
+            meniscusSum += meniscusStrength;
+            flowSpeedSum += std::max(water.flowSpeed, 0.0f);
+            if (bodyThickness >= 0.5f || meniscusStrength >= 0.45f) {
+                ++contract.water.thickLiquidCount;
+            }
+            if (sloshStrength > 0.02f && water.flowSpeed > 0.01f) {
+                ++contract.water.movingLiquidCount;
+            }
             contract.water.maxEmissiveHeat =
                 std::max(contract.water.maxEmissiveHeat, std::max(water.emissiveHeat, 0.0f));
             if (water.emissiveHeat > 0.01f) {
@@ -499,6 +516,10 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
             contract.water.avgAbsorption = absorptionSum * invCount;
             contract.water.avgFoamStrength = foamSum * invCount;
             contract.water.avgViscosity = viscositySum * invCount;
+            contract.water.avgBodyThickness = bodyThicknessSum * invCount;
+            contract.water.avgSloshStrength = sloshSum * invCount;
+            contract.water.avgMeniscusStrength = meniscusSum * invCount;
+            contract.water.avgFlowSpeed = flowSpeedSum * invCount;
         }
     }
 

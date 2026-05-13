@@ -372,6 +372,12 @@ struct FrameContract {
         float avgFoamStrength = 0.0f;
         float avgViscosity = 0.0f;
         float maxEmissiveHeat = 0.0f;
+        float avgBodyThickness = 0.0f;
+        float avgSloshStrength = 0.0f;
+        float avgMeniscusStrength = 0.0f;
+        float avgFlowSpeed = 0.0f;
+        uint32_t thickLiquidCount = 0;
+        uint32_t movingLiquidCount = 0;
     };
 
     struct VegetationInfo {

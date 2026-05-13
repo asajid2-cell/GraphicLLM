@@ -329,7 +329,13 @@ json FrameContractToJson(const FrameContract& contract) {
             {"avg_absorption", contract.water.avgAbsorption},
             {"avg_foam_strength", contract.water.avgFoamStrength},
             {"avg_viscosity", contract.water.avgViscosity},
-            {"max_emissive_heat", contract.water.maxEmissiveHeat}
+            {"max_emissive_heat", contract.water.maxEmissiveHeat},
+            {"avg_body_thickness", contract.water.avgBodyThickness},
+            {"avg_slosh_strength", contract.water.avgSloshStrength},
+            {"avg_meniscus_strength", contract.water.avgMeniscusStrength},
+            {"avg_flow_speed", contract.water.avgFlowSpeed},
+            {"thick_liquid_count", contract.water.thickLiquidCount},
+            {"moving_liquid_count", contract.water.movingLiquidCount}
         }},
         {"vegetation", {
             {"enabled", contract.vegetation.enabled},

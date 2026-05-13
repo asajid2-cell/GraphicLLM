@@ -124,11 +124,11 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.hasDefaultMetallic = true;
         info.defaultMetallic = 0.0f;
         info.hasDefaultRoughness = true;
-        info.defaultRoughness = 0.02f;
+        info.defaultRoughness = 0.012f;
         info.hasDefaultTransmission = true;
-        info.defaultTransmission = 0.85f;
+        info.defaultTransmission = 0.82f;
         info.hasDefaultSpecularFactor = true;
-        info.defaultSpecularFactor = 1.25f;
+        info.defaultSpecularFactor = 1.40f;
         info.hasDefaultSpecularColor = true;
         info.defaultSpecularColorFactor = glm::vec3(0.92f, 0.97f, 1.0f);
     } else if (contains("mirror")) {
@@ -236,14 +236,14 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         }
         info.metallic = true;
         info.clearcoat = true;
-        info.clearcoatFactor = 0.6f;
-        info.clearcoatRoughnessFactor = 0.08f;
+        info.clearcoatFactor = 0.72f;
+        info.clearcoatRoughnessFactor = contains("chrome") ? 0.035f : 0.06f;
         info.hasDefaultMetallic = true;
         info.defaultMetallic = 1.0f;
         info.hasDefaultRoughness = true;
-        info.defaultRoughness = contains("chrome") ? 0.08f : 0.12f;
+        info.defaultRoughness = contains("chrome") ? 0.045f : 0.09f;
         info.hasDefaultSpecularFactor = true;
-        info.defaultSpecularFactor = 1.15f;
+        info.defaultSpecularFactor = contains("chrome") ? 1.30f : 1.18f;
         info.hasDefaultSpecularColor = true;
         info.defaultSpecularColorFactor = contains("gold")
             ? glm::vec3(1.0f, 0.82f, 0.42f)

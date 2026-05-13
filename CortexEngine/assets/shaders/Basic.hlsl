@@ -1397,6 +1397,21 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
         specularIBL = prefiltered * Fibl;
+        if (isGlass)
+        {
+            // Glass should carry most of its readability through reflection
+            // and grazing-angle Fresnel. Suppress diffuse IBL and keep the
+            // prefiltered environment sharper so panes/cubes do not collapse
+            // into a flat blue alpha blend.
+            diffuseIBL *= 0.22f;
+            specularIBL *= 1.35f;
+        }
+        else if (metallic > 0.85f && roughness < 0.16f)
+        {
+            // Polished conductors need a little more environment contrast in
+            // the forward path to read as chrome under public showcase rigs.
+            specularIBL *= lerp(1.0f, 1.25f, saturate((0.16f - roughness) * 6.25f));
+        }
 
         float diffuseIntensity = g_EnvParams.x;
         float specularIntensity = g_EnvParams.y;
@@ -1988,6 +2003,26 @@ PSOutput PSMainInternal(PSInput input, bool useClusteredLocalLights)
 
     int2 pixelCoord = int2(input.position.xy);
     float3 color = CalculateLighting(normal, input.worldPos, albedo, metallic, roughness, ao, input.texCoord, pixelCoord, input.tangent, useClusteredLocalLights);
+
+    float materialTypeForOptics = g_FractalParams1.w;
+    bool glassOptics = (materialTypeForOptics > 0.5f && materialTypeForOptics < 1.5f) || transmission > 0.01f;
+    if (glassOptics)
+    {
+        float3 V = normalize(g_CameraPosition.xyz - input.worldPos);
+        float NdotV = saturate(dot(normalize(normal), V));
+        float ior = max(g_TransmissionParams.y, 1.0f);
+        float iorBend = saturate((ior - 1.0f) * 1.35f);
+        float opticalNoise = ProceduralMaterialMask(input.texCoord + normal.xy * 0.035f,
+                                                     input.worldPos + normalize(normal) * 0.18f);
+        float caustic = smoothstep(0.56f, 0.92f, opticalNoise);
+        float fresnelEdge = pow(1.0f - NdotV, 4.0f);
+        float3 transmittedTint = lerp(albedo, float3(0.70f, 0.92f, 1.0f), 0.32f + 0.30f * iorBend);
+        float3 internalScatter = transmittedTint * (0.22f + 0.28f * caustic) +
+                                 g_AmbientColor.rgb * (0.10f + 0.18f * iorBend);
+        float opticStrength = saturate(transmission * (0.38f + 0.42f * iorBend));
+        color = lerp(color, color * transmittedTint + internalScatter, opticStrength);
+        color += transmittedTint * fresnelEdge * (0.18f + 0.30f * transmission);
+    }
 
     // glTF emissive: emissiveFactor * emissiveStrength * emissiveTexture.
     float3 emissive = max(g_EmissiveFactorStrength.rgb, 0.0f) * max(g_EmissiveFactorStrength.w, 0.0f);

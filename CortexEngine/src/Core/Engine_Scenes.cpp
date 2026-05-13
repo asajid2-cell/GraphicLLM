@@ -843,7 +843,7 @@ void Engine::BuildMaterialLabScene() {
 
     const Swatch swatches[] = {
         {"MaterialLab_MirrorSphere", "mirror", glm::vec4(1.0f), 1.0f, 0.02f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
-        {"MaterialLab_ChromeSphere", "chrome", glm::vec4(0.68f, 0.68f, 0.72f, 1.0f), 1.0f, 0.14f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
+        {"MaterialLab_ChromeSphere", "chrome", glm::vec4(0.76f, 0.78f, 0.84f, 1.0f), 1.0f, 0.055f, &sphereMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
         {"MaterialLab_BrushedCylinder", "brushed_metal", glm::vec4(0.72f, 0.72f, 0.76f, 1.0f), 1.0f, 0.32f, &cylinderMesh, glm::vec3(1.0f), glm::vec3(0.0f)},
         {"MaterialLab_GoldTorus", "gold", glm::vec4(1.0f, 0.76f, 0.35f, 1.0f), 1.0f, 0.20f, &torusMesh, glm::vec3(1.0f), glm::vec3(glm::half_pi<float>(), 0.0f, 0.0f)},
         {"MaterialLab_ClearcoatCube", "clearcoat", glm::vec4(0.12f, 0.26f, 0.75f, 1.0f), 0.0f, 0.24f, &cubeMesh, glm::vec3(0.9f), glm::vec3(0.0f, 0.42f, 0.0f)},
@@ -869,9 +869,13 @@ void Engine::BuildMaterialLabScene() {
                                        s.color, s.metallic, s.roughness, s.preset);
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
         if (std::string(s.preset) == "glass") {
-            r.transmissionFactor = 0.68f;
-            r.ior = 1.45f;
-            r.specularFactor = 1.0f;
+            r.transmissionFactor = 0.74f;
+            r.ior = 1.50f;
+            r.specularFactor = 1.35f;
+        } else if (std::string(s.preset) == "chrome") {
+            r.clearcoatFactor = 0.72f;
+            r.clearcoatRoughnessFactor = 0.035f;
+            r.specularFactor = 1.30f;
         } else if (std::string(s.preset) == "clearcoat") {
             r.clearcoatFactor = 0.9f;
             r.clearcoatRoughnessFactor = 0.08f;
@@ -883,6 +887,32 @@ void Engine::BuildMaterialLabScene() {
             r.emissiveColor = glm::vec3(1.0f, 0.58f, 0.22f);
             r.emissiveStrength = 3.4f;
             r.emissiveBloomFactor = 0.6f;
+        }
+    }
+
+    // High-contrast strips behind the glass swatch make the transparent pass'
+    // refraction/tint behavior visible in screenshots and smoke captures.
+    if (cubeMesh && cubeMesh->gpuBuffers) {
+        struct GlassStrip {
+            const char* tag;
+            glm::vec3 offset;
+            glm::vec4 color;
+        };
+        const GlassStrip strips[] = {
+            {"MaterialLab_GlassRefractionStrip_Cyan",  {-3.72f, 1.08f, 2.05f}, glm::vec4(0.10f, 0.90f, 1.00f, 1.0f)},
+            {"MaterialLab_GlassRefractionStrip_Amber", {-3.20f, 1.08f, 2.05f}, glm::vec4(1.00f, 0.58f, 0.14f, 1.0f)},
+            {"MaterialLab_GlassRefractionStrip_Red",   {-2.68f, 1.08f, 2.05f}, glm::vec4(1.00f, 0.12f, 0.18f, 1.0f)}
+        };
+        for (const GlassStrip& strip : strips) {
+            auto e = addRenderable(strip.tag, cubeMesh, strip.offset,
+                                   glm::vec3(0.18f, 0.82f, 0.10f),
+                                   glm::vec3(0.0f),
+                                   strip.color,
+                                   0.0f, 0.18f, "emissive_panel");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            r.emissiveColor = glm::vec3(strip.color);
+            r.emissiveStrength = 2.1f;
+            r.emissiveBloomFactor = 0.35f;
         }
     }
 
@@ -1078,6 +1108,10 @@ void Engine::BuildGlassWaterCourtyardScene() {
         waterSurface.absorption = 0.40f;
         waterSurface.foamStrength = 0.92f;
         waterSurface.viscosity = 0.12f;
+        waterSurface.bodyThickness = 0.52f;
+        waterSurface.sloshStrength = 0.34f;
+        waterSurface.meniscusStrength = 0.45f;
+        waterSurface.flowSpeed = 1.15f;
         waterSurface.shallowTint = glm::vec3(0.10f, 0.55f, 0.85f);
         waterSurface.deepTint = glm::vec3(0.005f, 0.065f, 0.22f);
         m_registry->AddComponent<Scene::WaterSurfaceComponent>(water, waterSurface);
@@ -1109,9 +1143,9 @@ void Engine::BuildGlassWaterCourtyardScene() {
                                   glm::vec4(0.72f, 0.90f, 1.0f, 1.0f),
                                   0.0f, 0.035f, "glass_panel");
         auto& roofR = m_registry->GetComponent<Scene::RenderableComponent>(roof);
-        roofR.transmissionFactor = 0.55f;
-        roofR.ior = 1.45f;
-        roofR.specularFactor = 1.2f;
+        roofR.transmissionFactor = 0.66f;
+        roofR.ior = 1.50f;
+        roofR.specularFactor = 1.35f;
         roofR.doubleSided = true;
 
         auto warmPanel = addRenderable("GlassWaterCourtyard_SunsetPanel", quadMesh,
@@ -1134,9 +1168,9 @@ void Engine::BuildGlassWaterCourtyardScene() {
                                         glm::vec4(0.64f, 0.86f, 1.0f, 1.0f),
                                         0.0f, 0.04f, "glass");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(glassBlock);
-        r.transmissionFactor = 0.68f;
-        r.ior = 1.47f;
-        r.specularFactor = 1.15f;
+        r.transmissionFactor = 0.76f;
+        r.ior = 1.52f;
+        r.specularFactor = 1.38f;
     }
 
     if (sphereMesh && sphereMesh->gpuBuffers) {
@@ -1520,22 +1554,30 @@ void Engine::BuildLiquidGalleryScene() {
         float viscosity;
         float emissiveHeat;
         float roughness;
+        float bodyThickness;
+        float sloshStrength;
+        float meniscusStrength;
+        float flowSpeed;
         const char* preset;
     };
 
     const LiquidVat vats[] = {
         {"Water", Scene::WaterSurfaceComponent::LiquidType::Water,
          {-4.2f, 0.0f, -1.15f}, {0.08f, 0.42f, 0.72f, 0.72f},
-         {0.10f, 0.56f, 0.84f}, {0.005f, 0.06f, 0.23f}, 0.42f, 0.95f, 0.12f, 0.0f, 0.032f, "water"},
+         {0.10f, 0.56f, 0.84f}, {0.005f, 0.06f, 0.23f}, 0.42f, 0.95f, 0.12f, 0.0f, 0.032f,
+         0.52f, 0.36f, 0.44f, 1.20f, "water"},
         {"Lava", Scene::WaterSurfaceComponent::LiquidType::Lava,
          {1.35f, 0.0f, -1.15f}, {1.0f, 0.25f, 0.04f, 0.96f},
-         {1.0f, 0.42f, 0.06f}, {0.18f, 0.025f, 0.008f}, 0.95f, 0.0f, 0.78f, 5.2f, 0.24f, "lava"},
+         {1.0f, 0.42f, 0.06f}, {0.18f, 0.025f, 0.008f}, 0.95f, 0.0f, 0.78f, 5.2f, 0.24f,
+         0.84f, 0.14f, 0.62f, 0.46f, "lava"},
         {"Honey", Scene::WaterSurfaceComponent::LiquidType::Honey,
          {-4.2f, 0.0f, 2.25f}, {1.0f, 0.62f, 0.14f, 0.82f},
-         {1.0f, 0.75f, 0.20f}, {0.46f, 0.20f, 0.035f}, 0.58f, 0.08f, 0.78f, 0.0f, 0.16f, "honey"},
+         {1.0f, 0.75f, 0.20f}, {0.46f, 0.20f, 0.035f}, 0.58f, 0.08f, 0.78f, 0.0f, 0.16f,
+         0.82f, 0.10f, 0.74f, 0.32f, "honey"},
         {"Molasses", Scene::WaterSurfaceComponent::LiquidType::Molasses,
          {1.35f, 0.0f, 2.25f}, {0.15f, 0.065f, 0.025f, 0.88f},
-         {0.25f, 0.11f, 0.04f}, {0.025f, 0.010f, 0.004f}, 0.90f, 0.02f, 0.95f, 0.0f, 0.10f, "molasses"},
+         {0.25f, 0.11f, 0.04f}, {0.025f, 0.010f, 0.004f}, 0.90f, 0.02f, 0.95f, 0.0f, 0.10f,
+         0.96f, 0.06f, 0.88f, 0.18f, "molasses"},
     };
 
     for (const LiquidVat& vat : vats) {
@@ -1581,6 +1623,25 @@ void Engine::BuildLiquidGalleryScene() {
         }
 
         if (liquidPlane && liquidPlane->gpuBuffers) {
+            if (cubeMesh && cubeMesh->gpuBuffers) {
+                auto body = addRenderable(std::string("LiquidGallery_") + vat.name + "_Body",
+                                          cubeMesh,
+                                          vat.center + glm::vec3(0.0f, 0.12f, 0.0f),
+                                          glm::vec3(1.62f, 0.24f + vat.bodyThickness * 0.16f, 1.62f),
+                                          glm::vec3(0.0f),
+                                          glm::vec4(vat.deep, 0.34f + vat.bodyThickness * 0.20f),
+                                          0.0f, vat.roughness, vat.preset);
+                auto& bodyR = m_registry->GetComponent<Scene::RenderableComponent>(body);
+                bodyR.transmissionFactor = (vat.type == Scene::WaterSurfaceComponent::LiquidType::Lava) ? 0.0f : 0.22f;
+                bodyR.ior = (vat.type == Scene::WaterSurfaceComponent::LiquidType::Honey) ? 1.47f : 1.33f;
+                bodyR.specularFactor = (vat.type == Scene::WaterSurfaceComponent::LiquidType::Molasses) ? 0.9f : 1.1f;
+                if (vat.emissiveHeat > 0.0f) {
+                    bodyR.emissiveColor = vat.shallow;
+                    bodyR.emissiveStrength = vat.emissiveHeat * 0.65f;
+                    bodyR.emissiveBloomFactor = 0.55f;
+                }
+            }
+
             auto liquid = addRenderable(std::string("LiquidGallery_") + vat.name + "_Surface",
                                         liquidPlane,
                                         vat.center + glm::vec3(0.0f, 0.24f, 0.0f),
@@ -1604,6 +1665,10 @@ void Engine::BuildLiquidGalleryScene() {
             liquidComponent.foamStrength = vat.foam;
             liquidComponent.viscosity = vat.viscosity;
             liquidComponent.emissiveHeat = vat.emissiveHeat;
+            liquidComponent.bodyThickness = vat.bodyThickness;
+            liquidComponent.sloshStrength = vat.sloshStrength;
+            liquidComponent.meniscusStrength = vat.meniscusStrength;
+            liquidComponent.flowSpeed = vat.flowSpeed;
             liquidComponent.shallowTint = vat.shallow;
             liquidComponent.deepTint = vat.deep;
             m_registry->AddComponent<Scene::WaterSurfaceComponent>(liquid, liquidComponent);
@@ -1615,14 +1680,18 @@ void Engine::BuildLiquidGalleryScene() {
                       glm::vec3(-1.35f, 0.92f, -3.0f),
                       glm::vec3(0.72f),
                       glm::vec3(0.0f),
-                      glm::vec4(0.86f, 0.86f, 0.90f, 1.0f),
-                      1.0f, 0.08f, "mirror");
-        addRenderable("LiquidGallery_GlassProbe", sphereMesh,
-                      glm::vec3(4.3f, 0.88f, 0.65f),
-                      glm::vec3(0.62f),
-                      glm::vec3(0.0f),
-                      glm::vec4(0.70f, 0.88f, 1.0f, 1.0f),
-                      0.0f, 0.035f, "glass");
+                      glm::vec4(0.88f, 0.90f, 0.96f, 1.0f),
+                      1.0f, 0.045f, "chrome");
+        auto glassProbe = addRenderable("LiquidGallery_GlassProbe", sphereMesh,
+                                        glm::vec3(4.3f, 0.88f, 0.65f),
+                                        glm::vec3(0.62f),
+                                        glm::vec3(0.0f),
+                                        glm::vec4(0.70f, 0.88f, 1.0f, 1.0f),
+                                        0.0f, 0.025f, "glass");
+        auto& glassR = m_registry->GetComponent<Scene::RenderableComponent>(glassProbe);
+        glassR.transmissionFactor = 0.74f;
+        glassR.ior = 1.50f;
+        glassR.specularFactor = 1.35f;
     }
 
     if (quadMesh && quadMesh->gpuBuffers) {

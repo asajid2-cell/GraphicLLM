@@ -319,16 +319,16 @@
       "display_name": "Desert Relic Gallery",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "sunset_courtyard",
+      "default_environment": "cool_overcast",
       "default_lighting_rig": "desert_relic_sun",
       "required_bookmarks": ["hero", "stone_metal_closeup", "arch_depth"],
       "camera_bookmarks": [
         {
           "id": "hero",
           "label": "Sunlit relic hero",
-          "position": [-2.55, 1.35, -4.05],
-          "target": [0.06, 0.84, 0.46],
-          "fov": 39.0,
+          "position": [-3.1, 1.52, -5.1],
+          "target": [0.08, 0.76, 0.48],
+          "fov": 42.0,
           "validation": true
         },
         {

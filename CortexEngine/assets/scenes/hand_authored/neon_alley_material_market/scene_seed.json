@@ -29,7 +29,7 @@
   },
   "environment": {"ibl": "night_city", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-4.4, 1.55, -6.4], "target": [0.4, 1.1, 0.4], "fov": 44.0, "art_reason": "Low lens uses puddle reflections as foreground while preserving mounted signs."},
+    {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-1.85, 1.02, -3.15], "target": [0.62, 0.82, -0.10], "fov": 36.0, "art_reason": "Low close lens uses curb strips, display case, sign brackets, and puddle reflections as connected foreground/midground evidence."},
     {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-1.2, 1.05, -2.2], "target": [1.15, 0.9, -0.1], "fov": 34.0, "art_reason": "Judges material separation under colored light."},
     {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [2.9, 1.7, -4.4], "target": [-0.2, 1.2, 0.7], "fov": 40.0, "art_reason": "Backlit view makes particles visible without turning into noise."}
   ],

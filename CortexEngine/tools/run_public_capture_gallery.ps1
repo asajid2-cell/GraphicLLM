@@ -5,7 +5,8 @@ param(
     [string]$OutputDir = "",
     [int]$Width = 1920,
     [int]$Height = 1080,
-    [int]$SmokeFrames = 220
+    [int]$SmokeFrames = 220,
+    [switch]$AssetLedOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,9 +56,9 @@ $cases = @(
     @{ id = "coastal_cliff_foundry"; title = "Coastal Cliff Foundry"; scene = "coastal_cliff_foundry"; bookmark = "hero"; environment = "sunset_courtyard"; frames = 170; image = "coastal_cliff_foundry_hero.png" },
     @{ id = "coastal_cliff_foundry_material_closeup"; title = "Foundry Material Closeup"; scene = "coastal_cliff_foundry"; bookmark = "material_closeup"; environment = "sunset_courtyard"; frames = 150; image = "coastal_cliff_foundry_material_closeup.png" },
     @{ id = "coastal_cliff_foundry_atmosphere"; title = "Foundry Atmosphere"; scene = "coastal_cliff_foundry"; bookmark = "atmosphere"; environment = "sunset_courtyard"; frames = 150; image = "coastal_cliff_foundry_atmosphere.png" },
-    @{ id = "rain_glass_pavilion"; title = "Rain Glass Pavilion"; scene = "rain_glass_pavilion"; bookmark = "hero"; environment = "cool_overcast"; frames = 170; image = "rain_glass_pavilion_hero.png" },
-    @{ id = "rain_glass_pavilion_glass_closeup"; title = "Rain Glass Closeup"; scene = "rain_glass_pavilion"; bookmark = "glass_closeup"; environment = "cool_overcast"; frames = 150; image = "rain_glass_pavilion_glass_closeup.png" },
-    @{ id = "rain_glass_pavilion_puddle_chrome"; title = "Puddle and Chrome"; scene = "rain_glass_pavilion"; bookmark = "puddle_chrome"; environment = "cool_overcast"; frames = 150; image = "rain_glass_pavilion_puddle_chrome.png" },
+    @{ id = "rain_glass_pavilion"; title = "Rain Glass Pavilion"; scene = "rain_glass_pavilion"; bookmark = "hero"; environment = "night_city"; frames = 170; image = "rain_glass_pavilion_hero.png" },
+    @{ id = "rain_glass_pavilion_glass_closeup"; title = "Rain Glass Closeup"; scene = "rain_glass_pavilion"; bookmark = "glass_closeup"; environment = "night_city"; frames = 150; image = "rain_glass_pavilion_glass_closeup.png" },
+    @{ id = "rain_glass_pavilion_puddle_chrome"; title = "Puddle and Chrome"; scene = "rain_glass_pavilion"; bookmark = "puddle_chrome"; environment = "night_city"; frames = 150; image = "rain_glass_pavilion_puddle_chrome.png" },
     @{ id = "desert_relic_gallery"; title = "Desert Relic Gallery"; scene = "desert_relic_gallery"; bookmark = "hero"; environment = "sunset_courtyard"; frames = 170; image = "desert_relic_gallery_hero.png" },
     @{ id = "desert_relic_gallery_stone_metal"; title = "Desert Stone and Metal"; scene = "desert_relic_gallery"; bookmark = "stone_metal_closeup"; environment = "sunset_courtyard"; frames = 150; image = "desert_relic_gallery_stone_metal.png" },
     @{ id = "desert_relic_gallery_arch_depth"; title = "Desert Arch Depth"; scene = "desert_relic_gallery"; bookmark = "arch_depth"; environment = "sunset_courtyard"; frames = 150; image = "desert_relic_gallery_arch_depth.png" },
@@ -70,6 +71,17 @@ $cases = @(
     @{ id = "ibl_gallery_hero"; title = "IBL Gallery Hero"; scene = "ibl_gallery"; bookmark = "hero"; environment = "warm_gallery"; frames = 160; image = "ibl_gallery_hero.png" },
     @{ id = "ibl_gallery"; title = "IBL Gallery Sweep"; scene = "ibl_gallery"; bookmark = "environment_sweep"; environment = "warm_gallery"; frames = 180; image = "ibl_gallery_sweep.png" }
 )
+
+if ($AssetLedOnly) {
+    $assetLedScenes = @(
+        "coastal_cliff_foundry",
+        "rain_glass_pavilion",
+        "desert_relic_gallery",
+        "neon_alley_material_market",
+        "forest_creek_shrine"
+    )
+    $cases = @($cases | Where-Object { $assetLedScenes -contains $_.scene })
+}
 
 $runId = "public_capture_gallery_{0}_{1}_{2}" -f `
     (Get-Date -Format "yyyyMMdd_HHmmss_fff"),

@@ -363,9 +363,14 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Focused asset-led capture passed.
   - Visual baseline case `neon_alley_material_market_hero_release` added and validated by full 12-case runtime visual baseline and probe validation.
   - Harsh review recorded: this is currently the strongest new scene, but the market still needs denser storefront assets and signage that reads as designed graphics rather than blank glowing panels.
+  - Neon signage/environment iteration added sign glyph masks, amber blade sign detail, display shelf/posts, awnings, rear service door, pipe stacks, overhead beams, and floor breakup patches; required layout tokens now cover the new authored detail pieces.
+  - `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'` passed after the neon iteration.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the neon iteration.
+  - Focused captures `neon_review8`, `neon_review9`, `neon_review10`, and `neon_review11` were manually reviewed. `neon_review11` reduced the city-HDRI billboard failure and proved the new authored tokens render, but the scene remains rejected for public media because it is too dark, primitive-wall heavy, and the rain/glass/sign composition still lacks authored storefront quality.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Run visual review and fix bloom/particle/framing defects found in screenshots.
+  - Replace primitive storefront/display geometry with authored meshes or stronger modular facade pieces.
+  - Rebalance magenta/cyan lighting, display-case glass, rain particles, and foreground props so the scene reads as a deliberate wet market rather than a dark box set.
 
 ### ALS-010: Forest Creek Shrine Scene
 
@@ -478,6 +483,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion capture `rain_review12`; the interior focal point improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused neon captures `neon_review8`, `neon_review9`, `neon_review10`, and `neon_review11`; the city-HDRI billboard failure is reduced and the signage/detail tokens render, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.

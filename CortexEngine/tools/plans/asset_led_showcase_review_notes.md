@@ -302,6 +302,51 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Neon Alley Signage and Environment Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/neon_review8/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/neon_review9/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/neon_review10/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/neon_review11/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, and the city-HDRI billboard failure is reduced, but the neon alley remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added designed sign-mask bars, a secondary amber blade sign, and display-case interior shelf/post details so the signage no longer reads as only blank emissive rectangles.
+- Replaced the giant overhead slab with thinner overhead beams.
+- Added awnings, rear service door, pipe stacks, floor breakup patches, and stricter composition tokens for those details.
+- Switched the public/default capture path from `night_city` to `studio` with deliberately low IBL/specular intensity because `night_city` reflected as visible city billboards across the walls and display glass.
+- Tightened the hero bookmark so the display case, mounted sign, wet floor, and alley wall occupy a more connected frame.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `neon_review11` rendered at 1920x1080 with `renderScale=1.000`, `VB renderedThisFrame=true`, `instances=47`, and texture uploads `submitted=7 completed=7 failed=0 pending=0 uploaded=34.67MB`.
+
+Findings:
+
+- `neon_review8` and `neon_review9` were rejected because the scene looked like floating boxes in front of city-HDRI panels; the blank cyan sign and oversized reflective glass dominated the shot.
+- `neon_review10`/`neon_review11` remove the worst city-billboard read and prove the added details are present, but the scene is now too dark and still relies on primitive wall/display geometry.
+- The hero is acceptable as a checkpoint, not as a public screenshot. It needs authored storefront meshes, better interior props, more readable magenta/cyan balance, and rain/steam particles that do not obscure the display case.
+
+Decision:
+
+- Do not publish the neon alley captures.
+- Keep `ALS-009` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Desert Relic Asset Breakup and Environment Iteration
 
 Commands:

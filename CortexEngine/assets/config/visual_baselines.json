@@ -463,7 +463,7 @@
                       "id":  "neon_alley_material_market_hero_release",
                       "scene":  "neon_alley_material_market",
                       "camera_bookmark":  "hero",
-                      "environment":  "night_city",
+                      "environment":  "studio",
                       "graphics_preset":  "release_showcase",
                       "lighting_rig":  "neon_market_rain",
                       "required":  true,

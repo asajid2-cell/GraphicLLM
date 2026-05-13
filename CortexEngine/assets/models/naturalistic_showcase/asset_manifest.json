@@ -226,6 +226,84 @@
         "emissive": null,
         "fallback": "renderer_material_fallback_if_missing"
       }
+    },
+    {
+      "id": "tree_stump_01",
+      "display_name": "Tree Stump 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/tree_stump_01",
+      "runtime_gltf": "tree_stump_01/tree_stump_01_1k.gltf",
+      "expected_polycount": 70722,
+      "budget_class": "hero_natural",
+      "scene_uses": ["forest_creek_shrine"],
+      "tags": ["forest", "stump", "wood", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Grounded stump scan; place as a bank anchor rather than a floating canopy substitute."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.78, -0.19, -0.76], "max": [0.64, 0.38, 0.83]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["creek_bank_anchor", "natural_shrine_surround", "foreground_wood_detail"],
+      "material_textures": {
+        "status": "available_bound_runtime",
+        "base_color": "textures/tree_stump_01_diff_1k.jpg",
+        "normal": "textures/tree_stump_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/tree_stump_01_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "renderer_material_fallback_if_missing"
+      }
+    },
+    {
+      "id": "rock_moss_set_01",
+      "display_name": "Rock Moss Set 01",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/rock_moss_set_01",
+      "runtime_gltf": "rock_moss_set_01/rock_moss_set_01_1k.gltf",
+      "expected_polycount": 44538,
+      "budget_class": "detail_natural",
+      "scene_uses": ["forest_creek_shrine"],
+      "tags": ["forest", "moss", "rock", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Multi-rock set; placements must hide kit repetition and sit below the water/ground contact line."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-1.28, -0.66, -1.70], "max": [1.38, 1.11, 1.67]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["mossy_creek_edge", "bank_breakup", "wet_rock_detail"],
+      "material_textures": {
+        "status": "available_bound_runtime",
+        "base_color": "textures/rock_moss_set_01_diff_1k.jpg",
+        "normal": "textures/rock_moss_set_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/rock_moss_set_01_rough_1k.jpg",
+        "emissive": null,
+        "fallback": "renderer_material_fallback_if_missing"
+      }
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "display_name": "Wild Rooibos Bush",
+      "license": "CC0",
+      "source_url": "https://polyhaven.com/a/wild_rooibos_bush",
+      "runtime_gltf": "wild_rooibos_bush/wild_rooibos_bush_1k.gltf",
+      "expected_polycount": 7446,
+      "budget_class": "detail_natural",
+      "scene_uses": ["forest_creek_shrine"],
+      "tags": ["forest", "bush", "vegetation", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Compact vegetation asset used to replace floating primitive canopy blobs with grounded authored massing."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.55, 0.0, -0.55], "max": [0.55, 0.58, 0.55]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["grounded_canopy_breakup", "forest_bank_mass", "background_vegetation"],
+      "material_textures": {
+        "status": "available_bound_runtime",
+        "base_color": "textures/wild_rooibos_bush_diff_1k.jpg",
+        "normal": "textures/wild_rooibos_bush_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/wild_rooibos_bush_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "renderer_material_fallback_if_missing"
+      }
     }
   ]
 }

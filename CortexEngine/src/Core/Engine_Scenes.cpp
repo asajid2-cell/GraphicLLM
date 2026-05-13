@@ -4975,12 +4975,12 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
         renderer->SetWorldShaderPaletteContract("neon_market_rain", "neon_market_rain");
         renderer->SetEnvironmentPreset("studio");
         renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.24f, 0.34f);
+        renderer->SetIBLIntensity(0.30f, 0.40f);
         renderer->SetBackgroundPresentation(false, 0.45f, 0.40f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.16f, 0.72f, 0.38f)));
         renderer->SetSunColor(glm::vec3(0.12f, 0.42f, 0.88f));
         renderer->SetSunIntensity(0.9f);
-        renderer->SetExposure(0.70f);
+        renderer->SetExposure(0.84f);
         renderer->SetBloomIntensity(0.42f);
         renderer->SetBloomShape(0.75f, 0.58f, 2.25f);
         renderer->SetCinematicPostEnabled(true);
@@ -5009,14 +5009,14 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-1.65f, 1.05f, -3.55f), glm::vec3(0.28f, 0.92f, 0.20f), 34.0f, 120.0f);
+        glm::vec3(-1.78f, 1.02f, -3.35f), glm::vec3(0.08f, 0.84f, 0.04f), 38.0f, 120.0f);
 
     const AssetLedMaterialSettings wetAsphalt{glm::vec4(0.030f, 0.032f, 0.038f, 1.0f), 0.0f, 0.42f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.48f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings alleyBrick{glm::vec4(0.065f, 0.058f, 0.050f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.04f, 0.32f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings blackenedMetal{glm::vec4(0.018f, 0.020f, 0.024f, 1.0f), 0.65f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.18f, 0.22f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "soot_grime"};
-    const AssetLedMaterialSettings neonPink{glm::vec4(1.0f, 0.12f, 0.48f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.12f, 0.48f), 2.7f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
-    const AssetLedMaterialSettings neonCyan{glm::vec4(0.08f, 0.82f, 0.72f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.08f, 0.82f, 0.72f), 1.9f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
-    const AssetLedMaterialSettings neonAmber{glm::vec4(1.0f, 0.58f, 0.14f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(1.0f, 0.42f, 0.08f), 1.8f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings neonPink{glm::vec4(1.0f, 0.12f, 0.48f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.12f, 0.48f), 3.1f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings neonCyan{glm::vec4(0.08f, 0.82f, 0.72f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.08f, 0.82f, 0.72f), 2.2f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings neonAmber{glm::vec4(1.0f, 0.58f, 0.14f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(1.0f, 0.42f, 0.08f), 1.55f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
     const AssetLedMaterialSettings signMask{glm::vec4(0.012f, 0.016f, 0.022f, 1.0f), 0.0f, 0.32f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.2f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "soot_grime"};
     const AssetLedMaterialSettings glass{glm::vec4(0.32f, 0.52f, 0.66f, 0.30f), 0.0f, 0.10f, 0.38f, 1.45f, glm::vec3(0.0f), 1.0f, 0.28f, 0.16f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
     const AssetLedMaterialSettings chrome{glm::vec4(0.72f, 0.82f, 0.86f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.55f, 0.2f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
@@ -5026,6 +5026,10 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedRenderable(*m_registry, "NeonMarket_RightCurbStrip", cubeMesh, glm::vec3(1.75f, 0.03f, -0.35f), glm::vec3(0.16f, 0.14f, 7.6f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RearAlleyWall", cubeMesh, glm::vec3(0.0f, 1.28f, 3.20f), glm::vec3(5.4f, 2.55f, 0.32f), glm::vec3(0.0f), alleyBrick);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RearLowerServiceDoor", cubeMesh, glm::vec3(-0.85f, 0.78f, 3.02f), glm::vec3(0.75f, 1.45f, 0.08f), glm::vec3(0.0f), blackenedMetal);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RearMenuBoard", cubeMesh, glm::vec3(0.62f, 1.34f, 2.98f), glm::vec3(0.62f, 0.42f, 0.055f), glm::vec3(0.0f), neonPink);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RearMenuGlyphA", cubeMesh, glm::vec3(0.30f, 1.42f, 2.935f), glm::vec3(0.22f, 0.030f, 0.030f), glm::vec3(0.0f), signMask);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RearMenuGlyphB", cubeMesh, glm::vec3(0.68f, 1.30f, 2.935f), glm::vec3(0.28f, 0.030f, 0.030f), glm::vec3(0.0f), signMask);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RearMenuGlyphC", cubeMesh, glm::vec3(0.92f, 1.42f, 2.935f), glm::vec3(0.040f, 0.14f, 0.030f), glm::vec3(0.0f), signMask);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RearPipeStackA", cubeMesh, glm::vec3(1.05f, 1.32f, 2.98f), glm::vec3(0.08f, 2.15f, 0.08f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RearPipeStackB", cubeMesh, glm::vec3(1.26f, 1.02f, 2.96f), glm::vec3(0.055f, 1.55f, 0.055f), glm::vec3(0.0f), blackenedMetal);
     AddAssetLedRenderable(*m_registry, "NeonMarket_OverheadBeamFront", cubeMesh, glm::vec3(0.0f, 2.54f, -2.20f), glm::vec3(4.7f, 0.13f, 0.14f), glm::vec3(0.0f), blackenedMetal);
@@ -5045,16 +5049,18 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedRenderable(*m_registry, "NeonMarket_SmallAmberBladeSign", cubeMesh, glm::vec3(-2.04f, 1.38f, 1.35f), glm::vec3(0.08f, 0.22f, 0.72f), glm::vec3(0.0f), neonAmber);
     AddAssetLedRenderable(*m_registry, "NeonMarket_AmberBladeGlyphA", cubeMesh, glm::vec3(-1.98f, 1.43f, 1.15f), glm::vec3(0.035f, 0.05f, 0.18f), glm::vec3(0.0f), signMask);
     AddAssetLedRenderable(*m_registry, "NeonMarket_AmberBladeGlyphB", cubeMesh, glm::vec3(-1.98f, 1.33f, 1.55f), glm::vec3(0.035f, 0.045f, 0.20f), glm::vec3(0.0f), signMask);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_LeftStallGlowStrip", cubeMesh, glm::vec3(-1.86f, 0.88f, -0.20f), glm::vec3(0.045f, 0.050f, 1.26f), glm::vec3(0.0f), neonAmber);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_LeftStallLowerCyan", cubeMesh, glm::vec3(-1.84f, 0.52f, -0.34f), glm::vec3(0.040f, 0.035f, 0.78f), glm::vec3(0.0f), neonCyan);
     AddAssetLedRenderable(*m_registry, "NeonMarket_PinkSignBracketTop", cubeMesh, glm::vec3(-2.06f, 2.37f, -0.85f), glm::vec3(0.22f, 0.05f, 1.52f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_PinkSignBracketBottom", cubeMesh, glm::vec3(-2.06f, 1.83f, -0.85f), glm::vec3(0.22f, 0.05f, 1.52f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_CyanSignBracketTop", cubeMesh, glm::vec3(2.06f, 1.95f, 0.95f), glm::vec3(0.22f, 0.05f, 1.32f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_CyanSignBracketBottom", cubeMesh, glm::vec3(2.06f, 1.49f, 0.95f), glm::vec3(0.22f, 0.05f, 1.32f), glm::vec3(0.0f), chrome);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayGlass", cubeMesh, glm::vec3(0.6f, 0.66f, -1.2f), glm::vec3(1.3f, 0.68f, 0.55f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), glass);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayChromeTrim", cubeMesh, glm::vec3(0.6f, 1.04f, -1.2f), glm::vec3(1.4f, 0.06f, 0.62f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayBase", cubeMesh, glm::vec3(0.6f, 0.22f, -1.2f), glm::vec3(1.48f, 0.44f, 0.72f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetAsphalt);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayInnerAmberShelf", cubeMesh, glm::vec3(0.56f, 0.62f, -1.22f), glm::vec3(1.05f, 0.045f, 0.38f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), neonAmber);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayLeftPost", cubeMesh, glm::vec3(-0.11f, 0.58f, -1.27f), glm::vec3(0.055f, 0.74f, 0.06f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
-    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayRightPost", cubeMesh, glm::vec3(1.28f, 0.58f, -1.12f), glm::vec3(0.055f, 0.74f, 0.06f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayGlass", cubeMesh, glm::vec3(0.58f, 0.58f, -1.14f), glm::vec3(1.02f, 0.46f, 0.46f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayChromeTrim", cubeMesh, glm::vec3(0.58f, 0.85f, -1.14f), glm::vec3(1.12f, 0.045f, 0.52f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayBase", cubeMesh, glm::vec3(0.58f, 0.17f, -1.14f), glm::vec3(1.18f, 0.34f, 0.60f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetAsphalt);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayInnerAmberShelf", cubeMesh, glm::vec3(0.54f, 0.54f, -1.16f), glm::vec3(0.76f, 0.035f, 0.26f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), neonAmber);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayLeftPost", cubeMesh, glm::vec3(0.00f, 0.50f, -1.21f), glm::vec3(0.045f, 0.56f, 0.052f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_DisplayRightPost", cubeMesh, glm::vec3(1.13f, 0.50f, -1.08f), glm::vec3(0.045f, 0.56f, 0.052f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_PuddleBreakupA", cubeMesh, glm::vec3(-0.92f, 0.012f, -1.88f), glm::vec3(0.72f, 0.018f, 0.38f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), blackenedMetal);
     AddAssetLedRenderable(*m_registry, "NeonMarket_PuddleBreakupB", cubeMesh, glm::vec3(0.82f, 0.014f, 0.42f), glm::vec3(0.88f, 0.018f, 0.30f), glm::vec3(0.0f, glm::radians(-16.0f), 0.0f), blackenedMetal);
     for (int i = 0; i < 5; ++i) {
@@ -5069,9 +5075,10 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
         AddAssetLedNaturalisticRenderable(*m_registry, "NeonMarket_GroundedBarrel", "Barrel_01", barrelMesh, glm::vec3(1.55f, 0.45f, -2.0f), glm::vec3(0.55f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), chrome);
     }
     AddParticleEffect(*m_registry, "NeonMarket_SteamPuffs", "steam", glm::vec3(-0.2f, 0.22f, -1.6f));
-    AddParticleEffect(*m_registry, "NeonMarket_Rain", "rain", glm::vec3(0.0f, 2.8f, -0.3f));
-    AddAssetLedPointLight(*m_registry, "NeonMarket_PinkLight", glm::vec3(-1.9f, 1.8f, -0.7f), glm::vec3(1.0f, 0.18f, 0.58f), 5.5f, 6.5f);
-    AddAssetLedPointLight(*m_registry, "NeonMarket_CyanLight", glm::vec3(1.9f, 1.65f, 0.9f), glm::vec3(0.15f, 1.0f, 0.78f), 4.8f, 6.0f);
+    AddParticleEffect(*m_registry, "NeonMarket_Rain", "rain", glm::vec3(0.0f, 3.1f, 1.10f));
+    AddAssetLedPointLight(*m_registry, "NeonMarket_PinkLight", glm::vec3(-1.9f, 1.8f, -0.7f), glm::vec3(1.0f, 0.18f, 0.58f), 6.4f, 6.5f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_CyanLight", glm::vec3(1.9f, 1.65f, 0.9f), glm::vec3(0.15f, 1.0f, 0.78f), 5.4f, 6.0f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_LeftStallWarmLight", glm::vec3(-1.45f, 0.86f, -0.25f), glm::vec3(1.0f, 0.48f, 0.18f), 2.4f, 3.2f);
 }
 
 void Engine::BuildForestCreekShrineScene() {

@@ -563,6 +563,55 @@ Decision:
 - Keep `ALS-009` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Neon Alley Lit-Market Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_gpu_particle_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_effects_showcase_smoke.ps1`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/neon_review12_current_prepass/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/neon_review13_lit_market/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, and the neon shot is more readable, but the neon alley remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Raised the authored neon exposure to `0.84` and updated the world-palette contract so runtime checks enforce the brighter art direction.
+- Widened the hero camera to bring the left storefront back into the frame.
+- Reduced the display-case glass/base/shelf footprint so it no longer consumes the entire right foreground.
+- Moved the rain effect farther back and added a magenta rear menu board, glyph masks, and left-stall amber/cyan accent strips.
+- Strengthened the runtime layout contract to require the new menu/stall-light details.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- World shader contract passed with `palettes=5 modes=9`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- GPU particle contract tests passed.
+- Effects Showcase smoke passed.
+- Focused capture `neon_review13_lit_market` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=14.053`, `avg_luma=35.128`, and texture uploads `submitted=7 completed=7 failed=0 pending=0 uploaded=34.67MB`.
+
+Findings:
+
+- The new magenta menu board and left stall accent lights make the frame less empty than `neon_review12`.
+- The smaller display case is easier to read as glass/chrome instead of a giant transparent block.
+- The scene is still too dark for public media, rain streaks/droplets still distract from the case, and the storefront wall/display architecture remains primitive.
+
+Decision:
+
+- Do not publish the neon captures.
+- Keep `ALS-009` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Coastal Foundry Rail and Furnace Iteration
 
 Commands:

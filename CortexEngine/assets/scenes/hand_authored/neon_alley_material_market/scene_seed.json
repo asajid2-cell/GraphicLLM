@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "neon_alley_material_market",
+  "version": 1,
+  "status": "seeded_not_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "intent": {
+    "one_sentence": "A wet neon alley material market with emissive signs, chrome, glass, steam, and dense authored storefronts.",
+    "art_goal": "Push emissive bloom, particles, wet asphalt, chrome, glass, and cinematic post without disconnected set dressing.",
+    "foreground_midground_background": {
+      "foreground": "Wet asphalt, puddles, cable anchors, and reflective curb.",
+      "midground": "Market stalls, glass cases, neon signs, chrome props.",
+      "background": "Layered alley depth with haze and colored silhouettes."
+    },
+    "forbidden_reads": ["floating signs", "random neon rectangles", "unmounted cables", "flat dark-blue corridor"]
+  },
+  "lighting": {
+    "script_id": "neon_market_rain",
+    "rig": "neon_market_rain",
+    "key": "Magenta sign wall from left storefronts.",
+    "fill": "Blue rain bounce from right and ground puddles.",
+    "rim": "Cyan backlight through steam.",
+    "fog": "Colored wet haze and steam pockets.",
+    "exposure": 0.7,
+    "bloom_ceiling": 2.25,
+    "warm_cool_contrast": 0.82,
+    "world_shader_palette": "neon_market_rain"
+  },
+  "environment": {"ibl": "studio", "fallback": "procedural_sky"},
+  "cameras": [
+    {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-4.4, 1.55, -6.4], "target": [0.4, 1.1, 0.4], "fov": 44.0, "art_reason": "Low lens uses puddle reflections as foreground while preserving mounted signs."},
+    {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-1.2, 1.05, -2.2], "target": [1.15, 0.9, -0.1], "fov": 34.0, "art_reason": "Judges material separation under colored light."},
+    {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [2.9, 1.7, -4.4], "target": [-0.2, 1.2, 0.7], "fov": 40.0, "art_reason": "Backlit view makes particles visible without turning into noise."}
+  ],
+  "material_palette": [
+    {"id": "wet_asphalt", "surface_class": "masonry", "shader_mode": "wet_ground", "description": "Dark wet pavement with puddles and grime."},
+    {"id": "neon_glass", "surface_class": "glass", "shader_mode": "glass_tint", "description": "Display glass carrying colored reflections."},
+    {"id": "sign_emissive", "surface_class": "emissive", "shader_mode": "soot_grime", "description": "Mounted emissive signage with bloom control."},
+    {"id": "market_chrome", "surface_class": "mirror_metal", "shader_mode": "oxidized_metal", "description": "Chrome trims and wet pipes in colored light."}
+  ],
+  "assets": [
+    {"id": "left_storefront", "role": "building_front", "source": "primitive:storefront_group", "transform": {"position": [-1.8, 1.1, 0.0], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [0.38, 2.2, 4.6]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "wet_asphalt", "art_reason": "Storefront wall anchors signs, cables, and glass cases."},
+    {"id": "mounted_neon_sign", "role": "emissive_fixture", "source": "primitive:sign_box", "transform": {"position": [-1.55, 2.1, -0.85], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [0.12, 0.38, 1.35]}, "contact": "mounted", "anchor": "left_storefront", "material_override": "sign_emissive", "art_reason": "Sign is physically mounted to storefront, not floating in air."},
+    {"id": "glass_market_case", "role": "framed_glass_case", "source": "primitive:display_case", "transform": {"position": [0.6, 0.55, -1.2], "rotation_degrees": [0.0, -6.0, 0.0], "scale": [1.3, 0.9, 0.55]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "neon_glass", "art_reason": "Glass case gives reflections and refraction a believable object."}
+  ],
+  "authored_groups": [
+    {"id": "storefront_sign_group", "primary": true, "art_reason": "Signs, mounts, frames, and cables are tied to storefront geometry.", "parts": ["left_storefront", "mounted_neon_sign", "cable_clamps", "sign_brackets"], "contact_rules": {"requires_supports": true, "max_gap_m": 0.07}},
+    {"id": "wet_alley_group", "primary": true, "art_reason": "Pavement, curb, puddles, and drains make reflections grounded.", "parts": ["wet_asphalt_plane", "curb_strip", "drain_grate", "puddle_patches"], "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.05}},
+    {"id": "market_display_group", "primary": true, "art_reason": "Glass and chrome display objects provide material focus.", "parts": ["glass_market_case", "chrome_trim", "inner_emissive_shelf", "small_props"], "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.08}}
+  ],
+  "seeded_random_groups": [
+    {"id": "steam_puffs", "seed": 90777, "count": 12, "bounds": [-1.2, 0.2, -2.4, 2.2, 2.4, 1.7], "min_spacing": 0.5, "anchor": "wet_alley_group", "art_reason": "Secondary atmosphere tied to drains and warm fixtures."}
+  ],
+  "validation": {"contact_tolerance_m": 0.05, "max_gap_m": 0.08, "min_authored_groups": 3, "max_round_prop_axis_ratio": 1.2, "require_foreground_midground_background": true, "palette_required": true}
+}

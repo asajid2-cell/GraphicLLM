@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "forest_creek_shrine",
+  "version": 1,
+  "status": "seeded_not_runtime",
+  "units": "meters",
+  "coordinate_system": "y_up_right_handed",
+  "intent": {
+    "one_sentence": "A mossy forest creek shrine with shallow water, rocks, wood, vegetation, and soft filtered light.",
+    "art_goal": "Prove a natural scene can be authored and cohesive without random vegetation scatter.",
+    "foreground_midground_background": {
+      "foreground": "Shallow creek stones and reflected leaves.",
+      "midground": "Grounded shrine, moss, and fallen wood.",
+      "background": "Layered vegetation silhouettes and mist."
+    },
+    "forbidden_reads": ["random plant scatter", "floating shrine", "plain green/brown palette", "featureless creek sheet"]
+  },
+  "lighting": {
+    "script_id": "forest_creek_mist",
+    "rig": "forest_creek_mist",
+    "key": "Soft filtered green-gold sun through canopy.",
+    "fill": "Cool damp forest shade.",
+    "rim": "Warm low highlights on creek and shrine edges.",
+    "fog": "Thin ground mist over creek and undergrowth.",
+    "exposure": 0.86,
+    "bloom_ceiling": 1.25,
+    "warm_cool_contrast": 0.36,
+    "world_shader_palette": "forest_creek_mist"
+  },
+  "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
+  "cameras": [
+    {"id": "hero", "role": "Creek leading line into shrine and vegetation layers.", "position": [-4.2, 1.25, -5.1], "target": [0.2, 0.75, 0.65], "fov": 44.0, "art_reason": "Low creek angle ties water, rocks, and shrine into one composition."},
+    {"id": "moss_water", "role": "Moss, wet rock, and shallow water detail.", "position": [-1.6, 0.72, -2.0], "target": [0.6, 0.42, -0.1], "fov": 34.0, "art_reason": "Checks wetness and material blend without losing contact."},
+    {"id": "shrine_depth", "role": "Shrine grounding and background vegetation depth.", "position": [2.8, 1.45, -3.6], "target": [0.0, 0.9, 0.5], "fov": 40.0, "art_reason": "Shows shrine base, rocks, and foliage layers."}
+  ],
+  "material_palette": [
+    {"id": "mossy_stone", "surface_class": "masonry", "shader_mode": "moss_vegetation", "description": "Stone with moss accumulation and damp edges."},
+    {"id": "creek_water", "surface_class": "water", "shader_mode": "wet_ground", "description": "Shallow water with visible stone underneath."},
+    {"id": "wet_bark", "surface_class": "wood", "shader_mode": "soot_grime", "description": "Dark damp wood and roots."},
+    {"id": "filtered_leaf", "surface_class": "vegetation", "shader_mode": "moss_vegetation", "description": "Soft green vegetation with light variation."}
+  ],
+  "assets": [
+    {"id": "shrine_base", "role": "hero_plinth", "source": "primitive:stone_shrine_base", "transform": {"position": [0.0, 0.25, 0.35], "rotation_degrees": [0.0, 8.0, 0.0], "scale": [1.4, 0.5, 1.0]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "mossy_stone", "art_reason": "Grounded focal object; no floating shrine problem."},
+    {"id": "creek_sheet", "role": "contained_liquid", "source": "primitive:shallow_water_path", "transform": {"position": [-0.7, 0.05, -1.4], "rotation_degrees": [0.0, -12.0, 0.0], "scale": [2.8, 0.04, 3.4]}, "contact": "contained_liquid", "expected_surface_y": 0.05, "material_override": "creek_water", "art_reason": "Water follows a banked path instead of a thin isolated sheet."},
+    {"id": "fallen_trunk", "role": "natural_bridge", "source": "asset_kit:dead_tree_trunk", "transform": {"position": [-1.2, 0.24, 0.9], "rotation_degrees": [0.0, -22.0, 6.0], "scale": [0.95, 0.95, 0.95]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "wet_bark", "art_reason": "Natural scan bridges creek and shrine composition."}
+  ],
+  "authored_groups": [
+    {"id": "creek_bank_group", "primary": true, "art_reason": "Water is bounded by rocks and banks rather than floating flatly.", "parts": ["creek_sheet", "left_bank_rocks", "right_bank_rocks", "foam_edges"], "contact_rules": {"requires_ground_contact": true, "must_contain_liquid": true, "max_gap_m": 0.1}},
+    {"id": "shrine_group", "primary": true, "art_reason": "Shrine, plinth, moss, and stones are a grounded focal cluster.", "parts": ["shrine_base", "capstone", "moss_patches", "front_steps"], "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.06}},
+    {"id": "vegetation_layer_group", "primary": false, "art_reason": "Vegetation is clustered by bank and background layer, not uniform random scatter.", "parts": ["fallen_trunk", "fern_cluster_left", "fern_cluster_right", "background_canopy"], "contact_rules": {"requires_ground_contact": true, "max_gap_m": 0.12}}
+  ],
+  "seeded_random_groups": [
+    {"id": "leaf_litter", "seed": 51577, "count": 20, "bounds": [-2.4, 0.0, -2.2, 2.2, 0.08, 1.9], "min_spacing": 0.2, "anchor": "creek_bank_group", "art_reason": "Small secondary litter follows creek banks only."}
+  ],
+  "validation": {"contact_tolerance_m": 0.05, "max_gap_m": 0.12, "min_authored_groups": 3, "max_round_prop_axis_ratio": 1.2, "require_foreground_midground_background": true, "palette_required": true}
+}

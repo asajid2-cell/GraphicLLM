@@ -10,6 +10,12 @@
     "runtime_resolution": "1k",
     "max_total_bytes": 52428800,
     "max_single_asset_bytes": 8388608,
+    "orientation_contract_required": true,
+    "contact_policy_required": true,
+    "pbr_texture_status_required": true,
+    "allowed_up_axes": ["Y"],
+    "allowed_forward_axes": ["Z", "-Z", "X", "-X"],
+    "allowed_pivot_policies": ["asset_origin_authored", "floor_aligned_runtime", "centered_scan_runtime"],
     "notes": "The current Cortex glTF loader imports geometry only. Textures are kept with the assets for policy/source completeness and future PBR material hookup."
   },
   "assets": [
@@ -21,8 +27,23 @@
       "runtime_gltf": "boulder_01/boulder_01_1k.gltf",
       "expected_polycount": 123976,
       "budget_class": "hero_natural",
-      "scene_uses": ["outdoor_sunset_beach"],
-      "tags": ["coastal", "rock", "scan"]
+      "scene_uses": ["outdoor_sunset_beach", "coastal_cliff_foundry", "forest_creek_shrine"],
+      "tags": ["coastal", "rock", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Irregular scan; yaw is authored per placement."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.95, 0.0, -0.78], "max": [0.95, 0.82, 0.78]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["hero_rock_anchor", "shoreline_breakup", "creek_bank"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/boulder_01_diff_1k.jpg",
+        "normal": "textures/boulder_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/boulder_01_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "dead_tree_trunk",
@@ -32,8 +53,23 @@
       "runtime_gltf": "dead_tree_trunk/dead_tree_trunk_1k.gltf",
       "expected_polycount": 101802,
       "budget_class": "hero_natural",
-      "scene_uses": ["outdoor_sunset_beach"],
-      "tags": ["driftwood", "trunk", "scan"]
+      "scene_uses": ["outdoor_sunset_beach", "forest_creek_shrine"],
+      "tags": ["driftwood", "trunk", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Long object; placements must declare contact and rotation notes."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-1.3, 0.0, -0.42], "max": [1.3, 0.72, 0.42]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["driftwood", "natural_bridge", "foreground_anchor"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/dead_tree_trunk_diff_1k.jpg",
+        "normal": "textures/dead_tree_trunk_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/dead_tree_trunk_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "dry_branches_medium_01",
@@ -43,8 +79,23 @@
       "runtime_gltf": "dry_branches_medium_01/dry_branches_medium_01_1k.gltf",
       "expected_polycount": 16803,
       "budget_class": "detail_natural",
-      "scene_uses": ["outdoor_sunset_beach"],
-      "tags": ["branches", "debris", "scan"]
+      "scene_uses": ["outdoor_sunset_beach", "forest_creek_shrine"],
+      "tags": ["branches", "debris", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Detail scan; must remain grounded or explicitly mounted."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "centered_scan_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.6, 0.0, -0.55], "max": [0.6, 0.38, 0.55]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["ground_debris", "bank_detail"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/dry_branches_medium_01_diff_1k.jpg",
+        "normal": "textures/dry_branches_medium_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/dry_branches_medium_01_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "fern_02",
@@ -54,8 +105,23 @@
       "runtime_gltf": "fern_02/fern_02_1k.gltf",
       "expected_polycount": 6232,
       "budget_class": "detail_natural",
-      "scene_uses": ["outdoor_sunset_beach", "material_lab"],
-      "tags": ["plant", "vegetation", "scan"]
+      "scene_uses": ["outdoor_sunset_beach", "material_lab", "forest_creek_shrine"],
+      "tags": ["plant", "vegetation", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Vegetation clump; scale and ground contact are authored per cluster."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.45, 0.0, -0.45], "max": [0.45, 0.65, 0.45]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["vegetation_cluster", "foreground_detail"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/fern_02_diff_1k.jpg",
+        "normal": "textures/fern_02_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/fern_02_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "grass_bermuda_01",
@@ -65,8 +131,23 @@
       "runtime_gltf": "grass_bermuda_01/grass_bermuda_01_1k.gltf",
       "expected_polycount": 223596,
       "budget_class": "hero_natural",
-      "scene_uses": ["outdoor_sunset_beach"],
-      "tags": ["grass", "vegetation", "scan"]
+      "scene_uses": ["outdoor_sunset_beach", "forest_creek_shrine"],
+      "tags": ["grass", "vegetation", "scan"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Dense patch; only use as authored clumps or background bank detail."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.7, 0.0, -0.7], "max": [0.7, 0.42, 0.7]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["ground_cover", "background_bank"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/grass_bermuda_01_diff_1k.jpg",
+        "normal": "textures/grass_bermuda_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/grass_bermuda_01_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "Lantern_01",
@@ -76,8 +157,23 @@
       "runtime_gltf": "Lantern_01/Lantern_01_1k.gltf",
       "expected_polycount": 33902,
       "budget_class": "detail_prop",
-      "scene_uses": ["material_lab", "effects_showcase"],
-      "tags": ["prop", "metal", "glass"]
+      "scene_uses": ["material_lab", "effects_showcase", "neon_alley_material_market", "rain_glass_pavilion"],
+      "tags": ["prop", "metal", "glass"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Upright prop; runtime placement must keep base seated unless explicitly suspended."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.28, 0.0, -0.28], "max": [0.28, 0.92, 0.28]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["warm_fixture", "glass_metal_prop", "scale_reference"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/Lantern_01_brass_diff_1k.jpg",
+        "normal": "textures/Lantern_01_brass_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/Lantern_01_brass_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "WoodenTable_01",
@@ -87,8 +183,23 @@
       "runtime_gltf": "WoodenTable_01/WoodenTable_01_1k.gltf",
       "expected_polycount": 952,
       "budget_class": "detail_prop",
-      "scene_uses": ["material_lab"],
-      "tags": ["prop", "wood", "interior"]
+      "scene_uses": ["material_lab", "neon_alley_material_market"],
+      "tags": ["prop", "wood", "interior"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Furniture prop; must remain floor grounded."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.6, 0.0, -0.42], "max": [0.6, 0.78, 0.42]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["grounded_table", "market_display", "scale_reference"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/WoodenTable_01_diff_1k.jpg",
+        "normal": "textures/WoodenTable_01_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/WoodenTable_01_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     },
     {
       "id": "Barrel_01",
@@ -98,8 +209,23 @@
       "runtime_gltf": "Barrel_01/Barrel_01_1k.gltf",
       "expected_polycount": 2682,
       "budget_class": "detail_prop",
-      "scene_uses": ["effects_showcase"],
-      "tags": ["prop", "industrial", "metal"]
+      "scene_uses": ["effects_showcase", "neon_alley_material_market", "coastal_cliff_foundry"],
+      "tags": ["prop", "industrial", "metal"],
+      "orientation": {"up_axis": "Y", "forward_axis": "Z", "handedness": "right", "correction_euler_degrees": [0.0, 0.0, 0.0], "notes": "Cylindrical prop; non-uniform placement scale is disallowed except minor height variation."},
+      "scale_to_meters": 1.0,
+      "pivot_policy": "floor_aligned_runtime",
+      "floor_y": 0.0,
+      "bounds_meters": {"min": [-0.34, 0.0, -0.34], "max": [0.34, 0.88, 0.34]},
+      "thumbnail_capture": "pending_generated",
+      "intended_scene_roles": ["industrial_prop", "round_scale_reference", "foreground_detail"],
+      "material_textures": {
+        "status": "available_unbound_runtime",
+        "base_color": "textures/Barrel_01_explosive_diff_1k.jpg",
+        "normal": "textures/Barrel_01_explosive_nor_gl_1k.jpg",
+        "roughness_metallic_ao": "textures/Barrel_01_explosive_arm_1k.jpg",
+        "emissive": null,
+        "fallback": "material_override_until_pbr_binding"
+      }
     }
   ]
 }

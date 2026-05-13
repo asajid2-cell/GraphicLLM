@@ -132,3 +132,37 @@ Decision:
 - Keep ALS-006, ALS-008, and ALS-010 as `PARTIAL`.
 - Keep ALS-012 and ALS-014 as `PARTIAL`.
 - The startup-reapply fix is worth keeping because it prevents public graphics presets from silently overriding asset-led lighting/background contracts.
+
+## 2026-05-13 Forest Creek Detail Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/forest_redesign_review2/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_redesign_review3/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_redesign_review4/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the forest scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Retuned the forest hero camera several times to avoid the wide procedural-looking landscape frame.
+- Reduced shrine primitive scale and pushed it out of the focal area.
+- Added/required extra creek wall stones and hero fern clusters.
+- Lowered scanned boulders/trunks and reduced canopy/backdrop primitive scale to improve contact and hide obvious background construction.
+
+Findings:
+
+- The wide forest composition still exposes floating-looking scanned boulders, hard rectangular creek edges, sky/HDRI dependency, and flat background walls.
+- Tight creek-detail framing reduces some background exposure, but it still shows disconnected rocks, visible strip geometry, and a weak shrine silhouette.
+- The current asset kit is not enough to sell the forest scene as naturalistic from a wide public camera. This scene needs either better authored terrain/tree/shrine meshes or a redesigned macro-only material showcase.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+- Treat this as validated WIP evidence that the scene now has stronger contracts and more detailed foreground anchors, not as visual acceptance.

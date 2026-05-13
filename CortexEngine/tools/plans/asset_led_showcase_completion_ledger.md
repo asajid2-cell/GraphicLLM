@@ -376,6 +376,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Harsh review recorded: closer framing hides some edges, but the shrine remains box-built and vegetation/background are still flat walls.
   - Mesh-variety pass added shrine posts, cone roof, branch assets, and grass clusters; `asset_led_review3` capture passed, but hero composition remains rejected.
   - Startup-reapply/canopy pass removed the foreground mist streaks and split the canopy into smaller masses; `asset_led_review8` capture passed, but harsh review still rejected the scene as procedural primitives around a box shrine.
+  - Forest creek detail iteration rebuilt Release successfully and passed `run_scene_composition_stability_tests.ps1` plus `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`.
+  - Focused captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4` were manually reviewed and rejected: the scene still exposes floating-looking scanned boulders, hard creek-edge strips, sky/HDRI dependency, and flat background support geometry.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Replace box shrine and flat vegetation walls with organic banks, a stronger shrine silhouette, tree massing, and better water readability.
@@ -457,6 +459,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded that the third-pass screenshots remain WIP and should not be published.
   - Startup-reapply/backdrop focused capture command passed with `captures=15 size=1920x1080 preset=public_high`.
   - Manual review recorded that `asset_led_review8` screenshots remain WIP and should not be published.
+  - Manual review recorded the focused forest captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4`; all remain WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

@@ -429,10 +429,10 @@ Validation rule: deterministic randomness may be used only for secondary detail 
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_release_validation.ps1`
 - Evidence:
   - `run_asset_led_scene_contract_tests.ps1`, `run_asset_kit_policy_tests.ps1`, `run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, and `run_world_shader_contract_tests.ps1` now exist and pass targeted validation.
+  - `run_release_validation.ps1` now invokes `asset_kit_policy`, `scene_seed_contract`, `scene_composition_stability`, `world_shader_contract`, and `asset_led_scene_contract -RuntimeSmoke -SmokeFrames 30` before the public showcase scene gate.
   - `cmd.exe /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'` passed.
 - Remaining work:
-  - Add new release validation steps when scripts are meaningful.
-  - Do not add empty placeholder scripts just to satisfy the ledger.
+  - Run full release validation after public-capture polish gaps are resolved.
   - Keep no-skip required gates for public release readiness.
 
 ### ALS-014: Manual Harsh Review Loop

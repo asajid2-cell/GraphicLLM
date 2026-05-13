@@ -400,6 +400,48 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "asset_kit_policy" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_asset_kit_policy_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_seed_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_seed_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_composition_stability" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_composition_stability_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "world_shader_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_world_shader_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "asset_led_scene_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_asset_led_scene_contract_tests.ps1"),
+        "-RuntimeSmoke",
+        "-SmokeFrames", "30"
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "showcase_scene_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

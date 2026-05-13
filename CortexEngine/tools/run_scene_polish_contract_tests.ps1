@@ -73,6 +73,9 @@ foreach ($token in @(
     "OutdoorBeach_RockCluster_",
     "OutdoorBeach_Driftwood_",
     "OutdoorBeach_Coconut_",
+    "OutdoorBeach_WetSandPatch_",
+    "OutdoorBeach_PalmTrunkBand_",
+    "OutdoorBeach_PalmCrownCore_",
     "OutdoorBeach_SkyBackdrop",
     "OutdoorBeach_OceanHorizon",
     "for (int i = 0; i < 10; ++i)"
@@ -85,6 +88,10 @@ Assert-NotContains "Outdoor beach polish" $sceneSource "OutdoorBeach_Dune_"
 foreach ($token in @(
     "GlassWaterCourtyard_PoolCoping_North",
     "GlassWaterCourtyard_PoolCoping_South",
+    "GlassWaterCourtyard_PoolCorner_NW",
+    "GlassWaterCourtyard_CourtyardSkirt_Front",
+    "GlassWaterCourtyard_PoolStep_ShallowA",
+    "GlassWaterCourtyard_WaterlineTile_North",
     "GlassWaterCourtyard_CanopyFrame_North",
     "GlassWaterCourtyard_CanopyFrame_CenterB",
     "GlassWaterCourtyard_ColumnBase_",
@@ -93,6 +100,26 @@ foreach ($token in @(
     "GlassWaterCourtyard_GlassScreen_Left"
 )) {
     Assert-Contains "Glass courtyard polish" $sceneSource $token
+}
+
+foreach ($token in @(
+    "MaterialLab_BackdropBaseRail",
+    "MaterialLab_RightPropPlatform",
+    "MaterialLab_CenterFloorRunway",
+    "MaterialLab_ScannedWoodenTable"
+)) {
+    Assert-Contains "Material lab polish" $sceneSource $token
+}
+
+foreach ($token in @(
+    "LiquidGallery_BackWall_BaseTrim",
+    "LiquidGallery_IntegratedCountertop",
+    "LiquidGallery_FrontApron",
+    "_CornerPost_",
+    "LiquidGallery_CoolReflectionPanel",
+    "LiquidGallery_CenterDrainGrate"
+)) {
+    Assert-Contains "Liquid gallery polish" $sceneSource $token
 }
 
 foreach ($token in @(
@@ -105,21 +132,41 @@ foreach ($token in @(
 $beach = Get-Scene $showcase "outdoor_sunset_beach"
 $beachHero = Get-Bookmark $beach "hero"
 $beachWaterline = Get-Bookmark $beach "waterline"
+$beachLife = Get-Bookmark $beach "beach_life"
 if ($beachHero -and ([double]$beachHero.fov -gt 52.0)) {
     Add-Failure "outdoor_sunset_beach.hero fov should be tightened after polish"
 }
 if ($beachWaterline -and ([double]$beachWaterline.position[1] -gt 1.5)) {
     Add-Failure "outdoor_sunset_beach.waterline should use a lower waterline camera"
 }
+if ($beachLife -and ([double]$beachLife.fov -gt 40.0)) {
+    Add-Failure "outdoor_sunset_beach.beach_life should use a detail framing"
+}
 
 $courtyard = Get-Scene $showcase "glass_water_courtyard"
 $courtyardHero = Get-Bookmark $courtyard "hero"
 $courtyardCanopy = Get-Bookmark $courtyard "glass_canopy"
+$courtyardPoolSteps = Get-Bookmark $courtyard "pool_steps"
 if ($courtyardHero -and ([double]$courtyardHero.fov -gt 52.0)) {
     Add-Failure "glass_water_courtyard.hero fov should be tightened after polish"
 }
 if ($courtyardCanopy -and ([double]$courtyardCanopy.target[1] -lt 2.0)) {
     Add-Failure "glass_water_courtyard.glass_canopy should target the canopy/frame area"
+}
+if ($courtyardPoolSteps -and ([double]$courtyardPoolSteps.fov -gt 40.0)) {
+    Add-Failure "glass_water_courtyard.pool_steps should use a tight coping/step framing"
+}
+
+$materialLab = Get-Scene $showcase "material_lab"
+$propContext = Get-Bookmark $materialLab "prop_context"
+if ($propContext -and ([double]$propContext.fov -gt 42.0)) {
+    Add-Failure "material_lab.prop_context should use a focused naturalistic prop framing"
+}
+
+$liquid = Get-Scene $showcase "liquid_gallery"
+$liquidContext = Get-Bookmark $liquid "liquid_context"
+if ($liquidContext -and ([double]$liquidContext.fov -gt 48.0)) {
+    Add-Failure "liquid_gallery.liquid_context should avoid the old wide flat-panel framing"
 }
 
 $rt = Get-Scene $showcase "rt_showcase"

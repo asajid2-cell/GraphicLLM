@@ -356,16 +356,16 @@
       "display_name": "Neon Alley Material Market",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "night_city",
+      "default_environment": "studio",
       "default_lighting_rig": "neon_market_rain",
       "required_bookmarks": ["hero", "materials", "particles"],
       "camera_bookmarks": [
         {
           "id": "hero",
           "label": "Wet neon alley hero",
-          "position": [-1.85, 1.02, -3.15],
-          "target": [0.62, 0.82, -0.10],
-          "fov": 36.0,
+          "position": [-1.65, 1.05, -3.55],
+          "target": [0.28, 0.92, 0.20],
+          "fov": 34.0,
           "validation": true
         },
         {

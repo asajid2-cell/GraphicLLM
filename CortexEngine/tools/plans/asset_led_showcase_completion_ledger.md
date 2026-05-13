@@ -275,9 +275,13 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Focused capture `coastal_review11` was manually reviewed: the city HDRI mismatch is fixed, but box-platform construction, rail/post repetition, and flat cliff blocks remain visible, so the scene is still rejected for public media.
   - Coastal rail/furnace iteration aligned public metadata and visual baseline to `cool_overcast`, darkened furnace metals, added diagonal braces and channel grate slats, reduced rail repetition, tightened the hero camera, rebuilt Release, and passed scene-seed, composition-stability, showcase-scene, and asset-led runtime contracts.
   - Focused captures `coastal_review12` and `coastal_review13` were manually reviewed: the top beam/rail defect is reduced, but flat rear walls, repeated rail pieces, a floating-looking upper boulder, and rectangular industrial silhouettes still reject the scene for public media.
+  - Coastal crown-grounding iteration lowered/scaled upper cliff crown boulders, shortened diagonal braces, reduced the right industrial silhouette, reduced the foreground rock mass, and adjusted the hero camera to avoid swallowing the scene with foreground rocks.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the coastal crown-grounding iteration.
+  - Focused capture `CortexEngine/build/bin/logs/coastal_review15_rebalanced_rocks/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=0.850`, `gpu_frame_ms=3.511`, `avg_luma=93.709`, `rt_reflection_signal_avg_luma=0.08756`, `rt_reflection_history_signal_avg_luma=0.08772`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+  - Manual review rejected `coastal_review15_rebalanced_rocks` for public media: the floating-crown and foreground-rock failures are reduced, but oversized rail/platform construction, flat wall silhouettes, and sky/HDRI dependence remain.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace the remaining flat cliff/industrial box backdrops with better authored cliff/structure geometry or a redesigned close-up composition.
+  - Replace the remaining flat cliff/industrial box backdrops and oversized rail/platform construction with better authored cliff/structure geometry or a redesigned close-up composition.
   - Fix composition/shader defects found in screenshots.
   - Capture high-resolution public screenshots after harsh review.
 
@@ -504,6 +508,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review11`, `desert_review12`, and `desert_review13_lintel_grounding`; the relic focal read and tile breakup improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused forest captures `forest_review6` and `forest_review7_downward`; shrine scale and creek focus improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused coastal captures `coastal_review14` and `coastal_review15_rebalanced_rocks`; the floating crown and foreground-rock failures improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

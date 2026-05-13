@@ -165,6 +165,48 @@ Decision:
 - Do not publish the forest captures.
 - Keep `ALS-010` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-13 Coastal Crown Grounding Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/coastal_review14_grounded_crown/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/coastal_review15_rebalanced_rocks/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the coastal cliff foundry remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Lowered and reduced the upper cliff crown boulders so they no longer read as floating rocks.
+- Shortened the diagonal braces and reduced the right industrial silhouette.
+- Tested a closer camera, rejected it because foreground rocks swallowed the frame, then reduced the foreground rock mass and settled on a less aggressive hero camera.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `coastal_review15_rebalanced_rocks` rendered 1920x1080 with `renderScale=0.850`, `gpu_frame_ms=3.511`, `avg_luma=93.709`, `rt_reflection_signal_avg_luma=0.08756`, and `rt_reflection_history_signal_avg_luma=0.08772`.
+- Texture uploads in `coastal_review15_rebalanced_rocks` completed with `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The floating-crown issue is reduced.
+- The foreground boulder no longer dominates the whole frame.
+- The scene is still rejected for public media: the rail/platform assembly is oversized and block-built, the rear walls are flat silhouettes, and the composition still leans on sky/HDRI instead of authored set depth.
+
+Decision:
+
+- Do not publish the coastal captures.
+- Keep `ALS-006` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
 - Treat this as validated WIP evidence that the scene now has stronger contracts and more detailed foreground anchors, not as visual acceptance.
 
 ## 2026-05-13 Forest Asset-Kit Scale and Camera Iteration

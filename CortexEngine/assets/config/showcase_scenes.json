@@ -252,9 +252,9 @@
         {
           "id": "hero",
           "label": "Ocean-to-foundry hero",
-          "position": [-3.05, 1.08, -2.95],
-          "target": [0.25, 0.62, -0.02],
-          "fov": 34.0,
+          "position": [-2.72, 1.02, -2.72],
+          "target": [0.25, 0.58, -0.12],
+          "fov": 33.0,
           "validation": true
         },
         {

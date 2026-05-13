@@ -308,9 +308,14 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Focused capture `rain_review11` was manually reviewed: the city-HDRI billboard failure is fixed and the glass pavilion reads more intentional, but the rear enclosure/slats are still procedural and foliage remains too dark/sparse, so the scene is still rejected for public media.
   - Rain interior focal-point iteration added scanned `WoodenTable_01`, tightened the hero camera, rebuilt Release, and passed seed, composition, showcase-scene, and asset-led runtime contracts.
   - Focused capture `rain_review12` was manually reviewed: the table/lantern interior focal point and tighter camera are stronger, but rear screens/garden panels still read as procedural dark slabs/slats, so the scene remains rejected for public media.
+  - Rain segmented-screen iteration replaced the single large rear wood slab with two smaller low panels, shorter asymmetric slats, a warmer table mat, a glass roof panel, larger scanned `WoodenTable_01` placement, and a lower 1920x1080 hero camera.
+  - `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'` passed after the segmented-screen iteration.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`, `run_scene_composition_stability_tests.ps1`, `run_showcase_scene_contract_tests.ps1`, and `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30` passed after the segmented-screen iteration.
+  - Focused capture `CortexEngine/build/bin/logs/rain_review20_final_checkpoint/visual_validation_rt_showcase.bmp` rendered at 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=4.118`, `avg_luma=71.066`, `rt_reflection_signal_avg_luma=0.05278`, `rt_reflection_history_signal_avg_luma=0.05276`, and texture uploads `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
+  - Manual review rejected `rain_review20_final_checkpoint` for public media: the giant slab regression is gone and the table/floor/reflection focal read is better, but the cloudy HDRI band, procedural rear posts/slats, and blockout side panel remain visible.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
-  - Replace the remaining procedural rear enclosure/slat silhouette with stronger authored garden/architectural geometry or a tighter camera.
+  - Replace the remaining procedural rear enclosure/slat silhouette and cloudy horizon band with stronger authored garden/architectural geometry, a better rain-specific environment, or a more decisive close-up composition.
   - Run visual review and fix glass/refraction/material defects found in screenshots.
   - Add material controls for glass tint/refraction readability without hiding background objects.
 
@@ -485,6 +490,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion captures `rain_review9`, `rain_review10`, and `rain_review11`; the city-HDRI mismatch improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain pavilion capture `rain_review12`; the interior focal point improved, but the scene remains WIP and should not be published.
+  - Manual review recorded focused rain pavilion captures `rain_review13` through `rain_review20_final_checkpoint`; the final checkpoint removes the giant slab regression and keeps contracts green, but the scene remains WIP and should not be published.
   - Manual review recorded focused neon captures `neon_review8`, `neon_review9`, `neon_review10`, and `neon_review11`; the city-HDRI billboard failure is reduced and the signage/detail tokens render, but the scene remains WIP and should not be published.
   - Manual review recorded focused coastal captures `coastal_review12` and `coastal_review13`; the rail/beam defect is reduced, but the scene remains WIP and should not be published.
   - Manual review recorded focused desert captures `desert_review9` and `desert_review10`; the environment mismatch improved, but the scene remains WIP and should not be published.

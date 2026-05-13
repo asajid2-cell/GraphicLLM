@@ -302,6 +302,54 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Rain Pavilion Segmented-Screen Checkpoint
+
+Commands:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/rain_review13/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review14/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review15/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review16/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review18_studio_builder/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review19_low_close/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/rain_review20_final_checkpoint/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Replaced the giant rear wood screen slab with two smaller low panels and shorter asymmetric slats.
+- Added `RainPavilion_GlassRoofPanel` so the pavilion reads as a constructed glass room instead of only vertical panes.
+- Enlarged the scanned `WoodenTable_01`, added `RainPavilion_TableWarmMat`, reduced the lantern scale, and kept the hero at a low interior angle.
+- Tested a studio-IBL builder variant and a lower close camera; both were rejected because the studio HDRI mismatch and table silhouette were worse than the overcast checkpoint.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `rain_review20_final_checkpoint` rendered 1920x1080 with `renderScale=1.000`, `gpu_frame_ms=4.118`, `avg_luma=71.066`, `rt_reflection_signal_avg_luma=0.05278`, and `rt_reflection_history_signal_avg_luma=0.05276`.
+- Texture uploads in `rain_review20_final_checkpoint` completed with `submitted=14 completed=14 failed=0 pending=0 uploaded=109.33MB`.
+
+Findings:
+
+- The giant flat screen regression from `rain_review13` through `rain_review15` is fixed.
+- The hero now has a clearer table/floor/reflection focal read than the interrupted WIP.
+- The scene is still too procedural for public media: the cloudy HDRI band is visible through/behind the glass, the rear posts and slats are still blockout geometry, and the right-side panel reads as a flat prop wall.
+
+Decision:
+
+- Do not publish the rain pavilion captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Neon Alley Signage and Environment Iteration
 
 Commands:

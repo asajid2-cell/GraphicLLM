@@ -4608,7 +4608,7 @@ void Engine::BuildCoastalCliffFoundryScene() {
     if (renderer) {
         renderer->SetLightingRigContract("coastal_foundry_dusk", "scene_preset", false);
         renderer->SetWorldShaderPaletteContract("coastal_foundry_dusk", "coastal_foundry_dusk");
-        renderer->SetEnvironmentPreset("sunset_courtyard");
+        renderer->SetEnvironmentPreset("cool_overcast");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.72f, 0.98f);
         renderer->SetBackgroundPresentation(false, 0.95f, 0.08f);
@@ -4656,13 +4656,13 @@ void Engine::BuildCoastalCliffFoundryScene() {
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_WetBasaltDeck", cubeMesh, glm::vec3(-0.8f, -0.09f, -0.65f), glm::vec3(7.2f, 0.18f, 4.2f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), wetBasalt);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_ForegroundWetLedge", cubeMesh, glm::vec3(-2.9f, 0.02f, -2.15f), glm::vec3(3.0f, 0.18f, 1.0f), glm::vec3(0.0f, glm::radians(-16.0f), 0.0f), wetBasalt);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_OceanDropSkirt", cubeMesh, glm::vec3(-1.2f, -0.54f, 1.25f), glm::vec3(8.0f, 0.92f, 0.34f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_RearCliffShelf", cubeMesh, glm::vec3(0.35f, 0.42f, 3.35f), glm::vec3(8.8f, 0.84f, 1.35f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_UpperBasaltCut", cubeMesh, glm::vec3(-1.4f, 1.12f, 3.72f), glm::vec3(6.2f, 0.62f, 0.58f), glm::vec3(0.0f, glm::radians(11.0f), glm::radians(-3.0f)), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_DistantCliffWall", cubeMesh, glm::vec3(0.25f, 1.78f, 4.05f), glm::vec3(9.6f, 2.6f, 0.42f), glm::vec3(0.0f, glm::radians(-4.0f), glm::radians(2.0f)), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_CliffNotchLeft", cubeMesh, glm::vec3(-4.15f, 2.78f, 3.85f), glm::vec3(1.9f, 0.8f, 0.55f), glm::vec3(0.0f, glm::radians(17.0f), glm::radians(-8.0f)), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_CliffNotchRight", cubeMesh, glm::vec3(3.85f, 2.48f, 3.95f), glm::vec3(2.2f, 0.72f, 0.52f), glm::vec3(0.0f, glm::radians(-14.0f), glm::radians(6.0f)), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_BrokenCliffShoulderA", cubeMesh, glm::vec3(-3.6f, 0.52f, 2.35f), glm::vec3(2.3f, 1.0f, 1.0f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), wetBasalt);
-    AddAssetLedRenderable(*m_registry, "CoastalFoundry_BrokenCliffShoulderB", cubeMesh, glm::vec3(2.85f, 0.58f, 2.25f), glm::vec3(2.7f, 1.1f, 0.85f), glm::vec3(0.0f, glm::radians(-15.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_RearCliffShelf", cubeMesh, glm::vec3(0.15f, 0.28f, 3.05f), glm::vec3(6.4f, 0.48f, 1.10f), glm::vec3(0.0f, glm::radians(-6.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_UpperBasaltCut", cubeMesh, glm::vec3(-1.55f, 0.82f, 3.42f), glm::vec3(4.6f, 0.36f, 0.42f), glm::vec3(0.0f, glm::radians(11.0f), glm::radians(-3.0f)), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_DistantCliffWall", cubeMesh, glm::vec3(-1.15f, 1.22f, 3.86f), glm::vec3(5.6f, 1.35f, 0.30f), glm::vec3(0.0f, glm::radians(-4.0f), glm::radians(2.0f)), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_CliffNotchLeft", cubeMesh, glm::vec3(-3.45f, 1.72f, 3.62f), glm::vec3(1.2f, 0.42f, 0.38f), glm::vec3(0.0f, glm::radians(17.0f), glm::radians(-8.0f)), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_CliffNotchRight", cubeMesh, glm::vec3(2.85f, 1.58f, 3.72f), glm::vec3(1.35f, 0.40f, 0.36f), glm::vec3(0.0f, glm::radians(-14.0f), glm::radians(6.0f)), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_BrokenCliffShoulderA", cubeMesh, glm::vec3(-3.15f, 0.36f, 2.10f), glm::vec3(1.55f, 0.62f, 0.78f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), wetBasalt);
+    AddAssetLedRenderable(*m_registry, "CoastalFoundry_BrokenCliffShoulderB", cubeMesh, glm::vec3(2.42f, 0.38f, 2.05f), glm::vec3(1.70f, 0.64f, 0.70f), glm::vec3(0.0f, glm::radians(-15.0f), 0.0f), wetBasalt);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_LeftCliffReturn", cubeMesh, glm::vec3(-5.35f, 0.62f, 1.65f), glm::vec3(0.35f, 1.25f, 5.2f), glm::vec3(0.0f, glm::radians(8.0f), 0.0f), wetBasalt);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_RightIndustrialSilhouette", cubeMesh, glm::vec3(4.75f, 0.72f, 1.2f), glm::vec3(0.32f, 1.15f, 3.2f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), iron);
     AddAssetLedRenderable(*m_registry, "CoastalFoundry_LavaSurface", cubeMesh, glm::vec3(0.7f, 0.42f, -0.10f), glm::vec3(4.8f, 0.04f, 1.25f), glm::vec3(0.0f, glm::radians(-8.0f), 0.0f), lava);
@@ -4688,15 +4688,15 @@ void Engine::BuildCoastalCliffFoundryScene() {
         AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_BoulderAnchor", "boulder_01", boulderMesh, glm::vec3(-2.7f, 0.20f, 1.8f), glm::vec3(1.35f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), wetBasalt);
         AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_ForegroundRockMass", "boulder_01", boulderMesh, glm::vec3(-1.65f, 0.18f, -2.05f), glm::vec3(0.95f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), wetBasalt);
         AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RightShoreRockMass", "boulder_01", boulderMesh, glm::vec3(3.65f, 0.16f, 1.35f), glm::vec3(0.85f), glm::vec3(0.0f, glm::radians(54.0f), 0.0f), wetBasalt);
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassLeft", "boulder_01", boulderMesh, glm::vec3(-3.65f, 0.70f, 3.05f), glm::vec3(1.55f), glm::vec3(0.0f, glm::radians(-38.0f), glm::radians(4.0f)), wetBasalt);
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassCenter", "boulder_01", boulderMesh, glm::vec3(-0.55f, 0.84f, 3.40f), glm::vec3(1.95f), glm::vec3(0.0f, glm::radians(12.0f), glm::radians(-7.0f)), wetBasalt);
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassRight", "boulder_01", boulderMesh, glm::vec3(2.75f, 0.64f, 3.08f), glm::vec3(1.45f), glm::vec3(0.0f, glm::radians(51.0f), glm::radians(5.0f)), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassLeft", "boulder_01", boulderMesh, glm::vec3(-3.10f, 0.42f, 2.72f), glm::vec3(0.82f), glm::vec3(0.0f, glm::radians(-38.0f), glm::radians(4.0f)), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassCenter", "boulder_01", boulderMesh, glm::vec3(-0.55f, 0.44f, 3.02f), glm::vec3(0.96f), glm::vec3(0.0f, glm::radians(12.0f), glm::radians(-7.0f)), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_RearBasaltMassRight", "boulder_01", boulderMesh, glm::vec3(2.35f, 0.40f, 2.70f), glm::vec3(0.78f), glm::vec3(0.0f, glm::radians(51.0f), glm::radians(5.0f)), wetBasalt);
         AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_LeftCliffToe", "boulder_01", boulderMesh, glm::vec3(-4.35f, 0.24f, 0.85f), glm::vec3(1.05f), glm::vec3(0.0f, glm::radians(74.0f), 0.0f), wetBasalt);
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_UpperCliffCrownLeft", "boulder_01", boulderMesh, glm::vec3(-2.95f, 2.18f, 3.65f), glm::vec3(1.25f), glm::vec3(0.0f, glm::radians(-18.0f), glm::radians(11.0f)), wetBasalt);
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_UpperCliffCrownRight", "boulder_01", boulderMesh, glm::vec3(1.85f, 2.06f, 3.72f), glm::vec3(1.08f), glm::vec3(0.0f, glm::radians(36.0f), glm::radians(-9.0f)), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_UpperCliffCrownLeft", "boulder_01", boulderMesh, glm::vec3(-2.45f, 1.38f, 3.42f), glm::vec3(0.58f), glm::vec3(0.0f, glm::radians(-18.0f), glm::radians(11.0f)), wetBasalt);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_UpperCliffCrownRight", "boulder_01", boulderMesh, glm::vec3(1.55f, 1.30f, 3.48f), glm::vec3(0.52f), glm::vec3(0.0f, glm::radians(36.0f), glm::radians(-9.0f)), wetBasalt);
     }
     if (barrelMesh && barrelMesh->gpuBuffers) {
-        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_GroundedBarrel", "Barrel_01", barrelMesh, glm::vec3(2.8f, 0.50f, -1.55f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-24.0f), 0.0f), iron);
+        AddAssetLedNaturalisticRenderable(*m_registry, "CoastalFoundry_GroundedBarrel", "Barrel_01", barrelMesh, glm::vec3(2.45f, 0.18f, -1.32f), glm::vec3(0.58f), glm::vec3(0.0f, glm::radians(-24.0f), 0.0f), iron);
     }
     AddParticleEffect(*m_registry, "CoastalFoundry_EmberColumn", "embers", glm::vec3(0.55f, 0.92f, -0.05f));
     AddParticleEffect(*m_registry, "CoastalFoundry_SmokeColumn", "smoke", glm::vec3(0.15f, 1.08f, -0.05f));

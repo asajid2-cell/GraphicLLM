@@ -271,6 +271,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Harsh review recorded: rail contact improved, but the scene still reads as rails on a platform in front of an HDRI.
   - Mesh-variety pass added extra coastal boulder anchors and `asset_led_review3` capture passed, but harsh review still rejected the scene as public media.
   - Startup-reapply pass prevents public graphics/environment presets from overriding asset-led lighting/background controls; `asset_led_review8` capture passed, but harsh review still rejected the coastal hero because the HDRI dependency and flat wall/beam silhouettes remain visible.
+  - Coastal backdrop/grounding iteration moved the scene to the committed `cool_overcast` environment, reduced upper cliff mass scale, lowered the barrel, rebuilt Release, and passed scene-seed, composition-stability, and asset-led runtime contracts.
+  - Focused capture `coastal_review11` was manually reviewed: the city HDRI mismatch is fixed, but box-platform construction, rail/post repetition, and flat cliff blocks remain visible, so the scene is still rejected for public media.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Replace the remaining flat cliff/industrial box backdrops with better authored cliff/structure geometry or a redesigned composition.
@@ -464,6 +466,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded that `asset_led_review8` screenshots remain WIP and should not be published.
   - Manual review recorded the focused forest captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4`; all remain WIP and should not be published.
   - Manual review recorded focused forest captures `forest_assetkit_review3`, `forest_assetkit_review4`, and `forest_assetkit_review5`; the asset scale/camera pass improved the giant rock/log failure but remains WIP and should not be published.
+  - Manual review recorded focused coastal captures `coastal_review9`, `coastal_review10`, and `coastal_review11`; the environment mismatch improved, but the scene remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

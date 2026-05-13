@@ -166,3 +166,52 @@ Decision:
 - Keep `ALS-010` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 - Treat this as validated WIP evidence that the scene now has stronger contracts and more detailed foreground anchors, not as visual acceptance.
+
+## 2026-05-13 Forest Asset-Kit Scale and Camera Iteration
+
+Commands:
+
+- `cmake -S CortexEngine -B CortexEngine\build`
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_world_shader_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/forest_assetkit_review3/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_assetkit_review4/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/forest_assetkit_review5/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, asset policy remained under budget after removing the oversized rejected root scan, but the forest scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added committed CC0 Poly Haven assets `tree_stump_01`, `rock_moss_set_01`, and `wild_rooibos_bush` to the naturalistic asset kit.
+- Rejected and removed `root_cluster_01` because it exceeded `max_single_asset_bytes` and produced black overhead streaks in runtime review.
+- Added runtime texture bindings and forest placements for stump, moss-rock, and bush assets.
+- Raised and widened the forest hero camera, narrowed the creek sheet, reduced boulder/trunk/stump/moss-rock scale, and replaced floating primitive canopy blobs with grounded bush placements.
+
+Validation evidence:
+
+- Asset kit policy passed with `assets=11`.
+- Naturalistic asset policy passed with `assets=11 bytes=27417004/52428800`.
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- World shader contract passed with `palettes=5 modes=9`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `forest_assetkit_review5` loaded the new forest asset textures with `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+
+Findings:
+
+- The worst `forest_assetkit_review3` defects were fixed: the giant foreground rock mass and black horizontal log no longer dominate the frame.
+- The current hero is more readable as a complete scene, but it still exposes rectangular banks/platforms, a weak box-built shrine, visible strip geometry, sparse twig-like bush silhouettes, and too much procedural sky/background.
+- The forest scene needs a stronger authored terrain/shrine solution before it can be accepted as public media; asset additions alone are not enough.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+- Keep the asset-kit additions except the rejected root scan, because the remaining assets pass policy and improve runtime material coverage.

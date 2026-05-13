@@ -155,8 +155,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Existing glTF loader: `Utils::LoadGLTFMesh`
 - Validation command: `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1`
 - Evidence:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1` passed with `assets=8`.
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1` passed with `assets=8 bytes=19075769/52428800`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_kit_policy_tests.ps1` passed with `assets=11`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_naturalistic_asset_policy_tests.ps1` passed with `assets=11 bytes=27417004/52428800`.
 - Remaining work: none for manifest/orientation policy. Runtime material binding is now tracked as verified by ALS-003.
 
 ### ALS-003: PBR Texture Binding for Imported Assets
@@ -182,8 +182,8 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/asset_led_pbr_review -SmokeFrames 90`
 - Evidence:
   - Release target rebuilt successfully after binding changes.
-  - Asset kit policy passed with `assets=8`; it now rejects unbound material status, stale geometry-only notes, missing binding helpers, missing asset IDs, and missing runtime texture-path strings.
-  - Naturalistic asset policy passed with `assets=8 bytes=19075769/52428800`.
+  - Asset kit policy passed with `assets=11`; it now rejects unbound material status, stale geometry-only notes, missing binding helpers, missing asset IDs, and missing runtime texture-path strings.
+  - Naturalistic asset policy passed with `assets=11 bytes=27417004/52428800`.
   - Material path equivalence passed with `vb_luma=179.62 forward_luma=178.80 vb_rendered=True/False`.
   - Asset-led runtime smoke passed with `scenes=5`.
   - Focused high-quality asset-led capture passed with `captures=15 size=1920x1080 preset=public_high`.
@@ -378,6 +378,9 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Startup-reapply/canopy pass removed the foreground mist streaks and split the canopy into smaller masses; `asset_led_review8` capture passed, but harsh review still rejected the scene as procedural primitives around a box shrine.
   - Forest creek detail iteration rebuilt Release successfully and passed `run_scene_composition_stability_tests.ps1` plus `run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`.
   - Focused captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4` were manually reviewed and rejected: the scene still exposes floating-looking scanned boulders, hard creek-edge strips, sky/HDRI dependency, and flat background support geometry.
+  - Forest asset-kit iteration added committed CC0 `tree_stump_01`, `rock_moss_set_01`, and `wild_rooibos_bush` assets, added runtime texture bindings, rebuilt Release, and passed asset-kit, naturalistic-asset, scene-seed, composition, world-shader, and asset-led runtime contracts.
+  - Oversized `root_cluster_01` was rejected and removed because `run_naturalistic_asset_policy_tests.ps1` correctly failed it for exceeding `max_single_asset_bytes`.
+  - Focused capture `forest_assetkit_review5` loaded the new forest textures with `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`, but manual review still rejected the scene for rectangular banks/platforms, weak shrine silhouette, sparse bush silhouettes, and procedural sky/background exposure.
 - Remaining work:
   - Add high-quality public captures after final art acceptance.
   - Replace box shrine and flat vegetation walls with organic banks, a stronger shrine silhouette, tree massing, and better water readability.
@@ -460,6 +463,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Startup-reapply/backdrop focused capture command passed with `captures=15 size=1920x1080 preset=public_high`.
   - Manual review recorded that `asset_led_review8` screenshots remain WIP and should not be published.
   - Manual review recorded the focused forest captures `forest_redesign_review2`, `forest_redesign_review3`, and `forest_redesign_review4`; all remain WIP and should not be published.
+  - Manual review recorded focused forest captures `forest_assetkit_review3`, `forest_assetkit_review4`, and `forest_assetkit_review5`; the asset scale/camera pass improved the giant rock/log failure but remains WIP and should not be published.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

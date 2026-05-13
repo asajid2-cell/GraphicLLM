@@ -215,3 +215,43 @@ Decision:
 - Keep `ALS-010` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 - Keep the asset-kit additions except the rejected root scan, because the remaining assets pass policy and improve runtime material coverage.
+
+## 2026-05-13 Coastal Backdrop and Grounding Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -RuntimeSmoke -SmokeFrames 30`
+- Focused captures:
+  - `CortexEngine/build/bin/logs/coastal_review9/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/coastal_review10/visual_validation_rt_showcase.bmp`
+  - `CortexEngine/build/bin/logs/coastal_review11/visual_validation_rt_showcase.bmp`
+
+Result: build and contracts passed, and the coastal capture is less mismatched, but the scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Moved `coastal_cliff_foundry` from `sunset_courtyard` to `cool_overcast` because `procedural_sky` is a manifest fallback, not a valid `SetEnvironmentPreset` runtime ID.
+- Reduced the upper cliff wall/rock mass scale so boulders no longer read as giant floating slabs.
+- Lowered and moved the barrel so it sits closer to the deck instead of floating off the right edge.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Scene composition stability passed with `seeds=5`.
+- Asset-led runtime scene contracts passed with `scenes=5`.
+- Focused capture `coastal_review11` loaded the intended `cool_overcast` environment and rendered cleanly.
+
+Findings:
+
+- The city HDRI mismatch is fixed in the latest coastal capture; the background now reads as sky/clouds rather than unrelated urban waterfront.
+- The composition still has visible box-platform construction, rail/post repetition, a large flat cliff block, and weak integration between the foundry channel and shoreline.
+- The barrel is improved but still close to the edge of the constructed deck; this scene needs a deeper redesign of the industrial structure and cliff geometry before publication.
+
+Decision:
+
+- Do not publish the coastal captures.
+- Keep `ALS-006` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

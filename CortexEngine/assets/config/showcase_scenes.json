@@ -163,7 +163,7 @@
       "display_name": "Outdoor Sunset Beach",
       "current_status": "public_showcase_validated",
       "target_status": "public_showcase_validated",
-      "default_environment": "sunset_courtyard",
+      "default_environment": "cool_overcast",
       "default_lighting_rig": "sunset_rim",
       "required_bookmarks": ["hero", "waterline"],
       "camera_bookmarks": [

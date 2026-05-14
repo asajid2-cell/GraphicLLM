@@ -206,6 +206,46 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Neon Storefront Crop Iteration
+
+Commands:
+
+- `cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId neon_alley_material_market`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId neon_alley_material_market -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/neon_storefront_crop_review3 -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and capture passed, but the neon market remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Synchronized the runtime default/hero camera with a moderate right-storefront crop.
+- Tightened the materials bookmark around the display case, cyan sign, amber shelf, and right shelf detail.
+- Restored the particles bookmark after a tighter experiment exposed a hard right-side studio/background artifact.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Scene composition stability passed with `seeds=1`.
+- Neon asset-led runtime contracts passed with `scene=neon_alley_material_market`.
+- Asset-led public capture `neon_storefront_crop_review3` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Neon hero report recorded `gpu_frame_ms=8.095`, `avg_luma=46.505`, `rt_reflection_signal_avg_luma=0.02678`, `rt_reflection_history_signal_avg_luma=0.02680`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The empty alley/backdrop exposure is reduced compared with the wider hero.
+- The display case, wall panels, and signage still read as primitive blockout forms.
+- This crop is a recoverable checkpoint, not release media.
+
+Decision:
+
+- Do not publish the neon captures.
+- Keep `ALS-009` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Coastal Crown Grounding Checkpoint
 
 Commands:

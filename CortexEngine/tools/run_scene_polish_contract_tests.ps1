@@ -79,6 +79,9 @@ foreach ($token in @(
     "OutdoorBeach_PalmCrownCore_",
     "OutdoorBeach_SkyBackdrop",
     "OutdoorBeach_OceanHorizon",
+    "OutdoorBeach_AuthoredCove_WetEdge_",
+    "OutdoorBeach_Headland_Left",
+    "OutdoorBeach_NaturalDuneClump_",
     "for (int i = 0; i < 10; ++i)"
 )) {
     Assert-Contains "Outdoor beach polish" $sceneSource $token
@@ -98,7 +101,10 @@ foreach ($token in @(
     "GlassWaterCourtyard_ColumnBase_",
     "GlassWaterCourtyard_ColumnCap_",
     "GlassWaterCourtyard_BackWall_LowerTrim",
-    "GlassWaterCourtyard_GlassScreen_Left"
+    "GlassWaterCourtyard_GlassScreen_Left",
+    "GlassWaterCourtyard_BackWall_Niche_Dark",
+    "GlassWaterCourtyard_Planter_Left",
+    "GlassWaterCourtyard_CanopyShadowBaffle_"
 )) {
     Assert-Contains "Glass courtyard polish" $sceneSource $token
 }
@@ -115,6 +121,9 @@ foreach ($token in @(
 foreach ($token in @(
     "LiquidGallery_BackWall_BaseTrim",
     "LiquidGallery_IntegratedCountertop",
+    "LiquidGallery_ContinuousVatDeck",
+    "LiquidGallery_BackWall_RecessedShadow",
+    "LiquidGallery_LeftSideWall_Return",
     "LiquidGallery_FrontApron",
     "_CornerPost_",
     "LiquidGallery_CoolReflectionPanel",

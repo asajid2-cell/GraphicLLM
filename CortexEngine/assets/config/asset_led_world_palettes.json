@@ -36,7 +36,7 @@
       "fill_color": [0.08, 0.13, 0.22],
       "rim_color": [1.0, 0.72, 0.38],
       "fog_tint": [0.18, 0.24, 0.34],
-      "exposure": 0.78,
+      "exposure": 1.72,
       "bloom_ceiling": 1.6,
       "warm_cool_contrast": 0.74,
       "notes": "Blue rain ambience with warm interior rim light through glass."
@@ -64,7 +64,7 @@
       "fill_color": [0.12, 0.42, 0.88],
       "rim_color": [0.15, 1.0, 0.78],
       "fog_tint": [0.18, 0.12, 0.22],
-      "exposure": 0.84,
+      "exposure": 1.06,
       "bloom_ceiling": 2.25,
       "warm_cool_contrast": 0.82,
       "notes": "Emissive signage, wet pavement, and dense colored haze."

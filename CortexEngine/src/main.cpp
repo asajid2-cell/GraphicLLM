@@ -1,5 +1,18 @@
 #include "Core/Engine.h"
 #include "Core/StartupPreflight.h"
+#include "Scene/SemanticGraph.h"
+#include "Scene/SceneTransaction.h"
+#include "Scene/SceneIR.h"
+#include "Scene/RendererBackpressure.h"
+#include "Scene/GeneratedAssetAdmission.h"
+#include "Scene/CapturedSceneImport.h"
+#include "Scene/NeuralMaterialAuthoring.h"
+#include "Scene/SceneLayering.h"
+#include "Scene/SemanticRuntimeCompiler.h"
+#include "Scene/SceneTransactionRuntime.h"
+#include "Scene/AuthoringInputRouter.h"
+#include "Graphics/ManyLightReservoir.h"
+#include "Graphics/DiffuseRadianceCache.h"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -12,6 +25,7 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <algorithm>
 #include <cctype>
 #include <utility>
@@ -80,6 +94,15 @@ bool TryParsePositiveUInt(const std::string& text, uint32_t& outValue) {
     }
     outValue = static_cast<uint32_t>(parsed);
     return true;
+}
+
+bool HasArg(int argc, char* argv[], const std::string& expected) {
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] && expected == argv[i]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ApplyWindowDimensionOverride(EngineConfig& config, const std::string& name, const std::string& value) {
@@ -757,6 +780,90 @@ int main(int argc, char* argv[]) {
     try {
         if (EnvTruthy("CORTEX_FORCE_FATAL_ERROR")) {
             throw std::runtime_error("Forced fatal error requested by CORTEX_FORCE_FATAL_ERROR");
+        }
+
+        if (HasArg(argc, argv, "--semantic-graph-self-test")) {
+            const std::string report = Scene::RunSemanticGraphSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--scene-transaction-self-test")) {
+            const std::string report = Scene::RunSceneTransactionSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--semantic-visual-validation-self-test")) {
+            const std::string report = Scene::RunSemanticVisualValidationSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--scene-ir-self-test")) {
+            const std::string report = Scene::RunSceneIRSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--renderer-backpressure-self-test")) {
+            const std::string report = Scene::RunRendererBackpressureSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--generated-asset-admission-self-test")) {
+            const std::string report = Scene::RunGeneratedAssetAdmissionSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--many-light-sampling-self-test")) {
+            const std::string report = Graphics::RunManyLightReservoirSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--diffuse-radiance-cache-self-test")) {
+            const std::string report = Graphics::RunDiffuseRadianceCacheSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--captured-scene-import-self-test")) {
+            const std::string report = Scene::RunCapturedSceneImportSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--neural-material-authoring-self-test")) {
+            const std::string report = Scene::RunNeuralMaterialAuthoringSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--scene-layering-self-test")) {
+            const std::string report = Scene::RunSceneLayeringSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--semantic-runtime-compiler-self-test")) {
+            const std::string report = Scene::RunSemanticRuntimeCompilerSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--scene-transaction-runtime-self-test")) {
+            const std::string report = Scene::RunSceneTransactionRuntimeSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
+        }
+
+        if (HasArg(argc, argv, "--authoring-input-router-self-test")) {
+            const std::string report = Scene::RunAuthoringInputRouterSelfTestJson();
+            std::cout << report << std::endl;
+            return report.find("\"pass\": true") != std::string::npos ? 0 : 1;
         }
 
         // Create engine configuration

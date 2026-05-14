@@ -22,7 +22,7 @@
     "fill": "Low night fill from garden side.",
     "rim": "Warm interior fixtures through glass edges.",
     "fog": "Thin blue rain mist with warm interior scattering.",
-    "exposure": 0.78,
+    "exposure": 1.72,
     "bloom_ceiling": 1.6,
     "warm_cool_contrast": 0.74,
     "world_shader_palette": "rain_pavilion_night"

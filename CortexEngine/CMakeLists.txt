@@ -303,9 +303,22 @@ set(CORTEX_SOURCES
     src/Graphics/Renderer_WaterSurfaces.cpp
     src/Graphics/Renderer_Bloom.cpp
     src/Graphics/Renderer_SSAO.cpp
+    src/Graphics/ManyLightReservoir.cpp
+    src/Graphics/DiffuseRadianceCache.cpp
 
     src/Scene/ECS_Registry.cpp
     src/Scene/Components.cpp
+    src/Scene/SemanticGraph.cpp
+    src/Scene/SceneTransaction.cpp
+    src/Scene/SceneIR.cpp
+    src/Scene/RendererBackpressure.cpp
+    src/Scene/GeneratedAssetAdmission.cpp
+    src/Scene/CapturedSceneImport.cpp
+    src/Scene/NeuralMaterialAuthoring.cpp
+    src/Scene/SceneLayering.cpp
+    src/Scene/SemanticRuntimeCompiler.cpp
+    src/Scene/SceneTransactionRuntime.cpp
+    src/Scene/AuthoringInputRouter.cpp
     src/Scene/ParticleEffectLibrary.cpp
     src/Scene/TerrainNoise.cpp
     src/Scene/BiomeMap.cpp
@@ -438,9 +451,22 @@ set(CORTEX_HEADERS
     src/Graphics/VariableRateShading.h
     src/Graphics/Renderer.h
     src/Graphics/ShaderTypes.h
+    src/Graphics/ManyLightReservoir.h
+    src/Graphics/DiffuseRadianceCache.h
 
     src/Scene/ECS_Registry.h
     src/Scene/Components.h
+    src/Scene/SemanticGraph.h
+    src/Scene/SceneTransaction.h
+    src/Scene/SceneIR.h
+    src/Scene/RendererBackpressure.h
+    src/Scene/GeneratedAssetAdmission.h
+    src/Scene/CapturedSceneImport.h
+    src/Scene/NeuralMaterialAuthoring.h
+    src/Scene/SceneLayering.h
+    src/Scene/SemanticRuntimeCompiler.h
+    src/Scene/SceneTransactionRuntime.h
+    src/Scene/AuthoringInputRouter.h
     src/Scene/ParticleEffectLibrary.h
     src/Scene/TerrainNoise.h
     src/Scene/BiomeTypes.h

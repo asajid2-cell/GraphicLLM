@@ -172,6 +172,158 @@ if ($failures.Count -eq 0) {
 }
 
 if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "semantic_scene_graph_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_semantic_scene_graph_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_transaction_validation" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_transaction_validation.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_ir_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_ir_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "speech_authoring_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_speech_authoring_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_layering_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_layering_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "semantic_runtime_compiler" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_semantic_runtime_compiler_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "scene_transaction_runtime" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_scene_transaction_runtime_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "authoring_input_router" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_authoring_input_router_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "renderer_backpressure" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_renderer_backpressure_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "generated_asset_admission" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_generated_asset_admission_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "semantic_visual_validation" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_semantic_visual_validation_matrix.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "temporal_upscaling_contract" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_temporal_upscaling_contract_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "many_light_sampling" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_many_light_sampling_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "diffuse_radiance_cache" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_diffuse_radiance_cache_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "captured_scene_import" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_captured_scene_import_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "neural_material_authoring" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_neural_material_authoring_tests.ps1"),
+        "-NoBuild"
+    )
+}
+
+if ($failures.Count -eq 0) {
+    Invoke-ReleaseStep "sota_guardrails" @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $PSScriptRoot "run_sota_guardrail_contract_tests.ps1")
+    )
+}
+
+if ($failures.Count -eq 0) {
     Invoke-ReleaseStep "render_graph_boundary_contract" @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",

@@ -196,7 +196,7 @@ void ApplyLiquidGallerySceneControls(Renderer& renderer) {
     renderer.SetParticlesEnabled(true);
     renderer.SetEnvironmentPreset("warm_gallery");
     renderer.SetIBLEnabled(true);
-    renderer.SetIBLIntensity(0.64f, 0.92f);
+    renderer.SetIBLIntensity(0.68f, 0.96f);
     renderer.SetBackgroundPresentation(true, 0.78f, 0.16f);
 
     renderer.SetShadowsEnabled(true);
@@ -207,10 +207,10 @@ void ApplyLiquidGallerySceneControls(Renderer& renderer) {
     const glm::vec3 sunDir = glm::normalize(glm::vec3(-0.25f, 0.82f, 0.32f));
     renderer.SetSunDirection(sunDir);
     renderer.SetSunColor(glm::vec3(1.0f, 0.88f, 0.70f));
-    renderer.SetSunIntensity(2.8f);
+    renderer.SetSunIntensity(2.95f);
 
     renderer.SetRenderScale(0.85f);
-    renderer.SetExposure(0.94f);
+    renderer.SetExposure(0.99f);
     renderer.SetBloomIntensity(0.22f);
     renderer.SetBloomShape(0.85f, 0.50f, 1.80f);
     renderer.SetCinematicPostEnabled(true);

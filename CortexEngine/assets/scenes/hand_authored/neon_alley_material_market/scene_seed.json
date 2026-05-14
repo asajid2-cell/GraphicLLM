@@ -22,7 +22,7 @@
     "fill": "Blue rain bounce from right and ground puddles.",
     "rim": "Cyan backlight through steam.",
     "fog": "Colored wet haze and steam pockets.",
-    "exposure": 0.84,
+    "exposure": 1.06,
     "bloom_ceiling": 2.25,
     "warm_cool_contrast": 0.82,
     "world_shader_palette": "neon_market_rain"

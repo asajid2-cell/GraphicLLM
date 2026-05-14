@@ -207,6 +207,13 @@ void Engine::ProcessInput() {
                 const SDL_Keycode key = event.key.key;
                 bool overlayVisible = m_settingsOverlayVisible;
                 bool settingsWindowVisible = UI::DebugMenu::IsVisible();
+                const bool automationInputLocked =
+                    m_maxFrames > 0 ||
+                    m_exitAfterVisualValidationCapture ||
+                    m_simulateDeviceRemovedFrame > 0;
+                if (automationInputLocked) {
+                    break;
+                }
 
                 // -----------------------------------------------------------------
                 // Global keys that should always work, regardless of settings state

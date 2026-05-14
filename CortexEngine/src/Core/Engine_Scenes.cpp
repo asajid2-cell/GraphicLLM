@@ -2437,7 +2437,7 @@ void Engine::BuildLiquidGalleryScene() {
                                    glm::vec3(0.0f, -0.02f, 0.0f),
                                    glm::vec3(1.0f),
                                    glm::vec3(0.0f),
-                                   glm::vec4(0.25f, 0.24f, 0.22f, 1.0f),
+                                   glm::vec4(0.31f, 0.30f, 0.27f, 1.0f),
                                    0.0f, 0.58f, "wet_stone");
         auto& r = m_registry->GetComponent<Scene::RenderableComponent>(floor);
         r.doubleSided = true;
@@ -2449,7 +2449,7 @@ void Engine::BuildLiquidGalleryScene() {
                                   glm::vec3(0.0f, 3.0f, 4.9f),
                                   glm::vec3(1.0f),
                                   glm::vec3(-glm::half_pi<float>(), 0.0f, 0.0f),
-                                  glm::vec4(0.28f, 0.25f, 0.23f, 1.0f),
+                                  glm::vec4(0.34f, 0.31f, 0.28f, 1.0f),
                                   0.0f, 0.70f, "masonry");
         m_registry->GetComponent<Scene::RenderableComponent>(wall).doubleSided = true;
     }
@@ -2463,14 +2463,14 @@ void Engine::BuildLiquidGalleryScene() {
             const char* preset;
             float roughness;
         } trims[] = {
-            {"LiquidGallery_BackWall_BaseTrim", glm::vec3(0.0f, 0.58f, 4.68f), glm::vec3(8.6f, 0.14f, 0.10f), glm::vec4(0.18f, 0.17f, 0.16f, 1.0f), "wet_stone", 0.50f},
-            {"LiquidGallery_BackWall_TopTrim", glm::vec3(0.0f, 2.78f, 4.66f), glm::vec3(7.8f, 0.10f, 0.10f), glm::vec4(0.22f, 0.20f, 0.18f, 1.0f), "wet_stone", 0.52f},
-            {"LiquidGallery_BackWall_RecessedShadow", glm::vec3(-1.35f, 1.68f, 4.57f), glm::vec3(5.45f, 1.38f, 0.08f), glm::vec4(0.08f, 0.085f, 0.085f, 1.0f), "wet_stone", 0.44f},
-            {"LiquidGallery_LeftSideWall_Return", glm::vec3(-7.05f, 1.34f, 0.72f), glm::vec3(0.12f, 1.32f, 4.70f), glm::vec4(0.18f, 0.17f, 0.16f, 1.0f), "masonry", 0.64f},
-            {"LiquidGallery_RightSideWall_Return", glm::vec3(4.26f, 1.34f, 0.72f), glm::vec3(0.12f, 1.32f, 4.70f), glm::vec4(0.18f, 0.17f, 0.16f, 1.0f), "masonry", 0.64f},
-            {"LiquidGallery_LeftAisleLine", glm::vec3(-2.72f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.13f, 0.16f, 0.18f, 1.0f), "wet_stone", 0.36f},
-            {"LiquidGallery_RightAisleLine", glm::vec3(3.90f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.13f, 0.16f, 0.18f, 1.0f), "wet_stone", 0.36f},
-            {"LiquidGallery_CenterDrainGrate", glm::vec3(-1.35f, 0.045f, 0.58f), glm::vec3(0.46f, 0.030f, 0.13f), glm::vec4(0.05f, 0.055f, 0.055f, 1.0f), "brushed_metal", 0.28f}
+            {"LiquidGallery_BackWall_BaseTrim", glm::vec3(0.0f, 0.58f, 4.68f), glm::vec3(8.6f, 0.14f, 0.10f), glm::vec4(0.24f, 0.22f, 0.20f, 1.0f), "wet_stone", 0.50f},
+            {"LiquidGallery_BackWall_TopTrim", glm::vec3(0.0f, 2.78f, 4.66f), glm::vec3(7.8f, 0.10f, 0.10f), glm::vec4(0.28f, 0.25f, 0.22f, 1.0f), "wet_stone", 0.52f},
+            {"LiquidGallery_BackWall_RecessedShadow", glm::vec3(-1.35f, 1.68f, 4.57f), glm::vec3(5.45f, 1.38f, 0.08f), glm::vec4(0.13f, 0.13f, 0.12f, 1.0f), "wet_stone", 0.44f},
+            {"LiquidGallery_LeftSideWall_Return", glm::vec3(-7.05f, 1.34f, 0.72f), glm::vec3(0.12f, 1.32f, 4.70f), glm::vec4(0.24f, 0.22f, 0.20f, 1.0f), "masonry", 0.64f},
+            {"LiquidGallery_RightSideWall_Return", glm::vec3(4.26f, 1.34f, 0.72f), glm::vec3(0.12f, 1.32f, 4.70f), glm::vec4(0.24f, 0.22f, 0.20f, 1.0f), "masonry", 0.64f},
+            {"LiquidGallery_LeftAisleLine", glm::vec3(-2.72f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.18f, 0.21f, 0.23f, 1.0f), "wet_stone", 0.36f},
+            {"LiquidGallery_RightAisleLine", glm::vec3(3.90f, 0.035f, 0.55f), glm::vec3(0.065f, 0.030f, 4.95f), glm::vec4(0.18f, 0.21f, 0.23f, 1.0f), "wet_stone", 0.36f},
+            {"LiquidGallery_CenterDrainGrate", glm::vec3(-1.35f, 0.045f, 0.58f), glm::vec3(0.46f, 0.030f, 0.13f), glm::vec4(0.10f, 0.11f, 0.11f, 1.0f), "brushed_metal", 0.28f}
         };
         for (const auto& trim : trims) {
             auto e = addRenderable(trim.tag, cubeMesh, trim.position, trim.scale, glm::vec3(0.0f),
@@ -2490,14 +2490,14 @@ void Engine::BuildLiquidGalleryScene() {
             float roughness;
             const char* preset;
         } deckPieces[] = {
-            {"LiquidGallery_IntegratedCountertop", glm::vec3(-1.42f, 0.055f, 0.55f), glm::vec3(10.55f, 0.10f, 3.58f), glm::vec4(0.20f, 0.19f, 0.17f, 1.0f), 0.0f, 0.38f, "wet_stone"},
-            {"LiquidGallery_ContinuousVatDeck", glm::vec3(-1.42f, 0.018f, 0.55f), glm::vec3(10.35f, 0.040f, 3.42f), glm::vec4(0.16f, 0.15f, 0.14f, 1.0f), 0.0f, 0.44f, "wet_stone"},
-            {"LiquidGallery_FrontApron", glm::vec3(-1.42f, 0.32f, -2.90f), glm::vec3(10.70f, 0.42f, 0.20f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
-            {"LiquidGallery_RearApron", glm::vec3(-1.42f, 0.32f, 3.98f), glm::vec3(10.70f, 0.42f, 0.20f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
-            {"LiquidGallery_LeftApron", glm::vec3(-6.78f, 0.32f, 0.55f), glm::vec3(0.22f, 0.42f, 3.62f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
-            {"LiquidGallery_RightApron", glm::vec3(3.94f, 0.32f, 0.55f), glm::vec3(0.22f, 0.42f, 3.62f), glm::vec4(0.28f, 0.24f, 0.19f, 1.0f), 0.0f, 0.46f, "wet_stone"},
-            {"LiquidGallery_CenterSpine", glm::vec3(-1.42f, 0.40f, 0.55f), glm::vec3(10.40f, 0.12f, 0.16f), glm::vec4(0.12f, 0.12f, 0.11f, 1.0f), 0.0f, 0.40f, "wet_stone"},
-            {"LiquidGallery_CrossSpine", glm::vec3(-1.42f, 0.39f, 0.55f), glm::vec3(0.14f, 0.10f, 3.30f), glm::vec4(0.12f, 0.12f, 0.11f, 1.0f), 0.0f, 0.40f, "wet_stone"}
+            {"LiquidGallery_IntegratedCountertop", glm::vec3(-1.42f, 0.055f, 0.55f), glm::vec3(10.55f, 0.10f, 3.58f), glm::vec4(0.26f, 0.24f, 0.21f, 1.0f), 0.0f, 0.38f, "wet_stone"},
+            {"LiquidGallery_ContinuousVatDeck", glm::vec3(-1.42f, 0.018f, 0.55f), glm::vec3(10.35f, 0.040f, 3.42f), glm::vec4(0.21f, 0.20f, 0.18f, 1.0f), 0.0f, 0.44f, "wet_stone"},
+            {"LiquidGallery_FrontApron", glm::vec3(-1.42f, 0.32f, -2.90f), glm::vec3(10.70f, 0.42f, 0.20f), glm::vec4(0.34f, 0.29f, 0.23f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_RearApron", glm::vec3(-1.42f, 0.32f, 3.98f), glm::vec3(10.70f, 0.42f, 0.20f), glm::vec4(0.34f, 0.29f, 0.23f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_LeftApron", glm::vec3(-6.78f, 0.32f, 0.55f), glm::vec3(0.22f, 0.42f, 3.62f), glm::vec4(0.34f, 0.29f, 0.23f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_RightApron", glm::vec3(3.94f, 0.32f, 0.55f), glm::vec3(0.22f, 0.42f, 3.62f), glm::vec4(0.34f, 0.29f, 0.23f, 1.0f), 0.0f, 0.46f, "wet_stone"},
+            {"LiquidGallery_CenterSpine", glm::vec3(-1.42f, 0.40f, 0.55f), glm::vec3(10.40f, 0.12f, 0.16f), glm::vec4(0.17f, 0.17f, 0.15f, 1.0f), 0.0f, 0.40f, "wet_stone"},
+            {"LiquidGallery_CrossSpine", glm::vec3(-1.42f, 0.39f, 0.55f), glm::vec3(0.14f, 0.10f, 3.30f), glm::vec4(0.17f, 0.17f, 0.15f, 1.0f), 0.0f, 0.40f, "wet_stone"}
         };
         for (const auto& piece : deckPieces) {
             auto e = addRenderable(piece.tag, cubeMesh, piece.position, piece.scale, glm::vec3(0.0f),
@@ -4887,13 +4887,13 @@ void Engine::BuildRainGlassPavilionScene() {
         renderer->SetWorldShaderPaletteContract("rain_pavilion_night", "rain_pavilion_night");
         renderer->SetEnvironmentPreset("studio");
         renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.58f, 0.78f);
-        renderer->SetBackgroundPresentation(false, 0.82f, 0.18f);
+        renderer->SetIBLIntensity(1.12f, 1.30f);
+        renderer->SetBackgroundPresentation(false, 0.90f, 0.14f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.18f, 0.72f, 0.50f)));
-        renderer->SetSunColor(glm::vec3(0.25f, 0.46f, 0.95f));
-        renderer->SetSunIntensity(1.25f);
-        renderer->SetExposure(0.78f);
-        renderer->SetBloomIntensity(0.20f);
+        renderer->SetSunColor(glm::vec3(0.42f, 0.62f, 1.0f));
+        renderer->SetSunIntensity(3.8f);
+        renderer->SetExposure(1.72f);
+        renderer->SetBloomIntensity(0.26f);
         renderer->SetTAAEnabled(true);
         renderer->SetFXAAEnabled(true);
         renderer->SetSSREnabled(true);
@@ -4929,15 +4929,15 @@ void Engine::BuildRainGlassPavilionScene() {
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
         glm::vec3(-1.28f, 0.92f, 0.10f), glm::vec3(-0.44f, 0.70f, 0.84f), 28.0f, 120.0f);
 
-    const AssetLedMaterialSettings wetTile{glm::vec4(0.12f, 0.13f, 0.15f, 1.0f), 0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.78f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
-    const AssetLedMaterialSettings gardenMat{glm::vec4(0.050f, 0.075f, 0.070f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.55f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
+    const AssetLedMaterialSettings wetTile{glm::vec4(0.24f, 0.26f, 0.30f, 1.0f), 0.0f, 0.30f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.82f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings gardenMat{glm::vec4(0.11f, 0.15f, 0.13f, 1.0f), 0.0f, 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.24f, 0.46f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
     const AssetLedMaterialSettings vegetation{glm::vec4(0.12f, 0.24f, 0.16f, 1.0f), 0.0f, 0.64f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.16f, 0.32f, true, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};
     const AssetLedMaterialSettings glass{glm::vec4(0.18f, 0.30f, 0.42f, 0.18f), 0.0f, 0.045f, 0.72f, 1.45f, glm::vec3(0.0f), 1.0f, 0.12f, 0.05f, true, Scene::RenderableComponent::AlphaMode::Blend, Scene::RenderableComponent::RenderLayer::Opaque, "glass"};
-    const AssetLedMaterialSettings frameMetal{glm::vec4(0.42f, 0.48f, 0.52f, 1.0f), 1.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.34f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "oxidized_metal"};
+    const AssetLedMaterialSettings frameMetal{glm::vec4(0.58f, 0.64f, 0.68f, 1.0f), 1.0f, 0.16f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.38f, 0.06f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "oxidized_metal"};
     const AssetLedMaterialSettings chrome{glm::vec4(0.78f, 0.84f, 0.90f, 1.0f), 1.0f, 0.08f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.50f, 0.10f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "chrome"};
-    const AssetLedMaterialSettings wetWood{glm::vec4(0.25f, 0.18f, 0.12f, 1.0f), 0.0f, 0.48f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.42f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
-    const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.62f, 0.32f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.52f, 0.20f), 2.2f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
-    const AssetLedMaterialSettings warmMat{glm::vec4(0.13f, 0.085f, 0.055f, 1.0f), 0.0f, 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.12f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
+    const AssetLedMaterialSettings wetWood{glm::vec4(0.36f, 0.25f, 0.17f, 1.0f), 0.0f, 0.44f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.46f, 0.20f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.68f, 0.36f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(1.0f, 0.58f, 0.26f), 3.0f, 0.0f, 0.06f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
+    const AssetLedMaterialSettings warmMat{glm::vec4(0.24f, 0.16f, 0.10f, 1.0f), 0.0f, 0.54f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.14f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
     const AssetLedMaterialSettings tabletopWarmAccent{glm::vec4(0.70f, 0.28f, 0.10f, 1.0f), 0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.08f, 0.16f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "ceramic"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
@@ -5018,8 +5018,9 @@ void Engine::BuildRainGlassPavilionScene() {
     }
     AddParticleEffect(*m_registry, "RainPavilion_RainColumn", "rain", glm::vec3(1.35f, 2.7f, 1.55f));
     AddParticleEffect(*m_registry, "RainPavilion_Mist", "mist", glm::vec3(3.0f, 0.32f, 1.95f));
-    AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.55f, 1.55f), glm::vec3(1.0f, 0.58f, 0.30f), 2.5f, 4.2f);
-    AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.25f, 0.46f, 0.95f), 3.2f, 12.0f, false);
+    AddAssetLedPointLight(*m_registry, "RainPavilion_WarmInteriorLight", glm::vec3(0.0f, 1.55f, 1.55f), glm::vec3(1.0f, 0.62f, 0.34f), 5.2f, 5.5f);
+    AddAssetLedPointLight(*m_registry, "RainPavilion_TabletopFillLight", glm::vec3(-0.55f, 1.05f, 0.80f), glm::vec3(1.0f, 0.70f, 0.45f), 2.4f, 2.8f);
+    AddAssetLedSpotLight(*m_registry, "RainPavilion_BlueRainKey", glm::vec3(-3.0f, 4.2f, -3.0f), glm::vec3(0.0f, 0.4f, 0.1f), glm::vec3(0.42f, 0.62f, 1.0f), 6.4f, 15.0f, false);
 }
 
 void Engine::BuildDesertRelicGalleryScene() {
@@ -5157,12 +5158,12 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
         renderer->SetWorldShaderPaletteContract("neon_market_rain", "neon_market_rain");
         renderer->SetEnvironmentPreset("studio");
         renderer->SetIBLEnabled(true);
-        renderer->SetIBLIntensity(0.30f, 0.40f);
+        renderer->SetIBLIntensity(0.44f, 0.56f);
         renderer->SetBackgroundPresentation(false, 0.45f, 0.40f);
         renderer->SetSunDirection(glm::normalize(glm::vec3(-0.16f, 0.72f, 0.38f)));
         renderer->SetSunColor(glm::vec3(0.12f, 0.42f, 0.88f));
-        renderer->SetSunIntensity(0.9f);
-        renderer->SetExposure(0.84f);
+        renderer->SetSunIntensity(1.35f);
+        renderer->SetExposure(1.06f);
         renderer->SetBloomIntensity(0.42f);
         renderer->SetBloomShape(0.75f, 0.58f, 2.25f);
         renderer->SetCinematicPostEnabled(true);
@@ -5193,9 +5194,9 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
         glm::vec3(-1.20f, 1.05f, -2.20f), glm::vec3(1.15f, 0.90f, -0.10f), 34.0f, 120.0f);
 
-    const AssetLedMaterialSettings wetAsphalt{glm::vec4(0.030f, 0.032f, 0.038f, 1.0f), 0.0f, 0.42f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.48f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
-    const AssetLedMaterialSettings alleyBrick{glm::vec4(0.065f, 0.058f, 0.050f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.04f, 0.32f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
-    const AssetLedMaterialSettings blackenedMetal{glm::vec4(0.018f, 0.020f, 0.024f, 1.0f), 0.65f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.18f, 0.22f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "soot_grime"};
+    const AssetLedMaterialSettings wetAsphalt{glm::vec4(0.052f, 0.056f, 0.066f, 1.0f), 0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.54f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings alleyBrick{glm::vec4(0.100f, 0.088f, 0.076f, 1.0f), 0.0f, 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.06f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
+    const AssetLedMaterialSettings blackenedMetal{glm::vec4(0.038f, 0.044f, 0.052f, 1.0f), 0.65f, 0.30f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.18f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "soot_grime"};
     const AssetLedMaterialSettings neonPink{glm::vec4(1.0f, 0.12f, 0.48f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(1.0f, 0.12f, 0.48f), 3.1f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
     const AssetLedMaterialSettings neonCyan{glm::vec4(0.08f, 0.82f, 0.72f, 1.0f), 0.0f, 0.18f, 0.0f, 1.5f, glm::vec3(0.08f, 0.82f, 0.72f), 2.2f, 0.0f, 0.1f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
     const AssetLedMaterialSettings neonAmber{glm::vec4(1.0f, 0.58f, 0.14f, 1.0f), 0.0f, 0.20f, 0.0f, 1.5f, glm::vec3(1.0f, 0.42f, 0.08f), 1.55f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
@@ -5276,8 +5277,9 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddParticleEffect(*m_registry, "NeonMarket_Rain", "rain", glm::vec3(0.0f, 3.1f, 1.10f));
     AddAssetLedPointLight(*m_registry, "NeonMarket_PinkLight", glm::vec3(-1.9f, 1.8f, -0.7f), glm::vec3(1.0f, 0.18f, 0.58f), 6.4f, 6.5f);
     AddAssetLedPointLight(*m_registry, "NeonMarket_CyanLight", glm::vec3(1.9f, 1.65f, 0.9f), glm::vec3(0.15f, 1.0f, 0.78f), 5.4f, 6.0f);
-    AddAssetLedPointLight(*m_registry, "NeonMarket_LeftStallWarmLight", glm::vec3(-1.45f, 0.86f, -0.25f), glm::vec3(1.0f, 0.48f, 0.18f), 2.4f, 3.2f);
-    AddAssetLedPointLight(*m_registry, "NeonMarket_RightShelfCyanLight", glm::vec3(1.48f, 0.92f, -0.48f), glm::vec3(0.12f, 0.95f, 0.78f), 1.6f, 2.8f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_LeftStallWarmLight", glm::vec3(-1.45f, 0.86f, -0.25f), glm::vec3(1.0f, 0.48f, 0.18f), 3.4f, 3.8f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_RightShelfCyanLight", glm::vec3(1.48f, 0.92f, -0.48f), glm::vec3(0.12f, 0.95f, 0.78f), 2.4f, 3.4f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_CameraFillLight", glm::vec3(-0.15f, 1.35f, -1.85f), glm::vec3(0.42f, 0.58f, 0.78f), 1.8f, 5.0f);
 }
 
 void Engine::BuildForestCreekShrineScene() {

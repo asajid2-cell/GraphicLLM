@@ -1186,3 +1186,43 @@ Decision:
 - Do not publish the desert captures.
 - Keep `ALS-008` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-14 Neon Storefront Detail Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId neon_alley_material_market`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId neon_alley_material_market -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/neon_storefront_detail_review2 -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and the focused high capture passed, but the neon market remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added right-storefront trim, small facade breakups, and additional detail around the inset shelf.
+- Added display merchandise blocks inside the right case and main case, then shrank them after the first capture made them read too large.
+- Slightly reduced the right display case mass while preserving the crop from the previous storefront checkpoint.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Neon composition stability passed with `seeds=1`.
+- Neon asset-led runtime contract passed with `scene=neon_alley_material_market`.
+- Focused asset-led public capture `neon_storefront_detail_review2` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Hero report `public_capture_gallery_20260514_023813_655_39268_558ca394/neon_alley_material_market/frame_report_last.json` recorded `gpu_frame_ms=8.311`, `avg_luma=46.630`, `rt_reflection_signal_avg_luma=0.02716`, `rt_reflection_history_signal_avg_luma=0.02718`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- Storefront density is improved relative to the crop-only checkpoint.
+- The case, sign, wall, and display products still read as primitive box geometry rather than authored storefront assets.
+- Publication still needs a better modular facade/display asset approach or a more radical close material composition.
+
+Decision:
+
+- Do not publish the neon captures.
+- Keep `ALS-009` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

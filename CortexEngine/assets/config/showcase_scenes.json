@@ -326,9 +326,9 @@
         {
           "id": "hero",
           "label": "Sunlit relic hero",
-          "position": [-1.74, 1.08, -2.20],
-          "target": [0.10, 0.78, -0.04],
-          "fov": 32.0,
+          "position": [-1.32, 1.00, -1.84],
+          "target": [0.06, 0.84, 0.02],
+          "fov": 28.0,
           "validation": true
         },
         {

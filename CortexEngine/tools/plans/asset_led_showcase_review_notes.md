@@ -1146,3 +1146,43 @@ Decision:
 - Do not publish the rain captures.
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-14 Desert Relic Scale Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId desert_relic_gallery`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId desert_relic_gallery -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/desert_relic_scale_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and the focused high capture passed, but the desert relic scene remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Tightened the hero camera around the relic after the previous close crop still exposed giant primitive vessels and columns.
+- Reduced the bronze ring/pedestal scale and shrank the ceramic sphere-vessels so they no longer dominate the frame.
+- Lowered and shortened the high ruin/lintel/arch-column tokens while preserving required layout coverage.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Desert composition stability passed with `seeds=1`.
+- Desert asset-led runtime contract passed with `scene=desert_relic_gallery`.
+- Focused asset-led public capture `desert_relic_scale_review` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Hero report `public_capture_gallery_20260514_022535_664_39128_84144666/desert_relic_gallery/frame_report_last.json` recorded `gpu_frame_ms=7.134`, `avg_luma=124.914`, `rt_reflection_signal_avg_luma=0.06056`, `rt_reflection_history_signal_avg_luma=0.06056`, and texture uploads `submitted=8 completed=8 failed=0 pending=0 uploaded=77.33MB`.
+
+Findings:
+
+- The giant reflective vessel failure is materially reduced, and the ring is a cleaner focal object.
+- The scene still reads as primitive blockout because the plinth, front rail pieces, rear columns, and backdrop walls are visibly simple shapes.
+- Acceptance still needs authored ruin/plinth geometry or a more radical material composition.
+
+Decision:
+
+- Do not publish the desert captures.
+- Keep `ALS-008` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

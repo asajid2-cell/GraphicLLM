@@ -65,9 +65,13 @@
         "RainPavilion_RearWoodScreenSlat",
         "RainPavilion_GlassRoofPanel",
         "RainPavilion_TableWarmMat",
+        "RainPavilion_TableWarmTray",
+        "RainPavilion_TableChromeOrb",
+        "RainPavilion_TableGlassBead",
         "RainPavilion_GroundedInteriorTable",
         "RainPavilion_FloorChannel",
         "RainPavilion_ChromeDrain",
+        "RainPavilion_ChromePuddleRing",
         "RainPavilion_GroundedLantern"
       ],
       "support_groups": [

@@ -423,7 +423,7 @@
                       "id":  "rain_glass_pavilion_hero_release",
                       "scene":  "rain_glass_pavilion",
                       "camera_bookmark":  "hero",
-                      "environment":  "cool_overcast",
+                      "environment":  "studio",
                       "graphics_preset":  "release_showcase",
                       "lighting_rig":  "rain_pavilion_night",
                       "required":  true,

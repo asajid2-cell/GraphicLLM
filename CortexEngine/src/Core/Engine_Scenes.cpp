@@ -4885,7 +4885,7 @@ void Engine::BuildRainGlassPavilionScene() {
     if (renderer) {
         renderer->SetLightingRigContract("rain_pavilion_night", "scene_preset", false);
         renderer->SetWorldShaderPaletteContract("rain_pavilion_night", "rain_pavilion_night");
-        renderer->SetEnvironmentPreset("cool_overcast");
+        renderer->SetEnvironmentPreset("studio");
         renderer->SetIBLEnabled(true);
         renderer->SetIBLIntensity(0.58f, 0.78f);
         renderer->SetBackgroundPresentation(false, 0.82f, 0.18f);
@@ -4908,6 +4908,8 @@ void Engine::BuildRainGlassPavilionScene() {
     auto planeMesh = Utils::MeshGenerator::CreatePlane(1.0f, 1.0f);
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto cylinderMesh = Utils::MeshGenerator::CreateCylinder(0.5f, 0.12f, 32);
+    auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
+    auto torusMesh = Utils::MeshGenerator::CreateTorus(0.42f, 0.035f, 32, 12);
     auto lanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
     auto tableMesh = LoadNaturalisticShowcaseMesh("WoodenTable_01/WoodenTable_01_1k.gltf");
     auto bushMesh = LoadNaturalisticShowcaseMesh("wild_rooibos_bush/wild_rooibos_bush_1k.gltf");
@@ -4915,6 +4917,8 @@ void Engine::BuildRainGlassPavilionScene() {
     if (!UploadAssetLedMesh(renderer, planeMesh, "plane") ||
         !UploadAssetLedMesh(renderer, cubeMesh, "cube") ||
         !UploadAssetLedMesh(renderer, cylinderMesh, "cylinder") ||
+        !UploadAssetLedMesh(renderer, sphereMesh, "sphere") ||
+        !UploadAssetLedMesh(renderer, torusMesh, "torus") ||
         !UploadAssetLedMesh(renderer, lanternMesh, "Lantern_01") ||
         !UploadAssetLedMesh(renderer, tableMesh, "WoodenTable_01") ||
         !UploadAssetLedMesh(renderer, bushMesh, "wild_rooibos_bush") ||
@@ -4934,6 +4938,7 @@ void Engine::BuildRainGlassPavilionScene() {
     const AssetLedMaterialSettings wetWood{glm::vec4(0.25f, 0.18f, 0.12f, 1.0f), 0.0f, 0.48f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.42f, 0.26f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings warmLight{glm::vec4(1.0f, 0.62f, 0.32f, 1.0f), 0.0f, 0.22f, 0.0f, 1.5f, glm::vec3(1.0f, 0.52f, 0.20f), 2.2f, 0.0f, 0.08f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "emissive"};
     const AssetLedMaterialSettings warmMat{glm::vec4(0.13f, 0.085f, 0.055f, 1.0f), 0.0f, 0.58f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.12f, 0.34f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wood"};
+    const AssetLedMaterialSettings tabletopWarmAccent{glm::vec4(0.70f, 0.28f, 0.10f, 1.0f), 0.0f, 0.38f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.08f, 0.16f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "ceramic"};
 
     AddAssetLedRenderable(*m_registry, "RainPavilion_TiledFloor", cubeMesh, glm::vec3(0.0f, -0.04f, 0.0f), glm::vec3(7.0f, 0.08f, 5.2f), glm::vec3(0.0f), wetTile);
     AddAssetLedRenderable(*m_registry, "RainPavilion_ExtendedWetTerrace", cubeMesh, glm::vec3(0.0f, -0.08f, 1.6f), glm::vec3(11.0f, 0.08f, 6.4f), glm::vec3(0.0f), wetTile);
@@ -4985,12 +4990,18 @@ void Engine::BuildRainGlassPavilionScene() {
         AddAssetLedRenderable(*m_registry, "RainPavilion_GlassMullion", cubeMesh, glm::vec3(x, 1.08f, 2.10f), glm::vec3(0.04f, 1.82f, 0.06f), glm::vec3(0.0f), frameMetal);
     }
     AddAssetLedRenderable(*m_registry, "RainPavilion_ChromeDrain", cylinderMesh, glm::vec3(0.9f, 0.04f, -1.7f), glm::vec3(0.42f, 1.0f, 0.42f), glm::vec3(0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "RainPavilion_ChromePuddleRing", torusMesh, glm::vec3(0.9f, 0.075f, -1.7f), glm::vec3(0.72f), glm::vec3(0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "RainPavilion_WarmInteriorStrip", cubeMesh, glm::vec3(0.0f, 1.82f, 1.96f), glm::vec3(2.05f, 0.035f, 0.045f), glm::vec3(0.0f), warmLight);
     if (lanternMesh && lanternMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedLantern", "Lantern_01", lanternMesh, glm::vec3(-0.84f, 0.40f, 1.02f), glm::vec3(0.42f), glm::vec3(0.0f, glm::radians(18.0f), 0.0f), warmLight);
     }
     if (tableMesh && tableMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GroundedInteriorTable", "WoodenTable_01", tableMesh, glm::vec3(-0.10f, 0.33f, 1.10f), glm::vec3(0.62f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), wetWood);
+    }
+    AddAssetLedRenderable(*m_registry, "RainPavilion_TableWarmTray", cubeMesh, glm::vec3(-0.38f, 0.675f, 0.86f), glm::vec3(0.34f, 0.012f, 0.13f), glm::vec3(0.0f, glm::radians(-12.0f), 0.0f), tabletopWarmAccent);
+    if (sphereMesh && sphereMesh->gpuBuffers) {
+        AddAssetLedRenderable(*m_registry, "RainPavilion_TableChromeOrb", sphereMesh, glm::vec3(-0.60f, 0.79f, 0.78f), glm::vec3(0.12f), glm::vec3(0.0f), chrome);
+        AddAssetLedRenderable(*m_registry, "RainPavilion_TableGlassBead", sphereMesh, glm::vec3(-0.12f, 0.78f, 0.72f), glm::vec3(0.10f), glm::vec3(0.0f), glass);
     }
     if (bushMesh && bushMesh->gpuBuffers) {
         AddAssetLedNaturalisticRenderable(*m_registry, "RainPavilion_GardenBush", "wild_rooibos_bush", bushMesh, glm::vec3(-2.05f, 0.32f, 2.92f), glm::vec3(0.72f), glm::vec3(0.0f, glm::radians(12.0f), 0.0f), vegetation);

@@ -282,32 +282,32 @@
       "display_name": "Rain Glass Pavilion",
       "current_status": "seeded_runtime_wip",
       "target_status": "public_showcase_validated",
-      "default_environment": "cool_overcast",
+      "default_environment": "studio",
       "default_lighting_rig": "rain_pavilion_night",
       "required_bookmarks": ["hero", "glass_closeup", "puddle_chrome"],
       "camera_bookmarks": [
         {
           "id": "hero",
           "label": "Rain pavilion hero",
-          "position": [-0.92, 1.18, -0.82],
-          "target": [-0.04, 0.24, 0.88],
-          "fov": 32.0,
+          "position": [-1.16, 0.92, -0.34],
+          "target": [-0.36, 0.67, 0.86],
+          "fov": 28.0,
           "validation": true
         },
         {
           "id": "glass_closeup",
           "label": "Glass transmission closeup",
-          "position": [-2.4, 1.35, -2.0],
-          "target": [1.2, 1.05, 0.3],
-          "fov": 34.0,
+          "position": [-2.05, 0.92, -0.10],
+          "target": [-0.42, 0.70, 0.86],
+          "fov": 25.0,
           "validation": false
         },
         {
           "id": "puddle_chrome",
           "label": "Puddles and chrome",
-          "position": [1.8, 0.82, -3.1],
-          "target": [0.2, 0.38, 0.8],
-          "fov": 36.0,
+          "position": [1.30, 0.48, -2.42],
+          "target": [0.90, 0.075, -1.70],
+          "fov": 28.0,
           "validation": false
         }
       ],

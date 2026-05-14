@@ -35,10 +35,10 @@
     {
       "id": "hero",
       "role": "Read the full ocean-to-foundry story with clear foreground, midground, and background.",
-      "position": [-1.86, 1.03, -2.24],
-      "target": [0.30, 0.62, -0.08],
-      "fov": 30.0,
-      "art_reason": "Tighter diagonal angle emphasizes the lava containment, grates, wet basalt, and rock anchors while reducing the long rail/sky slab read."
+      "position": [-2.35, 1.42, -3.08],
+      "target": [0.28, 0.72, -0.06],
+      "fov": 34.0,
+      "art_reason": "Higher diagonal angle keeps lava containment, grates, wet basalt, and rock anchors visible while avoiding the near-field glowing channel face."
     },
     {
       "id": "material_closeup",
@@ -78,21 +78,21 @@
       "id": "foundry_channel",
       "role": "contained_liquid",
       "source": "primitive:box_trough_and_plane",
-      "transform": {"position": [0.7, 0.42, -0.1], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [4.8, 0.46, 1.25]},
+      "transform": {"position": [0.4, 0.42, -0.1], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [3.2, 0.34, 1.05]},
       "contact": "contained_liquid",
       "expected_surface_y": 0.42,
       "material_override": "lava_core",
-      "art_reason": "Central lava path is physically contained by attached trough walls."
+      "art_reason": "Central lava path is physically contained by shorter attached trough walls so it no longer dominates as an oversized platform."
     },
     {
       "id": "left_rail_run",
       "role": "attached_rail",
       "source": "primitive:metal_rail_group",
-      "transform": {"position": [-0.4, 0.82, -1.05], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [4.6, 0.18, 0.12]},
+      "transform": {"position": [-0.22, 0.75, -1.02], "rotation_degrees": [0.0, -8.0, 0.0], "scale": [3.2, 0.14, 0.10]},
       "contact": "mounted",
       "anchor": "foundry_channel",
       "material_override": "foundry_iron",
-      "art_reason": "Rail explicitly runs parallel to the trough and is mounted by posts, avoiding the old floating-bar look."
+      "art_reason": "Shorter rail explicitly runs parallel to the trough and is mounted by posts without reading as a giant foreground beam."
     }
   ],
   "authored_groups": [

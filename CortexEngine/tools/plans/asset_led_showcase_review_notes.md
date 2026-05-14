@@ -1226,3 +1226,43 @@ Decision:
 - Do not publish the neon captures.
 - Keep `ALS-009` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-14 Forest Creek Edge Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId forest_creek_shrine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId forest_creek_shrine -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/forest_creek_edge_review2 -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and the focused high capture passed, but the forest creek shrine remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Narrowed the creek sheet and shortened the hard foam/edge strips.
+- Enlarged nearby creek rocks so the water edge has more natural breakup.
+- Reduced oversized foreground hero ferns after the first edge pass made the strips and leaf scale dominate the frame.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Forest composition stability passed with `seeds=1`.
+- Forest asset-led runtime contract passed with `scene=forest_creek_shrine`.
+- Focused asset-led public capture `forest_creek_edge_review2` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Hero report `public_capture_gallery_20260514_025230_968_51416_c68ac191/forest_creek_shrine/frame_report_last.json` recorded `gpu_frame_ms=10.638`, `avg_luma=83.785`, `rt_reflection_signal_avg_luma=0.10987`, `rt_reflection_history_signal_avg_luma=0.10984`, and texture uploads `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+
+Findings:
+
+- The huge foreground fern failure is reduced, and the edge strips are less dominant than the first edge pass.
+- The hero still exposes a broad translucent water plane, hard green strip artifacts, block-built shrine geometry, and sky/backdrop dependency.
+- This scene still needs real terrain/water-bank/shrine authoring or a different material macro composition before publication.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

@@ -1106,3 +1106,43 @@ Decision:
 - Do not publish the coastal captures.
 - Keep `ALS-006` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
+
+## 2026-05-14 Rain Tabletop Detail Iteration
+
+Commands:
+
+- `cmd /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId rain_glass_pavilion`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId rain_glass_pavilion -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/rain_tabletop_detail_review2 -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and the focused high capture passed, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Lowered and reduced the required rear wood-screen and garden-screen tokens so they compete less with the table.
+- Tightened the hero/glass/puddle bookmarks around the tabletop, then pulled the final hero slightly wider after an oversized-prop first capture.
+- Added small glass/chrome/ceramic tabletop accents and scaled them down after `rain_tabletop_detail_review` made the chrome props read too large.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Rain composition stability passed with `seeds=1`.
+- Rain asset-led runtime contract passed with `scene=rain_glass_pavilion`.
+- Focused asset-led public capture `rain_tabletop_detail_review2` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Hero report `public_capture_gallery_20260514_021728_170_17612_a1ce27ec/rain_glass_pavilion/frame_report_last.json` recorded `gpu_frame_ms=11.069`, `avg_luma=43.736`, `rt_reflection_signal_avg_luma=0.03131`, `rt_reflection_history_signal_avg_luma=0.03180`, and texture uploads `submitted=13 completed=13 failed=0 pending=0 uploaded=66.67MB`.
+
+Findings:
+
+- The second capture fixes the oversized floating chrome-prop failure from the first tabletop-detail attempt.
+- The table still reads as blockout geometry, and the rear panels plus studio reflections remain obvious.
+- This remains a checkpoint only; acceptance likely needs a better authored table/interior prop setup or a different rain material composition.
+
+Decision:
+
+- Do not publish the rain captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.

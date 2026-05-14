@@ -289,25 +289,25 @@
         {
           "id": "hero",
           "label": "Rain pavilion hero",
-          "position": [-0.92, 0.90, 0.22],
-          "target": [-0.43, 0.72, 0.82],
-          "fov": 25.0,
+          "position": [-1.28, 0.92, 0.10],
+          "target": [-0.44, 0.70, 0.84],
+          "fov": 28.0,
           "validation": true
         },
         {
           "id": "glass_closeup",
           "label": "Glass transmission closeup",
-          "position": [-1.64, 0.82, 0.18],
-          "target": [-0.52, 0.70, 0.82],
+          "position": [-1.42, 0.78, 0.34],
+          "target": [-0.40, 0.72, 0.86],
           "fov": 25.0,
           "validation": false
         },
         {
           "id": "puddle_chrome",
           "label": "Puddles and chrome",
-          "position": [-1.15, 0.72, -0.62],
-          "target": [-0.50, 0.52, 0.76],
-          "fov": 30.0,
+          "position": [-1.22, 0.70, -0.24],
+          "target": [-0.47, 0.58, 0.80],
+          "fov": 26.0,
           "validation": false
         }
       ],

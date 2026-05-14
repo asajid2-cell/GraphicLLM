@@ -455,6 +455,15 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - `run_scene_polish_contract_tests.ps1` now checks the established-scene filter and still passed.
   - Established-scene high capture passed with `captures=23 size=1920x1080 preset=public_high`, manifest `CortexEngine/build/bin/logs/established_scene_review/gallery_manifest.json`, logs `CortexEngine/build/bin/logs/runs/public_capture_gallery_20260513_174449_832_46388_ac1b4bcd`.
   - Manual spot review rejected marking ALS-011 done: `outdoor_sunset_beach_hero` still reads as a procedural beach diorama, `glass_water_courtyard_hero` remains boxy and over-bright, and `liquid_gallery_hero` still exposes disconnected tabletop/room-backdrop construction.
+  - Public-scene composition checkpoint added stricter scene-polish contract tokens for authored beach cove/heads/dune clumps, courtyard wall niche/planters/canopy baffles, and liquid-gallery continuous vat deck/back/side returns.
+  - Release rebuild passed after the public-scene composition/framing slice with `cmake --build CortexEngine/build --config Release --target CortexEngine` under `C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat`.
+  - Focused checks passed:
+    `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_polish_contract_tests.ps1`;
+    `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_glass_water_courtyard_smoke.ps1 -NoBuild -SmokeFrames 90 -IsolatedLogs`;
+    `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_outdoor_sunset_beach_smoke.ps1 -NoBuild -SmokeFrames 90 -IsolatedLogs`;
+    `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_liquid_gallery_smoke.ps1 -NoBuild -SmokeFrames 90 -IsolatedLogs`.
+  - Established-scene high capture passed after the framing slice with `captures=23 size=1920x1080 preset=public_high`, manifest `CortexEngine/build/bin/logs/established_scene_review_framed_public_polish/gallery_manifest.json`, logs `CortexEngine/build/bin/logs/runs/public_capture_gallery_20260513_180749_062_45068_faf014da`.
+  - Manual review still rejects ALS-011 completion: `outdoor_sunset_beach_hero` has better framing but still reads as primitive beach props and flat horizon, `glass_water_courtyard_hero` is less wide but still boxy/over-bright, and `liquid_gallery_hero` is closer but still shows a constructed tabletop/gallery set rather than a fully authored space.
 - Remaining work:
   - Review each scene from every bookmark.
   - Convert procedural-looking sets into cohesive authored spaces.
@@ -535,6 +544,7 @@ Validation rule: deterministic randomness may be used only for secondary detail 
   - Manual review recorded focused coastal captures `coastal_review14` and `coastal_review15_rebalanced_rocks`; the floating crown and foreground-rock failures improved, but the scene remains WIP and should not be published.
   - Manual review recorded focused rain capture `rain_review21_downward_interior`; the sky/HDRI band improved, but the scene remains WIP and should not be published.
   - Manual review spot-checked established-scene captures from `established_scene_review`; old public scenes pass legacy contracts but still show procedural/boxy art issues, so ALS-011 remains WIP and docs/media was not refreshed.
+  - Manual review spot-checked `established_scene_review_framed_public_polish` after a public-scene composition/framing slice. The affected hero shots improved enough to be useful checkpoints, but all three remain rejected for release media: beach still looks primitive, courtyard still looks box-built, and liquid gallery still reads as a tabletop set.
 - Remaining work:
   - Fix recorded defects before committing asset-led screenshots to `docs/media`.
   - Fix the scene, shader, material, lighting, or camera before marking the item verified.

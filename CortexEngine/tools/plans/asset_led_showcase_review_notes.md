@@ -384,6 +384,38 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-13 Rain Pavilion Studio Vignette Iteration
+
+Commands:
+
+- `cmake --build CortexEngine\build --config Release --target CortexEngine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId rain_glass_pavilion`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId rain_glass_pavilion -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/rain_vignette_studio_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and high asset-led capture passed, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added contract-covered tabletop chrome/glass accents and a non-emissive warm tray.
+- Added `RainPavilion_ChromePuddleRing` so the low puddle/chrome bookmark has a real metallic focal object.
+- Tightened the rain public camera bookmarks around the table, glass, wet floor, and chrome detail.
+- Moved the rain public/default environment to `studio` to remove the cloudy overcast reflection band.
+
+Findings:
+
+- `rain_glass_pavilion_hero` and `rain_glass_pavilion_glass_closeup` now read more like intentional material vignettes than the previous sky-reflection table shot.
+- The rear panels/slats are still visible and remain blockout-like.
+- `rain_glass_pavilion_puddle_chrome` now shows chrome, but the framing is too extreme/abstract for publication.
+
+Decision:
+
+- Do not publish the rain pavilion captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Desert Relic Focal-Read Checkpoint
 
 Commands:

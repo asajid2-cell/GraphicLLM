@@ -104,7 +104,9 @@ foreach ($token in @(
     "GlassWaterCourtyard_GlassScreen_Left",
     "GlassWaterCourtyard_BackWall_Niche_Dark",
     "GlassWaterCourtyard_Planter_Left",
-    "GlassWaterCourtyard_CanopyShadowBaffle_"
+    "GlassWaterCourtyard_CanopyShadowBaffle_",
+    "GlassWaterCourtyard_ScannedFern_",
+    "GlassWaterCourtyard_ScannedLantern_"
 )) {
     Assert-Contains "Glass courtyard polish" $sceneSource $token
 }
@@ -125,6 +127,8 @@ foreach ($token in @(
     "LiquidGallery_BackWall_RecessedShadow",
     "LiquidGallery_LeftSideWall_Return",
     "LiquidGallery_FrontApron",
+    "LiquidGallery_ScannedBarrel_",
+    "LiquidGallery_ScannedLantern_",
     "_CornerPost_",
     "LiquidGallery_CoolReflectionPanel",
     "LiquidGallery_CenterDrainGrate"

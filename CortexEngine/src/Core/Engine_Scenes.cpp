@@ -1340,6 +1340,8 @@ void Engine::BuildGlassWaterCourtyardScene() {
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto columnMesh = Utils::MeshGenerator::CreateCylinder(0.28f, 3.2f, 32);
+    auto scannedFernMesh = LoadNaturalisticShowcaseMesh("fern_02/fern_02_1k.gltf");
+    auto scannedLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -1363,7 +1365,9 @@ void Engine::BuildGlassWaterCourtyardScene() {
             !uploadMesh(quadMesh, "quad") ||
             !uploadMesh(cubeMesh, "cube") ||
             !uploadMesh(sphereMesh, "sphere") ||
-            !uploadMesh(columnMesh, "column")) {
+            !uploadMesh(columnMesh, "column") ||
+            !uploadMesh(scannedFernMesh, "naturalistic fern_02") ||
+            !uploadMesh(scannedLanternMesh, "naturalistic Lantern_01")) {
             return;
         }
     }
@@ -1651,6 +1655,48 @@ void Engine::BuildGlassWaterCourtyardScene() {
             auto foliage = addRenderable(plant.tag, sphereMesh, plant.position, plant.scale, glm::vec3(0.0f),
                                          plant.color, 0.0f, 0.68f, "wood");
             m_registry->GetComponent<Scene::RenderableComponent>(foliage).doubleSided = true;
+        }
+    }
+
+    if (scannedFernMesh && scannedFernMesh->gpuBuffers) {
+        const struct CourtyardFernAsset {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } ferns[] = {
+            {"GlassWaterCourtyard_ScannedFern_LeftA", glm::vec3(-5.78f, 0.48f, 1.28f), glm::vec3(0.58f), 0.35f},
+            {"GlassWaterCourtyard_ScannedFern_LeftB", glm::vec3(-5.38f, 0.50f, 1.96f), glm::vec3(0.46f), -0.22f},
+            {"GlassWaterCourtyard_ScannedFern_RightA", glm::vec3(5.72f, 0.48f, 1.30f), glm::vec3(0.56f), -0.38f},
+            {"GlassWaterCourtyard_ScannedFern_RightB", glm::vec3(5.34f, 0.50f, 1.98f), glm::vec3(0.44f), 0.18f}
+        };
+        for (const auto& fern : ferns) {
+            auto e = addRenderable(fern.tag, scannedFernMesh, fern.position, fern.scale,
+                                   glm::vec3(0.0f, fern.yaw, 0.0f),
+                                   glm::vec4(0.12f, 0.32f, 0.15f, 1.0f),
+                                   0.0f, 0.62f, "wood");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            ApplyNaturalisticAssetTextures(r, "fern_02");
+            r.doubleSided = true;
+        }
+    }
+
+    if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
+        const struct CourtyardLanternAsset {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } lanterns[] = {
+            {"GlassWaterCourtyard_ScannedLantern_Left", glm::vec3(-2.95f, 0.24f, 2.45f), glm::vec3(0.34f), 0.28f},
+            {"GlassWaterCourtyard_ScannedLantern_Right", glm::vec3(3.05f, 0.24f, 2.34f), glm::vec3(0.30f), -0.36f}
+        };
+        for (const auto& lantern : lanterns) {
+            auto e = addRenderable(lantern.tag, scannedLanternMesh, lantern.position, lantern.scale,
+                                   glm::vec3(0.0f, lantern.yaw, 0.0f),
+                                   glm::vec4(0.92f, 0.68f, 0.36f, 1.0f),
+                                   1.0f, 0.24f, "brushed_gold");
+            ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(e), "Lantern_01");
         }
     }
 
@@ -2315,6 +2361,8 @@ void Engine::BuildLiquidGalleryScene() {
     auto cubeMesh = Utils::MeshGenerator::CreateCube();
     auto sphereMesh = Utils::MeshGenerator::CreateSphere(0.5f, 32);
     auto quadMesh = Utils::MeshGenerator::CreateQuad(1.0f, 1.0f);
+    auto scannedBarrelMesh = LoadNaturalisticShowcaseMesh("Barrel_01/Barrel_01_1k.gltf");
+    auto scannedLanternMesh = LoadNaturalisticShowcaseMesh("Lantern_01/Lantern_01_1k.gltf");
 
     if (renderer) {
         auto uploadMesh = [&](const std::shared_ptr<Scene::MeshData>& mesh, const char* label) {
@@ -2336,7 +2384,9 @@ void Engine::BuildLiquidGalleryScene() {
             !uploadMesh(liquidPlane, "liquid") ||
             !uploadMesh(cubeMesh, "cube") ||
             !uploadMesh(sphereMesh, "sphere") ||
-            !uploadMesh(quadMesh, "quad")) {
+            !uploadMesh(quadMesh, "quad") ||
+            !uploadMesh(scannedBarrelMesh, "naturalistic Barrel_01") ||
+            !uploadMesh(scannedLanternMesh, "naturalistic Lantern_01")) {
             return;
         }
     }
@@ -2651,6 +2701,46 @@ void Engine::BuildLiquidGalleryScene() {
 
     AddParticleEffect(*m_registry, "LiquidGallery_LavaEmbers", "embers", glm::vec3(1.35f, 0.80f, -1.15f));
     AddParticleEffect(*m_registry, "LiquidGallery_WaterMist", "mist", glm::vec3(-4.2f, 0.62f, -1.15f));
+
+    if (scannedBarrelMesh && scannedBarrelMesh->gpuBuffers) {
+        const struct LiquidGalleryBarrelAsset {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } barrels[] = {
+            {"LiquidGallery_ScannedBarrel_Left", glm::vec3(-6.15f, 0.28f, -2.55f), glm::vec3(0.46f), 0.22f},
+            {"LiquidGallery_ScannedBarrel_Right", glm::vec3(3.35f, 0.28f, -2.35f), glm::vec3(0.42f), -0.34f}
+        };
+        for (const auto& barrel : barrels) {
+            auto e = addRenderable(barrel.tag, scannedBarrelMesh, barrel.position, barrel.scale,
+                                   glm::vec3(0.0f, barrel.yaw, 0.0f),
+                                   glm::vec4(0.50f, 0.34f, 0.20f, 1.0f),
+                                   0.0f, 0.44f, "wood");
+            auto& r = m_registry->GetComponent<Scene::RenderableComponent>(e);
+            ApplyNaturalisticAssetTextures(r, "Barrel_01");
+            r.wetnessFactor = 0.34f;
+        }
+    }
+
+    if (scannedLanternMesh && scannedLanternMesh->gpuBuffers) {
+        const struct LiquidGalleryLanternAsset {
+            const char* tag;
+            glm::vec3 position;
+            glm::vec3 scale;
+            float yaw;
+        } lanterns[] = {
+            {"LiquidGallery_ScannedLantern_Water", glm::vec3(-5.88f, 0.52f, 1.98f), glm::vec3(0.30f), 0.42f},
+            {"LiquidGallery_ScannedLantern_Lava", glm::vec3(3.05f, 0.52f, 1.86f), glm::vec3(0.30f), -0.26f}
+        };
+        for (const auto& lantern : lanterns) {
+            auto e = addRenderable(lantern.tag, scannedLanternMesh, lantern.position, lantern.scale,
+                                   glm::vec3(0.0f, lantern.yaw, 0.0f),
+                                   glm::vec4(0.92f, 0.68f, 0.36f, 1.0f),
+                                   1.0f, 0.24f, "brushed_gold");
+            ApplyNaturalisticAssetTextures(m_registry->GetComponent<Scene::RenderableComponent>(e), "Lantern_01");
+        }
+    }
 
     auto addLight = [&](const char* tag,
                         Scene::LightType type,

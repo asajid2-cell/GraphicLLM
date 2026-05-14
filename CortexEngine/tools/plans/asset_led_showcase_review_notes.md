@@ -384,6 +384,37 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Neon Right-Market Detail Iteration
+
+Commands:
+
+- `cmake --build CortexEngine\build --config Release --target CortexEngine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId neon_alley_material_market`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId neon_alley_material_market -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/neon_right_market_detail_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and high asset-led capture passed, but the Neon alley remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Added right storefront inset, service shelf, cyan/amber price tabs, and a low glass display case.
+- Added a small right-side cyan light so the new shelf detail is visible in hero/material frames.
+- Shifted the `particles` bookmark away from the near right wall so it frames signage, rain, and the display case instead of a black slab.
+
+Findings:
+
+- `neon_alley_material_market_hero` and `materials` now show additional right-side detail and less empty black wall.
+- `neon_alley_material_market_particles` is materially better than the previous near-wall composition.
+- The scene still reads as a primitive, box-built alley with glowing rectangles and needs stronger authored storefront/facade assets before publication.
+
+Decision:
+
+- Do not publish the Neon captures.
+- Keep `ALS-009` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Rain Pavilion Studio Vignette Iteration
 
 Commands:

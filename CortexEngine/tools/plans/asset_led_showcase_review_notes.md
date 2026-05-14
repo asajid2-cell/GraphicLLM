@@ -384,6 +384,37 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Coastal Short-Rail and Lowered-Cliff Iteration
+
+Commands:
+
+- `cmake --build CortexEngine\build --config Release --target CortexEngine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId coastal_cliff_foundry`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId coastal_cliff_foundry -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/coastal_lowered_cliff_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and high asset-led capture passed, but Coastal remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Tightened the hero bookmark toward lava, grates, wet basalt, and rock anchors.
+- Shortened the lava channel, channel walls, rail runs, lower rails, and furnace crossbeam.
+- Lowered and scaled the upper cliff/notch tokens so they sit closer to rear rock masses instead of floating against the sky.
+
+Findings:
+
+- `coastal_cliff_foundry_atmosphere` no longer shows the worst floating sky slabs.
+- `coastal_cliff_foundry_hero` still reads as oversized rail/channel construction on a box platform.
+- The scene needs a stronger authored foundry/cliff redesign or a much more decisive close-up before publication.
+
+Decision:
+
+- Do not publish the Coastal captures.
+- Keep `ALS-006` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-14 Neon Right-Market Detail Iteration
 
 Commands:

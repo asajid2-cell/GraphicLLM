@@ -29,9 +29,9 @@
   },
   "environment": {"ibl": "studio", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-1.78, 1.02, -3.35], "target": [0.08, 0.84, 0.04], "fov": 38.0, "art_reason": "Wider low lens keeps the alley geometry, display case, mounted signs, and wet floor tied together while giving the darker left storefront enough frame space to read."},
-    {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-1.2, 1.05, -2.2], "target": [1.15, 0.9, -0.1], "fov": 34.0, "art_reason": "Judges material separation under colored light."},
-    {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [1.52, 1.42, -3.48], "target": [-0.24, 1.08, -0.02], "fov": 36.0, "art_reason": "Oblique view keeps the steam/rain column, left signage, and right shelf detail visible without letting the right storefront become a near-field black wall."}
+    {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-1.20, 1.05, -2.20], "target": [1.15, 0.90, -0.10], "fov": 34.0, "art_reason": "Moderate right-storefront lens keeps the display case, mounted cyan sign, right shelf details, and wet reflections dominant while avoiding a clipped macro crop."},
+    {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-0.42, 1.02, -2.02], "target": [1.38, 0.82, -0.45], "fov": 32.0, "art_reason": "Close storefront-detail view judges glass/chrome/neon separation without letting the display case become a giant block."},
+    {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [1.52, 1.42, -3.48], "target": [-0.24, 1.08, -0.02], "fov": 36.0, "art_reason": "Oblique view keeps the steam/rain column, left signage, and right shelf detail visible without exposing the right-side studio/background artifact."}
   ],
   "material_palette": [
     {"id": "wet_asphalt", "surface_class": "masonry", "shader_mode": "wet_ground", "description": "Dark wet pavement with puddles and grime."},

@@ -5187,7 +5187,7 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-1.78f, 1.02f, -3.35f), glm::vec3(0.08f, 0.84f, 0.04f), 38.0f, 120.0f);
+        glm::vec3(-1.20f, 1.05f, -2.20f), glm::vec3(1.15f, 0.90f, -0.10f), 34.0f, 120.0f);
 
     const AssetLedMaterialSettings wetAsphalt{glm::vec4(0.030f, 0.032f, 0.038f, 1.0f), 0.0f, 0.42f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.48f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings alleyBrick{glm::vec4(0.065f, 0.058f, 0.050f, 1.0f), 0.0f, 0.62f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.04f, 0.32f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};

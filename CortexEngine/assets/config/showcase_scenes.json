@@ -363,17 +363,17 @@
         {
           "id": "hero",
           "label": "Wet neon alley hero",
-          "position": [-1.78, 1.02, -3.35],
-          "target": [0.08, 0.84, 0.04],
-          "fov": 38.0,
+          "position": [-1.20, 1.05, -2.20],
+          "target": [1.15, 0.90, -0.10],
+          "fov": 34.0,
           "validation": true
         },
         {
           "id": "materials",
           "label": "Chrome, glass, and neon",
-          "position": [-1.2, 1.05, -2.2],
-          "target": [1.15, 0.9, -0.1],
-          "fov": 34.0,
+          "position": [-0.42, 1.02, -2.02],
+          "target": [1.38, 0.82, -0.45],
+          "fov": 32.0,
           "validation": false
         },
         {

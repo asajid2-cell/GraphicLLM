@@ -31,7 +31,7 @@
   "cameras": [
     {"id": "hero", "role": "Dense alley depth, wet pavement, signs, and storefronts.", "position": [-1.78, 1.02, -3.35], "target": [0.08, 0.84, 0.04], "fov": 38.0, "art_reason": "Wider low lens keeps the alley geometry, display case, mounted signs, and wet floor tied together while giving the darker left storefront enough frame space to read."},
     {"id": "materials", "role": "Chrome, glass case, emissive signs, and wet ground closeup.", "position": [-1.2, 1.05, -2.2], "target": [1.15, 0.9, -0.1], "fov": 34.0, "art_reason": "Judges material separation under colored light."},
-    {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [2.9, 1.7, -4.4], "target": [-0.2, 1.2, 0.7], "fov": 40.0, "art_reason": "Backlit view makes particles visible without turning into noise."}
+    {"id": "particles", "role": "Steam, rain, and bloom shafts down the alley.", "position": [1.52, 1.42, -3.48], "target": [-0.24, 1.08, -0.02], "fov": 36.0, "art_reason": "Oblique view keeps the steam/rain column, left signage, and right shelf detail visible without letting the right storefront become a near-field black wall."}
   ],
   "material_palette": [
     {"id": "wet_asphalt", "surface_class": "masonry", "shader_mode": "wet_ground", "description": "Dark wet pavement with puddles and grime."},

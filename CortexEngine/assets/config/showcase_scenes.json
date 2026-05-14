@@ -379,9 +379,9 @@
         {
           "id": "particles",
           "label": "Steam and rain",
-          "position": [2.9, 1.7, -4.4],
-          "target": [-0.2, 1.2, 0.7],
-          "fov": 40.0,
+          "position": [1.52, 1.42, -3.48],
+          "target": [-0.24, 1.08, -0.02],
+          "fov": 36.0,
           "validation": false
         }
       ],

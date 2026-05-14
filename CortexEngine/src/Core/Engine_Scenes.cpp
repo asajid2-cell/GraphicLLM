@@ -5217,6 +5217,12 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedRenderable(*m_registry, "NeonMarket_RightStorefront", cubeMesh, glm::vec3(2.25f, 1.05f, 0.2f), glm::vec3(0.34f, 2.1f, 4.4f), glm::vec3(0.0f), alleyBrick);
     AddAssetLedRenderable(*m_registry, "NeonMarket_LeftAwning", cubeMesh, glm::vec3(-1.95f, 1.58f, -0.65f), glm::vec3(0.58f, 0.08f, 2.70f), glm::vec3(0.0f), blackenedMetal);
     AddAssetLedRenderable(*m_registry, "NeonMarket_RightAwning", cubeMesh, glm::vec3(1.92f, 1.36f, 0.72f), glm::vec3(0.54f, 0.08f, 2.25f), glm::vec3(0.0f), blackenedMetal);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightInsetPanel", cubeMesh, glm::vec3(1.98f, 1.03f, -0.55f), glm::vec3(0.065f, 0.88f, 1.22f), glm::vec3(0.0f), signMask);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightServiceShelf", cubeMesh, glm::vec3(1.86f, 0.82f, -0.44f), glm::vec3(0.42f, 0.045f, 1.06f), glm::vec3(0.0f), chrome);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightCyanPriceTabs", cubeMesh, glm::vec3(1.82f, 1.08f, -0.82f), glm::vec3(0.052f, 0.13f, 0.22f), glm::vec3(0.0f), neonCyan);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightAmberPriceTabs", cubeMesh, glm::vec3(1.82f, 0.86f, -0.16f), glm::vec3(0.052f, 0.10f, 0.28f), glm::vec3(0.0f), neonAmber);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightLowDisplayCase", cubeMesh, glm::vec3(1.54f, 0.42f, -0.56f), glm::vec3(0.46f, 0.30f, 0.74f), glm::vec3(0.0f, glm::radians(4.0f), 0.0f), glass);
+    AddAssetLedRenderable(*m_registry, "NeonMarket_RightLowDisplayTrim", cubeMesh, glm::vec3(1.54f, 0.62f, -0.56f), glm::vec3(0.50f, 0.035f, 0.80f), glm::vec3(0.0f, glm::radians(4.0f), 0.0f), chrome);
     AddAssetLedRenderable(*m_registry, "NeonMarket_MountedPinkSign", cubeMesh, glm::vec3(-2.02f, 2.1f, -0.85f), glm::vec3(0.10f, 0.38f, 1.35f), glm::vec3(0.0f), neonPink);
     AddAssetLedRenderable(*m_registry, "NeonMarket_MountedCyanSign", cubeMesh, glm::vec3(2.02f, 1.72f, 0.95f), glm::vec3(0.10f, 0.32f, 1.15f), glm::vec3(0.0f), neonCyan);
     AddAssetLedRenderable(*m_registry, "NeonMarket_CyanSignGlyphA", cubeMesh, glm::vec3(1.94f, 1.77f, 0.58f), glm::vec3(0.035f, 0.055f, 0.30f), glm::vec3(0.0f), signMask);
@@ -5257,6 +5263,7 @@ void Engine::BuildNeonAlleyMaterialMarketScene() {
     AddAssetLedPointLight(*m_registry, "NeonMarket_PinkLight", glm::vec3(-1.9f, 1.8f, -0.7f), glm::vec3(1.0f, 0.18f, 0.58f), 6.4f, 6.5f);
     AddAssetLedPointLight(*m_registry, "NeonMarket_CyanLight", glm::vec3(1.9f, 1.65f, 0.9f), glm::vec3(0.15f, 1.0f, 0.78f), 5.4f, 6.0f);
     AddAssetLedPointLight(*m_registry, "NeonMarket_LeftStallWarmLight", glm::vec3(-1.45f, 0.86f, -0.25f), glm::vec3(1.0f, 0.48f, 0.18f), 2.4f, 3.2f);
+    AddAssetLedPointLight(*m_registry, "NeonMarket_RightShelfCyanLight", glm::vec3(1.48f, 0.92f, -0.48f), glm::vec3(0.12f, 0.95f, 0.78f), 1.6f, 2.8f);
 }
 
 void Engine::BuildForestCreekShrineScene() {

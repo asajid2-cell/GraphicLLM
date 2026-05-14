@@ -5063,7 +5063,7 @@ void Engine::BuildDesertRelicGalleryScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-2.72f, 1.34f, -3.58f), glm::vec3(0.06f, 0.72f, -0.02f), 36.0f, 180.0f);
+        glm::vec3(-1.74f, 1.08f, -2.20f), glm::vec3(0.10f, 0.78f, -0.04f), 32.0f, 180.0f);
 
     const AssetLedMaterialSettings stone{glm::vec4(0.64f, 0.58f, 0.46f, 1.0f), 0.0f, 0.74f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.62f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
     const AssetLedMaterialSettings shadowStone{glm::vec4(0.34f, 0.30f, 0.24f, 1.0f), 0.0f, 0.82f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.0f, 0.72f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "masonry"};
@@ -5080,14 +5080,14 @@ void Engine::BuildDesertRelicGalleryScene() {
     AddAssetLedRenderable(*m_registry, "DesertRelic_ForegroundSandLip", cubeMesh, glm::vec3(-1.34f, 0.030f, -2.10f), glm::vec3(0.92f, 0.045f, 0.20f), glm::vec3(0.0f, glm::radians(-16.0f), 0.0f), sand);
     AddAssetLedRenderable(*m_registry, "DesertRelic_LeftRuinReturn", cubeMesh, glm::vec3(-5.7f, 0.52f, 1.58f), glm::vec3(0.24f, 1.02f, 2.20f), glm::vec3(0.0f, glm::radians(7.0f), 0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_RightRuinReturn", cubeMesh, glm::vec3(5.7f, 0.38f, 1.82f), glm::vec3(0.18f, 0.74f, 1.35f), glm::vec3(0.0f, glm::radians(-7.0f), 0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_MainPlinth", cubeMesh, glm::vec3(0.0f, 0.30f, 0.0f), glm::vec3(2.2f, 0.60f, 1.2f), glm::vec3(0.0f), stone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepFront", cubeMesh, glm::vec3(0.0f, 0.12f, -0.98f), glm::vec3(2.75f, 0.24f, 0.36f), glm::vec3(0.0f), warmStone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepRear", cubeMesh, glm::vec3(0.0f, 0.18f, 0.88f), glm::vec3(2.45f, 0.26f, 0.28f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_MainPlinth", cubeMesh, glm::vec3(0.0f, 0.25f, 0.0f), glm::vec3(1.62f, 0.50f, 0.92f), glm::vec3(0.0f), stone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepFront", cubeMesh, glm::vec3(0.0f, 0.10f, -0.80f), glm::vec3(2.05f, 0.20f, 0.26f), glm::vec3(0.0f), warmStone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthStepRear", cubeMesh, glm::vec3(0.0f, 0.15f, 0.68f), glm::vec3(1.86f, 0.22f, 0.22f), glm::vec3(0.0f), stone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthCreviceA", cubeMesh, glm::vec3(-0.52f, 0.615f, -0.18f), glm::vec3(0.035f, 0.025f, 0.96f), glm::vec3(0.0f, glm::radians(-18.0f), 0.0f), shadowStone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthCreviceB", cubeMesh, glm::vec3(0.72f, 0.618f, 0.20f), glm::vec3(0.030f, 0.025f, 0.72f), glm::vec3(0.0f, glm::radians(28.0f), 0.0f), shadowStone);
     AddAssetLedRenderable(*m_registry, "DesertRelic_PlinthEdgeShadow", cubeMesh, glm::vec3(0.0f, 0.622f, -0.58f), glm::vec3(1.72f, 0.022f, 0.035f), glm::vec3(0.0f), shadowStone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_FrontPlinthChippedLeft", cubeMesh, glm::vec3(-0.98f, 0.31f, -0.632f), glm::vec3(0.32f, 0.22f, 0.035f), glm::vec3(0.0f, glm::radians(-2.0f), glm::radians(1.5f)), shadowStone);
-    AddAssetLedRenderable(*m_registry, "DesertRelic_FrontPlinthChippedRight", cubeMesh, glm::vec3(0.92f, 0.25f, -0.636f), glm::vec3(0.26f, 0.16f, 0.035f), glm::vec3(0.0f, glm::radians(2.0f), glm::radians(-1.0f)), warmStone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_FrontPlinthChippedLeft", cubeMesh, glm::vec3(-0.74f, 0.27f, -0.492f), glm::vec3(0.26f, 0.18f, 0.030f), glm::vec3(0.0f, glm::radians(-2.0f), glm::radians(1.5f)), shadowStone);
+    AddAssetLedRenderable(*m_registry, "DesertRelic_FrontPlinthChippedRight", cubeMesh, glm::vec3(0.70f, 0.22f, -0.496f), glm::vec3(0.22f, 0.13f, 0.030f), glm::vec3(0.0f, glm::radians(2.0f), glm::radians(-1.0f)), warmStone);
     for (int i = 0; i < 7; ++i) {
         const float x = -0.92f + static_cast<float>(i) * 0.28f;
         const AssetLedMaterialSettings& tileMat = (i % 3 == 1) ? warmStone : tileBlue;

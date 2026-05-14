@@ -415,6 +415,36 @@ Decision:
 - Keep `ALS-006` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Desert Relic Close-Crop Iteration
+
+Commands:
+
+- `cmake --build CortexEngine\build --config Release --target CortexEngine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId desert_relic_gallery`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId desert_relic_gallery -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/desert_relic_close_crop_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and high asset-led capture passed, but Desert remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Tightened the hero camera around the bronze ring, glass inlay, mosaic band, and chipped stone.
+- Reduced the main plinth, front/rear steps, and front chip proportions to shrink the tan-box face.
+
+Findings:
+
+- `desert_relic_gallery_hero` has a stronger relic/material focal read than the previous wide plinth composition.
+- The scene still reads as primitive blockout because oversized columns, rear blocks, reflective spheres, and flat sand/ruin planes dominate the image.
+- Publication likely requires real ruin/stone assets or a more radical scene redesign.
+
+Decision:
+
+- Do not publish the Desert captures.
+- Keep `ALS-008` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-14 Neon Right-Market Detail Iteration
 
 Commands:

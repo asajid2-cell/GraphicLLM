@@ -29,7 +29,7 @@
   },
   "environment": {"ibl": "cool_overcast", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Relic ring, chipped plinth, sand buildup, and shadow pattern.", "position": [-1.74, 1.08, -2.20], "target": [0.10, 0.78, -0.04], "fov": 32.0, "art_reason": "Tighter relic-biased view keeps the bronze ring, glass inlay, mosaic color, chipped stone, and sand contact readable while reducing the tan-box plinth and upper ruin slabs."},
+    {"id": "hero", "role": "Relic ring, chipped plinth, sand buildup, and shadow pattern.", "position": [-1.32, 1.00, -1.84], "target": [0.06, 0.84, 0.02], "fov": 28.0, "art_reason": "Relic-biased view keeps the bronze ring, glass inlay, mosaic color, chipped stone, and sand contact readable while cropping more of the primitive column and sphere massing."},
     {"id": "stone_metal_closeup", "role": "Stone edge wear, sand, and oxidized metal response.", "position": [-1.6, 1.1, -2.7], "target": [0.8, 0.72, -0.2], "fov": 35.0, "art_reason": "Close enough to judge material palette without flattening the ruin."},
     {"id": "arch_depth", "role": "Foreground/midground/background depth through ruin arches.", "position": [3.8, 1.8, -4.9], "target": [0.0, 1.1, 1.1], "fov": 42.0, "art_reason": "Frames relics through architecture instead of isolated props."}
   ],
@@ -41,7 +41,8 @@
   ],
   "assets": [
     {"id": "main_plinth", "role": "hero_plinth", "source": "primitive:stone_plinth", "transform": {"position": [0.0, 0.3, 0.0], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [2.2, 0.6, 1.2]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "wind_cut_stone", "art_reason": "Grounded central base gives all relics a coherent stage."},
-    {"id": "bronze_relic_ring", "role": "round_prop", "source": "primitive:torus", "transform": {"position": [0.15, 0.95, 0.0], "rotation_degrees": [74.0, 18.0, 0.0], "scale": [0.82, 0.82, 0.82]}, "contact": "mounted", "anchor": "main_plinth", "material_override": "aged_bronze", "art_reason": "Round prop is deliberately scaled evenly and seated on a base."},
+    {"id": "bronze_relic_ring", "role": "round_prop", "source": "primitive:torus", "transform": {"position": [0.15, 0.90, 0.0], "rotation_degrees": [74.0, 18.0, 0.0], "scale": [0.72, 0.72, 0.72]}, "contact": "mounted", "anchor": "main_plinth", "material_override": "aged_bronze", "art_reason": "Round prop is deliberately scaled evenly and seated on a base without overwhelming the plinth."},
+    {"id": "smaller_vessel_and_column_massing", "role": "blockout_reduction", "source": "primitive:scaled_ceramic_vessels+low_arch_tokens", "transform": {"position": [0.0, 0.8, 1.4], "rotation_degrees": [0.0, 0.0, 0.0], "scale": [3.6, 1.2, 1.0]}, "contact": "mounted", "anchor": "main_plinth", "material_override": "wind_cut_stone", "art_reason": "Shrunk vessels, columns, lintels, and high ruin tokens reduce the giant primitive-object read while preserving the authored ruin depth contract."},
     {"id": "sand_drift_front", "role": "ground_detail", "source": "primitive:sand_drift", "transform": {"position": [-0.6, 0.04, -1.15], "rotation_degrees": [0.0, -12.0, 0.0], "scale": [2.4, 0.08, 0.48]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "dry_sand", "art_reason": "Sand wraps the base and prevents the scene from reading as clean blocks."}
     ,
     {"id": "scanned_stone_clusters", "role": "naturalistic_ground_breakup", "source": "asset:boulder_01", "transform": {"position": [-0.3, 0.04, -0.8], "rotation_degrees": [0.0, 34.0, 0.0], "scale": [0.26, 0.26, 0.26]}, "contact": "grounded", "expected_surface_y": 0.0, "material_override": "wind_cut_stone", "art_reason": "Scanned stones interrupt the primitive plinth silhouette and give sand contact points."},

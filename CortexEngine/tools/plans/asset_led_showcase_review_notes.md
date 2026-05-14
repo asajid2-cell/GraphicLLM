@@ -384,6 +384,46 @@ Decision:
 - Keep `ALS-007` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Forest Creek Narrow-Crop Iteration
+
+Commands:
+
+- `cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId forest_creek_shrine`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId forest_creek_shrine -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/forest_creek_narrow_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and capture passed, but the forest creek shrine remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Tightened the hero camera around the creek/water material read.
+- Narrowed the creek sheet and foam-edge strips to reduce the broad flooded-plane read.
+- Synchronized the runtime camera with `showcase_scenes.json` and the hand-authored forest seed.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Scene composition stability passed with `seeds=1`.
+- Forest asset-led runtime contracts passed with `scene=forest_creek_shrine`.
+- Asset-led public capture `forest_creek_narrow_review` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Forest hero report recorded `gpu_frame_ms=11.058`, `avg_luma=73.618`, `rt_reflection_signal_avg_luma=0.08920`, `rt_reflection_history_signal_avg_luma=0.08915`, and texture uploads `submitted=26 completed=26 failed=0 pending=0 uploaded=173.33MB`.
+
+Findings:
+
+- The tighter crop makes the water material more prominent than the prior wide hero.
+- The scene still exposes flat green platforms, hard water/foam strips, a block-built shrine, floating-looking vegetation/rocks, and sky-wall dependency.
+- This is still a procedural diorama, not release media.
+
+Decision:
+
+- Do not publish the forest captures.
+- Keep `ALS-010` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-14 Coastal Short-Rail and Lowered-Cliff Iteration
 
 Commands:

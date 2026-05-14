@@ -29,9 +29,9 @@
   },
   "environment": {"ibl": "studio", "fallback": "procedural_sky"},
   "cameras": [
-    {"id": "hero", "role": "Table, glass accents, and wet floor as the release vignette.", "position": [-1.16, 0.92, -0.34], "target": [-0.36, 0.67, 0.86], "fov": 28.0, "art_reason": "Tight material-led view keeps the authored table, glass/chrome accents, lantern glow, and floor reflections dominant while hiding the weak cloudy horizon backdrop."},
-    {"id": "glass_closeup", "role": "Glass tint/refraction with tabletop object displacement.", "position": [-2.05, 0.92, -0.10], "target": [-0.42, 0.70, 0.86], "fov": 25.0, "art_reason": "Side view looks through the glass edge at the tabletop objects instead of across the empty rear wall."},
-    {"id": "puddle_chrome", "role": "Wet tile, chrome, and rain ripples.", "position": [1.30, 0.48, -2.42], "target": [0.90, 0.075, -1.70], "fov": 28.0, "art_reason": "Low close camera centers the chrome drain ring, water film, and floor channels instead of the pavilion backdrop."}
+    {"id": "hero", "role": "Table, glass accents, and wet floor as the release vignette.", "position": [-0.92, 0.90, 0.22], "target": [-0.43, 0.72, 0.82], "fov": 25.0, "art_reason": "Tighter material-led view keeps the authored table, glass/chrome accents, lantern glow, and floor reflections dominant while reducing weak rear wall and backdrop exposure."},
+    {"id": "glass_closeup", "role": "Glass tint/refraction with tabletop object displacement.", "position": [-1.64, 0.82, 0.18], "target": [-0.52, 0.70, 0.82], "fov": 25.0, "art_reason": "Closer side view looks through the glass edge at the tabletop objects instead of across the empty rear wall."},
+    {"id": "puddle_chrome", "role": "Wet tile, chrome, and rain reflections.", "position": [-1.15, 0.72, -0.62], "target": [-0.50, 0.52, 0.76], "fov": 30.0, "art_reason": "Reframed from the unsafe drain macro to keep the chrome tabletop orb, wet table sheen, glass edge, and floor reflections readable without clipping through floor channels."}
   ],
   "material_palette": [
     {"id": "rain_glass", "surface_class": "glass", "shader_mode": "glass_tint", "description": "Slight blue-gray glass with strong edge highlights and readable transmission."},

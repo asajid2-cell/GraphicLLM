@@ -4927,7 +4927,7 @@ void Engine::BuildRainGlassPavilionScene() {
     }
 
     m_activeCameraEntity = AddAssetLedCamera(*m_registry,
-        glm::vec3(-0.92f, 1.18f, -0.82f), glm::vec3(-0.04f, 0.24f, 0.88f), 32.0f, 120.0f);
+        glm::vec3(-0.92f, 0.90f, 0.22f), glm::vec3(-0.43f, 0.72f, 0.82f), 25.0f, 120.0f);
 
     const AssetLedMaterialSettings wetTile{glm::vec4(0.12f, 0.13f, 0.15f, 1.0f), 0.0f, 0.34f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.78f, 0.42f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "wet_masonry"};
     const AssetLedMaterialSettings gardenMat{glm::vec4(0.050f, 0.075f, 0.070f, 1.0f), 0.0f, 0.78f, 0.0f, 1.5f, glm::vec3(0.0f), 1.0f, 0.22f, 0.55f, false, Scene::RenderableComponent::AlphaMode::Opaque, Scene::RenderableComponent::RenderLayer::Opaque, "moss_vegetation"};

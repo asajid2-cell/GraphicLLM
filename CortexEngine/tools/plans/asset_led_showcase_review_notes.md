@@ -166,6 +166,46 @@ Decision:
 - Keep `ALS-010` as `PARTIAL`.
 - Keep `ALS-014` as `PARTIAL`.
 
+## 2026-05-14 Rain Tabletop Vignette Reframe
+
+Commands:
+
+- `cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && cmake --build CortexEngine\build --config Release --target CortexEngine'`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_seed_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_showcase_scene_contract_tests.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_scene_composition_stability_tests.ps1 -SceneId rain_glass_pavilion`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_asset_led_scene_contract_tests.ps1 -SceneId rain_glass_pavilion -RuntimeSmoke -SmokeFrames 45`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File CortexEngine/tools/run_public_capture_gallery.ps1 -NoBuild -Quality High -AssetLedOnly -OutputDir CortexEngine/build/bin/logs/rain_tabletop_vignette_review -Width 1920 -Height 1080 -SmokeFrames 90`
+
+Result: build, contracts, and capture passed, and the drain macro regression is fixed, but the rain pavilion remains **not public-gallery ready**.
+
+Changes reviewed:
+
+- Synchronized the runtime default and public hero camera around a tighter table/chrome/glass material vignette.
+- Tightened the glass-closeup bookmark while keeping the contract-required FOV range.
+- Reframed `puddle_chrome` away from the clipped chrome drain macro toward the table, chrome orb, wet surface, glass edge, and floor reflections.
+
+Validation evidence:
+
+- Scene seed contract passed with `seeds=5`.
+- Showcase scene contract passed with `scenes=12`.
+- Scene composition stability passed with `seeds=1`.
+- Rain asset-led runtime contracts passed with `scene=rain_glass_pavilion`.
+- Asset-led public capture `rain_tabletop_vignette_review` passed with `captures=15 size=1920x1080 preset=public_high`.
+- Rain hero report recorded `gpu_frame_ms=132.458`, `avg_luma=34.903`, `rt_reflection_signal_avg_luma=0.03780`, `rt_reflection_history_signal_avg_luma=0.03888`, and texture uploads `submitted=13 completed=13 failed=0 pending=0 uploaded=66.67MB`.
+
+Findings:
+
+- The old `puddle_chrome` shot no longer clips into the chrome drain and bright floor channel.
+- The hero is now a clearer table/chrome/glass material vignette.
+- Rear panels/slats, visible block geometry, and the table-heavy primitive composition still prevent publication.
+
+Decision:
+
+- Do not publish the rain captures.
+- Keep `ALS-007` as `PARTIAL`.
+- Keep `ALS-014` as `PARTIAL`.
+
 ## 2026-05-13 Coastal Crown Grounding Checkpoint
 
 Commands:

@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import pathlib
+import sys
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
+CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
+
+
+REQUIRED_PLAN_TOKENS = [
+    "FullSceneShaderPipeline V3 Refactor Plan and Ledger",
+    "FullSceneMaterialResolveV3",
+    "FullSceneLightingV3",
+    "FullSceneReflectionV3",
+    "SceneLocalEnvironmentV3",
+    "CinematicPostV3",
+    "material_attributes",
+    "direct_lighting",
+    "shadow_visibility",
+    "reflection_radiance",
+    "reflection_confidence",
+    "scene_local_environment",
+    "hdr_scene_color",
+    "ldr_cinematic_output",
+    "Default beauty remains unchanged",
+    "gallery",
+    "kitchen",
+    "office",
+    "gym",
+    "concert",
+    "red_room",
+    "stadium",
+    "L001 - V3 Contract Exists",
+    "L010 - Default Beauty Promotion",
+]
+
+REQUIRED_DOMAINS = [
+    "render_graph",
+    "material",
+    "lighting",
+    "reflection",
+    "environment",
+    "cinematic_post",
+    "validation",
+]
+
+REQUIRED_OUTPUTS = [
+    "material_attributes",
+    "direct_lighting",
+    "indirect_lighting",
+    "shadow_visibility",
+    "reflection_radiance",
+    "reflection_confidence",
+    "scene_local_environment",
+    "hdr_scene_color",
+    "ldr_cinematic_output",
+]
+
+
+def require(condition: bool, errors: list[str], message: str) -> None:
+    if not condition:
+        errors.append(message)
+
+
+def main() -> int:
+    errors: list[str] = []
+
+    require(PLAN_PATH.exists(), errors, f"Missing V3 plan: {PLAN_PATH}")
+    require(CONTRACT_PATH.exists(), errors, f"Missing V3 contract: {CONTRACT_PATH}")
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}")
+        return 1
+
+    plan = PLAN_PATH.read_text(encoding="utf-8")
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
+    for token in REQUIRED_PLAN_TOKENS:
+        require(token in plan, errors, f"V3 plan missing token: {token}")
+
+    require(
+        contract.get("schema") == "cortex.full_scene_shader_pipeline_v3.contract.v1",
+        errors,
+        "V3 contract schema is wrong",
+    )
+    require(
+        contract.get("status") == "planned_not_promoted",
+        errors,
+        "V3 contract must remain planned_not_promoted until runtime evidence exists",
+    )
+
+    families = set(contract.get("required_scene_families", []))
+    for family in ["gallery", "kitchen", "office", "gym", "concert", "red_room", "stadium"]:
+        require(family in families, errors, f"V3 contract missing scene family: {family}")
+
+    domains = contract.get("domains", {})
+    for domain in REQUIRED_DOMAINS:
+        require(domain in domains, errors, f"V3 contract missing domain: {domain}")
+
+    render_graph_outputs = set(domains.get("render_graph", {}).get("required_outputs", []))
+    for output in REQUIRED_OUTPUTS:
+        require(output in render_graph_outputs, errors, f"V3 render graph missing output: {output}")
+
+    validation_gates = set(domains.get("validation", {}).get("required_gates", []))
+    for gate in [
+        "no_missing_required_resource",
+        "reflection_temporal_delta_bounded",
+        "environment_mode_matches_scene",
+        "default_beauty_unchanged_until_promotion",
+    ]:
+        require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
+
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}")
+        return 1
+
+    print("PASS: Full Scene Shader Pipeline V3 plan contract is coherent")
+    print(f"Plan: {PLAN_PATH}")
+    print(f"Contract: {CONTRACT_PATH}")
+    print(f"Domains: {len(domains)}")
+    print(f"Required outputs: {len(render_graph_outputs)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

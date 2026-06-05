@@ -3528,3 +3528,32 @@ Current stopping position:
 - The next larger architectural move is the `FullSceneShaderPipelineV3`
   refactor plan: split material, lighting, reflection, environment, and
   cinematic post into explicit render-graph resources with validation gates.
+
+### FullSceneShaderPipeline V3 Refactor Plan - 2026-06-05
+
+Implemented:
+
+- Added the V3 plan/ledger:
+  `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+- Added the machine-checkable V3 contract:
+  `assets/final_art/full_scene_shader_pipeline_v3_contract.json`.
+- Added the V3 plan validator:
+  `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+
+V3 target:
+
+- move from isolated V2 signal slices to explicit render-graph resources for
+  material, lighting, reflection, scene-local environment, HDR composite, and
+  cinematic post.
+- keep default beauty unchanged until each domain has a producer resource,
+  consumer path, debug view, frame-report field, analyzer, packet evidence, and
+  promotion decision.
+- required cross-family proof remains gallery, kitchen, office, gym, concert,
+  red_room, and stadium.
+
+Current stopping position:
+
+- V3 is planned and contract-grounded, not implemented or promoted.
+- Next safe implementation slice is P0: add runtime frame-report placeholders
+  for `full_scene_shader_pipeline_v3` and packet skeletons while preserving the
+  current default beauty path.

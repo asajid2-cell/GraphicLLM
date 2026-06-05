@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 60u;
+constexpr uint32_t kMaxDebugViewMode = 61u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -68,6 +68,8 @@ void Renderer::CycleDebugViewMode() {
     // 57 = post reflection stability policy
     // 58 = post reflection resolver V2 candidate beauty
     // 59 = post reflection resolver V2 candidate delta
+    // 60 = post reflection source authority
+    // 61 = local reflection radiance buffer
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -132,6 +134,7 @@ void Renderer::CycleDebugViewMode() {
         case 58: label = "PostReflectionResolverV2Candidate"; break;
         case 59: label = "PostReflectionResolverV2CandidateDelta"; break;
         case 60: label = "PostReflectionSourceAuthority"; break;
+        case 61: label = "LocalReflectionRadiance"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

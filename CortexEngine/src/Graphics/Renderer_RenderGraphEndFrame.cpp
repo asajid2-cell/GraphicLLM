@@ -264,6 +264,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             taaHandle,
             rtReflHandle,
             rtReflHistHandle,
+            {},
             hzbHandle,
             backBufferHandle,
             wantsHzbDebug,
@@ -294,6 +295,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.descriptorUpdate.emissiveMetallic = postEmissiveMetallicResource;
         executeContext.descriptorUpdate.materialExt1 = postMaterialExt1Resource;
         executeContext.descriptorUpdate.materialExt2 = postMaterialExt2Resource;
+        executeContext.descriptorUpdate.localReflectionRadiance = nullptr;
         executeContext.draw.commandList = m_commandResources.graphicsList.Get();
         executeContext.draw.descriptorManager = m_services.descriptorManager.get();
         executeContext.draw.rootSignature = m_pipelineState.rootSignature.get();

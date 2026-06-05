@@ -109,6 +109,7 @@ Texture2D g_RTReflectionHistory : register(t9);
 Texture2D g_EmissiveMetallic : register(t10);
 Texture2D g_MaterialExt1 : register(t11);
 Texture2D g_MaterialExt2 : register(t12);
+Texture2D g_LocalReflectionRadiance : register(t13);
 // Shadow map array is accessed via a separate descriptor table (space1) so
 // that t0-t5 in space0 can be used for post-process textures without aliasing.
 Texture2DArray g_ShadowMap : register(t0, space1);
@@ -2058,6 +2059,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
                       saturate(sceneLocalReflectionPotential),
                       saturate(max(wSSR, wRT) * 4.0f),
                       1.0f);
+    }
+    if (g_DebugMode.x == 61.0f)
+    {
+        // Local reflection radiance buffer proof view:
+        //   RGB = resolved local reflection radiance
+        //   A   = producer confidence/admission weight visualized as brightness
+        float4 localRadiance = g_LocalReflectionRadiance.SampleLevel(g_Sampler, uv, 0);
+        return float4(saturate(localRadiance.rgb + localRadiance.a.xxx * 0.25f), 1.0f);
     }
 
     float3 reflectionBaseColor = hdrColor;

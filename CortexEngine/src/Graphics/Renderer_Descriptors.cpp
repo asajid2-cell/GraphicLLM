@@ -364,6 +364,7 @@ void Renderer::UpdatePostProcessDescriptorTable() {
     context.emissiveMetallic = emissiveMetallicRes;
     context.materialExt1 = materialExt1Res;
     context.materialExt2 = materialExt2Res;
+    context.localReflectionRadiance = nullptr;
     (void)PostProcessPass::UpdateDescriptorTable(context);
 }
 

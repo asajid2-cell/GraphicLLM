@@ -26,6 +26,7 @@ struct ResourceHandles {
     RGResourceHandle taa;
     RGResourceHandle rtReflection;
     RGResourceHandle rtReflectionHistory;
+    RGResourceHandle localReflectionRadiance;
     RGResourceHandle hzb;
     RGResourceHandle backBuffer;
     bool wantsHzbDebug = false;

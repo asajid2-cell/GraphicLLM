@@ -50,6 +50,9 @@ void Declare(RGPassBuilder& builder, const ResourceHandles& resources) {
     if (resources.rtReflectionHistory.IsValid()) {
         builder.Read(resources.rtReflectionHistory, RGResourceUsage::ShaderResource);
     }
+    if (resources.localReflectionRadiance.IsValid()) {
+        builder.Read(resources.localReflectionRadiance, RGResourceUsage::ShaderResource);
+    }
     if (resources.hzb.IsValid() && resources.wantsHzbDebug) {
         builder.Read(resources.hzb, RGResourceUsage::ShaderResource);
     }

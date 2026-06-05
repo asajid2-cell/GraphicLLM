@@ -559,7 +559,7 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         renderer_debug_source,
-        "constexpr uint32_t kMaxDebugViewMode = 60u",
+        "constexpr uint32_t kMaxDebugViewMode = 61u",
         "Renderer debug mode range",
     )
     for token in [
@@ -650,7 +650,7 @@ def validate_runtime_lighting_surface() -> list[str]:
         require_source_token(errors, deferred_lighting, token, "DeferredLighting V2 direct-light comparison")
 
     for token in [
-        "constexpr uint32_t kMaxDebugViewMode = 60u",
+        "constexpr uint32_t kMaxDebugViewMode = 61u",
         "VB_DeferredDirectLightUnshadowed",
         "VB_DeferredDirectLightShadowLoss",
     ]:
@@ -874,8 +874,10 @@ def validate_runtime_reflection_surface() -> list[str]:
         "g_DebugMode.x == 56.0f",
         "g_DebugMode.x == 57.0f",
         "g_DebugMode.x == 60.0f",
+        "g_DebugMode.x == 61.0f",
         "Reflection-source resolver weights",
         "Reflection source authority",
+        "Local reflection radiance buffer proof view",
         "Reflection stability policy",
         "reflectionStabilityScale",
         "stableSSRConfidence",
@@ -888,6 +890,7 @@ def validate_runtime_reflection_surface() -> list[str]:
     for token in [
         "PostReflectionSourceWeights",
         "PostReflectionSourceAuthority",
+        "LocalReflectionRadiance",
         "PostReflectionStabilityPolicy",
         "PostReflectionResolverV2Candidate",
         "PostReflectionResolverV2CandidateDelta",
@@ -897,6 +900,7 @@ def validate_runtime_reflection_surface() -> list[str]:
     for token in [
         "reflection_source_weights",
         "reflection_source_authority",
+        "local_reflection_radiance",
         "reflection_stability_policy",
         "reflection_resolver_candidate",
         "reflection_resolver_candidate_delta",

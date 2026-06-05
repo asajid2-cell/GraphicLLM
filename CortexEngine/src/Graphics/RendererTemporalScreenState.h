@@ -55,7 +55,7 @@ struct TemporalScreenPassState {
     bool taaResolveSrvTableValid = false;
     std::array<std::array<DescriptorHandle, 10>, kFrameCount> motionVectorSrvTables{};
     bool motionVectorSrvTableValid = false;
-    std::array<std::array<DescriptorHandle, 13>, kFrameCount> postProcessSrvTables{};
+    std::array<std::array<DescriptorHandle, 14>, kFrameCount> postProcessSrvTables{};
     bool postProcessSrvTableValid = false;
 
     [[nodiscard]] Result<void> CreateHistoryColor(ID3D12Device* device,

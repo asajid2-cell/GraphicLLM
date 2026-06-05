@@ -179,8 +179,13 @@ Result<void> DX12Pipeline::Initialize(
     blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
     blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-    blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-    blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+    // Preserve destination alpha for blended overlays. The HDR alpha channel
+    // carries post-process control data from the opaque/G-buffer path; blended
+    // glass, water, and particles do not write matching normal/material data,
+    // so publishing their physical opacity here makes the post stack run
+    // refraction/TAA decisions against the wrong surface.
+    blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+    blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
@@ -261,10 +266,10 @@ Result<void> DX12RootSignature::Initialize(ID3D12Device* device) {
     rootParameters[2].Descriptor.RegisterSpace = 0;
     rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Parameter 3: Descriptor table for textures (t0 - t12 in space0)
+    // Parameter 3: Descriptor table for textures (t0 - t13 in space0)
     D3D12_DESCRIPTOR_RANGE descriptorRange = {};
     descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    descriptorRange.NumDescriptors = 13;
+    descriptorRange.NumDescriptors = 14;
     descriptorRange.BaseShaderRegister = 0;
     descriptorRange.RegisterSpace = 0;
     descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;

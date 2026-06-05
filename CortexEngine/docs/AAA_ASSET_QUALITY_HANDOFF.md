@@ -3179,3 +3179,56 @@ Important guardrails:
   artifacts.
 - Do not claim completion until V2 beauty can explain material, light,
   reflection, shadow, temporal, post, and render-graph ownership per packet.
+
+### Reserved Post Local Reflection Radiance Slot - 2026-06-05
+
+Implemented and validated the first C++ binding surface for the future
+render-graph local reflection radiance producer:
+
+- post-process SRV table widened to `14` slots.
+- graphics root signature widened from `t0-t12` to `t0-t13`.
+- `PostProcess.hlsl` declares `g_LocalReflectionRadiance : register(t13)`.
+- debug view `61` is now reachable and labeled `LocalReflectionRadiance`.
+- `local_reflection_radiance` is part of the V2 frame-report/debug-view
+  contract and packet default view set.
+- graph and non-graph post descriptor update paths bind slot `13` as a null
+  `R16G16B16A16_FLOAT` SRV until the producer exists.
+
+Important diagnosis:
+
+- The first packet failed because the shader declared `t13` but the graphics
+  root signature still exposed only `13` descriptors.
+- After that fix, `local_reflection_radiance` initially matched
+  `reflection_source_authority`; this was not descriptor aliasing. The renderer
+  debug mode clamp was still capped at `60`, so requested view `61` was silently
+  clamped to `60`.
+- Raising `kMaxDebugViewMode` to `61` proved the actual slot: debug view `61`
+  is black/nonblack `0.0` while view `60` still shows authority signal.
+
+Validation evidence:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- shader prep passed:
+  post shader copied; `LocalReflectionRadiance.hlsl` DXC compile passed.
+- validators passed:
+  `python tools\check_full_scene_shader_pipeline_v2_frame_report.py`
+  and `python tools\validate_full_scene_shader_pipeline_v2_plan.py`.
+- packet passed:
+  `build/captures/v2_local_radiance_slot_smoke4_20260605`.
+- packet captured `6` views, emitted `60` V2 evidence rows, and had `0`
+  failures.
+- debug metrics:
+  `local_reflection_radiance` luma `0.0000`, nonblack `0.0000`;
+  `reflection_source_authority` luma `0.0661`, nonblack `0.4109`.
+- `ctest --test-dir build --output-on-failure -C Release` found no registered
+  tests in this build.
+
+Next implementation pass:
+
+- Allocate the local reflection radiance texture.
+- Add SRV/UAV descriptors and resource state.
+- Dispatch `LocalReflectionRadiance.hlsl` in the render graph.
+- Bind the produced SRV into post slot `13`.
+- Require debug view `61` to show nonzero producer-owned signal before feeding
+  it into the V2 reflection candidate.

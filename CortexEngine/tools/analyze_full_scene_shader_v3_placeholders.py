@@ -135,6 +135,8 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
                 failures.append("lighting adapter must be produced by FullSceneLightingV3Adapter")
             if lighting_domain.get("output_resource") != "hdr_color":
                 failures.append("lighting adapter must honestly name hdr_color as current output")
+            if v3.get("lighting_split_resources_allocated") is not True:
+                failures.append("lighting adapter packet must expose allocated split lighting resources")
             if lighting_domain.get("ready") is True and v3.get("lighting_split_resources_ready") is not True:
                 failures.append("lighting domain ready before split V3 lighting resources exist")
             if lighting_domain.get("default_beauty_affects") is not False:
@@ -161,6 +163,7 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         "material_attributes_resource_count": v3.get("material_attributes_resource_count"),
         "material_attributes_channel_count": v3.get("material_attributes_channel_count"),
         "lighting_adapter_ready": v3.get("lighting_adapter_ready"),
+        "lighting_split_resources_allocated": v3.get("lighting_split_resources_allocated"),
         "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
         "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
         "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
@@ -208,6 +211,9 @@ def main() -> int:
         ),
         "lighting_adapter_ready_report_count": sum(
             1 for row in rows if row.get("lighting_adapter_ready") is True
+        ),
+        "lighting_split_allocated_report_count": sum(
+            1 for row in rows if row.get("lighting_split_resources_allocated") is True
         ),
         "lighting_split_ready_report_count": sum(
             1 for row in rows if row.get("lighting_split_resources_ready") is True

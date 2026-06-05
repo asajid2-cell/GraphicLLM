@@ -48,6 +48,15 @@ Result<void> Renderer::CreateHDRTarget() {
         spdlog::warn("{}", normalRoughnessResult.Error());
     }
 
+    auto lightingV3Result = m_mainTargets.lightingV3.CreateTargets(
+        m_services.device->GetDevice(),
+        m_services.descriptorManager.get(),
+        width,
+        height);
+    if (lightingV3Result.IsErr()) {
+        spdlog::warn("{}", lightingV3Result.Error());
+    }
+
     InvalidateTAAHistory("resource_recreated");
     auto historyResult = m_temporalScreenState.CreateHistoryColor(
         m_services.device->GetDevice(),

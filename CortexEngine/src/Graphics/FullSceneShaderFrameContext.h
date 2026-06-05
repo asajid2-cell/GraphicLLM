@@ -1180,6 +1180,7 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool packetGateReady = false;
     bool materialAttributesReady = false;
     bool lightingAdapterReady = false;
+    bool lightingSplitResourcesAllocated = false;
     bool lightingSplitResourcesReady = false;
     uint32_t materialAttributesResourceCount = 0;
     uint32_t materialAttributesChannelCount = 0;
@@ -1314,14 +1315,21 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.lighting.lightCount > 0 &&
         contract.draws.visibilityBufferInstances > 0;
     context.lightingAdapterReady = lightingAdapterReady;
-    context.lightingSplitResourcesReady =
+    context.lightingSplitResourcesAllocated =
         FullSceneShaderHasResource(contract, "direct_lighting") &&
         FullSceneShaderHasResource(contract, "direct_lighting_unshadowed") &&
         FullSceneShaderHasResource(contract, "shadow_visibility") &&
         FullSceneShaderHasResource(contract, "shadow_loss") &&
         FullSceneShaderHasResource(contract, "indirect_lighting");
+    context.lightingSplitResourcesReady =
+        context.lightingSplitResourcesAllocated &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "direct_lighting") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "direct_lighting_unshadowed") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "shadow_visibility") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "shadow_loss") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneLightingV3", "indirect_lighting");
     context.lightingAdapterSignalCount = lightingAdapterReady ? 4u : 0u;
-    context.lightingSplitResourceCount = context.lightingSplitResourcesReady ? 5u : 0u;
+    context.lightingSplitResourceCount = context.lightingSplitResourcesAllocated ? 5u : 0u;
 
     FullSceneShaderPipelineV3DomainEvidence lightingDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
@@ -1337,6 +1345,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     lightingDomain.promotionState = lightingAdapterReady ? "adapter" : "planned";
     lightingDomain.backingResources = {
         "hdr_color",
+        "direct_lighting",
+        "direct_lighting_unshadowed",
+        "shadow_visibility",
+        "shadow_loss",
+        "indirect_lighting",
     };
     lightingDomain.debugViews = {
         "VB_DeferredDirectLight",
@@ -1352,7 +1365,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "shadow_factor_debug",
         "ambient_ibl_debug",
     };
-    lightingDomain.backingResourceCount = lightingAdapterReady ? 1u : 0u;
+    lightingDomain.backingResourceCount = 1u + context.lightingSplitResourceCount;
     lightingDomain.requiredChannelCount = 5u;
     lightingDomain.readyChannelCount = lightingAdapterReady ? 5u : 0u;
     lightingDomain.missingRequiredChannelCount =

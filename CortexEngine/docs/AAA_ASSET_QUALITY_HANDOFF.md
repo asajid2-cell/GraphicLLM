@@ -181,6 +181,37 @@ V3 indirect parity fix:
   the full required family set before moving to SceneLocalEnvironmentV3 or
   ReflectionV3.
 
+SceneLocalEnvironmentV3 evidence-domain slice:
+
+- Runtime V3 frame reports now expose:
+  - `scene_local_environment_ready`.
+  - `scene_local_environment_mode`.
+  - `scene_local_environment_channel_count`.
+- `SceneLocalEnvironmentV3` is now a real domain entry derived from the scene
+  visual/environment contract instead of a planned-only placeholder.
+- Current logical output: `scene_local_environment`.
+- Current debug view: `environment_mode`.
+- Current readiness channels:
+  `environment_mode`, `ambient_lighting`, `visible_background`,
+  `reflection_background`, and `atmosphere`.
+- Current mode compiler derives:
+  `enclosed_room`, `stage`, `neutral_lab`, or `open_exterior`.
+- The V3 placeholder analyzer now permits and validates `environment` as a
+  ready domain when all five channels are owned.
+- This is not a new shader/pass and does not change default beauty. It is the
+  ownership contract needed before ReflectionV3 and CompositeV3 can consume a
+  safe scene-local environment.
+- Runtime smoke:
+  `build/captures/v3_scene_local_environment_contract_smoke3_20260605`.
+  - reports: `16`.
+  - `scene_local_environment_ready_report_count=16`.
+  - `lighting_split_ready_report_count=16`.
+  - `full_scene_lighting_v3_executed_report_count=16`.
+  - failures: `0`.
+  - warnings: `0`.
+  - gallery mode: `neutral_lab`.
+  - gallery environment channel count: `5`.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:

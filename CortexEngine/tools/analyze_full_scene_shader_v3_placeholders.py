@@ -30,7 +30,7 @@ REQUIRED_DOMAINS = {
     "validation",
 }
 
-ALLOWED_READY_DOMAINS = {"material", "lighting"}
+ALLOWED_READY_DOMAINS = {"material", "lighting", "environment"}
 
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
@@ -370,6 +370,26 @@ def analyze_report(
                     f"{lighting_split_pass.get('draw_count')}"
                 )
 
+    environment_domain = domain_by_id.get("environment")
+    environment_ready = v3.get("scene_local_environment_ready") is True
+    if environment_ready:
+        if not isinstance(environment_domain, dict):
+            failures.append("scene_local_environment_ready=true but environment domain is missing")
+        else:
+            if environment_domain.get("producer") != "SceneLocalEnvironmentV3":
+                failures.append("environment domain must be produced by SceneLocalEnvironmentV3")
+            if environment_domain.get("output_resource") != "scene_local_environment":
+                failures.append("environment domain must output scene_local_environment")
+            if environment_domain.get("debug_view") != "environment_mode":
+                failures.append("environment domain must expose environment_mode debug view")
+            if environment_domain.get("default_beauty_affects") is not False:
+                failures.append("environment domain must not affect default beauty yet")
+            if environment_domain.get("ready_channel_count", 0) < 5:
+                failures.append("environment domain ready without all required channels")
+            mode = v3.get("scene_local_environment_mode")
+            if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
+                failures.append(f"environment domain ready with invalid mode: {mode}")
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -389,8 +409,11 @@ def analyze_report(
         "lighting_adapter_ready": v3.get("lighting_adapter_ready"),
         "lighting_split_resources_allocated": v3.get("lighting_split_resources_allocated"),
         "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
+        "scene_local_environment_ready": v3.get("scene_local_environment_ready"),
+        "scene_local_environment_mode": v3.get("scene_local_environment_mode"),
         "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
         "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
+        "scene_local_environment_channel_count": v3.get("scene_local_environment_channel_count"),
         "full_scene_lighting_v3_executed": (
             lighting_split_pass.get("executed") if isinstance(lighting_split_pass, dict) else None
         ),
@@ -463,6 +486,9 @@ def main() -> int:
         ),
         "lighting_split_ready_report_count": sum(
             1 for row in rows if row.get("lighting_split_resources_ready") is True
+        ),
+        "scene_local_environment_ready_report_count": sum(
+            1 for row in rows if row.get("scene_local_environment_ready") is True
         ),
         "full_scene_lighting_v3_executed_report_count": sum(
             1 for row in rows if row.get("full_scene_lighting_v3_executed") is True

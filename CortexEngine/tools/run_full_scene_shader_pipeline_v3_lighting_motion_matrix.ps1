@@ -1,6 +1,6 @@
 param(
     [string]$OutputRoot = "build/captures/full_scene_shader_pipeline_v3_lighting_motion_matrix",
-    [string]$FamilyFilter = "gallery,kitchen,gym,concert",
+    [string]$FamilyFilter = "gallery,kitchen,office,gym,concert,red_room,stadium",
     [string]$StressSceneFilter = "",
     [string]$MotionModes = "static,mouse_jitter,camera_sweep",
     [string]$ViewFilter = "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting",
@@ -8,7 +8,8 @@ param(
     [int]$CaptureFrame = 20,
     [int]$CaptureSequenceCount = 2,
     [switch]$NoBuild,
-    [switch]$SkipSceneAnalyzers
+    [switch]$SkipSceneAnalyzers,
+    [switch]$SummarizeExisting
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,16 +64,29 @@ foreach ($mode in $modeList) {
         $packetArgs += @("-StressSceneFilter", $StressSceneFilter)
     }
 
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $packetRunner @packetArgs
-    if ($LASTEXITCODE -ne 0) {
-        $failures.Add("packet failed for motion mode '$mode'") | Out-Null
+    $modeOutputPath = Join-Path $outputPath $mode
+    $motionJson = Join-Path $modeOutputPath "v3_lighting_motion.json"
+    $motionMd = Join-Path $modeOutputPath "v3_lighting_motion.md"
+    $manifest = Join-Path $modeOutputPath "manifest.json"
+
+    if (-not $SummarizeExisting) {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $packetRunner @packetArgs
+        if ($LASTEXITCODE -ne 0) {
+            $failures.Add("packet failed for motion mode '$mode'") | Out-Null
+            continue
+        }
+    } elseif (-not (Test-Path $manifest)) {
+        $failures.Add("missing existing manifest for '$mode': $manifest") | Out-Null
         continue
     }
 
-    $motionJson = Join-Path (Join-Path $outputPath $mode) "v3_lighting_motion.json"
     if (-not (Test-Path $motionJson)) {
-        $failures.Add("missing lighting motion report for '$mode': $motionJson") | Out-Null
-        continue
+        $analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
+        & python $analyzer --manifest $manifest --output-json $motionJson --output-md $motionMd --min-sequence-count $CaptureSequenceCount
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $motionJson)) {
+            $failures.Add("missing lighting motion report for '$mode': $motionJson") | Out-Null
+            continue
+        }
     }
 
     $report = Get-Content $motionJson -Raw | ConvertFrom-Json

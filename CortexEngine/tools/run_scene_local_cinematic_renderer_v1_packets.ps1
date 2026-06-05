@@ -27,7 +27,9 @@ param(
     [string]$KitchenSeed = "",
     [string]$OfficeSeed = "",
     [string]$GymSeed = "",
-    [string]$ConcertSeed = ""
+    [string]$ConcertSeed = "",
+    [string]$RedRoomSeed = "",
+    [string]$StadiumSeed = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -265,6 +267,17 @@ function Resolve-FamilySeed([string]$Family, [string]$ExplicitSeed) {
                 "assets/scenes/model_authored/scene_authoring_closed_loop_v1/novel_concert/scene_seed.json"
             )
         }
+        "red_room" {
+            return Resolve-FirstExistingSeed @(
+                "assets/scenes/model_authored/architecture_lighting_planner_v24_20260515/red_light_room/scene_seed.json",
+                "assets/scenes/model_authored/asset_density_v44_20260515/red_light_room/scene_seed.json"
+            )
+        }
+        "stadium" {
+            return Resolve-FirstExistingSeed @(
+                "assets/scenes/model_authored/architecture_lighting_planner_v24_20260515/stadium_night_match/scene_seed.json"
+            )
+        }
         default {
             return ""
         }
@@ -414,7 +427,7 @@ function Invoke-PacketCapture([string]$Family,
 $families = New-Object System.Collections.Generic.List[object]
 $stressTargets = Parse-StressSceneTargets $StressSceneFilter
 if ($familyFilterSet.Count -gt 0) {
-    $knownFamilies = @("gallery", "kitchen", "office", "gym", "concert")
+    $knownFamilies = @("gallery", "kitchen", "office", "gym", "concert", "red_room", "stadium")
     foreach ($requestedFamily in $familyFilterSet) {
         if ($knownFamilies -notcontains $requestedFamily.ToLowerInvariant()) {
             throw "Unknown FamilyFilter entry '$requestedFamily'. Known families: $($knownFamilies -join ', ')"
@@ -430,7 +443,9 @@ if ($familyFilterSet.Count -gt 0) {
         $familyFilterSet.Contains("kitchen") -or
         $familyFilterSet.Contains("office") -or
         $familyFilterSet.Contains("gym") -or
-        $familyFilterSet.Contains("concert"))
+        $familyFilterSet.Contains("concert") -or
+        $familyFilterSet.Contains("red_room") -or
+        $familyFilterSet.Contains("stadium"))
 }
 
 if ($includeGallery) {
@@ -447,7 +462,9 @@ if ($includeModelFamilies) {
         [pscustomobject]@{ Family = "kitchen"; ExplicitSeed = $KitchenSeed },
         [pscustomobject]@{ Family = "office"; ExplicitSeed = $OfficeSeed },
         [pscustomobject]@{ Family = "gym"; ExplicitSeed = $GymSeed },
-        [pscustomobject]@{ Family = "concert"; ExplicitSeed = $ConcertSeed }
+        [pscustomobject]@{ Family = "concert"; ExplicitSeed = $ConcertSeed },
+        [pscustomobject]@{ Family = "red_room"; ExplicitSeed = $RedRoomSeed },
+        [pscustomobject]@{ Family = "stadium"; ExplicitSeed = $StadiumSeed }
     )) {
         if ($familyFilterSet.Count -gt 0 -and -not $familyFilterSet.Contains($entry.Family)) {
             $resolvedSeeds[$entry.Family] = ""
@@ -465,7 +482,7 @@ if ($includeModelFamilies) {
         }
     }
 } else {
-    foreach ($key in @("kitchen", "office", "gym", "concert")) {
+    foreach ($key in @("kitchen", "office", "gym", "concert", "red_room", "stadium")) {
         $resolvedSeeds[$key] = ""
     }
 }
@@ -519,7 +536,7 @@ $manifest = [ordered]@{
     resolved_seeds = $resolvedSeeds
     results = $results
     missing_seed_families = @(
-        foreach ($key in @("kitchen", "office", "gym", "concert")) {
+        foreach ($key in @("kitchen", "office", "gym", "concert", "red_room", "stadium")) {
             if ([string]::IsNullOrWhiteSpace($resolvedSeeds[$key])) { $key }
         }
     )

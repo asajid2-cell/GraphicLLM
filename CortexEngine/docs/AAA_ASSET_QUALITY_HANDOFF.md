@@ -381,12 +381,22 @@ Implemented:
   - validates that the Markdown plan and JSON contract stay coherent.
   - checks required phases, domain ids, target family order, hard rules, and
     minimum required outputs.
+- `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  - external frame-report target for the V2 runtime integration.
+  - maps each required shader domain to a future
+    `full_scene_shader_pipeline_v2` frame-report section.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
+  - validates the external frame-report contract against the main V2 contract.
+  - can optionally inspect a runtime frame report and fail when V2 sections are
+    missing.
 
 Validation:
 
 ```powershell
 python tools\validate_full_scene_shader_pipeline_v2_plan.py
 python -m py_compile tools\validate_full_scene_shader_pipeline_v2_plan.py
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py
 ```
 
 Current interpretation:
@@ -397,6 +407,10 @@ Current interpretation:
   reflections, or temporal history.
 - The next implementation slice should add frame-report placeholders for V2
   domains, then upgrade material/asset evidence before changing visual output.
+- The first frame-report contract is external because the current renderer C++
+  worktree already has broad uncommitted frame-contract changes. Runtime C++
+  integration should use this external contract after those changes are
+  reconciled.
 - Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
   gates or provide stronger replacement evidence.
 
@@ -415,6 +429,7 @@ Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_replaceme
 Get-Content docs\media\final_art\generated\aaa_asset_quality\provider_requests\manifest.md
 Get-Content docs\FULL_SCENE_SHADER_PIPELINE_V2.md
 python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
 ```
 
 ## Git Policy

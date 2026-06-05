@@ -118,15 +118,28 @@ Deliverables:
 
 - `docs/FULL_SCENE_SHADER_PIPELINE_V2.md`
 - `assets/final_art/full_scene_shader_pipeline_v2_contract.json`
+- `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
 - `tools/validate_full_scene_shader_pipeline_v2_plan.py`
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
 - handoff update in `docs/AAA_ASSET_QUALITY_HANDOFF.md`
 
 Completion evidence:
 
 - plan validator passes.
 - contract includes every required shader domain.
+- external frame-report contract maps every required shader domain to a future
+  `full_scene_shader_pipeline_v2` frame-report section.
 - handoff identifies this as the next renderer/AAA direction.
 - focused commit is pushed.
+
+Notes:
+
+- The first frame-report contract is intentionally external because the current
+  renderer C++ worktree contains unrelated uncommitted frame-contract changes.
+- The follow-up runtime slice should consume this contract in
+  `FrameContract.h`, `FrameContractJson.cpp`, and
+  `FrameContractValidation.cpp` only after the existing dirty renderer changes
+  are reconciled.
 
 ### FSSP-V2-002 Material Model Upgrade
 
@@ -412,14 +425,16 @@ Validation:
 ## Next Implementation Order
 
 1. Land this plan, contract, and validator.
-2. Add frame-report placeholders for V2 domains without changing rendering.
-3. Upgrade material model and registry material evidence.
-4. Expand GBuffer/debug channel inventory.
-5. Add local reflection probe ownership before chasing more shiny materials.
-6. Add semantic light rigs and shadow/contact stability.
-7. Refactor post into named HDR stages.
-8. Move pass ownership into the render graph.
-9. Run cross-family V2 packets and compare to V1 seq8.
+2. Land the external V2 frame-report contract and checker.
+3. Add runtime frame-report placeholders for V2 domains without changing
+   rendering.
+4. Upgrade material model and registry material evidence.
+5. Expand GBuffer/debug channel inventory.
+6. Add local reflection probe ownership before chasing more shiny materials.
+7. Add semantic light rigs and shadow/contact stability.
+8. Refactor post into named HDR stages.
+9. Move pass ownership into the render graph.
+10. Run cross-family V2 packets and compare to V1 seq8.
 
 This order keeps the engine diagnosable. It avoids the previous trap where a
 scene looked better only because one setting hid the problem.

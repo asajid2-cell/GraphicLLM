@@ -86,6 +86,9 @@ cbuffer FrameConstants : register(b1)
     // x = profile exposure trim, y = HDR shoulder start,
     // z = HDR shoulder strength, w = post-tonemap white compression
     float4   g_CinematicExposureParams;
+    // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
+    // z = scene-local probe radiance enabled (>0.5), w = reserved
+    float4   g_LocalProbeParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -1704,7 +1707,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
                               materialReflectance *
                               rtReflectionCompositionStrength *
                               reflectionStabilityScale : 0.0f;
+    float localProbeSpecularPotential =
+        (g_LocalProbeParams.z > 0.5f) ? max(g_LocalProbeParams.y, 0.0f) : 0.0f;
     float iblReflectionPotential = saturate(materialReflectance * gloss * g_EnvParams.y);
+    float sceneLocalReflectionPotential =
+        saturate(materialReflectance * gloss * localProbeSpecularPotential);
+    float authorizedPrelitReflectionPotential =
+        saturate(max(iblReflectionPotential, sceneLocalReflectionPotential));
 
     if (g_DebugMode.x == 46.0f)
     {
@@ -1739,6 +1748,12 @@ float4 PSMain(VSOutput input) : SV_TARGET
         {
             return float4(1.0f, 0.78f + iblOwnerStrength * 0.20f, 0.05f, 1.0f);
         }
+        float localOwnerStrength = sceneLocalReflectionPotential;
+        localOwnerStrength *= lerp(1.0f, 0.82f, reflectionDebugStability);
+        if (localOwnerStrength > 0.015f)
+        {
+            return float4(0.05f, 0.70f + localOwnerStrength * 0.20f, 0.22f, 1.0f);
+        }
         if (reflectionEligibleClass || materialReflectance * gloss > 0.015f)
         {
             return float4(0.05f, 0.70f, 0.22f, 1.0f);
@@ -1750,10 +1765,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
         // Reflection-source resolver weights:
         //   R = SSR post-composite weight
         //   G = RT post-composite weight
-        //   B = IBL/prelit reflection potential
+        //   B = authorized scene-local or IBL/prelit reflection potential
         return float4(saturate(wSSR * 4.0f),
                       saturate(wRT * 4.0f),
-                      saturate(iblReflectionPotential),
+                      authorizedPrelitReflectionPotential,
                       1.0f);
     }
     if (g_DebugMode.x == 57.0f)

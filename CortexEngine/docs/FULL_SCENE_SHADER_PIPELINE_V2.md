@@ -2317,3 +2317,100 @@ Current interpretation:
 - The next real renderer architecture target is not another candidate tweak;
   it is making model-authored families feed scene-local reflection/probe/SSR/RT
   source signal into the post resolver, then rerunning this signal audit.
+
+## Full Scene Shader Pipeline V2 Scene-Local Source Plumbing Slice - 2026-06-05
+
+Purpose:
+
+- Start `FSSP-V2-004C` by fixing the source-signal gap found in the reflection
+  candidate audit.
+- Keep default beauty unchanged.
+- Make scene-local probe radiance visible to the post-stage source contract so
+  enclosed model-authored families do not look like they have zero authorized
+  reflection source merely because external IBL is disabled.
+
+Diagnosis:
+
+- Deferred lighting already receives local probe radiance through
+  `g_LocalProbeParams`.
+- Post-process `reflection_source_weights` only saw SSR, RT, and
+  `g_EnvParams.y`.
+- Enclosed model-authored families intentionally set external IBL/specular to
+  zero, so their post-stage source signal was zero even when their scene
+  profile declared local reflection probes.
+
+Implemented:
+
+- `ShaderTypes.h`
+  - appended `FrameConstants::localProbeParams`.
+  - x = local probe diffuse scale.
+  - y = local probe specular scale.
+  - z = local probe radiance enabled.
+  - w = reserved.
+- `Renderer_FramePostConstants.cpp`
+  - populates `localProbeParams` from `RendererEnvironmentState`.
+- `PostProcess.hlsl`
+  - reads `g_LocalProbeParams`.
+  - computes `sceneLocalReflectionPotential` from local probe specular scale,
+    material reflectance, and gloss.
+  - updates reflection-owner debug view `46` so local scene probe ownership can
+    light up before generic fallback.
+  - updates reflection-source debug view `56` so blue now reports authorized
+    scene-local or IBL/prelit reflection potential.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && ninja -C build CortexEngine -v'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_scene_local_source_plumbing_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Release `CortexEngine` target build: passed through direct `ninja`.
+- V2 cross-family packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_scene_local_source_plumbing_packet_20260605`.
+- requested families: `5`.
+- captured views: `30`.
+- evidence rows: `300`.
+- frame-report failures: `0`.
+- measured debug views: `30`.
+- metric failures: `0`.
+- source-signal families: `5`.
+- candidate-delta families: `0`.
+- signal warnings: `5`.
+- signal statuses:
+  - `gallery`: `wired_no_delta`, source luma `0.05381363`,
+    delta luma `0.00000004`.
+  - `kitchen`: `wired_no_delta`, source luma `0.00072311`,
+    source nonblack `0.17523763`.
+  - `office`: `wired_no_delta`, source luma `0.00023052`,
+    source nonblack `0.05801107`.
+  - `gym`: `wired_no_delta`, source luma `0.00029567`,
+    source nonblack `0.10023872`.
+  - `concert`: `wired_no_delta`, source luma `0.00089806`,
+    source nonblack `0.16962348`.
+
+Current interpretation:
+
+- The source plumbing slice achieved its immediate gate:
+  `source_signal_family_count` increased from `1/5` to `5/5`.
+- This is not a beauty promotion and not proof of visible reflection
+  improvement.
+- Candidate delta remains zero in model-authored families because the
+  candidate resolver still only changes SSR/RT blend behavior; the local probe
+  term is now visible to evidence but not yet composed by the V2 candidate
+  resolver.
+- The next useful slice is `FSSP-V2-005C`: route scene-local probe/fallback
+  sources into a real candidate reflection resolver path and keep it opt-in
+  until motion packets show stable improvement.

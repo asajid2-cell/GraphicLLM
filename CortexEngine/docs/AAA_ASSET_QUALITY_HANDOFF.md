@@ -2620,3 +2620,65 @@ Current interpretation:
 - Next work should pass a real local-probe/source color or resolved local
   reflection radiance into post, then test stability under motion before any
   default beauty promotion.
+
+## 2026-06-05 Post-Owned Local Probe Source Slice
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl`
+  - declares the existing `space1` environment SRVs for post:
+    `g_EnvDiffuse` and `g_EnvSpecular`.
+  - adds post-local direction/mip helpers and a scene-local probe specular
+    fallback matching the deferred lighting enclosed-scene palette.
+  - routes the V2 candidate-only local probe sheen term through
+    `SamplePostSceneLocalReflectionSource`.
+  - keeps default beauty unchanged.
+
+Why it matters:
+
+- The previous candidate color was still inferred from already-lit scene color
+  plus ambient, which was not a real source contract.
+- The new candidate source is owned:
+  - authorized external environment radiance only when `g_EnvParams`
+    explicitly allows it.
+  - scene-local room radiance otherwise, so enclosed scenes do not reintroduce
+    HDRI/background bleed.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_packet_20260605`.
+- source-signal families: `5/5`.
+- candidate-delta families: `5/5`.
+- warnings: `0`.
+- `ctest` completed with `No tests were found`.
+
+Candidate deltas:
+
+| Family | Delta Luma | Delta Nonblack |
+|---|---:|---:|
+| gallery | `0.01109893` | `0.08724501` |
+| kitchen | `0.00207694` | `0.09141168` |
+| office | `0.00062022` | `0.01469184` |
+| gym | `0.00067247` | `0.01252604` |
+| concert | `0.00249549` | `0.12392687` |
+
+Current next work:
+
+- Do not promote V2 reflection beauty yet.
+- Next useful slice is motion/stability proof on glossy/metal/glass surfaces,
+  then either:
+  - bind actual local probe textures into post when authorized, or
+  - add a resolved local reflection radiance buffer before post.

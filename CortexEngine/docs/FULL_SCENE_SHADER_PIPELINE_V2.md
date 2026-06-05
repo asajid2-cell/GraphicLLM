@@ -2582,3 +2582,82 @@ Current interpretation:
   passing actual probe/source color or resolved local reflection radiance into
   post, then run motion/stability gates on glossy surfaces before any beauty
   promotion.
+
+## 2026-06-05 Post-Owned Local Probe Source Slice
+
+Purpose:
+
+- Remove the candidate resolver's dependence on final scene color as a fake
+  local probe source.
+- Keep default beauty unchanged.
+- Let post-process consume an owned reflection source contract:
+  - authorized external environment radiance when the scene contract permits
+    IBL/specular environment.
+  - scene-local procedural room-probe radiance for enclosed scenes where
+    external HDRI bleed is not authorized.
+
+Implemented:
+
+- `PostProcess.hlsl`
+  - declares existing `space1` environment SRVs:
+    - `g_EnvDiffuse`, `t1`.
+    - `g_EnvSpecular`, `t2`.
+  - adds post-local environment direction/mip helpers.
+  - adds `ComputePostSceneLocalProbeSpecular`, matching the deferred lighting
+    enclosed-scene local probe fallback palette.
+  - adds `SamplePostSceneLocalReflectionSource`.
+  - rewires the V2 candidate-only local probe sheen term to consume that owned
+    source instead of deriving color from `reflectionBaseColor` and ambient.
+- Default beauty remains unchanged.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- Release build: passed.
+- runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_packet_20260605`.
+- captured views: `35`.
+- measured debug views: `35`.
+- metric failures: `0`.
+- source-signal families: `5/5`.
+- candidate-delta families: `5/5`.
+- warnings: `0`.
+
+Candidate signal:
+
+| Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| gallery | `meaningful_delta` | `0.05381363` | `0.32276584` | `0.01109893` | `0.08724501` |
+| kitchen | `meaningful_delta` | `0.00072311` | `0.17523763` | `0.00207694` | `0.09141168` |
+| office | `meaningful_delta` | `0.00023052` | `0.05801107` | `0.00062022` | `0.01469184` |
+| gym | `meaningful_delta` | `0.00029567` | `0.10023872` | `0.00067247` | `0.01252604` |
+| concert | `meaningful_delta` | `0.00089806` | `0.16962348` | `0.00249549` | `0.12392687` |
+
+Current interpretation:
+
+- The V2 candidate now consumes an owned post-visible local reflection source.
+- Enclosed scenes still avoid external IBL/HDRI bleed because the post source
+  falls back to scene-local room radiance unless the environment is explicitly
+  authorized.
+- This is still candidate/debug output only. Do not promote to default beauty
+  until motion/stability packets compare glossy surfaces under camera sweeps
+  and the user accepts the visual direction.

@@ -111,6 +111,8 @@ Texture2D g_MaterialExt2 : register(t12);
 // Shadow map array is accessed via a separate descriptor table (space1) so
 // that t0-t5 in space0 can be used for post-process textures without aliasing.
 Texture2DArray g_ShadowMap : register(t0, space1);
+Texture2D g_EnvDiffuse : register(t1, space1);
+Texture2D g_EnvSpecular : register(t2, space1);
 SamplerState g_Sampler : register(s0);
 
 // -----------------------------------------------------------------------------
@@ -803,6 +805,140 @@ float3 SoftLimitReflectionLuma(float3 color, float maxLumaOverride)
     float range = max(maxLuma - kneeLuma, 1e-3f);
     float limitedLuma = kneeLuma + range * (over / (over + range));
     return color * saturate(limitedLuma / max(luma, 1e-5f));
+}
+
+float2 DirectionToLatLong(float3 dir)
+{
+    dir = normalize(dir);
+    if (!all(isfinite(dir))) {
+        dir = float3(0.0f, 0.0f, 1.0f);
+    }
+
+    float phi = atan2(-dir.z, dir.x);
+    float theta = asin(clamp(dir.y, -1.0f, 1.0f));
+    return float2(0.5f + phi / (2.0f * PI), 0.5f - theta / PI);
+}
+
+float3 RotateEnvironmentDirection(float3 dir)
+{
+    float s, c;
+    sincos(g_CinematicParams.y, s, c);
+    return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
+}
+
+float EnvReflectionFootprintMip(float2 uv, float width, float height, float maxMip)
+{
+    float2 dx = ddx(uv);
+    float2 dy = ddy(uv);
+    dx.x = frac(dx.x + 0.5f) - 0.5f;
+    dy.x = frac(dy.x + 0.5f) - 0.5f;
+
+    float2 texelDx = dx * float2(width, height);
+    float2 texelDy = dy * float2(width, height);
+    float footprint = max(length(texelDx), length(texelDy));
+    return clamp(log2(max(footprint, 1.0f)), 0.0f, maxMip);
+}
+
+float StableIblMipRoughness(float roughness,
+                            float metallic,
+                            bool isMirror,
+                            bool isGlass,
+                            bool isWaterLike,
+                            bool isBrushedMetal)
+{
+    if (isMirror) {
+        return roughness;
+    }
+    if (isGlass || isWaterLike) {
+        return max(roughness, 0.06f);
+    }
+    if (isBrushedMetal) {
+        return max(roughness, 0.28f);
+    }
+    if (metallic > 0.85f) {
+        return max(roughness, 0.24f);
+    }
+    return roughness;
+}
+
+float3 NormalizedPostKeyLightColor()
+{
+    float3 lightColor = (g_LightCount.x > 0) ? g_Lights[0].color_range.rgb : float3(1.0f, 1.0f, 1.0f);
+    float lightLuma = max(dot(lightColor, float3(0.2126f, 0.7152f, 0.0722f)), 0.01f);
+    return lightColor / lightLuma;
+}
+
+float3 PostKeyLightDirection()
+{
+    if (g_LightCount.x == 0) {
+        return normalize(float3(0.35f, 0.85f, 0.25f));
+    }
+    return normalize(-g_Lights[0].direction_cosInner.xyz);
+}
+
+float3 ComputePostSceneLocalProbeSpecular(float3 reflectionDir,
+                                          uint surfaceClass,
+                                          uint sceneMaterialClass,
+                                          float roughness)
+{
+    reflectionDir = normalize(reflectionDir);
+    float3 ambientBase = max(g_AmbientColor.rgb, 0.018f.xxx);
+    float3 keyColor = NormalizedPostKeyLightColor();
+    float3 keyDir = PostKeyLightDirection();
+    float up = saturate(reflectionDir.y * 0.5f + 0.5f);
+    float front = saturate(
+        dot(normalize(reflectionDir.xz + 1e-4f.xx), normalize(keyDir.xz + 1e-4f.xx)) * 0.5f + 0.5f);
+
+    float3 roomLow = ambientBase * 0.70f + float3(0.040f, 0.036f, 0.032f);
+    float3 roomHigh = ambientBase * 1.28f + keyColor * 0.035f;
+    float3 local = lerp(roomLow, roomHigh, up);
+    local += keyColor * pow(front, 12.0f) * lerp(0.010f, 0.055f, saturate(1.0f - roughness));
+
+    if (sceneMaterialClass == SCENE_MATERIAL_EMISSIVE_NEON ||
+        sceneMaterialClass == SCENE_MATERIAL_SCREEN_PANEL) {
+        local += float3(0.030f, 0.090f, 0.150f) * saturate(1.0f - roughness * 0.55f);
+    } else if (surfaceClass == SURFACE_CLASS_WATER ||
+               surfaceClass == SURFACE_CLASS_GLASS ||
+               surfaceClass == SURFACE_CLASS_MIRROR) {
+        local *= 1.18f;
+    }
+
+    return max(local, 0.0f.xxx);
+}
+
+float3 SamplePostSceneLocalReflectionSource(float3 reflectionDir,
+                                            uint surfaceClass,
+                                            uint sceneMaterialClass,
+                                            float roughness,
+                                            float metallic,
+                                            float fireflyClampLuma)
+{
+    reflectionDir = normalize(reflectionDir);
+    float3 source = ComputePostSceneLocalProbeSpecular(
+        reflectionDir, surfaceClass, sceneMaterialClass, roughness);
+
+    if (g_EnvParams.z > 0.5f && g_EnvParams.y > 0.001f)
+    {
+        uint specWidth = 1u;
+        uint specHeight = 1u;
+        uint specMipCount = 1u;
+        g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMipCount);
+        float specMaxMip = max((specMipCount > 0u) ? (float)(specMipCount - 1u) : 0.0f, 0.0f);
+        float2 specUV = DirectionToLatLong(RotateEnvironmentDirection(reflectionDir));
+        float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * specMaxMip;
+        float footprintMip = EnvReflectionFootprintMip(specUV, (float)specWidth, (float)specHeight, specMaxMip);
+        float roughnessMip = StableIblMipRoughness(
+            roughness,
+            metallic,
+            SurfaceIsMirrorClass(surfaceClass) || sceneMaterialClass == SCENE_MATERIAL_MIRROR,
+            surfaceClass == SURFACE_CLASS_GLASS || sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE,
+            SurfaceIsWater(surfaceClass) || sceneMaterialClass == SCENE_MATERIAL_WATER,
+            surfaceClass == SURFACE_CLASS_BRUSHED_METAL || sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL);
+        float mipLevel = max(max(roughnessMip * specMaxMip, reflectionSafeMipFloor), footprintMip);
+        source = g_EnvSpecular.SampleLevel(g_Sampler, specUV, mipLevel).rgb * max(g_EnvParams.y, 0.0f);
+    }
+
+    return SoftLimitReflectionLuma(source, fireflyClampLuma);
 }
 
 float3 SceneMaterialCinematicReflectionTint(uint sceneMaterialClass,
@@ -1893,12 +2029,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
     candidateLocalProbeWeight *= lerp(1.0f, 0.35f, saturate(candidateWeightSum));
     if (candidateLocalProbeWeight > 1e-4f)
     {
-        float3 localProbeFloor = max(g_AmbientColor.rgb, 0.015f.xxx);
-        float3 localProbeSheenColor = max(
-            reflectionBaseColor,
-            localProbeFloor * (1.0f + localProbeSpecularPotential * 3.0f));
-        localProbeSheenColor += localProbeFloor * localProbeSpecularPotential * 2.0f;
-        localProbeSheenColor = SoftLimitReflectionLuma(localProbeSheenColor, rtReflectionFireflyClampLuma);
+        float3 localProbeSheenColor = SamplePostSceneLocalReflectionSource(
+            reflect(-viewForFresnel, gbufNormal),
+            surfaceClass,
+            sceneMaterialClass,
+            roughness,
+            metallic,
+            rtReflectionFireflyClampLuma);
 
         candidateReflectionCompositeColor = CompositeSceneMaterialCinematicReflection(
             candidateReflectionCompositeColor,

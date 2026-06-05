@@ -39,6 +39,13 @@ MATERIAL_PROVIDER_MANIFEST_PATH = (
     ROOT
     / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json"
 )
+MATERIAL_FULFILLMENT_SCHEMA_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_material_fulfillment_v2.schema.json"
+)
+MATERIAL_FULFILLMENT_MANIFEST_PATH = (
+    ROOT
+    / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_fulfillment/fulfillment_manifest.json"
+)
 
 
 REQUIRED_DOMAIN_IDS = {
@@ -92,6 +99,10 @@ def main() -> int:
         return fail(f"missing material provider request schema: {MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH}")
     if not MATERIAL_PROVIDER_MANIFEST_PATH.exists():
         return fail(f"missing material provider request manifest: {MATERIAL_PROVIDER_MANIFEST_PATH}")
+    if not MATERIAL_FULFILLMENT_SCHEMA_PATH.exists():
+        return fail(f"missing material fulfillment schema: {MATERIAL_FULFILLMENT_SCHEMA_PATH}")
+    if not MATERIAL_FULFILLMENT_MANIFEST_PATH.exists():
+        return fail(f"missing material fulfillment manifest: {MATERIAL_FULFILLMENT_MANIFEST_PATH}")
 
     plan_text = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -104,6 +115,12 @@ def main() -> int:
         MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH.read_text(encoding="utf-8")
     )
     material_provider_manifest = json.loads(MATERIAL_PROVIDER_MANIFEST_PATH.read_text(encoding="utf-8"))
+    material_fulfillment_schema = json.loads(
+        MATERIAL_FULFILLMENT_SCHEMA_PATH.read_text(encoding="utf-8")
+    )
+    material_fulfillment_manifest = json.loads(
+        MATERIAL_FULFILLMENT_MANIFEST_PATH.read_text(encoding="utf-8")
+    )
 
     missing_terms = sorted(term for term in REQUIRED_PLAN_TERMS if term not in plan_text)
     if missing_terms:
@@ -215,6 +232,42 @@ def main() -> int:
                 + ", ".join(missing_request_fields)
             )
 
+    required_fulfillment_fields = material_fulfillment_schema.get("required_manifest_fields")
+    if not isinstance(required_fulfillment_fields, list):
+        return fail("material fulfillment schema required_manifest_fields must be a list")
+    missing_fulfillment_fields = [
+        field for field in required_fulfillment_fields if field not in material_fulfillment_manifest
+    ]
+    if missing_fulfillment_fields:
+        return fail(
+            "material fulfillment manifest missing fields: " + ", ".join(missing_fulfillment_fields)
+        )
+    if (
+        material_fulfillment_manifest.get("schema")
+        != "cortex.full_scene_shader_material_fulfillment_manifest.v2"
+    ):
+        return fail("material fulfillment manifest schema id is invalid")
+    fulfillment_requests = material_fulfillment_manifest.get("requests")
+    if not isinstance(fulfillment_requests, list):
+        return fail("material fulfillment manifest requests must be a list")
+    provider_request_ids = {request.get("id") for request in requests}
+    fulfillment_request_ids = {request.get("request_id") for request in fulfillment_requests}
+    missing_fulfillment_ids = sorted(
+        request_id for request_id in provider_request_ids - fulfillment_request_ids if request_id
+    )
+    if missing_fulfillment_ids:
+        return fail(
+            "material fulfillment manifest missing provider requests: "
+            + ", ".join(missing_fulfillment_ids[:20])
+        )
+    allowed_fulfillment_statuses = set(material_fulfillment_schema.get("statuses", []))
+    for request in fulfillment_requests:
+        if request.get("status") not in allowed_fulfillment_statuses:
+            return fail(
+                f"material fulfillment request {request.get('request_id', '<missing>')} "
+                f"has invalid status {request.get('status')!r}"
+            )
+
     target_families = contract.get("target_families")
     if target_families != ["gallery", "kitchen", "office", "gym", "concert"]:
         return fail("target_families must preserve the Renderer V1 five-family gate order")
@@ -230,6 +283,7 @@ def main() -> int:
     print(f"Material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
     print(f"Material upgrade plan: {MATERIAL_UPGRADE_PLAN_PATH}")
     print(f"Material provider manifest: {MATERIAL_PROVIDER_MANIFEST_PATH}")
+    print(f"Material fulfillment manifest: {MATERIAL_FULFILLMENT_MANIFEST_PATH}")
     print(f"Domains: {len(domains)}")
     return 0
 

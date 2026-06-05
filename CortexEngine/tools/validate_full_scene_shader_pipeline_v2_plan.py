@@ -25,6 +25,13 @@ MATERIAL_EVIDENCE_SCHEMA_PATH = (
 MATERIAL_EVIDENCE_REPORT_PATH = (
     ROOT / "assets" / "final_art" / "full_scene_shader_material_evidence_v2.json"
 )
+MATERIAL_UPGRADE_PLAN_SCHEMA_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_material_upgrade_plan_v2.schema.json"
+)
+MATERIAL_UPGRADE_PLAN_PATH = (
+    ROOT
+    / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.json"
+)
 
 
 REQUIRED_DOMAIN_IDS = {
@@ -70,12 +77,18 @@ def main() -> int:
         return fail(f"missing material evidence schema: {MATERIAL_EVIDENCE_SCHEMA_PATH}")
     if not MATERIAL_EVIDENCE_REPORT_PATH.exists():
         return fail(f"missing material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
+    if not MATERIAL_UPGRADE_PLAN_SCHEMA_PATH.exists():
+        return fail(f"missing material upgrade plan schema: {MATERIAL_UPGRADE_PLAN_SCHEMA_PATH}")
+    if not MATERIAL_UPGRADE_PLAN_PATH.exists():
+        return fail(f"missing material upgrade plan: {MATERIAL_UPGRADE_PLAN_PATH}")
 
     plan_text = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_report_contract = json.loads(FRAME_REPORT_CONTRACT_PATH.read_text(encoding="utf-8"))
     material_evidence_schema = json.loads(MATERIAL_EVIDENCE_SCHEMA_PATH.read_text(encoding="utf-8"))
     material_evidence_report = json.loads(MATERIAL_EVIDENCE_REPORT_PATH.read_text(encoding="utf-8"))
+    material_upgrade_schema = json.loads(MATERIAL_UPGRADE_PLAN_SCHEMA_PATH.read_text(encoding="utf-8"))
+    material_upgrade_plan = json.loads(MATERIAL_UPGRADE_PLAN_PATH.read_text(encoding="utf-8"))
 
     missing_terms = sorted(term for term in REQUIRED_PLAN_TERMS if term not in plan_text)
     if missing_terms:
@@ -143,6 +156,21 @@ def main() -> int:
     if "primitive_hero_material_blocker_count" not in summary:
         return fail("material evidence report summary missing primitive_hero_material_blocker_count")
 
+    required_upgrade_fields = material_upgrade_schema.get("required_root_fields")
+    if not isinstance(required_upgrade_fields, list):
+        return fail("material upgrade plan schema required_root_fields must be a list")
+    missing_upgrade_fields = [
+        field for field in required_upgrade_fields if field not in material_upgrade_plan
+    ]
+    if missing_upgrade_fields:
+        return fail("material upgrade plan missing fields: " + ", ".join(missing_upgrade_fields))
+    if material_upgrade_plan.get("schema") != "cortex.full_scene_shader_material_upgrade_plan_v2":
+        return fail("material upgrade plan schema id is invalid")
+    if not isinstance(material_upgrade_plan.get("work_orders"), list):
+        return fail("material upgrade plan work_orders must be a list")
+    if material_evidence_report.get("status") == "BLOCKED" and not material_upgrade_plan["work_orders"]:
+        return fail("blocked material evidence must produce upgrade work orders")
+
     target_families = contract.get("target_families")
     if target_families != ["gallery", "kitchen", "office", "gym", "concert"]:
         return fail("target_families must preserve the Renderer V1 five-family gate order")
@@ -156,6 +184,7 @@ def main() -> int:
     print(f"Contract: {CONTRACT_PATH}")
     print(f"Frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
     print(f"Material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
+    print(f"Material upgrade plan: {MATERIAL_UPGRADE_PLAN_PATH}")
     print(f"Domains: {len(domains)}")
     return 0
 

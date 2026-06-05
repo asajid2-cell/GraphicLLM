@@ -399,6 +399,14 @@ Implemented:
   - generated baseline evidence report.
 - `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_evidence_report.md`
   - human-readable material evidence summary.
+- `assets/final_art/full_scene_shader_material_upgrade_plan_v2.schema.json`
+  - schema summary for shader material upgrade work orders.
+- `tools/plan_full_scene_shader_material_upgrades_v2.py`
+  - converts blocked V2 material evidence into P0/P1 work orders.
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.json`
+  - generated shader material upgrade queue.
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.md`
+  - human-readable shader material upgrade queue.
 
 Validation:
 
@@ -409,6 +417,8 @@ python tools\check_full_scene_shader_pipeline_v2_frame_report.py
 python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialEvidence
 python -m py_compile tools\build_full_scene_shader_material_evidence_v2.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialUpgradePlan
+python -m py_compile tools\plan_full_scene_shader_material_upgrades_v2.py
 ```
 
 Current interpretation:
@@ -431,6 +441,14 @@ Current interpretation:
   - missing hero texture evidence `10`.
   - primitive hero material blockers `24`.
   - unknown material-family assets `0`.
+- V2 material upgrade work-order baseline:
+  - status `READY`.
+  - work orders `56`.
+  - P0 orders `34`.
+  - P1 orders `22`.
+  - primitive hero material orders `24`.
+  - hero asset material orders `10`.
+  - registry asset material orders `22`.
 - Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
   gates or provide stronger replacement evidence.
 
@@ -451,6 +469,7 @@ Get-Content docs\FULL_SCENE_SHADER_PIPELINE_V2.md
 python tools\validate_full_scene_shader_pipeline_v2_plan.py
 python tools\check_full_scene_shader_pipeline_v2_frame_report.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialEvidence
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialUpgradePlan
 ```
 
 ## Git Policy

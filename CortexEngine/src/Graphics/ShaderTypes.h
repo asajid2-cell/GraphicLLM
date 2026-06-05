@@ -173,6 +173,9 @@ struct FrameConstants {
       // x = profile exposure trim, y = HDR shoulder start,
       // z = HDR shoulder strength, w = post-tonemap white compression.
       glm::vec4 cinematicExposureParams;
+      // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
+      // z = scene-local probe radiance enabled (>0.5), w = reserved.
+      glm::vec4 localProbeParams;
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer

@@ -2450,3 +2450,57 @@ Success condition for next slice:
 - Candidate delta does not need to be visually large yet.
 - Default beauty must remain V1/candidate-gated until source ownership,
   stability, and visual packet evidence pass.
+
+## 2026-06-05 Scene-Local Source Plumbing Slice
+
+Implemented:
+
+- Added shader-facing scene-local probe radiance to post-process frame
+  constants:
+  - `FrameConstants::localProbeParams` in `src/Graphics/ShaderTypes.h`.
+  - populated in `src/Graphics/Renderer_FramePostConstants.cpp`.
+  - consumed as `g_LocalProbeParams` in `assets/shaders/PostProcess.hlsl`.
+- Updated debug view `56` so blue reports authorized scene-local or
+  IBL/prelit reflection potential.
+- Updated debug view `46` so local scene probe ownership can light up before
+  generic fallback ownership.
+- Default beauty remains unchanged.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && ninja -C build CortexEngine -v'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_scene_local_source_plumbing_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- Build passed.
+- Packet passed.
+- `ctest` completed with `No tests were found`.
+- Packet:
+  `build/captures/full_scene_shader_pipeline_v2_scene_local_source_plumbing_packet_20260605`.
+- Source-signal families improved from `1/5` to `5/5`.
+- Candidate-delta families remain `0/5`.
+
+Family source signal:
+
+| Family | Status | Source Luma | Source Nonblack | Delta Luma |
+|---|---|---:|---:|---:|
+| gallery | `wired_no_delta` | `0.05381363` | `0.32276584` | `0.00000004` |
+| kitchen | `wired_no_delta` | `0.00072311` | `0.17523763` | `0.00000000` |
+| office | `wired_no_delta` | `0.00023052` | `0.05801107` | `0.00000000` |
+| gym | `wired_no_delta` | `0.00029567` | `0.10023872` | `0.00000000` |
+| concert | `wired_no_delta` | `0.00089806` | `0.16962348` | `0.00000000` |
+
+Current interpretation:
+
+- This proves the model-authored family source gap was real and is now bridged
+  at the post evidence layer.
+- It does not prove visible reflection improvement yet.
+- Next slice should make the V2 reflection candidate actually consume the
+  scene-local source term, still behind debug/candidate views, and then rerun
+  mouse-jiggle/cross-family packets.

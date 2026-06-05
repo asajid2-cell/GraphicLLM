@@ -378,6 +378,11 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     frameData.cinematicStabilityParams = BuildCinematicStabilityParams();
     frameData.cinematicLookParams = BuildCinematicLookParams();
     frameData.cinematicExposureParams = BuildCinematicExposureParams();
+    frameData.localProbeParams = glm::vec4(
+        m_environmentState.localProbeDiffuseIntensity,
+        m_environmentState.localProbeSpecularIntensity,
+        m_environmentState.localProbeRadianceEnabled ? 1.0f : 0.0f,
+        0.0f);
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

@@ -113,6 +113,9 @@ struct FullSceneShaderFrameContext {
         bool clusteredLightListReady = false;
         bool directLightPassReady = false;
         bool directLightShadowOutputReady = false;
+        bool directLightDebugViewReady = false;
+        bool directLightUnshadowedDebugViewReady = false;
+        bool directLightShadowLossDebugViewReady = false;
         bool exposurePolicyReady = false;
         bool exposureClippingGatePassed = false;
         uint32_t lightCount = 0;
@@ -547,6 +550,9 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.shadowedLightContractReady &&
         (!contract.features.shadowsEnabled ||
          FullSceneShaderPassReadsResource(contract, "VBDeferredLighting", "shadow_map"));
+    evidence.directLightDebugViewReady = evidence.directLightPassReady;
+    evidence.directLightUnshadowedDebugViewReady = evidence.directLightPassReady;
+    evidence.directLightShadowLossDebugViewReady = evidence.directLightShadowOutputReady;
     evidence.exposurePolicyReady =
         !contract.lighting.exposurePolicyId.empty() &&
         contract.lighting.exposurePolicyId != "default" &&
@@ -575,6 +581,9 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.clusteredLightListReady,
         evidence.directLightPassReady,
         evidence.directLightShadowOutputReady,
+        evidence.directLightDebugViewReady,
+        evidence.directLightUnshadowedDebugViewReady,
+        evidence.directLightShadowLossDebugViewReady,
         evidence.exposurePolicyReady,
         evidence.exposureClippingGatePassed,
     };
@@ -612,6 +621,12 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.failureReason = "V2 direct-light pass inputs or HDR output are missing";
     } else if (!evidence.directLightShadowOutputReady) {
         evidence.failureReason = "V2 direct-light shadow output is not connected to shadow_map";
+    } else if (!evidence.directLightDebugViewReady) {
+        evidence.failureReason = "V2 direct-light debug view is not owned by the deferred lighting pass";
+    } else if (!evidence.directLightUnshadowedDebugViewReady) {
+        evidence.failureReason = "V2 unshadowed direct-light debug view is not owned by the deferred lighting pass";
+    } else if (!evidence.directLightShadowLossDebugViewReady) {
+        evidence.failureReason = "V2 direct-light shadow-loss debug view is not owned by the deferred lighting pass";
     } else if (!evidence.exposureClippingGatePassed) {
         evidence.failureReason = "Exposure or light intensity contract is outside V2 bounds";
     } else {

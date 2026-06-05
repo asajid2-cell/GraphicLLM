@@ -26,10 +26,20 @@
       "readiness_fields": [
         "enabled",
         "full_scene_material_model_ready",
+        "runtime_policy_bridge_ready",
         "family_counts_available",
+        "reflection_policies_available",
+        "temporal_policies_available",
+        "post_policies_available",
         "texture_evidence_available",
+        "shader_feature_flags_available",
+        "sampled_material_count",
+        "policy_applied_count",
         "missing_hero_texture_evidence_count",
-        "unknown_material_family_count"
+        "descriptor_missing_count",
+        "descriptor_refresh_failure_count",
+        "unknown_material_family_count",
+        "validation_error_count"
       ],
       "debug_views": [
         "material_family",

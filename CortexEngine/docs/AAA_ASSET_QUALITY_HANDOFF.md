@@ -1096,3 +1096,108 @@ Next safe implementation checkpoint:
   styling.
 - The first implementation should make material readiness evidence real and
   keep beauty output on V1 until material packets prove ownership.
+
+## Full Scene Shader Pipeline V2 Material Truth Slice - 2026-06-05
+
+Purpose:
+
+- Convert the V2 material domain from a hardcoded not-ready placeholder into a
+  runtime evidence gate owned by the material system.
+- Keep beauty output on V1 while making material readiness measurable.
+
+Implemented:
+
+- Added `FullSceneMaterialModelEvidence` to `src/Graphics/MaterialModel.h`.
+- Added `BuildFullSceneMaterialModelEvidence(const FrameContract::MaterialStats&)`
+  to `src/Graphics/MaterialModel.cpp`.
+- The evidence builder now reports:
+  - sampled material count
+  - policy-applied count
+  - family coverage
+  - reflection-policy coverage
+  - temporal-policy coverage
+  - post-policy coverage
+  - descriptor/texture evidence
+  - shader feature flag evidence
+  - unknown/default family count
+  - descriptor missing/failure counts
+  - material validation errors
+- `FullSceneShaderFrameContext` now consumes this material-owned evidence
+  instead of hardcoding `material.enabled=false` and
+  `full_scene_material_model_ready=false`.
+- `FrameContractJson.cpp` now emits the material readiness sub-gates into
+  `full_scene_shader_pipeline_v2.material`.
+- The frame-report contract now requires the new material readiness fields.
+- The V2 checker now requires the material evidence builder and its policy /
+  descriptor gates.
+- The resolver now classifies named canonical presets that previously fell
+  through as default:
+  - `matte` -> ceramic tile
+  - `backdrop` -> painted wall
+  - `velvet`, `skin`, `foliage` -> fabric-like semantic material
+  - `sand` -> concrete/granular masonry
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\MaterialModel.h src\Graphics\MaterialModel.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp tools\check_full_scene_shader_pipeline_v2_frame_report.py assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json
+.\build.ps1 -Config Release
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_material_truth_ready_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- native Release build: passed.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- manifest:
+  `build/captures/full_scene_shader_pipeline_v2_material_truth_ready_packet_20260605/manifest.json`
+- summary:
+  `build/captures/full_scene_shader_pipeline_v2_material_truth_ready_packet_20260605/v2_frame_report_evidence_summary.json`
+- captured views: `7`
+- evidence rows: `70`
+- failures: `0`
+
+Material evidence from the packet:
+
+- `enabled=true`
+- `domain_ready=true`
+- `full_scene_material_model_ready=true`
+- `runtime_policy_bridge_ready=true`
+- `sampled_material_count=60`
+- `policy_applied_count=60`
+- `texture_evidence_available=true`
+- `descriptor_missing_count=0`
+- `descriptor_refresh_failure_count=0`
+- `unknown_material_family_count=0`
+- `validation_error_count=0`
+- facade owner: `MaterialResolver/FullSceneMaterialModelEvidence`
+- fallback owner remains `v1_fallback`
+
+Current caveats:
+
+- Beauty output remains intentionally `v1_fallback`.
+- This proves runtime material-policy ownership for the gallery packet. It does
+  not yet prove imported asset registry PBR texture quality, hero-surface
+  readiness, or cross-family material readiness.
+- `render_graph` remains not ready.
+- `asset_evidence` and `packet_gate` remain planned.
+
+Next recommended implementation:
+
+- Track C: make frame data/GBuffer ownership stronger.
+- Add/validate material id/object id/debug producer ownership rather than only
+  broad material policy channels.
+- Keep cross-family promotion blocked until material readiness is shown beyond
+  the gallery packet.

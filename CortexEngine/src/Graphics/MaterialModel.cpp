@@ -123,11 +123,13 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
         return SceneMaterialClassId::EmissiveNeon;
     }
     if (PresetContains(model, "ceramic") ||
+        PresetContains(model, "matte") ||
         PresetContains(model, "tile") ||
         PresetContains(model, "porcelain")) {
         return SceneMaterialClassId::CeramicTile;
     }
     if (PresetContains(model, "painted_wall") ||
+        PresetContains(model, "backdrop") ||
         PresetContains(model, "drywall") ||
         PresetContains(model, "plaster") ||
         PresetContains(model, "wall_paint")) {
@@ -135,6 +137,9 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
     }
     if (PresetContains(model, "fabric") ||
         PresetContains(model, "cloth") ||
+        PresetContains(model, "velvet") ||
+        PresetContains(model, "skin") ||
+        PresetContains(model, "foliage") ||
         PresetContains(model, "upholstery") ||
         PresetContains(model, "carpet")) {
         return SceneMaterialClassId::Fabric;
@@ -158,6 +163,7 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
         return SceneMaterialClassId::Plastic;
     }
     if (MaterialTypeNear(model, 4.0f) ||
+        PresetContains(model, "sand") ||
         PresetContains(model, "brick") ||
         PresetContains(model, "concrete") ||
         PresetContains(model, "stone") ||
@@ -528,6 +534,107 @@ void ApplyPresetDefaults(MaterialModel& model, const MaterialPresetInfo& preset)
 }
 
 } // namespace
+
+FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
+    const FrameContract::MaterialStats& materials) {
+    FullSceneMaterialModelEvidence evidence;
+    evidence.sampledMaterialCount = materials.sampled;
+    evidence.policyAppliedCount = materials.materialClassPolicyApplied;
+    evidence.unknownMaterialFamilyCount = materials.sceneMaterialDefault;
+    evidence.descriptorMissingCount = materials.descriptorTablesMissingAfterPrepare;
+    evidence.descriptorRefreshFailureCount = materials.descriptorRefreshFailures;
+    evidence.validationErrorCount = materials.validationErrors;
+    evidence.missingHeroTextureEvidenceCount =
+        materials.descriptorTablesMissingAfterPrepare +
+        (materials.resourcePrepareCalls == 0 ? materials.sampled : 0u);
+
+    const uint32_t sceneFamilyCount =
+        materials.sceneMaterialDefault +
+        materials.sceneMaterialPaintedWall +
+        materials.sceneMaterialCeramicTile +
+        materials.sceneMaterialPolishedWood +
+        materials.sceneMaterialBrushedMetal +
+        materials.sceneMaterialPolishedMetal +
+        materials.sceneMaterialGlassPane +
+        materials.sceneMaterialFabric +
+        materials.sceneMaterialPlastic +
+        materials.sceneMaterialWetSurface +
+        materials.sceneMaterialEmissiveNeon +
+        materials.sceneMaterialScreenPanel +
+        materials.sceneMaterialConcrete +
+        materials.sceneMaterialRubber +
+        materials.sceneMaterialWater +
+        materials.sceneMaterialMirror;
+    const uint32_t reflectionPolicyCount =
+        materials.materialReflectionNeutralFallback +
+        materials.materialReflectionLocalProbe +
+        materials.materialReflectionProbeGrid +
+        materials.materialReflectionPlanarProbe +
+        materials.materialReflectionSSR +
+        materials.materialReflectionRT;
+    const uint32_t temporalPolicyCount =
+        materials.materialTemporalStableDiffuse +
+        materials.materialTemporalStableGlossy +
+        materials.materialTemporalMirrorLocked +
+        materials.materialTemporalEmissiveLocked +
+        materials.materialTemporalWaterViewDependent;
+    const uint32_t postPolicyCount =
+        materials.materialPostNormal +
+        materials.materialPostBloomEmitter +
+        materials.materialPostExposureProtected +
+        materials.materialPostWetHighlight;
+
+    evidence.enabled = materials.sampled > 0;
+    evidence.familyCountsAvailable =
+        evidence.enabled && sceneFamilyCount == materials.sampled;
+    evidence.reflectionPoliciesAvailable =
+        evidence.enabled && reflectionPolicyCount == materials.sampled;
+    evidence.temporalPoliciesAvailable =
+        evidence.enabled && temporalPolicyCount == materials.sampled;
+    evidence.postPoliciesAvailable =
+        evidence.enabled && postPolicyCount == materials.sampled;
+    evidence.textureEvidenceAvailable =
+        evidence.enabled &&
+        materials.resourcePrepareCalls > 0 &&
+        materials.descriptorTablesMissingAfterPrepare == 0 &&
+        materials.descriptorRefreshFailures == 0;
+    evidence.shaderFeatureFlagsAvailable =
+        evidence.enabled &&
+        materials.advancedFeatureMaterials <= materials.sampled &&
+        materials.materialClassPolicyApplied <= materials.sampled;
+    evidence.runtimePolicyBridgeReady =
+        evidence.enabled &&
+        materials.materialClassPolicyApplied == materials.sampled &&
+        evidence.familyCountsAvailable &&
+        evidence.reflectionPoliciesAvailable &&
+        evidence.temporalPoliciesAvailable &&
+        evidence.postPoliciesAvailable &&
+        evidence.shaderFeatureFlagsAvailable;
+    evidence.fullSceneMaterialModelReady =
+        evidence.runtimePolicyBridgeReady &&
+        evidence.textureEvidenceAvailable &&
+        evidence.unknownMaterialFamilyCount == 0 &&
+        evidence.validationErrorCount == 0;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "No sampled runtime materials";
+    } else if (!evidence.runtimePolicyBridgeReady) {
+        evidence.failureReason =
+            "Runtime material policy bridge does not cover every sampled material";
+    } else if (!evidence.textureEvidenceAvailable) {
+        evidence.failureReason =
+            "Runtime material texture/descriptor evidence is incomplete";
+    } else if (evidence.unknownMaterialFamilyCount > 0) {
+        evidence.failureReason =
+            "Some sampled materials still resolve to the default/unknown scene material family";
+    } else if (evidence.validationErrorCount > 0) {
+        evidence.failureReason = "Material validation errors are present";
+    } else {
+        evidence.failureReason = "FullSceneMaterialModel runtime bridge is ready";
+    }
+
+    return evidence;
+}
 
 MaterialModel MaterialResolver::ResolveRenderable(
     const Scene::RenderableComponent& renderable,

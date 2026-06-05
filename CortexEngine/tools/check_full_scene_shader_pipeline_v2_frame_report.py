@@ -168,7 +168,9 @@ def validate_runtime_source_surface() -> list[str]:
         "struct FullSceneShaderFrameContext",
         "struct FullSceneShaderDomainEvidence",
         "FullSceneShaderPromotionState",
+        "FullSceneMaterialModelEvidence",
         "BuildFullSceneShaderFrameContext",
+        "BuildFullSceneMaterialModelEvidence(contract.materials)",
         "fallbackOwner = \"v1_fallback\"",
         "FullSceneShaderPromotionState::Instrumented",
         "FullSceneShaderPromotionState::Planned",
@@ -248,6 +250,24 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         model_header,
+        "struct FullSceneMaterialModelEvidence",
+        "MaterialModel full-scene material evidence",
+    )
+    require_source_token(
+        errors,
+        model_header,
+        "BuildFullSceneMaterialModelEvidence",
+        "MaterialModel full-scene evidence builder",
+    )
+    require_source_token(
+        errors,
+        model_header,
+        "runtimePolicyBridgeReady",
+        "MaterialModel full-scene policy bridge evidence",
+    )
+    require_source_token(
+        errors,
+        model_header,
         "MaterialReflectionPreferenceId",
         "MaterialModel policy enum",
     )
@@ -256,6 +276,24 @@ def validate_runtime_material_policy_surface() -> list[str]:
         model_source,
         "ApplyMaterialClassPolicy(model)",
         "MaterialResolver policy application",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence",
+        "MaterialResolver full-scene evidence implementation",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "materials.materialClassPolicyApplied == materials.sampled",
+        "MaterialResolver full-scene policy coverage gate",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "materials.descriptorTablesMissingAfterPrepare == 0",
+        "MaterialResolver texture descriptor evidence gate",
     )
     require_source_token(
         errors,

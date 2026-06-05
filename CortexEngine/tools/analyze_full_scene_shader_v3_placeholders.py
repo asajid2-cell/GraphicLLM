@@ -32,9 +32,125 @@ REQUIRED_DOMAINS = {
 
 ALLOWED_READY_DOMAINS = {"material", "lighting"}
 
+LIGHTING_SIGNAL_THRESHOLDS = {
+    "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
+    "direct_light_unshadowed": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
+    "direct_light_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
+    "shadow_factor": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
+    "ambient_ibl": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
+}
+
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def find_debug_view_metrics(input_path: pathlib.Path) -> pathlib.Path | None:
+    root = input_path if input_path.is_dir() else input_path.parent
+    metrics_path = root / "debug_view_metrics.json"
+    return metrics_path if metrics_path.exists() else None
+
+
+def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
+    metrics_path = find_debug_view_metrics(input_path)
+    failures: list[str] = []
+    warnings: list[str] = []
+    rows: list[dict[str, Any]] = []
+
+    if metrics_path is None:
+        return {
+            "metrics_path": None,
+            "ready": False,
+            "failures": ["V3 lighting signal gate requires debug_view_metrics.json"],
+            "warnings": warnings,
+            "rows": rows,
+        }
+
+    metrics_report = load_json(metrics_path)
+    if metrics_report.get("failures"):
+        failures.extend(f"debug_view_metrics failure: {failure}" for failure in metrics_report["failures"])
+
+    rows_by_view = {
+        row.get("view"): row
+        for row in metrics_report.get("rows", [])
+        if isinstance(row, dict) and isinstance(row.get("view"), str)
+    }
+
+    for view, thresholds in LIGHTING_SIGNAL_THRESHOLDS.items():
+        row = rows_by_view.get(view)
+        if not isinstance(row, dict):
+            failures.append(f"missing lighting debug-view metrics for {view}")
+            rows.append({"view": view, "status": "missing"})
+            continue
+        metrics = row.get("metrics")
+        if not isinstance(metrics, dict):
+            failures.append(f"lighting debug-view metrics for {view} are malformed")
+            rows.append({"view": view, "status": "malformed"})
+            continue
+
+        mean_luma = float(metrics.get("mean_luma", 0.0))
+        nonblack_ratio = float(metrics.get("nonblack_ratio", 0.0))
+        hot_pixel_ratio = float(metrics.get("hot_pixel_ratio", 0.0))
+        max_luma = float(metrics.get("max_luma", 0.0))
+        status = "ok"
+
+        min_mean_luma = thresholds.get("min_mean_luma")
+        if min_mean_luma is not None and mean_luma < min_mean_luma:
+            failures.append(
+                f"{view} mean_luma {mean_luma:.6f} below {min_mean_luma:.6f}"
+            )
+            status = "failed"
+        max_mean_luma = thresholds.get("max_mean_luma")
+        if max_mean_luma is not None and mean_luma > max_mean_luma:
+            failures.append(
+                f"{view} mean_luma {mean_luma:.6f} above {max_mean_luma:.6f}"
+            )
+            status = "failed"
+        min_nonblack_ratio = thresholds.get("min_nonblack_ratio")
+        if min_nonblack_ratio is not None and nonblack_ratio < min_nonblack_ratio:
+            failures.append(
+                f"{view} nonblack_ratio {nonblack_ratio:.6f} below {min_nonblack_ratio:.6f}"
+            )
+            status = "failed"
+
+        rows.append(
+            {
+                "view": view,
+                "status": status,
+                "mean_luma": mean_luma,
+                "max_luma": max_luma,
+                "nonblack_ratio": nonblack_ratio,
+                "hot_pixel_ratio": hot_pixel_ratio,
+            }
+        )
+
+    direct = rows_by_view.get("direct_light", {}).get("metrics", {})
+    unshadowed = rows_by_view.get("direct_light_unshadowed", {}).get("metrics", {})
+    shadow_loss = rows_by_view.get("direct_light_shadow_loss", {}).get("metrics", {})
+    if isinstance(direct, dict) and isinstance(unshadowed, dict):
+        direct_luma = float(direct.get("mean_luma", 0.0))
+        unshadowed_luma = float(unshadowed.get("mean_luma", 0.0))
+        if unshadowed_luma + 1e-6 < direct_luma * 0.90:
+            failures.append(
+                "direct_light_unshadowed mean_luma should be at least 90% of direct_light "
+                f"({unshadowed_luma:.6f} vs {direct_luma:.6f})"
+            )
+    if isinstance(shadow_loss, dict) and isinstance(unshadowed, dict):
+        loss_luma = float(shadow_loss.get("mean_luma", 0.0))
+        unshadowed_luma = float(unshadowed.get("mean_luma", 0.0))
+        if unshadowed_luma > 0.0 and loss_luma > unshadowed_luma * 1.25:
+            warnings.append(
+                "direct_light_shadow_loss mean_luma is unusually high relative to unshadowed "
+                f"({loss_luma:.6f} vs {unshadowed_luma:.6f})"
+            )
+
+    return {
+        "metrics_path": str(metrics_path),
+        "ready": not failures,
+        "failures": failures,
+        "warnings": warnings,
+        "rows": rows,
+    }
 
 
 def find_reports(root: pathlib.Path) -> list[pathlib.Path]:
@@ -245,6 +361,7 @@ def main() -> int:
     parser.add_argument("--stability-output", required=True)
     parser.add_argument("--require-lighting-split-ready", action="store_true")
     parser.add_argument("--require-lighting-split-draw-count", type=int)
+    parser.add_argument("--require-lighting-signal-metrics", action="store_true")
     args = parser.parse_args()
 
     input_path = pathlib.Path(args.input)
@@ -259,12 +376,18 @@ def main() -> int:
     ]
     failures = [failure for row in rows for failure in row.get("failures", [])]
     warnings = [warning for row in rows for warning in row.get("warnings", [])]
+    lighting_signal_metrics = None
+    if args.require_lighting_signal_metrics:
+        lighting_signal_metrics = analyze_lighting_signal_metrics(input_path)
+        failures.extend(lighting_signal_metrics["failures"])
+        warnings.extend(lighting_signal_metrics["warnings"])
 
     signal = {
         "schema": "cortex.full_scene_shader_pipeline_v3.placeholder_signal.v1",
         "input": str(input_path),
         "report_count": len(reports),
         "ok_report_count": sum(1 for row in rows if row.get("status") == "ok"),
+        "lighting_signal_metrics": lighting_signal_metrics,
         "failures": failures,
         "warnings": warnings,
         "rows": rows,
@@ -295,6 +418,9 @@ def main() -> int:
         ),
         "full_scene_lighting_v3_executed_report_count": sum(
             1 for row in rows if row.get("full_scene_lighting_v3_executed") is True
+        ),
+        "lighting_signal_metrics_ready": (
+            lighting_signal_metrics.get("ready") if isinstance(lighting_signal_metrics, dict) else None
         ),
         "failures": failures,
         "warnings": warnings,

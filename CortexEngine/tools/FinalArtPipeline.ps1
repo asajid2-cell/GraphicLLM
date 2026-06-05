@@ -18,6 +18,7 @@ param(
         "PretrainedVisualRejection",
         "AssetRegistryV2",
         "AAAAssetQuality",
+        "AAAReplacementPlan",
         "PretrainedAll",
         "All"
     )]
@@ -1064,6 +1065,15 @@ function Invoke-AssetRegistryV2 {
     }
 }
 
+function Invoke-AAAReplacementPlan {
+    Invoke-AssetRegistryV2
+    Invoke-AAAAssetQuality
+    python (Join-Path $Root "tools/plan_aaa_asset_replacements.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "AAA replacement planning failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-All {
     Invoke-KernelContracts
     Invoke-AssetNormalization
@@ -1096,6 +1106,7 @@ switch ($Action) {
     "PretrainedVisualRejection" { Invoke-PretrainedVisualRejection }
     "AssetRegistryV2" { Invoke-AssetRegistryV2 }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
+    "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "PretrainedAll" { Invoke-PretrainedAll }
     "All" { Invoke-All }
 }

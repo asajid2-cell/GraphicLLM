@@ -295,7 +295,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             lines.append(f"- missing required roles: {', '.join(scene['missing_required_roles'])}")
         lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(lines) + "\n")
 
 
 def main() -> int:
@@ -339,7 +340,8 @@ def main() -> int:
         "scenes": scenes,
     }
     args.out_json.parent.mkdir(parents=True, exist_ok=True)
-    args.out_json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    with args.out_json.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(report, indent=2) + "\n")
     write_markdown(report, args.out_md)
     print(json.dumps({"status": report["status"], "report": rel(args.out_json), "markdown": rel(args.out_md)}, indent=2))
     return 1 if args.fail_on_blocker and blocked else 0

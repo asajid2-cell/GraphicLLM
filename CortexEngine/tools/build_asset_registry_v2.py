@@ -257,7 +257,8 @@ def main() -> int:
         "assets": assets,
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    with args.out.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(report, indent=2) + "\n")
     print(json.dumps({"status": "PASS", "registry": args.out.relative_to(ROOT).as_posix(), "asset_count": len(assets), "aaa_ready_asset_count": ready_count}, indent=2))
     return 0
 

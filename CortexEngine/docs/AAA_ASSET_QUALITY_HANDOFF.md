@@ -3147,3 +3147,35 @@ Current stopping position:
 - Next pass should add the C++ resource/descriptor/render-graph dispatch
   plumbing and feed the produced radiance texture into the V2 post resolver
   behind the existing review toggle.
+
+### Full Scene Shader Goal Feature Contract - 2026-06-05
+
+User asked to plan the whole refactor before completing the goal feature.
+
+Decision:
+
+- The goal feature is not a prettier post shader or one stronger screenshot.
+- The goal feature is a default-off `FullSceneShaderV2BeautyCandidate` assembled
+  from owned runtime facts:
+  `SceneVisualContract -> FullSceneMaterialTable -> FullSceneSourceBuffers ->
+  LightingV2 -> LocalReflectionRadiance -> ShadowContactComposite ->
+  MaterialAwareTemporal -> FullSceneHdrPost -> RenderGraphEvidence`.
+- Do not promote default beauty until cross-family packets prove ownership,
+  stability, and visual improvement.
+
+Immediate next slice:
+
+- `FSSP-V2-004C scene-local source plumbing`.
+- Reserve/bind the local reflection radiance resource.
+- Add shader-facing local source readiness.
+- Expose source debug views/analyzer gates.
+- Prove nonzero source signal across gallery plus at least three
+  model-authored scenes.
+
+Important guardrails:
+
+- Do not start by tuning bloom, blur, IBL sharpness, or color grading.
+- Do not turn off IBL, shadows, reflections, or temporal history to hide
+  artifacts.
+- Do not claim completion until V2 beauty can explain material, light,
+  reflection, shadow, temporal, post, and render-graph ownership per packet.

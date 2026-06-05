@@ -21,6 +21,7 @@ param(
         "FullSceneShaderMaterialEvidence",
         "FullSceneShaderMaterialUpgradePlan",
         "FullSceneShaderMaterialProviderRequests",
+        "FullSceneShaderMaterialFulfillmentBaseline",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1102,6 +1103,18 @@ function Invoke-FullSceneShaderMaterialProviderRequests {
     }
 }
 
+function Invoke-FullSceneShaderMaterialFulfillmentBaseline {
+    Invoke-FullSceneShaderMaterialProviderRequests
+    python (Join-Path $Root "tools/build_full_scene_shader_material_fulfillment_v2.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 material fulfillment baseline build failed with exit code $LASTEXITCODE"
+    }
+    python (Join-Path $Root "tools/validate_full_scene_shader_material_fulfillment_v2.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 material fulfillment validation failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-AAAReplacementPlan {
     Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
@@ -1154,6 +1167,7 @@ switch ($Action) {
     "FullSceneShaderMaterialEvidence" { Invoke-FullSceneShaderMaterialEvidence }
     "FullSceneShaderMaterialUpgradePlan" { Invoke-FullSceneShaderMaterialUpgradePlan }
     "FullSceneShaderMaterialProviderRequests" { Invoke-FullSceneShaderMaterialProviderRequests }
+    "FullSceneShaderMaterialFulfillmentBaseline" { Invoke-FullSceneShaderMaterialFulfillmentBaseline }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for Full Scene Shader Pipeline V2 material provider fulfillment and admission tracking.",
+  "manifest_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_fulfillment/fulfillment_manifest.json",
+  "required_manifest_fields": [
+    "schema",
+    "generated_by",
+    "source_provider_manifest",
+    "status",
+    "summary",
+    "requests"
+  ],
+  "required_request_fields": [
+    "request_id",
+    "priority",
+    "kind",
+    "request_path",
+    "status",
+    "expected_outputs",
+    "admission"
+  ],
+  "statuses": [
+    "PENDING",
+    "SUBMITTED",
+    "FULFILLED",
+    "ADMITTED",
+    "REJECTED"
+  ],
+  "required_admitted_fields": [
+    "runtime_asset",
+    "asset_registry_patch",
+    "pbr_maps",
+    "lod_chain",
+    "collision_proxy",
+    "preview",
+    "provenance",
+    "v2_material_evidence_delta"
+  ]
+}

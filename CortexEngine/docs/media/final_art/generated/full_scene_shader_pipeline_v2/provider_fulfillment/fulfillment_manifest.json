@@ -1,0 +1,2790 @@
+{
+  "schema": "cortex.full_scene_shader_material_fulfillment_manifest.v2",
+  "generated_by": "tools/build_full_scene_shader_material_fulfillment_v2.py",
+  "source_provider_manifest": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json",
+  "status": "PENDING",
+  "summary": {
+    "request_count": 56,
+    "pending_count": 56,
+    "submitted_count": 0,
+    "fulfilled_count": 0,
+    "admitted_count": 0,
+    "rejected_count": 0,
+    "p0_count": 34,
+    "p1_count": 22
+  },
+  "requests": [
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__chair",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__chair.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric",
+          "fabric",
+          "plastic"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__books",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__books.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__chairdesk",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__chairdesk.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "plastic"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__computerkeyboard",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__computerkeyboard.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__computerscreen",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__computerscreen.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__desk",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__desk.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__kitchenfridge",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__kitchenfridge.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__kitchensink",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__kitchensink.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__lamproundtable",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__lamproundtable.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_hero_asset_material_evidence__table",
+      "priority": "P0",
+      "kind": "upgrade_hero_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__table.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_backboard",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_backboard.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_ball",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_ball.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_0",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_0.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_1",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_1.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_2",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_bleacher_row_2.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_rim",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_rim.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "basketball_gym_day__primitive_hero_material__sak_gym_scoreboard",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/basketball_gym_day__primitive_hero_material__sak_gym_scoreboard.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_kitchen_lantern__primitive_hero_material__sak_kitchen_countertop",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_kitchen_lantern__primitive_hero_material__sak_kitchen_countertop.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_kitchen_lantern__primitive_hero_material__sak_kitchen_lower_cabinets",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_kitchen_lantern__primitive_hero_material__sak_kitchen_lower_cabinets.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_book_0",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_book_0.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_book_1",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_book_1.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_book_2",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_book_2.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_keyboard",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_keyboard.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_monitor",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_monitor.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_shelf_0",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_shelf_0.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_shelf_1",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_shelf_1.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "home_office_evening__primitive_hero_material__sak_office_shelf_2",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/home_office_evening__primitive_hero_material__sak_office_shelf_2.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_0",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_0.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_1",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_1.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_2",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_2.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_3",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_3.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_4",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_floor_light_4.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_screen",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_screen.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "neon_streamer_concert__primitive_hero_material__sak_concert_stage",
+      "priority": "P0",
+      "kind": "replace_primitive_hero_material_surface",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/neon_streamer_concert__primitive_hero_material__sak_concert_stage.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__bench",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__bench.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__bookcaseopen",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__bookcaseopen.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__chairmoderncushion",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__chairmoderncushion.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "plastic"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__hoodmodern",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__hoodmodern.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchen_faucet_gooseneck",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchen_faucet_gooseneck.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupper",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupper.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperdouble",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperdouble.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperlow",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperlow.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchencoffeemachine",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencoffeemachine.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchenmicrowave",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchenmicrowave.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__kitchenstove",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchenstove.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__lampwall",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__lampwall.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric",
+          "metal",
+          "painted_wall"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__laptop",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__laptop.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__loungedesignchair",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__loungedesignchair.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric",
+          "plastic"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__paneling",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__paneling.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__plantsmall2",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__plantsmall2.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__rugrectangle",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__rugrectangle.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "tile"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__speaker",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__speaker.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__speakersmall",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__speakersmall.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__tableround",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__tableround.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "detail_normal",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric",
+          "wood"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__televisionantenna",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__televisionantenna.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "dielectric"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    },
+    {
+      "request_id": "shader_material__upgrade_registry_asset_material_evidence__toaster",
+      "priority": "P1",
+      "kind": "upgrade_registry_asset_material_evidence",
+      "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__toaster.json",
+      "status": "PENDING",
+      "expected_outputs": {
+        "accepted_outputs": [
+          "gltf",
+          "glb",
+          "png_pbr_texture_set",
+          "json_manifest"
+        ],
+        "required_pbr_maps": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "shader_feature_flags": [
+          "base_color_texture",
+          "normal_texture",
+          "orm_texture"
+        ],
+        "material_families": [
+          "metal"
+        ],
+        "texture_resolution_min": 1024,
+        "texture_resolution_target": 2048
+      },
+      "submitted_package": {
+        "provider": "",
+        "package_root": "",
+        "manifest": "",
+        "notes": ""
+      },
+      "admission": {
+        "runtime_asset": "",
+        "asset_registry_patch": "",
+        "pbr_maps": {},
+        "lod_chain": [],
+        "collision_proxy": "",
+        "preview": "",
+        "provenance": {},
+        "v2_material_evidence_delta": "",
+        "renderer_v1_packet": "",
+        "v2_material_debug_packet": "",
+        "admission_notes": "pending provider/library fulfillment"
+      }
+    }
+  ]
+}

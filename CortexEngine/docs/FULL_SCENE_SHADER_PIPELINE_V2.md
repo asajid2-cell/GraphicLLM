@@ -127,11 +127,16 @@ Deliverables:
 - `assets/final_art/full_scene_shader_material_provider_requests_v2.schema.json`
 - `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json`
 - `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.md`
+- `assets/final_art/full_scene_shader_material_fulfillment_v2.schema.json`
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_fulfillment/fulfillment_manifest.json`
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_fulfillment/fulfillment_manifest.md`
 - `tools/validate_full_scene_shader_pipeline_v2_plan.py`
 - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
 - `tools/build_full_scene_shader_material_evidence_v2.py`
 - `tools/plan_full_scene_shader_material_upgrades_v2.py`
 - `tools/export_full_scene_shader_material_provider_requests_v2.py`
+- `tools/build_full_scene_shader_material_fulfillment_v2.py`
+- `tools/validate_full_scene_shader_material_fulfillment_v2.py`
 - handoff update in `docs/AAA_ASSET_QUALITY_HANDOFF.md`
 
 Completion evidence:
@@ -147,6 +152,8 @@ Completion evidence:
 - material provider request export converts the work orders into fulfillment
   packs with PBR, shader-feature, LOD, collision, preview, and registry update
   requirements.
+- material fulfillment manifest tracks every provider request through pending,
+  submitted, fulfilled, admitted, or rejected state.
 - handoff identifies this as the next renderer/AAA direction.
 - focused commit is pushed.
 
@@ -185,6 +192,14 @@ Material provider request baseline:
 - P0 requests `34`.
 - P1 requests `22`.
 - request files including manifests `58`.
+
+Material fulfillment baseline:
+
+- status `PENDING`.
+- requests `56`.
+- pending `56`.
+- admitted `0`.
+- rejected `0`.
 
 ### FSSP-V2-002 Material Model Upgrade
 
@@ -475,15 +490,16 @@ Validation:
    bindings.
 4. Land the V2 material upgrade work-order planner.
 5. Land the V2 material provider request exporter.
-6. Add runtime frame-report placeholders for V2 domains without changing
+6. Land the V2 material fulfillment/admission manifest and validator.
+7. Add runtime frame-report placeholders for V2 domains without changing
    rendering.
-7. Upgrade material model and registry material evidence.
-8. Expand GBuffer/debug channel inventory.
-9. Add local reflection probe ownership before chasing more shiny materials.
-10. Add semantic light rigs and shadow/contact stability.
-11. Refactor post into named HDR stages.
-12. Move pass ownership into the render graph.
-13. Run cross-family V2 packets and compare to V1 seq8.
+8. Upgrade material model and registry material evidence.
+9. Expand GBuffer/debug channel inventory.
+10. Add local reflection probe ownership before chasing more shiny materials.
+11. Add semantic light rigs and shadow/contact stability.
+12. Refactor post into named HDR stages.
+13. Move pass ownership into the render graph.
+14. Run cross-family V2 packets and compare to V1 seq8.
 
 This order keeps the engine diagnosable. It avoids the previous trap where a
 scene looked better only because one setting hid the problem.

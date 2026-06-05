@@ -77,6 +77,7 @@ struct FrameContract {
         std::string fallbackReason;
         bool manifestPresent = false;
         bool iblLimitEnabled = false;
+        bool imageBasedLightingTexturesBound = true;
         bool backgroundVisible = true;
         float backgroundExposure = 1.0f;
         float backgroundBlur = 0.0f;
@@ -91,6 +92,9 @@ struct FrameContract {
         uint32_t localReflectionProbeCount = 0;
         uint32_t localReflectionProbeSkipped = 0;
         bool localReflectionProbeTableValid = false;
+        bool localReflectionProbeRadianceEnabled = false;
+        float localReflectionProbeDiffuseIntensity = 0.0f;
+        float localReflectionProbeSpecularIntensity = 0.0f;
     };
 
     struct GraphicsPresetInfo {
@@ -98,6 +102,46 @@ struct FrameContract {
         uint32_t schema = 1;
         bool dirtyFromUI = false;
         float renderScale = 1.0f;
+    };
+
+    struct SceneVisualInfo {
+        bool active = false;
+        std::string profileId = "unprofiled";
+        std::string family = "unknown";
+        std::string source = "unknown";
+        bool enclosedScene = false;
+        bool visibleExternalHDRIAllowed = false;
+        bool externalHDRIVisible = false;
+        bool invalidExternalHDRI = false;
+        std::string environmentOwner = "unknown";
+        std::string reflectionOwner = "unknown";
+        std::string localReflectionProbeRigId = "none";
+        std::string lightRigId = "custom";
+        std::string shadowPolicyId = "default";
+        std::string exposurePolicyId = "default";
+        uint32_t profileLightFixtureCount = 0;
+        std::string materialPaletteId = "default";
+        std::string lightingScriptId = "custom";
+        std::string lightingBalancePolicyId = "none";
+        bool lightingBalancePolicyActive = false;
+        float lightingBalanceSunScale = 1.0f;
+        float lightingBalanceAmbientScale = 1.0f;
+        float lightingBalanceLocalFixtureScale = 1.0f;
+        float lightingBalanceLocalProbeDiffuseScale = 1.0f;
+        float lightingBalanceLocalProbeSpecularScale = 1.0f;
+        float lightingBalanceExposureScale = 1.0f;
+        float lightingBalanceSSAOScale = 1.0f;
+        std::string materialClassSetId = "default";
+        std::string materialLayerSetId = "default";
+        std::string temporalPolicyId = "default";
+        std::string postPolicyId = "default";
+        std::string postQualitySetId = "default";
+        std::string toneMapperPreset = "aces";
+        uint32_t materialClassDebugViewMode = 41;
+        uint32_t materialPolicyDebugViewMode = 47;
+        uint32_t localReflectionProbeDebugViewMode = 42;
+        uint32_t reflectionOwnerDebugViewMode = 46;
+        bool pixelReflectionOwnerHistogramAvailable = false;
     };
 
     struct FeatureFlags {
@@ -205,6 +249,44 @@ struct FrameContract {
         uint32_t advancedWetness = 0;
         uint32_t advancedEmissiveBloom = 0;
         uint32_t advancedProceduralMask = 0;
+        uint32_t materialClassPolicyApplied = 0;
+        uint32_t materialPolicyRoughnessClamped = 0;
+        uint32_t materialPolicyNormalClamped = 0;
+        uint32_t materialPolicyProceduralClamped = 0;
+        uint32_t materialPolicyReflectionStable = 0;
+        uint32_t materialPolicyAlbedoLuminanceClamped = 0;
+        uint32_t materialPolicyAlbedoChromaClamped = 0;
+        uint32_t sceneMaterialDefault = 0;
+        uint32_t sceneMaterialPaintedWall = 0;
+        uint32_t sceneMaterialCeramicTile = 0;
+        uint32_t sceneMaterialPolishedWood = 0;
+        uint32_t sceneMaterialBrushedMetal = 0;
+        uint32_t sceneMaterialPolishedMetal = 0;
+        uint32_t sceneMaterialGlassPane = 0;
+        uint32_t sceneMaterialFabric = 0;
+        uint32_t sceneMaterialPlastic = 0;
+        uint32_t sceneMaterialWetSurface = 0;
+        uint32_t sceneMaterialEmissiveNeon = 0;
+        uint32_t sceneMaterialScreenPanel = 0;
+        uint32_t sceneMaterialConcrete = 0;
+        uint32_t sceneMaterialRubber = 0;
+        uint32_t sceneMaterialWater = 0;
+        uint32_t sceneMaterialMirror = 0;
+        uint32_t materialReflectionNeutralFallback = 0;
+        uint32_t materialReflectionLocalProbe = 0;
+        uint32_t materialReflectionProbeGrid = 0;
+        uint32_t materialReflectionPlanarProbe = 0;
+        uint32_t materialReflectionSSR = 0;
+        uint32_t materialReflectionRT = 0;
+        uint32_t materialTemporalStableDiffuse = 0;
+        uint32_t materialTemporalStableGlossy = 0;
+        uint32_t materialTemporalMirrorLocked = 0;
+        uint32_t materialTemporalEmissiveLocked = 0;
+        uint32_t materialTemporalWaterViewDependent = 0;
+        uint32_t materialPostNormal = 0;
+        uint32_t materialPostBloomEmitter = 0;
+        uint32_t materialPostExposureProtected = 0;
+        uint32_t materialPostWetHighlight = 0;
         uint32_t surfaceDefault = 0;
         uint32_t surfaceGlass = 0;
         uint32_t surfaceMirror = 0;
@@ -228,13 +310,31 @@ struct FrameContract {
         uint32_t blendTransmission = 0;
         uint32_t metallicTransmission = 0;
         uint32_t lowRoughnessNormal = 0;
+        uint32_t resourcePrepareCalls = 0;
+        uint32_t descriptorRefreshChecks = 0;
+        uint32_t descriptorTableWrites = 0;
+        uint32_t descriptorTableAllocations = 0;
+        uint32_t descriptorRefreshFailures = 0;
+        uint32_t descriptorTablesReadyAfterPrepare = 0;
+        uint32_t descriptorTablesMissingAfterPrepare = 0;
     };
 
     struct LightingInfo {
         std::string rigId = "custom";
         std::string rigSource = "manual";
+        std::string shadowPolicyId = "default";
+        std::string exposurePolicyId = "default";
         std::string worldShaderPaletteId = "default";
         std::string lightingScriptId = "custom";
+        std::string lightingBalancePolicyId = "none";
+        bool lightingBalancePolicyActive = false;
+        float lightingBalanceSunScale = 1.0f;
+        float lightingBalanceAmbientScale = 1.0f;
+        float lightingBalanceLocalFixtureScale = 1.0f;
+        float lightingBalanceLocalProbeDiffuseScale = 1.0f;
+        float lightingBalanceLocalProbeSpecularScale = 1.0f;
+        float lightingBalanceExposureScale = 1.0f;
+        float lightingBalanceSSAOScale = 1.0f;
         bool safeRigOnLowVRAM = false;
         bool safeRigVariantActive = false;
         float exposure = 1.0f;
@@ -261,6 +361,15 @@ struct FrameContract {
         float shadowPCFRadius = 0.0f;
         float cascadeSplitLambda = 0.0f;
         uint32_t lightCount = 0;
+        uint32_t pointLightCount = 0;
+        uint32_t spotLightCount = 0;
+        uint32_t areaRectLightCount = 0;
+        uint32_t twoSidedAreaLightCount = 0;
+        uint32_t semanticFixtureLightCount = 0;
+        uint32_t softFixtureLightCount = 0;
+        uint32_t emissiveFixtureLightCount = 0;
+        uint32_t stageFixtureLightCount = 0;
+        uint32_t practicalFixtureLightCount = 0;
         uint32_t shadowCastingLightCount = 0;
         float totalLightIntensity = 0.0f;
         float maxLightIntensity = 0.0f;
@@ -400,6 +509,7 @@ struct FrameContract {
     };
 
     struct CinematicPostInfo {
+        std::string qualitySetId = "default";
         bool enabled = false;
         bool postProcessPlanned = false;
         bool postProcessExecuted = false;
@@ -433,6 +543,21 @@ struct FrameContract {
         float warm = 0.0f;
         float cool = 0.0f;
         float godRayIntensity = 0.0f;
+        bool stabilityPolicyActive = false;
+        float materialMotionDamping = 0.0f;
+        float reflectionDebugStability = 0.0f;
+        float shadowSoftnessScale = 1.0f;
+        float highlightProtection = 0.0f;
+        bool lookPolicyActive = false;
+        float blackToeLift = 0.0f;
+        float highlightRolloff = 0.0f;
+        float colorSeparation = 0.0f;
+        float halationStrength = 0.0f;
+        bool exposurePolicyActive = false;
+        float profileExposureTrim = 1.0f;
+        float hdrShoulderStart = 24.0f;
+        float hdrShoulderStrength = 0.0f;
+        float postWhiteCompression = 0.0f;
     };
 
     struct MotionVectorInfo {
@@ -683,6 +808,7 @@ struct FrameContract {
     HealthInfo health;
     EnvironmentInfo environment;
     GraphicsPresetInfo graphicsPreset;
+    SceneVisualInfo sceneVisual;
     FeatureFlags features;
     FeatureFlags plannedFeatures;
     FeatureFlags executedFeatures;

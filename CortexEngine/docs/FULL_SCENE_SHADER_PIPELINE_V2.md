@@ -255,6 +255,9 @@ Completion evidence:
 - contract includes every required shader domain.
 - external frame-report contract maps every required shader domain to a future
   `full_scene_shader_pipeline_v2` frame-report section.
+- runtime frame-report JSON emits a `full_scene_shader_pipeline_v2` section
+  with all required readiness fields, labeled as `runtime_placeholder_v1_fallback`
+  until V2 domains are promoted.
 - material evidence report derives shader-family and PBR/hero-surface blockers
   from Asset Registry V2 and the scene binding overlay.
 - material upgrade plan converts blocked material evidence into P0/P1 work
@@ -310,6 +313,16 @@ Material fulfillment baseline:
 - pending `56`.
 - admitted `0`.
 - rejected `0`.
+
+Runtime V2 frame-report placeholder baseline:
+
+- status `runtime_placeholder_v1_fallback`.
+- beauty output remains `v1_fallback`.
+- section coverage includes material, GBuffer, lighting, reflections, shadows,
+  temporal, post, render graph, asset evidence, and packet gate.
+- readiness values are derived from existing V1 frame-contract ownership data.
+- checker now verifies that `FrameContractJson.cpp` emits every required V2
+  readiness field.
 
 ### FSSP-V2-002 Material Model Upgrade
 
@@ -601,7 +614,7 @@ Validation:
 4. Land the V2 material upgrade work-order planner.
 5. Land the V2 material provider request exporter.
 6. Land the V2 material fulfillment/admission manifest and validator.
-7. Add runtime frame-report placeholders for V2 domains without changing
+7. Landed runtime frame-report placeholders for V2 domains without changing
    rendering.
 8. Upgrade material model and registry material evidence.
 9. Expand GBuffer/debug channel inventory.

@@ -183,6 +183,8 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.environment.fallbackReason = m_environmentState.fallbackReason;
     contract.environment.manifestPresent = preflight.environmentManifestPresent;
     contract.environment.iblLimitEnabled = m_environmentState.limitEnabled;
+    contract.environment.imageBasedLightingTexturesBound =
+        m_environmentState.ShouldBindImageBasedLightingTextures();
     contract.environment.backgroundVisible = m_environmentState.backgroundVisible;
     contract.environment.backgroundExposure = m_environmentState.backgroundExposure;
     contract.environment.backgroundBlur = m_environmentState.backgroundBlur;
@@ -195,6 +197,12 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         static_cast<uint32_t>(m_visibilityBufferState.reflectionProbes.size());
     contract.environment.localReflectionProbeSkipped = m_visibilityBufferState.reflectionProbeSkipped;
     contract.environment.localReflectionProbeTableValid = m_visibilityBufferState.reflectionProbeTableValid;
+    contract.environment.localReflectionProbeRadianceEnabled =
+        m_environmentState.localProbeRadianceEnabled;
+    contract.environment.localReflectionProbeDiffuseIntensity =
+        m_environmentState.localProbeDiffuseIntensity;
+    contract.environment.localReflectionProbeSpecularIntensity =
+        m_environmentState.localProbeSpecularIntensity;
     if (const auto* env = m_environmentState.ActiveEnvironment()) {
         contract.environment.runtimePath = env->path;
         contract.environment.budgetClass = env->budgetClass;
@@ -208,13 +216,40 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.graphicsPreset.dirtyFromUI = health.graphicsPresetDirtyFromUI;
     contract.graphicsPreset.renderScale = m_qualityRuntimeState.renderScale;
 
+    contract.sceneVisual = m_sceneVisualContract;
+    contract.sceneVisual.externalHDRIVisible =
+        m_environmentState.backgroundVisible && m_environmentState.enabled;
+    contract.sceneVisual.invalidExternalHDRI =
+        contract.sceneVisual.active &&
+        contract.sceneVisual.enclosedScene &&
+        !contract.sceneVisual.visibleExternalHDRIAllowed &&
+        contract.sceneVisual.externalHDRIVisible;
+    contract.sceneVisual.lightRigId = m_lightingState.activeRigId;
+    contract.sceneVisual.materialPaletteId = m_lightingState.activeWorldShaderPaletteId;
+    contract.sceneVisual.lightingScriptId = m_lightingState.activeLightingScriptId;
+    contract.sceneVisual.toneMapperPreset = m_postProcessState.toneMapperPreset;
+
     contract.plannedFeatures = featurePlan.planned;
     contract.executedFeatures = featurePlan.active;
     contract.features = featurePlan.active;
     contract.lighting.rigId = m_lightingState.activeRigId;
     contract.lighting.rigSource = m_lightingState.activeRigSource;
+    contract.lighting.shadowPolicyId = contract.sceneVisual.shadowPolicyId;
+    contract.lighting.exposurePolicyId = contract.sceneVisual.exposurePolicyId;
     contract.lighting.worldShaderPaletteId = m_lightingState.activeWorldShaderPaletteId;
     contract.lighting.lightingScriptId = m_lightingState.activeLightingScriptId;
+    contract.lighting.lightingBalancePolicyId = contract.sceneVisual.lightingBalancePolicyId;
+    contract.lighting.lightingBalancePolicyActive = contract.sceneVisual.lightingBalancePolicyActive;
+    contract.lighting.lightingBalanceSunScale = contract.sceneVisual.lightingBalanceSunScale;
+    contract.lighting.lightingBalanceAmbientScale = contract.sceneVisual.lightingBalanceAmbientScale;
+    contract.lighting.lightingBalanceLocalFixtureScale =
+        contract.sceneVisual.lightingBalanceLocalFixtureScale;
+    contract.lighting.lightingBalanceLocalProbeDiffuseScale =
+        contract.sceneVisual.lightingBalanceLocalProbeDiffuseScale;
+    contract.lighting.lightingBalanceLocalProbeSpecularScale =
+        contract.sceneVisual.lightingBalanceLocalProbeSpecularScale;
+    contract.lighting.lightingBalanceExposureScale = contract.sceneVisual.lightingBalanceExposureScale;
+    contract.lighting.lightingBalanceSSAOScale = contract.sceneVisual.lightingBalanceSSAOScale;
     contract.lighting.safeRigOnLowVRAM = m_lightingState.useSafeRigOnLowVRAM;
     contract.lighting.safeRigVariantActive = m_lightingState.safeRigVariantActive;
     contract.lighting.exposure = m_qualityRuntimeState.exposure;
@@ -259,6 +294,41 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
         for (auto entity : lightView) {
             const auto& light = lightView.get<Scene::LightComponent>(entity);
             ++contract.lighting.lightCount;
+            switch (light.type) {
+                case Scene::LightType::Point:
+                    ++contract.lighting.pointLightCount;
+                    break;
+                case Scene::LightType::Spot:
+                    ++contract.lighting.spotLightCount;
+                    break;
+                case Scene::LightType::AreaRect:
+                    ++contract.lighting.areaRectLightCount;
+                    if (light.twoSided) {
+                        ++contract.lighting.twoSidedAreaLightCount;
+                    }
+                    break;
+                case Scene::LightType::Directional:
+                    break;
+            }
+            if (light.semanticClassId != 0u) {
+                ++contract.lighting.semanticFixtureLightCount;
+                switch (light.semanticClassId) {
+                    case 1u:
+                        ++contract.lighting.softFixtureLightCount;
+                        break;
+                    case 2u:
+                        ++contract.lighting.emissiveFixtureLightCount;
+                        break;
+                    case 3u:
+                        ++contract.lighting.stageFixtureLightCount;
+                        break;
+                    case 4u:
+                        ++contract.lighting.practicalFixtureLightCount;
+                        break;
+                    default:
+                        break;
+                }
+            }
             if (light.castsShadows) {
                 ++contract.lighting.shadowCastingLightCount;
             }
@@ -541,6 +611,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.vegetation.grassCapacity = m_vegetationState.grassInstances.capacity;
 
     contract.cinematicPost.enabled = m_postProcessState.cinematicEnabled;
+    contract.cinematicPost.qualitySetId = contract.sceneVisual.postQualitySetId;
     contract.cinematicPost.postProcessPlanned = featurePlan.runPostProcess;
     contract.cinematicPost.postProcessExecuted = m_frameDiagnostics.timings.postMs > 0.0f;
     contract.cinematicPost.bloomPlanned = featurePlan.runBloom;
@@ -564,6 +635,33 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     contract.cinematicPost.warm = m_postProcessState.warm;
     contract.cinematicPost.cool = m_postProcessState.cool;
     contract.cinematicPost.godRayIntensity = m_postProcessState.godRayIntensity;
+    const glm::vec4 cinematicStability = BuildCinematicStabilityParams();
+    contract.cinematicPost.stabilityPolicyActive =
+        contract.sceneVisual.active &&
+        contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+        cinematicStability.x > 0.0f;
+    contract.cinematicPost.materialMotionDamping = cinematicStability.x;
+    contract.cinematicPost.reflectionDebugStability = cinematicStability.y;
+    contract.cinematicPost.shadowSoftnessScale = cinematicStability.z;
+    contract.cinematicPost.highlightProtection = cinematicStability.w;
+    const glm::vec4 cinematicLook = BuildCinematicLookParams();
+    contract.cinematicPost.lookPolicyActive =
+        contract.sceneVisual.active &&
+        contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+        cinematicLook.y > 0.0f;
+    contract.cinematicPost.blackToeLift = cinematicLook.x;
+    contract.cinematicPost.highlightRolloff = cinematicLook.y;
+    contract.cinematicPost.colorSeparation = cinematicLook.z;
+    contract.cinematicPost.halationStrength = cinematicLook.w;
+    const glm::vec4 cinematicExposure = BuildCinematicExposureParams();
+    contract.cinematicPost.exposurePolicyActive =
+        contract.sceneVisual.active &&
+        contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+        cinematicExposure.x > 0.0f;
+    contract.cinematicPost.profileExposureTrim = cinematicExposure.x;
+    contract.cinematicPost.hdrShoulderStart = cinematicExposure.y;
+    contract.cinematicPost.hdrShoulderStrength = cinematicExposure.z;
+    contract.cinematicPost.postWhiteCompression = cinematicExposure.w;
 
     contract.motionVectors = m_frameDiagnostics.contract.motionVectors;
     contract.temporalMask = m_frameDiagnostics.contract.temporalMask;

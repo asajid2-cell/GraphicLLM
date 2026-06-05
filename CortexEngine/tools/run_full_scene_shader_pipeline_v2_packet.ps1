@@ -19,6 +19,7 @@ $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_pac
 $v2Checker = Join-Path $root "tools/check_full_scene_shader_pipeline_v2_frame_report.py"
 $debugMetricsTool = Join-Path $root "tools/analyze_full_scene_shader_debug_view_metrics.py"
 $reflectionSignalTool = Join-Path $root "tools/analyze_full_scene_shader_reflection_candidate_signal.py"
+$sequenceStabilityTool = Join-Path $root "tools/analyze_full_scene_shader_sequence_stability.py"
 
 if (-not (Test-Path $packetRunner)) {
     throw "Scene-local packet runner missing: $packetRunner"
@@ -31,6 +32,9 @@ if (-not (Test-Path $debugMetricsTool)) {
 }
 if (-not (Test-Path $reflectionSignalTool)) {
     throw "Full Scene Shader Pipeline V2 reflection signal tool missing: $reflectionSignalTool"
+}
+if (-not (Test-Path $sequenceStabilityTool)) {
+    throw "Full Scene Shader Pipeline V2 sequence stability tool missing: $sequenceStabilityTool"
 }
 
 $packetArgs = @(
@@ -168,6 +172,9 @@ $debugMetricsStdoutPath = Join-Path $outRootAbs "debug_view_metrics_stdout.txt"
 $reflectionSignalJsonPath = Join-Path $outRootAbs "reflection_candidate_signal.json"
 $reflectionSignalMdPath = Join-Path $outRootAbs "reflection_candidate_signal.md"
 $reflectionSignalStdoutPath = Join-Path $outRootAbs "reflection_candidate_signal_stdout.txt"
+$sequenceStabilityJsonPath = Join-Path $outRootAbs "sequence_stability.json"
+$sequenceStabilityMdPath = Join-Path $outRootAbs "sequence_stability.md"
+$sequenceStabilityStdoutPath = Join-Path $outRootAbs "sequence_stability_stdout.txt"
 
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryJsonPath
 $checkerOutput | Set-Content -Encoding UTF8 $checkerStdoutPath
@@ -204,6 +211,13 @@ if ($debugMetricsExit -ne 0) {
 if ($debugMetricsExit -eq 0) {
     $reflectionSignalOutput = & python $reflectionSignalTool --metrics $debugMetricsJsonPath --output-json $reflectionSignalJsonPath --output-md $reflectionSignalMdPath 2>&1
     $reflectionSignalOutput | Set-Content -Encoding UTF8 $reflectionSignalStdoutPath
+}
+
+$sequenceStabilityOutput = & python $sequenceStabilityTool --manifest $manifestPath --output-json $sequenceStabilityJsonPath --output-md $sequenceStabilityMdPath 2>&1
+$sequenceStabilityExit = $LASTEXITCODE
+$sequenceStabilityOutput | Set-Content -Encoding UTF8 $sequenceStabilityStdoutPath
+if ($sequenceStabilityExit -ne 0) {
+    $failures.Add("sequence stability failed; see $sequenceStabilityStdoutPath") | Out-Null
 }
 
 if ($failures.Count -gt 0) {

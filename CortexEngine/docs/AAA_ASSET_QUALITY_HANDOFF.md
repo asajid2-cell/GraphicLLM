@@ -2718,3 +2718,47 @@ Updated next work:
 - Next gate should be explicit glossy/metal/glass close-up stability
   comparison, then either actual local probe texture binding in post or a
   resolved local reflection radiance buffer.
+
+### Sequence Stability Analyzer Integration - 2026-06-05
+
+Implemented:
+
+- `tools/analyze_full_scene_shader_sequence_stability.py`
+  - reads V2 packet manifests and each result's `capture_sequence`.
+  - measures consecutive frame-to-frame mean absolute luma/RGB deltas.
+  - compares `reflection_resolver_candidate` motion delta against `beauty`
+    per family.
+  - emits `sequence_stability.json` and `sequence_stability.md`.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - now runs sequence stability after debug metrics and reflection signal.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
+  - now requires the analyzer and packet outputs.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_sequence_stability.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen" -ViewFilter "beauty,reflection_source_weights,reflection_source_authority,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_sequence_stability_integrated_smoke_20260605
+```
+
+Integrated smoke result:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_sequence_stability_integrated_smoke_20260605`.
+- source-signal families: `2/2`.
+- candidate-delta families: `2/2`.
+- sequence warnings/failures: `0/0`.
+
+| Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| gallery | `0.00311596` | `0.00310690` | `0.997` |
+| kitchen | `0.00385527` | `0.00383711` | `0.995` |
+
+Current next work:
+
+- Run an explicit glossy/metal/glass close-up stress packet through the same
+  sequence analyzer before any default-beauty promotion.
+- Then choose between actual local probe texture binding in post and a
+  resolved local reflection radiance buffer.

@@ -147,11 +147,25 @@ def validate_runtime_source_surface() -> list[str]:
         return [f"missing runtime V2 facade: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}"]
     if not VISIBILITY_BUFFER_HEADER_PATH.exists():
         return [f"missing visibility buffer runtime surface: {VISIBILITY_BUFFER_HEADER_PATH}"]
+    if not MATERIAL_MODEL_HEADER_PATH.exists():
+        return [f"missing material model runtime surface: {MATERIAL_MODEL_HEADER_PATH}"]
+    if not MATERIAL_MODEL_SOURCE_PATH.exists():
+        return [f"missing material model runtime source: {MATERIAL_MODEL_SOURCE_PATH}"]
 
     source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
     visibility_source = VISIBILITY_BUFFER_HEADER_PATH.read_text(encoding="utf-8")
-    runtime_surface = source + "\n" + facade_source + "\n" + visibility_source
+    material_header_source = MATERIAL_MODEL_HEADER_PATH.read_text(encoding="utf-8")
+    material_model_source = MATERIAL_MODEL_SOURCE_PATH.read_text(encoding="utf-8")
+    runtime_surface = "\n".join(
+        [
+            source,
+            facade_source,
+            visibility_source,
+            material_header_source,
+            material_model_source,
+        ]
+    )
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
     report_key = frame_contract.get("report_key", "")
     if f'"{report_key}"' not in runtime_surface:
@@ -174,7 +188,9 @@ def validate_runtime_source_surface() -> list[str]:
         "FullSceneMaterialModelEvidence",
         "FullSceneGBufferEvidence",
         "BuildFullSceneShaderFrameContext",
-        "BuildFullSceneMaterialModelEvidence(contract.materials)",
+        "BuildFullSceneMaterialModelEvidence(",
+        "contract.draws.visibilityBufferMaterials",
+        "context.materialPolicyChannelReady",
         "BuildFullSceneGBufferEvidence",
         "visibilityPayloadChannelReady",
         "visibilityPayloadProducerReady",
@@ -195,6 +211,18 @@ def validate_runtime_source_surface() -> list[str]:
     for token in facade_tokens:
         if token not in facade_source:
             errors.append(f"runtime V2 facade missing required token: {token}")
+
+    material_table_tokens = [
+        "shaderMaterialTableReady",
+        "shaderMaterialPolicyRowsReady",
+        "gbufferPolicyChannelBackedByMaterialTable",
+        '"shader_material_table_ready"',
+        '"shader_material_policy_rows_ready"',
+        '"gbuffer_policy_channel_backed_by_material_table"',
+    ]
+    for token in material_table_tokens:
+        if token not in runtime_surface:
+            errors.append(f"runtime material table surface missing required token: {token}")
 
     identity_debug_tokens = [
         "enum class DebugBlitVisibilityMode",
@@ -322,6 +350,30 @@ def validate_runtime_material_policy_surface() -> list[str]:
         model_source,
         "materials.materialClassPolicyApplied == materials.sampled",
         "MaterialResolver full-scene policy coverage gate",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "shaderMaterialTableRowCount",
+        "MaterialResolver shader-facing material table row evidence",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "gbufferPolicyChannelReady",
+        "MaterialResolver GBuffer policy backing gate",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "Shader-facing FullSceneMaterialTable is not populated with complete policy rows",
+        "MaterialResolver shader material table failure reason",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "GBuffer material policy channel is not backed by the shader material table",
+        "MaterialResolver GBuffer policy backing failure reason",
     )
     require_source_token(
         errors,

@@ -536,9 +536,13 @@ void ApplyPresetDefaults(MaterialModel& model, const MaterialPresetInfo& preset)
 } // namespace
 
 FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
-    const FrameContract::MaterialStats& materials) {
+    const FrameContract::MaterialStats& materials,
+    uint32_t shaderMaterialTableRowCount,
+    bool gbufferPolicyChannelReady) {
     FullSceneMaterialModelEvidence evidence;
     evidence.sampledMaterialCount = materials.sampled;
+    evidence.shaderMaterialTableRowCount = shaderMaterialTableRowCount;
+    evidence.shaderMaterialPolicyColumnCount = 4u;
     evidence.policyAppliedCount = materials.materialClassPolicyApplied;
     evidence.unknownMaterialFamilyCount = materials.sceneMaterialDefault;
     evidence.descriptorMissingCount = materials.descriptorTablesMissingAfterPrepare;
@@ -610,8 +614,23 @@ FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
         evidence.temporalPoliciesAvailable &&
         evidence.postPoliciesAvailable &&
         evidence.shaderFeatureFlagsAvailable;
+    evidence.shaderMaterialPolicyRowsReady =
+        evidence.runtimePolicyBridgeReady &&
+        evidence.shaderMaterialTableRowCount > 0 &&
+        evidence.shaderMaterialTableRowCount <= evidence.sampledMaterialCount &&
+        evidence.shaderMaterialPolicyColumnCount == 4u;
+    evidence.shaderMaterialTableReady =
+        evidence.shaderMaterialPolicyRowsReady &&
+        materials.resourcePrepareCalls > 0 &&
+        materials.descriptorTablesMissingAfterPrepare == 0 &&
+        materials.descriptorRefreshFailures == 0;
+    evidence.gbufferPolicyChannelBackedByMaterialTable =
+        evidence.shaderMaterialTableReady &&
+        gbufferPolicyChannelReady;
     evidence.fullSceneMaterialModelReady =
         evidence.runtimePolicyBridgeReady &&
+        evidence.shaderMaterialTableReady &&
+        evidence.gbufferPolicyChannelBackedByMaterialTable &&
         evidence.textureEvidenceAvailable &&
         evidence.unknownMaterialFamilyCount == 0 &&
         evidence.validationErrorCount == 0;
@@ -621,6 +640,12 @@ FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
     } else if (!evidence.runtimePolicyBridgeReady) {
         evidence.failureReason =
             "Runtime material policy bridge does not cover every sampled material";
+    } else if (!evidence.shaderMaterialTableReady) {
+        evidence.failureReason =
+            "Shader-facing FullSceneMaterialTable is not populated with complete policy rows";
+    } else if (!evidence.gbufferPolicyChannelBackedByMaterialTable) {
+        evidence.failureReason =
+            "GBuffer material policy channel is not backed by the shader material table";
     } else if (!evidence.textureEvidenceAvailable) {
         evidence.failureReason =
             "Runtime material texture/descriptor evidence is incomplete";
@@ -630,7 +655,7 @@ FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
     } else if (evidence.validationErrorCount > 0) {
         evidence.failureReason = "Material validation errors are present";
     } else {
-        evidence.failureReason = "FullSceneMaterialModel runtime bridge is ready";
+        evidence.failureReason = "FullSceneMaterialTable runtime bridge is ready";
     }
 
     return evidence;

@@ -151,6 +151,9 @@ struct MaterialValidationIssue {
 struct FullSceneMaterialModelEvidence {
     bool enabled = false;
     bool runtimePolicyBridgeReady = false;
+    bool shaderMaterialTableReady = false;
+    bool shaderMaterialPolicyRowsReady = false;
+    bool gbufferPolicyChannelBackedByMaterialTable = false;
     bool familyCountsAvailable = false;
     bool reflectionPoliciesAvailable = false;
     bool temporalPoliciesAvailable = false;
@@ -159,6 +162,8 @@ struct FullSceneMaterialModelEvidence {
     bool shaderFeatureFlagsAvailable = false;
     bool fullSceneMaterialModelReady = false;
     uint32_t sampledMaterialCount = 0;
+    uint32_t shaderMaterialTableRowCount = 0;
+    uint32_t shaderMaterialPolicyColumnCount = 0;
     uint32_t policyAppliedCount = 0;
     uint32_t unknownMaterialFamilyCount = 0;
     uint32_t missingHeroTextureEvidenceCount = 0;
@@ -170,7 +175,9 @@ struct FullSceneMaterialModelEvidence {
 };
 
 [[nodiscard]] FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
-    const FrameContract::MaterialStats& materials);
+    const FrameContract::MaterialStats& materials,
+    uint32_t shaderMaterialTableRowCount = 0,
+    bool gbufferPolicyChannelReady = false);
 
 class MaterialResolver {
 public:

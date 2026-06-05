@@ -322,21 +322,36 @@ inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
 
 inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameContract& contract) {
     FullSceneShaderFrameContext context;
-    context.materialModelEvidence = BuildFullSceneMaterialModelEvidence(contract.materials);
-    context.familyCountsAvailable = context.materialModelEvidence.familyCountsAvailable;
-    context.reflectionPoliciesAvailable = context.materialModelEvidence.reflectionPoliciesAvailable;
-    context.temporalPoliciesAvailable = context.materialModelEvidence.temporalPoliciesAvailable;
-    context.postPoliciesAvailable = context.materialModelEvidence.postPoliciesAvailable;
     context.extendedMaterialChannelsReady =
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext0") &&
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext1") &&
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext2");
+    context.familyCountsAvailable =
+        FullSceneShaderSceneMaterialFamilyCount(contract.materials) == contract.materials.sampled &&
+        contract.materials.sampled > 0;
+    context.reflectionPoliciesAvailable =
+        FullSceneShaderMaterialReflectionPreferenceCount(contract.materials) == contract.materials.sampled &&
+        contract.materials.sampled > 0;
+    context.temporalPoliciesAvailable =
+        FullSceneShaderMaterialTemporalPolicyCount(contract.materials) == contract.materials.sampled &&
+        contract.materials.sampled > 0;
+    context.postPoliciesAvailable =
+        FullSceneShaderMaterialPostSensitivityCount(contract.materials) == contract.materials.sampled &&
+        contract.materials.sampled > 0;
     context.materialPolicyChannelReady =
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext2") &&
         context.familyCountsAvailable &&
         context.reflectionPoliciesAvailable &&
         context.temporalPoliciesAvailable &&
         context.postPoliciesAvailable;
+    context.materialModelEvidence = BuildFullSceneMaterialModelEvidence(
+        contract.materials,
+        contract.draws.visibilityBufferMaterials,
+        context.materialPolicyChannelReady);
+    context.familyCountsAvailable = context.materialModelEvidence.familyCountsAvailable;
+    context.reflectionPoliciesAvailable = context.materialModelEvidence.reflectionPoliciesAvailable;
+    context.temporalPoliciesAvailable = context.materialModelEvidence.temporalPoliciesAvailable;
+    context.postPoliciesAvailable = context.materialModelEvidence.postPoliciesAvailable;
     context.velocityReady =
         FullSceneShaderHasResource(contract, "velocity") &&
         contract.motionVectors.planned &&

@@ -471,5 +471,72 @@ Result<void> VisibilityBufferRenderer::ApplyDeferredLighting(
     return Result<void>::Ok();
 }
 
-} // namespace Cortex::Graphics
+Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
+    ID3D12GraphicsCommandList* cmdList,
+    const FullSceneLightingV3Targets& targets,
+    ID3D12Resource* depthBuffer,
+    const DescriptorHandle& depthSRV,
+    ID3D12Resource* envDiffuseResource,
+    ID3D12Resource* envSpecularResource,
+    DXGI_FORMAT envFormat,
+    const DescriptorHandle& shadowMapSRV,
+    const DeferredLightingParams& params
+) {
+    if (!targets.directLighting || !targets.directLightingUnshadowed ||
+        !targets.shadowVisibility || !targets.shadowLoss || !targets.indirectLighting) {
+        return Result<void>::Err("FullSceneLightingV3 requires all split lighting targets");
+    }
 
+    auto writeSplitTarget = [&](ID3D12Resource* target,
+                                D3D12_CPU_DESCRIPTOR_HANDLE rtv,
+                                uint32_t deferredDebugMode,
+                                const char* label) -> Result<void> {
+        DeferredLightingParams splitParams = params;
+        splitParams.reflectionProbeParams.z = deferredDebugMode;
+        auto result = ApplyDeferredLighting(
+            cmdList,
+            target,
+            rtv,
+            depthBuffer,
+            depthSRV,
+            envDiffuseResource,
+            envSpecularResource,
+            envFormat,
+            shadowMapSRV,
+            splitParams);
+        if (result.IsErr()) {
+            return Result<void>::Err(std::string("FullSceneLightingV3 failed to write ") +
+                                     label + ": " + result.Error());
+        }
+        return Result<void>::Ok();
+    };
+
+    if (auto result = writeSplitTarget(targets.directLighting, targets.directLightingRTV, 44u, "direct_lighting");
+        result.IsErr()) {
+        return result;
+    }
+    if (auto result = writeSplitTarget(
+            targets.directLightingUnshadowed,
+            targets.directLightingUnshadowedRTV,
+            54u,
+            "direct_lighting_unshadowed");
+        result.IsErr()) {
+        return result;
+    }
+    if (auto result = writeSplitTarget(targets.shadowVisibility, targets.shadowVisibilityRTV, 43u, "shadow_visibility");
+        result.IsErr()) {
+        return result;
+    }
+    if (auto result = writeSplitTarget(targets.shadowLoss, targets.shadowLossRTV, 55u, "shadow_loss");
+        result.IsErr()) {
+        return result;
+    }
+    if (auto result = writeSplitTarget(targets.indirectLighting, targets.indirectLightingRTV, 45u, "indirect_lighting");
+        result.IsErr()) {
+        return result;
+    }
+
+    return Result<void>::Ok();
+}
+
+} // namespace Cortex::Graphics

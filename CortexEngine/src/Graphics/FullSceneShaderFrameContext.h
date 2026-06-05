@@ -1334,15 +1334,18 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     FullSceneShaderPipelineV3DomainEvidence lightingDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "lighting",
-            "FullSceneLightingV3Adapter",
-            "hdr_color",
+            context.lightingSplitResourcesReady ? "FullSceneLightingV3" : "FullSceneLightingV3Adapter",
+            context.lightingSplitResourcesReady ? "lighting_split" : "hdr_color",
             "VB_DeferredDirectLight",
-            lightingAdapterReady
+            context.lightingSplitResourcesReady
+                ? "FullSceneLightingV3 writes direct/unshadowed/shadow/indirect split lighting resources"
+                : lightingAdapterReady
                 ? "FullSceneLightingV3 adapter is backed by VBDeferredLighting -> hdr_color; split V3 lighting resources are pending"
                 : "FullSceneLightingV3 adapter is missing current deferred lighting ownership");
     lightingDomain.enabled = lightingAdapterReady;
     lightingDomain.ready = context.lightingSplitResourcesReady;
-    lightingDomain.promotionState = lightingAdapterReady ? "adapter" : "planned";
+    lightingDomain.promotionState =
+        context.lightingSplitResourcesReady ? "producer" : (lightingAdapterReady ? "adapter" : "planned");
     lightingDomain.backingResources = {
         "hdr_color",
         "direct_lighting",

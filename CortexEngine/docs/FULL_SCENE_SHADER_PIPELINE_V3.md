@@ -442,17 +442,22 @@ Evidence:
 
 Status: in progress.
 
-Current split-resource scaffold evidence:
+Current producer evidence:
 
-- current producer is `FullSceneLightingV3Adapter`.
+- current producer is `FullSceneLightingV3`.
+- current producer mode is opt-in via
+  `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT=1`.
+- current producer writes split resources by reusing the deferred lighting
+  term/debug shader paths; this is the first producer proof, not the final
+  single-pass HDR split architecture.
 - current adapter owner is `VBDeferredLighting`.
 - current adapter output is `hdr_color`.
 - runtime V3 report exposes `lighting_adapter_ready=true`.
 - runtime V3 report exposes `lighting_split_resources_allocated=true`.
-- runtime V3 report exposes `lighting_split_resources_ready=false`.
+- runtime V3 report exposes `lighting_split_resources_ready=true`.
 - runtime V3 report exposes `lighting_adapter_signal_count=4`.
 - runtime V3 report exposes `lighting_split_resource_count=5`.
-- concrete V3 resources now exist for:
+- `FullSceneLightingV3` writes:
   `direct_lighting`,
   `direct_lighting_unshadowed`,
   `shadow_visibility`,
@@ -465,8 +470,10 @@ Current split-resource scaffold evidence:
   `shadow_visibility`,
   `shadow_loss`, and
   `indirect_lighting`.
-- lighting domain remains `ready=false` because the split resources are not yet
-  written by a real `FullSceneLightingV3` producer pass.
+- lighting domain is `ready=true`.
+- lighting domain producer is `FullSceneLightingV3`.
+- lighting domain output resource is `lighting_split`.
+- lighting domain promotion state is `producer`.
 - adapter debug views include:
   `VB_DeferredDirectLight`,
   `VB_DeferredDirectLightUnshadowed`,
@@ -474,22 +481,22 @@ Current split-resource scaffold evidence:
   `VB_DeferredShadowFactor`, and
   `VB_DeferredAmbientIBL`.
 - smoke packet:
-  `build/captures/v3_lighting_split_scaffold_smoke1_20260605`.
+  `build/captures/v3_lighting_split_producer_smoke1_20260605`.
 - packet result:
   `lighting_adapter_ready_report_count=6`,
   `lighting_split_allocated_report_count=6`,
-  `lighting_split_ready_report_count=0`,
+  `lighting_split_ready_report_count=6`,
   failures `0`, warnings `0`.
 
-Required next evidence for completion:
+Required next evidence for completion/promotion:
 
-- real `FullSceneLightingV3` pass that writes `direct_lighting`,
-  `direct_lighting_unshadowed`, `shadow_visibility`, `shadow_loss`, and
-  `indirect_lighting`.
-- frame contract pass ownership proving `FullSceneLightingV3` writes each split
-  resource.
-- lighting domain `ready=true` only after those resources are produced and pass
-  packet gates.
+- replace the five debug-term redraws with a direct split-output lighting
+  shader/pass.
+- preserve the same frame-contract pass ownership for each split resource.
+- add signal gates for nonzero direct/indirect lighting and stable shadow
+  visibility.
+- keep default beauty unchanged until the consumer/composite path and packet
+  gates prove promotion quality.
 
 ### L006 - Reflection V3 Resolver
 
@@ -533,9 +540,10 @@ Required evidence:
   `build/captures/v3_material_attributes_smoke1_20260605`.
 - First real V3 domain is now instrumented:
   `FullSceneMaterialResolveV3 -> material_attributes`.
-- Current lighting adapter is instrumented with allocated split resources, but
-  the split resources are not producer-ready:
-  `FullSceneLightingV3Adapter -> hdr_color`.
-- Next safe implementation slice is the actual `FullSceneLightingV3` producer
-  pass that writes direct lighting, unshadowed direct lighting, shadow
-  visibility, shadow loss, and indirect lighting.
+- Current lighting domain is producer-ready under the opt-in V3 split flag:
+  `FullSceneLightingV3 -> lighting_split`.
+- Latest V3 lighting packet:
+  `build/captures/v3_lighting_split_producer_smoke1_20260605`.
+- Next safe implementation slice is replacing the debug-term redraw producer
+  with a direct split-output lighting shader/pass and then adding lighting
+  signal gates.

@@ -25,6 +25,11 @@ struct ResourceHandles {
     RGResourceHandle shadow;
     RGResourceHandle rtShadow;
     RGResourceHandle rtGI;
+    RGResourceHandle directLighting;
+    RGResourceHandle directLightingUnshadowed;
+    RGResourceHandle shadowVisibility;
+    RGResourceHandle shadowLoss;
+    RGResourceHandle indirectLighting;
     RGResourceHandle debugSource;
 };
 
@@ -127,6 +132,31 @@ struct DeferredLightingContext {
     StageFailureContext failure;
 };
 
+struct FullSceneLightingV3Context {
+    VisibilityBufferRenderer* renderer = nullptr;
+    ID3D12GraphicsCommandList* commandList = nullptr;
+    VisibilityBufferRenderer::FullSceneLightingV3Targets targets{};
+    ID3D12Resource* depthBuffer = nullptr;
+    DescriptorHandle depthSRV{};
+    ID3D12Resource* envDiffuseResource = nullptr;
+    ID3D12Resource* envSpecularResource = nullptr;
+    DXGI_FORMAT envFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    DescriptorHandle shadowMapSRV{};
+    VisibilityBufferRenderer::DeferredLightingParams params{};
+    D3D12_RESOURCE_STATES* depthState = nullptr;
+    D3D12_RESOURCE_STATES* lightingSplitState = nullptr;
+    D3D12_RESOURCE_STATES* shadowState = nullptr;
+    D3D12_RESOURCE_STATES* rtShadowState = nullptr;
+    D3D12_RESOURCE_STATES* rtGIState = nullptr;
+    bool enabled = false;
+    bool shadowValid = false;
+    bool rtShadowValid = false;
+    bool rtGIValid = false;
+    bool brdfLutValid = false;
+    bool clusterGraphOwned = false;
+    StageFailureContext failure;
+};
+
 struct GraphContext {
     ResourceHandles resources;
     bool needsMaterialResolve = false;
@@ -136,6 +166,7 @@ struct GraphContext {
     bool debugGBuffer = false;
     bool brdfGraphOwned = false;
     bool clusterGraphOwned = false;
+    bool fullSceneLightingV3Enabled = false;
     ClearContext clear;
     VisibilityContext visibility;
     MaterialResolveContext materialResolve;
@@ -143,6 +174,7 @@ struct GraphContext {
     BRDFLUTContext brdfLut;
     ClusteredLightsContext clusteredLights;
     DeferredLightingContext deferredLighting;
+    FullSceneLightingV3Context fullSceneLightingV3;
     StageFailureContext graphFailure;
 };
 
@@ -153,6 +185,7 @@ struct GraphContext {
 [[nodiscard]] bool GenerateBRDFLUT(const BRDFLUTContext& context);
 [[nodiscard]] bool BuildClusteredLights(const ClusteredLightsContext& context);
 [[nodiscard]] bool ApplyDeferredLighting(const DeferredLightingContext& context);
+[[nodiscard]] bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context);
 [[nodiscard]] bool AddStagedPath(RenderGraph& graph, const GraphContext& context);
 
 } // namespace Cortex::Graphics::VisibilityBufferGraphPass

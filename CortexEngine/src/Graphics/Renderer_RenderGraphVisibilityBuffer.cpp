@@ -8,6 +8,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <string>
 
 namespace Cortex::Graphics {
@@ -48,6 +49,14 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         const auto deferredInputs = debugPath
             ? VisibilityBufferDeferredLightingInputs{}
             : PrepareVisibilityBufferDeferredLighting(registry);
+        const bool fullSceneLightingV3Enabled =
+            !debugPath &&
+            std::getenv("CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT") != nullptr &&
+            m_mainTargets.lightingV3.resources.directLighting &&
+            m_mainTargets.lightingV3.resources.directLightingUnshadowed &&
+            m_mainTargets.lightingV3.resources.shadowVisibility &&
+            m_mainTargets.lightingV3.resources.shadowLoss &&
+            m_mainTargets.lightingV3.resources.indirectLighting;
 
         m_services.renderGraph->BeginFrame();
         const VisibilityBufferGraphResources vbResources = ImportVisibilityBufferGraphResources(
@@ -62,7 +71,13 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             m_rtShadowTargets.mask.Get(),
             m_rtShadowTargets.maskState,
             m_rtGITargets.color.Get(),
-            m_rtGITargets.colorState);
+            m_rtGITargets.colorState,
+            m_mainTargets.lightingV3.resources.directLighting.Get(),
+            m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get(),
+            m_mainTargets.lightingV3.resources.shadowVisibility.Get(),
+            m_mainTargets.lightingV3.resources.shadowLoss.Get(),
+            m_mainTargets.lightingV3.resources.indirectLighting.Get(),
+            m_mainTargets.lightingV3.resources.state);
         const bool clusterGraphOwned =
             !debugPath &&
             !deferredInputs.localLights.empty() &&
@@ -91,6 +106,11 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbPassResources.shadow = vbResources.shadow;
         vbPassResources.rtShadow = vbResources.rtShadow;
         vbPassResources.rtGI = vbResources.rtGI;
+        vbPassResources.directLighting = vbResources.directLighting;
+        vbPassResources.directLightingUnshadowed = vbResources.directLightingUnshadowed;
+        vbPassResources.shadowVisibility = vbResources.shadowVisibility;
+        vbPassResources.shadowLoss = vbResources.shadowLoss;
+        vbPassResources.indirectLighting = vbResources.indirectLighting;
         vbPassResources.debugSource = SelectVBGBufferDebugHandle(vbResources, vbDebugView);
 
         VisibilityBufferGraphPass::GraphContext vbGraphContext{};
@@ -102,6 +122,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugGBuffer = debugGBuffer;
         vbGraphContext.brdfGraphOwned = brdfGraphOwned;
         vbGraphContext.clusterGraphOwned = clusterGraphOwned;
+        vbGraphContext.fullSceneLightingV3Enabled = fullSceneLightingV3Enabled;
         VisibilityBufferGraphPass::StageFailureContext vbFailure{
             &vbStageFailed,
             &vbStageFailureStage,
@@ -179,6 +200,43 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.deferredLighting.clusterGraphOwned = clusterGraphOwned;
         vbGraphContext.deferredLighting.renderedThisFrame = &m_visibilityBufferState.renderedThisFrame;
         vbGraphContext.deferredLighting.failure = vbFailure;
+        vbGraphContext.fullSceneLightingV3.renderer = m_services.visibilityBuffer.get();
+        vbGraphContext.fullSceneLightingV3.commandList = m_commandResources.graphicsList.Get();
+        vbGraphContext.fullSceneLightingV3.targets.directLighting = m_mainTargets.lightingV3.resources.directLighting.Get();
+        vbGraphContext.fullSceneLightingV3.targets.directLightingRTV = m_mainTargets.lightingV3.descriptors.directLightingRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.directLightingUnshadowed =
+            m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get();
+        vbGraphContext.fullSceneLightingV3.targets.directLightingUnshadowedRTV =
+            m_mainTargets.lightingV3.descriptors.directLightingUnshadowedRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.shadowVisibility =
+            m_mainTargets.lightingV3.resources.shadowVisibility.Get();
+        vbGraphContext.fullSceneLightingV3.targets.shadowVisibilityRTV =
+            m_mainTargets.lightingV3.descriptors.shadowVisibilityRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.shadowLoss = m_mainTargets.lightingV3.resources.shadowLoss.Get();
+        vbGraphContext.fullSceneLightingV3.targets.shadowLossRTV = m_mainTargets.lightingV3.descriptors.shadowLossRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.targets.indirectLighting =
+            m_mainTargets.lightingV3.resources.indirectLighting.Get();
+        vbGraphContext.fullSceneLightingV3.targets.indirectLightingRTV =
+            m_mainTargets.lightingV3.descriptors.indirectLightingRTV.cpu;
+        vbGraphContext.fullSceneLightingV3.depthBuffer = m_depthResources.resources.buffer.Get();
+        vbGraphContext.fullSceneLightingV3.depthSRV = m_depthResources.descriptors.srv;
+        vbGraphContext.fullSceneLightingV3.envDiffuseResource = deferredInputs.envDiffuseResource;
+        vbGraphContext.fullSceneLightingV3.envSpecularResource = deferredInputs.envSpecularResource;
+        vbGraphContext.fullSceneLightingV3.envFormat = deferredInputs.envFormat;
+        vbGraphContext.fullSceneLightingV3.shadowMapSRV = m_shadowResources.resources.srv;
+        vbGraphContext.fullSceneLightingV3.params = deferredInputs.params;
+        vbGraphContext.fullSceneLightingV3.depthState = &m_depthResources.resources.resourceState;
+        vbGraphContext.fullSceneLightingV3.lightingSplitState = &m_mainTargets.lightingV3.resources.state;
+        vbGraphContext.fullSceneLightingV3.shadowState = &m_shadowResources.resources.resourceState;
+        vbGraphContext.fullSceneLightingV3.rtShadowState = &m_rtShadowTargets.maskState;
+        vbGraphContext.fullSceneLightingV3.rtGIState = &m_rtGITargets.colorState;
+        vbGraphContext.fullSceneLightingV3.enabled = fullSceneLightingV3Enabled;
+        vbGraphContext.fullSceneLightingV3.shadowValid = vbResources.shadow.IsValid();
+        vbGraphContext.fullSceneLightingV3.rtShadowValid = vbResources.rtShadow.IsValid();
+        vbGraphContext.fullSceneLightingV3.rtGIValid = vbResources.rtGI.IsValid();
+        vbGraphContext.fullSceneLightingV3.brdfLutValid = vbResources.brdfLut.IsValid();
+        vbGraphContext.fullSceneLightingV3.clusterGraphOwned = clusterGraphOwned;
+        vbGraphContext.fullSceneLightingV3.failure = vbFailure;
 
         if (!VisibilityBufferGraphPass::AddStagedPath(*m_services.renderGraph, vbGraphContext)) {
             vbStageFailed = true;
@@ -201,6 +259,9 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
             if (vbResources.shadow.IsValid()) m_shadowResources.resources.resourceState = m_services.renderGraph->GetResourceState(vbResources.shadow);
             if (vbResources.rtShadow.IsValid()) m_rtShadowTargets.maskState = m_services.renderGraph->GetResourceState(vbResources.rtShadow);
             if (vbResources.rtGI.IsValid()) m_rtGITargets.colorState = m_services.renderGraph->GetResourceState(vbResources.rtGI);
+            if (vbResources.directLighting.IsValid()) {
+                m_mainTargets.lightingV3.resources.state = m_services.renderGraph->GetResourceState(vbResources.directLighting);
+            }
 
             auto finalStates = m_services.visibilityBuffer->GetResourceStateSnapshot();
             finalStates.visibility = m_services.renderGraph->GetResourceState(vbResources.visibility);
@@ -261,6 +322,15 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                  "gbuffer_material_ext0", "gbuffer_material_ext1", "gbuffer_material_ext2",
                                  "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},
                                 {"hdr_color"},
+                                false, nullptr, true);
+            }
+            if (fullSceneLightingV3Enabled) {
+                RecordFramePass("FullSceneLightingV3", true, true, 5,
+                                {"depth", "gbuffer_albedo", "gbuffer_normal_roughness", "gbuffer_emissive_metallic",
+                                 "gbuffer_material_ext0", "gbuffer_material_ext1", "gbuffer_material_ext2",
+                                 "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},
+                                {"direct_lighting", "direct_lighting_unshadowed", "shadow_visibility",
+                                 "shadow_loss", "indirect_lighting"},
                                 false, nullptr, true);
             }
             result.executed = m_visibilityBufferState.renderedThisFrame;

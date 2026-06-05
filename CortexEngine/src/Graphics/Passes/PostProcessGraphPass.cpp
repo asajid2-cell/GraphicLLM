@@ -73,6 +73,13 @@ void Execute(const RenderGraph& graph, const ExecuteContext& context) {
         }
         descriptorUpdate.bloomOverride = bloomOverride;
     }
+    if (context.localReflectionRadiance.IsValid()) {
+        descriptorUpdate.localReflectionRadiance = graph.GetResource(context.localReflectionRadiance);
+        if (!descriptorUpdate.localReflectionRadiance) {
+            Fail(context.status, "bind_local_reflection_radiance");
+            return;
+        }
+    }
 
     if (context.runRtReflectionDebugClear) {
         (void)RTReflectionDebugClearPass::ClearForDebugView(context.rtReflectionDebugClear);

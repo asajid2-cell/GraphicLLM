@@ -3255,3 +3255,68 @@ Current stopping position:
   allocate the `R16G16B16A16_FLOAT` local radiance texture, dispatch
   `LocalReflectionRadiance.hlsl`, bind the produced SRV into slot `13`, and
   make debug view `61` show nonzero producer-owned signal.
+
+### Render-Graph Local Reflection Radiance Producer - 2026-06-05
+
+Implemented:
+
+- `src/Graphics/Passes/LocalReflectionRadiancePass.*`
+  - adds a compute render-graph pass named `LocalReflectionRadiance`.
+  - creates a transient `R16G16B16A16_FLOAT` UAV/SRV radiance target.
+  - reads depth, normal/roughness, emissive/metallic, material ext channels,
+    scene color, and optional active environment specular.
+  - dispatches `LocalReflectionRadiance.hlsl`.
+- `src/Graphics/RendererLocalReflectionState.h`
+  - owns per-frame local radiance SRV/UAV descriptor tables.
+- `src/Graphics/RendererPipelineState.h` and
+  `src/Graphics/Renderer_ScreenComputePipelineSetup.cpp`
+  - add and compile the local radiance compute pipeline.
+- `src/Graphics/Renderer_Descriptors.cpp`
+  - allocates persistent per-frame local radiance compute descriptor tables.
+- `src/Graphics/Renderer_RenderGraphEndFrame.cpp`
+  - inserts the `LocalReflectionRadiance` pass before post when the GBuffer
+    inputs are available.
+  - passes the graph-produced radiance handle into post.
+- `src/Graphics/Passes/PostProcessGraphPass.*`
+  - resolves the graph-produced radiance resource at post execution time and
+    binds it to slot `13`.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T cs_6_3 -E CSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\LocalReflectionRadiance.dxil assets\shaders\LocalReflectionRadiance.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,local_reflection_radiance,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_local_radiance_producer_smoke1_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- packet:
+  `build/captures/v2_local_radiance_producer_smoke1_20260605`.
+- captured views: `6`.
+- V2 packet evidence: passed.
+- debug view `61` changed from the previous null-slot proof to producer signal:
+  - previous `local_reflection_radiance`: luma `0.0000`, nonblack `0.0000`.
+  - producer `local_reflection_radiance`: luma `0.0950`, nonblack `1.0000`.
+- `reflection_source_authority` remains distinct:
+  luma `0.0661`, nonblack `0.4109`.
+- candidate signal remains valid:
+  source luma `0.12212419`, delta luma `0.02840133`.
+- logs confirm:
+  `Local reflection radiance compute pipeline created successfully`.
+- `ctest` still found no registered tests in this build.
+
+Current stopping position:
+
+- The renderer now has a real render-graph-owned local reflection radiance
+  producer and packet-visible debug output.
+- Default beauty is still unchanged.
+- Next work should feed `g_LocalReflectionRadiance` into the V2 reflection
+  candidate path behind the existing review toggle, then rerun broader glossy
+  stress packets and compare candidate delta/stability against the prior
+  structured post-only candidate.

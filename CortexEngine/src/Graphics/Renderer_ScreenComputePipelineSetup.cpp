@@ -131,6 +131,26 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
     }
 
     if (m_pipelineState.computeRootSignature) {
+        auto localRadianceResult =
+            ShaderCompiler::CompileFromFile("assets/shaders/LocalReflectionRadiance.hlsl", "CSMain", "cs_6_3");
+        if (localRadianceResult.IsOk()) {
+            m_pipelineState.localReflectionRadianceCompute = std::make_unique<DX12ComputePipeline>();
+            auto localRadiancePipelineResult = m_pipelineState.localReflectionRadianceCompute->Initialize(
+                m_services.device->GetDevice(),
+                m_pipelineState.computeRootSignature->GetRootSignature(),
+                localRadianceResult.Value());
+            if (localRadiancePipelineResult.IsErr()) {
+                spdlog::warn("Failed to create local reflection radiance compute pipeline: {}",
+                             localRadiancePipelineResult.Error());
+                m_pipelineState.localReflectionRadianceCompute.reset();
+            } else {
+                spdlog::info("Local reflection radiance compute pipeline created successfully");
+            }
+        } else {
+            spdlog::warn("Failed to compile local reflection radiance compute shader: {}",
+                         localRadianceResult.Error());
+        }
+
         static const char* kHzbInitCS = R"(
 Texture2D<float> g_Depth : register(t0);
 RWTexture2D<float> g_OutMip : register(u0);

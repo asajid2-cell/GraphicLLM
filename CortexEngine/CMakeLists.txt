@@ -130,6 +130,7 @@ set(CORTEX_SOURCES
     src/Graphics/TemporalManager.cpp
     src/Graphics/RendererGeometryUtils.cpp
     src/Graphics/RendererSceneSnapshot.cpp
+    src/Graphics/RendererSceneProfile.cpp
     src/Graphics/Renderer_AssetRegistry.cpp
     src/Graphics/GPUCulling.cpp
     src/Graphics/GPUCulling_Dispatch.cpp
@@ -150,6 +151,7 @@ set(CORTEX_SOURCES
     src/Graphics/Passes/FullscreenPass.cpp
     src/Graphics/Passes/HZBPass.cpp
     src/Graphics/Passes/IndirectMeshDrawPass.cpp
+    src/Graphics/Passes/LocalReflectionRadiancePass.cpp
     src/Graphics/Passes/MainPassTargetPass.cpp
     src/Graphics/Passes/MeshDrawPass.cpp
     src/Graphics/Passes/MeshUploadCopyPass.cpp

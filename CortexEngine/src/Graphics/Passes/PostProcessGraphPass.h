@@ -35,6 +35,7 @@ struct ResourceHandles {
 struct ExecuteContext {
     bool useBloomOverride = false;
     RGResourceHandle bloom;
+    RGResourceHandle localReflectionRadiance;
     PostProcessPass::DescriptorUpdateContext descriptorUpdate;
     PostProcessPass::DrawContext draw;
     bool* backBufferUsedAsRenderTarget = nullptr;

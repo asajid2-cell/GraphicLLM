@@ -387,6 +387,23 @@ Evidence:
 - extracted frame report:
   `required_outputs=9`, `domains=7`, `packet_gate_ready=false`.
 
+### L003A - V3 Packet Skeleton Artifacts
+
+Status: complete.
+
+Evidence:
+
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- packet skeleton emits `v3_signal.json`.
+- packet skeleton emits `v3_stability.json`.
+- packet skeleton enforces `status=planned_not_promoted`.
+- packet skeleton enforces `default_beauty_affects=false`.
+- wrapper smoke packet:
+  `build/captures/v3_packet_skeleton_smoke1_20260605`.
+- wrapper smoke packet produced:
+  `v3_signal.json` and `v3_stability.json`.
+
 ### L004 - Material Resolve V3
 
 Status: pending.
@@ -434,7 +451,7 @@ Required evidence:
 - V2 remains the active renderer path.
 - Default beauty remains unchanged.
 - Latest V3 placeholder packet:
-  `build/captures/v3_runtime_placeholder_smoke2_20260605`.
-- Next safe implementation slice is a V3 packet harness skeleton for the
-  required debug views and placeholder `v3_signal.json`/`v3_stability.json`
-  artifacts.
+  `build/captures/v3_packet_skeleton_smoke1_20260605`.
+- Next safe implementation slice is the first real V3 domain implementation:
+  material resolve placeholders should become concrete `material_attributes`
+  resources and debug views.

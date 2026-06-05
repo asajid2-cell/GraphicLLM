@@ -11,6 +11,8 @@ PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
+V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
+V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -83,6 +85,16 @@ def main() -> int:
         errors,
         f"Missing full scene shader frame context: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}",
     )
+    require(
+        V3_PLACEHOLDER_ANALYZER_PATH.exists(),
+        errors,
+        f"Missing V3 placeholder analyzer: {V3_PLACEHOLDER_ANALYZER_PATH}",
+    )
+    require(
+        V3_PACKET_RUNNER_PATH.exists(),
+        errors,
+        f"Missing V3 packet runner: {V3_PACKET_RUNNER_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -92,7 +104,11 @@ def main() -> int:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
-    runtime_surface = frame_contract_source + "\n" + frame_context_source
+    analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
+    packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
+    runtime_surface = "\n".join(
+        [frame_contract_source, frame_context_source, analyzer_source, packet_source]
+    )
 
     for token in REQUIRED_PLAN_TOKENS:
         require(token in plan, errors, f"V3 plan missing token: {token}")
@@ -150,6 +166,12 @@ def main() -> int:
         "FullSceneReflectionV3",
         "SceneLocalEnvironmentV3",
         "CinematicPostV3",
+        "FullSceneShaderPipelineV3PacketGate",
+        "cortex.full_scene_shader_pipeline_v3.placeholder_signal.v1",
+        "cortex.full_scene_shader_pipeline_v3.placeholder_stability.v1",
+        "v3_signal.json",
+        "v3_stability.json",
+        "run_full_scene_shader_pipeline_v2_packet.ps1",
     ]:
         require(token in runtime_surface, errors, f"V3 runtime surface missing token: {token}")
 

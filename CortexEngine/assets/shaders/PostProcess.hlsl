@@ -1768,6 +1768,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
                       1.0f);
     }
 
+    float3 reflectionBaseColor = hdrColor;
+    float3 currentReflectionCompositeColor = hdrColor;
+    float3 candidateReflectionCompositeColor = hdrColor;
+
     float  weightSum = wSSR + wRT;
     if (weightSum > 1e-4f)
     {
@@ -1786,8 +1790,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
         // gate how strongly we move towards the hybrid reflection color.
         float roughBlendGate = pow(saturate(1.0f - roughness), 2.0f);
         float reflBlend = maxReflBlend * saturate(weightSum) * roughBlendGate;
-        hdrColor = CompositeSceneMaterialCinematicReflection(
-            hdrColor,
+        currentReflectionCompositeColor = CompositeSceneMaterialCinematicReflection(
+            reflectionBaseColor,
             reflHybrid,
             reflBlend,
             sceneMaterialClass,
@@ -1796,6 +1800,68 @@ float4 PSMain(VSOutput input) : SV_TARGET
             metallic,
             materialReflectance,
             rtReflectionFireflyClampLuma);
+    }
+    hdrColor = currentReflectionCompositeColor;
+
+    // V2 candidate resolver: stricter SSR admission and smoother RT handoff.
+    // This is debug/packet opt-in only; default beauty remains the current
+    // resolver until cross-family stability evidence proves the candidate.
+    float stableSSRConfidence = smoothstep(0.58f, 0.82f, ssrWeightRaw);
+    stableSSRConfidence *= smoothstep(0.10f, 0.16f, roughness);
+    stableSSRConfidence *= 1.0f - smoothstep(0.24f, 0.34f, roughness);
+    float candidateWSSR = 0.0f;
+    if (!isMirrorClass && !isWaterClass && stableSSRConfidence > 0.0f)
+    {
+        candidateWSSR = stableSSRConfidence *
+                        stableSSRConfidence *
+                        kMaxSSRWeight *
+                        gloss *
+                        materialReflectance *
+                        reflectionStabilityScale;
+    }
+    float candidateRTConfidence = 1.0f - stableSSRConfidence;
+    candidateRTConfidence *= candidateRTConfidence;
+    if (isWaterClass || isPolishedConductor || isMirrorClass)
+    {
+        candidateRTConfidence = max(candidateRTConfidence, 0.72f);
+    }
+    float candidateWRT = rtEnabled ? candidateRTConfidence *
+                                      rtGloss *
+                                      materialReflectance *
+                                      rtReflectionCompositionStrength *
+                                      reflectionStabilityScale : 0.0f;
+    float candidateWeightSum = candidateWSSR + candidateWRT;
+    if (candidateWeightSum > 1e-4f)
+    {
+        float invCandidateSum = 1.0f / candidateWeightSum;
+        float3 candidateHybrid = (ssrColor * candidateWSSR + rtRefl * candidateWRT) * invCandidateSum;
+        float candidateMaxBlend = SurfaceReflectionCeiling(
+            surfaceClass,
+            roughness,
+            metallic,
+            transmission,
+            dielectricFresnel);
+        candidateMaxBlend *= reflectionStabilityScale;
+        float candidateRoughBlendGate = pow(saturate(1.0f - roughness), 2.0f);
+        float candidateBlend = candidateMaxBlend * saturate(candidateWeightSum) * candidateRoughBlendGate;
+        candidateReflectionCompositeColor = CompositeSceneMaterialCinematicReflection(
+            reflectionBaseColor,
+            candidateHybrid,
+            candidateBlend,
+            sceneMaterialClass,
+            surfaceClass,
+            roughness,
+            metallic,
+            materialReflectance,
+            rtReflectionFireflyClampLuma);
+    }
+    if (g_DebugMode.x == 58.0f)
+    {
+        hdrColor = candidateReflectionCompositeColor;
+    }
+    if (g_DebugMode.x == 59.0f)
+    {
+        return float4(saturate(abs(candidateReflectionCompositeColor - currentReflectionCompositeColor) * 4.0f), 1.0f);
     }
 
     // Bloom: sample blurred bloom texture if available

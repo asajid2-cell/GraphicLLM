@@ -2214,3 +2214,77 @@ Current interpretation:
 - Debug packet outputs are now measurable artifacts, not only images.
 - This gives future V2 candidate passes a cheap regression gate for source
   ownership and visual signal before subjective review.
+
+## Full Scene Shader V2 Reflection Resolver Candidate - 2026-06-05
+
+Implemented:
+
+- Added an opt-in reflection resolver candidate path in
+  `assets/shaders/PostProcess.hlsl`.
+  - Default beauty remains the current resolver.
+  - Candidate path uses stricter SSR admission via `stableSSRConfidence`.
+  - Polished, mirror, water, and conductor surfaces keep a stronger RT handoff
+    so SSR and RT do not fight as aggressively.
+  - debug view `58`: `reflection_resolver_candidate`.
+  - debug view `59`: `reflection_resolver_candidate_delta`.
+- Updated `src/Graphics/Renderer_DebugSettings.cpp`.
+  - max debug mode is now `59`.
+  - labels added:
+    - `PostReflectionResolverV2Candidate`.
+    - `PostReflectionResolverV2CandidateDelta`.
+- Updated packet surfaces:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`.
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+- Updated V2 frame-report contract/checker:
+  - `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`.
+  - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Build note:
+
+- The first `cmake --build` wrapper command timed out with stale `cmake` and
+  `ninja` child processes.
+- Those orphaned build processes were stopped.
+- Direct `ninja -C build CortexEngine -v` under Visual Studio 18 completed and
+  linked the executable.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_packet_20260605`.
+- captured views: `19`.
+- evidence rows: `190`.
+- frame-report failures: `0`.
+- measured debug views: `19`.
+- metric failures: `0`.
+- candidate views:
+  - `reflection_resolver_candidate`, debug view `58`.
+  - `reflection_resolver_candidate_delta`, debug view `59`.
+- key candidate metrics:
+  - `reflection_resolver_candidate` mean RGB:
+    `0.620142, 0.591729, 0.550348`.
+  - `reflection_resolver_candidate` nonblack ratio: `1.0`.
+  - `reflection_resolver_candidate_delta` mean RGB:
+    `0.000000055, 0.000000043, 0.000000034`.
+  - `reflection_resolver_candidate_delta` nonblack ratio:
+    `0.00000217`.
+
+Current interpretation:
+
+- The V2 reflection candidate path exists as a measurable opt-in path.
+- It is intentionally not promoted to default beauty.
+- Static gallery delta is near zero, so the next proof must be motion and
+  cross-family comparison rather than claiming visual improvement from this
+  slice.

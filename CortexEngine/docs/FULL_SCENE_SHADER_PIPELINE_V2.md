@@ -2110,3 +2110,94 @@ Current interpretation:
 - The next candidate-shader pass can compare these metrics before/after and
   reject changes that silently zero out reflection, lighting, temporal, or
   material debug surfaces.
+
+## Full Scene Shader Pipeline V2 Reflection Resolver Candidate Slice - 2026-06-05
+
+Purpose:
+
+- Start an opt-in `FSSP-V2-005B` reflection resolver candidate path without
+  changing default beauty.
+- Make the candidate and candidate-vs-current delta packet-visible so smooth
+  and metallic reflection changes can be validated before promotion.
+
+Implemented:
+
+- `PostProcess.hlsl`
+  - preserves the current resolver as default beauty.
+  - adds `reflectionBaseColor`, `currentReflectionCompositeColor`, and
+    `candidateReflectionCompositeColor`.
+  - adds a conservative V2 candidate resolver with stricter SSR admission via
+    `stableSSRConfidence` and smoother RT handoff on polished, mirror, and
+    water-class surfaces.
+  - debug view `58` renders the V2 reflection resolver candidate beauty.
+  - debug view `59` renders candidate-vs-current reflection delta.
+- `Renderer_DebugSettings.cpp`
+  - expands the debug view range to `59`.
+  - labels:
+    - `PostReflectionResolverV2Candidate`.
+    - `PostReflectionResolverV2CandidateDelta`.
+- Packet runners now expose:
+  - `reflection_resolver_candidate`.
+  - `reflection_resolver_candidate_delta`.
+- The V2 frame-report contract and checker require the new candidate views.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Build note:
+
+- The first `cmake --build` wrapper command timed out with stale `cmake` and
+  `ninja` child processes.
+- Those orphaned build processes were stopped.
+- Direct `ninja -C build CortexEngine -v` under the Visual Studio 18 developer
+  environment completed and linked `build/bin/CortexEngine.exe`.
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed through direct `ninja`.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_packet_20260605`.
+- captured views: `19`.
+- evidence rows: `190`.
+- frame-report failures: `0`.
+- measured debug views: `19`.
+- metric failures: `0`.
+- candidate views:
+  - `reflection_resolver_candidate`, debug view `58`.
+  - `reflection_resolver_candidate_delta`, debug view `59`.
+- key candidate metrics:
+  - `reflection_resolver_candidate` mean RGB:
+    `0.620142, 0.591729, 0.550348`.
+  - `reflection_resolver_candidate` nonblack ratio: `1.0`.
+  - `reflection_resolver_candidate_delta` mean RGB:
+    `0.000000055, 0.000000043, 0.000000034`.
+  - `reflection_resolver_candidate_delta` nonblack ratio:
+    `0.00000217`.
+
+Current interpretation:
+
+- The V2 reflection resolver candidate is wired, packet-visible, and
+  conservative on the static gallery frame.
+- The near-zero delta means this slice does not yet prove visible improvement;
+  it proves safe opt-in infrastructure and measurable comparison.
+- Next proof should use mouse-jiggle/camera-sweep and cross-family packets so
+  the candidate can show whether it reduces smooth/metallic instability under
+  motion before any default beauty promotion.

@@ -54,6 +54,8 @@ $views = @(
     [pscustomobject]@{ Name = "reflection_owner"; DebugView = 46 },
     [pscustomobject]@{ Name = "reflection_source_weights"; DebugView = 56 },
     [pscustomobject]@{ Name = "reflection_stability_policy"; DebugView = 57 },
+    [pscustomobject]@{ Name = "reflection_resolver_candidate"; DebugView = 58 },
+    [pscustomobject]@{ Name = "reflection_resolver_candidate_delta"; DebugView = 59 },
     [pscustomobject]@{ Name = "shadow_factor"; DebugView = 43 },
     [pscustomobject]@{ Name = "direct_light"; DebugView = 44 },
     [pscustomobject]@{ Name = "direct_light_unshadowed"; DebugView = 54 },

@@ -1704,6 +1704,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
                               materialReflectance *
                               rtReflectionCompositionStrength *
                               reflectionStabilityScale : 0.0f;
+    float iblReflectionPotential = saturate(materialReflectance * gloss * g_EnvParams.y);
 
     if (g_DebugMode.x == 46.0f)
     {
@@ -1732,7 +1733,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
             return float4(0.95f, 0.10f + ownerStrength * 0.30f, 0.95f, 1.0f);
         }
 
-        float iblOwnerStrength = saturate(materialReflectance * gloss * g_EnvParams.y);
+        float iblOwnerStrength = iblReflectionPotential;
         iblOwnerStrength *= lerp(1.0f, 0.82f, reflectionDebugStability);
         if (g_EnvParams.z > 0.5f && iblOwnerStrength > 0.015f)
         {
@@ -1743,6 +1744,28 @@ float4 PSMain(VSOutput input) : SV_TARGET
             return float4(0.05f, 0.70f, 0.22f, 1.0f);
         }
         return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    }
+    if (g_DebugMode.x == 56.0f)
+    {
+        // Reflection-source resolver weights:
+        //   R = SSR post-composite weight
+        //   G = RT post-composite weight
+        //   B = IBL/prelit reflection potential
+        return float4(saturate(wSSR * 4.0f),
+                      saturate(wRT * 4.0f),
+                      saturate(iblReflectionPotential),
+                      1.0f);
+    }
+    if (g_DebugMode.x == 57.0f)
+    {
+        // Reflection stability policy:
+        //   R = material reflectance
+        //   G = gloss
+        //   B = scene/material stability scale
+        return float4(saturate(materialReflectance),
+                      saturate(gloss),
+                      saturate(reflectionStabilityScale),
+                      1.0f);
     }
 
     float  weightSum = wSSR + wRT;

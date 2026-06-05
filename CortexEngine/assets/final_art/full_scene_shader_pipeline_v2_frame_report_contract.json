@@ -167,6 +167,8 @@
       ],
       "debug_views": [
         "reflection_owner",
+        "reflection_source_weights",
+        "reflection_stability_policy",
         "room_probe_weight",
         "hero_probe_weight",
         "planar_probe_mask"

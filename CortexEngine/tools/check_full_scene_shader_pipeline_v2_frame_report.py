@@ -554,7 +554,7 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         renderer_debug_source,
-        "constexpr uint32_t kMaxDebugViewMode = 55u",
+        "constexpr uint32_t kMaxDebugViewMode = 57u",
         "Renderer debug mode range",
     )
     for token in [
@@ -645,7 +645,7 @@ def validate_runtime_lighting_surface() -> list[str]:
         require_source_token(errors, deferred_lighting, token, "DeferredLighting V2 direct-light comparison")
 
     for token in [
-        "constexpr uint32_t kMaxDebugViewMode = 55u",
+        "constexpr uint32_t kMaxDebugViewMode = 57u",
         "VB_DeferredDirectLightUnshadowed",
         "VB_DeferredDirectLightShadowLoss",
     ]:
@@ -767,6 +767,8 @@ def validate_runtime_reflection_surface() -> list[str]:
     errors: list[str] = []
     required_paths = [
         RAYTRACED_REFLECTIONS_SHADER_PATH,
+        POST_PROCESS_SHADER_PATH,
+        RENDERER_DEBUG_SETTINGS_SOURCE_PATH,
         SHADER_TYPES_HEADER_PATH,
         FRAME_POST_CONSTANTS_SOURCE_PATH,
         FULL_SCENE_SHADER_FRAME_CONTEXT_PATH,
@@ -779,6 +781,12 @@ def validate_runtime_reflection_surface() -> list[str]:
         return errors
 
     rt_reflections_shader = RAYTRACED_REFLECTIONS_SHADER_PATH.read_text(encoding="utf-8")
+    post_process_shader = POST_PROCESS_SHADER_PATH.read_text(encoding="utf-8")
+    renderer_debug_source = RENDERER_DEBUG_SETTINGS_SOURCE_PATH.read_text(encoding="utf-8")
+    packet_script = RUN_FULL_SCENE_SHADER_PACKET_PATH.read_text(encoding="utf-8")
+    scene_packet_script = (ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1").read_text(
+        encoding="utf-8"
+    )
     shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
     frame_post_source = FRAME_POST_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
     facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
@@ -855,6 +863,30 @@ def validate_runtime_reflection_surface() -> list[str]:
         '"missing_reflection_contract_count"',
     ]:
         require_source_token(errors, json_source, token, "FullScene reflection frame-report JSON")
+
+    for token in [
+        "iblReflectionPotential",
+        "g_DebugMode.x == 56.0f",
+        "g_DebugMode.x == 57.0f",
+        "Reflection-source resolver weights",
+        "Reflection stability policy",
+        "reflectionStabilityScale",
+    ]:
+        require_source_token(errors, post_process_shader, token, "PostProcess reflection resolver debug views")
+
+    for token in [
+        "PostReflectionSourceWeights",
+        "PostReflectionStabilityPolicy",
+    ]:
+        require_source_token(errors, renderer_debug_source, token, "Renderer reflection resolver debug labels")
+
+    for token in [
+        "reflection_source_weights",
+        "reflection_stability_policy",
+    ]:
+        require_source_token(errors, json.dumps(load_json(FRAME_REPORT_CONTRACT_PATH)), token, "V2 reflection debug-view contract")
+        require_source_token(errors, packet_script, token, "V2 packet runner reflection resolver views")
+        require_source_token(errors, scene_packet_script, token, "Scene-local packet reflection resolver views")
 
     return errors
 
@@ -1009,6 +1041,8 @@ def validate_v2_packet_runner_surface() -> list[str]:
         "material_id",
         "object_id",
         "reflection_owner",
+        "reflection_source_weights",
+        "reflection_stability_policy",
         "shadow_factor",
         "direct_light",
         "direct_light_unshadowed",

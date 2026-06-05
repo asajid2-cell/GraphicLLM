@@ -3455,3 +3455,57 @@ Current stopping position:
 - Next implementation work can add a shadow-output lighting pass or richer
   semantic light source payloads and immediately gate them against
   `lighting_signal.json`.
+
+### Direct-Light Debug Ownership Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now explicitly reports:
+  - `direct_light_debug_view_ready`.
+  - `direct_light_unshadowed_debug_view_ready`.
+  - `direct_light_shadow_loss_debug_view_ready`.
+- `FrameContractJson.cpp` serializes those fields under
+  `full_scene_shader_pipeline_v2.lighting`.
+- `full_scene_shader_pipeline_v2_frame_report_contract.json` requires the new
+  readiness fields in the lighting section.
+- `check_full_scene_shader_pipeline_v2_frame_report.py` verifies the C++ and
+  JSON surfaces keep those fields.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build/captures/v2_lighting_debug_contract_smoke1_20260605
+```
+
+Packet result:
+
+- packet:
+  `build/captures/v2_lighting_debug_contract_smoke1_20260605`.
+- captured views: `5`.
+- V2 packet evidence: passed.
+- lighting signal:
+  - direct-signal families: `1/1`.
+  - shadow-loss families: `1/1`.
+  - `direct_light` luma `0.42691390`.
+  - `direct_light_unshadowed` luma `0.45792174`.
+  - `direct_light_shadow_loss` luma `0.22298621`.
+- generated frame report:
+  - `direct_light_pass_ready=true`.
+  - `direct_light_shadow_output_ready=true`.
+  - `direct_light_debug_view_ready=true`.
+  - `direct_light_unshadowed_debug_view_ready=true`.
+  - `direct_light_shadow_loss_debug_view_ready=true`.
+  - `missing_lighting_contract_count=0`.
+
+Current stopping position:
+
+- Direct-light V2 debug outputs are now runtime-owned evidence, frame-report
+  contract fields, and packet-gated signal artifacts.
+- This remains an instrumentation/shadow-output bridge. Default beauty is still
+  not promoted.
+- Next work should add actual semantic light-buffer payloads or a named
+  `FullSceneLightingV2` shadow output resource, using this contract as the
+  admission gate.

@@ -3381,3 +3381,51 @@ Current stopping position:
 - This creates the measured bridge for the next semantic light-buffer/direct
   light V2 shadow-output pass.
 - Default beauty remains unchanged.
+
+### Direct-Light Debug Ownership Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now has explicit readiness fields for the
+  direct-light debug outputs:
+  - `directLightDebugViewReady`.
+  - `directLightUnshadowedDebugViewReady`.
+  - `directLightShadowLossDebugViewReady`.
+- `FrameContractJson.cpp` serializes:
+  - `direct_light_debug_view_ready`.
+  - `direct_light_unshadowed_debug_view_ready`.
+  - `direct_light_shadow_loss_debug_view_ready`.
+- `full_scene_shader_pipeline_v2_frame_report_contract.json` and
+  `check_full_scene_shader_pipeline_v2_frame_report.py` require the new fields.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V2 frame-report checker passed.
+- V2 plan checker passed.
+- focused packet passed:
+  `build/captures/v2_lighting_debug_contract_smoke1_20260605`.
+
+Focused packet evidence:
+
+- direct-signal families: `1/1`.
+- shadow-loss families: `1/1`.
+- `direct_light` luma `0.42691390`.
+- `direct_light_unshadowed` luma `0.45792174`.
+- `direct_light_shadow_loss` luma `0.22298621`.
+- generated frame report fields:
+  - `direct_light_pass_ready=true`.
+  - `direct_light_shadow_output_ready=true`.
+  - `direct_light_debug_view_ready=true`.
+  - `direct_light_unshadowed_debug_view_ready=true`.
+  - `direct_light_shadow_loss_debug_view_ready=true`.
+  - `missing_lighting_contract_count=0`.
+
+Current stopping position:
+
+- Direct-light V2 debug outputs are now owned in runtime evidence, required by
+  the frame-report contract, and packet-gated by `lighting_signal.json`.
+- Default beauty remains unchanged.
+- Next safe slice: semantic light-buffer payloads or a named
+  `FullSceneLightingV2` shadow-output resource.

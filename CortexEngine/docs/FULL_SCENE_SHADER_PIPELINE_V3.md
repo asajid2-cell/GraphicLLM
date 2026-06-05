@@ -302,6 +302,162 @@ Required motion modes:
 
 ## Implementation Phases
 
+## Full AAA Visual Refactor Roadmap
+
+This roadmap is the concrete path from the current review-only V3 slices to a
+full-scene shader stack that can credibly target Unreal-style visuals.
+
+The core rule: each visual domain is refactored into an owned resource before it
+is allowed to affect default beauty. A domain is not real because a screenshot
+looks better. It is real when it has a producer, resource name, debug view,
+frame-report fields, packet metrics, motion stability evidence, cross-family
+evidence, and a fallback decision.
+
+### Current Proven Base
+
+Already proven:
+
+- V3 contract, validator, packet skeleton, and frame-report visibility exist.
+- Material Resolve V3 exposes material attributes and debug views.
+- Lighting V3 can write concrete split MRT resources:
+  `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
+  `shadow_loss`, and `indirect_lighting`.
+- Concrete split-buffer packet evidence exists for the static gallery path.
+- Default beauty is still V2/V1 fallback, not V3-promoted.
+
+Not proven yet:
+
+- lighting split parity under camera motion.
+- lighting split parity across kitchens, offices, gyms, concerts, red rooms,
+  and stadiums.
+- source-aware reflections.
+- scene-local reflection backgrounds.
+- physically coherent roughness/metal/normal response under movement.
+- cinematic HDR composite and post pipeline.
+- default-beauty promotion.
+
+### Refactor Spine
+
+The engine should converge on this runtime spine:
+
+```text
+FrameSetupV3
+  -> Visibility / GBuffer
+  -> MaterialResolveV3
+  -> SceneLocalEnvironmentV3
+  -> LightingV3
+  -> ReflectionV3
+  -> CompositeV3
+  -> CinematicPostV3
+  -> Packet / PromotionGate
+```
+
+Each stage owns exactly one contract boundary:
+
+- `FrameSetupV3` owns scene profile, quality tier, camera jitter state, and
+  debug mode routing.
+- `MaterialResolveV3` owns all PBR material channels and authored fallback
+  policy.
+- `SceneLocalEnvironmentV3` owns ambient radiance, visible background,
+  reflection background, atmosphere, and IBL permission.
+- `LightingV3` owns direct light, unshadowed light, shadow visibility, shadow
+  loss, and diffuse indirect.
+- `ReflectionV3` owns reflection radiance, source ID, confidence, roughness
+  filtering, and temporal delta.
+- `CompositeV3` owns HDR energy combination and clamps only by explicit policy.
+- `CinematicPostV3` owns exposure, tone map, bloom, color grade, sharpen, and
+  optional depth of field.
+- `Packet / PromotionGate` owns whether any stage can affect default beauty.
+
+### Execution Order
+
+1. Lock motion-stable Lighting V3.
+   - Run mouse-jiggle and camera-sweep packets against the five concrete split
+     buffers.
+   - Compare V3 split buffers to legacy deferred debug terms.
+   - Fix only root parity/stability causes, not per-scene brightness tweaks.
+   - Completion means lighting split has bounded temporal delta and no missing
+     split resources across gallery, kitchen, gym, and concert.
+
+2. Build SceneLocalEnvironmentV3 before ReflectionV3 promotion.
+   - Separate visible background from lighting environment and reflection
+     fallback.
+   - Add explicit modes:
+     `enclosed_room`, `open_exterior`, `stage`, `neutral_lab`.
+   - Enclosed rooms must not show or reflect unrelated external IBL imagery.
+   - Stage/concert scenes should support dark local background with authored
+     emissive and spot/area lighting.
+
+3. Build ReflectionV3 as a source-aware resolver.
+   - Inputs: material roughness/metallic/normal, scene-local environment,
+     local probes, optional SSR/ray query, and history.
+   - Outputs: `reflection_radiance`, `reflection_source_id`,
+     `reflection_confidence`, `reflection_temporal_delta`, and
+     `rejected_reflection_source`.
+   - The resolver must explicitly choose between local probe, SSR, ray query,
+     and scene-local fallback per pixel.
+   - Glossy/metal surfaces must stop jittering through source switches that are
+     invisible to the debug packet.
+
+4. Refactor shadows into stable visibility, not hidden lighting math.
+   - Keep `shadow_visibility` and `shadow_loss` inspectable.
+   - Add per-light shadow ownership and contact-shadow provenance.
+   - Stabilize with receiver-plane bias, cascade/projection diagnostics, and
+     temporal rejection metrics where applicable.
+   - Completion means shadow flicker is caught by packet deltas even when the
+     user reports it only during high-FPS mouse movement.
+
+5. Replace ad hoc HDR composition with CompositeV3.
+   - Combine base material, direct, indirect, emissive, reflection, atmosphere,
+     and transmission through one named pass.
+   - Emit `hdr_scene_color`, `energy_clamp_mask`, and `overbright_mask`.
+   - The default beauty path should remain unchanged until CompositeV3 can
+     reproduce or improve the current fallback on multiple scene families.
+
+6. Add CinematicPostV3 after HDR stability.
+   - Filmic tonemap, exposure meter, bloom extract, color grade delta, and
+     sharpen should be separate debug views.
+   - Post cannot hide unstable lighting/reflection/shadow inputs.
+   - Completion means raw HDR and final LDR packets show bounded exposure,
+     useful bloom, and no persistent clipping.
+
+7. Cross-family promotion ladder.
+   - Promote domains in order:
+     material debug readiness -> lighting review -> environment review ->
+     reflection review -> composite review -> post review -> default beauty.
+   - Required families:
+     gallery, kitchen, office, gym, concert, red_room, stadium.
+   - Every promotion packet must include static, camera sweep, and mouse jiggle.
+
+### Why This Is Better Than Screenshot Tweaking
+
+- It converts visual quality into inspectable resources, so we can isolate
+  whether an artifact is material, shadow, reflection, environment, composite,
+  or post.
+- It preserves a playable fallback while building risky renderer domains in
+  review-only mode.
+- It forces motion tests before promotion, which directly targets the flicker
+  and shiny-surface jitter failures that static screenshots missed.
+- It separates scene-local environment from visible IBLs, so room scenes can
+  use ambient/reflection energy without leaking unrelated backgrounds.
+- It creates packet evidence that survives compaction and avoids re-litigating
+  whether a bug was actually reproduced.
+
+### Immediate Next Slice
+
+The next implementation slice is not ReflectionV3 yet. First finish Lighting V3
+motion stability and cross-family parity because ReflectionV3 consumes lighting
+and shadow terms.
+
+Required outputs for the next slice:
+
+- motion packet command that captures the five concrete V3 lighting buffers.
+- analyzer fields for per-buffer temporal delta under camera sweep and
+  mouse-jiggle.
+- cross-family packet rows for at least gallery, kitchen, gym, and concert.
+- updated ledger evidence showing whether Lighting V3 is promotable or exactly
+  which parity/stability blocker remains.
+
 ### P0 - Contract and Harness
 
 - Add V3 contract JSON.

@@ -482,59 +482,254 @@ Result<void> VisibilityBufferRenderer::ApplyFullSceneLightingV3(
     const DescriptorHandle& shadowMapSRV,
     const DeferredLightingParams& params
 ) {
+    if (!m_fullSceneLightingV3Pipeline) {
+        return Result<void>::Err("FullSceneLightingV3 split pipeline not initialized");
+    }
     if (!targets.directLighting || !targets.directLightingUnshadowed ||
         !targets.shadowVisibility || !targets.shadowLoss || !targets.indirectLighting) {
         return Result<void>::Err("FullSceneLightingV3 requires all split lighting targets");
     }
 
-    auto writeSplitTarget = [&](ID3D12Resource* target,
-                                D3D12_CPU_DESCRIPTOR_HANDLE rtv,
-                                uint32_t deferredDebugMode,
-                                const char* label) -> Result<void> {
-        DeferredLightingParams splitParams = params;
-        splitParams.reflectionProbeParams.z = deferredDebugMode;
-        auto result = ApplyDeferredLighting(
-            cmdList,
-            target,
-            rtv,
-            depthBuffer,
-            depthSRV,
-            envDiffuseResource,
-            envSpecularResource,
-            envFormat,
-            shadowMapSRV,
-            splitParams);
-        if (result.IsErr()) {
-            return Result<void>::Err(std::string("FullSceneLightingV3 failed to write ") +
-                                     label + ": " + result.Error());
+    if (!depthBuffer) {
+        return Result<void>::Err("FullSceneLightingV3 requires a valid depth buffer");
+    }
+    if (!shadowMapSRV.IsValid()) {
+        return Result<void>::Err("FullSceneLightingV3 requires a valid shadow map SRV");
+    }
+    {
+        auto brdfResult = EnsureBRDFLUT(cmdList);
+        if (brdfResult.IsErr()) {
+            return Result<void>::Err("FullSceneLightingV3 failed to ensure BRDF LUT: " + brdfResult.Error());
         }
-        return Result<void>::Ok();
+    }
+    if (params.clusterParams.z > 0u && !m_transitionSkip.clusteredLights) {
+        auto clusterResult = BuildClusteredLightLists(cmdList, params);
+        if (clusterResult.IsErr()) {
+            return Result<void>::Err("FullSceneLightingV3 failed to build clustered light lists: " + clusterResult.Error());
+        }
+    }
+
+    constexpr D3D12_RESOURCE_STATES kSrvState =
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    D3D12_RESOURCE_BARRIER barriers[6] = {};
+    int barrierCount = 0;
+
+    if (!m_transitionSkip.deferredLighting && m_albedoState != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferAlbedo.Get();
+        barriers[barrierCount].Transition.StateBefore = m_albedoState;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_albedoState = kSrvState;
+    }
+    if (!m_transitionSkip.deferredLighting && m_normalRoughnessState != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferNormalRoughness.Get();
+        barriers[barrierCount].Transition.StateBefore = m_normalRoughnessState;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_normalRoughnessState = kSrvState;
+    }
+    if (!m_transitionSkip.deferredLighting && m_emissiveMetallicState != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferEmissiveMetallic.Get();
+        barriers[barrierCount].Transition.StateBefore = m_emissiveMetallicState;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_emissiveMetallicState = kSrvState;
+    }
+    if (!m_transitionSkip.deferredLighting && m_materialExt0State != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt0.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt0State;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt0State = kSrvState;
+    }
+    if (!m_transitionSkip.deferredLighting && m_materialExt1State != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt1.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt1State;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt1State = kSrvState;
+    }
+    if (!m_transitionSkip.deferredLighting && m_materialExt2State != kSrvState) {
+        barriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[barrierCount].Transition.pResource = m_gbufferMaterialExt2.Get();
+        barriers[barrierCount].Transition.StateBefore = m_materialExt2State;
+        barriers[barrierCount].Transition.StateAfter = kSrvState;
+        barriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrierCount++;
+        m_materialExt2State = kSrvState;
+    }
+    if (barrierCount > 0) {
+        cmdList->ResourceBarrier(barrierCount, barriers);
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[5] = {
+        targets.directLightingRTV,
+        targets.directLightingUnshadowedRTV,
+        targets.shadowVisibilityRTV,
+        targets.shadowLossRTV,
+        targets.indirectLightingRTV,
+    };
+    cmdList->OMSetRenderTargets(5, rtvs, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetPipelineState(m_fullSceneLightingV3Pipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_deferredLightingRootSignature.Get());
+
+    ID3D12DescriptorHeap* heaps[] = {m_descriptorManager->GetCBV_SRV_UAV_Heap()};
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    if (!m_deferredLightingCB) {
+        D3D12_HEAP_PROPERTIES uploadHeapProps = {};
+        uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC cbDesc = {};
+        cbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        cbDesc.Width = (sizeof(DeferredLightingParams) + 255) & ~255;
+        cbDesc.Height = 1;
+        cbDesc.DepthOrArraySize = 1;
+        cbDesc.MipLevels = 1;
+        cbDesc.SampleDesc.Count = 1;
+        cbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        HRESULT hr = m_device->GetDevice()->CreateCommittedResource(
+            &uploadHeapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &cbDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_deferredLightingCB)
+        );
+        if (FAILED(hr)) {
+            return Result<void>::Err("Failed to create FullSceneLightingV3 constant buffer");
+        }
+        m_deferredLightingCB->SetName(L"DeferredLightingCB");
+    }
+
+    void* mapped = nullptr;
+    HRESULT hr = m_deferredLightingCB->Map(0, nullptr, &mapped);
+    if (SUCCEEDED(hr) && mapped) {
+        memcpy(mapped, &params, sizeof(DeferredLightingParams));
+        m_deferredLightingCB->Unmap(0, nullptr);
+    }
+
+    cmdList->SetGraphicsRootConstantBufferView(0, m_deferredLightingCB->GetGPUVirtualAddress());
+
+    if (params.shadowInvSizeAndSpecMaxMip.x <= 0.0f || params.shadowInvSizeAndSpecMaxMip.y <= 0.0f) {
+        return Result<void>::Err("FullSceneLightingV3 requires valid shadowInvSize");
+    }
+
+    auto& gbufferTable = m_deferredGBufferSrvTables[m_frameIndex];
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC albedoSrvDesc{};
+    albedoSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    albedoSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    albedoSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    albedoSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferAlbedo.Get(), &albedoSrvDesc, gbufferTable[0].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC normalSrvDesc{};
+    normalSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    normalSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    normalSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    normalSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferNormalRoughness.Get(), &normalSrvDesc, gbufferTable[1].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC emissiveSrvDesc{};
+    emissiveSrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    emissiveSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    emissiveSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    emissiveSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferEmissiveMetallic.Get(), &emissiveSrvDesc, gbufferTable[2].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthSrvDesc{};
+    depthSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    depthSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(depthBuffer, &depthSrvDesc, gbufferTable[3].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC ext0SrvDesc{};
+    ext0SrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext0SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    ext0SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    ext0SrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt0.Get(), &ext0SrvDesc, gbufferTable[4].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC ext1SrvDesc{};
+    ext1SrvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    ext1SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    ext1SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    ext1SrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt1.Get(), &ext1SrvDesc, gbufferTable[5].cpu);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC ext2SrvDesc{};
+    ext2SrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    ext2SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    ext2SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    ext2SrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_gbufferMaterialExt2.Get(), &ext2SrvDesc, gbufferTable[6].cpu);
+
+    cmdList->SetGraphicsRootDescriptorTable(1, gbufferTable[0].gpu);
+
+    auto& envShadowTable = m_deferredEnvShadowSrvTables[m_frameIndex];
+    auto createSrvOrNull = [&](D3D12_CPU_DESCRIPTOR_HANDLE dst, ID3D12Resource* resource, DXGI_FORMAT fmt) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format = fmt;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = resource ? resource->GetDesc().MipLevels : 1;
+        m_device->GetDevice()->CreateShaderResourceView(resource, &srvDesc, dst);
     };
 
-    if (auto result = writeSplitTarget(targets.directLighting, targets.directLightingRTV, 44u, "direct_lighting");
-        result.IsErr()) {
-        return result;
+    createSrvOrNull(envShadowTable[0].cpu, envDiffuseResource, envFormat);
+    createSrvOrNull(envShadowTable[1].cpu, envSpecularResource, envFormat);
+
+    if (shadowMapSRV.IsValid()) {
+        m_device->GetDevice()->CopyDescriptorsSimple(
+            1,
+            envShadowTable[2].cpu,
+            shadowMapSRV.cpu,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    } else {
+        createSrvOrNull(envShadowTable[2].cpu, nullptr, DXGI_FORMAT_R32_FLOAT);
     }
-    if (auto result = writeSplitTarget(
-            targets.directLightingUnshadowed,
-            targets.directLightingUnshadowedRTV,
-            54u,
-            "direct_lighting_unshadowed");
-        result.IsErr()) {
-        return result;
-    }
-    if (auto result = writeSplitTarget(targets.shadowVisibility, targets.shadowVisibilityRTV, 43u, "shadow_visibility");
-        result.IsErr()) {
-        return result;
-    }
-    if (auto result = writeSplitTarget(targets.shadowLoss, targets.shadowLossRTV, 55u, "shadow_loss");
-        result.IsErr()) {
-        return result;
-    }
-    if (auto result = writeSplitTarget(targets.indirectLighting, targets.indirectLightingRTV, 45u, "indirect_lighting");
-        result.IsErr()) {
-        return result;
-    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC brdfSrvDesc{};
+    brdfSrvDesc.Format = DXGI_FORMAT_R16G16_FLOAT;
+    brdfSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    brdfSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    brdfSrvDesc.Texture2D.MipLevels = 1;
+    m_device->GetDevice()->CreateShaderResourceView(m_brdfLut.Get(), &brdfSrvDesc, envShadowTable[3].cpu);
+
+    cmdList->SetGraphicsRootDescriptorTable(2, envShadowTable[0].gpu);
+
+    const D3D12_GPU_VIRTUAL_ADDRESS lightsVA =
+        (m_localLightCount > 0 && m_localLightsBuffer) ? m_localLightsBuffer->GetGPUVirtualAddress() : 0;
+    const D3D12_GPU_VIRTUAL_ADDRESS rangesVA =
+        m_clusterRangesBuffer ? m_clusterRangesBuffer->GetGPUVirtualAddress() : 0;
+    const D3D12_GPU_VIRTUAL_ADDRESS indicesVA =
+        m_clusterLightIndicesBuffer ? m_clusterLightIndicesBuffer->GetGPUVirtualAddress() : 0;
+
+    cmdList->SetGraphicsRootShaderResourceView(3, lightsVA);
+    cmdList->SetGraphicsRootShaderResourceView(4, rangesVA);
+    cmdList->SetGraphicsRootShaderResourceView(5, indicesVA);
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->DrawInstanced(3, 1, 0, 0);
 
     return Result<void>::Ok();
 }

@@ -207,6 +207,62 @@ Result<void> VisibilityBufferRenderer::CreateDeferredLightingPipeline() {
         spdlog::info("VisibilityBuffer: Deferred lighting pipeline created");
     }
 
+    // ========================================================================
+    // FullSceneLightingV3 Split Pipeline (Graphics - Fullscreen MRT)
+    // ========================================================================
+    {
+        auto deferredVS = ShaderCompiler::CompileFromFile(
+            "assets/shaders/DeferredLighting.hlsl",
+            "VSMain",
+            "vs_6_6"
+        );
+        if (deferredVS.IsErr()) {
+            spdlog::warn("Failed to compile FullSceneLightingV3 VS: {}", deferredVS.Error());
+            return Result<void>::Ok();
+        }
+
+        auto splitPS = ShaderCompiler::CompileFromFile(
+            "assets/shaders/DeferredLighting.hlsl",
+            "PSMainV3LightingSplit",
+            "ps_6_6"
+        );
+        if (splitPS.IsErr()) {
+            spdlog::warn("Failed to compile FullSceneLightingV3 PS: {}", splitPS.Error());
+            return Result<void>::Ok();
+        }
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC splitPsoDesc = {};
+        splitPsoDesc.pRootSignature = m_deferredLightingRootSignature.Get();
+        splitPsoDesc.VS = {deferredVS.Value().data.data(), deferredVS.Value().data.size()};
+        splitPsoDesc.PS = {splitPS.Value().data.data(), splitPS.Value().data.size()};
+
+        for (UINT i = 0; i < 5; ++i) {
+            splitPsoDesc.BlendState.RenderTarget[i].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+            splitPsoDesc.RTVFormats[i] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        }
+        splitPsoDesc.SampleMask = UINT_MAX;
+
+        splitPsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        splitPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        splitPsoDesc.RasterizerState.DepthClipEnable = TRUE;
+
+        splitPsoDesc.DepthStencilState.DepthEnable = FALSE;
+        splitPsoDesc.DepthStencilState.StencilEnable = FALSE;
+
+        splitPsoDesc.InputLayout = {nullptr, 0};
+        splitPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        splitPsoDesc.NumRenderTargets = 5;
+        splitPsoDesc.SampleDesc.Count = 1;
+
+        hr = device->CreateGraphicsPipelineState(&splitPsoDesc, IID_PPV_ARGS(&m_fullSceneLightingV3Pipeline));
+        if (FAILED(hr)) {
+            spdlog::warn("Failed to create FullSceneLightingV3 split PSO");
+            return Result<void>::Ok();
+        }
+
+        spdlog::info("VisibilityBuffer: FullSceneLightingV3 split pipeline created");
+    }
+
     return Result<void>::Ok();
 }
 

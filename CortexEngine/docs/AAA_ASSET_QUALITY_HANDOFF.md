@@ -3937,3 +3937,92 @@ Current stopping position:
 - The next major renderer slice should replace the five debug-term redraws with
   a direct split-output lighting shader/pass, then add lighting signal gates
   for direct, indirect, shadow visibility, and shadow loss.
+
+### FullSceneShaderPipeline V3 Direct MRT Lighting Split - 2026-06-05
+
+Implemented:
+
+- Replaced the first `FullSceneLightingV3` producer's five deferred debug-term
+  redraws with a direct split-output MRT shader path.
+- Added `PSMainV3LightingSplit` in `assets/shaders/DeferredLighting.hlsl`.
+- Added `m_fullSceneLightingV3Pipeline` and a five-RTV fullscreen graphics PSO.
+- `ApplyFullSceneLightingV3` now binds all five split render targets and draws
+  one fullscreen triangle.
+- Frame-contract pass evidence now reports `FullSceneLightingV3.draw_count=1`.
+- Diagnosed an asset-sync/runtime-copy trap: the source shader contained the new
+  entry point, but the runtime copy under `build/bin/assets/shaders` was stale.
+  The runtime shader was explicitly synced before the successful packet.
+- Tightened the V3 packet gate so split packets now require
+  `lighting_split_resources_ready=true`, `FullSceneLightingV3` pass evidence,
+  all five split writes, and `FullSceneLightingV3.draw_count=1`.
+
+Touched files:
+
+- `assets/shaders/DeferredLighting.hlsl`.
+- `src/Graphics/VisibilityBuffer.h`.
+- `src/Graphics/VisibilityBuffer_DeferredLighting.cpp`.
+- `src/Graphics/VisibilityBuffer_DeferredLightingPipeline.cpp`.
+- `src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp`.
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+- `docs/AAA_ASSET_QUALITY_HANDOFF.md`.
+
+Important diagnosis:
+
+- First packet attempt:
+  `build/captures/v3_lighting_split_mrt_smoke1_20260605`.
+- It passed the loose wrapper, but runtime evidence was not acceptable:
+  `lighting_split_resources_ready=false`.
+- Runtime log root cause:
+  `Failed to compile FullSceneLightingV3 PS: DXC shader compilation failed: error: missing entry point definition`.
+- The source shader had `PSMainV3LightingSplit`, but
+  `build/bin/assets/shaders/DeferredLighting.hlsl` was stale because a previous
+  build used `CORTEX_SKIP_ASSET_SYNC=1` and still touched the asset stamp.
+- After syncing the runtime shader, the same packet succeeded with real producer
+  evidence.
+- Strict analyzer replay now rejects the stale packet with:
+  `V3 split packet requires lighting_split_resources_ready=true` and
+  `V3 split packet requires FullSceneLightingV3 pass evidence`.
+
+Validation:
+
+- clean target rebuild passed after removing corrupt generated `.obj` files left
+  by the interrupted build:
+  `ninja -C build CortexEngine -j 4 -v`.
+- successful V3 MRT packet:
+  `build/captures/v3_lighting_split_mrt_smoke3_strict_20260605`.
+- extracted frame-report evidence:
+  - `lighting_split_resources_allocated=true`.
+  - `lighting_split_resources_ready=true`.
+  - `lighting_adapter_ready=true`.
+  - `lighting_adapter_signal_count=4`.
+  - `lighting_split_resource_count=5`.
+  - ready domains include `lighting` and `material`.
+  - `FullSceneLightingV3.executed=true`.
+  - `FullSceneLightingV3.draw_count=1`.
+  - `FullSceneLightingV3.writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `lighting_adapter_ready_report_count=6`.
+  - `lighting_split_allocated_report_count=6`.
+  - `lighting_split_ready_report_count=6`.
+  - `full_scene_lighting_v3_executed_report_count=6`.
+  - failures `0`, warnings `0`.
+- validators:
+  - `python tools/validate_full_scene_shader_pipeline_v3_plan.py`: passed.
+  - `python tools/check_full_scene_shader_pipeline_v2_frame_report.py`: passed.
+  - `python -m py_compile tools/validate_full_scene_shader_pipeline_v3_plan.py tools/analyze_full_scene_shader_v3_placeholders.py`: passed.
+  - `ctest --test-dir build --output-on-failure -C Release`: no tests found.
+
+Current stopping position:
+
+- V3 lighting split now has a real direct MRT producer under the opt-in split
+  flag.
+- Default beauty remains V2 and unchanged.
+- Next safe slice:
+  - add direct signal gates over the five split resources.
+  - close visual parity gaps between `PSMainV3LightingSplit` and the default
+    deferred beauty shader before any promotion attempt.

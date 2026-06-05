@@ -3718,3 +3718,71 @@ Current stopping position:
   current deferred direct-light ownership into concrete V3 resources for
   direct lighting, unshadowed direct lighting, shadow visibility, and shadow
   loss.
+
+### FullSceneShaderPipeline V3 Lighting Adapter - 2026-06-05
+
+Implemented:
+
+- Added honest V3 lighting adapter evidence for the current deferred lighting
+  path.
+- Current producer is `FullSceneLightingV3Adapter`.
+- Current adapter owner/output is `VBDeferredLighting -> hdr_color`.
+- V3 frame reports now expose:
+  - `lighting_adapter_ready`.
+  - `lighting_split_resources_ready`.
+  - `lighting_adapter_signal_count`.
+  - `lighting_split_resource_count`.
+- Lighting domain reports adapter debug views:
+  - `VB_DeferredDirectLight`.
+  - `VB_DeferredDirectLightUnshadowed`.
+  - `VB_DeferredDirectLightShadowLoss`.
+  - `VB_DeferredShadowFactor`.
+  - `VB_DeferredAmbientIBL`.
+- Lighting domain intentionally remains `ready=false` until split V3 resources
+  exist.
+- Default beauty remains unchanged:
+  `default_beauty_affects=false`.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V3 validator passed.
+- V2 frame-report checker still passed.
+- V3 lighting adapter packet passed:
+  `build/captures/v3_lighting_adapter_smoke1_20260605`.
+- extracted frame-report evidence:
+  - `status=planned_not_promoted`.
+  - `beauty_output=full_scene_shader_pipeline_v2`.
+  - `default_beauty_affects=false`.
+  - `lighting_adapter_ready=true`.
+  - `lighting_split_resources_ready=false`.
+  - `lighting_adapter_signal_count=4`.
+  - `lighting_split_resource_count=0`.
+  - `lighting.enabled=true`.
+  - `lighting.ready=false`.
+  - `lighting.producer=FullSceneLightingV3Adapter`.
+  - `lighting.output_resource=hdr_color`.
+  - `lighting.promotion_state=adapter`.
+  - `lighting.ready_channel_count=5`.
+  - `lighting.missing_required_channel_count=0`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `lighting_adapter_ready_report_count=6`.
+  - `lighting_split_ready_report_count=0`.
+  - failures `0`, warnings `0`.
+- `lighting_signal.json`:
+  - direct-signal families `1/1`.
+  - shadow-loss families `1/1`.
+  - `direct_light` luma `0.42679371`.
+  - `direct_light_unshadowed` luma `0.45791158`.
+  - `direct_light_shadow_loss` luma `0.22303063`.
+
+Current stopping position:
+
+- V3 lighting has an honest adapter contract over the current deferred path.
+- The next major refactor must allocate/split real V3 lighting resources:
+  `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
+  `shadow_loss`, and `indirect_lighting`.

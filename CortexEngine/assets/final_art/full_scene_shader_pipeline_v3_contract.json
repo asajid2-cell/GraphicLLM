@@ -74,6 +74,10 @@
     },
     "lighting": {
       "producer": "FullSceneLightingV3",
+      "adapter_producer": "FullSceneLightingV3Adapter",
+      "adapter_output_resource": "hdr_color",
+      "adapter_owner": "VBDeferredLighting",
+      "adapter_status": "instrumented_not_split",
       "required_light_types": [
         "directional",
         "point",
@@ -88,6 +92,13 @@
         "shadow_visibility",
         "shadow_loss",
         "indirect_lighting"
+      ],
+      "current_adapter_debug_views": [
+        "VB_DeferredDirectLight",
+        "VB_DeferredDirectLightUnshadowed",
+        "VB_DeferredDirectLightShadowLoss",
+        "VB_DeferredShadowFactor",
+        "VB_DeferredAmbientIBL"
       ],
       "required_debug_views": [
         "direct_light",

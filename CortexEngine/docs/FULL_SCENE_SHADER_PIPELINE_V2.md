@@ -977,7 +977,7 @@ Validation:
 | Domain | Required Evidence | Current Status |
 |---|---|---|
 | Material | material families, texture evidence, debug views | runtime material evidence ready for gallery packet; asset-registry/hero texture evidence still pending |
-| GBuffer | channel inventory, object/material ids, velocity | required resources/producers reported; stable material-id/object-id/debug-source ownership still blocking |
+| GBuffer | channel inventory, object/material ids, velocity | visibility payload, producer, instance table, material lookup, and stable instance ids reported; stable per-pixel material-id/object-id/debug-source ownership still blocking |
 | Lighting | semantic light rigs, owner/debug reports | planned |
 | Reflection | room/hero/planar/local ownership | planned |
 | Shadow | cascade/local/contact debug and stability | planned |
@@ -1001,11 +1001,120 @@ Validation:
 8. Landed runtime material model readiness evidence for the gallery V2 packet.
 9. Landed GBuffer resource/producer ownership evidence; material/object-id
    ownership remains the next Track C blocker.
-10. Add local reflection probe ownership before chasing more shiny materials.
-11. Add semantic light rigs and shadow/contact stability.
-12. Refactor post into named HDR stages.
-13. Move pass ownership into the render graph.
-14. Run cross-family V2 packets and compare to V1 seq8.
+10. Landed identity substrate evidence for the visibility payload, instance
+    table, material lookup table, and stable instance ids.
+11. Add per-pixel material-id/object-id debug ownership.
+12. Add local reflection probe ownership before chasing more shiny materials.
+13. Add semantic light rigs and shadow/contact stability.
+14. Refactor post into named HDR stages.
+15. Move pass ownership into the render graph.
+16. Run cross-family V2 packets and compare to V1 seq8.
 
 This order keeps the engine diagnosable. It avoids the previous trap where a
 scene looked better only because one setting hid the problem.
+
+## Full Scene Shader Pipeline V2 Identity Ownership Slice - 2026-06-05
+
+Purpose:
+
+- Implement the first concrete feature from
+  `docs/FULL_SCENE_SHADER_REFACTOR_MASTER_PLAN.md`.
+- Prove the visibility-buffer identity substrate before trying to make V2
+  lighting, reflections, shadows, or temporal consume object/material ids.
+- Keep V2 beauty on the V1 fallback while the renderer gains better frame
+  ownership evidence.
+
+Implemented:
+
+- Added `visibility_buffer` to frame-contract resource snapshots.
+- Added draw-count evidence:
+  - `visibility_buffer_materials`.
+  - `visibility_buffer_invalid_stable_ids`.
+- `Renderer_VisibilityBufferCollection.cpp` now reports:
+  - visibility material table size.
+  - invalid stable culling-id count.
+- `FullSceneGBufferEvidence` now reports:
+  - visibility payload channel readiness.
+  - visibility payload producer readiness.
+  - instance identity table readiness.
+  - instance material lookup readiness.
+  - stable instance id availability.
+  - visibility-buffer instance count.
+  - visibility-buffer material count.
+  - invalid stable instance id count.
+- The V2 frame-report contract requires those fields.
+- The V2 checker statically requires the new identity ownership surface.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\FrameContract.h src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\Renderer_VisibilityBufferCollection.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\check_full_scene_shader_pipeline_v2_frame_report.py
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- executable target build: passed.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Build caveat:
+
+- `.\build.ps1 -Config Release` hung in the asset-sync step
+  (`tools/sync_assets.cmake`) before producing a fresh executable timestamp.
+- The stuck `cmake`/`ninja` helper processes were stopped.
+- A direct `CortexEngine` target build with the Visual Studio environment then
+  passed and linked `build/bin/CortexEngine.exe`.
+
+Packet evidence:
+
+- manifest:
+  `build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605/manifest.json`
+- summary:
+  `build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605/v2_frame_report_evidence_summary.json`
+- captured views: `7`.
+- evidence rows: `70`.
+- failures: `0`.
+
+Gallery beauty GBuffer identity evidence:
+
+- `visibility_payload_channel_ready=true`.
+- `visibility_payload_producer_ready=true`.
+- `instance_identity_table_ready=true`.
+- `instance_material_lookup_ready=true`.
+- `stable_instance_id_available=true`.
+- `visibility_buffer_instance_count=55`.
+- `visibility_buffer_material_count=36`.
+- `invalid_stable_instance_id_count=0`.
+- `missing_required_channel_count=0`.
+- `missing_ownership_channel_count=3`.
+- `material_id_channel_ready=false`.
+- `object_id_channel_ready=false`.
+- `gbuffer.domain_ready=false`.
+- failure reason:
+  `Stable per-pixel material-id channel is not promoted`.
+
+Current interpretation:
+
+- The visibility-buffer identity substrate is now reported and packet-proved.
+- The GBuffer domain still correctly fails because per-pixel material id,
+  object id, and debug-view source ownership are not promoted.
+- This is the intended stopping point for `FSSP-V2-003A`; it narrows the next
+  blocker from broad GBuffer ownership to explicit per-pixel id/debug outputs.
+
+Next recommended implementation:
+
+- Continue Track C with `FSSP-V2-003B Per-Pixel Identity Debug`.
+- Add or expose material-id/object-id debug views from the visibility payload
+  and instance/material tables.
+- Only promote `material_id_channel_ready`, `object_id_channel_ready`, or
+  `debug_view_source_report_available` after the packet captures those views.

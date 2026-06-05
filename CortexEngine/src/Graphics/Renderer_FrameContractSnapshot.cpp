@@ -397,6 +397,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("hdr_color", m_mainTargets.hdr.resources.color.Get(), contract.renderWidth, contract.renderHeight);
     addResource("gbuffer_normal_roughness", m_mainTargets.normalRoughness.resources.texture.Get(), contract.renderWidth, contract.renderHeight);
     if (m_services.visibilityBuffer) {
+        addResource("visibility_buffer", m_services.visibilityBuffer->GetVisibilityBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_normal_roughness", m_services.visibilityBuffer->GetNormalRoughnessBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_emissive_metallic", m_services.visibilityBuffer->GetEmissiveMetallicBuffer(), contract.renderWidth, contract.renderHeight);

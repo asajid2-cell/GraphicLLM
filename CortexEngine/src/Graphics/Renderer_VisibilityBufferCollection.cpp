@@ -13,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -512,6 +513,14 @@ void Renderer::CollectInstancesForVisibilityBuffer(Scene::ECS_Registry* registry
     if (uploadResult.IsErr()) {
         spdlog::warn("Failed to update visibility buffer instances: {}", uploadResult.Error());
     }
+    const uint32_t invalidStableIds = static_cast<uint32_t>(std::count_if(
+        m_visibilityBufferState.instances.begin(),
+        m_visibilityBufferState.instances.end(),
+        [](const VBInstanceData& instance) {
+            return instance.cullingId == std::numeric_limits<uint32_t>::max();
+        }));
+    m_frameDiagnostics.contract.drawCounts.visibilityBufferMaterials = static_cast<uint32_t>(vbMaterials.size());
+    m_frameDiagnostics.contract.drawCounts.visibilityBufferInvalidStableIds = invalidStableIds;
     m_frameDiagnostics.contract.motionVectors.instanceCount = static_cast<uint32_t>(m_visibilityBufferState.instances.size());
     m_frameDiagnostics.contract.motionVectors.meshCount = static_cast<uint32_t>(m_visibilityBufferState.meshDraws.size());
 

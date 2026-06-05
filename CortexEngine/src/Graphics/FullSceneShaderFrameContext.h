@@ -75,11 +75,19 @@ struct FullSceneShaderFrameContext {
         bool emissiveMetallicChannelReady = false;
         bool extendedMaterialChannelsReady = false;
         bool semanticMaterialPolicyChannelReady = false;
+        bool visibilityPayloadChannelReady = false;
+        bool visibilityPayloadProducerReady = false;
+        bool instanceIdentityTableReady = false;
+        bool instanceMaterialLookupReady = false;
+        bool stableInstanceIdAvailable = false;
         bool materialIdChannelReady = false;
         bool objectIdChannelReady = false;
         bool velocityChannelReady = false;
         bool producerOwnershipAvailable = false;
         bool debugViewSourceReportAvailable = false;
+        uint32_t visibilityBufferInstanceCount = 0;
+        uint32_t visibilityBufferMaterialCount = 0;
+        uint32_t invalidStableInstanceIdCount = 0;
         uint32_t missingRequiredChannelCount = 0;
         uint32_t missingOwnershipChannelCount = 0;
         std::string owner = "VisibilityBufferRenderer/FullSceneGBufferEvidence";
@@ -198,8 +206,23 @@ inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBuff
         FullSceneShaderHasResource(contract, "vb_gbuffer_emissive_metallic");
     evidence.extendedMaterialChannelsReady = extendedMaterialChannelsReady;
     evidence.semanticMaterialPolicyChannelReady = materialPolicyChannelReady;
+    evidence.visibilityPayloadChannelReady = FullSceneShaderHasResource(contract, "visibility_buffer");
+    evidence.visibilityPayloadProducerReady =
+        FullSceneShaderPassWritesResource(contract, "VBVisibility", "visibility_buffer") ||
+        FullSceneShaderPassWritesResource(contract, "VisibilityBuffer", "visibility_buffer");
+    evidence.visibilityBufferInstanceCount = contract.draws.visibilityBufferInstances;
+    evidence.visibilityBufferMaterialCount = contract.draws.visibilityBufferMaterials;
+    evidence.invalidStableInstanceIdCount = contract.draws.visibilityBufferInvalidStableIds;
+    evidence.instanceIdentityTableReady = evidence.visibilityBufferInstanceCount > 0;
+    evidence.instanceMaterialLookupReady =
+        evidence.visibilityBufferMaterialCount > 0 &&
+        evidence.visibilityBufferMaterialCount <= evidence.visibilityBufferInstanceCount;
+    evidence.stableInstanceIdAvailable =
+        evidence.instanceIdentityTableReady &&
+        evidence.invalidStableInstanceIdCount == 0;
     evidence.velocityChannelReady = velocityReady;
     evidence.producerOwnershipAvailable =
+        evidence.visibilityPayloadProducerReady &&
         FullSceneShaderExecutedProducerWrites(
             contract,
             "VisibilityBuffer",
@@ -222,6 +245,11 @@ inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBuff
         evidence.emissiveMetallicChannelReady,
         evidence.extendedMaterialChannelsReady,
         evidence.semanticMaterialPolicyChannelReady,
+        evidence.visibilityPayloadChannelReady,
+        evidence.visibilityPayloadProducerReady,
+        evidence.instanceIdentityTableReady,
+        evidence.instanceMaterialLookupReady,
+        evidence.stableInstanceIdAvailable,
         evidence.velocityChannelReady,
         evidence.producerOwnershipAvailable,
     };
@@ -255,7 +283,7 @@ inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBuff
     if (!evidence.enabled) {
         evidence.failureReason = "Visibility buffer is not enabled";
     } else if (evidence.missingRequiredChannelCount > 0) {
-        evidence.failureReason = "Required GBuffer resources or producers are missing";
+        evidence.failureReason = "Required GBuffer identity resources or producers are missing";
     } else if (!evidence.materialIdChannelReady) {
         evidence.failureReason = "Stable per-pixel material-id channel is not promoted";
     } else if (!evidence.objectIdChannelReady) {

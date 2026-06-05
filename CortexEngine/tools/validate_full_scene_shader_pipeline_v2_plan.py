@@ -16,6 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V2.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_contract.json"
+FRAME_REPORT_CONTRACT_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_frame_report_contract.json"
+)
 
 
 REQUIRED_DOMAIN_IDS = {
@@ -55,9 +58,12 @@ def main() -> int:
         return fail(f"missing plan: {PLAN_PATH}")
     if not CONTRACT_PATH.exists():
         return fail(f"missing contract: {CONTRACT_PATH}")
+    if not FRAME_REPORT_CONTRACT_PATH.exists():
+        return fail(f"missing frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
 
     plan_text = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    frame_report_contract = json.loads(FRAME_REPORT_CONTRACT_PATH.read_text(encoding="utf-8"))
 
     missing_terms = sorted(term for term in REQUIRED_PLAN_TERMS if term not in plan_text)
     if missing_terms:
@@ -97,6 +103,16 @@ def main() -> int:
         if phase not in plan_text:
             return fail(f"{domain_id} phase {phase} is not documented in plan")
 
+    frame_sections = frame_report_contract.get("required_sections")
+    if not isinstance(frame_sections, list):
+        return fail("frame-report contract required_sections must be a list")
+    frame_section_ids = {section.get("id") for section in frame_sections if isinstance(section, dict)}
+    missing_frame_sections = sorted(REQUIRED_DOMAIN_IDS - frame_section_ids)
+    if missing_frame_sections:
+        return fail("frame-report contract missing sections: " + ", ".join(missing_frame_sections))
+    if frame_report_contract.get("report_key") != "full_scene_shader_pipeline_v2":
+        return fail("frame-report contract report_key must be full_scene_shader_pipeline_v2")
+
     target_families = contract.get("target_families")
     if target_families != ["gallery", "kitchen", "office", "gym", "concert"]:
         return fail("target_families must preserve the Renderer V1 five-family gate order")
@@ -108,6 +124,7 @@ def main() -> int:
     print("PASS: Full Scene Shader Pipeline V2 plan contract is coherent")
     print(f"Plan: {PLAN_PATH}")
     print(f"Contract: {CONTRACT_PATH}")
+    print(f"Frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
     print(f"Domains: {len(domains)}")
     return 0
 

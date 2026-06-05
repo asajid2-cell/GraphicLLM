@@ -1,0 +1,213 @@
+{
+  "schema": "cortex.full_scene_shader_pipeline_v2_frame_report_contract.v1",
+  "purpose": "Expected frame-report surface for Full Scene Shader Pipeline V2 before C++ runtime integration.",
+  "report_key": "full_scene_shader_pipeline_v2",
+  "status": "planned_external_contract",
+  "baseline_dependencies": [
+    "scene_visual_contract",
+    "materials",
+    "lighting",
+    "cinematic_post",
+    "render_graph",
+    "frame_contract_validation"
+  ],
+  "required_sections": [
+    {
+      "id": "material_contract",
+      "report_path": "full_scene_shader_pipeline_v2.material",
+      "phase": "FSSP-V2-002",
+      "readiness_fields": [
+        "enabled",
+        "full_scene_material_model_ready",
+        "family_counts_available",
+        "texture_evidence_available",
+        "missing_hero_texture_evidence_count",
+        "unknown_material_family_count"
+      ],
+      "debug_views": [
+        "material_family",
+        "texture_evidence",
+        "shader_feature_flags"
+      ]
+    },
+    {
+      "id": "gbuffer_contract",
+      "report_path": "full_scene_shader_pipeline_v2.gbuffer",
+      "phase": "FSSP-V2-003",
+      "readiness_fields": [
+        "enabled",
+        "channel_inventory_available",
+        "object_id_channel_ready",
+        "material_id_channel_ready",
+        "velocity_channel_ready",
+        "extended_material_channels_ready"
+      ],
+      "debug_views": [
+        "gbuffer_albedo",
+        "gbuffer_normal_roughness",
+        "gbuffer_material_id",
+        "gbuffer_object_id",
+        "gbuffer_velocity"
+      ]
+    },
+    {
+      "id": "scene_local_lighting",
+      "report_path": "full_scene_shader_pipeline_v2.lighting",
+      "phase": "FSSP-V2-004",
+      "readiness_fields": [
+        "enabled",
+        "semantic_light_rig_ready",
+        "light_owner_report_available",
+        "rect_area_light_count",
+        "practical_fixture_count",
+        "exposure_clipping_gate_passed"
+      ],
+      "debug_views": [
+        "direct_light",
+        "light_owner",
+        "light_type",
+        "fixture_shadow_owner"
+      ]
+    },
+    {
+      "id": "local_reflections",
+      "report_path": "full_scene_shader_pipeline_v2.reflections",
+      "phase": "FSSP-V2-005",
+      "readiness_fields": [
+        "enabled",
+        "room_probe_count",
+        "hero_probe_count",
+        "planar_probe_count",
+        "unauthorized_external_hdri_ratio",
+        "unknown_reflection_owner_ratio"
+      ],
+      "debug_views": [
+        "reflection_owner",
+        "room_probe_weight",
+        "hero_probe_weight",
+        "planar_probe_mask"
+      ]
+    },
+    {
+      "id": "shadow_contact_stability",
+      "report_path": "full_scene_shader_pipeline_v2.shadows",
+      "phase": "FSSP-V2-006",
+      "readiness_fields": [
+        "enabled",
+        "shadow_policy_report_available",
+        "cascade_debug_available",
+        "local_shadow_atlas_ready",
+        "contact_shadow_ready",
+        "shadow_stability_gate_passed"
+      ],
+      "debug_views": [
+        "shadow_factor",
+        "shadow_cascade",
+        "shadow_bias",
+        "contact_shadow"
+      ]
+    },
+    {
+      "id": "material_aware_temporal",
+      "report_path": "full_scene_shader_pipeline_v2.temporal",
+      "phase": "FSSP-V2-007",
+      "readiness_fields": [
+        "enabled",
+        "motion_vectors_ready",
+        "material_aware_rejection_ready",
+        "history_clamp_ready",
+        "smooth_surface_motion_gate_passed",
+        "camera_sweep_gate_passed"
+      ],
+      "debug_views": [
+        "velocity",
+        "temporal_rejection",
+        "history_clamp",
+        "taa_blend"
+      ]
+    },
+    {
+      "id": "hdr_post_v2",
+      "report_path": "full_scene_shader_pipeline_v2.post",
+      "phase": "FSSP-V2-008",
+      "readiness_fields": [
+        "enabled",
+        "named_post_stages_ready",
+        "exposure_report_available",
+        "tone_map_report_available",
+        "visual_quality_gate_passed",
+        "shader_warning_regression_count"
+      ],
+      "debug_views": [
+        "pre_tonemap_hdr",
+        "exposure",
+        "bloom",
+        "post_final"
+      ]
+    },
+    {
+      "id": "render_graph_ownership",
+      "report_path": "full_scene_shader_pipeline_v2.render_graph",
+      "phase": "FSSP-V2-009",
+      "readiness_fields": [
+        "enabled",
+        "explicit_pass_graph_ready",
+        "resource_producer_report_available",
+        "resource_state_report_available",
+        "debug_view_source_report_available",
+        "missing_producer_count"
+      ],
+      "debug_views": [
+        "pass_ownership",
+        "resource_producer",
+        "resource_state"
+      ]
+    },
+    {
+      "id": "asset_registry_material_evidence",
+      "report_path": "full_scene_shader_pipeline_v2.asset_evidence",
+      "phase": "FSSP-V2-002",
+      "readiness_fields": [
+        "enabled",
+        "asset_registry_v2_linked",
+        "hero_surface_readiness_available",
+        "pbr_texture_readiness_available",
+        "shader_feature_flags_available",
+        "missing_registry_material_count"
+      ],
+      "debug_views": [
+        "asset_source_class",
+        "asset_material_readiness",
+        "hero_surface_readiness"
+      ]
+    },
+    {
+      "id": "cross_family_packets",
+      "report_path": "full_scene_shader_pipeline_v2.packet_gate",
+      "phase": "FSSP-V2-010",
+      "readiness_fields": [
+        "enabled",
+        "gallery_packet_passed",
+        "kitchen_packet_passed",
+        "office_packet_passed",
+        "gym_packet_passed",
+        "concert_packet_passed",
+        "v1_baseline_preserved"
+      ],
+      "debug_views": [
+        "beauty",
+        "material_family",
+        "reflection_owner",
+        "shadow_factor",
+        "temporal_rejection"
+      ]
+    }
+  ],
+  "hard_gate_defaults": {
+    "allow_missing_v2_section_during_planning": true,
+    "allow_external_hdri_in_enclosed_scenes": false,
+    "allow_unknown_material_family_in_v2": false,
+    "allow_unknown_reflection_owner_in_v2": false,
+    "allow_missing_debug_view_source_in_v2": false
+  }
+}

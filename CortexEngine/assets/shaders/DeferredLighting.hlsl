@@ -1639,3 +1639,283 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     return float4(color, 1.0);
 }
+
+struct FullSceneLightingV3Output {
+    float4 directLighting : SV_Target0;
+    float4 directLightingUnshadowed : SV_Target1;
+    float4 shadowVisibility : SV_Target2;
+    float4 shadowLoss : SV_Target3;
+    float4 indirectLighting : SV_Target4;
+};
+
+FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
+    FullSceneLightingV3Output output;
+    output.directLighting = float4(0.0f.xxx, 1.0f);
+    output.directLightingUnshadowed = float4(0.0f.xxx, 1.0f);
+    output.shadowVisibility = float4(1.0f.xxx, 1.0f);
+    output.shadowLoss = float4(0.0f.xxx, 1.0f);
+    output.indirectLighting = float4(0.0f.xxx, 1.0f);
+
+    uint2 pixelCoord = uint2(input.position.xy);
+    float2 screenSize = max(float2(g_ScreenAndCluster.xy), float2(1.0f, 1.0f));
+    float2 pixelUv = (float2(pixelCoord) + 0.5f) / screenSize;
+
+    float4 albedo = g_GBufferAlbedo.Load(int3(pixelCoord, 0));
+    float4 normalRoughness = g_GBufferNormalRoughness.Load(int3(pixelCoord, 0));
+    float4 emissiveMetallic = g_GBufferEmissiveMetallic.Load(int3(pixelCoord, 0));
+    float4 materialExt0 = g_GBufferMaterialExt0.Load(int3(pixelCoord, 0));
+    float4 materialExt1 = g_GBufferMaterialExt1.Load(int3(pixelCoord, 0));
+    float4 materialExt2 = g_GBufferMaterialExt2.Load(int3(pixelCoord, 0));
+    float depth = g_DepthBuffer.Load(int3(pixelCoord, 0));
+
+    if (depth >= 0.9999f) {
+        return output;
+    }
+
+    float3 albedoColor = albedo.rgb;
+    float ao = saturate(albedo.a);
+    float3 normal = normalize(normalRoughness.xyz * 2.0f - 1.0f);
+    float roughness = normalRoughness.w;
+    float3 emissive = emissiveMetallic.rgb;
+    float metallic = emissiveMetallic.a;
+
+    float clearCoatWeight = saturate(materialExt0.x);
+    float clearCoatRoughness = saturate(materialExt0.y);
+    float ior = max(materialExt0.z, 1.0f);
+    float specularFactor = saturate(materialExt0.w);
+    float3 specularColor = saturate(materialExt1.rgb);
+    uint surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
+    float anisotropy = saturate(materialExt2.g);
+    float sheenWeight = saturate(materialExt2.b);
+    float subsurfaceWrap = SceneMaterialSubsurfaceWrap(sceneMaterialClass);
+
+    float3 worldPos = ReconstructWorldPosition(pixelUv, depth);
+    float3 V = normalize(g_CameraPosition.xyz - worldPos);
+    float NdotV = max(dot(normal, V), 0.0f);
+    roughness = max(saturate(roughness), SurfaceRoughnessFloor(surfaceClass, metallic));
+    {
+        float3 dnDx = ddx(normal);
+        float3 dnDy = ddy(normal);
+        float normalVariance = saturate(dot(dnDx, dnDx) + dot(dnDy, dnDy));
+        float varianceBoost = SurfaceNormalVarianceRoughnessBoost(surfaceClass, roughness, metallic);
+        roughness = saturate(roughness + normalVariance * varianceBoost);
+    }
+
+    float f0Ior = pow((ior - 1.0f) / max(ior + 1.0f, 1e-4f), 2.0f);
+    float3 dielectricF0 = f0Ior.xxx * specularFactor * specularColor;
+    float3 F0 = lerp(dielectricF0, albedoColor, metallic);
+
+    float3 L = normalize(g_SunDirection.xyz);
+    float3 H = normalize(V + L);
+    float NdotL = max(dot(normal, L), 0.0f);
+    float anisotropicLobeScale = 1.0f;
+    float specularRoughness = ApplyDeferredAnisotropy(roughness, anisotropy, normal, H, anisotropicLobeScale);
+    float NDF = DistributionGGX(normal, H, specularRoughness);
+    float G = GeometrySmith(normal, V, L, specularRoughness);
+    float3 F = FresnelSchlick(max(dot(H, V), 0.0f), F0);
+    float3 specular = (NDF * G * F / max(4.0f * NdotV * NdotL, 0.001f)) *
+                      anisotropicLobeScale *
+                      RoughSpecularEnergyCompensation(F0, specularRoughness);
+
+    if (clearCoatWeight > 0.01f) {
+        float coatBlend = clearCoatWeight * 0.8f;
+        float3 F_coat = FresnelSchlick(max(dot(H, V), 0.0f), float3(0.04f, 0.04f, 0.04f));
+        float D_coat = DistributionGGX(normal, H, clearCoatRoughness);
+        float G_coat = GeometrySmith(normal, V, L, clearCoatRoughness);
+        float3 specCoat = (D_coat * G_coat * F_coat) / max(4.0f * NdotV * NdotL, 0.001f);
+        specular = lerp(specular, specCoat, coatBlend);
+    }
+
+    float3 kS = F;
+    float3 kD = (1.0f - kS) * (1.0f - metallic);
+    if (subsurfaceWrap > 0.01f) {
+        float lambert = max(NdotL, 1e-4f);
+        float wrapped = saturate((NdotL + subsurfaceWrap) / (1.0f + subsurfaceWrap));
+        kD *= wrapped / lambert;
+    }
+    if (sheenWeight > 0.01f) {
+        float sheen = pow(saturate(1.0f - NdotL), 4.0f) *
+                      pow(saturate(1.0f - NdotV), 4.0f);
+        specular += sheenWeight * sheen * albedoColor;
+    }
+
+    float shadow = ComputeShadow(worldPos, normal, sceneMaterialClass, surfaceClass, roughness, metallic);
+    float sunLdotH = saturate(dot(L, H));
+    float diffuseBurley = BurleyDiffuseFactor(NdotV, NdotL, sunLdotH, roughness);
+    float3 sunBrdf = ApplySceneMaterialCinematicDirectBRDF(
+        kD * albedoColor * (diffuseBurley / PI),
+        specular,
+        albedoColor,
+        sceneMaterialClass,
+        surfaceClass,
+        roughness,
+        metallic,
+        clearCoatWeight,
+        sheenWeight,
+        NdotV,
+        NdotL,
+        sunLdotH);
+    float3 directLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
+    float3 directLight = directLightUnshadowed * shadow;
+
+    if (g_ClusterParams.z > 0u) {
+        uint width = g_ScreenAndCluster.x;
+        uint height = g_ScreenAndCluster.y;
+        uint clusterCountX = g_ScreenAndCluster.z;
+        uint clusterCountY = g_ScreenAndCluster.w;
+        uint tileW = (width + clusterCountX - 1u) / clusterCountX;
+        uint tileH = (height + clusterCountY - 1u) / clusterCountY;
+        uint cx = min(pixelCoord.x / max(tileW, 1u), clusterCountX - 1u);
+        uint cy = min(pixelCoord.y / max(tileH, 1u), clusterCountY - 1u);
+        float viewZ = mul(g_ViewMatrix, float4(worldPos, 1.0f)).z;
+        uint cz = ComputeClusterZ(viewZ);
+        uint clusterIndex = cx + cy * clusterCountX + cz * (clusterCountX * clusterCountY);
+        uint2 range = g_ClusterRanges[clusterIndex];
+        uint base = range.x;
+        uint count = min(range.y, g_ClusterParams.y);
+
+        bool useAllLocalLightsFallback = false;
+        uint lightLoopCount = count;
+        if (g_ClusterParams.z > 0u && g_ClusterParams.z <= g_ClusterParams.y) {
+            useAllLocalLightsFallback = true;
+            lightLoopCount = g_ClusterParams.z;
+        } else if (lightLoopCount == 0u && g_ClusterParams.z > 0u) {
+            useAllLocalLightsFallback = true;
+            lightLoopCount = min(g_ClusterParams.z, g_ClusterParams.y);
+        }
+
+        [loop]
+        for (uint i = 0; i < lightLoopCount; ++i) {
+            uint lightIndex = useAllLocalLightsFallback ? i : g_ClusterLightIndices[base + i];
+            if (lightIndex >= g_ClusterParams.z) {
+                continue;
+            }
+
+            Light light = g_LocalLights[lightIndex];
+            uint type = (uint)(light.position_type.w + 0.5f);
+            if (type < 0.5f) {
+                continue;
+            }
+            const bool isSpot = (type == LIGHT_TYPE_SPOT);
+            const bool isAreaRect = (type == LIGHT_TYPE_AREA_RECT);
+            const uint fixtureClass = DecodeFixtureClass(type, light);
+
+            float3 lightPos = light.position_type.xyz;
+            float3 toLight = lightPos - worldPos;
+            float dist = length(toLight);
+            if (dist < 1e-3f) {
+                continue;
+            }
+            float rangeMeters = light.color_range.w;
+            if (rangeMeters <= 0.0f || dist > rangeMeters) {
+                continue;
+            }
+
+            float3 Ll = toLight / dist;
+            float NdotLl = max(dot(normal, Ll), 0.0f);
+            if (NdotLl <= 0.0f) {
+                continue;
+            }
+
+            float att = saturate(1.0f - dist / rangeMeters);
+            att *= att;
+            if (isAreaRect) {
+                att = max(att, fixtureClass == FIXTURE_CLASS_EMISSIVE ? 0.42f : 0.35f);
+            }
+            if (isSpot) {
+                float3 spotDir = normalize(light.direction_cosInner.xyz);
+                float cosInner = light.direction_cosInner.w;
+                float cosOuter = light.params.x;
+                float cosTheta = dot(spotDir, normalize(worldPos - lightPos));
+                float spot = saturate((cosTheta - cosOuter) / max(cosInner - cosOuter, 1e-3f));
+                att *= spot * spot;
+            }
+
+            float3 radiance = light.color_range.rgb * att * FixtureRadianceScale(fixtureClass);
+            float3 Hl = normalize(V + Ll);
+            float roughForLight = FixtureRoughnessForSpecular(roughness, fixtureClass, isAreaRect);
+            float localAnisotropicLobeScale = 1.0f;
+            roughForLight = ApplyDeferredAnisotropy(roughForLight, anisotropy, normal, Hl, localAnisotropicLobeScale);
+            float NDF_l = DistributionGGX(normal, Hl, roughForLight);
+            float G_l = GeometrySmith(normal, V, Ll, roughForLight);
+            float3 F_l = FresnelSchlick(max(dot(Hl, V), 0.0f), F0);
+            float3 spec_l = (NDF_l * G_l * F_l / max(4.0f * NdotV * NdotLl, 0.001f)) *
+                            localAnisotropicLobeScale *
+                            RoughSpecularEnergyCompensation(F0, roughForLight);
+            spec_l = min(spec_l, 4.0f.xxx);
+
+            float3 kS_l = F_l;
+            float3 kD_l = (1.0f - kS_l) * (1.0f - metallic);
+            if (subsurfaceWrap > 0.01f) {
+                float lambert_l = max(NdotLl, 1e-4f);
+                float wrapped_l = saturate((NdotLl + subsurfaceWrap) / (1.0f + subsurfaceWrap));
+                kD_l *= wrapped_l / lambert_l;
+            }
+
+            float shadowLocal = 1.0f;
+            if (isSpot && light.params.y >= 0.0f) {
+                shadowLocal = ComputeLocalLightShadow(
+                    worldPos,
+                    normal,
+                    Ll,
+                    light.params.y,
+                    sceneMaterialClass,
+                    surfaceClass,
+                    roughness,
+                    metallic);
+            }
+            float fixtureNdotLl = FixtureWrappedNdotL(NdotLl, fixtureClass);
+            float localLdotH = saturate(dot(Ll, Hl));
+            float localDiffuseBurley = BurleyDiffuseFactor(NdotV, fixtureNdotLl, localLdotH, roughness);
+            float3 localBrdf = ApplySceneMaterialCinematicDirectBRDF(
+                kD_l * albedoColor * (localDiffuseBurley / PI),
+                spec_l,
+                albedoColor,
+                sceneMaterialClass,
+                surfaceClass,
+                roughness,
+                metallic,
+                clearCoatWeight,
+                sheenWeight,
+                NdotV,
+                fixtureNdotLl,
+                localLdotH);
+            float3 localDirectUnshadowed = localBrdf * radiance * fixtureNdotLl;
+            directLightUnshadowed += localDirectUnshadowed;
+            directLight += localDirectUnshadowed * shadowLocal;
+        }
+    }
+
+    float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
+    float3 kD_ibl = (1.0f - metallic) * (1.0f - Fibl);
+    if (subsurfaceWrap > 0.01f) {
+        kD_ibl *= 1.0f + subsurfaceWrap * 0.35f;
+    }
+
+    float3 indirect = g_AmbientColor.rgb * albedoColor * kD_ibl * ao;
+    if (g_LocalProbeParams.z > 0.5f) {
+        float3 probeDiffuse = ComputeSceneLocalProbeDiffuse(normal, surfaceClass, sceneMaterialClass);
+        float3 probeSpecular = ComputeSceneLocalProbeSpecular(reflect(-V, normal), surfaceClass, sceneMaterialClass, roughness);
+        indirect += probeDiffuse * albedoColor * kD_ibl * max(g_LocalProbeParams.x, 0.0f) * ao;
+        indirect += probeSpecular * Fibl * max(g_LocalProbeParams.y, 0.0f) * SpecularOcclusion(NdotV, ao, roughness);
+    }
+    indirect += emissive;
+    indirect = ApplySceneMaterialCinematicIndirectShaping(
+        indirect,
+        albedoColor,
+        normal,
+        sceneMaterialClass,
+        surfaceClass,
+        roughness,
+        metallic,
+        ao,
+        NdotV);
+
+    output.directLighting = float4(max(directLight, 0.0f.xxx), 1.0f);
+    output.directLightingUnshadowed = float4(max(directLightUnshadowed, 0.0f.xxx), 1.0f);
+    output.shadowVisibility = float4(shadow.xxx, 1.0f);
+    output.shadowLoss = float4(max(directLightUnshadowed - directLight, 0.0f.xxx), 1.0f);
+    output.indirectLighting = float4(max(indirect, 0.0f.xxx), 1.0f);
+    return output;
+}

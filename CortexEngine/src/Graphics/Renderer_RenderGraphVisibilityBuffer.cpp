@@ -325,7 +325,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                 false, nullptr, true);
             }
             if (fullSceneLightingV3Enabled) {
-                RecordFramePass("FullSceneLightingV3", true, true, 5,
+                RecordFramePass("FullSceneLightingV3", true, true, 1,
                                 {"depth", "gbuffer_albedo", "gbuffer_normal_roughness", "gbuffer_emissive_metallic",
                                  "gbuffer_material_ext0", "gbuffer_material_ext1", "gbuffer_material_ext2",
                                  "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},

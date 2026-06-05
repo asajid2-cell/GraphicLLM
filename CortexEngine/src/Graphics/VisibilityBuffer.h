@@ -609,6 +609,7 @@ private:
     // Deferred lighting pipeline
     ComPtr<ID3D12RootSignature> m_deferredLightingRootSignature;
     ComPtr<ID3D12PipelineState> m_deferredLightingPipeline;
+    ComPtr<ID3D12PipelineState> m_fullSceneLightingV3Pipeline;
     ComPtr<ID3D12DescriptorHeap> m_deferredLightingSamplerHeap;
     ComPtr<ID3D12Resource> m_deferredLightingCB;  // Persistent constant buffer for lighting params
 

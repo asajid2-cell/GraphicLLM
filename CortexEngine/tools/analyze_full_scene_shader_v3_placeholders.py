@@ -51,7 +51,25 @@ def get_v3(report: dict[str, Any]) -> dict[str, Any] | None:
     return v3 if isinstance(v3, dict) else None
 
 
-def analyze_report(path: pathlib.Path) -> dict[str, Any]:
+def find_frame_pass(report: dict[str, Any], name: str) -> dict[str, Any] | None:
+    frame_contract = report.get("frame_contract")
+    if not isinstance(frame_contract, dict):
+        return None
+    passes = frame_contract.get("passes", [])
+    if not isinstance(passes, list):
+        return None
+    for frame_pass in passes:
+        if isinstance(frame_pass, dict) and frame_pass.get("name") == name:
+            return frame_pass
+    return None
+
+
+def analyze_report(
+    path: pathlib.Path,
+    *,
+    require_lighting_split_ready: bool,
+    require_lighting_split_draw_count: int | None,
+) -> dict[str, Any]:
     report = load_json(path)
     v3 = get_v3(report)
     failures: list[str] = []
@@ -127,6 +145,7 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
 
     lighting_domain = domain_by_id.get("lighting")
     lighting_adapter_ready = v3.get("lighting_adapter_ready") is True
+    lighting_split_pass = find_frame_pass(report, "FullSceneLightingV3")
     if lighting_adapter_ready:
         if not isinstance(lighting_domain, dict):
             failures.append("lighting adapter ready but lighting domain is missing")
@@ -154,6 +173,39 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
             if lighting_domain.get("ready_channel_count", 0) < 5:
                 failures.append("lighting adapter ready without required debug signal channels")
 
+    if require_lighting_split_ready:
+        if v3.get("lighting_split_resources_ready") is not True:
+            failures.append("V3 split packet requires lighting_split_resources_ready=true")
+        if not isinstance(lighting_split_pass, dict):
+            failures.append("V3 split packet requires FullSceneLightingV3 pass evidence")
+        else:
+            if lighting_split_pass.get("executed") is not True:
+                failures.append("V3 split packet requires FullSceneLightingV3.executed=true")
+            writes = set(lighting_split_pass.get("writes", []))
+            missing_writes = sorted(
+                {
+                    "direct_lighting",
+                    "direct_lighting_unshadowed",
+                    "shadow_visibility",
+                    "shadow_loss",
+                    "indirect_lighting",
+                }
+                - writes
+            )
+            if missing_writes:
+                failures.append(
+                    "FullSceneLightingV3 missing split writes: " + ", ".join(missing_writes)
+                )
+            if (
+                require_lighting_split_draw_count is not None
+                and lighting_split_pass.get("draw_count") != require_lighting_split_draw_count
+            ):
+                failures.append(
+                    "FullSceneLightingV3 draw_count must be "
+                    f"{require_lighting_split_draw_count}, got "
+                    f"{lighting_split_pass.get('draw_count')}"
+                )
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -175,6 +227,12 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
         "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
         "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
+        "full_scene_lighting_v3_executed": (
+            lighting_split_pass.get("executed") if isinstance(lighting_split_pass, dict) else None
+        ),
+        "full_scene_lighting_v3_draw_count": (
+            lighting_split_pass.get("draw_count") if isinstance(lighting_split_pass, dict) else None
+        ),
         "failures": failures,
         "warnings": warnings,
     }
@@ -185,11 +243,20 @@ def main() -> int:
     parser.add_argument("--input", required=True, help="Frame report file or capture root")
     parser.add_argument("--signal-output", required=True)
     parser.add_argument("--stability-output", required=True)
+    parser.add_argument("--require-lighting-split-ready", action="store_true")
+    parser.add_argument("--require-lighting-split-draw-count", type=int)
     args = parser.parse_args()
 
     input_path = pathlib.Path(args.input)
     reports = find_reports(input_path)
-    rows = [analyze_report(path) for path in reports]
+    rows = [
+        analyze_report(
+            path,
+            require_lighting_split_ready=args.require_lighting_split_ready,
+            require_lighting_split_draw_count=args.require_lighting_split_draw_count,
+        )
+        for path in reports
+    ]
     failures = [failure for row in rows for failure in row.get("failures", [])]
     warnings = [warning for row in rows for warning in row.get("warnings", [])]
 
@@ -225,6 +292,9 @@ def main() -> int:
         ),
         "lighting_split_ready_report_count": sum(
             1 for row in rows if row.get("lighting_split_resources_ready") is True
+        ),
+        "full_scene_lighting_v3_executed_report_count": sum(
+            1 for row in rows if row.get("full_scene_lighting_v3_executed") is True
         ),
         "failures": failures,
         "warnings": warnings,

@@ -50,7 +50,7 @@ try {
         exit $LASTEXITCODE
     }
 
-    & python $v3Analyzer --input $outputPath --signal-output $signalOutput --stability-output $stabilityOutput
+    & python $v3Analyzer --input $outputPath --signal-output $signalOutput --stability-output $stabilityOutput --require-lighting-split-ready --require-lighting-split-draw-count 1
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

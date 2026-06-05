@@ -447,9 +447,10 @@ Current producer evidence:
 - current producer is `FullSceneLightingV3`.
 - current producer mode is opt-in via
   `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT=1`.
-- current producer writes split resources by reusing the deferred lighting
-  term/debug shader paths; this is the first producer proof, not the final
-  single-pass HDR split architecture.
+- current producer uses `PSMainV3LightingSplit` in `DeferredLighting.hlsl`.
+- current producer writes all five split resources with one fullscreen MRT
+  draw instead of five deferred debug-term redraws.
+- current producer is still review-only and is not the default beauty path.
 - current adapter owner is `VBDeferredLighting`.
 - current adapter output is `hdr_color`.
 - runtime V3 report exposes `lighting_adapter_ready=true`.
@@ -481,20 +482,23 @@ Current producer evidence:
   `VB_DeferredShadowFactor`, and
   `VB_DeferredAmbientIBL`.
 - smoke packet:
-  `build/captures/v3_lighting_split_producer_smoke1_20260605`.
+  `build/captures/v3_lighting_split_mrt_smoke3_strict_20260605`.
 - packet result:
   `lighting_adapter_ready_report_count=6`,
   `lighting_split_allocated_report_count=6`,
   `lighting_split_ready_report_count=6`,
   failures `0`, warnings `0`.
+- pass evidence:
+  `FullSceneLightingV3.executed=true`,
+  `FullSceneLightingV3.draw_count=1`,
+  `FullSceneLightingV3.writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
 
 Required next evidence for completion/promotion:
 
-- replace the five debug-term redraws with a direct split-output lighting
-  shader/pass.
-- preserve the same frame-contract pass ownership for each split resource.
-- add signal gates for nonzero direct/indirect lighting and stable shadow
-  visibility.
+- add signal gates for nonzero direct lighting, indirect lighting, shadow
+  visibility, and shadow loss using the split resources directly.
+- close parity gaps between `PSMainV3LightingSplit` and the current default
+  deferred beauty lighting path, especially local probe and environment terms.
 - keep default beauty unchanged until the consumer/composite path and packet
   gates prove promotion quality.
 

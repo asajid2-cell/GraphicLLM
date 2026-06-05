@@ -48,6 +48,9 @@
       ],
       "debug_views": [
         "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
         "texture_evidence",
         "shader_feature_flags"
       ]

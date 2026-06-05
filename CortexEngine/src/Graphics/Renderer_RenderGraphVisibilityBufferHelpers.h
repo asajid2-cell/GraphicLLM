@@ -18,6 +18,10 @@ inline constexpr uint32_t kVBDebugGBufferExt1 = 7;
 inline constexpr uint32_t kVBDebugGBufferExt2 = 8;
 inline constexpr uint32_t kVBDebugMaterialId = 9;
 inline constexpr uint32_t kVBDebugStableObjectId = 10;
+inline constexpr uint32_t kVBDebugMaterialFamily = 11;
+inline constexpr uint32_t kVBDebugReflectionPolicy = 12;
+inline constexpr uint32_t kVBDebugTemporalPolicy = 13;
+inline constexpr uint32_t kVBDebugPostSensitivity = 14;
 inline constexpr D3D12_RESOURCE_STATES kVBShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
@@ -28,7 +32,11 @@ inline bool IsVBGBufferDebugView(uint32_t debugView) {
 inline bool IsVBVisibilityIdentityDebugView(uint32_t debugView) {
     return debugView == kVBDebugVisibility ||
            debugView == kVBDebugMaterialId ||
-           debugView == kVBDebugStableObjectId;
+           debugView == kVBDebugStableObjectId ||
+           debugView == kVBDebugMaterialFamily ||
+           debugView == kVBDebugReflectionPolicy ||
+           debugView == kVBDebugTemporalPolicy ||
+           debugView == kVBDebugPostSensitivity;
 }
 
 inline VisibilityBufferRenderer::DebugBlitVisibilityMode SelectVBVisibilityDebugMode(uint32_t debugView) {
@@ -37,6 +45,18 @@ inline VisibilityBufferRenderer::DebugBlitVisibilityMode SelectVBVisibilityDebug
     }
     if (debugView == kVBDebugStableObjectId) {
         return VisibilityBufferRenderer::DebugBlitVisibilityMode::StableObjectId;
+    }
+    if (debugView == kVBDebugMaterialFamily) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialFamily;
+    }
+    if (debugView == kVBDebugReflectionPolicy) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::ReflectionPolicy;
+    }
+    if (debugView == kVBDebugTemporalPolicy) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::TemporalPolicy;
+    }
+    if (debugView == kVBDebugPostSensitivity) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::PostSensitivity;
     }
     return VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
 }

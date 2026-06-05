@@ -397,6 +397,9 @@ public:
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetInstanceBufferAddress() const {
         return m_instanceBuffer[m_frameIndex] ? m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress() : 0;
     }
+    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetMaterialBufferAddress() const {
+        return m_materialBuffer[m_frameIndex] ? m_materialBuffer[m_frameIndex]->GetGPUVirtualAddress() : 0;
+    }
 
     enum class DebugBlitBuffer : uint32_t {
         Albedo = 0,
@@ -411,6 +414,10 @@ public:
         PayloadInstance = 0,
         MaterialId = 1,
         StableObjectId = 2,
+        MaterialFamily = 3,
+        ReflectionPolicy = 4,
+        TemporalPolicy = 5,
+        PostSensitivity = 6,
     };
 
     // Debug: Blit albedo to HDR buffer for visualization

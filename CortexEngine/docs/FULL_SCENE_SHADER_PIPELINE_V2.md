@@ -1339,3 +1339,91 @@ Next recommended implementation:
   reflection policy, temporal policy, and post sensitivity.
 - Then start scene-local light-rig ownership and local reflection/probe
   ownership.
+
+## Full Scene Shader Pipeline V2 Material Policy Debug Views Slice - 2026-06-05
+
+Purpose:
+
+- Make the shader-facing material table inspectable per pixel.
+- Prove material-family, reflection-policy, temporal-policy, and
+  post-sensitivity policy columns are read directly from
+  `VBMaterialConstants.policyParams`.
+- Give later lighting, reflection, temporal, and HDR post refactors a concrete
+  debug substrate instead of relying on broad surface-class overlays.
+
+Implemented:
+
+- Added visibility-buffer debug modes:
+  - `50`: `VB_MaterialFamilyPolicy`.
+  - `51`: `VB_ReflectionPolicy`.
+  - `52`: `VB_TemporalPolicy`.
+  - `53`: `VB_PostSensitivity`.
+- Extended `DebugBlitVisibility.hlsl` with:
+  - `StructuredBuffer<VBMaterialConstants> g_Materials : register(t2)`.
+  - material-family policy from `policyParams.x`.
+  - reflection policy from `policyParams.y`.
+  - temporal policy from `policyParams.z`.
+  - post sensitivity from `policyParams.w`.
+- Extended the visibility debug-blit root signature with material-table SRV
+  slot `t2`.
+- Added a runtime guard that fails material-policy debug blits if the material
+  table is missing.
+- Added packet names:
+  - `material_family`.
+  - `reflection_policy`.
+  - `temporal_policy`.
+  - `post_sensitivity`.
+- Updated the V2 packet runner and final-art pipeline wrapper to capture the
+  expanded material-policy packet by default.
+- Updated the V2 checker to require the debug modes, material table binding,
+  root SRV binding, and packet view names.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- assets\shaders\DebugBlitVisibility.hlsl src\Graphics\VisibilityBuffer.h src\Graphics\VisibilityBuffer_DebugBlit.cpp src\Graphics\VisibilityBuffer_DebugBlitPipelines.cpp src\Graphics\Renderer_DebugSettings.cpp src\Graphics\Renderer_VisibilityBufferCulling.cpp src\Graphics\Renderer_VisibilityBufferOrchestration.cpp src\Graphics\Renderer_VisibilityBufferStages.cpp src\Graphics\Renderer_RenderGraphVisibilityBufferHelpers.h tools\run_full_scene_shader_pipeline_v2_packet.ps1 tools\FinalArtPipeline.ps1 tools\check_full_scene_shader_pipeline_v2_frame_report.py assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\run_scene_local_cinematic_renderer_v1_packets.ps1
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_material_policy_debug_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- Release `CortexEngine` target build: passed and linked after restoring the
+  Visual Studio developer environment in-process.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_material_policy_debug_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- policy debug views:
+  - `material_family` debug view `50`.
+  - `reflection_policy` debug view `51`.
+  - `temporal_policy` debug view `52`.
+  - `post_sensitivity` debug view `53`.
+
+Current interpretation:
+
+- `FSSP-V2-002C` is complete for the gallery packet.
+- The material domain now has both shader-table readiness and per-pixel policy
+  debug visibility.
+- V2 beauty remains `v1_fallback`; this slice only strengthens the facts that
+  future full-scene lighting/reflection/temporal/post passes can consume.
+
+Next recommended implementation:
+
+- Start scene-local semantic light-rig ownership.
+- Then build local reflection/probe ownership so enclosed scenes no longer
+  depend on unauthorized environment fallback.

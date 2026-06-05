@@ -33,6 +33,10 @@ constexpr uint32_t kVBDebugGBufferExt1 = 7;
 constexpr uint32_t kVBDebugGBufferExt2 = 8;
 constexpr uint32_t kVBDebugMaterialId = 9;
 constexpr uint32_t kVBDebugStableObjectId = 10;
+constexpr uint32_t kVBDebugMaterialFamily = 11;
+constexpr uint32_t kVBDebugReflectionPolicy = 12;
+constexpr uint32_t kVBDebugTemporalPolicy = 13;
+constexpr uint32_t kVBDebugPostSensitivity = 14;
 
 bool IsVisibilityBufferDebugView(uint32_t debugView) {
     return debugView != kVBDebugNone;
@@ -42,7 +46,11 @@ bool IsVisibilityBufferUnculledDebugView(uint32_t debugView) {
     return debugView == kVBDebugVisibility ||
            debugView == kVBDebugDepth ||
            debugView == kVBDebugMaterialId ||
-           debugView == kVBDebugStableObjectId;
+           debugView == kVBDebugStableObjectId ||
+           debugView == kVBDebugMaterialFamily ||
+           debugView == kVBDebugReflectionPolicy ||
+           debugView == kVBDebugTemporalPolicy ||
+           debugView == kVBDebugPostSensitivity;
 }
 
 bool IsVisibilityBufferGBufferDebugView(uint32_t debugView) {
@@ -86,12 +94,24 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
 
     if (debugView == kVBDebugVisibility ||
         debugView == kVBDebugMaterialId ||
-        debugView == kVBDebugStableObjectId) {
+        debugView == kVBDebugStableObjectId ||
+        debugView == kVBDebugMaterialFamily ||
+        debugView == kVBDebugReflectionPolicy ||
+        debugView == kVBDebugTemporalPolicy ||
+        debugView == kVBDebugPostSensitivity) {
         auto mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
         if (debugView == kVBDebugMaterialId) {
             mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialId;
         } else if (debugView == kVBDebugStableObjectId) {
             mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::StableObjectId;
+        } else if (debugView == kVBDebugMaterialFamily) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialFamily;
+        } else if (debugView == kVBDebugReflectionPolicy) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::ReflectionPolicy;
+        } else if (debugView == kVBDebugTemporalPolicy) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::TemporalPolicy;
+        } else if (debugView == kVBDebugPostSensitivity) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::PostSensitivity;
         }
         auto dbg = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(
             m_commandResources.graphicsList.Get(),

@@ -59,7 +59,7 @@ Result<void> VisibilityBufferRenderer::CreateDebugBlitPipelines() {
         samplerRange.RegisterSpace = 0;
         samplerRange.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
 
-        D3D12_ROOT_PARAMETER1 params[4] = {};
+        D3D12_ROOT_PARAMETER1 params[5] = {};
         params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[0].DescriptorTable.NumDescriptorRanges = 1;
         params[0].DescriptorTable.pDescriptorRanges = &srvRange;
@@ -81,9 +81,14 @@ Result<void> VisibilityBufferRenderer::CreateDebugBlitPipelines() {
         params[3].Descriptor.RegisterSpace = 0;
         params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+        params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        params[4].Descriptor.ShaderRegister = 2;
+        params[4].Descriptor.RegisterSpace = 0;
+        params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC blitRootDesc = {};
         blitRootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        blitRootDesc.Desc_1_1.NumParameters = 4;
+        blitRootDesc.Desc_1_1.NumParameters = 5;
         blitRootDesc.Desc_1_1.pParameters = params;
         blitRootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 

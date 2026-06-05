@@ -1606,3 +1606,68 @@ Current state:
 - V2 beauty is still intentionally `v1_fallback`.
 - Next slice should add material policy debug views before promoting any
   lighting/reflection beauty behavior.
+
+## Full Scene Shader V2 Material Policy Debug Views - 2026-06-05
+
+Implemented:
+
+- Added visibility-buffer material-policy debug modes:
+  - `50`: `VB_MaterialFamilyPolicy`.
+  - `51`: `VB_ReflectionPolicy`.
+  - `52`: `VB_TemporalPolicy`.
+  - `53`: `VB_PostSensitivity`.
+- `DebugBlitVisibility.hlsl` now reads the shader-facing material table at
+  `t2` and colors pixels from `VBMaterialConstants.policyParams.x/y/z/w`.
+- The debug blit root signature now exposes the material-table SRV, and the
+  runtime blit path fails clearly if a material-policy view is requested before
+  the material table exists.
+- The packet runner recognizes:
+  - `material_family`.
+  - `reflection_policy`.
+  - `temporal_policy`.
+  - `post_sensitivity`.
+- The default V2 packet now captures `13` views:
+  `beauty`, `surface_policy`, the four material-policy views,
+  `material_id`, `object_id`, `reflection_owner`, `shadow_factor`,
+  `direct_light`, `ambient_ibl`, and `taa_blend`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- assets\shaders\DebugBlitVisibility.hlsl src\Graphics\VisibilityBuffer.h src\Graphics\VisibilityBuffer_DebugBlit.cpp src\Graphics\VisibilityBuffer_DebugBlitPipelines.cpp src\Graphics\Renderer_DebugSettings.cpp src\Graphics\Renderer_VisibilityBufferCulling.cpp src\Graphics\Renderer_VisibilityBufferOrchestration.cpp src\Graphics\Renderer_VisibilityBufferStages.cpp src\Graphics\Renderer_RenderGraphVisibilityBufferHelpers.h tools\run_full_scene_shader_pipeline_v2_packet.ps1 tools\FinalArtPipeline.ps1 tools\check_full_scene_shader_pipeline_v2_frame_report.py assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\run_scene_local_cinematic_renderer_v1_packets.ps1
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_material_policy_debug_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- diff check: passed.
+- full `CortexEngine` target build: passed and linked after restoring the
+  Visual Studio developer environment.
+- V2 packet: passed.
+- `ctest`: ran but reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_material_policy_debug_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+
+Current state:
+
+- `FSSP-V2-002C` is packet-proved for the gallery target.
+- Material-family, reflection-policy, temporal-policy, and post-sensitivity
+  are now per-pixel inspectable from the same shader material table used by the
+  visibility-buffer path.
+- V2 beauty is still intentionally `v1_fallback`.
+- Next architecture slice should start scene-local semantic light-rig ownership
+  and then local reflection/probe ownership.

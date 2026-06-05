@@ -4633,3 +4633,36 @@ Next safe pass:
    `review_packet_passed` with subset warnings.
 3. Do not weaken the promotion gate to ignore failed packet rows; use the new
    frame-report summarizer only as diagnosis evidence during GPU faults.
+
+### Full Scene Shader AAA Refactor Direction - 2026-06-05
+
+Planning document:
+
+- `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md`
+
+Current direction:
+
+- stop treating shader quality as isolated fixes.
+- keep V3 as the proof harness and bridge.
+- build an opt-in `FullSceneCandidateBeautyV3` path before any default beauty
+  promotion.
+- every major visual feature must have a named producer resource, debug view,
+  frame-report field, and packet gate.
+- renderer stability remains phase zero; the kitchen device-removal issue must
+  be fixed before any visual packet can be trusted as promotion evidence.
+
+Refactor phases:
+
+1. stabilize motion-vector/kitchen packet and failure reporting.
+2. add candidate beauty switch and side-by-side capture support.
+3. convert material attributes from adapter evidence to real shader resources.
+4. convert lighting split into direct, shadow, and indirect resources.
+5. convert scene-local environment into real irradiance/reflection resources.
+6. implement source-aware reflection resolver shader.
+7. implement full-scene composite shader.
+8. implement cinematic post stack.
+9. run cross-family packet ladder and promotion decision.
+
+Do not claim completion from a screenshot. Completion requires opt-in candidate
+beauty, real V3 shader resources, cross-family packet evidence, no device
+removal, explanatory debug views, and user acceptance before default promotion.

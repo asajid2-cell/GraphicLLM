@@ -96,6 +96,36 @@ struct FullSceneShaderFrameContext {
 
     FullSceneGBufferEvidence gbufferEvidence;
 
+    struct FullSceneLightingRigEvidence {
+        bool enabled = false;
+        bool ready = false;
+        bool semanticLightRigReady = false;
+        bool sceneLocalEnvironmentShaderReady = false;
+        bool lightOwnerReportAvailable = false;
+        bool semanticLightRolesAvailable = false;
+        bool rigPolicyIdsConsistent = false;
+        bool lightingBalancePolicyReady = false;
+        bool localFixtureContractReady = false;
+        bool shadowedLightContractReady = false;
+        bool exposurePolicyReady = false;
+        bool exposureClippingGatePassed = false;
+        uint32_t lightCount = 0;
+        uint32_t rectAreaLightCount = 0;
+        uint32_t semanticFixtureLightCount = 0;
+        uint32_t softFixtureLightCount = 0;
+        uint32_t emissiveFixtureLightCount = 0;
+        uint32_t stageFixtureLightCount = 0;
+        uint32_t practicalFixtureLightCount = 0;
+        uint32_t shadowCastingLightCount = 0;
+        float totalLightIntensity = 0.0f;
+        float maxLightIntensity = 0.0f;
+        uint32_t missingLightingContractCount = 0;
+        std::string owner = "SceneVisualContract/FullSceneLightingRigEvidence";
+        std::string failureReason = "Semantic light-rig evidence is not populated";
+    };
+
+    FullSceneLightingRigEvidence lightingEvidence;
+
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
     FullSceneShaderDomainEvidence lighting;
@@ -303,6 +333,120 @@ inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBuff
     return evidence;
 }
 
+inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneLightingRigEvidence(
+    const FrameContract& contract,
+    bool sceneLocalEnvironmentShaderReady) {
+    FullSceneShaderFrameContext::FullSceneLightingRigEvidence evidence;
+    evidence.enabled = contract.lighting.lightCount > 0 || contract.features.iblEnabled;
+    evidence.sceneLocalEnvironmentShaderReady = sceneLocalEnvironmentShaderReady;
+    evidence.semanticLightRigReady =
+        contract.sceneVisual.active &&
+        !contract.lighting.rigId.empty() &&
+        contract.lighting.rigId != "custom" &&
+        !contract.lighting.rigSource.empty() &&
+        contract.lighting.rigSource != "manual";
+    evidence.lightCount = contract.lighting.lightCount;
+    evidence.rectAreaLightCount = contract.lighting.areaRectLightCount;
+    evidence.semanticFixtureLightCount = contract.lighting.semanticFixtureLightCount;
+    evidence.softFixtureLightCount = contract.lighting.softFixtureLightCount;
+    evidence.emissiveFixtureLightCount = contract.lighting.emissiveFixtureLightCount;
+    evidence.stageFixtureLightCount = contract.lighting.stageFixtureLightCount;
+    evidence.practicalFixtureLightCount = contract.lighting.practicalFixtureLightCount;
+    evidence.shadowCastingLightCount = contract.lighting.shadowCastingLightCount;
+    evidence.totalLightIntensity = contract.lighting.totalLightIntensity;
+    evidence.maxLightIntensity = contract.lighting.maxLightIntensity;
+
+    evidence.lightOwnerReportAvailable =
+        evidence.semanticFixtureLightCount > 0 ||
+        contract.sceneVisual.profileLightFixtureCount > 0;
+    evidence.semanticLightRolesAvailable =
+        evidence.semanticFixtureLightCount > 0 ||
+        evidence.rectAreaLightCount > 0 ||
+        evidence.stageFixtureLightCount > 0 ||
+        evidence.practicalFixtureLightCount > 0 ||
+        contract.lighting.sunIntensity > 0.0f;
+    evidence.rigPolicyIdsConsistent =
+        contract.sceneVisual.lightRigId == contract.lighting.rigId &&
+        contract.sceneVisual.shadowPolicyId == contract.lighting.shadowPolicyId &&
+        contract.sceneVisual.exposurePolicyId == contract.lighting.exposurePolicyId;
+    evidence.lightingBalancePolicyReady =
+        contract.lighting.lightingBalancePolicyActive &&
+        !contract.lighting.lightingBalancePolicyId.empty() &&
+        contract.lighting.lightingBalancePolicyId != "none" &&
+        contract.lighting.lightingBalanceSunScale > 0.0f &&
+        contract.lighting.lightingBalanceAmbientScale > 0.0f &&
+        contract.lighting.lightingBalanceLocalFixtureScale > 0.0f &&
+        contract.lighting.lightingBalanceLocalProbeDiffuseScale >= 0.0f &&
+        contract.lighting.lightingBalanceLocalProbeSpecularScale >= 0.0f &&
+        contract.lighting.lightingBalanceExposureScale > 0.0f &&
+        contract.lighting.lightingBalanceSSAOScale > 0.0f;
+    evidence.localFixtureContractReady =
+        evidence.lightCount > 0 &&
+        (evidence.semanticFixtureLightCount > 0 ||
+         evidence.rectAreaLightCount > 0 ||
+         contract.lighting.pointLightCount > 0 ||
+         contract.lighting.spotLightCount > 0);
+    evidence.shadowedLightContractReady =
+        !contract.features.shadowsEnabled ||
+        (evidence.shadowCastingLightCount > 0 &&
+         !contract.lighting.shadowPolicyId.empty() &&
+         contract.lighting.shadowPolicyId != "default");
+    evidence.exposurePolicyReady =
+        !contract.lighting.exposurePolicyId.empty() &&
+        contract.lighting.exposurePolicyId != "default" &&
+        contract.lighting.exposure > 0.0f;
+    evidence.exposureClippingGatePassed =
+        evidence.exposurePolicyReady &&
+        contract.lighting.exposure >= 0.05f &&
+        contract.lighting.exposure <= 10.0f &&
+        evidence.maxLightIntensity >= 0.0f &&
+        evidence.maxLightIntensity <= 100.0f &&
+        evidence.totalLightIntensity >= 0.0f &&
+        evidence.totalLightIntensity <= 1000.0f;
+
+    const bool requiredContracts[] = {
+        evidence.semanticLightRigReady,
+        evidence.sceneLocalEnvironmentShaderReady,
+        evidence.lightOwnerReportAvailable,
+        evidence.semanticLightRolesAvailable,
+        evidence.rigPolicyIdsConsistent,
+        evidence.lightingBalancePolicyReady,
+        evidence.localFixtureContractReady,
+        evidence.shadowedLightContractReady,
+        evidence.exposurePolicyReady,
+        evidence.exposureClippingGatePassed,
+    };
+    for (bool ready : requiredContracts) {
+        if (!ready) {
+            ++evidence.missingLightingContractCount;
+        }
+    }
+
+    evidence.ready = evidence.enabled && evidence.missingLightingContractCount == 0;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "No scene-local light or IBL contribution is enabled";
+    } else if (!evidence.semanticLightRigReady) {
+        evidence.failureReason = "Semantic light rig id/source is missing or still manual";
+    } else if (!evidence.lightOwnerReportAvailable) {
+        evidence.failureReason = "Light owner report has no semantic fixture evidence";
+    } else if (!evidence.rigPolicyIdsConsistent) {
+        evidence.failureReason = "Lighting rig, shadow policy, or exposure policy do not match the scene visual contract";
+    } else if (!evidence.lightingBalancePolicyReady) {
+        evidence.failureReason = "Scene-local lighting balance policy is missing or invalid";
+    } else if (!evidence.localFixtureContractReady) {
+        evidence.failureReason = "Local fixture contract has no usable scene-owned lights";
+    } else if (!evidence.shadowedLightContractReady) {
+        evidence.failureReason = "Shadowed light contract is missing shadow-casting light ownership";
+    } else if (!evidence.exposureClippingGatePassed) {
+        evidence.failureReason = "Exposure or light intensity contract is outside V2 bounds";
+    } else {
+        evidence.failureReason = "Scene-local semantic light-rig ownership is ready";
+    }
+
+    return evidence;
+}
+
 inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
     std::string id,
     bool enabled,
@@ -383,6 +527,9 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         !contract.sceneVisual.invalidExternalHDRI &&
         !contract.sceneVisual.environmentOwner.empty() &&
         contract.sceneVisual.environmentOwner != "unknown";
+    context.lightingEvidence = BuildFullSceneLightingRigEvidence(
+        contract,
+        context.sceneLocalEnvironmentShaderReady);
     context.postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -406,12 +553,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.gbufferEvidence.failureReason);
     context.lighting = MakeFullSceneShaderDomainEvidence(
         "lighting",
-        contract.lighting.lightCount > 0 || contract.features.iblEnabled,
-        context.sceneLocalEnvironmentShaderReady &&
-            !contract.lighting.rigId.empty() &&
-            contract.lighting.rigId != "custom",
-        "SceneVisualContract/LightingState",
-        "Semantic light-rig output remains V1-owned until packet gates pass");
+        context.lightingEvidence.enabled,
+        context.lightingEvidence.ready,
+        context.lightingEvidence.owner,
+        context.lightingEvidence.failureReason);
     context.reflections = MakeFullSceneShaderDomainEvidence(
         "reflections",
         contract.features.ssrEnabled ||

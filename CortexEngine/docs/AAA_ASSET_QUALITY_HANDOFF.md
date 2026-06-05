@@ -760,3 +760,61 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -
 - Stage only files touched for the current AAA asset-quality slice.
 - If GitHub push fails due credentials/network, keep the local commit and
   record the failure here.
+
+## Full Scene Shader Pipeline V2 Refactor Planning Checkpoint - 2026-06-05
+
+Latest user direction:
+
+- Move from isolated renderer fixes toward full-scene shaders capable of
+  Unreal-like visual quality.
+- Plan the whole refactor before landing the next goal feature.
+- Keep the focus on scene-owned renderer architecture, not another
+  one-screenshot visual tweak.
+
+Current planning state:
+
+- `docs/FULL_SCENE_SHADER_PIPELINE_V2.md` now contains a whole-renderer
+  refactor strategy.
+- The plan defines six ownership layers:
+  - scene visual contract
+  - material and asset evidence
+  - frame data and GBuffer
+  - scene illumination
+  - stability and composition
+  - presentation and evidence
+- The plan adds explicit refactor boundaries so lighting, reflections,
+  temporal, post, and debug packets consume shared scene/material truth instead
+  of inventing local per-pass interpretations.
+- The target data flow is:
+  `scene preset / scene graph / asset registry -> SceneVisualContract ->
+  FullSceneShaderFrameContext -> material/light/probe/post policies ->
+  Visibility/GBuffer -> Lighting/Reflections/Shadows -> Material-aware
+  Temporal -> HDR Post -> Debug Atlases + Frame Report + Beauty Output`.
+- The implementation tracks are now:
+  - Track A: contracts and facades
+  - Track B: material truth
+  - Track C: GBuffer and debug surfaces
+  - Track D: lighting, probes, and reflections
+  - Track E: shadows and temporal stability
+  - Track F: post, render graph, and promotion
+- The promotion ladder is now explicit:
+  `planned -> instrumented -> shadow_output -> candidate -> packet_passed ->
+  cross_family_passed -> default_ready`.
+
+Next implementation slice when coding resumes:
+
+1. Add `FullSceneShaderFrameContext` as the runtime facade.
+2. Populate it from current V1 scene profile state.
+3. Add per-domain promotion state for material, GBuffer, lighting, reflection,
+   shadow, temporal, post, and render graph.
+4. Emit owner, fallback owner, readiness, and failure reason into frame-report
+   JSON.
+5. Add a packet command that captures beauty plus debug atlases.
+6. Keep beauty output on V1 until this instrumentation proves the renderer can
+   explain its own pixels.
+
+Important constraint:
+
+- Do not begin with a shader beauty tweak. The next real feature should be the
+  runtime facade plus evidence packet skeleton, because that creates the brain
+  and harness for later AAA shader work.

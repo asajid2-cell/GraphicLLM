@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 59u;
+constexpr uint32_t kMaxDebugViewMode = 60u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -131,6 +131,7 @@ void Renderer::CycleDebugViewMode() {
         case 57: label = "PostReflectionStabilityPolicy"; break;
         case 58: label = "PostReflectionResolverV2Candidate"; break;
         case 59: label = "PostReflectionResolverV2CandidateDelta"; break;
+        case 60: label = "PostReflectionSourceAuthority"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

@@ -2043,3 +2043,70 @@ Current interpretation:
   material stability policy owns the artifact.
 - Next implementation should add per-view numeric delta metrics or start an
   opt-in reflection resolver candidate path behind a debug/profile flag.
+
+## Full Scene Shader Pipeline V2 Debug View Metrics Slice - 2026-06-05
+
+Purpose:
+
+- Convert packet debug-view BMPs into numeric evidence so shader changes can be
+  compared across runs without relying only on contact sheets.
+- Measure reflection, lighting, material, temporal, and beauty debug surfaces
+  with stable per-view image statistics.
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_debug_view_metrics.py`.
+  - reads packet `manifest.json`.
+  - parses captured BMPs with the Python standard library.
+  - emits `debug_view_metrics.json` and `debug_view_metrics.md`.
+  - records width, height, pixel count, mean RGB, max RGB, mean/max luma,
+    nonblack ratio, and hot-pixel ratio per captured view.
+- Updated `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+  - every V2 packet now runs the debug-view metrics analyzer after frame-report
+    evidence is generated.
+- Updated `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+  - requires the metrics analyzer and packet metric outputs.
+
+Validation:
+
+```powershell
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\manifest.json --output-json build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\debug_view_metrics.json --output-md build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\debug_view_metrics.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_debug_view_metrics_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Results:
+
+- standalone metrics analyzer: passed on the previous reflection resolver
+  packet.
+- V2 packet with integrated metrics: passed.
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_debug_view_metrics_packet_20260605`.
+- captured views: `17`.
+- evidence rows: `170`.
+- frame-report failures: `0`.
+- measured debug views: `17`.
+- metric failures: `0`.
+- key reflection metrics:
+  - `reflection_source_weights` mean RGB:
+    `0.000001, 0.069131, 0.060542`.
+  - `reflection_source_weights` nonblack ratio: `0.322766`.
+  - `reflection_stability_policy` mean RGB:
+    `0.159872, 0.110794, 0.343249`.
+  - `reflection_stability_policy` nonblack ratio: `1.0`.
+
+Current interpretation:
+
+- V2 packets now produce numeric debug-view evidence beside screenshots and
+  frame reports.
+- The next candidate-shader pass can compare these metrics before/after and
+  reject changes that silently zero out reflection, lighting, temporal, or
+  material debug surfaces.

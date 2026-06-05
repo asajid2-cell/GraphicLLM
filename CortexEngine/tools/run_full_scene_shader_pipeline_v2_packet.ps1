@@ -17,12 +17,16 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $outRootAbs = Join-Path $root $OutputRoot
 $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_packets.ps1"
 $v2Checker = Join-Path $root "tools/check_full_scene_shader_pipeline_v2_frame_report.py"
+$debugMetricsTool = Join-Path $root "tools/analyze_full_scene_shader_debug_view_metrics.py"
 
 if (-not (Test-Path $packetRunner)) {
     throw "Scene-local packet runner missing: $packetRunner"
 }
 if (-not (Test-Path $v2Checker)) {
     throw "Full Scene Shader Pipeline V2 checker missing: $v2Checker"
+}
+if (-not (Test-Path $debugMetricsTool)) {
+    throw "Full Scene Shader Pipeline V2 debug-view metrics tool missing: $debugMetricsTool"
 }
 
 $packetArgs = @(
@@ -154,6 +158,9 @@ $summary.rows = @($rows.ToArray())
 $summaryJsonPath = Join-Path $outRootAbs "v2_frame_report_evidence_summary.json"
 $summaryMdPath = Join-Path $outRootAbs "v2_frame_report_evidence_summary.md"
 $checkerStdoutPath = Join-Path $outRootAbs "v2_frame_report_checker_stdout.txt"
+$debugMetricsJsonPath = Join-Path $outRootAbs "debug_view_metrics.json"
+$debugMetricsMdPath = Join-Path $outRootAbs "debug_view_metrics.md"
+$debugMetricsStdoutPath = Join-Path $outRootAbs "debug_view_metrics_stdout.txt"
 
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryJsonPath
 $checkerOutput | Set-Content -Encoding UTF8 $checkerStdoutPath
@@ -180,6 +187,13 @@ foreach ($row in $rows.ToArray()) {
         $row.fallback_owner)) | Out-Null
 }
 $md | Set-Content -Encoding UTF8 $summaryMdPath
+
+$debugMetricsOutput = & python $debugMetricsTool --manifest $manifestPath --output-json $debugMetricsJsonPath --output-md $debugMetricsMdPath 2>&1
+$debugMetricsExit = $LASTEXITCODE
+$debugMetricsOutput | Set-Content -Encoding UTF8 $debugMetricsStdoutPath
+if ($debugMetricsExit -ne 0) {
+    $failures.Add("debug-view metrics failed; see $debugMetricsStdoutPath") | Out-Null
+}
 
 if ($failures.Count -gt 0) {
     Write-Host "Full Scene Shader Pipeline V2 packet evidence failed:" -ForegroundColor Red

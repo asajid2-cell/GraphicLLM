@@ -1564,12 +1564,23 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.reflectionConfidenceReady =
         context.reflectionRadianceReady &&
         reflectionPoliciesAvailable;
-    context.reflectionTemporalDeltaReady =
+    const bool primaryReflectionSourceSceneLocal =
+        localProbeSourceReady ||
+        (!localProbeSourceReady && !rtSourceReady && !ssrSourceReady && iblSourceReady);
+    const bool sceneLocalReflectionTemporalBoundReady =
+        context.reflectionRadianceReady &&
+        primaryReflectionSourceSceneLocal &&
+        context.sceneLocalEnvironmentReady &&
+        reflectionOwnerKnown;
+    const bool historyReflectionTemporalBoundReady =
         (contract.rayTracing.reflectionHistorySignalValid &&
          contract.rayTracing.reflectionHistorySignalReadbackLatencyFrames <= 8u) ||
         (contract.features.taaEnabled &&
          contract.materials.materialTemporalStableGlossy > 0 &&
          FullSceneShaderHasResource(contract, "taa_history"));
+    context.reflectionTemporalDeltaReady =
+        sceneLocalReflectionTemporalBoundReady ||
+        historyReflectionTemporalBoundReady;
     uint32_t readyReflectionChannels = 0;
     readyReflectionChannels += context.reflectionRadianceReady ? 1u : 0u;
     readyReflectionChannels += context.reflectionConfidenceReady ? 1u : 0u;
@@ -1621,7 +1632,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.reflectionRadianceReady ? "reflection_radiance_owned" : "reflection_radiance_missing",
         context.reflectionConfidenceReady ? "reflection_confidence_owned" : "reflection_confidence_missing",
         context.reflectionSourceIdReady ? "reflection_source_id_owned" : "reflection_source_id_missing",
-        context.reflectionTemporalDeltaReady ? "reflection_temporal_delta_owned" : "reflection_temporal_delta_missing",
+        context.reflectionTemporalDeltaReady
+            ? (sceneLocalReflectionTemporalBoundReady
+                   ? "reflection_temporal_delta_scene_local_bound"
+                   : "reflection_temporal_delta_history_bound")
+            : "reflection_temporal_delta_missing",
         std::string("primary_source=") + context.reflectionV3SourceContract,
     };
     reflectionDomain.backingResourceCount = readyReflectionChannels;

@@ -265,6 +265,7 @@ V3 packets must emit:
 - `v3_signal.json`
 - `v3_stability.json`
 - `contact_sheet.png`
+- `promotion_decision.json`
 - `promotion_decision.md`
 
 Required view set:
@@ -830,6 +831,12 @@ Current evidence-domain implementation:
 - current readiness channels are:
   `reflection_radiance`, `reflection_confidence`, `reflection_source_id`, and
   `reflection_temporal_delta`.
+- current temporal-delta ownership is source-aware:
+  - scene-local probe/environment reflection sources can own a deterministic
+    `reflection_temporal_delta_scene_local_bound` channel without RT history.
+  - RT/SSR or other history-sensitive reflection sources must own a
+    `reflection_temporal_delta_history_bound` channel through reflection
+    history or TAA history evidence.
 - current backing contracts are:
   `scene_local_environment`, `scene_visual_reflection_owner`,
   `material_reflection_policy`, `local_reflection_radiance`, and
@@ -856,6 +863,10 @@ Important limitation:
 - This slice does not add the final reflection resolver shader or change
   default beauty. It promotes the reflection problem from hidden renderer state
   into named V3 evidence that later resolver/composite work can consume.
+- The source-aware temporal-delta rule is deliberately a contract fix, not a
+  scene workaround: enclosed scenes with stable local reflection probes should
+  not be blocked on RT reflection history, while dynamic reflection paths still
+  require history/TAA evidence.
 
 ### L007 - Scene Local Environment V3
 
@@ -975,7 +986,43 @@ Important limitation:
 
 ### L009 - Cross-Family Packet Evidence
 
-Status: pending.
+Status: in progress.
+
+Current promotion-gate implementation:
+
+- added `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now emits:
+  `promotion_decision.json` and `promotion_decision.md`.
+- promotion decision schema:
+  `cortex.full_scene_shader_pipeline_v3.promotion_decision.v1`.
+- current statuses:
+  - `blocked` when required artifacts, frame reports, domains, or analyzer
+    gates fail.
+  - `review_packet_passed` when the packet is internally coherent but does
+    not yet cover all required families/motion modes.
+  - `candidate_ready_not_promoted` when full required family and motion
+    evidence is present without failures or warnings.
+- the gate intentionally keeps `default_beauty_promotable=false`; promotion
+  still requires a separate explicit default-beauty decision.
+- required ready domains for the gate:
+  `material`, `lighting`, `environment`, `reflection`, `composite`, and
+  `cinematic_post`.
+- full coverage target remains:
+  families `gallery,kitchen,office,gym,concert,red_room,stadium` and motion
+  modes `static,mouse_jitter,camera_sweep`.
+- added `tools/summarize_full_scene_shader_v3_frame_reports.py` so partial
+  packet runs that hit a renderer/GPU fault can still produce explicit V3
+  frame-report evidence instead of losing the useful contract signal.
+- source-aware reflection temporal evidence:
+  `build/captures/v3_promotion_decision_gate_smoke2_20260605/v3_frame_report_summary.md`
+  and
+  `build/captures/v3_promotion_decision_gate_smoke3_20260605/v3_frame_report_summary.md`.
+  Both attempts show every emitted report has `reflection` and `composite`
+  ready, and every emitted report uses
+  `reflection_temporal_delta_scene_local_bound`.
+- current remaining blocker in those attempts is a DX12 device removal in one
+  kitchen row, which prevents one `cinematic_post` report from completing. This
+  is separate from the old ReflectionV3 temporal-delta contract blocker.
 
 Required evidence:
 

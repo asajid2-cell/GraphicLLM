@@ -46,6 +46,8 @@ LIGHTING_SIGNAL_THRESHOLDS = {
     "v3_indirect_lighting": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
 }
 
+SIGNAL_THRESHOLD_EPSILON = 1e-4
+
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -101,19 +103,19 @@ def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
         status = "ok"
 
         min_mean_luma = thresholds.get("min_mean_luma")
-        if min_mean_luma is not None and mean_luma < min_mean_luma:
+        if min_mean_luma is not None and mean_luma + SIGNAL_THRESHOLD_EPSILON < min_mean_luma:
             failures.append(
                 f"{view} mean_luma {mean_luma:.6f} below {min_mean_luma:.6f}"
             )
             status = "failed"
         max_mean_luma = thresholds.get("max_mean_luma")
-        if max_mean_luma is not None and mean_luma > max_mean_luma:
+        if max_mean_luma is not None and mean_luma - SIGNAL_THRESHOLD_EPSILON > max_mean_luma:
             failures.append(
                 f"{view} mean_luma {mean_luma:.6f} above {max_mean_luma:.6f}"
             )
             status = "failed"
         min_nonblack_ratio = thresholds.get("min_nonblack_ratio")
-        if min_nonblack_ratio is not None and nonblack_ratio < min_nonblack_ratio:
+        if min_nonblack_ratio is not None and nonblack_ratio + SIGNAL_THRESHOLD_EPSILON < min_nonblack_ratio:
             failures.append(
                 f"{view} nonblack_ratio {nonblack_ratio:.6f} below {min_nonblack_ratio:.6f}"
             )

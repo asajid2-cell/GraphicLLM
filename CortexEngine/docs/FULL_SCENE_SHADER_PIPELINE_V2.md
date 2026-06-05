@@ -121,9 +121,13 @@ Deliverables:
 - `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
 - `assets/final_art/full_scene_shader_material_evidence_v2.schema.json`
 - `assets/final_art/full_scene_shader_material_evidence_v2.json`
+- `assets/final_art/full_scene_shader_material_upgrade_plan_v2.schema.json`
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.json`
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.md`
 - `tools/validate_full_scene_shader_pipeline_v2_plan.py`
 - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
 - `tools/build_full_scene_shader_material_evidence_v2.py`
+- `tools/plan_full_scene_shader_material_upgrades_v2.py`
 - handoff update in `docs/AAA_ASSET_QUALITY_HANDOFF.md`
 
 Completion evidence:
@@ -134,6 +138,8 @@ Completion evidence:
   `full_scene_shader_pipeline_v2` frame-report section.
 - material evidence report derives shader-family and PBR/hero-surface blockers
   from Asset Registry V2 and the scene binding overlay.
+- material upgrade plan converts blocked material evidence into P0/P1 work
+  orders.
 - handoff identifies this as the next renderer/AAA direction.
 - focused commit is pushed.
 
@@ -155,6 +161,16 @@ Material evidence baseline:
 - missing hero texture evidence `10`.
 - primitive hero material blockers `24`.
 - unknown material-family assets `0`.
+
+Material upgrade work-order baseline:
+
+- status `READY`.
+- work orders `56`.
+- P0 orders `34`.
+- P1 orders `22`.
+- primitive hero material orders `24`.
+- hero asset material orders `10`.
+- registry asset material orders `22`.
 
 ### FSSP-V2-002 Material Model Upgrade
 
@@ -443,15 +459,16 @@ Validation:
 2. Land the external V2 frame-report contract and checker.
 3. Land the V2 material evidence report from Asset Registry V2 and scene
    bindings.
-4. Add runtime frame-report placeholders for V2 domains without changing
+4. Land the V2 material upgrade work-order planner.
+5. Add runtime frame-report placeholders for V2 domains without changing
    rendering.
-5. Upgrade material model and registry material evidence.
-6. Expand GBuffer/debug channel inventory.
-7. Add local reflection probe ownership before chasing more shiny materials.
-8. Add semantic light rigs and shadow/contact stability.
-9. Refactor post into named HDR stages.
-10. Move pass ownership into the render graph.
-11. Run cross-family V2 packets and compare to V1 seq8.
+6. Upgrade material model and registry material evidence.
+7. Expand GBuffer/debug channel inventory.
+8. Add local reflection probe ownership before chasing more shiny materials.
+9. Add semantic light rigs and shadow/contact stability.
+10. Refactor post into named HDR stages.
+11. Move pass ownership into the render graph.
+12. Run cross-family V2 packets and compare to V1 seq8.
 
 This order keeps the engine diagnosable. It avoids the previous trap where a
 scene looked better only because one setting hid the problem.

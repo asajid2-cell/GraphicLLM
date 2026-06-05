@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for Full Scene Shader Pipeline V2 material upgrade work orders.",
+  "report_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.json",
+  "required_root_fields": [
+    "schema",
+    "generated_by",
+    "source_material_evidence",
+    "source_bindings",
+    "status",
+    "summary",
+    "priority_counts",
+    "work_orders"
+  ],
+  "required_work_order_fields": [
+    "id",
+    "priority",
+    "kind",
+    "reason",
+    "acceptance",
+    "provider_preferences"
+  ],
+  "priorities": [
+    "P0",
+    "P1",
+    "P2"
+  ],
+  "work_order_kinds": [
+    "replace_primitive_hero_material_surface",
+    "upgrade_hero_asset_material_evidence",
+    "upgrade_registry_asset_material_evidence"
+  ]
+}

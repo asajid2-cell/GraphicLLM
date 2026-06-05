@@ -19,6 +19,7 @@ param(
         "AssetRegistryV2",
         "SceneAssetBindings",
         "FullSceneShaderMaterialEvidence",
+        "FullSceneShaderMaterialUpgradePlan",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1084,6 +1085,14 @@ function Invoke-FullSceneShaderMaterialEvidence {
     }
 }
 
+function Invoke-FullSceneShaderMaterialUpgradePlan {
+    Invoke-FullSceneShaderMaterialEvidence
+    python (Join-Path $Root "tools/plan_full_scene_shader_material_upgrades_v2.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 material upgrade planning failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-AAAReplacementPlan {
     Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
@@ -1134,6 +1143,7 @@ switch ($Action) {
     "AssetRegistryV2" { Invoke-AssetRegistryV2 }
     "SceneAssetBindings" { Invoke-SceneAssetBindings }
     "FullSceneShaderMaterialEvidence" { Invoke-FullSceneShaderMaterialEvidence }
+    "FullSceneShaderMaterialUpgradePlan" { Invoke-FullSceneShaderMaterialUpgradePlan }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

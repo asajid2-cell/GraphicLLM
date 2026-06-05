@@ -11,6 +11,13 @@
     "render_graph",
     "frame_contract_validation"
   ],
+  "common_evidence_fields": [
+    "promotion_state",
+    "domain_ready",
+    "facade_owner",
+    "fallback_owner",
+    "failure_reason"
+  ],
   "required_sections": [
     {
       "id": "material_contract",

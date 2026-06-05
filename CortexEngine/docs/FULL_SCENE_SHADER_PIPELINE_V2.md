@@ -539,6 +539,30 @@ Runtime V2 frame-report placeholder baseline:
 - checker now verifies that `FrameContractJson.cpp` emits every required V2
   readiness field.
 
+Runtime facade baseline:
+
+- `src/Graphics/FullSceneShaderFrameContext.h` owns the first runtime facade
+  for V2.
+- `BuildFullSceneShaderFrameContext(const FrameContract&)` derives shared
+  V2 evidence from the current V1 frame contract without changing beauty
+  output.
+- The facade exposes per-domain evidence for material, GBuffer, lighting,
+  reflections, shadows, temporal, post, render graph, asset evidence, and
+  packet gate.
+- Every domain now carries:
+  - `promotion_state`
+  - `domain_ready`
+  - `facade_owner`
+  - `fallback_owner`
+  - `failure_reason`
+- `FrameContractJson.cpp` consumes the facade instead of calculating all V2
+  readiness inline.
+- `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  declares those common evidence fields.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now fails if the
+  runtime report stops using `FullSceneShaderFrameContext` or if supplied frame
+  reports omit the per-domain evidence object.
+
 Material runtime-policy bridge baseline:
 
 - every registry asset now carries a V2 runtime policy bridge in material

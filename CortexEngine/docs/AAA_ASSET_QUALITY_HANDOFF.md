@@ -28,6 +28,51 @@ that can support AAA-style final art:
   - `assets/final_art/final_art_pretrained_asset_plan.json`
   - `assets/final_art/pretrained_asset_import.schema.json`
 
+## 2026-06-05 Full Scene Shader V3 Refactor Direction
+
+Current renderer direction:
+
+- Continue `docs/FULL_SCENE_SHADER_PIPELINE_V3.md` as the live renderer plan
+  and ledger.
+- Do not chase more screenshot tweaks or IBL hiding as a quality strategy.
+- Target an Unreal-style full-scene shader stack through owned, inspectable
+  render domains:
+  material resolve, scene-local environment, direct/indirect lighting,
+  shadows, reflections, HDR composite, and cinematic post.
+
+Current proven state:
+
+- V3 contract, validators, runtime report visibility, and packet skeleton
+  exist.
+- Material Resolve V3 is complete as a review/debug domain.
+- Lighting V3 now writes concrete split MRT resources:
+  `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
+  `shadow_loss`, and `indirect_lighting`.
+- The static gallery concrete split packet passed and is pushed.
+- Default beauty remains unchanged; V3 is not promoted.
+
+Next renderer slice:
+
+1. Finish Lighting V3 motion stability.
+   - Add static, camera-sweep, and mouse-jiggle packet evidence for the five
+     concrete split buffers.
+   - Compare V3 split resources against legacy deferred lighting terms.
+   - Run at least gallery, kitchen, gym, and concert before claiming stability.
+2. Build SceneLocalEnvironmentV3 after Lighting V3 motion evidence.
+   - Separate visible background, lighting environment, reflection background,
+     and atmosphere.
+   - Make enclosed-room/stage modes stop reflecting unrelated IBL imagery.
+3. Build ReflectionV3 only after environment ownership is explicit.
+   - Source-aware reflection resolver with radiance, source ID, confidence,
+     temporal delta, and rejected-source debug views.
+4. Add CompositeV3 and CinematicPostV3 after lighting/reflection inputs are
+   stable.
+   - HDR composition first, filmic post second.
+   - Post is not allowed to hide unstable upstream inputs.
+
+Do not promote V3 domains into default beauty until the packet/promotion gate
+has motion and cross-family evidence.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:

@@ -3608,3 +3608,51 @@ Extracted V3 frame-report evidence:
 - domains are present and not ready:
   render_graph, material, lighting, reflection, environment, cinematic_post,
   and validation.
+
+### FullSceneShaderPipeline V3 Packet Skeleton - 2026-06-05
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- Added `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- The V3 packet skeleton reuses the V2 packet renderer for now, then scans all
+  generated `frame_report_shutdown.json` files for V3 placeholder correctness.
+- The skeleton emits:
+  - `v3_signal.json`.
+  - `v3_stability.json`.
+- The analyzer requires:
+  - V3 report schema is `cortex.full_scene_shader_pipeline_v3.runtime_report.v1`.
+  - `status=planned_not_promoted`.
+  - `default_beauty_affects=false`.
+  - `runtime_placeholders_ready=true`.
+  - `contract_grounded=true`.
+  - `packet_gate_ready=false`.
+  - all required V3 outputs and domains are present.
+
+Current stopping position:
+
+- V3 P0 now has plan, contract, runtime frame-report placeholders, and packet
+  skeleton artifacts.
+- Next implementation slice should turn the first domain from placeholder into
+  real render-graph signal. The best first domain is material resolve:
+  `FullSceneMaterialResolveV3 -> material_attributes`.
+
+Validation:
+
+- V3 validator passed:
+  `python tools\validate_full_scene_shader_pipeline_v3_plan.py`.
+- Python compile passed for:
+  `tools\validate_full_scene_shader_pipeline_v3_plan.py` and
+  `tools\analyze_full_scene_shader_v3_placeholders.py`.
+- direct analyzer pass succeeded on:
+  `build/captures/v3_runtime_placeholder_smoke2_20260605`.
+  - reports scanned: `6`.
+  - emitted `v3_signal.json`.
+  - emitted `v3_stability.json`.
+- wrapper packet passed:
+  `build/captures/v3_packet_skeleton_smoke1_20260605`.
+  - V2 packet evidence passed.
+  - V3 placeholder analyzer passed.
+  - reports scanned: `6`.
+  - emitted `v3_signal.json`.
+  - emitted `v3_stability.json`.

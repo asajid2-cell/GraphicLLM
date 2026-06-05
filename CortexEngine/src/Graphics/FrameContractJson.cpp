@@ -344,12 +344,20 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
             {"id", domain.id},
             {"enabled", domain.enabled},
             {"ready", domain.ready},
+            {"default_beauty_affects", domain.defaultBeautyAffects},
             {"producer", domain.producer},
             {"output_resource", domain.outputResource},
             {"debug_view", domain.debugView},
             {"packet_gate", domain.packetGate},
             {"promotion_state", domain.promotionState},
-            {"failure_reason", domain.failureReason}
+            {"failure_reason", domain.failureReason},
+            {"backing_resources", domain.backingResources},
+            {"debug_views", domain.debugViews},
+            {"channels", domain.channels},
+            {"backing_resource_count", domain.backingResourceCount},
+            {"required_channel_count", domain.requiredChannelCount},
+            {"ready_channel_count", domain.readyChannelCount},
+            {"missing_required_channel_count", domain.missingRequiredChannelCount}
         });
     }
 
@@ -361,6 +369,9 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"runtime_placeholders_ready", context.runtimePlaceholdersReady},
         {"contract_grounded", context.contractGrounded},
         {"packet_gate_ready", context.packetGateReady},
+        {"material_attributes_ready", context.materialAttributesReady},
+        {"material_attributes_resource_count", context.materialAttributesResourceCount},
+        {"material_attributes_channel_count", context.materialAttributesChannelCount},
         {"contract_path", context.contractPath},
         {"plan_path", context.planPath},
         {"required_scene_families", context.requiredSceneFamilies},

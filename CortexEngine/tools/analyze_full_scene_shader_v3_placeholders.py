@@ -30,6 +30,8 @@ REQUIRED_DOMAINS = {
     "validation",
 }
 
+ALLOWED_READY_DOMAINS = {"material"}
+
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -74,6 +76,11 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         for domain in domains
         if isinstance(domain, dict) and domain.get("ready") is True
     )
+    domain_by_id = {
+        domain.get("id"): domain
+        for domain in domains
+        if isinstance(domain, dict) and isinstance(domain.get("id"), str)
+    }
     outputs = set(v3.get("required_outputs", []))
 
     if v3.get("schema") != "cortex.full_scene_shader_pipeline_v3.runtime_report.v1":
@@ -97,10 +104,26 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
     if missing_domains:
         failures.append("missing required domains: " + ", ".join(missing_domains))
 
-    if ready_domains:
+    unexpected_ready_domains = sorted(set(ready_domains) - ALLOWED_READY_DOMAINS)
+    if unexpected_ready_domains:
         warnings.append(
-            "V3 placeholder has ready domains before implementation: " + ", ".join(ready_domains)
+            "V3 has domains ready before their implementation gate: "
+            + ", ".join(unexpected_ready_domains)
         )
+
+    material_domain = domain_by_id.get("material")
+    material_ready = isinstance(material_domain, dict) and material_domain.get("ready") is True
+    if material_ready:
+        if material_domain.get("output_resource") != "material_attributes":
+            failures.append("material domain must output material_attributes")
+        if material_domain.get("producer") != "FullSceneMaterialResolveV3":
+            failures.append("material domain must be produced by FullSceneMaterialResolveV3")
+        if material_domain.get("default_beauty_affects") is not False:
+            failures.append("material domain must not affect default beauty yet")
+        if material_domain.get("backing_resource_count", 0) < 6:
+            failures.append("material domain ready without all backing resources")
+        if material_domain.get("ready_channel_count", 0) < 14:
+            failures.append("material domain ready without enough material channels")
 
     return {
         "report": str(path),
@@ -115,6 +138,9 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         "required_output_count": len(outputs),
         "domain_count": len(domain_ids),
         "ready_domains": ready_domains,
+        "material_attributes_ready": v3.get("material_attributes_ready"),
+        "material_attributes_resource_count": v3.get("material_attributes_resource_count"),
+        "material_attributes_channel_count": v3.get("material_attributes_channel_count"),
         "failures": failures,
         "warnings": warnings,
     }
@@ -154,6 +180,9 @@ def main() -> int:
             1 for row in rows if row.get("v3_status") != "planned_not_promoted"
         ),
         "ready_domain_report_count": sum(1 for row in rows if row.get("ready_domains")),
+        "material_ready_report_count": sum(
+            1 for row in rows if row.get("material_attributes_ready") is True
+        ),
         "failures": failures,
         "warnings": warnings,
     }

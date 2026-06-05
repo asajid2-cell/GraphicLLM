@@ -1154,12 +1154,20 @@ struct FullSceneShaderPipelineV3DomainEvidence {
     std::string id;
     bool enabled = false;
     bool ready = false;
+    bool defaultBeautyAffects = false;
     std::string producer = "planned";
     std::string outputResource = "none";
     std::string debugView = "none";
     std::string packetGate = "pending";
     std::string promotionState = "planned";
     std::string failureReason = "V3 domain is planned but not implemented";
+    std::vector<std::string> backingResources;
+    std::vector<std::string> debugViews;
+    std::vector<std::string> channels;
+    uint32_t backingResourceCount = 0;
+    uint32_t requiredChannelCount = 0;
+    uint32_t readyChannelCount = 0;
+    uint32_t missingRequiredChannelCount = 0;
 };
 
 struct FullSceneShaderPipelineV3FrameContext {
@@ -1170,6 +1178,9 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool runtimePlaceholdersReady = true;
     bool contractGrounded = true;
     bool packetGateReady = false;
+    bool materialAttributesReady = false;
+    uint32_t materialAttributesResourceCount = 0;
+    uint32_t materialAttributesChannelCount = 0;
     std::string contractPath = "assets/final_art/full_scene_shader_pipeline_v3_contract.json";
     std::string planPath = "docs/FULL_SCENE_SHADER_PIPELINE_V3.md";
     std::vector<std::string> requiredSceneFamilies = {
@@ -1215,6 +1226,83 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     FullSceneShaderPipelineV3FrameContext context;
     context.defaultBeautyAffects = false;
     context.beautyOutput = contract.sceneVisual.active ? "full_scene_shader_pipeline_v2" : "legacy_beauty";
+
+    const std::vector<std::string> materialBackingResources = {
+        "vb_gbuffer_albedo",
+        "vb_gbuffer_normal_roughness",
+        "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext0",
+        "vb_gbuffer_material_ext1",
+        "vb_gbuffer_material_ext2",
+    };
+    const std::vector<std::string> materialChannels = {
+        "base_color",
+        "opacity",
+        "normal",
+        "roughness",
+        "emissive",
+        "metallic",
+        "clearcoat",
+        "ior",
+        "specular",
+        "transmission",
+        "surface_class",
+        "anisotropy",
+        "sheen",
+        "material_class",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
+    };
+    uint32_t readyMaterialResources = 0;
+    for (const std::string& resource : materialBackingResources) {
+        if (FullSceneShaderHasResource(contract, resource.c_str())) {
+            ++readyMaterialResources;
+        }
+    }
+    const bool materialResolveReady =
+        readyMaterialResources == materialBackingResources.size() &&
+        contract.features.visibilityBufferEnabled &&
+        contract.draws.visibilityBufferMaterials > 0 &&
+        contract.materials.sampled > 0;
+    context.materialAttributesReady = materialResolveReady;
+    context.materialAttributesResourceCount = readyMaterialResources;
+    context.materialAttributesChannelCount =
+        materialResolveReady ? static_cast<uint32_t>(materialChannels.size()) : 0u;
+
+    FullSceneShaderPipelineV3DomainEvidence materialDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "material",
+            "FullSceneMaterialResolveV3",
+            "material_attributes",
+            "material_missing_channel_mask",
+            materialResolveReady
+                ? "FullSceneMaterialResolveV3 material_attributes aggregate is backed by visibility-buffer material resolve outputs"
+                : "FullSceneMaterialResolveV3 material_attributes aggregate is missing backing material resolve outputs");
+    materialDomain.enabled = contract.features.visibilityBufferEnabled;
+    materialDomain.ready = materialResolveReady;
+    materialDomain.promotionState = materialResolveReady ? "instrumented" : "planned";
+    materialDomain.backingResources = materialBackingResources;
+    materialDomain.debugViews = {
+        "VB_GBuffer_Albedo",
+        "VB_GBuffer_NormalRoughness",
+        "VB_GBuffer_EmissiveMetallic",
+        "VB_GBuffer_MaterialExt0",
+        "VB_GBuffer_MaterialExt1",
+        "VB_GBuffer_SurfaceClass",
+        "VB_MaterialFamilyPolicy",
+        "VB_ReflectionPolicy",
+        "VB_TemporalPolicy",
+        "VB_PostSensitivity",
+    };
+    materialDomain.channels = materialChannels;
+    materialDomain.backingResourceCount = readyMaterialResources;
+    materialDomain.requiredChannelCount = static_cast<uint32_t>(materialChannels.size());
+    materialDomain.readyChannelCount =
+        materialResolveReady ? static_cast<uint32_t>(materialChannels.size()) : 0u;
+    materialDomain.missingRequiredChannelCount =
+        materialDomain.requiredChannelCount - materialDomain.readyChannelCount;
+
     context.domains = {
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "render_graph",
@@ -1222,12 +1310,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "v3_resource_registry",
             "v3_resource_ownership",
             "V3 render-graph resources are planned but not allocated"),
-        MakeFullSceneShaderPipelineV3DomainEvidence(
-            "material",
-            "FullSceneMaterialResolveV3",
-            "material_attributes",
-            "material_missing_channel_mask",
-            "FullSceneMaterialResolveV3 is planned but not implemented"),
+        materialDomain,
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "lighting",
             "FullSceneLightingV3",

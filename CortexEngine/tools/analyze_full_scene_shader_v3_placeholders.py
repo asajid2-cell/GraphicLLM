@@ -30,7 +30,7 @@ REQUIRED_DOMAINS = {
     "validation",
 }
 
-ALLOWED_READY_DOMAINS = {"material", "lighting", "environment"}
+ALLOWED_READY_DOMAINS = {"material", "lighting", "environment", "reflection"}
 
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
@@ -390,6 +390,43 @@ def analyze_report(
             if mode not in {"enclosed_room", "open_exterior", "stage", "neutral_lab"}:
                 failures.append(f"environment domain ready with invalid mode: {mode}")
 
+    reflection_domain = domain_by_id.get("reflection")
+    reflection_ready = v3.get("reflection_v3_ready") is True
+    if reflection_ready:
+        if v3.get("scene_local_environment_ready") is not True:
+            failures.append("reflection_v3_ready=true before scene_local_environment_ready")
+        if not isinstance(reflection_domain, dict):
+            failures.append("reflection_v3_ready=true but reflection domain is missing")
+        else:
+            if reflection_domain.get("producer") != "FullSceneReflectionV3":
+                failures.append("reflection domain must be produced by FullSceneReflectionV3")
+            if reflection_domain.get("output_resource") != "reflection_radiance":
+                failures.append("reflection domain must output reflection_radiance")
+            if reflection_domain.get("debug_view") != "reflection_confidence":
+                failures.append("reflection domain must expose reflection_confidence debug view")
+            if reflection_domain.get("default_beauty_affects") is not False:
+                failures.append("reflection domain must not affect default beauty yet")
+            if reflection_domain.get("ready_channel_count", 0) < 4:
+                failures.append("reflection domain ready without all required channels")
+            if reflection_domain.get("missing_required_channel_count", 1) != 0:
+                failures.append("reflection domain ready with missing required channels")
+            source_contract = v3.get("reflection_v3_source_contract")
+            if source_contract not in {
+                "local_probe",
+                "ray_query_reflection",
+                "screen_space_reflection",
+                "scene_local_environment",
+            }:
+                failures.append(f"reflection domain ready with invalid source contract: {source_contract}")
+        for key in [
+            "reflection_radiance_ready",
+            "reflection_confidence_ready",
+            "reflection_source_id_ready",
+            "reflection_temporal_delta_ready",
+        ]:
+            if v3.get(key) is not True:
+                failures.append(f"reflection_v3_ready=true but {key} is not true")
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -411,9 +448,17 @@ def analyze_report(
         "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
         "scene_local_environment_ready": v3.get("scene_local_environment_ready"),
         "scene_local_environment_mode": v3.get("scene_local_environment_mode"),
+        "reflection_v3_ready": v3.get("reflection_v3_ready"),
+        "reflection_radiance_ready": v3.get("reflection_radiance_ready"),
+        "reflection_confidence_ready": v3.get("reflection_confidence_ready"),
+        "reflection_source_id_ready": v3.get("reflection_source_id_ready"),
+        "reflection_temporal_delta_ready": v3.get("reflection_temporal_delta_ready"),
+        "reflection_v3_source_contract": v3.get("reflection_v3_source_contract"),
         "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
         "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
         "scene_local_environment_channel_count": v3.get("scene_local_environment_channel_count"),
+        "reflection_v3_channel_count": v3.get("reflection_v3_channel_count"),
+        "reflection_v3_source_count": v3.get("reflection_v3_source_count"),
         "full_scene_lighting_v3_executed": (
             lighting_split_pass.get("executed") if isinstance(lighting_split_pass, dict) else None
         ),
@@ -489,6 +534,9 @@ def main() -> int:
         ),
         "scene_local_environment_ready_report_count": sum(
             1 for row in rows if row.get("scene_local_environment_ready") is True
+        ),
+        "reflection_v3_ready_report_count": sum(
+            1 for row in rows if row.get("reflection_v3_ready") is True
         ),
         "full_scene_lighting_v3_executed_report_count": sum(
             1 for row in rows if row.get("full_scene_lighting_v3_executed") is True

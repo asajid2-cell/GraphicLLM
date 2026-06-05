@@ -1316,3 +1316,52 @@ Next recommended implementation:
      new `vb_gbuffer_object_id`/`vb_gbuffer_material_id` target is required,
   3. expose producer/debug source reporting in frame reports,
   4. only then allow `gbuffer.domain_ready=true`.
+
+## Full Scene Shader Refactor Master Plan - 2026-06-05
+
+User direction:
+
+- Move to full-scene shaders for Unreal-like visual quality.
+- Plan the whole refactor before completing or promoting the goal feature.
+- Treat this as a renderer architecture migration, not an IBL, bloom, contrast,
+  or one-scene beauty tweak.
+
+Implemented:
+
+- Added `docs/FULL_SCENE_SHADER_REFACTOR_MASTER_PLAN.md`.
+- Linked it from `docs/FULL_SCENE_SHADER_PIPELINE_V2.md`.
+
+Master-plan decision:
+
+- V2 beauty must be assembled from scene-owned facts:
+  `SceneVisualContract -> FullSceneMaterialTable -> FullSceneFrameData/GBuffer
+  -> FullSceneLightRig -> FullSceneProbeSet -> Shadows/Reflections/Indirect
+  -> Material-aware Temporal -> HDR Post -> Beauty/Debug/Frame Report`.
+- V1 remains the playable fallback until V2 packets prove stronger evidence.
+- No V2 domain can promote without debug views, frame-report fields, and packet
+  evidence.
+
+Planned refactor phases:
+
+1. Freeze the V1 baseline and keep V2 evidence-only where needed.
+2. Add frame identity and GBuffer ownership.
+3. Promote a full runtime material table.
+4. Build scene-local semantic light rigs.
+5. Build local reflection/probe ownership.
+6. Centralize shadow/contact stability.
+7. Add material-aware temporal resolve.
+8. Split HDR post into named measured stages.
+9. Enforce render graph resource/pass/debug ownership.
+10. Run cross-family V2 promotion packets.
+
+Next concrete feature:
+
+- `FSSP-V2-003A Identity Ownership`.
+- Expose `visibility_buffer` as a frame-report resource.
+- Report visibility instance count, material table count, and invalid stable id
+  count.
+- Add V2 GBuffer evidence for visibility payload readiness, producer readiness,
+  instance identity table readiness, material lookup readiness, and stable
+  instance id readiness.
+- Keep `gbuffer.domain_ready=false` until material id/object id/debug-source
+  ownership is genuinely promoted.

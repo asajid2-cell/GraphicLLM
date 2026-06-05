@@ -131,6 +131,11 @@ The current V1 path remains the playable fallback until V2 proves equivalent
 or stronger gates. Every phase must ship with a visible debug mode, frame-report
 fields, and a packet gate before its beauty output becomes trusted.
 
+The whole-renderer implementation plan now lives in
+`docs/FULL_SCENE_SHADER_REFACTOR_MASTER_PLAN.md`. Use that document for the
+architecture boundaries, implementation order, pseudocode, and first concrete
+feature slice. Keep this file as the phase ledger and evidence record.
+
 ### Master Refactor Plan
 
 The V2 refactor has one central rule: the final beauty pixel must be assembled

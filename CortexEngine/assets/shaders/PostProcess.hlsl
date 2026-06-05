@@ -2017,8 +2017,11 @@ float4 PSMain(VSOutput input) : SV_TARGET
             materialReflectance,
             rtReflectionFireflyClampLuma);
     }
+    // Gate the V2 source sheen with the same owned-source potential reported by
+    // debug view 56. The sampler below still chooses between authorized IBL and
+    // scene-local radiance, so enclosed scenes remain protected from HDRI bleed.
     float candidateLocalProbeWeight =
-        saturate(sceneLocalReflectionPotential * 10.0f) *
+        saturate(authorizedPrelitReflectionPotential * 10.0f) *
         saturate(reflectionStabilityScale) *
         saturate(SurfaceReflectionCeiling(
             surfaceClass,

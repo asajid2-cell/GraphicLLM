@@ -1,0 +1,151 @@
+{
+  "schema": "cortex.full_scene_shader_pipeline_v2_contract.v1",
+  "purpose": "Machine-readable contract for the planned Full Scene Shader Pipeline V2 refactor.",
+  "baseline": {
+    "preserve_renderer_v1": true,
+    "renderer_v1_plan": "docs/SCENE_LOCAL_CINEMATIC_RENDERER_V1.md",
+    "final_renderer_v1_packet": "build/captures/scene_local_cinematic_renderer_v1_final_gate_20260605/warm_micro_jitter_full_seq8/manifest.json",
+    "aaa_handoff": "docs/AAA_ASSET_QUALITY_HANDOFF.md"
+  },
+  "required_domains": [
+    {
+      "id": "material_contract",
+      "phase": "FSSP-V2-002",
+      "required_outputs": [
+        "full_scene_material_model",
+        "material_family_counts",
+        "texture_evidence",
+        "material_debug_views"
+      ],
+      "must_preserve_v1_gate": "material_class_analysis"
+    },
+    {
+      "id": "gbuffer_contract",
+      "phase": "FSSP-V2-003",
+      "required_outputs": [
+        "gbuffer_channel_inventory",
+        "object_id_channel",
+        "material_id_channel",
+        "velocity_channel",
+        "debug_channel_packet"
+      ],
+      "must_preserve_v1_gate": "frame_contract_validation"
+    },
+    {
+      "id": "scene_local_lighting",
+      "phase": "FSSP-V2-004",
+      "required_outputs": [
+        "semantic_light_rigs",
+        "light_owner_report",
+        "direct_light_debug",
+        "exposure_clipping_gate"
+      ],
+      "must_preserve_v1_gate": "visual_quality_analysis"
+    },
+    {
+      "id": "local_reflections",
+      "phase": "FSSP-V2-005",
+      "required_outputs": [
+        "room_probe_ownership",
+        "hero_probe_ownership",
+        "planar_probe_ownership",
+        "reflection_owner_debug"
+      ],
+      "must_preserve_v1_gate": "reflection_owner_analysis"
+    },
+    {
+      "id": "shadow_contact_stability",
+      "phase": "FSSP-V2-006",
+      "required_outputs": [
+        "shadow_policy_report",
+        "contact_shadow_debug",
+        "cascade_debug",
+        "shadow_stability_packet"
+      ],
+      "must_preserve_v1_gate": "packet_stability_analysis"
+    },
+    {
+      "id": "material_aware_temporal",
+      "phase": "FSSP-V2-007",
+      "required_outputs": [
+        "velocity_debug",
+        "temporal_rejection_debug",
+        "history_clamp_debug",
+        "smooth_surface_motion_gate"
+      ],
+      "must_preserve_v1_gate": "packet_stability_analysis"
+    },
+    {
+      "id": "hdr_post_v2",
+      "phase": "FSSP-V2-008",
+      "required_outputs": [
+        "named_post_stages",
+        "exposure_report",
+        "tone_map_report",
+        "visual_quality_gate"
+      ],
+      "must_preserve_v1_gate": "visual_quality_analysis"
+    },
+    {
+      "id": "render_graph_ownership",
+      "phase": "FSSP-V2-009",
+      "required_outputs": [
+        "explicit_pass_graph",
+        "resource_producer_report",
+        "resource_state_report",
+        "debug_view_source_report"
+      ],
+      "must_preserve_v1_gate": "frame_contract_validation"
+    },
+    {
+      "id": "asset_registry_material_evidence",
+      "phase": "FSSP-V2-002",
+      "required_outputs": [
+        "asset_material_family",
+        "pbr_texture_readiness",
+        "shader_feature_flags",
+        "hero_surface_readiness"
+      ],
+      "must_preserve_v1_gate": "aaa_asset_quality"
+    },
+    {
+      "id": "cross_family_packets",
+      "phase": "FSSP-V2-010",
+      "required_outputs": [
+        "gallery_packet",
+        "kitchen_packet",
+        "office_packet",
+        "gym_packet",
+        "concert_packet",
+        "v1_baseline_comparison"
+      ],
+      "must_preserve_v1_gate": "all_v1_hard_gates"
+    }
+  ],
+  "phase_order": [
+    "FSSP-V2-001",
+    "FSSP-V2-002",
+    "FSSP-V2-003",
+    "FSSP-V2-004",
+    "FSSP-V2-005",
+    "FSSP-V2-006",
+    "FSSP-V2-007",
+    "FSSP-V2-008",
+    "FSSP-V2-009",
+    "FSSP-V2-010"
+  ],
+  "target_families": [
+    "gallery",
+    "kitchen",
+    "office",
+    "gym",
+    "concert"
+  ],
+  "hard_rules": [
+    "Do not disable IBL, shadows, reflections, or temporal history as a fix unless a profile explicitly requires that feature off and the packet evidence still proves visual quality.",
+    "Do not accept visible external HDRI ownership in enclosed scenes.",
+    "Do not regress Renderer V1 hard gates while implementing V2.",
+    "Do not use one-scene screenshot improvement as proof of a reusable renderer feature.",
+    "Every V2 domain must have frame-report or packet evidence before it is considered implemented."
+  ]
+}

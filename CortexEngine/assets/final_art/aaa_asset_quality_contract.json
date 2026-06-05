@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "purpose": "AAA asset-quality admission contract for deciding when a scene family has moved beyond blockout/prototype assets.",
+  "report_schema": "cortex.aaa_asset_quality.report.v1",
+  "policy": {
+    "whole_scene_blob_forbidden": true,
+    "editable_mesh_required": true,
+    "renderer_v1_contract_required": true,
+    "scene_local_environment_required": true,
+    "human_review_required_for_completion": true,
+    "prototype_generators_allowed_as_blockers_only": [
+      "openai_shap_e_text300m"
+    ],
+    "aaa_provider_targets": [
+      "hunyuan3d_2_1",
+      "trellis_image_large",
+      "cc0_curated_library",
+      "artist_authored_pbr"
+    ]
+  },
+  "minimums": {
+    "scene_score": 0.82,
+    "hero_runtime_mesh_ratio": 0.85,
+    "all_runtime_mesh_ratio": 0.55,
+    "primitive_ratio_max": 0.45,
+    "required_role_coverage": 0.95,
+    "pbr_texture_asset_ratio": 0.65,
+    "lod_ready_asset_ratio": 0.70,
+    "collision_ready_asset_ratio": 0.70,
+    "provenance_ready_asset_ratio": 0.95,
+    "min_runtime_mesh_instances": 18,
+    "min_unique_runtime_assets": 10,
+    "min_material_presets": 12,
+    "min_scene_detail_objects": 45
+  },
+  "weights": {
+    "hero_runtime_mesh_ratio": 0.18,
+    "all_runtime_mesh_ratio": 0.12,
+    "primitive_ratio": 0.10,
+    "required_role_coverage": 0.14,
+    "pbr_texture_asset_ratio": 0.12,
+    "lod_ready_asset_ratio": 0.08,
+    "collision_ready_asset_ratio": 0.08,
+    "provenance_ready_asset_ratio": 0.08,
+    "unique_runtime_asset_ratio": 0.05,
+    "material_preset_ratio": 0.05,
+    "detail_object_ratio": 0.10
+  },
+  "target_scenes": [
+    {
+      "id": "home_kitchen_lantern",
+      "catalog_scene": "home_kitchen_lantern",
+      "renderer_family": "kitchen",
+      "admitted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_kitchen/scene_seed.json",
+      "hero_roles": ["warm_fixture", "fridge", "cabinet", "countertop", "sink", "tabletop_surface"],
+      "blockout_allowlist_roles": ["room_floor", "room_wall", "room_ceiling", "window_light"]
+    },
+    {
+      "id": "home_office_evening",
+      "catalog_scene": "home_office_evening",
+      "renderer_family": "office",
+      "admitted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_office/scene_seed.json",
+      "hero_roles": ["desk", "monitor", "keyboard", "task_lamp", "chair", "shelf", "book"],
+      "blockout_allowlist_roles": ["room_floor", "room_wall", "room_ceiling", "window_light"]
+    },
+    {
+      "id": "basketball_gym_day",
+      "catalog_scene": "basketball_gym_day",
+      "renderer_family": "gym",
+      "admitted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_basketball_gym/scene_seed.json",
+      "hero_roles": ["backboard", "hoop", "ball", "bleacher", "stadium_seat", "scoreboard"],
+      "blockout_allowlist_roles": ["room_floor", "room_wall", "room_ceiling", "court_marking"]
+    },
+    {
+      "id": "neon_streamer_concert",
+      "catalog_scene": "neon_streamer_concert",
+      "renderer_family": "concert",
+      "admitted_seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_concert/scene_seed.json",
+      "hero_roles": ["stage", "desk", "hero_screen", "stage_light", "audience_riser", "auditorium_seat", "overhead_light"],
+      "blockout_allowlist_roles": ["venue_floor", "venue_wall", "ceiling_plane", "light_beam"]
+    },
+    {
+      "id": "rt_showcase_gallery",
+      "catalog_scene": "liquid_gallery",
+      "renderer_family": "gallery",
+      "admitted_seed": "",
+      "hero_roles": ["hero_liquid_pair", "plinth", "vessel_rim", "reflection_card"],
+      "blockout_allowlist_roles": ["support_neutral_gallery"]
+    }
+  ],
+  "hard_blockers": [
+    "missing target seed",
+    "missing renderer V1 manifest",
+    "renderer family missing from manifest",
+    "enclosed scene permits visible HDRI",
+    "required role coverage below minimum",
+    "hero role still primitive/blockout",
+    "runtime mesh instance count below minimum",
+    "unique runtime asset count below minimum",
+    "pbr texture ratio below minimum",
+    "lod readiness ratio below minimum",
+    "collision readiness ratio below minimum",
+    "provenance readiness ratio below minimum"
+  ]
+}

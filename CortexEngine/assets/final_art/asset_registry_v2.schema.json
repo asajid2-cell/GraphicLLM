@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for the generated AAA asset registry V2.",
+  "registry_path": "assets/final_art/asset_registry_v2.json",
+  "required_root_fields": [
+    "schema",
+    "generated_by",
+    "asset_count",
+    "source_scene_count",
+    "assets",
+    "summary"
+  ],
+  "required_asset_fields": [
+    "id",
+    "runtime_asset",
+    "source_class",
+    "provenance",
+    "referenced_by",
+    "semantic_roles",
+    "scene_families",
+    "readiness",
+    "quality_blockers"
+  ],
+  "source_classes": [
+    "artist_authored_pbr",
+    "cc0_curated_library",
+    "engine_generated_fidelity_mesh",
+    "prototype_pretrained_generated",
+    "unknown_runtime_asset"
+  ],
+  "readiness_fields": [
+    "editable_mesh",
+    "separated_object",
+    "provenance_ready",
+    "pbr_textures_complete",
+    "lod_chain_ready",
+    "collision_proxy_ready",
+    "scale_bounds_known",
+    "support_anchor_known",
+    "preview_ready",
+    "aaa_ready"
+  ]
+}

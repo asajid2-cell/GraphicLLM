@@ -1201,7 +1201,8 @@ float4 PSMain(VSOutput input) : SV_Target0 {
         NdotV,
         NdotL,
         sunLdotH);
-    float3 directLight = sunBrdf * g_SunRadiance.rgb * NdotL * shadow;
+    float3 directLightUnshadowed = sunBrdf * g_SunRadiance.rgb * NdotL;
+    float3 directLight = directLightUnshadowed * shadow;
 
     // Clustered local lights.
     if (g_ClusterParams.z > 0u) {
@@ -1372,7 +1373,9 @@ float4 PSMain(VSOutput input) : SV_Target0 {
                 NdotV,
                 fixtureNdotLl,
                 localLdotH);
-            directLight += localBrdf * radiance * fixtureNdotLl * shadowLocal;
+            float3 localDirectUnshadowed = localBrdf * radiance * fixtureNdotLl;
+            directLightUnshadowed += localDirectUnshadowed;
+            directLight += localDirectUnshadowed * shadowLocal;
         }
     }
 
@@ -1600,6 +1603,12 @@ float4 PSMain(VSOutput input) : SV_Target0 {
 
     if (g_ReflectionProbeParams.z == 44u) {
         return float4(saturate(directLight), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 54u) {
+        return float4(saturate(directLightUnshadowed), 1.0f);
+    }
+    if (g_ReflectionProbeParams.z == 55u) {
+        return float4(saturate((directLightUnshadowed - directLight) * 2.0f), 1.0f);
     }
     if (g_ReflectionProbeParams.z == 45u) {
         return float4(saturate(ambient), 1.0f);

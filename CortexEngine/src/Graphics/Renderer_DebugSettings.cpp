@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 53u;
+constexpr uint32_t kMaxDebugViewMode = 55u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -62,6 +62,8 @@ void Renderer::CycleDebugViewMode() {
     // 51 = VB reflection policy
     // 52 = VB temporal policy
     // 53 = VB post sensitivity
+    // 54 = VB deferred direct light before shadows
+    // 55 = VB deferred direct-light shadow loss
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -119,6 +121,8 @@ void Renderer::CycleDebugViewMode() {
         case 51: label = "VB_ReflectionPolicy"; break;
         case 52: label = "VB_TemporalPolicy"; break;
         case 53: label = "VB_PostSensitivity"; break;
+        case 54: label = "VB_DeferredDirectLightUnshadowed"; break;
+        case 55: label = "VB_DeferredDirectLightShadowLoss"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

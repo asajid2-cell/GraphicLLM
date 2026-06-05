@@ -554,7 +554,7 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         renderer_debug_source,
-        "constexpr uint32_t kMaxDebugViewMode = 53u",
+        "constexpr uint32_t kMaxDebugViewMode = 55u",
         "Renderer debug mode range",
     )
     for token in [
@@ -627,6 +627,36 @@ def validate_runtime_lighting_surface() -> list[str]:
         '"rig_source"',
     ]:
         require_source_token(errors, json_source, token, "FullScene lighting frame-report JSON")
+
+    deferred_lighting = DEFERRED_LIGHTING_SHADER_PATH.read_text(encoding="utf-8")
+    renderer_debug = RENDERER_DEBUG_SETTINGS_SOURCE_PATH.read_text(encoding="utf-8")
+    packet_script = RUN_FULL_SCENE_SHADER_PACKET_PATH.read_text(encoding="utf-8")
+    scene_packet_script = (ROOT / "tools" / "run_scene_local_cinematic_renderer_v1_packets.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    for token in [
+        "directLightUnshadowed",
+        "localDirectUnshadowed",
+        "g_ReflectionProbeParams.z == 54u",
+        "g_ReflectionProbeParams.z == 55u",
+        "directLightUnshadowed - directLight",
+    ]:
+        require_source_token(errors, deferred_lighting, token, "DeferredLighting V2 direct-light comparison")
+
+    for token in [
+        "constexpr uint32_t kMaxDebugViewMode = 55u",
+        "VB_DeferredDirectLightUnshadowed",
+        "VB_DeferredDirectLightShadowLoss",
+    ]:
+        require_source_token(errors, renderer_debug, token, "Renderer V2 direct-light debug labels")
+
+    for token in [
+        "direct_light_unshadowed",
+        "direct_light_shadow_loss",
+    ]:
+        require_source_token(errors, packet_script, token, "V2 packet runner direct-light comparison views")
+        require_source_token(errors, scene_packet_script, token, "Scene-local packet direct-light comparison views")
 
     return errors
 
@@ -981,6 +1011,8 @@ def validate_v2_packet_runner_surface() -> list[str]:
         "reflection_owner",
         "shadow_factor",
         "direct_light",
+        "direct_light_unshadowed",
+        "direct_light_shadow_loss",
         "ambient_ibl",
         "taa_blend",
     ]

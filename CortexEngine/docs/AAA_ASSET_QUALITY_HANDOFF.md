@@ -2033,3 +2033,67 @@ Current interpretation:
 - V2 beauty remains `v1_fallback`.
 - Next shader-side lighting work should add a V2 direct-light shadow
   output/debug comparison path.
+
+## Full Scene Shader V2 Direct-Light Shadow Comparison - 2026-06-05
+
+Implemented:
+
+- Added shader-side direct-light comparison surfaces in
+  `assets/shaders/DeferredLighting.hlsl`.
+  - `directLightUnshadowed` is accumulated beside the existing shadowed
+    `directLight`.
+  - local lights accumulate `localDirectUnshadowed` before local shadow factors.
+  - debug mode `54` outputs unshadowed direct light.
+  - debug mode `55` outputs direct-light shadow loss.
+- Updated `src/Graphics/Renderer_DebugSettings.cpp`.
+  - max debug mode is now `55`.
+  - labels added:
+    - `VB_DeferredDirectLightUnshadowed`.
+    - `VB_DeferredDirectLightShadowLoss`.
+- Updated packet surfaces:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`.
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+- Updated V2 frame-report contract/checker:
+  - `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`.
+  - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+$env:CORTEX_SKIP_ASSET_SYNC='1'; cmake --build build --config Release --target CortexEngine --parallel 8
+cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_direct_light_shadow_compare_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Build note:
+
+- Full asset sync hung in this repo again.
+- Build was verified with `CORTEX_SKIP_ASSET_SYNC=1`.
+- The edited `DeferredLighting.hlsl` was then copied explicitly to
+  `build/bin/assets/shaders/DeferredLighting.hlsl` for runtime packet proof.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_direct_light_shadow_compare_packet_20260605`.
+- captured views: `15`.
+- evidence rows: `150`.
+- failures: `0`.
+- captured direct-light comparison views:
+  - `direct_light`, debug view `44`.
+  - `direct_light_unshadowed`, debug view `54`.
+  - `direct_light_shadow_loss`, debug view `55`.
+
+Current interpretation:
+
+- V2 lighting now has shader-side direct-light/shadow comparison output, not
+  just evidence fields.
+- V2 beauty remains `v1_fallback`.
+- Next options:
+  - add packet delta metrics for direct-light shadow comparison.
+  - or move to reflection-source resolver shadow-output if lighting comparison
+    is enough for this slice.

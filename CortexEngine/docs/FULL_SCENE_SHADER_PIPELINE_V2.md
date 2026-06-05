@@ -1889,3 +1889,79 @@ Current interpretation:
   HDR output, and shadow-map input connection.
 - The next shader-side lighting slice should add a V2 direct-light shadow
   output/debug comparison path rather than adding more profile-only evidence.
+
+## Full Scene Shader Pipeline V2 Direct-Light Shadow Comparison Slice - 2026-06-05
+
+Purpose:
+
+- Continue `FSSP-V2-004B` by adding a shader-side direct-light comparison
+  surface.
+- Make V2 direct lighting inspectable as:
+  - shadowed direct light.
+  - unshadowed direct light.
+  - direct-light shadow loss.
+- Keep V1 beauty as fallback while exposing the shadow-output comparison in
+  packet captures.
+
+Implemented:
+
+- `DeferredLighting.hlsl`
+  - now accumulates `directLightUnshadowed` beside the existing shadowed
+    `directLight`.
+  - local lights also accumulate `localDirectUnshadowed` before applying
+    local shadow factors.
+  - debug mode `54` returns unshadowed direct light.
+  - debug mode `55` returns the direct-light energy removed by shadows.
+- `Renderer_DebugSettings.cpp`
+  - expands the debug view range to `55`.
+  - labels:
+    - `VB_DeferredDirectLightUnshadowed`.
+    - `VB_DeferredDirectLightShadowLoss`.
+- Packet runners now expose:
+  - `direct_light_unshadowed`.
+  - `direct_light_shadow_loss`.
+- The V2 frame-report contract and checker require the new comparison views.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+$env:CORTEX_SKIP_ASSET_SYNC='1'; cmake --build build --config Release --target CortexEngine --parallel 8
+cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_direct_light_shadow_compare_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed with `CORTEX_SKIP_ASSET_SYNC=1`.
+- Updated `DeferredLighting.hlsl` was copied into `build/bin/assets/shaders`.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_direct_light_shadow_compare_packet_20260605`.
+- captured views: `15`.
+- evidence rows: `150`.
+- failures: `0`.
+- direct-light comparison views:
+  - `direct_light`, debug view `44`.
+  - `direct_light_unshadowed`, debug view `54`.
+  - `direct_light_shadow_loss`, debug view `55`.
+
+Current interpretation:
+
+- V2 direct-light/shadow contribution can now be inspected as a shader-side
+  comparison surface.
+- This is still a debug/packet surface, not a V2 beauty promotion.
+- The next lighting implementation should turn this comparison into a
+  shadow-output candidate path with per-view delta metrics, or move to the
+  reflection source resolver shadow-output slice if lighting comparison is
+  sufficient for now.

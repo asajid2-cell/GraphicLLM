@@ -907,9 +907,71 @@ Important limitation:
   It creates the runtime contract that ReflectionV3 and CompositeV3 can consume
   without relying on visible IBL/background leakage.
 
-### L008 - Cinematic Post V3
+### L008 - Composite V3 and Cinematic Post V3
 
-Status: pending.
+Status: in progress.
+
+Current evidence-domain implementation:
+
+- runtime V3 frame report now exposes:
+  - `composite_v3_ready`.
+  - `hdr_scene_color_ready`.
+  - `composite_inputs_ready`.
+  - `composite_energy_policy_ready`.
+  - `composite_overbright_diagnostics_ready`.
+  - `composite_v3_producer`.
+  - `composite_v3_channel_count`.
+  - `cinematic_post_v3_ready`.
+  - `ldr_cinematic_output_ready`.
+  - `exposure_meter_ready`.
+  - `bloom_extract_ready`.
+  - `color_grade_ready`.
+  - `tone_map_ready`.
+  - `cinematic_post_v3_producer`.
+  - `cinematic_post_v3_channel_count`.
+- `FullSceneCompositeV3Adapter` is now a real V3 domain entry.
+- current composite output resource is the logical ownership contract
+  `hdr_scene_color`, backed by the current `hdr_color` resource.
+- current composite debug view is `hdr_scene_color`.
+- current composite readiness channels are:
+  `hdr_scene_color`, `composite_inputs`, `energy_clamp_policy`, and
+  `overbright_diagnostics`.
+- current composite backing contracts are:
+  `hdr_color`, `material_attributes`, `lighting_split`,
+  `reflection_radiance`, and `scene_local_environment`.
+- `CinematicPostV3Adapter` is now a real V3 domain entry.
+- current post output resource is the logical ownership contract
+  `ldr_cinematic_output`, backed by the current `PostProcess -> back_buffer`
+  path.
+- current post debug view is `exposure_meter`.
+- current post readiness channels are:
+  `ldr_cinematic_output`, `exposure_meter`, `bloom_extract`,
+  `color_grade_delta`, and `tone_map`.
+- the placeholder packet analyzer now allows and validates the `composite`
+  and `cinematic_post` domains only after their upstream V3 domains are ready.
+- first runtime smoke:
+  `build/captures/v3_composite_post_contract_smoke1_20260605`.
+- first runtime smoke result:
+  `report_count=16`,
+  `composite_v3_ready_report_count=16`,
+  `cinematic_post_v3_ready_report_count=16`,
+  `reflection_v3_ready_report_count=16`,
+  failures `0`, warnings `0`.
+- gallery smoke composite evidence:
+  `composite_v3_producer=FullSceneCompositeV3Adapter`,
+  `composite_v3_channel_count=4`,
+  all four composite channel flags ready.
+- gallery smoke post evidence:
+  `cinematic_post_v3_producer=CinematicPostV3Adapter`,
+  `cinematic_post_v3_channel_count=5`,
+  all five post channel flags ready.
+
+Important limitation:
+
+- This slice does not promote default beauty and does not replace the current
+  shader composite/post path. It creates named V3 ownership around the existing
+  HDR and LDR outputs so a later candidate beauty path can be gated rather than
+  guessed from screenshots.
 
 ### L009 - Cross-Family Packet Evidence
 

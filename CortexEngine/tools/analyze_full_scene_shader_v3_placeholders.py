@@ -26,11 +26,12 @@ REQUIRED_DOMAINS = {
     "lighting",
     "reflection",
     "environment",
+    "composite",
     "cinematic_post",
     "validation",
 }
 
-ALLOWED_READY_DOMAINS = {"material", "lighting", "environment", "reflection"}
+ALLOWED_READY_DOMAINS = {"material", "lighting", "environment", "reflection", "composite", "cinematic_post"}
 
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
@@ -427,6 +428,71 @@ def analyze_report(
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
 
+    composite_domain = domain_by_id.get("composite")
+    composite_ready = v3.get("composite_v3_ready") is True
+    if composite_ready:
+        for dependency in [
+            "material_attributes_ready",
+            "lighting_split_resources_ready",
+            "scene_local_environment_ready",
+            "reflection_v3_ready",
+        ]:
+            if v3.get(dependency) is not True:
+                failures.append(f"composite_v3_ready=true before {dependency}")
+        if not isinstance(composite_domain, dict):
+            failures.append("composite_v3_ready=true but composite domain is missing")
+        else:
+            if composite_domain.get("producer") != "FullSceneCompositeV3Adapter":
+                failures.append("composite domain must currently be produced by FullSceneCompositeV3Adapter")
+            if composite_domain.get("output_resource") != "hdr_scene_color":
+                failures.append("composite domain must output hdr_scene_color")
+            if composite_domain.get("debug_view") != "hdr_scene_color":
+                failures.append("composite domain must expose hdr_scene_color debug view")
+            if composite_domain.get("default_beauty_affects") is not False:
+                failures.append("composite domain must not affect default beauty yet")
+            if composite_domain.get("ready_channel_count", 0) < 4:
+                failures.append("composite domain ready without all required channels")
+            if composite_domain.get("missing_required_channel_count", 1) != 0:
+                failures.append("composite domain ready with missing required channels")
+        for key in [
+            "hdr_scene_color_ready",
+            "composite_inputs_ready",
+            "composite_energy_policy_ready",
+            "composite_overbright_diagnostics_ready",
+        ]:
+            if v3.get(key) is not True:
+                failures.append(f"composite_v3_ready=true but {key} is not true")
+
+    post_domain = domain_by_id.get("cinematic_post")
+    post_ready = v3.get("cinematic_post_v3_ready") is True
+    if post_ready:
+        if v3.get("composite_v3_ready") is not True:
+            failures.append("cinematic_post_v3_ready=true before composite_v3_ready")
+        if not isinstance(post_domain, dict):
+            failures.append("cinematic_post_v3_ready=true but cinematic_post domain is missing")
+        else:
+            if post_domain.get("producer") != "CinematicPostV3Adapter":
+                failures.append("cinematic_post domain must currently be produced by CinematicPostV3Adapter")
+            if post_domain.get("output_resource") != "ldr_cinematic_output":
+                failures.append("cinematic_post domain must output ldr_cinematic_output")
+            if post_domain.get("debug_view") != "exposure_meter":
+                failures.append("cinematic_post domain must expose exposure_meter debug view")
+            if post_domain.get("default_beauty_affects") is not False:
+                failures.append("cinematic_post domain must not affect default beauty yet")
+            if post_domain.get("ready_channel_count", 0) < 5:
+                failures.append("cinematic_post domain ready without all required channels")
+            if post_domain.get("missing_required_channel_count", 1) != 0:
+                failures.append("cinematic_post domain ready with missing required channels")
+        for key in [
+            "ldr_cinematic_output_ready",
+            "exposure_meter_ready",
+            "bloom_extract_ready",
+            "color_grade_ready",
+            "tone_map_ready",
+        ]:
+            if v3.get(key) is not True:
+                failures.append(f"cinematic_post_v3_ready=true but {key} is not true")
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -454,11 +520,26 @@ def analyze_report(
         "reflection_source_id_ready": v3.get("reflection_source_id_ready"),
         "reflection_temporal_delta_ready": v3.get("reflection_temporal_delta_ready"),
         "reflection_v3_source_contract": v3.get("reflection_v3_source_contract"),
+        "composite_v3_ready": v3.get("composite_v3_ready"),
+        "hdr_scene_color_ready": v3.get("hdr_scene_color_ready"),
+        "composite_inputs_ready": v3.get("composite_inputs_ready"),
+        "composite_energy_policy_ready": v3.get("composite_energy_policy_ready"),
+        "composite_overbright_diagnostics_ready": v3.get("composite_overbright_diagnostics_ready"),
+        "composite_v3_producer": v3.get("composite_v3_producer"),
+        "cinematic_post_v3_ready": v3.get("cinematic_post_v3_ready"),
+        "ldr_cinematic_output_ready": v3.get("ldr_cinematic_output_ready"),
+        "exposure_meter_ready": v3.get("exposure_meter_ready"),
+        "bloom_extract_ready": v3.get("bloom_extract_ready"),
+        "color_grade_ready": v3.get("color_grade_ready"),
+        "tone_map_ready": v3.get("tone_map_ready"),
+        "cinematic_post_v3_producer": v3.get("cinematic_post_v3_producer"),
         "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
         "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
         "scene_local_environment_channel_count": v3.get("scene_local_environment_channel_count"),
         "reflection_v3_channel_count": v3.get("reflection_v3_channel_count"),
         "reflection_v3_source_count": v3.get("reflection_v3_source_count"),
+        "composite_v3_channel_count": v3.get("composite_v3_channel_count"),
+        "cinematic_post_v3_channel_count": v3.get("cinematic_post_v3_channel_count"),
         "full_scene_lighting_v3_executed": (
             lighting_split_pass.get("executed") if isinstance(lighting_split_pass, dict) else None
         ),
@@ -537,6 +618,12 @@ def main() -> int:
         ),
         "reflection_v3_ready_report_count": sum(
             1 for row in rows if row.get("reflection_v3_ready") is True
+        ),
+        "composite_v3_ready_report_count": sum(
+            1 for row in rows if row.get("composite_v3_ready") is True
+        ),
+        "cinematic_post_v3_ready_report_count": sum(
+            1 for row in rows if row.get("cinematic_post_v3_ready") is True
         ),
         "full_scene_lighting_v3_executed_report_count": sum(
             1 for row in rows if row.get("full_scene_lighting_v3_executed") is True

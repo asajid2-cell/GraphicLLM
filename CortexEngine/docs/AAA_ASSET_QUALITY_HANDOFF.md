@@ -252,6 +252,51 @@ ReflectionV3 evidence-domain slice:
   - gallery reflection channel count: `4`.
   - gallery reflection source count: `4`.
 
+CompositeV3 / CinematicPostV3 evidence-domain slice:
+
+- Runtime V3 frame reports now expose:
+  - `composite_v3_ready`.
+  - `hdr_scene_color_ready`.
+  - `composite_inputs_ready`.
+  - `composite_energy_policy_ready`.
+  - `composite_overbright_diagnostics_ready`.
+  - `composite_v3_producer`.
+  - `composite_v3_channel_count`.
+  - `cinematic_post_v3_ready`.
+  - `ldr_cinematic_output_ready`.
+  - `exposure_meter_ready`.
+  - `bloom_extract_ready`.
+  - `color_grade_ready`.
+  - `tone_map_ready`.
+  - `cinematic_post_v3_producer`.
+  - `cinematic_post_v3_channel_count`.
+- `FullSceneCompositeV3Adapter` is now a real V3 domain entry around the
+  current `hdr_color` resource.
+- Current composite readiness channels:
+  `hdr_scene_color`, `composite_inputs`, `energy_clamp_policy`, and
+  `overbright_diagnostics`.
+- `CinematicPostV3Adapter` is now a real V3 domain entry around the current
+  `PostProcess -> back_buffer` path.
+- Current post readiness channels:
+  `ldr_cinematic_output`, `exposure_meter`, `bloom_extract`,
+  `color_grade_delta`, and `tone_map`.
+- The V3 contract JSON now includes a required `composite` domain.
+- This is not a default-beauty promotion. It names and validates current
+  HDR/LDR ownership so the eventual candidate beauty path has a measurable
+  gate.
+- Runtime smoke:
+  `build/captures/v3_composite_post_contract_smoke1_20260605`.
+  - reports: `16`.
+  - `composite_v3_ready_report_count=16`.
+  - `cinematic_post_v3_ready_report_count=16`.
+  - `reflection_v3_ready_report_count=16`.
+  - failures: `0`.
+  - warnings: `0`.
+  - gallery composite producer: `FullSceneCompositeV3Adapter`.
+  - gallery composite channel count: `4`.
+  - gallery post producer: `CinematicPostV3Adapter`.
+  - gallery post channel count: `5`.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:

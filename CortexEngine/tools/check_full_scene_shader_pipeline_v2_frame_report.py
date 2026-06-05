@@ -622,6 +622,8 @@ def validate_runtime_temporal_surface() -> list[str]:
         TEMPORAL_REJECTION_SOURCE_PATH,
         POST_PROCESS_SHADER_PATH,
         SHADER_TYPES_HEADER_PATH,
+        FULL_SCENE_SHADER_FRAME_CONTEXT_PATH,
+        FRAME_CONTRACT_JSON_SOURCE_PATH,
     ]
     for path in required_paths:
         if not path.exists():
@@ -633,6 +635,8 @@ def validate_runtime_temporal_surface() -> list[str]:
     temporal_source = TEMPORAL_REJECTION_SOURCE_PATH.read_text(encoding="utf-8")
     post_shader = POST_PROCESS_SHADER_PATH.read_text(encoding="utf-8")
     shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
+    facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    json_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
 
     require_source_token(
         errors,
@@ -676,6 +680,39 @@ def validate_runtime_temporal_surface() -> list[str]:
         "SetComputeRootConstantBufferView(kFrameConstantsRoot, desc.frameConstants)",
         "TemporalRejectionMask frame constants binding",
     )
+
+    for token in [
+        "struct FullSceneTemporalEvidence",
+        "BuildFullSceneTemporalEvidence",
+        "visibilityBufferMotionReady",
+        "previousTransformHistoryReady",
+        "temporalMaskStatsReady",
+        "taaHistoryVelocityReprojectionReady",
+        "taaHistoryDisocclusionRejectionReady",
+        "missingTemporalContractCount",
+        "Material-aware temporal stability is ready",
+    ]:
+        require_source_token(errors, facade_source, token, "FullScene temporal evidence")
+
+    for token in [
+        '"visibility_buffer_motion_ready"',
+        '"previous_transform_history_ready"',
+        '"temporal_mask_ready"',
+        '"temporal_mask_stats_ready"',
+        '"temporal_mask_latency_ready"',
+        '"taa_history_ready"',
+        '"taa_history_velocity_reprojection_ready"',
+        '"taa_history_disocclusion_rejection_ready"',
+        '"temporal_mask_accepted_ratio"',
+        '"temporal_mask_disocclusion_ratio"',
+        '"temporal_mask_high_motion_ratio"',
+        '"temporal_mask_out_of_bounds_ratio"',
+        '"temporal_mask_readback_latency_frames"',
+        '"taa_history_age_frames"',
+        '"taa_history_accumulation_alpha"',
+        '"missing_temporal_contract_count"',
+    ]:
+        require_source_token(errors, json_source, token, "FullScene temporal frame-report JSON")
 
     return errors
 

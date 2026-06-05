@@ -200,11 +200,27 @@
       "readiness_fields": [
         "enabled",
         "motion_vectors_ready",
+        "visibility_buffer_motion_ready",
+        "previous_transform_history_ready",
+        "temporal_mask_ready",
+        "temporal_mask_stats_ready",
+        "temporal_mask_latency_ready",
         "jitter_reprojection_ready",
         "material_aware_rejection_ready",
         "history_clamp_ready",
+        "taa_history_ready",
+        "taa_history_velocity_reprojection_ready",
+        "taa_history_disocclusion_rejection_ready",
         "smooth_surface_motion_gate_passed",
-        "camera_sweep_gate_passed"
+        "camera_sweep_gate_passed",
+        "temporal_mask_accepted_ratio",
+        "temporal_mask_disocclusion_ratio",
+        "temporal_mask_high_motion_ratio",
+        "temporal_mask_out_of_bounds_ratio",
+        "temporal_mask_readback_latency_frames",
+        "taa_history_age_frames",
+        "taa_history_accumulation_alpha",
+        "missing_temporal_contract_count"
       ],
       "debug_views": [
         "velocity",

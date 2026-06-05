@@ -50,6 +50,7 @@ bool UpdateDescriptorTable(const DescriptorUpdateContext& context) {
     writeOrNull(10, context.emissiveMetallic, DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(11, context.materialExt1, DXGI_FORMAT_R16G16B16A16_FLOAT);
     writeOrNull(12, context.materialExt2, DXGI_FORMAT_R8G8B8A8_UNORM);
+    writeOrNull(13, context.localReflectionRadiance, DXGI_FORMAT_R16G16B16A16_FLOAT);
     return true;
 }
 

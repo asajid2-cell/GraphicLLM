@@ -43,6 +43,7 @@ struct DescriptorUpdateContext {
     ID3D12Resource* emissiveMetallic = nullptr;
     ID3D12Resource* materialExt1 = nullptr;
     ID3D12Resource* materialExt2 = nullptr;
+    ID3D12Resource* localReflectionRadiance = nullptr;
 };
 
 [[nodiscard]] bool UpdateDescriptorTable(const DescriptorUpdateContext& context);

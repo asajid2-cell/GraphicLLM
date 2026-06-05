@@ -3179,3 +3179,79 @@ Current interpretation:
 - Next work should add the C++ resource state:
   local reflection radiance texture + SRV/UAV descriptors + render-graph
   dispatch pass + post-process SRV binding behind the existing V2 review toggle.
+
+### Reserved Post Local Reflection Radiance Slot - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl`
+  - adds `g_LocalReflectionRadiance` at `t13`.
+  - adds debug view `61`:
+    `local_reflection_radiance`.
+- `src/Graphics/RHI/DX12Pipeline.cpp`
+  - widens the graphics/post SRV root-signature range from `t0-t12` to
+    `t0-t13`.
+- `src/Graphics/RendererTemporalScreenState.h`
+  - widens persistent post-process SRV tables from `13` to `14` slots.
+- `src/Graphics/Passes/PostProcessPass.*`
+  - writes slot `13` as a null `R16G16B16A16_FLOAT` SRV until a producer exists.
+- `src/Graphics/Passes/PostProcessGraphPass.*` and
+  `src/Graphics/Renderer_RenderGraphEndFrame.cpp`
+  - add a render-graph read/handle surface for the future local radiance
+    producer while binding null for now.
+- `src/Graphics/Renderer_Descriptors.cpp`
+  - binds the runtime non-graph post descriptor surface with a null local
+    radiance SRV.
+- `src/Graphics/Renderer_DebugSettings.cpp`
+  - raises the debug-view ceiling to `61` and adds the
+    `LocalReflectionRadiance` label.
+- `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  and V2 packet scripts/checkers
+  - include `local_reflection_radiance` as an official reflection debug/evidence
+    view.
+
+Diagnosis fixed during this slice:
+
+- First packet attempt failed PSO creation because `PostProcess.hlsl` declared
+  `t13` while the graphics root signature only exposed `13` descriptors.
+- After the root-signature fix, the `local_reflection_radiance` capture matched
+  `reflection_source_authority`. Root cause was a stale runtime debug clamp:
+  requested debug view `61` was clamped to `60`.
+- The corrected packet proves debug view `61` now reaches the shader and samples
+  the reserved null SRV independently from view `60`.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T cs_6_3 -E CSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\LocalReflectionRadiance.dxil assets\shaders\LocalReflectionRadiance.hlsl
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,local_reflection_radiance,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_local_radiance_slot_smoke4_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- packet:
+  `build/captures/v2_local_radiance_slot_smoke4_20260605`.
+- captured views: `6`.
+- V2 evidence rows: `60`.
+- V2 packet failures: `0`.
+- debug metrics:
+  - `reflection_source_authority`: luma `0.0661`, nonblack `0.4109`.
+  - `local_reflection_radiance`: luma `0.0000`, nonblack `0.0000`.
+- reflection candidate signal remains valid:
+  source luma `0.12212419`, delta luma `0.02840133`.
+- `ctest` found no registered tests in this build, so it is not meaningful
+  coverage for this slice.
+
+Current stopping position:
+
+- The post-process binding surface for a render-graph-owned local reflection
+  radiance buffer is reserved, validated, and packet-visible.
+- This does not yet produce local radiance. The next implementation pass should
+  allocate the `R16G16B16A16_FLOAT` local radiance texture, dispatch
+  `LocalReflectionRadiance.hlsl`, bind the produced SRV into slot `13`, and
+  make debug view `61` show nonzero producer-owned signal.

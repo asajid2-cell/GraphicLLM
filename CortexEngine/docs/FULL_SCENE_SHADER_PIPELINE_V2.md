@@ -3119,3 +3119,63 @@ Current interpretation:
 - Next work should either run interactive user review from the P-menu checkbox
   or begin the real render-graph reflection-radiance buffer that can replace
   the post-only approximation.
+
+### Local Reflection Radiance Buffer Kernel - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/LocalReflectionRadiance.hlsl`
+  - new compute shader kernel for the first render-graph-ready local
+    reflection radiance buffer.
+  - consumes depth, normal/roughness, emissive/metallic, material ext channels,
+    scene color, and authorized environment specular input.
+  - writes `g_OutputRadiance` as `rgb = resolved local reflection radiance`,
+    `a = confidence/admission weight`.
+  - uses the same material/surface classification vocabulary as
+    `PostProcess.hlsl` through `SurfaceClassification.hlsli`.
+  - reconstructs stable world position and reflection direction from
+    `FrameConstants`.
+  - computes local architectural reflection structure, floor/horizon bounce,
+    key-light strips, material-class boosts, local probe confidence, and
+    optional authorized IBL contribution.
+  - rejects sky/background pixels and zero-confidence pixels up front.
+  - soft-limits extreme radiance with the existing RT reflection firefly clamp
+    contract.
+
+Binding contract for the next C++ pass:
+
+| Resource | Register | Purpose |
+|---|---:|---|
+| `g_Depth` | `t0` | surface ownership / world reconstruction |
+| `g_NormalRoughness` | `t1` | reflection direction and gloss |
+| `g_EmissiveMetallic` | `t2` | metallic channel |
+| `g_MaterialExt1` | `t3` | transmission channel |
+| `g_MaterialExt2` | `t4` | surface class and scene material class |
+| `g_SceneColor` | `t5` | reserved for later scene-color-aware radiance |
+| `g_EnvSpecular` | `t6` | authorized IBL/specular source |
+| `g_OutputRadiance` | `u0` | local reflection radiance buffer |
+| `g_Sampler` | `s0` | shared linear sampler |
+| `FrameConstants` | `b1` | camera, lighting, material policy, local probe state |
+
+Validation:
+
+```powershell
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T cs_6_3 -E CSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\LocalReflectionRadiance.dxil assets\shaders\LocalReflectionRadiance.hlsl
+```
+
+Result:
+
+- DXC compile passed.
+- Generated:
+  `build/bin/assets/shaders/LocalReflectionRadiance.dxil`.
+
+Current interpretation:
+
+- We now have a compiled local reflection radiance producer shader, not only a
+  post-process approximation.
+- It is deliberately not bound into default rendering yet, because the current
+  source tree has broad unrelated C++ changes and the first safe checkpoint is
+  the stable shader/resource contract.
+- Next work should add the C++ resource state:
+  local reflection radiance texture + SRV/UAV descriptors + render-graph
+  dispatch pass + post-process SRV binding behind the existing V2 review toggle.

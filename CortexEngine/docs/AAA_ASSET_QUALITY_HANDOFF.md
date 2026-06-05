@@ -297,6 +297,28 @@ CompositeV3 / CinematicPostV3 evidence-domain slice:
   - gallery post producer: `CinematicPostV3Adapter`.
   - gallery post channel count: `5`.
 
+V3 promotion decision gate:
+
+- Added `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now emits:
+  - `promotion_decision.json`.
+  - `promotion_decision.md`.
+- Promotion decision schema:
+  `cortex.full_scene_shader_pipeline_v3.promotion_decision.v1`.
+- Current statuses:
+  - `blocked`: packet artifacts, frame reports, domains, or analyzer gates
+    failed.
+  - `review_packet_passed`: packet is internally coherent but does not yet
+    cover all required families/motion modes.
+  - `candidate_ready_not_promoted`: full required family and motion evidence is
+    present without failures or warnings.
+- Required ready domains:
+  `material`, `lighting`, `environment`, `reflection`, `composite`, and
+  `cinematic_post`.
+- The decision keeps `default_beauty_promotable=false`. This is deliberate:
+  default beauty still requires a separate explicit promotion step and user
+  review, not just a green packet.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:
@@ -4540,3 +4562,74 @@ Next safe pass:
    split debug views.
 3. Begin `FullSceneReflectionV3` scaffolding only after split lighting remains
    stable under motion.
+
+### FullSceneShaderPipeline V3 Promotion Gate / Reflection Temporal Contract - 2026-06-05
+
+Current slice:
+
+- finishing the V3 promotion-decision gate and making it useful across
+  non-gallery scene families.
+- target artifact:
+  `tools/build_full_scene_shader_v3_promotion_decision.py`.
+- focused packet under diagnosis:
+  `build/captures/v3_promotion_decision_gate_smoke1_20260605`.
+
+Diagnosis from the kitchen packet:
+
+- kitchen has `scene_local_environment_ready=true`.
+- kitchen has a ready local reflection probe:
+  `local_reflection_probe_count=1`,
+  `local_reflection_probe_table_valid=true`,
+  `local_reflection_probe_radiance_enabled=true`.
+- kitchen reflection source contract chooses `local_probe`.
+- previous `FullSceneReflectionV3` still failed because
+  `reflection_temporal_delta_ready=false`.
+- that blocked `reflection_v3_ready`, then `composite_v3_ready`, then
+  `cinematic_post_v3_ready`.
+
+Root contract fix:
+
+- `src/Graphics/FullSceneShaderFrameContext.h` now treats reflection temporal
+  delta ownership as source-aware.
+- scene-local probe/environment reflection sources can own
+  `reflection_temporal_delta_scene_local_bound` without RT reflection history.
+- RT/SSR or other history-sensitive paths still require
+  `reflection_temporal_delta_history_bound` through reflection history or TAA
+  history evidence.
+- this is not a scene workaround and does not change default beauty.
+
+Validation still pending for this slice:
+
+- V3 plan validator passed after updating the runtime-surface token check for
+  `reflection_temporal_delta_scene_local_bound` and
+  `reflection_temporal_delta_history_bound`.
+- focused object compile passed for
+  `CMakeFiles\CortexEngine.dir\src\Graphics\FrameContractJson.cpp.obj`.
+- full `CortexEngine` build passed after using the correctly quoted skip:
+  `set "CORTEX_SKIP_ASSET_SYNC=1"`.
+- packet attempts:
+  - `build/captures/v3_promotion_decision_gate_smoke2_20260605`
+  - `build/captures/v3_promotion_decision_gate_smoke3_20260605`
+- both packet attempts hit a DX12 device removal in one kitchen row, so the
+  promotion decision could not be treated as a clean packet pass.
+- however, the new V3 frame-report summaries prove the contract fix:
+  - smoke2: `report_count=32`, reflection `32/32`, composite `32/32`,
+    cinematic post `31/32`, temporal channel
+    `reflection_temporal_delta_scene_local_bound=32`.
+  - smoke3: `report_count=30`, reflection `30/30`, composite `30/30`,
+    cinematic post `29/30`, temporal channel
+    `reflection_temporal_delta_scene_local_bound=30`.
+- remaining blocker is now renderer/GPU stability in the kitchen packet path,
+  not the old `ReflectionV3` temporal-delta contract.
+
+Next safe pass:
+
+1. Diagnose the kitchen DX12 device removal:
+   `lastGpuMarker='MotionVectors'`, DRED page fault `GPU VA=0x0`, failing rows
+   under `v3_promotion_decision_gate_smoke2_20260605/kitchen/shadow_factor`
+   and `v3_promotion_decision_gate_smoke3_20260605/kitchen/beauty`.
+2. Once the kitchen packet stops device-hanging, rerun the V3 promotion packet
+   and require the decision to move from `blocked` to at least
+   `review_packet_passed` with subset warnings.
+3. Do not weaken the promotion gate to ignore failed packet rows; use the new
+   frame-report summarizer only as diagnosis evidence during GPU faults.

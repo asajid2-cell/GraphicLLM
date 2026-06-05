@@ -13,6 +13,7 @@ FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson
 FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
 V3_PLACEHOLDER_ANALYZER_PATH = ROOT / "tools" / "analyze_full_scene_shader_v3_placeholders.py"
 V3_PACKET_RUNNER_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v3_packet.ps1"
+V3_PROMOTION_DECISION_PATH = ROOT / "tools" / "build_full_scene_shader_v3_promotion_decision.py"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -96,6 +97,11 @@ def main() -> int:
         errors,
         f"Missing V3 packet runner: {V3_PACKET_RUNNER_PATH}",
     )
+    require(
+        V3_PROMOTION_DECISION_PATH.exists(),
+        errors,
+        f"Missing V3 promotion decision builder: {V3_PROMOTION_DECISION_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -107,8 +113,9 @@ def main() -> int:
     frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
     analyzer_source = V3_PLACEHOLDER_ANALYZER_PATH.read_text(encoding="utf-8")
     packet_source = V3_PACKET_RUNNER_PATH.read_text(encoding="utf-8")
+    promotion_source = V3_PROMOTION_DECISION_PATH.read_text(encoding="utf-8")
     runtime_surface = "\n".join(
-        [frame_contract_source, frame_context_source, analyzer_source, packet_source]
+        [frame_contract_source, frame_context_source, analyzer_source, packet_source, promotion_source]
     )
 
     for token in REQUIRED_PLAN_TOKENS:
@@ -275,7 +282,8 @@ def main() -> int:
         "reflection_radiance_owned",
         "reflection_confidence_owned",
         "reflection_source_id_owned",
-        "reflection_temporal_delta_owned",
+        "reflection_temporal_delta_scene_local_bound",
+        "reflection_temporal_delta_history_bound",
         "SceneLocalEnvironmentV3",
         "ambient_lighting_owned",
         "reflection_background_owned",
@@ -295,6 +303,12 @@ def main() -> int:
         "cortex.full_scene_shader_pipeline_v3.placeholder_stability.v1",
         "v3_signal.json",
         "v3_stability.json",
+        "promotion_decision.json",
+        "promotion_decision.md",
+        "cortex.full_scene_shader_pipeline_v3.promotion_decision.v1",
+        "candidate_ready_not_promoted",
+        "review_packet_passed",
+        "default_beauty_promotable",
         "run_full_scene_shader_pipeline_v2_packet.ps1",
     ]:
         require(token in runtime_surface, errors, f"V3 runtime surface missing token: {token}")

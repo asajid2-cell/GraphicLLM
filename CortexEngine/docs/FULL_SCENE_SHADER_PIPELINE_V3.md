@@ -735,13 +735,46 @@ Current producer evidence:
 - current cross-family motion blocker:
   `mouse_jitter: concert/v3_indirect_lighting` has motion delta `0.00395094`,
   legacy `ambient_ibl` delta `0.00115572`, V3/legacy ratio `3.419`.
+- indirect parity fix:
+  `PSMainV3LightingSplit` now uses the same scene-local ambient/probe
+  contract as the legacy `ambient_ibl` path:
+  probe weight selection, interior no-environment gate, box-projected probe
+  direction, diffuse/specular local probe scaling, reflection-footprint mip
+  floor, specular ceiling, split AO, local fill, and sheen.
+- indirect parity fix also removes emissive from `indirect_lighting`; emissive
+  belongs in the future V3 composite domain rather than the ambient/indirect
+  debug resource.
+- targeted concert mouse-jiggle parity probe:
+  `build/captures/v3_lighting_concert_indirect_parity_probe2_20260605`.
+- targeted concert result:
+  `v3_indirect_lighting.delta=0.00115572`,
+  legacy `ambient_ibl.delta=0.00115572`,
+  V3/legacy ratio `1.000`,
+  failures `0`, warnings `0`.
+- post-fix cross-family matrix:
+  `build/captures/v3_lighting_motion_matrix_cross_family_after_indirect_fix1_20260605`.
+- post-fix cross-family result:
+  families `gallery,kitchen,gym,concert`,
+  modes `mouse_jitter,camera_sweep`,
+  `rows=40`, failures `0`, warnings `0`.
+- post-fix per-mode V3 stability:
+  - `mouse_jitter`: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`,
+    failures `0`, warnings `0`.
+  - `camera_sweep`: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`,
+    failures `0`, warnings `0`.
 
 Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
-- repeat the V3 lighting motion matrix with promotion-grade frame counts after
-  diagnosing the concert indirect-lighting motion warning.
+- repeat the V3 lighting motion matrix with promotion-grade frame counts and
+  include office/red-room/stadium once those families are packet-wired.
 - compare V3 split outputs against the legacy deferred terms under those
   motion and cross-family packets, not just the static/gallery smoke.
 - keep default beauty unchanged until the consumer/composite path and packet

@@ -1893,16 +1893,177 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         kD_ibl *= 1.0f + subsurfaceWrap * 0.35f;
     }
 
-    float3 indirect = g_AmbientColor.rgb * albedoColor * kD_ibl * ao;
-    if (g_LocalProbeParams.z > 0.5f) {
-        float3 probeDiffuse = ComputeSceneLocalProbeDiffuse(normal, surfaceClass, sceneMaterialClass);
-        float3 probeSpecular = ComputeSceneLocalProbeSpecular(reflect(-V, normal), surfaceClass, sceneMaterialClass, roughness);
-        indirect += probeDiffuse * albedoColor * kD_ibl * max(g_LocalProbeParams.x, 0.0f) * ao;
-        indirect += probeSpecular * Fibl * max(g_LocalProbeParams.y, 0.0f) * SpecularOcclusion(NdotV, ao, roughness);
+    const bool iblEnabled = (g_EnvParams.z > 0.5f);
+    const bool authoredInteriorNoEnvironment = (!iblEnabled && g_EnvParams.w <= 0.001f);
+    float3 ambient = 0.0f.xxx;
+    if (!iblEnabled) {
+        if (authoredInteriorNoEnvironment) {
+            ambient = g_AmbientColor.rgb * albedoColor * kD_ibl;
+        } else {
+            float3 skyColor = ComputeLocalOutdoorSky(float3(normal.x * 0.25f, 0.86f, normal.z * 0.25f));
+            float3 groundColor = ComputeLocalOutdoorSky(float3(normal.x * 0.18f, -0.70f, normal.z * 0.18f));
+            float upWeight = saturate(normal.y * 0.5f + 0.5f);
+            float horizonWeight = saturate(1.0f - abs(normal.y));
+            float3 hemisphere = lerp(groundColor * 0.72f, skyColor, upWeight);
+            hemisphere = lerp(hemisphere, g_AmbientColor.rgb, horizonWeight * 0.22f);
+            ambient = hemisphere * albedoColor * kD_ibl * 0.42f;
+            if (surfaceClass != SURFACE_CLASS_GLASS &&
+                surfaceClass != SURFACE_CLASS_WATER &&
+                surfaceClass != SURFACE_CLASS_MIRROR &&
+                metallic < 0.25f) {
+                float roughReceiver = smoothstep(0.38f, 0.90f, roughness);
+                ambient += g_AmbientColor.rgb * albedoColor * kD_ibl * (0.18f * roughReceiver);
+            }
+        }
     }
-    indirect += emissive;
-    indirect = ApplySceneMaterialCinematicIndirectShaping(
-        indirect,
+
+    uint diffuseEnvIndex = INVALID_BINDLESS_INDEX;
+    uint specularEnvIndex = INVALID_BINDLESS_INDEX;
+    float3 specDir = reflect(-V, normal);
+    float3 specDirGlobal = specDir;
+    float probeWeight = 0.0f;
+
+    uint specWidth = 1u;
+    uint specHeight = 1u;
+    uint specMipCount = 1u;
+    g_EnvSpecular.GetDimensions(0, specWidth, specHeight, specMipCount);
+    float specMaxMip = max((specMipCount > 0u) ? (float)(specMipCount - 1u) : g_ShadowInvSizeAndSpecMaxMip.z, 0.0f);
+    if (specMaxMip <= 0.0f) {
+        specMaxMip = max(g_ShadowInvSizeAndSpecMaxMip.z, 0.0f);
+    }
+    const float diffuseMip = specMaxMip;
+
+#ifdef ENABLE_BINDLESS
+    const uint probeCount = g_ReflectionProbeParams.y;
+    const uint probeTableIndex = g_ReflectionProbeParams.x;
+    if (probeCount > 0u && probeTableIndex != INVALID_BINDLESS_INDEX)
+    {
+        StructuredBuffer<ReflectionProbe> probes = ResourceDescriptorHeap[probeTableIndex];
+
+        float bestW = 0.0f;
+        uint bestI = 0u;
+
+        const uint kMaxProbeIter = 64u;
+        uint count = min(probeCount, kMaxProbeIter);
+        [loop]
+        for (uint i = 0u; i < count; ++i)
+        {
+            ReflectionProbe p = probes[i];
+            float w = ComputeProbeWeight(worldPos, p.centerBlend.xyz, p.extents.xyz, p.centerBlend.w);
+            if (w > bestW)
+            {
+                bestW = w;
+                bestI = i;
+            }
+        }
+
+        if (bestW > 0.0f)
+        {
+            ReflectionProbe p = probes[bestI];
+            diffuseEnvIndex = p.envIndices.x;
+            specularEnvIndex = p.envIndices.y;
+            specDir = BoxProjectReflection(worldPos, specDir, p.centerBlend.xyz, p.extents.xyz);
+            probeWeight = bestW;
+        }
+    }
+#endif
+
+    const bool localProbeRadianceEnabled =
+        (g_LocalProbeParams.z > 0.5f) &&
+        (probeWeight > 0.0f);
+    const bool localProbeTextureRadianceAllowed =
+        localProbeRadianceEnabled &&
+        !authoredInteriorNoEnvironment &&
+        (diffuseEnvIndex != INVALID_BINDLESS_INDEX || specularEnvIndex != INVALID_BINDLESS_INDEX);
+    const float localProbeDiffuseScale = localProbeRadianceEnabled ? max(g_LocalProbeParams.x, 0.0f) : 0.0f;
+    const float localProbeSpecularScale = localProbeRadianceEnabled ? max(g_LocalProbeParams.y, 0.0f) : 0.0f;
+
+    float3 diffuseIBL = 0.0f.xxx;
+    float3 specularIBL = 0.0f.xxx;
+    if ((iblEnabled && g_EnvParams.x > 0.0f) || localProbeDiffuseScale > 0.0f) {
+        float3 irradianceGlobal = iblEnabled
+            ? SampleEnvDiffuse(normal, INVALID_BINDLESS_INDEX, diffuseMip)
+            : 0.0f.xxx;
+        float3 irradianceLocal = localProbeTextureRadianceAllowed && diffuseEnvIndex != INVALID_BINDLESS_INDEX
+            ? SampleEnvDiffuse(normal, diffuseEnvIndex, diffuseMip)
+            : ComputeSceneLocalProbeDiffuse(normal, surfaceClass, sceneMaterialClass);
+        diffuseIBL = irradianceGlobal * albedoColor * kD_ibl;
+        diffuseIBL += irradianceLocal * albedoColor * kD_ibl * localProbeDiffuseScale * probeWeight;
+    }
+
+    float aoDiffuse = ao;
+    float aoSpec = SpecularOcclusion(NdotV, ao, roughness);
+    if ((iblEnabled && g_EnvParams.y > 0.0f) || localProbeSpecularScale > 0.0f) {
+        float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * specMaxMip;
+        float globalFootprintMip = EnvReflectionFootprintMipFromDirection(specDirGlobal, (float)specWidth, (float)specHeight, specMaxMip);
+        float localFootprintMip = EnvReflectionFootprintMipFromDirection(specDir, (float)specWidth, (float)specHeight, specMaxMip);
+        float reflectionFootprintMip = max(globalFootprintMip, localFootprintMip);
+        float iblMipRoughness = SurfaceIblMipRoughness(roughness, surfaceClass, metallic);
+        float mipLevel = max(max(iblMipRoughness * specMaxMip, reflectionSafeMipFloor), reflectionFootprintMip);
+        float3 specGlobal = iblEnabled
+            ? SampleEnvSpecular(specDirGlobal, mipLevel, INVALID_BINDLESS_INDEX)
+            : 0.0f.xxx;
+        float3 specLocal = localProbeTextureRadianceAllowed && specularEnvIndex != INVALID_BINDLESS_INDEX
+            ? SampleEnvSpecular(specDir, mipLevel, specularEnvIndex)
+            : ComputeSceneLocalProbeSpecular(specDir, surfaceClass, sceneMaterialClass, roughness);
+        float3 prefilteredColor =
+            specGlobal * max(g_EnvParams.y, 0.0f) +
+            specLocal * localProbeSpecularScale * probeWeight;
+        float3 iblSpecWeight = Fibl;
+        if (surfaceClass != SURFACE_CLASS_GLASS &&
+            surfaceClass != SURFACE_CLASS_WATER &&
+            surfaceClass != SURFACE_CLASS_MIRROR &&
+            metallic < 0.25f) {
+            const float fresnelMax = max(max(Fibl.r, Fibl.g), Fibl.b);
+            const float reflectionCeiling =
+                SurfaceReflectionCeiling(surfaceClass, roughness, metallic, saturate(materialExt1.a), fresnelMax);
+            iblSpecWeight = min(iblSpecWeight, reflectionCeiling.xxx);
+        }
+        specularIBL = prefilteredColor * iblSpecWeight;
+        specularIBL *= RoughSpecularEnergyCompensation(F0, roughness);
+
+        if (clearCoatWeight > 0.01f) {
+            float coatBlend = clearCoatWeight * 0.8f;
+            float coatMip = max(max(clearCoatRoughness * specMaxMip, reflectionSafeMipFloor), reflectionFootprintMip);
+            float3 coatGlobal = iblEnabled
+                ? SampleEnvSpecular(specDirGlobal, coatMip, INVALID_BINDLESS_INDEX)
+                : 0.0f.xxx;
+            float3 coatLocal = localProbeTextureRadianceAllowed && specularEnvIndex != INVALID_BINDLESS_INDEX
+                ? SampleEnvSpecular(specDir, coatMip, specularEnvIndex)
+                : ComputeSceneLocalProbeSpecular(specDir, surfaceClass, sceneMaterialClass, clearCoatRoughness);
+            float3 coatPref =
+                coatGlobal * max(g_EnvParams.y, 0.0f) +
+                coatLocal * localProbeSpecularScale * probeWeight;
+            float3 coatF0 = float3(0.04f, 0.04f, 0.04f);
+            float3 coatSpecWeight = FresnelSchlickRoughness(NdotV, coatF0, clearCoatRoughness);
+            if (surfaceClass != SURFACE_CLASS_GLASS &&
+                surfaceClass != SURFACE_CLASS_WATER &&
+                surfaceClass != SURFACE_CLASS_MIRROR &&
+                metallic < 0.25f) {
+                const float coatFresnelMax = max(max(coatSpecWeight.r, coatSpecWeight.g), coatSpecWeight.b);
+                const float coatCeiling =
+                    SurfaceReflectionCeiling(surfaceClass, max(clearCoatRoughness, roughness), metallic, saturate(materialExt1.a), coatFresnelMax);
+                coatSpecWeight = min(coatSpecWeight, coatCeiling.xxx);
+            }
+            float3 coatIBL = coatPref * coatSpecWeight;
+            specularIBL = lerp(specularIBL, coatIBL, coatBlend);
+        }
+    }
+
+    ambient *= aoDiffuse;
+    ambient += diffuseIBL * (iblEnabled ? g_EnvParams.x : 1.0f) * aoDiffuse;
+    ambient += specularIBL * aoSpec;
+    if (iblEnabled &&
+        surfaceClass != SURFACE_CLASS_GLASS &&
+        surfaceClass != SURFACE_CLASS_WATER &&
+        surfaceClass != SURFACE_CLASS_MIRROR &&
+        metallic < 0.25f) {
+        float roughReceiver = smoothstep(0.42f, 0.88f, roughness);
+        float3 localFillColor = max(g_AmbientColor.rgb, 0.12f.xxx);
+        ambient += localFillColor * albedoColor * kD_ibl * aoDiffuse * (0.38f * roughReceiver);
+    }
+    ambient = ApplySceneMaterialCinematicIndirectShaping(
+        ambient,
         albedoColor,
         normal,
         sceneMaterialClass,
@@ -1911,11 +2072,15 @@ FullSceneLightingV3Output PSMainV3LightingSplit(VSOutput input) {
         metallic,
         ao,
         NdotV);
+    if (sheenWeight > 0.01f) {
+        float grazing = pow(saturate(1.0f - NdotV), 4.0f);
+        ambient += albedoColor * sheenWeight * grazing * 0.08f;
+    }
 
     output.directLighting = float4(max(directLight, 0.0f.xxx), 1.0f);
     output.directLightingUnshadowed = float4(max(directLightUnshadowed, 0.0f.xxx), 1.0f);
     output.shadowVisibility = float4(shadow.xxx, 1.0f);
     output.shadowLoss = float4(max(directLightUnshadowed - directLight, 0.0f.xxx), 1.0f);
-    output.indirectLighting = float4(max(indirect, 0.0f.xxx), 1.0f);
+    output.indirectLighting = float4(max(ambient, 0.0f.xxx), 1.0f);
     return output;
 }

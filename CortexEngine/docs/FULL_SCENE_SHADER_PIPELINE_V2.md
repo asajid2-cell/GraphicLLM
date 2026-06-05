@@ -1524,3 +1524,100 @@ Current interpretation:
   consume.
 - Next architecture slice should build local reflection/probe ownership and RT
   miss fallback evidence with the same contract-first pattern.
+
+## Full Scene Shader Pipeline V2 Reflection Ownership Evidence Slice - 2026-06-05
+
+Purpose:
+
+- Start Phase 4 by replacing the loose reflection facade with a scene-local
+  reflection/probe ownership contract.
+- Make V2 prove whether reflection owners are known, local probes are valid,
+  external IBL visibility is authorized, RT miss fallback is safe, and enclosed
+  scenes have a local or neutral miss path before any V2 reflection beauty pass
+  is promoted.
+
+Implemented:
+
+- Added `FullSceneReflectionOwnershipEvidence` to
+  `FullSceneShaderFrameContext`.
+- V2 reflection readiness now checks:
+  - reflection-owner debug/report availability.
+  - known scene reflection owner.
+  - complete material reflection policies.
+  - authorized external IBL visibility.
+  - declared local probe rig table/radiance/intensity readiness.
+  - RT reflection miss environment policy.
+  - enclosed-scene miss fallback safety.
+  - at least one authorized reflection source contract.
+- V2 frame reports now emit:
+  - skipped probe count.
+  - local probe rig/table/radiance/intensity readiness.
+  - local probe diffuse/specular intensity.
+  - enclosed miss fallback safety.
+  - reflection source contract readiness.
+  - external IBL visibility authorization.
+  - reflection owner known.
+  - missing reflection contract count.
+- The V2 checker now requires the reflection ownership evidence builder and the
+  new frame-report fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_ownership_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed and linked.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_ownership_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+
+Gallery beauty reflection evidence:
+
+- `reflection_owner_known=true`.
+- `reflection_owner_report_available=true`.
+- `reflection_policies_available=true`.
+- `external_ibl_visibility_authorized=true`.
+- `rt_miss_environment_policy_ready=true`.
+- `enclosed_miss_fallback_safe=true`.
+- `reflection_source_contract_ready=true`.
+- `room_probe_count=2`.
+- `local_probe_rig_declared=true`.
+- `local_probe_table_ready=true`.
+- `local_probe_radiance_ready=true`.
+- `local_probe_intensity_ready=true`.
+- `local_probe_contract_ready=true`.
+- `local_probe_diffuse_intensity=0.171000`.
+- `local_probe_specular_intensity=0.323000`.
+- `skipped_probe_count=0`.
+- `unauthorized_external_hdri_ratio=0`.
+- `unknown_reflection_owner_ratio=0`.
+- `missing_reflection_contract_count=0`.
+- `reflections.domain_ready=true`.
+- failure reason:
+  `Scene-local reflection/probe ownership is ready`.
+
+Current interpretation:
+
+- `FSSP-V2-005A` is complete for the gallery packet.
+- Reflection still renders through the V1 beauty fallback, but V2 now has a
+  packet-proved local reflection/probe ownership contract.
+- Next architecture slice should formalize shadow/contact stability evidence,
+  then material-aware temporal promotion evidence.

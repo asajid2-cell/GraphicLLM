@@ -1717,3 +1717,49 @@ Current state:
   semantic lighting pass work.
 - Next architecture slice should build local reflection/probe ownership and RT
   miss fallback evidence.
+
+## Full Scene Shader V2 Reflection Ownership Evidence - 2026-06-05
+
+Implemented:
+
+- Added `FullSceneReflectionOwnershipEvidence` as the V2 reflection-domain
+  readiness source.
+- V2 reflections now report reflection-owner readiness, material reflection
+  policy coverage, external IBL authorization, local probe table/radiance/
+  intensity readiness, RT miss safety, enclosed miss fallback safety,
+  reflection source contract readiness, and missing reflection contract count.
+- The V2 checker requires the reflection ownership evidence builder and the new
+  JSON fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_ownership_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_ownership_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- gallery V2 reflections:
+  - `missing_reflection_contract_count=0`.
+  - `room_probe_count=2`.
+  - `local_probe_contract_ready=true`.
+  - `external_ibl_visibility_authorized=true`.
+  - `rt_miss_environment_policy_ready=true`.
+  - `reflections.domain_ready=true`.
+
+Current state:
+
+- `FSSP-V2-005A` is packet-proved for the gallery target.
+- V2 reflection/probe ownership is now contract-owned enough to begin the
+  actual local reflection/probe shader-side work.
+- Next architecture slice should formalize shadow/contact stability evidence.

@@ -168,10 +168,23 @@
       "readiness_fields": [
         "enabled",
         "shadow_policy_report_available",
+        "shadow_map_ready",
+        "shadow_map_producer_ready",
         "cascade_debug_available",
+        "cascade_policy_ready",
+        "shadow_bias_policy_ready",
+        "shadow_filter_policy_ready",
+        "shadow_caster_ownership_ready",
         "local_shadow_atlas_ready",
+        "rt_shadow_mask_ready",
+        "rt_shadow_history_ready",
         "contact_shadow_ready",
-        "shadow_stability_gate_passed"
+        "shadow_stability_gate_passed",
+        "shadow_casting_light_count",
+        "shadow_bias",
+        "shadow_pcf_radius",
+        "cascade_split_lambda",
+        "missing_shadow_contract_count"
       ],
       "debug_views": [
         "shadow_factor",

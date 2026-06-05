@@ -156,6 +156,33 @@ struct FullSceneShaderFrameContext {
 
     FullSceneReflectionOwnershipEvidence reflectionEvidence;
 
+    struct FullSceneShadowContactEvidence {
+        bool enabled = false;
+        bool ready = false;
+        bool shadowPolicyReportAvailable = false;
+        bool shadowMapReady = false;
+        bool shadowMapProducerReady = false;
+        bool cascadeDebugAvailable = false;
+        bool cascadePolicyReady = false;
+        bool shadowBiasPolicyReady = false;
+        bool shadowFilterPolicyReady = false;
+        bool shadowCasterOwnershipReady = false;
+        bool localShadowAtlasReady = false;
+        bool rtShadowMaskReady = false;
+        bool rtShadowHistoryReady = false;
+        bool contactShadowReady = false;
+        bool shadowStabilityGatePassed = false;
+        uint32_t shadowCastingLightCount = 0;
+        float shadowBias = 0.0f;
+        float shadowPCFRadius = 0.0f;
+        float cascadeSplitLambda = 0.0f;
+        uint32_t missingShadowContractCount = 0;
+        std::string owner = "ShadowResources/FullSceneShadowContactEvidence";
+        std::string failureReason = "Shadow/contact stability evidence is not populated";
+    };
+
+    FullSceneShadowContactEvidence shadowEvidence;
+
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
     FullSceneShaderDomainEvidence lighting;
@@ -575,6 +602,92 @@ BuildFullSceneReflectionOwnershipEvidence(
     return evidence;
 }
 
+inline FullSceneShaderFrameContext::FullSceneShadowContactEvidence BuildFullSceneShadowContactEvidence(
+    const FrameContract& contract) {
+    FullSceneShaderFrameContext::FullSceneShadowContactEvidence evidence;
+    evidence.enabled = contract.features.shadowsEnabled;
+    evidence.shadowCastingLightCount = contract.lighting.shadowCastingLightCount;
+    evidence.shadowBias = contract.lighting.shadowBias;
+    evidence.shadowPCFRadius = contract.lighting.shadowPCFRadius;
+    evidence.cascadeSplitLambda = contract.lighting.cascadeSplitLambda;
+    evidence.shadowPolicyReportAvailable =
+        !contract.lighting.shadowPolicyId.empty() &&
+        contract.lighting.shadowPolicyId != "default";
+    evidence.shadowMapReady = FullSceneShaderHasResource(contract, "shadow_map");
+    evidence.shadowMapProducerReady =
+        FullSceneShaderPassWritesResource(contract, "ShadowPass", "shadow_map");
+    evidence.cascadeDebugAvailable = evidence.shadowMapReady;
+    evidence.cascadePolicyReady =
+        evidence.cascadeSplitLambda >= 0.0f &&
+        evidence.cascadeSplitLambda <= 1.0f;
+    evidence.shadowBiasPolicyReady =
+        evidence.shadowBias >= 0.0f &&
+        evidence.shadowBias <= 0.02f;
+    evidence.shadowFilterPolicyReady =
+        evidence.shadowPCFRadius >= 0.0f &&
+        evidence.shadowPCFRadius <= 8.0f;
+    evidence.shadowCasterOwnershipReady = evidence.shadowCastingLightCount > 0;
+    evidence.localShadowAtlasReady =
+        evidence.shadowMapReady &&
+        evidence.shadowMapProducerReady &&
+        evidence.shadowCasterOwnershipReady;
+    evidence.rtShadowMaskReady =
+        FullSceneShaderHasResource(contract, "rt_shadow_mask") &&
+        FullSceneShaderPassWritesResource(contract, "RTShadowsGI", "rt_shadow_mask");
+    evidence.rtShadowHistoryReady = FullSceneShaderHasResource(contract, "rt_shadow_history");
+    evidence.contactShadowReady =
+        evidence.rtShadowMaskReady ||
+        (evidence.localShadowAtlasReady && evidence.shadowPCFRadius > 0.0f);
+
+    const bool requiredContracts[] = {
+        evidence.shadowPolicyReportAvailable,
+        evidence.shadowMapReady,
+        evidence.shadowMapProducerReady,
+        evidence.cascadeDebugAvailable,
+        evidence.cascadePolicyReady,
+        evidence.shadowBiasPolicyReady,
+        evidence.shadowFilterPolicyReady,
+        evidence.shadowCasterOwnershipReady,
+        evidence.localShadowAtlasReady,
+        evidence.contactShadowReady,
+    };
+    for (bool ready : requiredContracts) {
+        if (!ready) {
+            ++evidence.missingShadowContractCount;
+        }
+    }
+
+    evidence.shadowStabilityGatePassed =
+        evidence.enabled &&
+        evidence.missingShadowContractCount == 0 &&
+        (!contract.features.rtGIEnabled || evidence.rtShadowMaskReady);
+    evidence.ready = evidence.enabled && evidence.shadowStabilityGatePassed;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "Shadows are disabled";
+    } else if (!evidence.shadowPolicyReportAvailable) {
+        evidence.failureReason = "Scene-local shadow policy report is missing";
+    } else if (!evidence.shadowMapReady || !evidence.shadowMapProducerReady) {
+        evidence.failureReason = "Shadow map resource or producer is missing";
+    } else if (!evidence.shadowCasterOwnershipReady) {
+        evidence.failureReason = "No shadow-casting light ownership is reported";
+    } else if (!evidence.cascadePolicyReady) {
+        evidence.failureReason = "Cascade split policy is outside valid bounds";
+    } else if (!evidence.shadowBiasPolicyReady) {
+        evidence.failureReason = "Shadow bias policy is outside valid bounds";
+    } else if (!evidence.shadowFilterPolicyReady) {
+        evidence.failureReason = "Shadow filter policy is outside valid bounds";
+    } else if (!evidence.contactShadowReady) {
+        evidence.failureReason = "Contact/near-field shadow signal is missing";
+    } else if (!evidence.shadowStabilityGatePassed) {
+        evidence.failureReason = "Shadow stability gate has unresolved required contracts";
+    } else {
+        evidence.failureReason = "Scene-local shadow/contact stability is ready";
+    }
+
+    return evidence;
+}
+
 inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
     std::string id,
     bool enabled,
@@ -664,6 +777,7 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         !context.unknownReflectionOwner,
         context.reflectionPoliciesAvailable,
         context.rtMissEnvironmentPolicyReady);
+    context.shadowEvidence = BuildFullSceneShadowContactEvidence(contract);
     context.postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -699,13 +813,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.reflectionEvidence.failureReason);
     context.shadows = MakeFullSceneShaderDomainEvidence(
         "shadows",
-        contract.features.shadowsEnabled,
-        contract.features.shadowsEnabled &&
-            !contract.lighting.shadowPolicyId.empty() &&
-            contract.lighting.shadowPolicyId != "default" &&
-            FullSceneShaderHasResource(contract, "shadow_map"),
-        "ShadowResources/SceneVisualContract",
-        "Contact-shadow and stability gates are not promoted");
+        context.shadowEvidence.enabled,
+        context.shadowEvidence.ready,
+        context.shadowEvidence.owner,
+        context.shadowEvidence.failureReason);
     context.temporal = MakeFullSceneShaderDomainEvidence(
         "temporal",
         contract.features.taaEnabled,

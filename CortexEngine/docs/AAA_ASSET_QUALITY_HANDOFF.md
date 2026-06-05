@@ -1763,3 +1763,53 @@ Current state:
 - V2 reflection/probe ownership is now contract-owned enough to begin the
   actual local reflection/probe shader-side work.
 - Next architecture slice should formalize shadow/contact stability evidence.
+
+## Full Scene Shader V2 Shadow Contact Evidence - 2026-06-05
+
+Implemented:
+
+- Added `FullSceneShadowContactEvidence` as the V2 shadow-domain readiness
+  source.
+- V2 shadows now report shadow policy, shadow-map resource readiness,
+  `ShadowPass` producer ownership, caster ownership, cascade/bias/filter policy
+  bounds, RT shadow mask/history readiness, contact shadow readiness, stability
+  gate status, and missing shadow contract count.
+- The V2 checker requires the shadow/contact evidence builder and the new JSON
+  fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_shadow_contact_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_shadow_contact_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- gallery V2 shadows:
+  - `missing_shadow_contract_count=0`.
+  - `shadow_map_ready=true`.
+  - `shadow_map_producer_ready=true`.
+  - `shadow_caster_ownership_ready=true`.
+  - `rt_shadow_mask_ready=true`.
+  - `rt_shadow_history_ready=true`.
+  - `contact_shadow_ready=true`.
+  - `shadow_stability_gate_passed=true`.
+  - `shadows.domain_ready=true`.
+
+Current state:
+
+- `FSSP-V2-006A` is packet-proved for the gallery target.
+- V2 shadow/contact stability is now contract-owned enough to begin shader-side
+  shadow/contact promotion work.
+- Next architecture slice should formalize material-aware temporal promotion
+  evidence.

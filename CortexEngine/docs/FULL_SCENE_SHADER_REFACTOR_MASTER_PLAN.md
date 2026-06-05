@@ -45,6 +45,8 @@ Implemented baseline:
   packet through `FullSceneLightingRigEvidence`.
 - Scene-local reflection/probe ownership is packet-proved for the gallery
   packet through `FullSceneReflectionOwnershipEvidence`.
+- Scene-local shadow/contact stability is packet-proved for the gallery packet
+  through `FullSceneShadowContactEvidence`.
 
 Known blockers:
 
@@ -54,7 +56,9 @@ Known blockers:
 - Reflection still renders through the V1 beauty fallback. The local
   reflection/probe ownership evidence exists, but the resolver has not yet been
   promoted to V2 beauty output.
-- Shadow/contact stability needs a formal policy and packet gates.
+- Shadows still render through the V1 beauty fallback. The shadow/contact
+  stability evidence exists, but the shadow/contact path has not yet been
+  promoted to V2 beauty output.
 - Temporal resolve needs material/object-aware history confidence rather than a
   mostly global policy.
 - HDR post is not yet a named, measured, packet-visible presentation pipeline.

@@ -3277,3 +3277,58 @@ Current stopping position:
 - Next slice should consume `g_LocalReflectionRadiance` in the V2 reflection
   candidate behind the existing P-menu review toggle, then rerun broad glossy
   stress packets before considering any promotion.
+
+### Local Reflection Radiance Candidate Consumption - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl` now blends the V2 reflection candidate
+  toward `g_LocalReflectionRadiance` when the produced buffer alpha confidence
+  is nonzero.
+- Alpha `0` preserves the previous structured resolver fallback, so null or
+  missing producer behavior remains compatible with the old candidate path.
+- Default beauty remains unchanged unless debug view `58` or the P-menu
+  `V2 reflection candidate (review)` toggle is active.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- post shader DXC compile passed; existing depth-load truncation warnings remain
+  unchanged.
+- local radiance compute shader DXC compile passed.
+- focused packet passed:
+  `build/captures/v2_local_radiance_candidate_consume_smoke1_20260605`.
+  - `local_reflection_radiance` luma `0.0950`, nonblack `0.99999`.
+  - `reflection_resolver_candidate_delta` luma `0.0281`, nonblack `0.1805`.
+- broader glossy packet passed:
+  `build/captures/v2_local_radiance_candidate_broader_glossy_20260605`.
+  - source-signal families: `4/4`.
+  - candidate-delta families: `4/4`.
+  - warnings/failures: `0/0`.
+
+Broader glossy candidate signal:
+
+| Stress Family | Local Radiance Luma | Candidate Delta Luma |
+|---|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.06236662` | `0.01245237` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.08687313` | `0.01305811` |
+| `stress_material_lab_glass_emissive` | `0.09037495` | `0.01930018` |
+| `stress_rt_showcase_reflection_closeup` | `0.09496863` | `0.02824227` |
+
+Broader glossy sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00291844` | `0.00289495` | `0.992` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00121205` | `0.00118124` | `0.975` |
+| `stress_material_lab_glass_emissive` | `0.00152219` | `0.00149033` | `0.979` |
+| `stress_rt_showcase_reflection_closeup` | `0.00487044` | `0.00478940` | `0.983` |
+
+Current stopping position:
+
+- V2 reflection candidate now consumes a render-graph-owned local radiance
+  buffer.
+- This is still candidate/review-only, not default beauty.
+- Next safe work is a visual review/contact sheet for the produced-radiance
+  candidate or the first semantic light-buffer/direct-light V2 shadow output.

@@ -2172,7 +2172,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
     candidateLocalProbeWeight *= lerp(1.0f, 0.52f, saturate(candidateWeightSum));
     if (candidateLocalProbeWeight > 1e-4f)
     {
-        float3 localProbeSheenColor = ResolveV2SceneLocalReflectionRadiance(
+        float3 fallbackLocalRadiance = ResolveV2SceneLocalReflectionRadiance(
             reflect(-viewForFresnel, gbufNormal),
             worldForFresnel,
             gbufNormal,
@@ -2181,6 +2181,15 @@ float4 PSMain(VSOutput input) : SV_TARGET
             roughness,
             metallic,
             rtReflectionFireflyClampLuma);
+        float4 producedLocalRadiance = g_LocalReflectionRadiance.SampleLevel(g_Sampler, uv, 0);
+        float producedLocalConfidence = saturate(producedLocalRadiance.a);
+        float3 producedLocalColor = SoftLimitReflectionLuma(
+            max(producedLocalRadiance.rgb, 0.0f.xxx),
+            rtReflectionFireflyClampLuma);
+        float3 localProbeSheenColor = lerp(
+            fallbackLocalRadiance,
+            producedLocalColor,
+            producedLocalConfidence);
 
         candidateReflectionCompositeColor = CompositeSceneMaterialCinematicReflection(
             candidateReflectionCompositeColor,

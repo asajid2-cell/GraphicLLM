@@ -2682,3 +2682,39 @@ Current next work:
   then either:
   - bind actual local probe textures into post when authorized, or
   - add a resolved local reflection radiance buffer before post.
+
+### Camera-Sweep Motion Proof - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 120 -CaptureFrame 60 -CaptureSequenceCount 3 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_camera_sweep_packet_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_camera_sweep_packet_20260605`.
+- source-signal families: `5/5`.
+- candidate-delta families: `5/5`.
+- warnings: `0`.
+- failures: `0`.
+
+Camera-sweep deltas:
+
+| Family | Delta Luma | Delta Nonblack |
+|---|---:|---:|
+| gallery | `0.01119955` | `0.08748481` |
+| kitchen | `0.00205583` | `0.08955838` |
+| office | `0.00061088` | `0.01438151` |
+| gym | `0.00063635` | `0.01116862` |
+| concert | `0.00243640` | `0.12174154` |
+
+Updated next work:
+
+- The owned local probe candidate has now passed mouse-jitter and camera-sweep
+  cross-family evidence packets as a debug/candidate output.
+- Do not promote default beauty yet.
+- Next gate should be explicit glossy/metal/glass close-up stability
+  comparison, then either actual local probe texture binding in post or a
+  resolved local reflection radiance buffer.

@@ -3320,3 +3320,71 @@ Current stopping position:
   candidate path behind the existing review toggle, then rerun broader glossy
   stress packets and compare candidate delta/stability against the prior
   structured post-only candidate.
+
+### Local Reflection Radiance Candidate Consumption - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl`
+  - the V2 reflection candidate now samples `g_LocalReflectionRadiance`.
+  - produced radiance is admitted by the buffer alpha confidence channel.
+  - alpha `0` preserves the previous structured post resolver fallback.
+  - produced RGB is firefly-limited before it can affect the candidate.
+- Default beauty remains unchanged unless debug view `58` or the existing
+  `V2 reflection candidate (review)` toggle is active.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T ps_6_3 -E PSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\PostProcess.dxil assets\shaders\PostProcess.hlsl
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T cs_6_3 -E CSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\LocalReflectionRadiance.dxil assets\shaders\LocalReflectionRadiance.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,local_reflection_radiance,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_local_radiance_candidate_consume_smoke1_20260605
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive,glass_water_courtyard:glass_canopy,dragon_over_water:floor_reflection_closeup" -ViewFilter "beauty,local_reflection_radiance,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_local_radiance_candidate_broader_glossy_20260605
+```
+
+Focused packet result:
+
+- packet:
+  `build/captures/v2_local_radiance_candidate_consume_smoke1_20260605`.
+- captured views: `6`.
+- V2 packet evidence: passed.
+- `local_reflection_radiance`: luma `0.0950`, nonblack `0.99999`.
+- `reflection_resolver_candidate_delta`: luma `0.0281`, nonblack `0.1805`.
+
+Broader glossy stress result:
+
+- packet:
+  `build/captures/v2_local_radiance_candidate_broader_glossy_20260605`.
+- captured views: `28`.
+- source-signal families: `4/4`.
+- candidate-delta families: `4/4`.
+- warnings/failures: `0/0`.
+
+Candidate signal:
+
+| Stress Family | Local Radiance Luma | Local Radiance Nonblack | Candidate Delta Luma | Candidate Delta Nonblack |
+|---|---:|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.06236662` | `0.86520833` | `0.01245237` | `0.07959635` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.08687313` | `0.98508681` | `0.01305811` | `0.16990560` |
+| `stress_material_lab_glass_emissive` | `0.09037495` | `0.99988064` | `0.01930018` | `0.13744358` |
+| `stress_rt_showcase_reflection_closeup` | `0.09496863` | `0.99999132` | `0.02824227` | `0.18028971` |
+
+Sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00291844` | `0.00289495` | `0.992` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00121205` | `0.00118124` | `0.975` |
+| `stress_material_lab_glass_emissive` | `0.00152219` | `0.00149033` | `0.979` |
+| `stress_rt_showcase_reflection_closeup` | `0.00487044` | `0.00478940` | `0.983` |
+
+Current stopping position:
+
+- The V2 reflection candidate now consumes a real render-graph-produced local
+  radiance buffer instead of using only the post-only structured fallback.
+- The candidate remains opt-in/review-only.
+- Next work should either expose stronger visual review packets/contact sheets
+  for this produced-radiance candidate or begin the next owned source domain:
+  semantic light-buffer/direct-light V2 shadow output.

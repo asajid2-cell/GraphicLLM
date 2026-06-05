@@ -809,7 +809,53 @@ Status: pending.
 
 ### L007 - Scene Local Environment V3
 
-Status: pending.
+Status: in progress.
+
+Current evidence-domain implementation:
+
+- runtime V3 frame report now exposes:
+  - `scene_local_environment_ready`.
+  - `scene_local_environment_mode`.
+  - `scene_local_environment_channel_count`.
+- `SceneLocalEnvironmentV3` is now a real V3 domain entry rather than a
+  planned-only placeholder.
+- current producer is `SceneLocalEnvironmentV3`.
+- current output resource is the logical ownership contract
+  `scene_local_environment`.
+- current debug view is `environment_mode`.
+- current mode compiler derives:
+  - `enclosed_room` for enclosed local rooms.
+  - `stage` for enclosed concert/stage rigs.
+  - `neutral_lab` for gallery/lab style profiles.
+  - `open_exterior` for non-enclosed exterior scenes.
+- current readiness channels are:
+  `environment_mode`, `ambient_lighting`, `visible_background`,
+  `reflection_background`, and `atmosphere`.
+- current backing contracts are:
+  `scene_visual_contract`, `environment_state`,
+  `scene_lighting_balance_policy`, `local_reflection_probe_rig`, and
+  `scene_post_exposure_policy`.
+- the placeholder packet analyzer now allows and validates the `environment`
+  domain when these ownership channels are ready.
+- first runtime smoke:
+  `build/captures/v3_scene_local_environment_contract_smoke3_20260605`.
+- first runtime smoke result:
+  `report_count=16`,
+  `scene_local_environment_ready_report_count=16`,
+  `lighting_split_ready_report_count=16`,
+  `full_scene_lighting_v3_executed_report_count=16`,
+  failures `0`, warnings `0`.
+- gallery smoke environment evidence:
+  `scene_local_environment_mode=neutral_lab`,
+  `scene_local_environment_channel_count=5`,
+  ready channels `ambient_lighting_owned`, `visible_background_owned`,
+  `reflection_background_owned`, and `atmosphere_owned`.
+
+Important limitation:
+
+- This slice does not add a new environment shader or change default beauty.
+  It creates the runtime contract that ReflectionV3 and CompositeV3 can consume
+  without relying on visible IBL/background leakage.
 
 ### L008 - Cinematic Post V3
 

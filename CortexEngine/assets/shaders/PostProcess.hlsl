@@ -1881,6 +1881,36 @@ float4 PSMain(VSOutput input) : SV_TARGET
             materialReflectance,
             rtReflectionFireflyClampLuma);
     }
+    float candidateLocalProbeWeight =
+        saturate(sceneLocalReflectionPotential * 10.0f) *
+        saturate(reflectionStabilityScale) *
+        saturate(SurfaceReflectionCeiling(
+            surfaceClass,
+            roughness,
+            metallic,
+            transmission,
+            dielectricFresnel) * 0.55f);
+    candidateLocalProbeWeight *= lerp(1.0f, 0.35f, saturate(candidateWeightSum));
+    if (candidateLocalProbeWeight > 1e-4f)
+    {
+        float3 localProbeFloor = max(g_AmbientColor.rgb, 0.015f.xxx);
+        float3 localProbeSheenColor = max(
+            reflectionBaseColor,
+            localProbeFloor * (1.0f + localProbeSpecularPotential * 3.0f));
+        localProbeSheenColor += localProbeFloor * localProbeSpecularPotential * 2.0f;
+        localProbeSheenColor = SoftLimitReflectionLuma(localProbeSheenColor, rtReflectionFireflyClampLuma);
+
+        candidateReflectionCompositeColor = CompositeSceneMaterialCinematicReflection(
+            candidateReflectionCompositeColor,
+            localProbeSheenColor,
+            candidateLocalProbeWeight,
+            sceneMaterialClass,
+            surfaceClass,
+            roughness,
+            metallic,
+            materialReflectance,
+            rtReflectionFireflyClampLuma);
+    }
     if (g_DebugMode.x == 58.0f)
     {
         hdrColor = candidateReflectionCompositeColor;

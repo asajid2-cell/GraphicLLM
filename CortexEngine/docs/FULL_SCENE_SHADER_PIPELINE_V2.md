@@ -2499,3 +2499,86 @@ Current interpretation:
 - The next implementation should not add more views; it should add a candidate
   reflection resolve path that actually consumes the local probe authority term
   in a physically bounded way.
+
+### Local Probe Candidate Resolver Packet - 2026-06-05
+
+Purpose:
+
+- Move from source evidence to an opt-in candidate resolver behavior.
+- Make the V2 reflection candidate consume scene-local probe authority in
+  model-authored enclosed scenes.
+- Keep default beauty on the existing resolver.
+
+Implemented:
+
+- `PostProcess.hlsl`
+  - adds a bounded candidate-only local probe sheen term.
+  - gates it by:
+    - scene-local reflection potential.
+    - reflection stability scale.
+    - material `SurfaceReflectionCeiling`.
+    - existing SSR/RT candidate weight, so local probe does not fight stronger
+      screen/ray owners.
+  - derives candidate local probe color from already-lit scene color plus
+    ambient scene-local floor because post still does not bind probe cubemaps.
+  - `reflection_resolver_candidate` and
+    `reflection_resolver_candidate_delta` now move on local-probe-only
+    model-authored families.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_local_probe_candidate_weighted_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_local_probe_candidate_weighted_packet_20260605`.
+- captured views: `35`.
+- evidence rows: `350`.
+- failures: `0`.
+- source-signal families: `5`.
+- candidate-delta families: `5`.
+- warnings: `0`.
+
+Candidate signal:
+
+| Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| gallery | `meaningful_delta` | `0.05381363` | `0.32276584` | `0.00343681` | `0.08734592` |
+| kitchen | `meaningful_delta` | `0.00072311` | `0.17523763` | `0.00149478` | `0.08704644` |
+| office | `meaningful_delta` | `0.00023052` | `0.05801107` | `0.00032100` | `0.00128472` |
+| gym | `meaningful_delta` | `0.00029567` | `0.10023872` | `0.00052648` | `0.01372613` |
+| concert | `meaningful_delta` | `0.00089806` | `0.16962348` | `0.00219636` | `0.11669922` |
+
+Authority remains local for enclosed model-authored families:
+
+| Family | Authority Mean RGB | Authority Nonblack |
+|---|---:|---:|
+| kitchen | `0.0000,0.0100,0.0000` | `0.1752` |
+| office | `0.0000,0.0032,0.0000` | `0.0580` |
+| gym | `0.0000,0.0041,0.0000` | `0.1002` |
+| concert | `0.0000,0.0124,0.0000` | `0.1696` |
+
+Current interpretation:
+
+- This completes the first candidate-behavior slice after source plumbing:
+  the V2 candidate now consumes local probe authority across all tested
+  families.
+- It still does not promote V2 beauty to default.
+- The next slice should make the local probe candidate less approximate by
+  passing actual probe/source color or resolved local reflection radiance into
+  post, then run motion/stability gates on glossy surfaces before any beauty
+  promotion.

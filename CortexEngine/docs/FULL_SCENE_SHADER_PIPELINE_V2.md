@@ -131,6 +131,200 @@ The current V1 path remains the playable fallback until V2 proves equivalent
 or stronger gates. Every phase must ship with a visible debug mode, frame-report
 fields, and a packet gate before its beauty output becomes trusted.
 
+### Whole-Renderer Refactor Strategy
+
+The target is not a larger collection of nicer shaders. The target is a
+scene-owned rendering architecture where every final pixel can be traced back
+to a material model, lighting rig, reflection source, shadow policy, temporal
+policy, and post profile. Unreal-like quality comes from those systems agreeing
+on the same scene facts, not from a single bloom, IBL, or roughness tweak.
+
+The refactor is split into six ownership layers:
+
+1. Scene visual contract layer
+   - Owns the high-level intent for the frame: scene family, enclosure type,
+     environment owner, local/visible background policy, lighting mood,
+     reflection policy, temporal policy, and post grade.
+   - This is the only layer allowed to decide whether a scene is gallery,
+     kitchen, office, gym, concert, outdoor, wet, neon, daylight, or enclosed.
+   - Existing entry points: `SceneCinematicProfile`,
+     `RendererSceneProfile`, `FrameContract::SceneVisualInfo`, and the
+     scene-local renderer V1 packet tools.
+
+2. Material and asset evidence layer
+   - Owns what every renderable is made of.
+   - It must combine Asset Registry V2 evidence, authored material settings,
+     imported texture slots, procedural detail, and semantic scene role into a
+     single `FullSceneMaterialModel`.
+   - Later shading passes are not allowed to guess that a pixel is tile,
+     glass, brushed metal, wall paint, fabric, water, or neon from roughness
+     alone.
+
+3. Frame data and GBuffer layer
+   - Owns the compact per-pixel facts that shaders need: material family,
+     object id, material id, velocity, normal, roughness, metallic, AO,
+     emissive, clearcoat, transmission, detail masks, and policy ids.
+   - This layer is the bridge from scene semantics to shader math. It must stay
+     append-only until every packet gate proves the new channels are valid.
+
+4. Scene illumination layer
+   - Owns all direct, indirect, reflection, probe, and sky/background energy.
+   - It should expose a semantic light rig, local probes, planar/hero probes,
+     shadow policy, and fallback ownership.
+   - Enclosed scenes should read as lit by their own room, not by a leftover
+     HDRI. Outdoor/gallery scenes can still intentionally expose external IBL.
+
+5. Stability and composition layer
+   - Owns temporal history, motion-vector validation, material-aware history
+     rejection, shadow stability, reflection stability, exposure stability, and
+     camera packet stability.
+   - This layer prevents the renderer from producing one good still while
+     breaking during mouse-look or camera sweeps.
+
+6. Presentation and evidence layer
+   - Owns tone map, color grade, bloom, clarity, debug atlases, frame reports,
+     packet comparison, and promotion gates.
+   - No V2 domain is accepted because the beauty image looks better once. It is
+     accepted only when evidence says the frame is owned, stable, and
+     comparable across scene families.
+
+### Refactor Boundaries
+
+These boundaries are intended to stop V2 from becoming another scattered set of
+scene-specific patches:
+
+- `RendererSceneProfile` and `SceneCinematicProfile` decide scene intent.
+- `MaterialModel` and Asset Registry V2 decide material truth.
+- Visibility/GBuffer code only encodes facts; it should not decide artistic
+  lighting.
+- Lighting shaders consume material and scene policy; they should not infer
+  enclosure/background ownership from whether a texture happens to be bound.
+- Reflection shaders choose from declared reflection sources; they should not
+  synthesize external environment misses in enclosed scenes.
+- Temporal code consumes material/object/policy ids; it should not use one
+  global clamp for glass, water, brushed metal, emissive, and wall paint.
+- Post code consumes an HDR profile; it should not hide lighting or material
+  problems with uncontrolled crushing, sharpening, or bloom.
+- Packet tools own promotion; screenshots are review material, not proof.
+
+### Data Flow Target
+
+The intended frame path is:
+
+```text
+scene preset / scene graph / asset registry
+  -> SceneVisualContract
+  -> FullSceneShaderFrameContext
+  -> FullSceneMaterialTable
+  -> FullSceneLightRig + FullSceneProbeSet + FullScenePostProfile
+  -> Visibility / GBuffer facts
+  -> Lighting + Reflections + Shadows
+  -> Material-aware Temporal
+  -> HDR Post
+  -> Debug Atlases + Frame Report + Beauty Output
+```
+
+The important change is that the renderer stops letting each pass invent its
+own local interpretation of the scene. The scene contract and material table
+become the shared source of truth.
+
+### Refactor Implementation Tracks
+
+Track A: contracts and facades
+
+- Add `FullSceneShaderFrameContext` as a per-frame facade.
+- Populate it from existing V1 profile data first.
+- Emit frame-report ownership for every field, including fallback owner.
+- Do not change beauty output until ownership reports are complete.
+
+Track B: material truth
+
+- Convert asset/material evidence into runtime material models.
+- Add missing texture-slot and procedural-detail evidence to frame reports.
+- Preserve existing scene material class ids while adding richer families and
+  feature bits.
+- Add debug views for material family, policy id, texture readiness, and
+  temporal class.
+
+Track C: GBuffer and debug surfaces
+
+- Inventory every render target and shader channel.
+- Add object/material/velocity/policy ids in a measured way.
+- Make debug views and packet captures available before lighting depends on
+  the new channel.
+
+Track D: lighting, probes, and reflections
+
+- Promote semantic light rigs out of ad hoc scene setup.
+- Add local room/hero/planar probe ownership for enclosed scenes.
+- Route RT/SSR/probe/environment reflection choices through a single reflection
+  source resolver.
+- Keep sharp external IBL valid for gallery/outdoor scenes, but make it
+  explicit and measurable.
+
+Track E: shadows and temporal stability
+
+- Normalize shadow bias/filter/contact policy by scene scale, receiver class,
+  and light type.
+- Add material/object-aware temporal rejection and clamp widths.
+- Add mouse-jiggle, camera-sweep, and smooth-metal/glass/water packet gates.
+
+Track F: post, render graph, and promotion
+
+- Split post into named HDR stages: exposure, bloom, rolloff, tone map, grade,
+  clarity, output encode.
+- Move pass/resource ownership into an explicit render graph contract.
+- Add a cross-family packet command that captures beauty, material, GBuffer,
+  lighting, reflection, shadow, temporal, post, and frame-report evidence.
+
+### Promotion Ladder
+
+V2 should move through these promotion states:
+
+| State | Meaning | Beauty Output |
+|---|---|---|
+| `planned` | contract exists, no runtime evidence | V1 |
+| `instrumented` | runtime emits ownership/evidence, still using V1 output | V1 |
+| `shadow_output` | V2 domain computes/debugs beside V1 | V1 |
+| `candidate` | V2 domain can drive beauty under a flag | optional V2 |
+| `packet_passed` | packet gates pass on at least one target family | opt-in V2 |
+| `cross_family_passed` | gallery/kitchen/office/gym/concert pass | preset V2 |
+| `default_ready` | V1 gates preserved and V2 gates stronger | default V2 |
+
+Any domain can be rolled back independently. A failed domain must still emit
+its failed evidence so the packet explains why it did not promote.
+
+### Target File Ownership Map
+
+The likely code ownership map for the refactor is:
+
+| Area | Current Files | V2 Direction |
+|---|---|---|
+| scene visual contract | `RendererSceneProfile.*`, `RendererControlApplier_*`, `Engine_Scenes.cpp` | centralize profile application and scene-owned visual intent |
+| material model | `MaterialModel.*`, `MaterialState.h`, `Renderer_Materials.cpp`, asset registry tools | richer runtime material families and texture evidence |
+| GBuffer/VB | `VisibilityBuffer_*`, `MaterialResolve.hlsl`, `DeferredLighting.hlsl` | explicit material/object/policy/velocity facts |
+| environment/reflection | `Renderer_Environment.cpp`, `RendererEnvironmentState.h`, `RaytracedReflections.hlsl`, `PostProcess.hlsl` | one reflection-source resolver and local probe ownership |
+| lighting/shadow | `Renderer_FrameLightingConstants.cpp`, `Renderer_ShadowPass.cpp`, `Renderer_RenderGraphDepthShadow.cpp`, lighting HLSL | semantic rigs, stable shadow policy, debug owners |
+| temporal | `TemporalRejectionMask.*`, temporal shader code, `Renderer_FrameEnd.cpp` | material-aware rejection, clamp, and packet capture |
+| post | `PostProcess.hlsl`, post constants, UI controls | named HDR stages and profile-owned color pipeline |
+| frame reports | `FrameContract*`, packet analyzers, V2 validators | promotion gates and cross-family evidence |
+
+### First Feature Slice After Planning
+
+The first implementation slice should not be a beauty tweak. It should be the
+runtime facade and packet skeleton:
+
+1. Add `FullSceneShaderFrameContext` and populate it from current V1 scene
+   profile state.
+2. Add per-domain enable/promotion state:
+   `material`, `gbuffer`, `lighting`, `reflection`, `shadow`, `temporal`,
+   `post`, and `render_graph`.
+3. Emit frame-report JSON with owner, fallback owner, readiness, and failure
+   reason for each domain.
+4. Add a packet command that captures one scene with beauty plus debug atlases.
+5. Keep beauty output on V1 until this instrumentation proves the renderer can
+   explain its own pixels.
+
 ### Migration Shape
 
 1. Add V2 contracts beside V1.

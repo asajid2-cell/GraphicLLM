@@ -563,6 +563,25 @@ Runtime facade baseline:
   runtime report stops using `FullSceneShaderFrameContext` or if supplied frame
   reports omit the per-domain evidence object.
 
+Runtime packet harness baseline:
+
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1` wraps the existing
+  scene-local cinematic packet runner and narrows capture to V2-relevant debug
+  views:
+  `beauty`, `surface_policy`, `reflection_owner`, `shadow_factor`,
+  `direct_light`, `ambient_ibl`, and `taa_blend`.
+- The packet runner validates each emitted `frame_report_last.json` or
+  `frame_report_shutdown.json` with
+  `tools/check_full_scene_shader_pipeline_v2_frame_report.py --strict-frame-report`.
+- The packet runner writes:
+  - `v2_frame_report_evidence_summary.json`
+  - `v2_frame_report_evidence_summary.md`
+  - `v2_frame_report_checker_stdout.txt`
+- `tools/FinalArtPipeline.ps1` exposes the command as
+  `-Action FullSceneShaderV2Packet`.
+- This harness is ready for runtime packet execution once a fresh native build
+  includes the facade changes.
+
 Material runtime-policy bridge baseline:
 
 - every registry asset now carries a V2 runtime policy bridge in material

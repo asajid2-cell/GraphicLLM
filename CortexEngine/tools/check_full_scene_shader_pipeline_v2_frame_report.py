@@ -35,6 +35,7 @@ DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
 )
 TEMPORAL_REJECTION_SHADER_PATH = ROOT / "assets" / "shaders" / "TemporalRejectionMask.hlsl"
 TEMPORAL_REJECTION_SOURCE_PATH = ROOT / "src" / "Graphics" / "TemporalRejectionMask.cpp"
+RUN_FULL_SCENE_SHADER_PACKET_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v2_packet.ps1"
 
 
 def fail(message: str) -> int:
@@ -567,13 +568,49 @@ def validate_runtime_scene_local_environment_surface() -> list[str]:
     return errors
 
 
+def validate_v2_packet_runner_surface() -> list[str]:
+    errors: list[str] = []
+    if not RUN_FULL_SCENE_SHADER_PACKET_PATH.exists():
+        return [f"missing V2 packet runner: {RUN_FULL_SCENE_SHADER_PACKET_PATH}"]
+
+    packet_script = RUN_FULL_SCENE_SHADER_PACKET_PATH.read_text(encoding="utf-8")
+    required_tokens = [
+        "run_scene_local_cinematic_renderer_v1_packets.ps1",
+        "full_scene_shader_pipeline_v2",
+        "frame_contract.full_scene_shader_pipeline_v2",
+        "promotion_state",
+        "domain_ready",
+        "facade_owner",
+        "fallback_owner",
+        "failure_reason",
+        "v2_frame_report_evidence_summary.json",
+        "v2_frame_report_evidence_summary.md",
+        "check_full_scene_shader_pipeline_v2_frame_report.py",
+        "surface_policy",
+        "reflection_owner",
+        "shadow_factor",
+        "direct_light",
+        "ambient_ibl",
+        "taa_blend",
+    ]
+    for token in required_tokens:
+        if token not in packet_script:
+            errors.append(f"V2 packet runner missing required token: {token}")
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
     frame_report = load_json(frame_report_path)
+    report_root = frame_report.get("frame_contract", frame_report)
+    if not isinstance(report_root, dict):
+        errors.append("frame report must be an object or contain a frame_contract object")
+        return errors
 
     report_key = frame_contract["report_key"]
-    v2_report = frame_report.get(report_key)
+    v2_report = report_root.get(report_key)
     if not isinstance(v2_report, dict):
         message = f"frame report missing top-level {report_key}"
         if strict:
@@ -584,7 +621,7 @@ def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
 
     for section in frame_contract["required_sections"]:
         section_id = section["id"]
-        section_data = get_path(frame_report, section["report_path"])
+        section_data = get_path(report_root, section["report_path"])
         if not isinstance(section_data, dict):
             errors.append(f"missing section {section_id} at {section['report_path']}")
             continue
@@ -618,6 +655,7 @@ def main() -> int:
     errors.extend(validate_runtime_temporal_surface())
     errors.extend(validate_runtime_reflection_surface())
     errors.extend(validate_runtime_scene_local_environment_surface())
+    errors.extend(validate_v2_packet_runner_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

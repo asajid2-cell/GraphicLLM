@@ -53,6 +53,7 @@ $views = @(
     [pscustomobject]@{ Name = "reflection_probe_weight"; DebugView = 42 },
     [pscustomobject]@{ Name = "reflection_owner"; DebugView = 46 },
     [pscustomobject]@{ Name = "reflection_source_weights"; DebugView = 56 },
+    [pscustomobject]@{ Name = "reflection_source_authority"; DebugView = 60 },
     [pscustomobject]@{ Name = "reflection_stability_policy"; DebugView = 57 },
     [pscustomobject]@{ Name = "reflection_resolver_candidate"; DebugView = 58 },
     [pscustomobject]@{ Name = "reflection_resolver_candidate_delta"; DebugView = 59 },

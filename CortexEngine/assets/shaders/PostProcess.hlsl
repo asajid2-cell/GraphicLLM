@@ -1782,6 +1782,17 @@ float4 PSMain(VSOutput input) : SV_TARGET
                       saturate(reflectionStabilityScale),
                       1.0f);
     }
+    if (g_DebugMode.x == 60.0f)
+    {
+        // Reflection source authority:
+        //   R = authorized external IBL/prelit source potential
+        //   G = scene-local probe source potential
+        //   B = screen/ray source potential
+        return float4(saturate(iblReflectionPotential),
+                      saturate(sceneLocalReflectionPotential),
+                      saturate(max(wSSR, wRT) * 4.0f),
+                      1.0f);
+    }
 
     float3 reflectionBaseColor = hdrColor;
     float3 currentReflectionCompositeColor = hdrColor;

@@ -2504,3 +2504,67 @@ Current interpretation:
 - Next slice should make the V2 reflection candidate actually consume the
   scene-local source term, still behind debug/candidate views, and then rerun
   mouse-jiggle/cross-family packets.
+
+## 2026-06-05 Reflection Source Authority Debug View
+
+Implemented:
+
+- Added debug view `60`, `reflection_source_authority`.
+- Channel contract:
+  - R = authorized external IBL/prelit source potential.
+  - G = scene-local probe source potential.
+  - B = SSR/RT screen/ray source potential.
+- Wired through:
+  - `assets/shaders/PostProcess.hlsl`.
+  - `src/Graphics/Renderer_DebugSettings.cpp`.
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`.
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+  - `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`.
+  - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_source_authority_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- Build passed.
+- Packet passed.
+- `ctest` completed with `No tests were found`.
+- Packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_source_authority_packet_20260605`.
+- Source-signal families: `5/5`.
+- Candidate-delta families: `0/5`.
+
+Authority metrics:
+
+| Family | Mean RGB | Nonblack |
+|---|---:|---:|
+| gallery | `0.0605,0.0156,0.0691` | `0.3228` |
+| kitchen | `0.0000,0.0100,0.0000` | `0.1752` |
+| office | `0.0000,0.0032,0.0000` | `0.0580` |
+| gym | `0.0000,0.0041,0.0000` | `0.1002` |
+| concert | `0.0000,0.0124,0.0000` | `0.1696` |
+
+Interpretation:
+
+- Enclosed model-authored families now prove green scene-local probe authority
+  with zero external red authority.
+- Gallery still shows external/RT authority, which is expected for that family.
+- Next slice should consume local probe authority in a bounded candidate
+  reflection resolver. Do not add another view before making candidate output
+  move.
+
+Build command warning:
+
+- Use `set "CORTEX_SKIP_ASSET_SYNC=1"` with quotes in `cmd.exe`.
+- The unquoted form can include a trailing space and miss the exact CMake env
+  check, causing slow full asset sync.

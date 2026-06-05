@@ -2414,3 +2414,88 @@ Current interpretation:
 - The next useful slice is `FSSP-V2-005C`: route scene-local probe/fallback
   sources into a real candidate reflection resolver path and keep it opt-in
   until motion packets show stable improvement.
+
+### Reflection Source Authority Packet - 2026-06-05
+
+Purpose:
+
+- Make the source signal more honest by separating external environment,
+  scene-local probe, and SSR/RT authority.
+- Keep this as a debug/evidence view only.
+
+Implemented:
+
+- `PostProcess.hlsl`
+  - debug view `60`:
+    - R = authorized external IBL/prelit source potential.
+    - G = scene-local probe source potential.
+    - B = screen/ray source potential.
+- `Renderer_DebugSettings.cpp`
+  - `kMaxDebugViewMode = 60`.
+  - label `PostReflectionSourceAuthority`.
+- Packet runners:
+  - added `reflection_source_authority`.
+- Frame-report contract/checker:
+  - require `reflection_source_authority` alongside the existing reflection
+    source/candidate views.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_source_authority_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Build note:
+
+- Use quoted `set "CORTEX_SKIP_ASSET_SYNC=1"` in `cmd.exe`.
+- The unquoted `set CORTEX_SKIP_ASSET_SYNC=1 && ...` form can pass a trailing
+  space and miss the exact CMake fast path, causing `sync_assets.cmake` to scan
+  the full asset tree and appear stuck.
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- Release build: passed.
+- runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_source_authority_packet_20260605`.
+- captured views: `35`.
+- evidence rows: `350`.
+- failures: `0`.
+- measured debug views: `35`.
+- metric failures: `0`.
+- source-signal families: `5`.
+- candidate-delta families: `0`.
+
+Authority view metrics:
+
+| Family | Mean RGB | Mean Luma | Nonblack |
+|---|---:|---:|---:|
+| gallery | `0.0605,0.0156,0.0691` | `0.0290` | `0.3228` |
+| kitchen | `0.0000,0.0100,0.0000` | `0.0072` | `0.1752` |
+| office | `0.0000,0.0032,0.0000` | `0.0023` | `0.0580` |
+| gym | `0.0000,0.0041,0.0000` | `0.0029` | `0.1002` |
+| concert | `0.0000,0.0124,0.0000` | `0.0089` | `0.1696` |
+
+Current interpretation:
+
+- The authority split behaves correctly:
+  - model-authored enclosed families show green scene-local probe authority and
+    no red external-IBL authority.
+  - gallery carries external/RT authority as expected.
+- This closes the evidence side of `FSSP-V2-004C` for local source visibility.
+- The next implementation should not add more views; it should add a candidate
+  reflection resolve path that actually consumes the local probe authority term
+  in a physically bounded way.

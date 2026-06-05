@@ -1179,8 +1179,12 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool contractGrounded = true;
     bool packetGateReady = false;
     bool materialAttributesReady = false;
+    bool lightingAdapterReady = false;
+    bool lightingSplitResourcesReady = false;
     uint32_t materialAttributesResourceCount = 0;
     uint32_t materialAttributesChannelCount = 0;
+    uint32_t lightingAdapterSignalCount = 0;
+    uint32_t lightingSplitResourceCount = 0;
     std::string contractPath = "assets/final_art/full_scene_shader_pipeline_v3_contract.json";
     std::string planPath = "docs/FULL_SCENE_SHADER_PIPELINE_V3.md";
     std::vector<std::string> requiredSceneFamilies = {
@@ -1303,6 +1307,57 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     materialDomain.missingRequiredChannelCount =
         materialDomain.requiredChannelCount - materialDomain.readyChannelCount;
 
+    const bool lightingAdapterReady =
+        FullSceneShaderPassWritesResource(contract, "VBDeferredLighting", "hdr_color") &&
+        contract.features.visibilityBufferEnabled &&
+        contract.features.shadowsEnabled &&
+        contract.lighting.lightCount > 0 &&
+        contract.draws.visibilityBufferInstances > 0;
+    context.lightingAdapterReady = lightingAdapterReady;
+    context.lightingSplitResourcesReady =
+        FullSceneShaderHasResource(contract, "direct_lighting") &&
+        FullSceneShaderHasResource(contract, "direct_lighting_unshadowed") &&
+        FullSceneShaderHasResource(contract, "shadow_visibility") &&
+        FullSceneShaderHasResource(contract, "shadow_loss") &&
+        FullSceneShaderHasResource(contract, "indirect_lighting");
+    context.lightingAdapterSignalCount = lightingAdapterReady ? 4u : 0u;
+    context.lightingSplitResourceCount = context.lightingSplitResourcesReady ? 5u : 0u;
+
+    FullSceneShaderPipelineV3DomainEvidence lightingDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "lighting",
+            "FullSceneLightingV3Adapter",
+            "hdr_color",
+            "VB_DeferredDirectLight",
+            lightingAdapterReady
+                ? "FullSceneLightingV3 adapter is backed by VBDeferredLighting -> hdr_color; split V3 lighting resources are pending"
+                : "FullSceneLightingV3 adapter is missing current deferred lighting ownership");
+    lightingDomain.enabled = lightingAdapterReady;
+    lightingDomain.ready = context.lightingSplitResourcesReady;
+    lightingDomain.promotionState = lightingAdapterReady ? "adapter" : "planned";
+    lightingDomain.backingResources = {
+        "hdr_color",
+    };
+    lightingDomain.debugViews = {
+        "VB_DeferredDirectLight",
+        "VB_DeferredDirectLightUnshadowed",
+        "VB_DeferredDirectLightShadowLoss",
+        "VB_DeferredShadowFactor",
+        "VB_DeferredAmbientIBL",
+    };
+    lightingDomain.channels = {
+        "direct_lighting_debug",
+        "direct_lighting_unshadowed_debug",
+        "shadow_loss_debug",
+        "shadow_factor_debug",
+        "ambient_ibl_debug",
+    };
+    lightingDomain.backingResourceCount = lightingAdapterReady ? 1u : 0u;
+    lightingDomain.requiredChannelCount = 5u;
+    lightingDomain.readyChannelCount = lightingAdapterReady ? 5u : 0u;
+    lightingDomain.missingRequiredChannelCount =
+        lightingDomain.requiredChannelCount - lightingDomain.readyChannelCount;
+
     context.domains = {
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "render_graph",
@@ -1311,12 +1366,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "v3_resource_ownership",
             "V3 render-graph resources are planned but not allocated"),
         materialDomain,
-        MakeFullSceneShaderPipelineV3DomainEvidence(
-            "lighting",
-            "FullSceneLightingV3",
-            "direct_lighting",
-            "shadow_visibility",
-            "FullSceneLightingV3 split outputs are planned but not implemented"),
+        lightingDomain,
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "reflection",
             "FullSceneReflectionV3",

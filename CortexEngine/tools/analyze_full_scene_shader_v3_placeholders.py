@@ -125,6 +125,25 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         if material_domain.get("ready_channel_count", 0) < 14:
             failures.append("material domain ready without enough material channels")
 
+    lighting_domain = domain_by_id.get("lighting")
+    lighting_adapter_ready = v3.get("lighting_adapter_ready") is True
+    if lighting_adapter_ready:
+        if not isinstance(lighting_domain, dict):
+            failures.append("lighting adapter ready but lighting domain is missing")
+        else:
+            if lighting_domain.get("producer") != "FullSceneLightingV3Adapter":
+                failures.append("lighting adapter must be produced by FullSceneLightingV3Adapter")
+            if lighting_domain.get("output_resource") != "hdr_color":
+                failures.append("lighting adapter must honestly name hdr_color as current output")
+            if lighting_domain.get("ready") is True and v3.get("lighting_split_resources_ready") is not True:
+                failures.append("lighting domain ready before split V3 lighting resources exist")
+            if lighting_domain.get("default_beauty_affects") is not False:
+                failures.append("lighting adapter must not mark default beauty as V3-owned")
+            if lighting_domain.get("backing_resource_count", 0) < 1:
+                failures.append("lighting adapter ready without hdr_color backing resource")
+            if lighting_domain.get("ready_channel_count", 0) < 5:
+                failures.append("lighting adapter ready without required debug signal channels")
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -141,6 +160,10 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         "material_attributes_ready": v3.get("material_attributes_ready"),
         "material_attributes_resource_count": v3.get("material_attributes_resource_count"),
         "material_attributes_channel_count": v3.get("material_attributes_channel_count"),
+        "lighting_adapter_ready": v3.get("lighting_adapter_ready"),
+        "lighting_split_resources_ready": v3.get("lighting_split_resources_ready"),
+        "lighting_adapter_signal_count": v3.get("lighting_adapter_signal_count"),
+        "lighting_split_resource_count": v3.get("lighting_split_resource_count"),
         "failures": failures,
         "warnings": warnings,
     }
@@ -182,6 +205,12 @@ def main() -> int:
         "ready_domain_report_count": sum(1 for row in rows if row.get("ready_domains")),
         "material_ready_report_count": sum(
             1 for row in rows if row.get("material_attributes_ready") is True
+        ),
+        "lighting_adapter_ready_report_count": sum(
+            1 for row in rows if row.get("lighting_adapter_ready") is True
+        ),
+        "lighting_split_ready_report_count": sum(
+            1 for row in rows if row.get("lighting_split_resources_ready") is True
         ),
         "failures": failures,
         "warnings": warnings,

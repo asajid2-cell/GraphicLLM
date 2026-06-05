@@ -442,6 +442,38 @@ Evidence:
 
 Status: pending.
 
+Current adapter evidence:
+
+- current producer is `FullSceneLightingV3Adapter`.
+- current adapter owner is `VBDeferredLighting`.
+- current adapter output is `hdr_color`.
+- runtime V3 report exposes `lighting_adapter_ready=true`.
+- runtime V3 report exposes `lighting_split_resources_ready=false`.
+- runtime V3 report exposes `lighting_adapter_signal_count=4`.
+- runtime V3 report exposes `lighting_split_resource_count=0`.
+- lighting domain remains `ready=false` until split resources exist.
+- adapter debug views include:
+  `VB_DeferredDirectLight`,
+  `VB_DeferredDirectLightUnshadowed`,
+  `VB_DeferredDirectLightShadowLoss`,
+  `VB_DeferredShadowFactor`, and
+  `VB_DeferredAmbientIBL`.
+- smoke packet:
+  `build/captures/v3_lighting_adapter_smoke1_20260605`.
+- lighting signal:
+  direct-signal families `1/1`, shadow-loss families `1/1`.
+- packet result:
+  `lighting_adapter_ready_report_count=6`,
+  `lighting_split_ready_report_count=0`,
+  failures `0`, warnings `0`.
+
+Required next evidence for completion:
+
+- concrete V3 resources for `direct_lighting`, `direct_lighting_unshadowed`,
+  `shadow_visibility`, `shadow_loss`, and `indirect_lighting`.
+- lighting domain `ready=true` only after those resources exist and pass packet
+  gates.
+
 ### L006 - Reflection V3 Resolver
 
 Status: pending.
@@ -484,5 +516,8 @@ Required evidence:
   `build/captures/v3_material_attributes_smoke1_20260605`.
 - First real V3 domain is now instrumented:
   `FullSceneMaterialResolveV3 -> material_attributes`.
-- Next safe implementation slice is `FullSceneLightingV3`: split current
-  shadowed direct-light ownership into concrete V3 lighting resources.
+- Current lighting adapter is instrumented but not split:
+  `FullSceneLightingV3Adapter -> hdr_color`.
+- Next safe implementation slice is the actual `FullSceneLightingV3` resource
+  split: direct lighting, unshadowed direct lighting, shadow visibility, shadow
+  loss, and indirect lighting.

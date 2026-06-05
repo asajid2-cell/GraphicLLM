@@ -109,6 +109,7 @@ struct FullSceneShaderFrameContext {
         bool shadowedLightContractReady = false;
         bool shaderLightArrayReady = false;
         bool semanticLightPayloadReady = false;
+        bool semanticLightShaderPayloadReady = false;
         bool areaLightPayloadReady = false;
         bool clusteredLightListReady = false;
         bool directLightPassReady = false;
@@ -125,6 +126,7 @@ struct FullSceneShaderFrameContext {
         uint32_t rectAreaLightCount = 0;
         uint32_t twoSidedAreaLightCount = 0;
         uint32_t semanticFixtureLightCount = 0;
+        uint32_t semanticLightPayloadCount = 0;
         uint32_t softFixtureLightCount = 0;
         uint32_t emissiveFixtureLightCount = 0;
         uint32_t stageFixtureLightCount = 0;
@@ -133,6 +135,8 @@ struct FullSceneShaderFrameContext {
         float totalLightIntensity = 0.0f;
         float maxLightIntensity = 0.0f;
         uint32_t missingLightingContractCount = 0;
+        std::string semanticLightPayloadOwner = "none";
+        std::string semanticLightPayloadChannels = "none";
         std::string lightingV2PassOwner = "none";
         std::string lightingV2OutputResource = "none";
         std::string owner = "SceneVisualContract/FullSceneLightingRigEvidence";
@@ -535,6 +539,16 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
     evidence.semanticLightPayloadReady =
         evidence.semanticLightRolesAvailable &&
         evidence.semanticFixtureLightCount > 0;
+    evidence.semanticLightPayloadCount = evidence.semanticFixtureLightCount;
+    evidence.semanticLightPayloadOwner =
+        evidence.semanticLightPayloadReady ? "FrameConstants.lights" : "none";
+    evidence.semanticLightPayloadChannels =
+        evidence.semanticLightPayloadReady ? "direction_cosInner.w_or_params.z" : "none";
+    evidence.semanticLightShaderPayloadReady =
+        evidence.semanticLightPayloadReady &&
+        evidence.shaderLightArrayReady &&
+        evidence.semanticLightPayloadCount <= evidence.lightCount &&
+        evidence.semanticLightPayloadOwner == "FrameConstants.lights";
     evidence.areaLightPayloadReady =
         evidence.rectAreaLightCount == 0 ||
         (evidence.rectAreaLightCount <= evidence.lightCount &&
@@ -589,6 +603,7 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.shadowedLightContractReady,
         evidence.shaderLightArrayReady,
         evidence.semanticLightPayloadReady,
+        evidence.semanticLightShaderPayloadReady,
         evidence.areaLightPayloadReady,
         evidence.clusteredLightListReady,
         evidence.directLightPassReady,
@@ -626,6 +641,8 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.failureReason = "Shader-facing light array is empty or over budget";
     } else if (!evidence.semanticLightPayloadReady) {
         evidence.failureReason = "Semantic light payload is not encoded in shader-facing lights";
+    } else if (!evidence.semanticLightShaderPayloadReady) {
+        evidence.failureReason = "Semantic light payload is not owned by FrameConstants.lights shader lanes";
     } else if (!evidence.areaLightPayloadReady) {
         evidence.failureReason = "Area-light payload is missing or outside valid bounds";
     } else if (!evidence.clusteredLightListReady) {

@@ -3477,3 +3477,54 @@ Current stopping position:
 - Default beauty remains unchanged.
 - Next safe slice: split into a real `FullSceneLightingV2` resource or add
   semantic light-buffer payloads while preserving this contract.
+
+### Semantic Light Payload Ownership Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now exposes semantic light shader payload
+  readiness/count/owner/channel fields.
+- Runtime report names the current semantic payload owner as
+  `FrameConstants.lights`.
+- Runtime report names the current semantic payload lanes as
+  `direction_cosInner.w_or_params.z`.
+- The frame-report checker now verifies the new JSON fields and the
+  shader-facing upload tokens in
+  `Renderer_VisibilityBufferDeferredLighting.cpp`.
+- Default beauty remains unchanged.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V2 frame-report checker passed.
+- V2 plan checker passed.
+- focused packet passed:
+  `build/captures/v2_semantic_light_payload_smoke1_20260605`.
+- strict frame-report validation passed on:
+  `build/captures/v2_semantic_light_payload_smoke1_20260605/stress_rt_showcase_reflection_closeup/direct_light/frame_report_shutdown.json`.
+
+Focused packet evidence:
+
+- `semantic_light_payload_ready=true`.
+- `semantic_light_shader_payload_ready=true`.
+- `semantic_light_payload_count=4`.
+- `semantic_light_payload_owner=FrameConstants.lights`.
+- `semantic_light_payload_channels=direction_cosInner.w_or_params.z`.
+- `shader_light_array_ready=true`.
+- `semantic_fixture_light_count=4`.
+- `lighting_v2_shadow_output_ready=true`.
+- `missing_lighting_contract_count=0`.
+- direct-signal families: `1/1`.
+- shadow-loss families: `1/1`.
+- `direct_light` luma `0.42689531`.
+- `direct_light_unshadowed` luma `0.45797355`.
+- `direct_light_shadow_loss` luma `0.22300819`.
+
+Current stopping position:
+
+- Scene-local semantic light intent is now connected to named shader payload
+  lanes and packet-visible contract evidence.
+- The next larger architectural move is the `FullSceneShaderPipelineV3`
+  refactor plan: split material, lighting, reflection, environment, and
+  cinematic post into explicit render-graph resources with validation gates.

@@ -599,6 +599,10 @@ def validate_runtime_lighting_surface() -> list[str]:
         "shadowedLightContractReady",
         "shaderLightArrayReady",
         "semanticLightPayloadReady",
+        "semanticLightShaderPayloadReady",
+        "semanticLightPayloadOwner",
+        "semanticLightPayloadChannels",
+        "semanticLightPayloadCount",
         "areaLightPayloadReady",
         "clusteredLightListReady",
         "directLightPassReady",
@@ -624,6 +628,10 @@ def validate_runtime_lighting_surface() -> list[str]:
         '"shadowed_light_contract_ready"',
         '"shader_light_array_ready"',
         '"semantic_light_payload_ready"',
+        '"semantic_light_shader_payload_ready"',
+        '"semantic_light_payload_owner"',
+        '"semantic_light_payload_channels"',
+        '"semantic_light_payload_count"',
         '"area_light_payload_ready"',
         '"clustered_light_list_ready"',
         '"direct_light_pass_ready"',
@@ -661,6 +669,14 @@ def validate_runtime_lighting_surface() -> list[str]:
         "directLightUnshadowed - directLight",
     ]:
         require_source_token(errors, deferred_lighting, token, "DeferredLighting V2 direct-light comparison")
+
+    deferred_lighting_constants = DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
+    for token in [
+        "semanticClassId",
+        "direction_cosInner",
+        "isAreaRect ? areaHalfSize.x : semanticClassId",
+    ]:
+        require_source_token(errors, deferred_lighting_constants, token, "Deferred lighting semantic payload upload")
 
     for token in [
         "constexpr uint32_t kMaxDebugViewMode = 61u",

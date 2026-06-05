@@ -685,10 +685,15 @@ Current producer evidence:
   `tools/analyze_full_scene_shader_v3_lighting_motion.py`.
 - V3 lighting motion matrix runner:
   `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`.
+- the matrix runner supports `-SummarizeExisting` to recover completed packet
+  captures when the outer matrix wrapper is interrupted before aggregation.
 - the V3 packet runner now emits `v3_lighting_motion.json` and
   `v3_lighting_motion.md` whenever `CaptureSequenceCount >= 2`.
 - no-stress packet wiring exists for clean family-only matrix rows:
   `-NoStressScene` on V3/V2 packet runners.
+- packet family wiring now includes the full required V3 family set:
+  `gallery`, `kitchen`, `office`, `gym`, `concert`, `red_room`, and
+  `stadium`.
 - gallery-only mouse-jiggle matrix smoke:
   `build/captures/v3_lighting_motion_matrix_gallery_smoke3_20260605`.
 - gallery-only mouse-jiggle matrix result:
@@ -768,13 +773,31 @@ Current producer evidence:
     `full_scene_lighting_v3_executed_report_count=44`,
     `lighting_signal_metrics_ready=true`,
     failures `0`, warnings `0`.
+- new-family packet wiring smoke:
+  `build/captures/v3_lighting_motion_new_families_smoke1_20260605`.
+- new-family smoke scope:
+  families `red_room,stadium`;
+  mode `mouse_jitter`;
+  sequence count `2`;
+  views `beauty`, five legacy lighting terms, and five concrete V3 lighting
+  buffers.
+- new-family smoke matrix result:
+  `rows=10`, failures `0`, warnings `0`.
+- new-family debug-view metrics:
+  captured views `22`, measured views `22`, failures `0`.
+- new-family V3/legacy mouse-jiggle ratios:
+  - `red_room`: direct `1.062`, unshadowed `1.062`, shadow visibility `0.715`,
+    shadow loss `0.193`, indirect `0.568`.
+  - `stadium`: direct `1.031`, unshadowed `1.030`, shadow visibility `1.091`,
+    shadow loss `0.540`, indirect `1.000`.
 
 Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
 - repeat the V3 lighting motion matrix with promotion-grade frame counts and
-  include office/red-room/stadium once those families are packet-wired.
+  include the full required family set now that red-room/stadium are
+  packet-wired.
 - compare V3 split outputs against the legacy deferred terms under those
   motion and cross-family packets, not just the static/gallery smoke.
 - keep default beauty unchanged until the consumer/composite path and packet

@@ -154,10 +154,32 @@ V3 indirect parity fix:
   - rows: `40`.
   - failures: `0`.
   - warnings: `0`.
+- Packet family expansion:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1` now resolves
+    `red_room` and `stadium` seeds.
+  - `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`
+    defaults to the required V3 family set:
+    `gallery,kitchen,office,gym,concert,red_room,stadium`.
+  - the matrix runner now has `-SummarizeExisting` so interrupted capture
+    runs can be aggregated from existing manifests instead of rerendered.
+- New-family lighting motion smoke:
+  `build/captures/v3_lighting_motion_new_families_smoke1_20260605`.
+  - families: `red_room,stadium`.
+  - mode: `mouse_jitter`.
+  - rows: `10`.
+  - debug views captured/measured: `22/22`.
+  - failures: `0`.
+  - warnings: `0`.
+  - red room V3/legacy ratios:
+    direct `1.062`, unshadowed `1.062`, shadow visibility `0.715`,
+    shadow loss `0.193`, indirect `0.568`.
+  - stadium V3/legacy ratios:
+    direct `1.031`, unshadowed `1.030`, shadow visibility `1.091`,
+    shadow loss `0.540`, indirect `1.000`.
 - Next renderer step:
   repeat the V3 lighting motion matrix with promotion-grade frame counts and
-  then add the missing office/red-room/stadium packet families before moving to
-  SceneLocalEnvironmentV3 or ReflectionV3.
+  the full required family set before moving to SceneLocalEnvironmentV3 or
+  ReflectionV3.
 
 ## 2026-06-05 AAA Gate Refactor
 

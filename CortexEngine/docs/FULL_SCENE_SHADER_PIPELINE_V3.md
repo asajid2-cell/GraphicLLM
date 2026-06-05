@@ -487,18 +487,25 @@ Current producer evidence:
   `lighting_adapter_ready_report_count=6`,
   `lighting_split_allocated_report_count=6`,
   `lighting_split_ready_report_count=6`,
+  `lighting_signal_metrics_ready=true`,
   failures `0`, warnings `0`.
 - pass evidence:
   `FullSceneLightingV3.executed=true`,
   `FullSceneLightingV3.draw_count=1`,
   `FullSceneLightingV3.writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
+- signal evidence:
+  `direct_light.mean_luma=0.426794`,
+  `direct_light_unshadowed.mean_luma=0.457842`,
+  `direct_light_shadow_loss.mean_luma=0.223022`,
+  `shadow_factor.mean_luma=0.350937`, and
+  `ambient_ibl.mean_luma=0.196339`.
 
 Required next evidence for completion/promotion:
 
-- add signal gates for nonzero direct lighting, indirect lighting, shadow
-  visibility, and shadow loss using the split resources directly.
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
+- add split-resource debug views that sample the concrete V3 MRT outputs
+  directly rather than relying on the legacy debug-view naming surface.
 - keep default beauty unchanged until the consumer/composite path and packet
   gates prove promotion quality.
 

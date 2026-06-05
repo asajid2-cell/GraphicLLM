@@ -4026,3 +4026,60 @@ Current stopping position:
   - add direct signal gates over the five split resources.
   - close visual parity gaps between `PSMainV3LightingSplit` and the default
     deferred beauty shader before any promotion attempt.
+
+### FullSceneShaderPipeline V3 Lighting Signal Gate - 2026-06-05
+
+Implemented:
+
+- Added lighting signal metric gates to
+  `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now requires:
+  - `lighting_split_resources_ready=true`.
+  - `FullSceneLightingV3.draw_count=1`.
+  - all five split resource writes.
+  - nonblank/coherent lighting debug-view metrics for:
+    `direct_light`, `direct_light_unshadowed`,
+    `direct_light_shadow_loss`, `shadow_factor`, and `ambient_ibl`.
+- The signal gates are intentionally conservative. They catch blank/dead terms
+  and basic incoherence, but do not yet prove full visual parity with default
+  V2 beauty.
+
+Touched files:
+
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+- `docs/AAA_ASSET_QUALITY_HANDOFF.md`.
+
+Validation:
+
+- fresh packet:
+  `build/captures/v3_lighting_split_signal_gate_smoke1_20260605`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `lighting_adapter_ready_report_count=6`.
+  - `lighting_split_allocated_report_count=6`.
+  - `lighting_split_ready_report_count=6`.
+  - `full_scene_lighting_v3_executed_report_count=6`.
+  - `lighting_signal_metrics_ready=true`.
+  - failures `0`, warnings `0`.
+- signal metrics:
+  - `direct_light.mean_luma=0.426794`, `nonblack_ratio=1.0`.
+  - `direct_light_unshadowed.mean_luma=0.457842`, `nonblack_ratio=1.0`.
+  - `direct_light_shadow_loss.mean_luma=0.223022`, `nonblack_ratio=1.0`.
+  - `shadow_factor.mean_luma=0.350937`, `nonblack_ratio=1.0`.
+  - `ambient_ibl.mean_luma=0.196339`, `nonblack_ratio=1.0`.
+- validators:
+  - `python tools/validate_full_scene_shader_pipeline_v3_plan.py`: passed.
+  - `python tools/check_full_scene_shader_pipeline_v2_frame_report.py`: passed.
+
+Current stopping position:
+
+- V3 lighting now has ownership, one-draw producer, and nonblank signal gates.
+- The gate still measures the existing lighting debug-view capture surface.
+- Next safe slice:
+  - add explicit debug views that sample the actual V3 MRT split resources.
+  - then compare those concrete split outputs against the legacy debug terms and
+    close parity gaps in `PSMainV3LightingSplit`.

@@ -555,7 +555,7 @@ def validate_runtime_material_policy_surface() -> list[str]:
     require_source_token(
         errors,
         renderer_debug_source,
-        "constexpr uint32_t kMaxDebugViewMode = 57u",
+        "constexpr uint32_t kMaxDebugViewMode = 59u",
         "Renderer debug mode range",
     )
     for token in [
@@ -646,7 +646,7 @@ def validate_runtime_lighting_surface() -> list[str]:
         require_source_token(errors, deferred_lighting, token, "DeferredLighting V2 direct-light comparison")
 
     for token in [
-        "constexpr uint32_t kMaxDebugViewMode = 57u",
+        "constexpr uint32_t kMaxDebugViewMode = 59u",
         "VB_DeferredDirectLightUnshadowed",
         "VB_DeferredDirectLightShadowLoss",
     ]:
@@ -872,18 +872,26 @@ def validate_runtime_reflection_surface() -> list[str]:
         "Reflection-source resolver weights",
         "Reflection stability policy",
         "reflectionStabilityScale",
+        "stableSSRConfidence",
+        "candidateReflectionCompositeColor",
+        "g_DebugMode.x == 58.0f",
+        "g_DebugMode.x == 59.0f",
     ]:
         require_source_token(errors, post_process_shader, token, "PostProcess reflection resolver debug views")
 
     for token in [
         "PostReflectionSourceWeights",
         "PostReflectionStabilityPolicy",
+        "PostReflectionResolverV2Candidate",
+        "PostReflectionResolverV2CandidateDelta",
     ]:
         require_source_token(errors, renderer_debug_source, token, "Renderer reflection resolver debug labels")
 
     for token in [
         "reflection_source_weights",
         "reflection_stability_policy",
+        "reflection_resolver_candidate",
+        "reflection_resolver_candidate_delta",
     ]:
         require_source_token(errors, json.dumps(load_json(FRAME_REPORT_CONTRACT_PATH)), token, "V2 reflection debug-view contract")
         require_source_token(errors, packet_script, token, "V2 packet runner reflection resolver views")
@@ -1048,6 +1056,8 @@ def validate_v2_packet_runner_surface() -> list[str]:
         "reflection_owner",
         "reflection_source_weights",
         "reflection_stability_policy",
+        "reflection_resolver_candidate",
+        "reflection_resolver_candidate_delta",
         "shadow_factor",
         "direct_light",
         "direct_light_unshadowed",

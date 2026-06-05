@@ -169,6 +169,8 @@
         "reflection_owner",
         "reflection_source_weights",
         "reflection_stability_policy",
+        "reflection_resolver_candidate",
+        "reflection_resolver_candidate_delta",
         "room_probe_weight",
         "hero_probe_weight",
         "planar_probe_mask"

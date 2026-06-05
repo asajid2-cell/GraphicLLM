@@ -5,6 +5,7 @@
   "catalog": "assets/final_art/final_art_scene_catalog.json",
   "import_manifest": "assets/generated/pretrained_assets/import_manifest.json",
   "asset_registry": "assets/final_art/asset_registry_v2.json",
+  "scene_bindings": "assets/final_art/scene_asset_bindings_v1.json",
   "renderer_manifest": "build/captures/scene_local_cinematic_renderer_v1_final_gate_20260605/warm_micro_jitter_full_seq8/manifest.json",
   "scene_count": 5,
   "passed_scene_count": 0,
@@ -75,7 +76,16 @@
         "reflection_owner": "local_room_no_visible_hdri",
         "profile_id": "kitchen_morning_warm_scene_local_v1"
       },
-      "asset_registry_coverage": 1.0
+      "asset_registry_coverage": 1.0,
+      "scene_asset_binding": {
+        "status": "BOUND",
+        "object_count": 135,
+        "registry_bound_count": 27,
+        "primitive_blockout_count": 6,
+        "primitive_hero_blocker_count": 2,
+        "unresolved_runtime_asset_count": 0,
+        "aaa_ready_bound_count": 0
+      }
     },
     {
       "id": "home_office_evening",
@@ -125,7 +135,16 @@
         "reflection_owner": "local_room_no_visible_hdri",
         "profile_id": "office_evening_scene_local_v1"
       },
-      "asset_registry_coverage": 1.0
+      "asset_registry_coverage": 1.0,
+      "scene_asset_binding": {
+        "status": "BOUND",
+        "object_count": 131,
+        "registry_bound_count": 24,
+        "primitive_blockout_count": 5,
+        "primitive_hero_blocker_count": 8,
+        "unresolved_runtime_asset_count": 0,
+        "aaa_ready_bound_count": 0
+      }
     },
     {
       "id": "basketball_gym_day",
@@ -181,7 +200,16 @@
         "reflection_owner": "local_room_no_visible_hdri",
         "profile_id": "basketball_gym_bright_scene_local_v1"
       },
-      "asset_registry_coverage": 1.0
+      "asset_registry_coverage": 1.0,
+      "scene_asset_binding": {
+        "status": "BOUND",
+        "object_count": 125,
+        "registry_bound_count": 30,
+        "primitive_blockout_count": 17,
+        "primitive_hero_blocker_count": 7,
+        "unresolved_runtime_asset_count": 0,
+        "aaa_ready_bound_count": 0
+      }
     },
     {
       "id": "neon_streamer_concert",
@@ -239,7 +267,16 @@
         "reflection_owner": "local_room_no_visible_hdri",
         "profile_id": "neon_concert_auditorium_scene_local_v1"
       },
-      "asset_registry_coverage": 1.0
+      "asset_registry_coverage": 1.0,
+      "scene_asset_binding": {
+        "status": "BOUND",
+        "object_count": 154,
+        "registry_bound_count": 39,
+        "primitive_blockout_count": 5,
+        "primitive_hero_blocker_count": 7,
+        "unresolved_runtime_asset_count": 0,
+        "aaa_ready_bound_count": 0
+      }
     },
     {
       "id": "rt_showcase_gallery",
@@ -292,7 +329,16 @@
         "reflection_owner": "gallery_visible_ibl_plus_local_panels",
         "profile_id": "gallery_public_cinematic_v1"
       },
-      "asset_registry_coverage": 0.0
+      "asset_registry_coverage": 0.0,
+      "scene_asset_binding": {
+        "status": "MISSING_SEED",
+        "object_count": 0,
+        "registry_bound_count": 0,
+        "primitive_blockout_count": 0,
+        "primitive_hero_blocker_count": 0,
+        "unresolved_runtime_asset_count": 0,
+        "aaa_ready_bound_count": 0
+      }
     }
   ]
 }

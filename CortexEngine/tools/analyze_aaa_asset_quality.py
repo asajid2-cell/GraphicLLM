@@ -15,6 +15,7 @@ DEFAULT_CONTRACT = ROOT / "assets/final_art/aaa_asset_quality_contract.json"
 DEFAULT_CATALOG = ROOT / "assets/final_art/final_art_scene_catalog.json"
 DEFAULT_IMPORT_MANIFEST = ROOT / "assets/generated/pretrained_assets/import_manifest.json"
 DEFAULT_ASSET_REGISTRY = ROOT / "assets/final_art/asset_registry_v2.json"
+DEFAULT_SCENE_BINDINGS = ROOT / "assets/final_art/scene_asset_bindings_v1.json"
 DEFAULT_OUT_JSON = ROOT / "docs/media/final_art/generated/aaa_asset_quality/aaa_asset_quality_report.json"
 DEFAULT_OUT_MD = ROOT / "docs/media/final_art/generated/aaa_asset_quality/aaa_asset_quality_report.md"
 
@@ -84,6 +85,16 @@ def asset_registry_index(asset_registry: dict[str, Any] | None) -> dict[str, dic
     }
 
 
+def scene_binding_index(scene_bindings: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not scene_bindings:
+        return {}
+    return {
+        str(scene.get("scene", "")): scene
+        for scene in scene_bindings.get("scenes", [])
+        if scene.get("scene")
+    }
+
+
 def renderer_family_evidence(renderer_manifest: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     if not renderer_manifest:
         return {}
@@ -114,6 +125,7 @@ def analyze_scene(
     catalog_by_id: dict[str, dict[str, Any]],
     renderer_by_family: dict[str, dict[str, Any]],
     registry_by_path: dict[str, dict[str, Any]],
+    bindings_by_scene: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     minimums = contract["minimums"]
     weights = contract["weights"]
@@ -129,6 +141,7 @@ def analyze_scene(
         blockers.append("missing target seed")
 
     renderer_family = str(target.get("renderer_family", ""))
+    scene_binding = bindings_by_scene.get(str(target.get("id", "")), {})
     renderer = renderer_by_family.get(renderer_family)
     if renderer_by_family and not renderer:
         blockers.append("renderer family missing from manifest")
@@ -255,6 +268,15 @@ def analyze_scene(
         "primitive_hero_roles": primitive_hero_roles,
         "renderer_evidence": renderer or {},
         "asset_registry_coverage": round(ratio(sum(1 for asset in runtime_assets if asset in registry_by_path), max(1, len(runtime_assets))), 4),
+        "scene_asset_binding": {
+            "status": scene_binding.get("status", "MISSING_BINDING") if bindings_by_scene else "",
+            "object_count": scene_binding.get("object_count", 0),
+            "registry_bound_count": scene_binding.get("registry_bound_count", 0),
+            "primitive_blockout_count": scene_binding.get("primitive_blockout_count", 0),
+            "primitive_hero_blocker_count": scene_binding.get("primitive_hero_blocker_count", 0),
+            "unresolved_runtime_asset_count": scene_binding.get("unresolved_runtime_asset_count", 0),
+            "aaa_ready_bound_count": scene_binding.get("aaa_ready_bound_count", 0),
+        },
     }
 
 
@@ -269,13 +291,15 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
     lines.append("")
     lines.append("## Summary")
     lines.append("")
-    lines.append("| Scene | Status | Score | Runtime Meshes | Unique Assets | Primitive Ratio | PBR Ratio | LOD Ratio | Collision Ratio |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("| Scene | Status | Score | Runtime Meshes | Bound Objects | Primitive Hero Blockers | Unique Assets | Primitive Ratio | PBR Ratio | LOD Ratio | Collision Ratio |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for scene in report["scenes"]:
         metrics = scene["metrics"]
+        binding = scene.get("scene_asset_binding", {})
         lines.append(
             f"| {scene['id']} | {scene['status']} | {scene['score']:.4f} | "
-            f"{metrics['runtime_mesh_instances']} | {metrics['unique_runtime_assets']} | "
+            f"{metrics['runtime_mesh_instances']} | {binding.get('registry_bound_count', 0)} | "
+            f"{binding.get('primitive_hero_blocker_count', 0)} | {metrics['unique_runtime_assets']} | "
             f"{metrics['primitive_ratio']:.4f} | {metrics['pbr_texture_asset_ratio']:.4f} | "
             f"{metrics['lod_ready_asset_ratio']:.4f} | {metrics['collision_ready_asset_ratio']:.4f} |"
         )
@@ -305,6 +329,7 @@ def main() -> int:
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--import-manifest", type=Path, default=DEFAULT_IMPORT_MANIFEST)
     parser.add_argument("--asset-registry", type=Path, default=DEFAULT_ASSET_REGISTRY)
+    parser.add_argument("--scene-bindings", type=Path, default=DEFAULT_SCENE_BINDINGS)
     parser.add_argument("--renderer-manifest", type=Path, default=None)
     parser.add_argument("--out-json", type=Path, default=DEFAULT_OUT_JSON)
     parser.add_argument("--out-md", type=Path, default=DEFAULT_OUT_MD)
@@ -315,13 +340,15 @@ def main() -> int:
     catalog = load_json(args.catalog)
     import_manifest = load_json(args.import_manifest) if args.import_manifest.exists() else {"assets": []}
     asset_registry = load_json(args.asset_registry) if args.asset_registry.exists() else None
+    scene_bindings = load_json(args.scene_bindings) if args.scene_bindings.exists() else None
     renderer_manifest = load_json(args.renderer_manifest) if args.renderer_manifest and args.renderer_manifest.exists() else None
     catalog_by_id = scene_catalog_index(catalog)
     renderer_by_family = renderer_family_evidence(renderer_manifest)
     registry_by_path = asset_registry_index(asset_registry)
+    bindings_by_scene = scene_binding_index(scene_bindings)
 
     scenes = [
-        analyze_scene(target, contract, catalog_by_id, renderer_by_family, registry_by_path)
+        analyze_scene(target, contract, catalog_by_id, renderer_by_family, registry_by_path, bindings_by_scene)
         for target in contract["target_scenes"]
     ]
     blocked = [scene for scene in scenes if scene["status"] != "PASS"]
@@ -332,6 +359,7 @@ def main() -> int:
         "catalog": rel(args.catalog),
         "import_manifest": rel(args.import_manifest),
         "asset_registry": rel(args.asset_registry) if args.asset_registry.exists() else "",
+        "scene_bindings": rel(args.scene_bindings) if args.scene_bindings.exists() else "",
         "renderer_manifest": rel(args.renderer_manifest) if args.renderer_manifest else "",
         "scene_count": len(scenes),
         "passed_scene_count": len(scenes) - len(blocked),

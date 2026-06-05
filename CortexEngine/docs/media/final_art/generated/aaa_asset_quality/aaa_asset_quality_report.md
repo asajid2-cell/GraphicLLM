@@ -7,13 +7,13 @@ Blocked scenes: `5`
 
 ## Summary
 
-| Scene | Status | Score | Runtime Meshes | Unique Assets | Primitive Ratio | PBR Ratio | LOD Ratio | Collision Ratio |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| home_kitchen_lantern | BLOCKED | 0.6014 | 27 | 19 | 0.7556 | 0.0370 | 0.0000 | 0.0000 |
-| home_office_evening | BLOCKED | 0.5774 | 24 | 14 | 0.7786 | 0.0000 | 0.0000 | 0.0000 |
-| basketball_gym_day | BLOCKED | 0.4827 | 30 | 4 | 0.6240 | 0.0000 | 0.0000 | 0.0000 |
-| neon_streamer_concert | BLOCKED | 0.5658 | 39 | 6 | 0.7143 | 0.0000 | 0.0000 | 0.0000 |
-| rt_showcase_gallery | BLOCKED | 0.1000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| Scene | Status | Score | Runtime Meshes | Bound Objects | Primitive Hero Blockers | Unique Assets | Primitive Ratio | PBR Ratio | LOD Ratio | Collision Ratio |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| home_kitchen_lantern | BLOCKED | 0.6014 | 27 | 27 | 2 | 19 | 0.7556 | 0.0370 | 0.0000 | 0.0000 |
+| home_office_evening | BLOCKED | 0.5774 | 24 | 24 | 8 | 14 | 0.7786 | 0.0000 | 0.0000 | 0.0000 |
+| basketball_gym_day | BLOCKED | 0.4827 | 30 | 30 | 7 | 4 | 0.6240 | 0.0000 | 0.0000 | 0.0000 |
+| neon_streamer_concert | BLOCKED | 0.5658 | 39 | 39 | 7 | 6 | 0.7143 | 0.0000 | 0.0000 | 0.0000 |
+| rt_showcase_gallery | BLOCKED | 0.1000 | 0 | 0 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
 
 ## Blockers
 

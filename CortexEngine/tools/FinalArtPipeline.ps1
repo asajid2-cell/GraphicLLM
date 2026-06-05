@@ -17,6 +17,7 @@ param(
         "PretrainedSceneAssembly",
         "PretrainedVisualRejection",
         "AssetRegistryV2",
+        "SceneAssetBindings",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1066,8 +1067,16 @@ function Invoke-AssetRegistryV2 {
     }
 }
 
-function Invoke-AAAReplacementPlan {
+function Invoke-SceneAssetBindings {
     Invoke-AssetRegistryV2
+    python (Join-Path $Root "tools/build_scene_asset_bindings_v1.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Scene asset binding build failed with exit code $LASTEXITCODE"
+    }
+}
+
+function Invoke-AAAReplacementPlan {
+    Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
     python (Join-Path $Root "tools/plan_aaa_asset_replacements.py")
     if ($LASTEXITCODE -ne 0) {
@@ -1114,6 +1123,7 @@ switch ($Action) {
     "PretrainedSceneAssembly" { Invoke-PretrainedSceneAssembly }
     "PretrainedVisualRejection" { Invoke-PretrainedVisualRejection }
     "AssetRegistryV2" { Invoke-AssetRegistryV2 }
+    "SceneAssetBindings" { Invoke-SceneAssetBindings }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

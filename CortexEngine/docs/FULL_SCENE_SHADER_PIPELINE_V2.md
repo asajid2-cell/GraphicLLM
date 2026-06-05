@@ -1804,3 +1804,88 @@ Current interpretation:
 - V2 beauty still remains `v1_fallback`.
 - The next architecture slice should start semantic light buffers and V2
   direct-light shadow output.
+
+## Full Scene Shader Pipeline V2 Semantic Light Buffer Evidence Slice - 2026-06-05
+
+Purpose:
+
+- Start `FSSP-V2-004B` by proving that the semantic light rig is backed by
+  shader-facing light payloads and direct-light pass ownership.
+- Move lighting evidence beyond scene-profile counts toward the actual V2
+  direct-light inputs and outputs.
+
+Implemented:
+
+- Extended `FullSceneLightingRigEvidence` with:
+  - shader light-array readiness.
+  - semantic light-payload readiness.
+  - area-light payload readiness.
+  - clustered light-list readiness.
+  - direct-light pass readiness.
+  - direct-light shadow-output readiness.
+  - point, spot, and two-sided area-light counts.
+- Added `FullSceneShaderPassReadsResource` to pair with existing pass-write
+  ownership checks.
+- V2 lighting readiness now requires:
+  - populated shader-facing light array.
+  - semantic fixture payloads.
+  - valid area-light payloads when rect lights exist.
+  - `VBClusteredLights` ownership of `cluster_ranges` and
+    `cluster_light_indices`.
+  - `VBDeferredLighting` reading GBuffer inputs and writing `hdr_color`.
+  - `VBDeferredLighting` reading `shadow_map` when shadows are enabled.
+- The V2 frame-report contract and checker require the new lighting fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_light_buffer_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_light_buffer_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+
+Gallery beauty lighting evidence:
+
+- `missing_lighting_contract_count=0`.
+- `shader_light_array_ready=true`.
+- `semantic_light_payload_ready=true`.
+- `area_light_payload_ready=true`.
+- `clustered_light_list_ready=true`.
+- `direct_light_pass_ready=true`.
+- `direct_light_shadow_output_ready=true`.
+- `point_light_count=1`.
+- `spot_light_count=3`.
+- `rect_area_light_count=2`.
+- `semantic_fixture_light_count=4`.
+- `shadow_casting_light_count=1`.
+- `lighting.domain_ready=true`.
+
+Current interpretation:
+
+- `FSSP-V2-004B` is packet-proved for the gallery target at the evidence
+  layer.
+- Lighting still renders through the V1 beauty fallback, but V2 now proves the
+  actual shader-facing light array, clustered light-list ownership, direct-light
+  HDR output, and shadow-map input connection.
+- The next shader-side lighting slice should add a V2 direct-light shadow
+  output/debug comparison path rather than adding more profile-only evidence.

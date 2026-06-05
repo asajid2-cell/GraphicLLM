@@ -28,6 +28,8 @@ FRAME_POST_CONSTANTS_SOURCE_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePo
 DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
     ROOT / "src" / "Graphics" / "Renderer_VisibilityBufferDeferredLighting.cpp"
 )
+TEMPORAL_REJECTION_SHADER_PATH = ROOT / "assets" / "shaders" / "TemporalRejectionMask.hlsl"
+TEMPORAL_REJECTION_SOURCE_PATH = ROOT / "src" / "Graphics" / "TemporalRejectionMask.cpp"
 
 
 def fail(message: str) -> int:
@@ -312,6 +314,71 @@ def validate_runtime_material_policy_surface() -> list[str]:
     return errors
 
 
+def validate_runtime_temporal_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        TEMPORAL_REJECTION_SHADER_PATH,
+        TEMPORAL_REJECTION_SOURCE_PATH,
+        POST_PROCESS_SHADER_PATH,
+        SHADER_TYPES_HEADER_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing runtime temporal source: {path}")
+    if errors:
+        return errors
+
+    temporal_shader = TEMPORAL_REJECTION_SHADER_PATH.read_text(encoding="utf-8")
+    temporal_source = TEMPORAL_REJECTION_SOURCE_PATH.read_text(encoding="utf-8")
+    post_shader = POST_PROCESS_SHADER_PATH.read_text(encoding="utf-8")
+    shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
+
+    require_source_token(
+        errors,
+        temporal_shader,
+        "cbuffer FrameConstants : register(b1)",
+        "TemporalRejectionMask frame constants",
+    )
+    require_source_token(
+        errors,
+        temporal_shader,
+        "float4   g_TAAParams",
+        "TemporalRejectionMask TAA params",
+    )
+    require_source_token(
+        errors,
+        temporal_shader,
+        "historyUv = uv + velocity + g_TAAParams.xy",
+        "TemporalRejectionMask jitter reprojection",
+    )
+    require_source_token(
+        errors,
+        temporal_shader,
+        "max(speedPixels - 4.0f, 0.0f) / 56.0f",
+        "TemporalRejectionMask camera-sweep motion taper",
+    )
+    require_source_token(
+        errors,
+        post_shader,
+        "historyUV = saturate(uv + vel + g_TAAParams.xy)",
+        "PostProcess TAA resolve jitter reprojection",
+    )
+    require_source_token(
+        errors,
+        shader_types,
+        "glm::vec4 taaParams",
+        "ShaderTypes TAA params",
+    )
+    require_source_token(
+        errors,
+        temporal_source,
+        "SetComputeRootConstantBufferView(kFrameConstantsRoot, desc.frameConstants)",
+        "TemporalRejectionMask frame constants binding",
+    )
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
@@ -353,6 +420,7 @@ def main() -> int:
     errors = validate_contracts()
     errors.extend(validate_runtime_source_surface())
     errors.extend(validate_runtime_material_policy_surface())
+    errors.extend(validate_runtime_temporal_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

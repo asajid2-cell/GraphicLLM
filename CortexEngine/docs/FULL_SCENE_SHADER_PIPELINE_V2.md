@@ -97,6 +97,10 @@ V2 is organized as contracts, not scattered features.
 6. Temporal Contract
    - Motion vectors are first-class for camera and objects.
    - TAA/history rejection is material-aware.
+   - Temporal rejection and TAA resolve must use the same jitter-aware history
+     coordinate contract. A mask that tests `uv + velocity` while resolve uses
+     `uv + velocity + jitter_delta` is invalid because it will over-reject
+     stable surfaces during mouse rotation and make reflections/materials pop.
    - Smooth metals, glass, water, emissive, and high-frequency normal maps
      receive stricter history clamps.
 
@@ -266,6 +270,8 @@ Completion evidence:
 - runtime material-policy source is statically checked across CPU material
   resolution, VB material constants, HLSL material resolve, and the scene
   material GBuffer channel.
+- temporal rejection source is statically checked for jitter-aware history
+  reprojection matching the TAA resolve path.
 - material evidence report derives shader-family and PBR/hero-surface blockers
   from Asset Registry V2 and the scene binding overlay.
 - material upgrade plan converts blocked material evidence into P0/P1 work

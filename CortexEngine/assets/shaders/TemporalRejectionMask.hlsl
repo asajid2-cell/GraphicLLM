@@ -5,6 +5,41 @@ Texture2D<float2> g_Velocity : register(t2);
 RWTexture2D<float4> g_TemporalRejectionMask : register(u0);
 RWByteAddressBuffer g_TemporalMaskStats : register(u1);
 
+// Frame constants must match ShaderTypes.h. The temporal mask is part of the
+// same reprojection contract as TAAResolvePS, so it needs the same jitter delta.
+cbuffer FrameConstants : register(b1)
+{
+    float4x4 g_ViewMatrix;
+    float4x4 g_ProjectionMatrix;
+    float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
+    float4   g_CameraPosition;
+    float4   g_TimeAndExposure;
+    float4   g_AmbientColor;
+    uint4    g_LightCount;
+    struct Light
+    {
+        float4 position_type;
+        float4 direction_cosInner;
+        float4 color_range;
+        float4 params;
+    };
+    static const uint LIGHT_MAX = 16;
+    Light    g_Lights[LIGHT_MAX];
+    float4x4 g_LightViewProjection[6];
+    float4   g_CascadeSplits;
+    float4   g_ShadowParams;
+    float4   g_DebugMode;
+    float4   g_PostParams;
+    float4   g_EnvParams;
+    float4   g_ColorGrade;
+    float4   g_FogParams;
+    float4   g_FogExtraParams;
+    float4   g_AOParams;
+    float4   g_BloomParams;
+    float4   g_TAAParams;
+};
+
 static const uint TEMPORAL_STATS_SCALE = 256u;
 static const uint TEMPORAL_STATS_ACCEPTED_OFFSET = 0u;
 static const uint TEMPORAL_STATS_DISOCCLUSION_OFFSET = 4u;
@@ -33,7 +68,7 @@ void BuildTemporalRejectionMaskCS(uint3 id : SV_DispatchThreadID)
     const float2 dim = max(float2(width, height), 1.0f);
     const float2 uv = (float2(p) + 0.5f) / dim;
     const float2 velocity = g_Velocity.Load(int3(p, 0));
-    const float2 historyUv = uv + velocity;
+    const float2 historyUv = uv + velocity + g_TAAParams.xy;
     const bool inBounds =
         historyUv.x >= 0.0f && historyUv.x <= 1.0f &&
         historyUv.y >= 0.0f && historyUv.y <= 1.0f;
@@ -47,7 +82,10 @@ void BuildTemporalRejectionMaskCS(uint3 id : SV_DispatchThreadID)
 
     const float depthAcceptance = exp2(-abs(centerDepth - historyDepth) * 160.0f);
     const float normalAcceptance = saturate((dot(centerNormal, historyNormal) - 0.78f) / 0.22f);
-    const float motionAcceptance = saturate(1.0f - max(speedPixels - 2.0f, 0.0f) / 22.0f);
+    // Camera rotation can move static, correctly reprojectable surfaces by many
+    // pixels per frame. Let depth/normal/bounds own disocclusion rejection and
+    // taper motion more gently so the TAA pass can stabilize IBL/specular detail.
+    const float motionAcceptance = saturate(1.0f - max(speedPixels - 4.0f, 0.0f) / 56.0f);
     const float boundsAcceptance = inBounds ? 1.0f : 0.0f;
     const float acceptance = depthAcceptance * normalAcceptance * motionAcceptance * boundsAcceptance;
 

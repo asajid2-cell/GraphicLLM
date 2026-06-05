@@ -115,6 +115,7 @@
       "readiness_fields": [
         "enabled",
         "motion_vectors_ready",
+        "jitter_reprojection_ready",
         "material_aware_rejection_ready",
         "history_clamp_ready",
         "smooth_surface_motion_gate_passed",

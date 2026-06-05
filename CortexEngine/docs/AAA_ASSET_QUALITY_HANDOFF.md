@@ -2568,3 +2568,55 @@ Build command warning:
 - Use `set "CORTEX_SKIP_ASSET_SYNC=1"` with quotes in `cmd.exe`.
 - The unquoted form can include a trailing space and miss the exact CMake env
   check, causing slow full asset sync.
+
+## 2026-06-05 Local Probe Candidate Resolver Slice
+
+Implemented:
+
+- Added a candidate-only local probe sheen term in `PostProcess.hlsl`.
+- It is gated by scene-local reflection potential, reflection stability scale,
+  material reflection ceiling, and existing SSR/RT candidate weight.
+- It changes only `reflection_resolver_candidate` and
+  `reflection_resolver_candidate_delta`.
+- Default beauty remains unchanged.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_local_probe_candidate_weighted_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- Packet:
+  `build/captures/full_scene_shader_pipeline_v2_local_probe_candidate_weighted_packet_20260605`.
+- Source-signal families: `5/5`.
+- Candidate-delta families: `5/5`.
+- Warnings: `0`.
+- `ctest` completed with `No tests were found`.
+
+Candidate deltas:
+
+| Family | Status | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|
+| gallery | `meaningful_delta` | `0.00343681` | `0.08734592` |
+| kitchen | `meaningful_delta` | `0.00149478` | `0.08704644` |
+| office | `meaningful_delta` | `0.00032100` | `0.00128472` |
+| gym | `meaningful_delta` | `0.00052648` | `0.01372613` |
+| concert | `meaningful_delta` | `0.00219636` | `0.11669922` |
+
+Current interpretation:
+
+- The candidate resolver now consumes local scene source authority across the
+  full tested family set.
+- This is a real architecture step beyond evidence-only plumbing.
+- It remains approximate because post still does not bind actual room/hero
+  probe radiance; it derives the candidate local term from already-lit scene
+  color plus ambient scene-local floor.
+- Next work should pass a real local-probe/source color or resolved local
+  reflection radiance into post, then test stability under motion before any
+  default beauty promotion.

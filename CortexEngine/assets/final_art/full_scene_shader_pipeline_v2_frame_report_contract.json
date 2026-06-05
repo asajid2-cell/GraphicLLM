@@ -79,6 +79,7 @@
         "room_probe_count",
         "hero_probe_count",
         "planar_probe_count",
+        "rt_miss_environment_policy_ready",
         "unauthorized_external_hdri_ratio",
         "unknown_reflection_owner_ratio"
       ],

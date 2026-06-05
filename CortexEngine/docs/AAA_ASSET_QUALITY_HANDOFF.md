@@ -610,6 +610,42 @@ Current caveat:
   with mouse-jiggle/camera-sweep evidence before V2 temporal gates can be
   promoted beyond placeholder/fallback status.
 
+### Full Scene Shader Pipeline V2 Reflection Miss Ownership Slice
+
+Purpose:
+
+- Make ray-traced reflection misses respect scene-local environment ownership
+  instead of leaking visible HDRI/background energy into enclosed authored
+  scenes.
+- This is a root shader policy for glossy/metal/glass stability; it is not an
+  IBL-off workaround.
+
+Implementation state:
+
+- `RaytracedReflections.hlsl` now treats zero background exposure as an authored
+  enclosed-scene signal: when IBL is disabled and background exposure is zero,
+  ray misses return black instead of synthesizing an external sky/ambient lobe.
+- RT reflection environment sampling now uses `g_AmbientColor.w`
+  (`backgroundBlur`) as a minimum specular mip floor, so reflection-safe local
+  backgrounds can damp high-frequency HDRI detail without disabling IBL.
+- Interior hit-surface radiance no longer adds a horizon-weighted sky ambient
+  lobe when the authored scene declares no external environment.
+- `FrameContractJson.cpp` reports
+  `full_scene_shader_pipeline_v2.reflections.rt_miss_environment_policy_ready`.
+- The field is true only when:
+  - no invalid external HDRI is reported.
+  - outdoor/non-enclosed scenes are allowed, or enclosed scenes have local
+    reflection probes, zero background exposure, or IBL disabled.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now statically
+  checks the RT reflection miss policy, background exposure upload, and
+  background-blur mip-floor contract.
+
+Current caveat:
+
+- This hardens reflection ownership. It still needs rendered packet evidence
+  on enclosed scenes with IBL enabled/background controls before V2 reflection
+  gates can be promoted.
+
 ## Resume Commands
 
 ```powershell

@@ -129,6 +129,12 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
     const bool unknownReflectionOwner =
         contract.sceneVisual.reflectionOwner.empty() ||
         contract.sceneVisual.reflectionOwner == "unknown";
+    const bool rtMissEnvironmentPolicyReady =
+        !contract.sceneVisual.invalidExternalHDRI &&
+        (!contract.sceneVisual.enclosedScene ||
+         contract.environment.localReflectionProbeCount > 0 ||
+         contract.environment.backgroundExposure <= 0.001f ||
+         !contract.features.iblEnabled);
     const bool postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -185,6 +191,7 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"room_probe_count", contract.environment.localReflectionProbeCount},
             {"hero_probe_count", 0},
             {"planar_probe_count", 0},
+            {"rt_miss_environment_policy_ready", rtMissEnvironmentPolicyReady},
             {"unauthorized_external_hdri_ratio",
              contract.sceneVisual.invalidExternalHDRI ? 1.0 : 0.0},
             {"unknown_reflection_owner_ratio", unknownReflectionOwner ? 1.0 : 0.0},

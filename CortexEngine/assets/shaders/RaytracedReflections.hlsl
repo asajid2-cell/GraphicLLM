@@ -113,10 +113,11 @@ float3 SampleEnvironment(float3 dir, float roughness)
     dir = normalize(dir);
 
     // When IBL is disabled, fall back to flat ambient so RT reflections
-    // do not fight the main shading.
+    // do not fight the main shading. Enclosed authored scenes also set
+    // background exposure to zero, so misses must not synthesize a sky lobe.
     if (g_EnvParams.z <= 0.5f)
     {
-        return g_AmbientColor.rgb;
+        return (g_EnvParams.w <= 0.001f) ? float3(0.0f, 0.0f, 0.0f) : g_AmbientColor.rgb;
     }
 
     float2 envUV = DirectionToLatLong(dir);
@@ -125,7 +126,9 @@ float3 SampleEnvironment(float3 dir, float roughness)
     // that the post-process then has to hide.
     float perceptualRoughness = saturate(roughness);
     const float kApproxEnvMaxMip = 5.0f;
-    float envMip = perceptualRoughness * perceptualRoughness * kApproxEnvMaxMip;
+    float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * kApproxEnvMaxMip;
+    float envMip = max(perceptualRoughness * perceptualRoughness * kApproxEnvMaxMip,
+                       reflectionSafeMipFloor);
     float3 env = g_EnvSpecular.SampleLevel(g_Sampler, envUV, envMip).rgb;
     float envMax = max(max(env.r, env.g), env.b);
     const float kMaxEnvSample = 16.0f;
@@ -160,7 +163,10 @@ float3 EstimateHitSurfaceRadiance(ReflectionPayload payload, float3 hitPoint, fl
 
     float3 radiance = payload.emissive;
     float hemi = saturate(N.y * 0.5f + 0.5f);
-    float3 skyAmbient = g_AmbientColor.rgb * lerp(0.45f, 1.25f, hemi);
+    const bool authoredInteriorNoEnvironment = (g_EnvParams.z <= 0.5f && g_EnvParams.w <= 0.001f);
+    float3 skyAmbient = authoredInteriorNoEnvironment
+        ? g_AmbientColor.rgb
+        : g_AmbientColor.rgb * lerp(0.45f, 1.25f, hemi);
     radiance += skyAmbient * albedo * diffuseWeight;
 
     float3 envDir = reflect(incomingRayDir, N);

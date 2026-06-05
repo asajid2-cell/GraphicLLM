@@ -690,6 +690,250 @@ before lighting and reflections can be trustworthy. Temporal stability needs
 object/material ids before it can stop smooth surfaces from popping. Post is
 late because it should present good inputs, not mask bad ones.
 
+## Goal Feature: Full Scene Shader V2 Beauty Candidate
+
+The next goal feature is not a single shader toggle. It is a complete
+`FullSceneShaderV2BeautyCandidate` path that can render selected scenes from
+the V2 contracts while V1 remains the fallback.
+
+The feature is allowed to exist only when the frame can answer these questions
+for the final beauty image:
+
+- Which scene visual contract owned the frame?
+- Which shader-facing material table row owned each visible pixel?
+- Which semantic lights contributed direct energy?
+- Which local probe, planar source, SSR/RT source, neutral fallback, or
+  authorized external environment owned each reflection?
+- Which shadow policy owned cascade, local, RT, and contact shadows?
+- Which material-aware temporal policy accepted or rejected history?
+- Which HDR post profile mapped scene-linear output to display output?
+- Which render graph pass produced every consumed resource and debug view?
+
+The feature must be built as a switchable candidate path:
+
+```text
+V1 playable path
+  -> unchanged default fallback
+
+V2 candidate path
+  -> FullSceneMaterialResolveV2
+  -> FullSceneLightingV2
+  -> FullSceneReflectionResolveV2
+  -> FullSceneShadowCompositeV2
+  -> FullSceneTemporalResolveV2
+  -> FullScenePostV2
+  -> Beauty candidate + debug atlas + frame report
+```
+
+The V2 candidate can be selected for packet runs and debug review. It must not
+become the default until cross-family evidence and user review accept it.
+
+## Refactor Workstreams For The Goal Feature
+
+### Workstream 1: Shared FullSceneFrameData
+
+Purpose:
+
+- Collapse scattered pass-local interpretation into one shader-facing frame
+  contract.
+- Make material/object/policy identity cheap and consistent for all later
+  passes.
+
+Implementation shape:
+
+- Keep the visibility-buffer identity and material-policy debug views already
+  packet-proved.
+- Add a named `FullSceneFrameData` shader include or equivalent binding
+  contract for:
+  - material id.
+  - object id.
+  - material family.
+  - scene material class.
+  - reflection policy.
+  - temporal policy.
+  - post sensitivity.
+  - normal, depth, roughness, metallic, AO, emissive, velocity.
+- Update frame reports so each V2 pass states whether it consumed the shared
+  frame data or fell back to V1/local data.
+
+Validation:
+
+- Debug views prove every policy channel.
+- V2 lighting, reflections, temporal, and post all report the same material
+  table row count and frame-data source.
+
+### Workstream 2: FullSceneLightingV2
+
+Purpose:
+
+- Replace ad hoc direct lighting with semantic light rigs that produce rich,
+  scene-local illumination.
+
+Implementation shape:
+
+- Promote `FullSceneLightingRigEvidence` into shader-facing light buffers.
+- Add V2 direct-light shader path for semantic light roles:
+  `key`, `fill`, `practical`, `display`, `stage`, `high_bay`, `sun`,
+  `skylight`, and `accent`.
+- Add area-light approximation for rect fixtures and screens.
+- Add light-id/direct-light/exposure debug views.
+- Keep V1 lighting as fallback until V2 direct light can run as
+  `shadow_output`.
+
+Validation:
+
+- Gallery, kitchen, gym, and concert packets show different semantic lighting
+  signatures.
+- No scene passes by raising ambient light until shadows/materials disappear.
+- Exposure clipping and dark-crush gates stay bounded.
+
+### Workstream 3: FullSceneReflectionResolveV2
+
+Purpose:
+
+- Make shiny and smooth surfaces look deliberate without reflecting unrelated
+  environment content or jittering under camera motion.
+
+Implementation shape:
+
+- Route SSR, RT reflection, local room probes, hero probes, planar probes,
+  neutral fallback, and authorized external IBL through one resolver.
+- Encode reflection source id into a debug/diagnostic output.
+- Add material-family roughness policy so glass, polished metal, tile, water,
+  mirror, and matte surfaces use different paths.
+- Keep external HDRI reflection valid only when the scene contract authorizes
+  it.
+
+Validation:
+
+- Enclosed scenes report zero unauthorized external HDRI ratio.
+- Smooth/metallic mouse-jiggle packets stay below reflection shimmer
+  thresholds.
+- Reflection owner debug matches visible reflective surfaces.
+
+### Workstream 4: FullSceneShadowCompositeV2
+
+Purpose:
+
+- Make contact, local, RT, and cascade shadows stable enough for moving camera
+  review.
+
+Implementation shape:
+
+- Use `FullSceneShadowContactEvidence` as the promotion gate.
+- Centralize bias/filter/contact settings by light type, receiver material,
+  scene scale, and slope.
+- Add shadow debug views for cascade id, local-light id, shadow factor, contact
+  term, and bias class.
+- Composite shadow terms in a named V2 stage instead of spreading decisions
+  across unrelated lighting code.
+
+Validation:
+
+- Mouse-jiggle packet on walls, floors, plinths, tables, and glossy objects.
+- Contact shadows remain stable on small supports.
+- Cascade/local transitions do not create visible popping.
+
+### Workstream 5: FullSceneTemporalResolveV2
+
+Purpose:
+
+- Stop the remaining material/shader popping on smooth, metallic, glass,
+  emissive, patterned, and high-frequency surfaces.
+
+Implementation shape:
+
+- Formalize `FullSceneTemporalEvidence`.
+- Make temporal resolve consume material id, object id, velocity, depth,
+  normal, roughness, emissive, and material temporal policy.
+- Use one shared jitter-aware history-coordinate helper for temporal rejection
+  and TAA resolve.
+- Add material-specific history confidence and clamp widths.
+- Add debug views for velocity, rejection reason, clamp width, history weight,
+  material temporal class, and disocclusion.
+
+Validation:
+
+- Reproduce camera mouse-jiggle packets at high frame rate.
+- Compare smooth metal, glass, tile, wall, water, emissive, and matte surfaces.
+- Packet fails if stability comes from blurring, disabling reflections, or
+  disabling temporal history.
+
+### Workstream 6: FullScenePostV2
+
+Purpose:
+
+- Turn good lighting/material inputs into a cinematic presentation stack
+  without hiding broken domains.
+
+Implementation shape:
+
+- Split post into named stages:
+  exposure, bloom threshold, bloom composite, highlight rolloff, tone map,
+  color grade, clarity/sharpen, output encode.
+- Add profile-owned controls for gallery, kitchen, office, gym, concert, wet,
+  and outdoor scenes.
+- Add luma histogram, bloom area, highlight clip, dark-crush, saturation, and
+  edge-clarity evidence.
+- Keep stochastic/noise post disabled unless packet-gated.
+
+Validation:
+
+- Post reports cannot override failed material, lighting, reflection, shadow,
+  or temporal domains.
+- HDR screenshots become richer because inputs are richer, not because the post
+  crushed or blurred them.
+
+### Workstream 7: FullSceneRenderGraphContract
+
+Purpose:
+
+- Make the V2 beauty path auditable and maintainable instead of becoming a new
+  pile of special cases.
+
+Implementation shape:
+
+- Declare expected V2 passes:
+  `ShadowPrepassV2`, `VisibilityV2`, `MaterialResolveV2`, `LightingV2`,
+  `ReflectionResolveV2`, `ShadowCompositeV2`, `TemporalResolveV2`, `PostV2`,
+  `DebugAtlasV2`, and `FrameReportV2`.
+- Every pass declares inputs, outputs, producers, consumers, state transitions,
+  debug outputs, timing, and fallback owner.
+- Packet tools fail on stale resources, missing producers, ambiguous debug
+  source, or unowned fallback resources.
+
+Validation:
+
+- V2 candidate frame report can reconstruct the final image dependency graph.
+- A missing V2 resource fails clearly instead of silently using a V1/global
+  fallback.
+
+## Milestone Order For Completing The Goal Feature
+
+1. `FSSP-V2-007A`: material-aware temporal evidence.
+   - Formalize temporal readiness and stability gates before more beauty work.
+2. `FSSP-V2-004B`: semantic light buffers and direct-light shadow output.
+   - Run V2 direct light beside V1 and capture debug views.
+3. `FSSP-V2-005B`: reflection source resolver shadow output.
+   - Prove local/authorized reflection sources on enclosed and gallery scenes.
+4. `FSSP-V2-006B`: shadow composite policy centralization.
+   - Move bias/filter/contact decisions under one V2 policy.
+5. `FSSP-V2-007B`: material-aware temporal candidate.
+   - Use material/object policy to stabilize reflection and material history.
+6. `FSSP-V2-008A`: HDR post stage contract.
+   - Split post and report luma/bloom/grade metrics.
+7. `FSSP-V2-009A`: render graph contract.
+   - Make V2 pass/resource ownership explicit.
+8. `FSSP-V2-010A`: cross-family V2 candidate packet.
+   - Run gallery, kitchen, office, gym, concert, and wet/glass-heavy scene.
+9. `FSSP-V2-010B`: user review packet.
+   - Present beauty plus debug atlases and honest blockers.
+
+The first implementation move remains temporal evidence because the user has
+repeatedly seen motion-dependent material/reflection instability. The renderer
+needs to prove it can see and classify that instability before we trust richer
+lighting or post polish.
+
 ## Do Not Do
 
 - Do not start by tuning bloom, contrast, or IBL blur.

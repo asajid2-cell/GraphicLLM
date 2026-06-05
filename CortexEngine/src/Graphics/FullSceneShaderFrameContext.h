@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Graphics/FrameContract.h"
+#include "Graphics/MaterialModel.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -61,6 +62,8 @@ struct FullSceneShaderFrameContext {
     bool sceneLocalEnvironmentShaderReady = false;
     bool postNamedStagesReady = false;
     bool explicitPassGraphReady = false;
+
+    FullSceneMaterialModelEvidence materialModelEvidence;
 
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
@@ -145,18 +148,11 @@ inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
 
 inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameContract& contract) {
     FullSceneShaderFrameContext context;
-    context.familyCountsAvailable =
-        contract.materials.sampled > 0 &&
-        FullSceneShaderSceneMaterialFamilyCount(contract.materials) == contract.materials.sampled;
-    context.reflectionPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        FullSceneShaderMaterialReflectionPreferenceCount(contract.materials) == contract.materials.sampled;
-    context.temporalPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        FullSceneShaderMaterialTemporalPolicyCount(contract.materials) == contract.materials.sampled;
-    context.postPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        FullSceneShaderMaterialPostSensitivityCount(contract.materials) == contract.materials.sampled;
+    context.materialModelEvidence = BuildFullSceneMaterialModelEvidence(contract.materials);
+    context.familyCountsAvailable = context.materialModelEvidence.familyCountsAvailable;
+    context.reflectionPoliciesAvailable = context.materialModelEvidence.reflectionPoliciesAvailable;
+    context.temporalPoliciesAvailable = context.materialModelEvidence.temporalPoliciesAvailable;
+    context.postPoliciesAvailable = context.materialModelEvidence.postPoliciesAvailable;
     context.extendedMaterialChannelsReady =
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext0") &&
         FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext1") &&
@@ -204,10 +200,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
 
     context.material = MakeFullSceneShaderDomainEvidence(
         "material",
-        false,
-        false,
-        "MaterialResolver/SceneMaterialClassId",
-        "FullSceneMaterialModel not promoted to runtime beauty output");
+        context.materialModelEvidence.enabled,
+        context.materialModelEvidence.fullSceneMaterialModelReady,
+        context.materialModelEvidence.owner,
+        context.materialModelEvidence.failureReason);
     context.gbuffer = MakeFullSceneShaderDomainEvidence(
         "gbuffer",
         contract.features.visibilityBufferEnabled,

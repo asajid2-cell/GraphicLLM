@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Graphics/FrameContract.h"
 #include "Graphics/ShaderTypes.h"
 
 #include <cstdint>
@@ -146,6 +147,30 @@ struct MaterialValidationIssue {
     Severity severity = Severity::Warning;
     std::string message;
 };
+
+struct FullSceneMaterialModelEvidence {
+    bool enabled = false;
+    bool runtimePolicyBridgeReady = false;
+    bool familyCountsAvailable = false;
+    bool reflectionPoliciesAvailable = false;
+    bool temporalPoliciesAvailable = false;
+    bool postPoliciesAvailable = false;
+    bool textureEvidenceAvailable = false;
+    bool shaderFeatureFlagsAvailable = false;
+    bool fullSceneMaterialModelReady = false;
+    uint32_t sampledMaterialCount = 0;
+    uint32_t policyAppliedCount = 0;
+    uint32_t unknownMaterialFamilyCount = 0;
+    uint32_t missingHeroTextureEvidenceCount = 0;
+    uint32_t descriptorMissingCount = 0;
+    uint32_t descriptorRefreshFailureCount = 0;
+    uint32_t validationErrorCount = 0;
+    std::string owner = "MaterialResolver/FullSceneMaterialModelEvidence";
+    std::string failureReason = "No sampled runtime materials";
+};
+
+[[nodiscard]] FullSceneMaterialModelEvidence BuildFullSceneMaterialModelEvidence(
+    const FrameContract::MaterialStats& materials);
 
 class MaterialResolver {
 public:

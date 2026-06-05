@@ -21,6 +21,7 @@ $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_pac
 $v2Checker = Join-Path $root "tools/check_full_scene_shader_pipeline_v2_frame_report.py"
 $debugMetricsTool = Join-Path $root "tools/analyze_full_scene_shader_debug_view_metrics.py"
 $reflectionSignalTool = Join-Path $root "tools/analyze_full_scene_shader_reflection_candidate_signal.py"
+$lightingSignalTool = Join-Path $root "tools/analyze_full_scene_shader_lighting_signal.py"
 $sequenceStabilityTool = Join-Path $root "tools/analyze_full_scene_shader_sequence_stability.py"
 
 if (-not (Test-Path $packetRunner)) {
@@ -34,6 +35,9 @@ if (-not (Test-Path $debugMetricsTool)) {
 }
 if (-not (Test-Path $reflectionSignalTool)) {
     throw "Full Scene Shader Pipeline V2 reflection signal tool missing: $reflectionSignalTool"
+}
+if (-not (Test-Path $lightingSignalTool)) {
+    throw "Full Scene Shader Pipeline V2 lighting signal tool missing: $lightingSignalTool"
 }
 if (-not (Test-Path $sequenceStabilityTool)) {
     throw "Full Scene Shader Pipeline V2 sequence stability tool missing: $sequenceStabilityTool"
@@ -178,6 +182,9 @@ $debugMetricsStdoutPath = Join-Path $outRootAbs "debug_view_metrics_stdout.txt"
 $reflectionSignalJsonPath = Join-Path $outRootAbs "reflection_candidate_signal.json"
 $reflectionSignalMdPath = Join-Path $outRootAbs "reflection_candidate_signal.md"
 $reflectionSignalStdoutPath = Join-Path $outRootAbs "reflection_candidate_signal_stdout.txt"
+$lightingSignalJsonPath = Join-Path $outRootAbs "lighting_signal.json"
+$lightingSignalMdPath = Join-Path $outRootAbs "lighting_signal.md"
+$lightingSignalStdoutPath = Join-Path $outRootAbs "lighting_signal_stdout.txt"
 $sequenceStabilityJsonPath = Join-Path $outRootAbs "sequence_stability.json"
 $sequenceStabilityMdPath = Join-Path $outRootAbs "sequence_stability.md"
 $sequenceStabilityStdoutPath = Join-Path $outRootAbs "sequence_stability_stdout.txt"
@@ -217,6 +224,12 @@ if ($debugMetricsExit -ne 0) {
 if ($debugMetricsExit -eq 0) {
     $reflectionSignalOutput = & python $reflectionSignalTool --metrics $debugMetricsJsonPath --output-json $reflectionSignalJsonPath --output-md $reflectionSignalMdPath 2>&1
     $reflectionSignalOutput | Set-Content -Encoding UTF8 $reflectionSignalStdoutPath
+    $lightingSignalOutput = & python $lightingSignalTool --metrics $debugMetricsJsonPath --output-json $lightingSignalJsonPath --output-md $lightingSignalMdPath 2>&1
+    $lightingSignalExit = $LASTEXITCODE
+    $lightingSignalOutput | Set-Content -Encoding UTF8 $lightingSignalStdoutPath
+    if ($lightingSignalExit -ne 0) {
+        $failures.Add("lighting signal failed; see $lightingSignalStdoutPath") | Out-Null
+    }
 }
 
 $sequenceStabilityOutput = & python $sequenceStabilityTool --manifest $manifestPath --output-json $sequenceStabilityJsonPath --output-md $sequenceStabilityMdPath 2>&1

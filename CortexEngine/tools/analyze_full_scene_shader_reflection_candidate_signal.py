@@ -36,6 +36,9 @@ def build_report(metrics_path: Path, source_threshold: float, delta_threshold: f
     failures: list[str] = []
     for family in sorted(by_family):
         views = by_family[family]
+        present = [view for view in (SOURCE_VIEW, CANDIDATE_VIEW, DELTA_VIEW) if view in views]
+        if not present:
+            continue
         missing = [view for view in (SOURCE_VIEW, CANDIDATE_VIEW, DELTA_VIEW) if view not in views]
         if missing:
             failures.append(f"{family}: missing views: {', '.join(missing)}")

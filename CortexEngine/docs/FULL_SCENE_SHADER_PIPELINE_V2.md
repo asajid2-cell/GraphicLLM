@@ -3388,3 +3388,70 @@ Current stopping position:
 - Next work should either expose stronger visual review packets/contact sheets
   for this produced-radiance candidate or begin the next owned source domain:
   semantic light-buffer/direct-light V2 shadow output.
+
+### Direct-Light V2 Signal Gate - 2026-06-05
+
+Implemented:
+
+- `tools/analyze_full_scene_shader_lighting_signal.py`
+  - reads `debug_view_metrics.json`.
+  - audits `direct_light`, `direct_light_unshadowed`, and
+    `direct_light_shadow_loss` as a complete per-family lighting view set.
+  - reports direct-signal families and shadow-loss families.
+  - skips packets that did not request any lighting views, and fails only when
+    a family requested an incomplete lighting view set.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - now writes `lighting_signal.json`, `lighting_signal.md`, and
+    `lighting_signal_stdout.txt`.
+- `tools/analyze_full_scene_shader_reflection_candidate_signal.py`
+  - now also skips packets that did not request reflection views, so focused
+    lighting packets do not fail a reflection-only gate.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
+  - now treats the lighting signal analyzer and packet artifacts as part of
+    the V2 packet harness surface.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_lighting_signal.py tools\analyze_full_scene_shader_reflection_candidate_signal.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build/captures/v2_lighting_signal_gallery_smoke2_20260605
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive,glass_water_courtyard:glass_canopy,dragon_over_water:floor_reflection_closeup" -ViewFilter "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor" -SmokeFrames 60 -CaptureFrame 30 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build/captures/v2_lighting_signal_broader_gallery_20260605
+```
+
+Focused packet result:
+
+- packet:
+  `build/captures/v2_lighting_signal_gallery_smoke2_20260605`.
+- captured views: `5`.
+- direct-signal families: `1/1`.
+- shadow-loss families: `1/1`.
+- `direct_light` luma `0.42686291`.
+- `direct_light_unshadowed` luma `0.45795877`.
+- `direct_light_shadow_loss` luma `0.22296271`.
+
+Broader gallery lighting result:
+
+- packet:
+  `build/captures/v2_lighting_signal_broader_gallery_20260605`.
+- captured views: `20`.
+- direct-signal families: `4/4`.
+- shadow-loss families: `4/4`.
+- warnings/failures: `0/0`.
+
+| Stress Family | Direct Luma | Unshadowed Luma | Shadow Loss Luma | Shadow Loss Nonblack |
+|---|---:|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.46242101` | `0.49161639` | `0.24304297` | `1.00000000` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.22994216` | `0.25624099` | `0.15694929` | `0.58094184` |
+| `stress_material_lab_glass_emissive` | `0.36311143` | `0.39868422` | `0.13314867` | `0.30354058` |
+| `stress_rt_showcase_reflection_closeup` | `0.42693366` | `0.45802755` | `0.22293851` | `1.00000000` |
+
+Current stopping position:
+
+- V2 packets now produce a machine-checkable direct-light/shadow-loss signal
+  report.
+- This is not a lighting beauty promotion. It is the evidence bridge needed
+  before adding semantic light-buffer/direct-light V2 shadow output.
+- Next implementation work can add a shadow-output lighting pass or richer
+  semantic light source payloads and immediately gate them against
+  `lighting_signal.json`.

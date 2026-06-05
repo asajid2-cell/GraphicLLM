@@ -354,6 +354,52 @@ Current interpretation:
   source class and registry readiness for visible/loaded objects, so validation
   can fail hero pixels dominated by primitive/proxy sources.
 
+## 2026-06-05 Full Scene Shader Pipeline V2 Planning Slice
+
+Implemented:
+
+- `docs/FULL_SCENE_SHADER_PIPELINE_V2.md`
+  - living plan and completion ledger for the next renderer architecture step.
+  - preserves Renderer V1 as the stability/ownership baseline.
+  - defines ten V2 phases:
+    - `FSSP-V2-001` contract and plan.
+    - `FSSP-V2-002` material model upgrade.
+    - `FSSP-V2-003` GBuffer/debug channel expansion.
+    - `FSSP-V2-004` scene-local semantic light rig system.
+    - `FSSP-V2-005` local reflection probe system.
+    - `FSSP-V2-006` shadow/contact stability.
+    - `FSSP-V2-007` material-aware temporal pipeline.
+    - `FSSP-V2-008` HDR cinematic post V2.
+    - `FSSP-V2-009` render graph ownership refactor.
+    - `FSSP-V2-010` cross-family V2 gate.
+- `assets/final_art/full_scene_shader_pipeline_v2_contract.json`
+  - machine-readable required-domain contract for the shader pipeline.
+  - requires material, GBuffer, lighting, reflection, shadow, temporal, post,
+    render graph, asset-registry evidence, and cross-family packet domains.
+  - names the Renderer V1 gate each V2 domain must preserve.
+- `tools/validate_full_scene_shader_pipeline_v2_plan.py`
+  - validates that the Markdown plan and JSON contract stay coherent.
+  - checks required phases, domain ids, target family order, hard rules, and
+    minimum required outputs.
+
+Validation:
+
+```powershell
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Current interpretation:
+
+- This shifts the next work from profile/post tweaks into a full renderer
+  architecture refactor.
+- The plan explicitly forbids hiding problems by disabling IBL, shadows,
+  reflections, or temporal history.
+- The next implementation slice should add frame-report placeholders for V2
+  domains, then upgrade material/asset evidence before changing visual output.
+- Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
+  gates or provide stronger replacement evidence.
+
 ## Resume Commands
 
 ```powershell
@@ -367,6 +413,8 @@ python tools\analyze_aaa_asset_quality.py --renderer-manifest build\captures\sce
 Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_quality_report.md
 Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_replacement_work_orders.md
 Get-Content docs\media\final_art\generated\aaa_asset_quality\provider_requests\manifest.md
+Get-Content docs\FULL_SCENE_SHADER_PIPELINE_V2.md
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
 ```
 
 ## Git Policy

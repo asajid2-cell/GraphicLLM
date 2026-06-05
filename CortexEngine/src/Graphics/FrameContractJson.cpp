@@ -118,6 +118,11 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
     const bool velocityReady = HasResource(contract, "velocity") &&
         contract.motionVectors.planned &&
         contract.motionVectors.executed;
+    const bool jitterReprojectionReady =
+        contract.features.taaEnabled &&
+        velocityReady &&
+        contract.temporalMask.built &&
+        HasResource(contract, "temporal_rejection_mask");
     const bool reflectionOwnerAvailable =
         contract.sceneVisual.pixelReflectionOwnerHistogramAvailable ||
         contract.sceneVisual.reflectionOwnerDebugViewMode != 0;
@@ -202,6 +207,7 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
         {"temporal", {
             {"enabled", contract.features.taaEnabled},
             {"motion_vectors_ready", velocityReady},
+            {"jitter_reprojection_ready", jitterReprojectionReady},
             {"material_aware_rejection_ready", temporalPoliciesAvailable},
             {"history_clamp_ready", HasResource(contract, "taa_history")},
             {"smooth_surface_motion_gate_passed", false},

@@ -571,6 +571,45 @@ Current caveat:
   this environment; use the focused Python validators first and only run the
   native build with a bounded timeout.
 
+### Full Scene Shader Pipeline V2 Temporal Reprojection Slice
+
+Purpose:
+
+- Fix a real temporal stability substrate issue for AAA material/reflection
+  quality: the temporal rejection mask must test the same jitter-aware history
+  coordinate used by the TAA resolve path.
+- This targets smooth/metallic/reflection popping under mouse rotation and
+  camera sweeps without disabling TAA, reflections, shadows, or IBL.
+
+Implementation state:
+
+- `TemporalRejectionMask.hlsl` now binds `FrameConstants` and uses
+  `g_TAAParams.xy` in its history UV:
+  `historyUv = uv + velocity + g_TAAParams.xy`.
+- The temporal rejection mask now uses a gentler high-motion taper so camera
+  rotation does not reject otherwise valid static surfaces before depth/normal
+  disocclusion tests can own the decision.
+- `FrameContractJson.cpp` reports
+  `full_scene_shader_pipeline_v2.temporal.jitter_reprojection_ready`.
+- The field is true only when:
+  - TAA is enabled.
+  - motion vectors are planned/executed and the velocity resource is valid.
+  - temporal rejection mask was built.
+  - `temporal_rejection_mask` exists and matches the frame contract.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now statically
+  checks:
+  - temporal rejection shader has frame constants at `b1`.
+  - temporal rejection reads `g_TAAParams`.
+  - temporal rejection uses `uv + velocity + g_TAAParams.xy`.
+  - post-process TAA resolve also uses jitter-aware history UVs.
+  - the temporal pass binds frame constants at the expected root.
+
+Current caveat:
+
+- This is a data-path/stability contract slice. It still needs a runtime packet
+  with mouse-jiggle/camera-sweep evidence before V2 temporal gates can be
+  promoted beyond placeholder/fallback status.
+
 ## Resume Commands
 
 ```powershell

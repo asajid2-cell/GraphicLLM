@@ -818,3 +818,89 @@ Important constraint:
 - Do not begin with a shader beauty tweak. The next real feature should be the
   runtime facade plus evidence packet skeleton, because that creates the brain
   and harness for later AAA shader work.
+
+## Full Scene Shader Pipeline V2 Runtime Facade Slice - 2026-06-05
+
+Purpose:
+
+- Start the real V2 implementation by creating a shared runtime facade for
+  full-scene shader evidence.
+- Keep beauty output on V1 while the renderer learns to explain per-domain
+  ownership, readiness, fallback, and promotion state.
+
+Implemented:
+
+- Added `src/Graphics/FullSceneShaderFrameContext.h`.
+- Added `FullSceneShaderPromotionState` with the promotion ladder:
+  `planned`, `instrumented`, `shadow_output`, `candidate`, `packet_passed`,
+  `cross_family_passed`, and `default_ready`.
+- Added `FullSceneShaderDomainEvidence` with:
+  - `enabled`
+  - `ready`
+  - `promotionState`
+  - `owner`
+  - `fallbackOwner`
+  - `failureReason`
+- Added `BuildFullSceneShaderFrameContext(const FrameContract&)`.
+- The facade derives shared V2 evidence from the existing V1 `FrameContract`:
+  - material family count coverage
+  - material reflection policy coverage
+  - material temporal policy coverage
+  - material post sensitivity coverage
+  - velocity readiness
+  - material policy channel readiness
+  - jitter-aware temporal readiness
+  - reflection owner report availability
+  - RT reflection miss environment policy readiness
+  - scene-local environment shader readiness
+  - named post-stage readiness
+  - explicit render-graph readiness
+- `FrameContractJson.cpp` now builds `FullSceneShaderFrameContext` and emits a
+  common `evidence` object for each V2 section.
+- The V2 frame-report contract now declares common evidence fields:
+  `promotion_state`, `domain_ready`, `facade_owner`, `fallback_owner`, and
+  `failure_reason`.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now verifies:
+  - the runtime source includes `FullSceneShaderFrameContext`.
+  - the JSON builder calls `BuildFullSceneShaderFrameContext(contract)`.
+  - every common evidence field is emitted.
+  - optional supplied frame reports include an `evidence` object for each V2
+    section.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Result:
+
+- all passed.
+
+Native build attempt:
+
+```powershell
+cmake --build build --config Release --target CortexEngine
+```
+
+Result:
+
+- timed out after about `184s`.
+- leftover `cmake`/`ninja` helper processes were found and stopped.
+- do not treat native compilation as verified for this slice.
+
+Current caveat:
+
+- This is an instrumentation/facade slice, not a beauty-output promotion.
+- `full_scene_shader_pipeline_v2.status` remains
+  `runtime_placeholder_v1_fallback`.
+- `beauty_output` remains `v1_fallback`.
+
+Next recommended implementation:
+
+- Add the packet command/smoke that captures one scene with beauty plus V2
+  debug atlases and the frame-report JSON.
+- After that, start Track B material truth by moving richer material evidence
+  into the runtime material model.

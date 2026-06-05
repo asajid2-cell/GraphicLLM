@@ -16,6 +16,7 @@ FRAME_REPORT_CONTRACT_PATH = (
     ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_frame_report_contract.json"
 )
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
+FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
 VISIBILITY_BUFFER_HEADER_PATH = ROOT / "src" / "Graphics" / "VisibilityBuffer.h"
 MATERIAL_MODEL_HEADER_PATH = ROOT / "src" / "Graphics" / "MaterialModel.h"
 MATERIAL_MODEL_SOURCE_PATH = ROOT / "src" / "Graphics" / "MaterialModel.cpp"
@@ -118,6 +119,22 @@ def validate_contracts() -> list[str]:
             if hard_gate_defaults.get(key) is not False:
                 errors.append(f"hard_gate_defaults.{key} must be false")
 
+    common_evidence_fields = frame_contract.get("common_evidence_fields")
+    expected_common_evidence_fields = {
+        "promotion_state",
+        "domain_ready",
+        "facade_owner",
+        "fallback_owner",
+        "failure_reason",
+    }
+    if not isinstance(common_evidence_fields, list):
+        errors.append("common_evidence_fields must be a list")
+    elif set(common_evidence_fields) != expected_common_evidence_fields:
+        errors.append(
+            "common_evidence_fields must be exactly: "
+            + ", ".join(sorted(expected_common_evidence_fields))
+        )
+
     return errors
 
 
@@ -125,16 +142,43 @@ def validate_runtime_source_surface() -> list[str]:
     errors: list[str] = []
     if not FRAME_CONTRACT_JSON_SOURCE_PATH.exists():
         return [f"missing runtime frame contract JSON source: {FRAME_CONTRACT_JSON_SOURCE_PATH}"]
+    if not FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.exists():
+        return [f"missing runtime V2 facade: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}"]
 
     source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
+    facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    runtime_surface = source + "\n" + facade_source
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
     report_key = frame_contract.get("report_key", "")
-    if f'"{report_key}"' not in source:
+    if f'"{report_key}"' not in runtime_surface:
         errors.append(f"runtime JSON source does not emit {report_key}")
-    if "runtime_placeholder_v1_fallback" not in source:
+    if "runtime_placeholder_v1_fallback" not in runtime_surface:
         errors.append("runtime JSON source must label the V2 report as a V1 fallback placeholder")
     if "FullSceneShaderPipelineV2ToJson" not in source:
         errors.append("runtime JSON source must use a named V2 report builder")
+    if "#include \"Graphics/FullSceneShaderFrameContext.h\"" not in source:
+        errors.append("runtime JSON source must consume FullSceneShaderFrameContext")
+    if "BuildFullSceneShaderFrameContext(contract)" not in source:
+        errors.append("runtime JSON source must build the V2 frame context facade")
+    if "domainEvidence(context." not in source:
+        errors.append("runtime JSON source must emit per-domain facade evidence")
+
+    facade_tokens = [
+        "struct FullSceneShaderFrameContext",
+        "struct FullSceneShaderDomainEvidence",
+        "FullSceneShaderPromotionState",
+        "BuildFullSceneShaderFrameContext",
+        "fallbackOwner = \"v1_fallback\"",
+        "FullSceneShaderPromotionState::Instrumented",
+        "FullSceneShaderPromotionState::Planned",
+    ]
+    for token in facade_tokens:
+        if token not in facade_source:
+            errors.append(f"runtime V2 facade missing required token: {token}")
+
+    for field in frame_contract.get("common_evidence_fields", []):
+        if f'"{field}"' not in source:
+            errors.append(f"runtime JSON source missing common evidence field {field}")
 
     for section in frame_contract.get("required_sections", []):
         if not isinstance(section, dict):
@@ -547,6 +591,13 @@ def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
         for field in section["readiness_fields"]:
             if field not in section_data:
                 errors.append(f"{section_id} missing readiness field {field}")
+        evidence = section_data.get("evidence")
+        if not isinstance(evidence, dict):
+            errors.append(f"{section_id} missing common evidence object")
+            continue
+        for field in frame_contract.get("common_evidence_fields", []):
+            if field not in evidence:
+                errors.append(f"{section_id} evidence missing field {field}")
 
     return errors
 

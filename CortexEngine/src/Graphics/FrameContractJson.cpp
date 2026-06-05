@@ -1,4 +1,5 @@
 #include "Graphics/FrameContractJson.h"
+#include "Graphics/FullSceneShaderFrameContext.h"
 
 #include <algorithm>
 #include <nlohmann/json.hpp>
@@ -31,49 +32,6 @@ json FeatureFlagsToJson(const FrameContract::FeatureFlags& features) {
     };
 }
 
-uint32_t SceneMaterialFamilyCount(const FrameContract::MaterialStats& materials) {
-    return materials.sceneMaterialDefault +
-           materials.sceneMaterialPaintedWall +
-           materials.sceneMaterialCeramicTile +
-           materials.sceneMaterialPolishedWood +
-           materials.sceneMaterialBrushedMetal +
-           materials.sceneMaterialPolishedMetal +
-           materials.sceneMaterialGlassPane +
-           materials.sceneMaterialFabric +
-           materials.sceneMaterialPlastic +
-           materials.sceneMaterialWetSurface +
-           materials.sceneMaterialEmissiveNeon +
-           materials.sceneMaterialScreenPanel +
-           materials.sceneMaterialConcrete +
-           materials.sceneMaterialRubber +
-           materials.sceneMaterialWater +
-           materials.sceneMaterialMirror;
-}
-
-uint32_t MaterialReflectionPreferenceCount(const FrameContract::MaterialStats& materials) {
-    return materials.materialReflectionNeutralFallback +
-           materials.materialReflectionLocalProbe +
-           materials.materialReflectionProbeGrid +
-           materials.materialReflectionPlanarProbe +
-           materials.materialReflectionSSR +
-           materials.materialReflectionRT;
-}
-
-uint32_t MaterialTemporalPolicyCount(const FrameContract::MaterialStats& materials) {
-    return materials.materialTemporalStableDiffuse +
-           materials.materialTemporalStableGlossy +
-           materials.materialTemporalMirrorLocked +
-           materials.materialTemporalEmissiveLocked +
-           materials.materialTemporalWaterViewDependent;
-}
-
-uint32_t MaterialPostSensitivityCount(const FrameContract::MaterialStats& materials) {
-    return materials.materialPostNormal +
-           materials.materialPostBloomEmitter +
-           materials.materialPostExposureProtected +
-           materials.materialPostWetHighlight;
-}
-
 bool HasResource(const FrameContract& contract, const char* name) {
     return std::any_of(
         contract.resources.begin(),
@@ -83,87 +41,32 @@ bool HasResource(const FrameContract& contract, const char* name) {
         });
 }
 
-bool HasExecutedPass(const FrameContract& contract, const char* name) {
-    return std::any_of(
-        contract.passes.begin(),
-        contract.passes.end(),
-        [name](const FrameContract::PassRecord& pass) {
-            return pass.name == name && pass.executed;
-        });
-}
-
 json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
-    const bool familyCountsAvailable =
-        contract.materials.sampled > 0 &&
-        SceneMaterialFamilyCount(contract.materials) == contract.materials.sampled;
-    const bool reflectionPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        MaterialReflectionPreferenceCount(contract.materials) == contract.materials.sampled;
-    const bool temporalPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        MaterialTemporalPolicyCount(contract.materials) == contract.materials.sampled;
-    const bool postPoliciesAvailable =
-        contract.materials.sampled > 0 &&
-        MaterialPostSensitivityCount(contract.materials) == contract.materials.sampled;
-    const bool extendedMaterialChannelsReady =
-        HasResource(contract, "vb_gbuffer_material_ext0") &&
-        HasResource(contract, "vb_gbuffer_material_ext1") &&
-        HasResource(contract, "vb_gbuffer_material_ext2");
-    const bool materialPolicyChannelReady =
-        HasResource(contract, "vb_gbuffer_material_ext2") &&
-        familyCountsAvailable &&
-        reflectionPoliciesAvailable &&
-        temporalPoliciesAvailable &&
-        postPoliciesAvailable;
-    const bool velocityReady = HasResource(contract, "velocity") &&
-        contract.motionVectors.planned &&
-        contract.motionVectors.executed;
-    const bool jitterReprojectionReady =
-        contract.features.taaEnabled &&
-        velocityReady &&
-        contract.temporalMask.built &&
-        HasResource(contract, "temporal_rejection_mask");
-    const bool reflectionOwnerAvailable =
-        contract.sceneVisual.pixelReflectionOwnerHistogramAvailable ||
-        contract.sceneVisual.reflectionOwnerDebugViewMode != 0;
-    const bool unknownReflectionOwner =
-        contract.sceneVisual.reflectionOwner.empty() ||
-        contract.sceneVisual.reflectionOwner == "unknown";
-    const bool rtMissEnvironmentPolicyReady =
-        !contract.sceneVisual.invalidExternalHDRI &&
-        (!contract.sceneVisual.enclosedScene ||
-         contract.environment.localReflectionProbeCount > 0 ||
-         contract.environment.backgroundExposure <= 0.001f ||
-         !contract.features.iblEnabled);
-    const bool sceneLocalEnvironmentShaderReady =
-        contract.sceneVisual.active &&
-        !contract.sceneVisual.invalidExternalHDRI &&
-        !contract.sceneVisual.environmentOwner.empty() &&
-        contract.sceneVisual.environmentOwner != "unknown";
-    const bool postNamedStagesReady =
-        contract.cinematicPost.enabled &&
-        contract.cinematicPost.postProcessPlanned &&
-        contract.cinematicPost.postProcessExecuted;
-    const bool explicitPassGraphReady =
-        contract.renderGraph.active &&
-        contract.renderGraph.passRecords > 0 &&
-        contract.renderGraph.transientValidationRan;
+    const FullSceneShaderFrameContext context = BuildFullSceneShaderFrameContext(contract);
+    auto domainEvidence = [](const FullSceneShaderDomainEvidence& evidence) {
+        return json{
+            {"promotion_state", ToString(evidence.promotionState)},
+            {"domain_ready", evidence.ready},
+            {"facade_owner", evidence.owner},
+            {"fallback_owner", evidence.fallbackOwner},
+            {"failure_reason", evidence.failureReason}
+        };
+    };
 
     return {
-        {"schema", "cortex.full_scene_shader_pipeline_v2.runtime_report.v1"},
-        {"status", "runtime_placeholder_v1_fallback"},
-        {"beauty_output", "v1_fallback"},
+        {"schema", context.schema},
+        {"status", context.status},
+        {"beauty_output", context.beautyOutput},
         {"material", {
             {"enabled", false},
             {"full_scene_material_model_ready", false},
-            {"family_counts_available", familyCountsAvailable},
+            {"family_counts_available", context.familyCountsAvailable},
             {"texture_evidence_available",
              contract.materials.resourcePrepareCalls > 0 &&
                  contract.materials.descriptorTablesMissingAfterPrepare == 0},
             {"missing_hero_texture_evidence_count", 0},
             {"unknown_material_family_count", contract.materials.sceneMaterialDefault},
-            {"facade_owner", "MaterialResolver/SceneMaterialClassId"},
-            {"fallback_reason", "FullSceneMaterialModel not promoted to runtime beauty output"}
+            {"evidence", domainEvidence(context.material)}
         }},
         {"gbuffer", {
             {"enabled", contract.features.visibilityBufferEnabled},
@@ -172,21 +75,21 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
                  HasResource(contract, "vb_gbuffer_normal_roughness")},
             {"object_id_channel_ready", false},
             {"material_id_channel_ready", HasResource(contract, "vb_gbuffer_material_ext2")},
-            {"material_policy_channel_ready", materialPolicyChannelReady},
-            {"velocity_channel_ready", velocityReady},
-            {"extended_material_channels_ready", extendedMaterialChannelsReady},
-            {"facade_owner", "VisibilityBufferRenderer"}
+            {"material_policy_channel_ready", context.materialPolicyChannelReady},
+            {"velocity_channel_ready", context.velocityReady},
+            {"extended_material_channels_ready", context.extendedMaterialChannelsReady},
+            {"evidence", domainEvidence(context.gbuffer)}
         }},
         {"lighting", {
             {"enabled", contract.lighting.lightCount > 0 || contract.features.iblEnabled},
             {"semantic_light_rig_ready",
              !contract.lighting.rigId.empty() && contract.lighting.rigId != "custom"},
-            {"scene_local_environment_shader_ready", sceneLocalEnvironmentShaderReady},
+            {"scene_local_environment_shader_ready", context.sceneLocalEnvironmentShaderReady},
             {"light_owner_report_available", contract.lighting.semanticFixtureLightCount > 0},
             {"rect_area_light_count", contract.lighting.areaRectLightCount},
             {"practical_fixture_count", contract.lighting.practicalFixtureLightCount},
             {"exposure_clipping_gate_passed", false},
-            {"facade_owner", "SceneVisualContract/LightingState"},
+            {"evidence", domainEvidence(context.lighting)},
             {"rig_id", contract.lighting.rigId},
             {"shadow_policy_id", contract.lighting.shadowPolicyId},
             {"exposure_policy_id", contract.lighting.exposurePolicyId}
@@ -197,13 +100,13 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"room_probe_count", contract.environment.localReflectionProbeCount},
             {"hero_probe_count", 0},
             {"planar_probe_count", 0},
-            {"rt_miss_environment_policy_ready", rtMissEnvironmentPolicyReady},
+            {"rt_miss_environment_policy_ready", context.rtMissEnvironmentPolicyReady},
             {"unauthorized_external_hdri_ratio",
              contract.sceneVisual.invalidExternalHDRI ? 1.0 : 0.0},
-            {"unknown_reflection_owner_ratio", unknownReflectionOwner ? 1.0 : 0.0},
-            {"reflection_owner_report_available", reflectionOwnerAvailable},
-            {"reflection_policies_available", reflectionPoliciesAvailable},
-            {"facade_owner", "SceneVisualContract/EnvironmentState"},
+            {"unknown_reflection_owner_ratio", context.unknownReflectionOwner ? 1.0 : 0.0},
+            {"reflection_owner_report_available", context.reflectionOwnerReportAvailable},
+            {"reflection_policies_available", context.reflectionPoliciesAvailable},
+            {"evidence", domainEvidence(context.reflections)},
             {"owner", contract.sceneVisual.reflectionOwner}
         }},
         {"shadows", {
@@ -215,45 +118,45 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"local_shadow_atlas_ready", contract.lighting.shadowCastingLightCount > 0},
             {"contact_shadow_ready", false},
             {"shadow_stability_gate_passed", false},
-            {"facade_owner", "ShadowResources/SceneVisualContract"}
+            {"evidence", domainEvidence(context.shadows)}
         }},
         {"temporal", {
             {"enabled", contract.features.taaEnabled},
-            {"motion_vectors_ready", velocityReady},
-            {"jitter_reprojection_ready", jitterReprojectionReady},
-            {"material_aware_rejection_ready", temporalPoliciesAvailable},
+            {"motion_vectors_ready", context.velocityReady},
+            {"jitter_reprojection_ready", context.jitterReprojectionReady},
+            {"material_aware_rejection_ready", context.temporalPoliciesAvailable},
             {"history_clamp_ready", HasResource(contract, "taa_history")},
             {"smooth_surface_motion_gate_passed", false},
             {"camera_sweep_gate_passed", false},
-            {"facade_owner", "TemporalMask/FrameDiagnostics"}
+            {"evidence", domainEvidence(context.temporal)}
         }},
         {"post", {
             {"enabled", contract.cinematicPost.enabled},
-            {"named_post_stages_ready", postNamedStagesReady},
+            {"named_post_stages_ready", context.postNamedStagesReady},
             {"exposure_report_available", contract.cinematicPost.exposurePolicyActive},
             {"tone_map_report_available", !contract.cinematicPost.toneMapperPreset.empty()},
             {"visual_quality_gate_passed", false},
             {"shader_warning_regression_count", 0},
-            {"facade_owner", "CinematicPostInfo"},
+            {"evidence", domainEvidence(context.post)},
             {"quality_set_id", contract.cinematicPost.qualitySetId}
         }},
         {"render_graph", {
             {"enabled", contract.renderGraph.active},
-            {"explicit_pass_graph_ready", explicitPassGraphReady},
+            {"explicit_pass_graph_ready", context.explicitPassGraphReady},
             {"resource_producer_report_available", contract.renderGraph.passRecords > 0},
             {"resource_state_report_available", contract.renderGraph.transientValidationRan},
             {"debug_view_source_report_available", false},
             {"missing_producer_count", 0},
-            {"facade_owner", "FrameDiagnostics/RenderGraphInfo"}
+            {"evidence", domainEvidence(context.renderGraph)}
         }},
         {"asset_evidence", {
             {"enabled", false},
             {"asset_registry_v2_linked", false},
             {"hero_surface_readiness_available", false},
             {"pbr_texture_readiness_available", false},
-            {"shader_feature_flags_available", familyCountsAvailable},
+            {"shader_feature_flags_available", context.familyCountsAvailable},
             {"missing_registry_material_count", 0},
-            {"facade_owner", "external_material_evidence_report"}
+            {"evidence", domainEvidence(context.assetEvidence)}
         }},
         {"packet_gate", {
             {"enabled", false},
@@ -263,7 +166,7 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"gym_packet_passed", false},
             {"concert_packet_passed", false},
             {"v1_baseline_preserved", true},
-            {"facade_owner", "external_cross_family_packet_gate"}
+            {"evidence", domainEvidence(context.packetGate)}
         }}
     };
 }

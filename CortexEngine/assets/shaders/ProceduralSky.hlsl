@@ -66,78 +66,104 @@ float MiePhase(float cosTheta, float g) {
     return (1.0f - g2) / (4.0f * 3.14159265f * pow(max(denom, 0.001f), 1.5f));
 }
 
-// Simplified atmospheric scattering for real-time rendering
+float Hash21(float2 p)
+{
+    p = frac(p * float2(127.1f, 311.7f));
+    p += dot(p, p + 41.23f);
+    return frac(p.x * p.y);
+}
+
+float ValueNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0f - 2.0f * f);
+    float a = Hash21(i);
+    float b = Hash21(i + float2(1.0f, 0.0f));
+    float c = Hash21(i + float2(0.0f, 1.0f));
+    float d = Hash21(i + float2(1.0f, 1.0f));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float FBM(float2 p)
+{
+    float value = 0.0f;
+    float amp = 0.5f;
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        value += ValueNoise(p) * amp;
+        p = p * 2.05f + 13.17f;
+        amp *= 0.5f;
+    }
+    return value;
+}
+
+float CloudMask(float3 viewDir, float horizon, float up)
+{
+    float2 cloudUv = float2(viewDir.x * 2.3f + viewDir.z * 0.55f + g_Time.x * 0.0015f,
+                            up * 1.85f + viewDir.z * 0.18f);
+    float streaks = FBM(cloudUv * float2(1.25f, 0.55f));
+    float wisps = FBM(cloudUv * float2(3.40f, 1.05f) + 23.0f);
+    float layer = smoothstep(0.38f, 0.66f, streaks * 0.78f + wisps * 0.30f);
+    return layer * saturate(up * 1.35f + 0.28f) * saturate(1.0f - horizon * 0.18f);
+}
+
+// Simplified atmospheric scattering for real-time rendering. This is tuned for
+// local outdoor scenes rather than generic HDRI replacement: soft sun, low wet
+// horizon haze, and darker below-horizon tones for water/shore captures.
 float3 ComputeAtmosphericScattering(float3 viewDir, float3 sunDir) {
-    // View angle from horizon
-    float viewAngle = viewDir.y;
+    float viewY = viewDir.y;
+    float sunY = sunDir.y;
+    float sunDot = saturate(dot(viewDir, sunDir));
+    float horizon = pow(saturate(1.0f - abs(viewY) * 1.15f), 1.45f);
+    float up = saturate(viewY);
+    float down = saturate(-viewY);
 
-    // Sun angle from horizon
-    float sunAngle = sunDir.y;
-
-    // Optical depth approximation (thicker atmosphere at horizon)
-    float opticalDepthView = exp(-max(viewAngle, -0.1f) * 3.0f);
-    float opticalDepthSun = exp(-max(sunAngle, -0.1f) * 2.0f);
-
-    // Rayleigh scattering (blue sky)
-    float3 rayleigh = RAYLEIGH_BETA * opticalDepthView * 40.0f;
-
-    // Mie scattering (sun glow, haze)
-    float cosTheta = dot(viewDir, sunDir);
-    float miePhase = MiePhase(cosTheta, MIE_G);
-    float3 mie = MIE_BETA * miePhase * opticalDepthView * 200.0f;
-
-    // Sun disk
-    float sunDisk = smoothstep(0.9997f, 0.9999f, cosTheta);
-
-    // Soft sun glow
-    float sunGlow = pow(saturate(cosTheta), 8.0f) * 0.5f;
-    float sunHalo = pow(saturate(cosTheta), 64.0f) * 2.0f;
-
-    // Sky color based on sun position
-    float3 skyZenith = float3(0.15f, 0.3f, 0.6f);      // Deep blue at zenith
-    float3 skyHorizon = float3(0.5f, 0.6f, 0.7f);     // Lighter at horizon
-
-    // Sunset/sunrise colors
-    float sunsetFactor = saturate(1.0f - abs(sunAngle) * 4.0f);
-    float3 sunsetZenith = float3(0.2f, 0.15f, 0.3f);   // Purple-ish zenith at sunset
-    float3 sunsetHorizon = float3(1.0f, 0.4f, 0.1f);   // Orange horizon at sunset
-
-    skyZenith = lerp(skyZenith, sunsetZenith, sunsetFactor * 0.7f);
-    skyHorizon = lerp(skyHorizon, sunsetHorizon, sunsetFactor);
-
-    // Blend zenith to horizon based on view direction
-    float horizonBlend = 1.0f - saturate(viewAngle + 0.1f);
-    horizonBlend = pow(horizonBlend, 0.8f);
-    float3 skyBase = lerp(skyZenith, skyHorizon, horizonBlend);
-
-    // Apply scattering
-    float3 scattered = rayleigh + mie;
-    float3 skyColor = skyBase + scattered * saturate(sunAngle + 0.3f);
-
-    // Sun contribution
     float3 sunColor = g_SunRadiance.rgb;
-    float sunIntensity = dot(sunColor, float3(0.2126f, 0.7152f, 0.0722f));
-    sunColor = normalize(sunColor + 0.001f) * min(sunIntensity, 10.0f);
+    float sunLum = max(dot(sunColor, float3(0.2126f, 0.7152f, 0.0722f)), 0.01f);
+    sunColor = sunColor / sunLum;
 
-    // Add sun disk and glow
-    skyColor += sunColor * sunDisk * 10.0f;
-    skyColor += sunColor * (sunGlow + sunHalo) * saturate(sunAngle + 0.2f);
+    float lowSun = saturate(1.0f - sunY * 1.45f);
+    float3 zenith = lerp(float3(0.18f, 0.31f, 0.47f),
+                         float3(0.09f, 0.16f, 0.28f),
+                         lowSun * 0.45f);
+    float3 upperHaze = lerp(float3(0.47f, 0.57f, 0.63f),
+                            float3(0.72f, 0.47f, 0.28f),
+                            lowSun * 0.55f);
+    float3 wetHorizon = lerp(float3(0.19f, 0.30f, 0.29f),
+                             float3(0.42f, 0.27f, 0.16f),
+                             lowSun * 0.50f);
+    float3 belowHorizon = float3(0.035f, 0.075f, 0.068f);
 
-    // Ground color (below horizon)
-    float groundBlend = saturate(-viewAngle * 3.0f);
-    float3 groundColor = float3(0.3f, 0.25f, 0.2f) * saturate(sunAngle + 0.3f) * 0.5f;
-    skyColor = lerp(skyColor, groundColor, groundBlend);
+    float3 skyColor = lerp(upperHaze, zenith, pow(up, 0.55f));
+    skyColor = lerp(skyColor, wetHorizon, horizon * 0.80f);
+    skyColor = lerp(skyColor, belowHorizon, pow(down, 0.65f));
 
-    // Night sky (when sun is below horizon)
-    float nightFactor = saturate(-sunAngle * 2.0f);
-    float3 nightSky = float3(0.01f, 0.01f, 0.02f);
-    skyColor = lerp(skyColor, nightSky, nightFactor * (1.0f - groundBlend));
+    float opticalDepth = exp(-max(viewY, -0.12f) * 2.3f);
+    float rayleighLift = saturate(up + 0.18f) * 0.035f;
+    skyColor += RAYLEIGH_BETA * opticalDepth * 2600.0f * rayleighLift;
 
-    // Exposure/intensity based on sun
-    float exposure = lerp(0.3f, 1.2f, saturate(sunAngle + 0.2f));
-    skyColor *= exposure;
+    float miePhase = MiePhase(sunDot, MIE_G);
+    float sunDisk = smoothstep(0.99945f, 0.99982f, sunDot);
+    float sunCore = pow(sunDot, 420.0f) * 1.35f;
+    float sunHalo = pow(sunDot, 18.0f) * 0.55f;
+    float broadGlow = pow(sunDot, 4.0f) * 0.18f;
+    float atmosphereVisibility = saturate(sunY + 0.28f);
+    skyColor += sunColor * (sunDisk * 4.0f + sunCore + sunHalo + broadGlow) * atmosphereVisibility;
+    skyColor += sunColor * miePhase * MIE_BETA * opticalDepth * 7000.0f * atmosphereVisibility;
 
-    return max(skyColor, 0.0f);
+    float waterMist = horizon * saturate(0.75f - sunY * 0.25f);
+    skyColor = lerp(skyColor, float3(0.55f, 0.61f, 0.55f), waterMist * 0.18f);
+
+    float clouds = CloudMask(viewDir, horizon, up);
+    float3 cloudColor = lerp(float3(0.50f, 0.56f, 0.52f),
+                             float3(0.84f, 0.80f, 0.70f),
+                             lowSun * 0.38f);
+    skyColor = lerp(skyColor, cloudColor, clouds * 0.42f);
+
+    float exposure = lerp(0.60f, 1.12f, saturate(sunY + 0.18f));
+    return max(skyColor * exposure, 0.0f);
 }
 
 float4 PSMain(VSOutput input) : SV_TARGET {

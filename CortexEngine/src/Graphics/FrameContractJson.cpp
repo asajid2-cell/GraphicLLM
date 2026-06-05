@@ -135,6 +135,11 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
          contract.environment.localReflectionProbeCount > 0 ||
          contract.environment.backgroundExposure <= 0.001f ||
          !contract.features.iblEnabled);
+    const bool sceneLocalEnvironmentShaderReady =
+        contract.sceneVisual.active &&
+        !contract.sceneVisual.invalidExternalHDRI &&
+        !contract.sceneVisual.environmentOwner.empty() &&
+        contract.sceneVisual.environmentOwner != "unknown";
     const bool postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -176,6 +181,7 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"enabled", contract.lighting.lightCount > 0 || contract.features.iblEnabled},
             {"semantic_light_rig_ready",
              !contract.lighting.rigId.empty() && contract.lighting.rigId != "custom"},
+            {"scene_local_environment_shader_ready", sceneLocalEnvironmentShaderReady},
             {"light_owner_report_available", contract.lighting.semanticFixtureLightCount > 0},
             {"rect_area_light_count", contract.lighting.areaRectLightCount},
             {"practical_fixture_count", contract.lighting.practicalFixtureLightCount},

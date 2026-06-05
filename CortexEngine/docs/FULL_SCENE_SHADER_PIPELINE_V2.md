@@ -81,6 +81,9 @@ V2 is organized as contracts, not scattered features.
      lights.
    - Each light has owner id, purpose, intensity units or normalized artistic
      exposure, shadow policy, color temperature, and affected zones.
+   - Forward shading, procedural sky, and water shaders must use the
+     scene-local ambient/background/reflection contract. A scene-owned sky or
+     water surface cannot behave like a detached generic HDRI backdrop.
 
 4. Reflection And Indirect Contract
    - Enclosed scenes use local room probes, hero probes, planar probes, or

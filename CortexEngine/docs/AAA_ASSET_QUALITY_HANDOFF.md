@@ -646,6 +646,47 @@ Current caveat:
   on enclosed scenes with IBL enabled/background controls before V2 reflection
   gates can be promoted.
 
+### Full Scene Shader Pipeline V2 Scene-Local Environment Shader Slice
+
+Purpose:
+
+- Move forward shading, procedural sky, and water away from generic standalone
+  shader behavior and into the same scene-local environment contract used by
+  reflections and post.
+- This is the shader-side substrate for more Unreal-like scene coherence:
+  stable IBL filtering, authored local sky color, and water/liquid reflections
+  that read as part of the scene.
+
+Implementation state:
+
+- `Basic.hlsl` now has forward-path fixture shaping and stable environment
+  reflection mip selection:
+  - lat-long derivative seam handling through `EnvReflectionFootprintMip`.
+  - background blur as a minimum specular IBL mip floor.
+  - material-aware roughness floors for mirror/glass/water/brushed metal.
+- `ProceduralSky.hlsl` now has a scene-local atmospheric profile instead of a
+  generic HDRI replacement:
+  - wet horizon haze.
+  - local cloud/noise shaping.
+  - below-horizon darkening suitable for water/shore captures.
+- `Water.hlsl` now uses a local liquid reflection palette and glint model:
+  - ambient-owned sky tint.
+  - local silt/bank/film/caustic detail for water.
+  - liquid-specific reflection/glint handling for water/lava/honey/molasses.
+- `FrameContractJson.cpp` reports
+  `full_scene_shader_pipeline_v2.lighting.scene_local_environment_shader_ready`.
+- The field is true only when:
+  - the scene visual contract is active.
+  - the environment owner is known.
+  - no invalid external HDRI is reported.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now statically
+  checks the forward/sky/water scene-local shader surface.
+
+Current caveat:
+
+- This slice is shader/source-contract evidence. It still needs visual packets
+  before V2 scene-local environment output can be promoted as the default look.
+
 ### Checkpoint - 2026-06-05 Early AM
 
 Pushed commits:

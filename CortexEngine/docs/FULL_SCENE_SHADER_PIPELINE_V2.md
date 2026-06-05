@@ -1621,3 +1621,93 @@ Current interpretation:
   packet-proved local reflection/probe ownership contract.
 - Next architecture slice should formalize shadow/contact stability evidence,
   then material-aware temporal promotion evidence.
+
+## Full Scene Shader Pipeline V2 Shadow Contact Evidence Slice - 2026-06-05
+
+Purpose:
+
+- Start Phase 5 by replacing the thin shadow facade with explicit
+  shadow/contact stability evidence.
+- Make V2 prove shadow policy, shadow-map resource ownership, producer
+  ownership, caster ownership, cascade/bias/filter policy bounds, RT shadow
+  signal readiness, and contact/near-field shadow readiness before any V2
+  shadow-heavy beauty path is promoted.
+
+Implemented:
+
+- Added `FullSceneShadowContactEvidence` to `FullSceneShaderFrameContext`.
+- V2 shadow readiness now checks:
+  - scene-local shadow policy report.
+  - valid `shadow_map` resource.
+  - `ShadowPass` producer ownership for `shadow_map`.
+  - cascade debug/resource availability.
+  - cascade split, bias, and filter policy bounds.
+  - shadow-casting light ownership.
+  - local shadow atlas readiness.
+  - RT shadow mask readiness.
+  - RT shadow history readiness.
+  - contact/near-field shadow readiness.
+  - missing shadow contract count.
+- V2 frame reports now emit the above fields directly.
+- The V2 checker now requires the shadow/contact evidence builder and the new
+  frame-report fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_shadow_contact_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed and linked.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_shadow_contact_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+
+Gallery beauty shadow evidence:
+
+- `shadow_policy_report_available=true`.
+- `shadow_map_ready=true`.
+- `shadow_map_producer_ready=true`.
+- `cascade_debug_available=true`.
+- `cascade_policy_ready=true`.
+- `shadow_bias_policy_ready=true`.
+- `shadow_filter_policy_ready=true`.
+- `shadow_caster_ownership_ready=true`.
+- `local_shadow_atlas_ready=true`.
+- `rt_shadow_mask_ready=true`.
+- `rt_shadow_history_ready=true`.
+- `contact_shadow_ready=true`.
+- `shadow_stability_gate_passed=true`.
+- `shadow_casting_light_count=1`.
+- `shadow_bias=0.003000`.
+- `shadow_pcf_radius=3.0`.
+- `cascade_split_lambda=0.55`.
+- `missing_shadow_contract_count=0`.
+- `shadows.domain_ready=true`.
+- failure reason:
+  `Scene-local shadow/contact stability is ready`.
+
+Current interpretation:
+
+- `FSSP-V2-006A` is complete for the gallery packet.
+- Shadows still render through the V1 beauty fallback, but V2 now has a
+  packet-proved shadow/contact stability contract.
+- Next architecture slice should formalize material-aware temporal promotion
+  evidence.

@@ -776,6 +776,53 @@ def validate_runtime_reflection_surface() -> list[str]:
     return errors
 
 
+def validate_runtime_shadow_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        FULL_SCENE_SHADER_FRAME_CONTEXT_PATH,
+        FRAME_CONTRACT_JSON_SOURCE_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing runtime shadow evidence source: {path}")
+    if errors:
+        return errors
+
+    facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    json_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
+
+    for token in [
+        "struct FullSceneShadowContactEvidence",
+        "BuildFullSceneShadowContactEvidence",
+        "shadowMapProducerReady",
+        "shadowCasterOwnershipReady",
+        "shadowBiasPolicyReady",
+        "shadowFilterPolicyReady",
+        "rtShadowMaskReady",
+        "rtShadowHistoryReady",
+        "missingShadowContractCount",
+        "Scene-local shadow/contact stability is ready",
+    ]:
+        require_source_token(errors, facade_source, token, "FullScene shadow/contact evidence")
+
+    for token in [
+        '"shadow_map_ready"',
+        '"shadow_map_producer_ready"',
+        '"cascade_policy_ready"',
+        '"shadow_bias_policy_ready"',
+        '"shadow_filter_policy_ready"',
+        '"shadow_caster_ownership_ready"',
+        '"rt_shadow_mask_ready"',
+        '"rt_shadow_history_ready"',
+        '"shadow_casting_light_count"',
+        '"shadow_pcf_radius"',
+        '"missing_shadow_contract_count"',
+    ]:
+        require_source_token(errors, json_source, token, "FullScene shadow frame-report JSON")
+
+    return errors
+
+
 def validate_runtime_scene_local_environment_surface() -> list[str]:
     errors: list[str] = []
     required_paths = [
@@ -946,6 +993,7 @@ def main() -> int:
     errors.extend(validate_runtime_lighting_surface())
     errors.extend(validate_runtime_temporal_surface())
     errors.extend(validate_runtime_reflection_surface())
+    errors.extend(validate_runtime_shadow_surface())
     errors.extend(validate_runtime_scene_local_environment_surface())
     errors.extend(validate_v2_packet_runner_surface())
     if args.frame_report:

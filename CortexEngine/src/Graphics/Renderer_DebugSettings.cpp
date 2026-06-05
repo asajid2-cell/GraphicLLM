@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 61u;
+constexpr uint32_t kMaxDebugViewMode = 66u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -70,6 +70,11 @@ void Renderer::CycleDebugViewMode() {
     // 59 = post reflection resolver V2 candidate delta
     // 60 = post reflection source authority
     // 61 = local reflection radiance buffer
+    // 62 = V3 direct lighting split buffer
+    // 63 = V3 unshadowed direct lighting split buffer
+    // 64 = V3 shadow visibility split buffer
+    // 65 = V3 shadow loss split buffer
+    // 66 = V3 indirect lighting split buffer
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -135,6 +140,11 @@ void Renderer::CycleDebugViewMode() {
         case 59: label = "PostReflectionResolverV2CandidateDelta"; break;
         case 60: label = "PostReflectionSourceAuthority"; break;
         case 61: label = "LocalReflectionRadiance"; break;
+        case 62: label = "VB_V3DirectLighting"; break;
+        case 63: label = "VB_V3DirectLightingUnshadowed"; break;
+        case 64: label = "VB_V3ShadowVisibility"; break;
+        case 65: label = "VB_V3ShadowLoss"; break;
+        case 66: label = "VB_V3IndirectLighting"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

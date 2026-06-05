@@ -31,6 +31,7 @@ struct ResourceHandles {
     RGResourceHandle shadowLoss;
     RGResourceHandle indirectLighting;
     RGResourceHandle debugSource;
+    RGResourceHandle lightingV3DebugSource;
 };
 
 struct StageFailureContext {
@@ -82,6 +83,8 @@ struct DebugBlitContext {
     bool debugVisibility = false;
     bool debugDepth = false;
     bool debugGBuffer = false;
+    bool debugExternalSRV = false;
+    DescriptorHandle externalSRV{};
     VisibilityBufferRenderer::DebugBlitVisibilityMode visibilityMode =
         VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
     VisibilityBufferRenderer::DebugBlitBuffer gbufferSource =
@@ -167,6 +170,7 @@ struct GraphContext {
     bool brdfGraphOwned = false;
     bool clusterGraphOwned = false;
     bool fullSceneLightingV3Enabled = false;
+    bool lightingV3DebugBlit = false;
     ClearContext clear;
     VisibilityContext visibility;
     MaterialResolveContext materialResolve;

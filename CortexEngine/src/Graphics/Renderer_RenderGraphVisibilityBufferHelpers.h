@@ -22,11 +22,20 @@ inline constexpr uint32_t kVBDebugMaterialFamily = 11;
 inline constexpr uint32_t kVBDebugReflectionPolicy = 12;
 inline constexpr uint32_t kVBDebugTemporalPolicy = 13;
 inline constexpr uint32_t kVBDebugPostSensitivity = 14;
+inline constexpr uint32_t kVBDebugLightingV3Direct = 15;
+inline constexpr uint32_t kVBDebugLightingV3DirectUnshadowed = 16;
+inline constexpr uint32_t kVBDebugLightingV3ShadowVisibility = 17;
+inline constexpr uint32_t kVBDebugLightingV3ShadowLoss = 18;
+inline constexpr uint32_t kVBDebugLightingV3Indirect = 19;
 inline constexpr D3D12_RESOURCE_STATES kVBShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
 inline bool IsVBGBufferDebugView(uint32_t debugView) {
     return debugView >= kVBDebugGBufferAlbedo && debugView <= kVBDebugGBufferExt2;
+}
+
+inline bool IsVBFullSceneLightingV3DebugView(uint32_t debugView) {
+    return debugView >= kVBDebugLightingV3Direct && debugView <= kVBDebugLightingV3Indirect;
 }
 
 inline bool IsVBVisibilityIdentityDebugView(uint32_t debugView) {
@@ -185,6 +194,18 @@ inline VisibilityBufferRenderer::DebugBlitBuffer SelectVBGBufferDebugBuffer(uint
             return VisibilityBufferRenderer::DebugBlitBuffer::MaterialExt2;
         default:
             return VisibilityBufferRenderer::DebugBlitBuffer::Albedo;
+    }
+}
+
+inline RGResourceHandle SelectVBFullSceneLightingV3DebugHandle(const VisibilityBufferGraphResources& resources,
+                                                               uint32_t debugView) {
+    switch (debugView) {
+        case kVBDebugLightingV3DirectUnshadowed: return resources.directLightingUnshadowed;
+        case kVBDebugLightingV3ShadowVisibility: return resources.shadowVisibility;
+        case kVBDebugLightingV3ShadowLoss: return resources.shadowLoss;
+        case kVBDebugLightingV3Indirect: return resources.indirectLighting;
+        case kVBDebugLightingV3Direct:
+        default: return resources.directLighting;
     }
 }
 

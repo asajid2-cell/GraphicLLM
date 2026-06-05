@@ -38,6 +38,11 @@ LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
     "shadow_factor": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
     "ambient_ibl": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
+    "v3_direct_lighting": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
+    "v3_direct_lighting_unshadowed": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
+    "v3_shadow_visibility": {"min_mean_luma": 0.02, "max_mean_luma": 0.98, "min_nonblack_ratio": 0.05},
+    "v3_shadow_loss": {"min_mean_luma": 0.005, "min_nonblack_ratio": 0.01},
+    "v3_indirect_lighting": {"min_mean_luma": 0.01, "min_nonblack_ratio": 0.05},
 }
 
 
@@ -142,6 +147,49 @@ def analyze_lighting_signal_metrics(input_path: pathlib.Path) -> dict[str, Any]:
             warnings.append(
                 "direct_light_shadow_loss mean_luma is unusually high relative to unshadowed "
                 f"({loss_luma:.6f} vs {unshadowed_luma:.6f})"
+            )
+
+    v3_direct = rows_by_view.get("v3_direct_lighting", {}).get("metrics", {})
+    v3_unshadowed = rows_by_view.get("v3_direct_lighting_unshadowed", {}).get("metrics", {})
+    v3_shadow_loss = rows_by_view.get("v3_shadow_loss", {}).get("metrics", {})
+    if isinstance(v3_direct, dict) and isinstance(v3_unshadowed, dict):
+        direct_luma = float(v3_direct.get("mean_luma", 0.0))
+        unshadowed_luma = float(v3_unshadowed.get("mean_luma", 0.0))
+        if unshadowed_luma + 1e-6 < direct_luma * 0.90:
+            failures.append(
+                "v3_direct_lighting_unshadowed mean_luma should be at least 90% of "
+                f"v3_direct_lighting ({unshadowed_luma:.6f} vs {direct_luma:.6f})"
+            )
+    if isinstance(v3_shadow_loss, dict) and isinstance(v3_unshadowed, dict):
+        loss_luma = float(v3_shadow_loss.get("mean_luma", 0.0))
+        unshadowed_luma = float(v3_unshadowed.get("mean_luma", 0.0))
+        if unshadowed_luma > 0.0 and loss_luma > unshadowed_luma * 1.25:
+            warnings.append(
+                "v3_shadow_loss mean_luma is unusually high relative to v3 unshadowed "
+                f"({loss_luma:.6f} vs {unshadowed_luma:.6f})"
+            )
+
+    legacy_pairs = {
+        "direct_light": "v3_direct_lighting",
+        "direct_light_unshadowed": "v3_direct_lighting_unshadowed",
+        "direct_light_shadow_loss": "v3_shadow_loss",
+        "shadow_factor": "v3_shadow_visibility",
+        "ambient_ibl": "v3_indirect_lighting",
+    }
+    for legacy_view, v3_view in legacy_pairs.items():
+        legacy_metrics = rows_by_view.get(legacy_view, {}).get("metrics", {})
+        v3_metrics = rows_by_view.get(v3_view, {}).get("metrics", {})
+        if not isinstance(legacy_metrics, dict) or not isinstance(v3_metrics, dict):
+            continue
+        legacy_luma = float(legacy_metrics.get("mean_luma", 0.0))
+        v3_luma = float(v3_metrics.get("mean_luma", 0.0))
+        if legacy_luma <= 0.0:
+            continue
+        ratio = v3_luma / legacy_luma
+        if ratio < 0.20 or ratio > 5.00:
+            warnings.append(
+                f"{v3_view} mean_luma is far from legacy {legacy_view}: "
+                f"ratio={ratio:.3f} legacy={legacy_luma:.6f} v3={v3_luma:.6f}"
             )
 
     return {

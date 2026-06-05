@@ -126,6 +126,36 @@ struct FullSceneShaderFrameContext {
 
     FullSceneLightingRigEvidence lightingEvidence;
 
+    struct FullSceneReflectionOwnershipEvidence {
+        bool enabled = false;
+        bool ready = false;
+        bool reflectionOwnerReportAvailable = false;
+        bool reflectionOwnerKnown = false;
+        bool reflectionPoliciesAvailable = false;
+        bool externalIblVisibilityAuthorized = false;
+        bool localProbeRigDeclared = false;
+        bool localProbeTableReady = false;
+        bool localProbeRadianceReady = false;
+        bool localProbeIntensityReady = false;
+        bool localProbeContractReady = false;
+        bool rtMissEnvironmentPolicyReady = false;
+        bool enclosedMissFallbackSafe = false;
+        bool reflectionSourceContractReady = false;
+        uint32_t roomProbeCount = 0;
+        uint32_t heroProbeCount = 0;
+        uint32_t planarProbeCount = 0;
+        uint32_t skippedProbeCount = 0;
+        float localProbeDiffuseIntensity = 0.0f;
+        float localProbeSpecularIntensity = 0.0f;
+        float unauthorizedExternalHDRIRatio = 1.0f;
+        float unknownReflectionOwnerRatio = 1.0f;
+        uint32_t missingReflectionContractCount = 0;
+        std::string owner = "SceneVisualContract/FullSceneReflectionOwnershipEvidence";
+        std::string failureReason = "Reflection ownership evidence is not populated";
+    };
+
+    FullSceneReflectionOwnershipEvidence reflectionEvidence;
+
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
     FullSceneShaderDomainEvidence lighting;
@@ -447,6 +477,104 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
     return evidence;
 }
 
+inline FullSceneShaderFrameContext::FullSceneReflectionOwnershipEvidence
+BuildFullSceneReflectionOwnershipEvidence(
+    const FrameContract& contract,
+    bool reflectionOwnerReportAvailable,
+    bool reflectionOwnerKnown,
+    bool reflectionPoliciesAvailable,
+    bool rtMissEnvironmentPolicyReady) {
+    FullSceneShaderFrameContext::FullSceneReflectionOwnershipEvidence evidence;
+    evidence.enabled =
+        contract.features.ssrEnabled ||
+        contract.features.rtReflectionsEnabled ||
+        contract.features.iblEnabled ||
+        contract.environment.localReflectionProbeCount > 0;
+    evidence.reflectionOwnerReportAvailable = reflectionOwnerReportAvailable;
+    evidence.reflectionOwnerKnown = reflectionOwnerKnown;
+    evidence.reflectionPoliciesAvailable = reflectionPoliciesAvailable;
+    evidence.roomProbeCount = contract.environment.localReflectionProbeCount;
+    evidence.skippedProbeCount = contract.environment.localReflectionProbeSkipped;
+    evidence.localProbeDiffuseIntensity = contract.environment.localReflectionProbeDiffuseIntensity;
+    evidence.localProbeSpecularIntensity = contract.environment.localReflectionProbeSpecularIntensity;
+    evidence.externalIblVisibilityAuthorized =
+        !contract.sceneVisual.invalidExternalHDRI &&
+        (!contract.sceneVisual.externalHDRIVisible ||
+         contract.sceneVisual.visibleExternalHDRIAllowed);
+    evidence.localProbeRigDeclared =
+        !contract.sceneVisual.localReflectionProbeRigId.empty() &&
+        contract.sceneVisual.localReflectionProbeRigId != "none";
+    evidence.localProbeTableReady =
+        evidence.roomProbeCount > 0 &&
+        contract.environment.localReflectionProbeTableValid &&
+        evidence.skippedProbeCount == 0;
+    evidence.localProbeRadianceReady =
+        contract.environment.localReflectionProbeRadianceEnabled;
+    evidence.localProbeIntensityReady =
+        evidence.localProbeDiffuseIntensity > 0.0f ||
+        evidence.localProbeSpecularIntensity > 0.0f;
+    evidence.localProbeContractReady =
+        !evidence.localProbeRigDeclared ||
+        (evidence.localProbeTableReady &&
+         evidence.localProbeRadianceReady &&
+         evidence.localProbeIntensityReady);
+    evidence.rtMissEnvironmentPolicyReady = rtMissEnvironmentPolicyReady;
+    evidence.enclosedMissFallbackSafe =
+        !contract.sceneVisual.enclosedScene ||
+        contract.environment.localReflectionProbeCount > 0 ||
+        contract.environment.backgroundExposure <= 0.001f ||
+        !contract.features.iblEnabled;
+    evidence.reflectionSourceContractReady =
+        evidence.localProbeContractReady ||
+        contract.features.ssrEnabled ||
+        contract.features.rtReflectionsEnabled ||
+        (contract.features.iblEnabled && evidence.externalIblVisibilityAuthorized);
+    evidence.unauthorizedExternalHDRIRatio = evidence.externalIblVisibilityAuthorized ? 0.0f : 1.0f;
+    evidence.unknownReflectionOwnerRatio = evidence.reflectionOwnerKnown ? 0.0f : 1.0f;
+
+    const bool requiredContracts[] = {
+        evidence.reflectionOwnerReportAvailable,
+        evidence.reflectionOwnerKnown,
+        evidence.reflectionPoliciesAvailable,
+        evidence.externalIblVisibilityAuthorized,
+        evidence.localProbeContractReady,
+        evidence.rtMissEnvironmentPolicyReady,
+        evidence.enclosedMissFallbackSafe,
+        evidence.reflectionSourceContractReady,
+    };
+    for (bool ready : requiredContracts) {
+        if (!ready) {
+            ++evidence.missingReflectionContractCount;
+        }
+    }
+
+    evidence.ready = evidence.enabled && evidence.missingReflectionContractCount == 0;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "No reflection or environment source is enabled";
+    } else if (!evidence.reflectionOwnerReportAvailable) {
+        evidence.failureReason = "Reflection-owner debug report is missing";
+    } else if (!evidence.reflectionOwnerKnown) {
+        evidence.failureReason = "Scene visual contract has unknown reflection owner";
+    } else if (!evidence.reflectionPoliciesAvailable) {
+        evidence.failureReason = "Material reflection policies are not complete";
+    } else if (!evidence.externalIblVisibilityAuthorized) {
+        evidence.failureReason = "External HDRI visibility is unauthorized for the scene";
+    } else if (!evidence.localProbeContractReady) {
+        evidence.failureReason = "Declared local reflection probe rig is missing table/radiance/intensity evidence";
+    } else if (!evidence.rtMissEnvironmentPolicyReady) {
+        evidence.failureReason = "RT reflection miss policy can still sample an unsafe environment fallback";
+    } else if (!evidence.enclosedMissFallbackSafe) {
+        evidence.failureReason = "Enclosed scene has no safe local or neutral reflection miss fallback";
+    } else if (!evidence.reflectionSourceContractReady) {
+        evidence.failureReason = "No authorized reflection source contract is available";
+    } else {
+        evidence.failureReason = "Scene-local reflection/probe ownership is ready";
+    }
+
+    return evidence;
+}
+
 inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
     std::string id,
     bool enabled,
@@ -530,6 +658,12 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
     context.lightingEvidence = BuildFullSceneLightingRigEvidence(
         contract,
         context.sceneLocalEnvironmentShaderReady);
+    context.reflectionEvidence = BuildFullSceneReflectionOwnershipEvidence(
+        contract,
+        context.reflectionOwnerReportAvailable,
+        !context.unknownReflectionOwner,
+        context.reflectionPoliciesAvailable,
+        context.rtMissEnvironmentPolicyReady);
     context.postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -559,14 +693,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.lightingEvidence.failureReason);
     context.reflections = MakeFullSceneShaderDomainEvidence(
         "reflections",
-        contract.features.ssrEnabled ||
-            contract.features.rtReflectionsEnabled ||
-            contract.environment.localReflectionProbeCount > 0,
-        context.rtMissEnvironmentPolicyReady &&
-            context.reflectionOwnerReportAvailable &&
-            !context.unknownReflectionOwner,
-        "SceneVisualContract/EnvironmentState",
-        "Reflection-source resolver is instrumented but not promoted");
+        context.reflectionEvidence.enabled,
+        context.reflectionEvidence.ready,
+        context.reflectionEvidence.owner,
+        context.reflectionEvidence.failureReason);
     context.shadows = MakeFullSceneShaderDomainEvidence(
         "shadows",
         contract.features.shadowsEnabled,

@@ -686,6 +686,8 @@ def validate_runtime_reflection_surface() -> list[str]:
         RAYTRACED_REFLECTIONS_SHADER_PATH,
         SHADER_TYPES_HEADER_PATH,
         FRAME_POST_CONSTANTS_SOURCE_PATH,
+        FULL_SCENE_SHADER_FRAME_CONTEXT_PATH,
+        FRAME_CONTRACT_JSON_SOURCE_PATH,
     ]
     for path in required_paths:
         if not path.exists():
@@ -696,6 +698,8 @@ def validate_runtime_reflection_surface() -> list[str]:
     rt_reflections_shader = RAYTRACED_REFLECTIONS_SHADER_PATH.read_text(encoding="utf-8")
     shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
     frame_post_source = FRAME_POST_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
+    facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    json_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
 
     require_source_token(
         errors,
@@ -739,6 +743,35 @@ def validate_runtime_reflection_surface() -> list[str]:
         "authoredInteriorNoEnvironment",
         "RaytracedReflections authored interior ambient policy",
     )
+    for token in [
+        "struct FullSceneReflectionOwnershipEvidence",
+        "BuildFullSceneReflectionOwnershipEvidence",
+        "externalIblVisibilityAuthorized",
+        "localProbeContractReady",
+        "rtMissEnvironmentPolicyReady",
+        "enclosedMissFallbackSafe",
+        "reflectionSourceContractReady",
+        "missingReflectionContractCount",
+        "Scene-local reflection/probe ownership is ready",
+    ]:
+        require_source_token(errors, facade_source, token, "FullScene reflection ownership evidence")
+
+    for token in [
+        '"skipped_probe_count"',
+        '"local_probe_rig_declared"',
+        '"local_probe_table_ready"',
+        '"local_probe_radiance_ready"',
+        '"local_probe_intensity_ready"',
+        '"local_probe_contract_ready"',
+        '"local_probe_diffuse_intensity"',
+        '"local_probe_specular_intensity"',
+        '"enclosed_miss_fallback_safe"',
+        '"reflection_source_contract_ready"',
+        '"external_ibl_visibility_authorized"',
+        '"reflection_owner_known"',
+        '"missing_reflection_contract_count"',
+    ]:
+        require_source_token(errors, json_source, token, "FullScene reflection frame-report JSON")
 
     return errors
 

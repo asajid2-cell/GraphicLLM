@@ -43,14 +43,17 @@ Implemented baseline:
   policy columns are per-pixel debug-visible from the material table.
 - Scene-local semantic light-rig ownership is packet-proved for the gallery
   packet through `FullSceneLightingRigEvidence`.
+- Scene-local reflection/probe ownership is packet-proved for the gallery
+  packet through `FullSceneReflectionOwnershipEvidence`.
 
 Known blockers:
 
 - Lighting still renders through the V1 beauty fallback. The semantic rig
   evidence exists, but the full-scene lighting shader pass has not yet been
   promoted to V2 beauty output.
-- Reflection ownership still needs local room, hero, planar, SSR, RT, neutral,
-  and authorized external environment sources in one resolver.
+- Reflection still renders through the V1 beauty fallback. The local
+  reflection/probe ownership evidence exists, but the resolver has not yet been
+  promoted to V2 beauty output.
 - Shadow/contact stability needs a formal policy and packet gates.
 - Temporal resolve needs material/object-aware history confidence rather than a
   mostly global policy.

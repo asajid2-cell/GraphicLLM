@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for provider request packs generated from Full Scene Shader Pipeline V2 material upgrade work orders.",
+  "manifest_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json",
+  "required_manifest_fields": [
+    "schema",
+    "generated_by",
+    "source_work_orders",
+    "request_count",
+    "priority_counts",
+    "kind_counts",
+    "requests"
+  ],
+  "required_request_fields": [
+    "schema",
+    "id",
+    "priority",
+    "source_work_order",
+    "kind",
+    "provider_preferences",
+    "accepted_outputs",
+    "forbidden_outputs",
+    "material_contract",
+    "asset_registry_update_contract",
+    "admission_gate"
+  ],
+  "request_kinds": [
+    "replace_primitive_hero_material_surface",
+    "upgrade_hero_asset_material_evidence",
+    "upgrade_registry_asset_material_evidence"
+  ],
+  "required_pbr_maps": [
+    "base_color",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic",
+    "emissive_when_needed",
+    "opacity_or_transmission_when_needed"
+  ]
+}

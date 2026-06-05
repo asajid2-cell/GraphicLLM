@@ -20,6 +20,7 @@ param(
         "SceneAssetBindings",
         "FullSceneShaderMaterialEvidence",
         "FullSceneShaderMaterialUpgradePlan",
+        "FullSceneShaderMaterialProviderRequests",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1093,6 +1094,14 @@ function Invoke-FullSceneShaderMaterialUpgradePlan {
     }
 }
 
+function Invoke-FullSceneShaderMaterialProviderRequests {
+    Invoke-FullSceneShaderMaterialUpgradePlan
+    python (Join-Path $Root "tools/export_full_scene_shader_material_provider_requests_v2.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 material provider request export failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-AAAReplacementPlan {
     Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
@@ -1144,6 +1153,7 @@ switch ($Action) {
     "SceneAssetBindings" { Invoke-SceneAssetBindings }
     "FullSceneShaderMaterialEvidence" { Invoke-FullSceneShaderMaterialEvidence }
     "FullSceneShaderMaterialUpgradePlan" { Invoke-FullSceneShaderMaterialUpgradePlan }
+    "FullSceneShaderMaterialProviderRequests" { Invoke-FullSceneShaderMaterialProviderRequests }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

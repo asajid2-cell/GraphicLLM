@@ -407,6 +407,14 @@ Implemented:
   - generated shader material upgrade queue.
 - `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.md`
   - human-readable shader material upgrade queue.
+- `assets/final_art/full_scene_shader_material_provider_requests_v2.schema.json`
+  - schema summary for shader material provider request packs.
+- `tools/export_full_scene_shader_material_provider_requests_v2.py`
+  - exports V2 material upgrade work orders into provider/library request packs.
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json`
+  - generated V2 material provider request manifest.
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.md`
+  - human-readable V2 material provider request manifest.
 
 Validation:
 
@@ -419,6 +427,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -
 python -m py_compile tools\build_full_scene_shader_material_evidence_v2.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialUpgradePlan
 python -m py_compile tools\plan_full_scene_shader_material_upgrades_v2.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialProviderRequests
+python -m py_compile tools\export_full_scene_shader_material_provider_requests_v2.py
 ```
 
 Current interpretation:
@@ -449,6 +459,11 @@ Current interpretation:
   - primitive hero material orders `24`.
   - hero asset material orders `10`.
   - registry asset material orders `22`.
+- V2 material provider request baseline:
+  - requests `56`.
+  - P0 requests `34`.
+  - P1 requests `22`.
+  - request files including manifests `58`.
 - Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
   gates or provide stronger replacement evidence.
 
@@ -470,6 +485,7 @@ python tools\validate_full_scene_shader_pipeline_v2_plan.py
 python tools\check_full_scene_shader_pipeline_v2_frame_report.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialEvidence
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialUpgradePlan
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialProviderRequests
 ```
 
 ## Git Policy

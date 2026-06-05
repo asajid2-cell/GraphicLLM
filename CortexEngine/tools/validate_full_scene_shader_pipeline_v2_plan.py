@@ -32,6 +32,13 @@ MATERIAL_UPGRADE_PLAN_PATH = (
     ROOT
     / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.json"
 )
+MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_material_provider_requests_v2.schema.json"
+)
+MATERIAL_PROVIDER_MANIFEST_PATH = (
+    ROOT
+    / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/manifest.json"
+)
 
 
 REQUIRED_DOMAIN_IDS = {
@@ -81,6 +88,10 @@ def main() -> int:
         return fail(f"missing material upgrade plan schema: {MATERIAL_UPGRADE_PLAN_SCHEMA_PATH}")
     if not MATERIAL_UPGRADE_PLAN_PATH.exists():
         return fail(f"missing material upgrade plan: {MATERIAL_UPGRADE_PLAN_PATH}")
+    if not MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH.exists():
+        return fail(f"missing material provider request schema: {MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH}")
+    if not MATERIAL_PROVIDER_MANIFEST_PATH.exists():
+        return fail(f"missing material provider request manifest: {MATERIAL_PROVIDER_MANIFEST_PATH}")
 
     plan_text = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -89,6 +100,10 @@ def main() -> int:
     material_evidence_report = json.loads(MATERIAL_EVIDENCE_REPORT_PATH.read_text(encoding="utf-8"))
     material_upgrade_schema = json.loads(MATERIAL_UPGRADE_PLAN_SCHEMA_PATH.read_text(encoding="utf-8"))
     material_upgrade_plan = json.loads(MATERIAL_UPGRADE_PLAN_PATH.read_text(encoding="utf-8"))
+    material_provider_schema = json.loads(
+        MATERIAL_PROVIDER_REQUEST_SCHEMA_PATH.read_text(encoding="utf-8")
+    )
+    material_provider_manifest = json.loads(MATERIAL_PROVIDER_MANIFEST_PATH.read_text(encoding="utf-8"))
 
     missing_terms = sorted(term for term in REQUIRED_PLAN_TERMS if term not in plan_text)
     if missing_terms:
@@ -171,6 +186,35 @@ def main() -> int:
     if material_evidence_report.get("status") == "BLOCKED" and not material_upgrade_plan["work_orders"]:
         return fail("blocked material evidence must produce upgrade work orders")
 
+    required_manifest_fields = material_provider_schema.get("required_manifest_fields")
+    if not isinstance(required_manifest_fields, list):
+        return fail("material provider schema required_manifest_fields must be a list")
+    missing_manifest_fields = [
+        field for field in required_manifest_fields if field not in material_provider_manifest
+    ]
+    if missing_manifest_fields:
+        return fail("material provider manifest missing fields: " + ", ".join(missing_manifest_fields))
+    if (
+        material_provider_manifest.get("schema")
+        != "cortex.full_scene_shader_material_provider_request_manifest.v2"
+    ):
+        return fail("material provider manifest schema id is invalid")
+    if material_provider_manifest.get("request_count", 0) < material_upgrade_plan["summary"].get("p0_count", 0):
+        return fail("material provider manifest must cover at least all P0 material upgrade orders")
+    requests = material_provider_manifest.get("requests")
+    if not isinstance(requests, list):
+        return fail("material provider manifest requests must be a list")
+    required_request_fields = material_provider_schema.get("required_request_fields", [])
+    for request in requests:
+        missing_request_fields = [
+            field for field in required_request_fields if field not in request
+        ]
+        if missing_request_fields:
+            return fail(
+                f"material provider request {request.get('id', '<missing>')} missing fields: "
+                + ", ".join(missing_request_fields)
+            )
+
     target_families = contract.get("target_families")
     if target_families != ["gallery", "kitchen", "office", "gym", "concert"]:
         return fail("target_families must preserve the Renderer V1 five-family gate order")
@@ -185,6 +229,7 @@ def main() -> int:
     print(f"Frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
     print(f"Material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
     print(f"Material upgrade plan: {MATERIAL_UPGRADE_PLAN_PATH}")
+    print(f"Material provider manifest: {MATERIAL_PROVIDER_MANIFEST_PATH}")
     print(f"Domains: {len(domains)}")
     return 0
 

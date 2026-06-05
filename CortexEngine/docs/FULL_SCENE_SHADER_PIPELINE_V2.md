@@ -108,6 +108,116 @@ V2 is organized as contracts, not scattered features.
      `Lighting`, `LocalReflections`, `Transparent`, `Temporal`, `Post`,
      `DebugComposite`, and `FrameReport`.
 
+## Refactor Execution Blueprint
+
+This refactor should move like a renderer migration, not like visual tuning.
+The current V1 path remains the playable fallback until V2 proves equivalent
+or stronger gates. Every phase must ship with a visible debug mode, frame-report
+fields, and a packet gate before its beauty output becomes trusted.
+
+### Migration Shape
+
+1. Add V2 contracts beside V1.
+   - Introduce `FullSceneShaderPipelineV2` data shapes in frame reports and
+     tools before changing shader output.
+   - Keep current V1 scene profiles, material class analyzers, stability
+     checks, and visual-quality packets running.
+   - Dual-write V1 and V2 evidence where possible so a regression has a direct
+     comparison point.
+
+2. Build a runtime facade.
+   - Route material resolution, lighting selection, reflection ownership,
+     temporal policy, and post profile through named facade calls.
+   - Facades may call existing V1 code at first.
+   - The point is to make ownership explicit before replacing internals.
+
+3. Replace one domain at a time.
+   - Material model first, because every later pass depends on material
+     semantics.
+   - GBuffer second, because lighting, reflections, temporal, and debug views
+     need stable channels.
+   - Lighting/reflections/shadows third, because they are the visible scene
+     realism stack.
+   - Temporal/post/render graph last, because they should stabilize and
+     structure real signals, not compensate for missing upstream data.
+
+4. Promote by packets, not screenshots.
+   - A domain becomes default only when debug packets show complete ownership,
+     mouse-jiggle stability, and cross-family coverage.
+   - The beauty result can improve during development, but it cannot be the
+     sole proof.
+
+### Runtime Facade Targets
+
+The first C++ migration slice should add small ownership facades without
+rewiring every call site:
+
+```cpp
+struct FullSceneShaderFrameContext {
+    SceneCinematicProfile sceneProfile;
+    FullSceneMaterialTable materialTable;
+    FullSceneLightRig lightRig;
+    FullSceneProbeSet probeSet;
+    FullSceneTemporalPolicy temporalPolicy;
+    FullScenePostProfile postProfile;
+    FullSceneFrameReport report;
+};
+
+FullSceneMaterialTable BuildFullSceneMaterialTable(SceneSnapshot snapshot);
+FullSceneLightRig ResolveFullSceneLightRig(SceneProfile profile);
+FullSceneProbeSet ResolveFullSceneProbeSet(SceneProfile profile);
+FullSceneTemporalPolicy ResolveFullSceneTemporalPolicy(SceneProfile profile);
+FullScenePostProfile ResolveFullScenePostProfile(SceneProfile profile);
+```
+
+Initial implementations can wrap current V1 behavior. The required change is
+that the frame report can say which facade owned each decision and whether it
+fell back to V1 defaults.
+
+### Shader Data Migration
+
+V2 shader data should be introduced as append-only channels until the contract
+is proven:
+
+| Stage | First V2 Data | Promotion Gate |
+|---|---|---|
+| Material resolve | material family, feature bits, texture coverage, temporal class | all visible pixels resolve to known family or declared fallback |
+| GBuffer | object id, material id, velocity, clearcoat/transmission/detail masks | debug views prove nonzero coverage on target scenes |
+| Lighting | semantic light id, rig id, shadow policy id | every non-ambient contribution has owner metadata |
+| Reflection | reflection source id, probe id, planar/room/hero/fallback tag | shiny/glass/water pixels never sample inappropriate visible HDRI in enclosed scenes |
+| Shadow | cascade/local/contact owner, bias class, filter class | mouse-jiggle packets stay below flicker threshold |
+| Temporal | rejection reason, clamp width, history weight, material policy | smooth and metallic surfaces do not shimmer or pop under camera jitter |
+| Post | exposure, bloom, rolloff, grade, clarity stage outputs | luma/saturation/edge metrics stay in bounds across families |
+
+### Rollback And Default Policy
+
+- V2 has a runtime flag and per-domain enable bits until cross-family gates
+  pass.
+- A failed V2 domain must fall back to V1 for beauty output while still
+  reporting the failed V2 evidence.
+- A domain may not become default if its debug path is missing, if frame-report
+  ownership is incomplete, or if it only works by disabling IBL/reflections,
+  shadows, or temporal history.
+- The default preset should advance only after `gallery`, `kitchen`, `office`,
+  `gym`, and `concert` all pass a comparable packet.
+
+### Evidence Packet Shape
+
+Every V2 candidate packet should include:
+
+- beauty stills from the same camera bookmarks as V1.
+- material family/debug atlas.
+- GBuffer channel atlas.
+- light ownership and shadow ownership debug.
+- reflection ownership debug.
+- temporal rejection/clamp debug.
+- post-stage luma and color report.
+- frame-report JSON.
+- comparison table against V1 seq8.
+
+This is the guardrail against repeating the old loop where a setting change
+made one capture look better while another scene regressed.
+
 ## Phase Ledger
 
 ### FSSP-V2-001 Contract And Plan

@@ -449,6 +449,15 @@ Current interpretation:
   architecture refactor.
 - The plan explicitly forbids hiding problems by disabling IBL, shadows,
   reflections, or temporal history.
+- The refactor blueprint is now explicit:
+  - keep V1 as the playable fallback while adding V2 contracts beside it.
+  - add runtime facades for material, lighting, reflection, temporal, and post
+    ownership before replacing internals.
+  - migrate one shader domain at a time: material, GBuffer, lighting,
+    reflections/shadows, temporal/post, then render graph.
+  - promote domains only by packet evidence, not screenshots.
+  - failed V2 domains must report their failure and fall back to V1 beauty
+    output until cross-family gates pass.
 - The next implementation slice should add frame-report placeholders for V2
   domains, then upgrade material/asset evidence before changing visual output.
 - The first frame-report contract is external because the current renderer C++

@@ -3332,3 +3332,52 @@ Current stopping position:
 - This is still candidate/review-only, not default beauty.
 - Next safe work is a visual review/contact sheet for the produced-radiance
   candidate or the first semantic light-buffer/direct-light V2 shadow output.
+
+### Direct-Light V2 Signal Gate - 2026-06-05
+
+Implemented:
+
+- `tools/analyze_full_scene_shader_lighting_signal.py`
+  - audits `direct_light`, `direct_light_unshadowed`, and
+    `direct_light_shadow_loss` from packet debug metrics.
+  - writes `lighting_signal.json` and `lighting_signal.md`.
+  - tolerates packets with no lighting views and fails incomplete lighting view
+    sets.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - now runs the lighting signal analyzer after debug-view metrics.
+- `tools/analyze_full_scene_shader_reflection_candidate_signal.py`
+  - now tolerates lighting-only packets by skipping families with no reflection
+    views.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
+  - now requires the lighting analyzer and packet artifacts as part of the V2
+    packet harness surface.
+
+Validation:
+
+- py_compile passed for the new/edited analyzer and checker tools.
+- V2 frame-report contract checker passed.
+- focused lighting packet passed:
+  `build/captures/v2_lighting_signal_gallery_smoke2_20260605`.
+- broader gallery lighting packet passed:
+  `build/captures/v2_lighting_signal_broader_gallery_20260605`.
+
+Broader gallery lighting result:
+
+- direct-signal families: `4/4`.
+- shadow-loss families: `4/4`.
+- warnings/failures: `0/0`.
+
+| Stress Family | Direct Luma | Unshadowed Luma | Shadow Loss Luma |
+|---|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.46242101` | `0.49161639` | `0.24304297` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.22994216` | `0.25624099` | `0.15694929` |
+| `stress_material_lab_glass_emissive` | `0.36311143` | `0.39868422` | `0.13314867` |
+| `stress_rt_showcase_reflection_closeup` | `0.42693366` | `0.45802755` | `0.22293851` |
+
+Current stopping position:
+
+- Direct-light and shadow-loss debug views are now packet-gated by a named V2
+  analyzer.
+- This creates the measured bridge for the next semantic light-buffer/direct
+  light V2 shadow-output pass.
+- Default beauty remains unchanged.

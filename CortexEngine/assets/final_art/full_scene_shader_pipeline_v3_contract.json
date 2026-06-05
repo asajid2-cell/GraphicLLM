@@ -1,0 +1,178 @@
+{
+  "schema": "cortex.full_scene_shader_pipeline_v3.contract.v1",
+  "purpose": "Ground the FullSceneShaderPipeline V3 refactor in named render-graph resources, debug views, frame-report evidence, and packet gates before beauty promotion.",
+  "status": "planned_not_promoted",
+  "promotion_rule": "No V3 domain may affect default beauty until its producer resource, consumer path, debug view, frame-report fields, packet analyzer, and contact sheet evidence pass on the required stress families.",
+  "required_scene_families": [
+    "gallery",
+    "kitchen",
+    "office",
+    "gym",
+    "concert",
+    "red_room",
+    "stadium"
+  ],
+  "domains": {
+    "render_graph": {
+      "owner": "FullSceneShaderPipelineV3",
+      "required_outputs": [
+        "material_attributes",
+        "direct_lighting",
+        "indirect_lighting",
+        "shadow_visibility",
+        "reflection_radiance",
+        "reflection_confidence",
+        "scene_local_environment",
+        "hdr_scene_color",
+        "ldr_cinematic_output"
+      ],
+      "required_contract_fields": [
+        "resource_owner",
+        "producer_pass",
+        "consumer_passes",
+        "debug_view_id",
+        "default_beauty_affects",
+        "packet_gate"
+      ]
+    },
+    "material": {
+      "producer": "FullSceneMaterialResolveV3",
+      "required_channels": [
+        "base_color",
+        "roughness",
+        "metallic",
+        "normal",
+        "ambient_occlusion",
+        "emissive",
+        "opacity",
+        "transmission",
+        "clearcoat",
+        "sheen",
+        "anisotropy",
+        "ior",
+        "thickness",
+        "material_class"
+      ],
+      "required_debug_views": [
+        "material_base_color",
+        "material_roughness",
+        "material_metallic",
+        "material_normal",
+        "material_class",
+        "material_missing_channel_mask"
+      ]
+    },
+    "lighting": {
+      "producer": "FullSceneLightingV3",
+      "required_light_types": [
+        "directional",
+        "point",
+        "spot",
+        "rect_area",
+        "emissive_mesh",
+        "scene_local_ambient"
+      ],
+      "required_outputs": [
+        "direct_lighting",
+        "direct_lighting_unshadowed",
+        "shadow_visibility",
+        "shadow_loss",
+        "indirect_lighting"
+      ],
+      "required_debug_views": [
+        "direct_light",
+        "direct_light_unshadowed",
+        "shadow_visibility",
+        "shadow_loss",
+        "indirect_light",
+        "lighting_overbright",
+        "lighting_underlit"
+      ]
+    },
+    "reflection": {
+      "producer": "FullSceneReflectionV3",
+      "required_sources": [
+        "local_reflection_radiance",
+        "screen_space_reflection",
+        "ray_query_reflection",
+        "local_probe",
+        "scene_local_environment"
+      ],
+      "required_outputs": [
+        "reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id",
+        "reflection_temporal_delta"
+      ],
+      "required_debug_views": [
+        "reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id",
+        "reflection_temporal_delta",
+        "reflection_rejected_source_mask"
+      ]
+    },
+    "environment": {
+      "producer": "SceneLocalEnvironmentV3",
+      "required_modes": [
+        "enclosed_room",
+        "open_exterior",
+        "stage",
+        "neutral_lab"
+      ],
+      "required_outputs": [
+        "scene_local_environment",
+        "ambient_lighting",
+        "visible_background",
+        "reflection_background",
+        "atmosphere"
+      ],
+      "required_debug_views": [
+        "environment_mode",
+        "ambient_lighting",
+        "reflection_background",
+        "visible_background",
+        "atmosphere"
+      ]
+    },
+    "cinematic_post": {
+      "producer": "CinematicPostV3",
+      "required_stages": [
+        "filmic_tonemap",
+        "exposure",
+        "bloom",
+        "color_grade",
+        "depth_of_field",
+        "sharpen"
+      ],
+      "required_debug_views": [
+        "hdr_scene_color",
+        "exposure_meter",
+        "bloom_extract",
+        "color_grade_delta",
+        "ldr_cinematic_output"
+      ]
+    },
+    "validation": {
+      "required_artifacts": [
+        "frame_report_shutdown.json",
+        "debug_view_metrics.json",
+        "v3_signal.json",
+        "v3_stability.json",
+        "contact_sheet.png",
+        "promotion_decision.md"
+      ],
+      "required_gates": [
+        "no_missing_required_resource",
+        "no_missing_required_material_channel",
+        "lighting_signal_nonzero",
+        "shadow_visibility_stable",
+        "reflection_confidence_nonzero",
+        "reflection_temporal_delta_bounded",
+        "environment_mode_matches_scene",
+        "post_exposure_not_clipped",
+        "default_beauty_unchanged_until_promotion"
+      ]
+    }
+  }
+}

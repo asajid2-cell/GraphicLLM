@@ -137,6 +137,27 @@ def main() -> int:
         require(output in render_graph_outputs, errors, f"V3 render graph missing output: {output}")
         require(output in runtime_surface, errors, f"V3 runtime placeholder missing output: {output}")
 
+    material_contract = domains.get("material", {})
+    require(
+        material_contract.get("output_resource") == "material_attributes",
+        errors,
+        "V3 material contract must output material_attributes",
+    )
+    material_backing_resources = set(material_contract.get("required_backing_resources", []))
+    for resource in [
+        "vb_gbuffer_albedo",
+        "vb_gbuffer_normal_roughness",
+        "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext0",
+        "vb_gbuffer_material_ext1",
+        "vb_gbuffer_material_ext2",
+    ]:
+        require(
+            resource in material_backing_resources,
+            errors,
+            f"V3 material contract missing backing resource: {resource}",
+        )
+
     validation_gates = set(domains.get("validation", {}).get("required_gates", []))
     for gate in [
         "no_missing_required_resource",
@@ -161,6 +182,24 @@ def main() -> int:
         '"contract_grounded"',
         "packetGateReady",
         '"packet_gate_ready"',
+        "materialAttributesReady",
+        '"material_attributes_ready"',
+        "materialAttributesResourceCount",
+        '"material_attributes_resource_count"',
+        "materialAttributesChannelCount",
+        '"material_attributes_channel_count"',
+        "backingResources",
+        '"backing_resources"',
+        "debugViews",
+        '"debug_views"',
+        "readyChannelCount",
+        '"ready_channel_count"',
+        "vb_gbuffer_albedo",
+        "vb_gbuffer_normal_roughness",
+        "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext0",
+        "vb_gbuffer_material_ext1",
+        "vb_gbuffer_material_ext2",
         "FullSceneMaterialResolveV3",
         "FullSceneLightingV3",
         "FullSceneReflectionV3",

@@ -37,6 +37,16 @@
     },
     "material": {
       "producer": "FullSceneMaterialResolveV3",
+      "output_resource": "material_attributes",
+      "output_contract": "aggregate_over_visibility_buffer_material_resolve_outputs",
+      "required_backing_resources": [
+        "vb_gbuffer_albedo",
+        "vb_gbuffer_normal_roughness",
+        "vb_gbuffer_emissive_metallic",
+        "vb_gbuffer_material_ext0",
+        "vb_gbuffer_material_ext1",
+        "vb_gbuffer_material_ext2"
+      ],
       "required_channels": [
         "base_color",
         "roughness",

@@ -3656,3 +3656,65 @@ Validation:
   - reports scanned: `6`.
   - emitted `v3_signal.json`.
   - emitted `v3_stability.json`.
+
+### FullSceneShaderPipeline V3 Material Attributes - 2026-06-05
+
+Implemented:
+
+- V3 material domain now reports a real aggregate output:
+  `FullSceneMaterialResolveV3 -> material_attributes`.
+- `material_attributes` is backed by the visibility-buffer material resolve
+  resources:
+  - `vb_gbuffer_albedo`.
+  - `vb_gbuffer_normal_roughness`.
+  - `vb_gbuffer_emissive_metallic`.
+  - `vb_gbuffer_material_ext0`.
+  - `vb_gbuffer_material_ext1`.
+  - `vb_gbuffer_material_ext2`.
+- V3 frame reports now expose:
+  - `material_attributes_ready`.
+  - `material_attributes_resource_count`.
+  - `material_attributes_channel_count`.
+  - per-domain `backing_resources`.
+  - per-domain `debug_views`.
+  - per-domain `channels`.
+  - per-domain channel counts.
+- The V3 analyzer permits `material` as the first ready domain while keeping
+  all other domains placeholder-gated.
+- Default beauty remains unchanged:
+  `default_beauty_affects=false`.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V3 validator passed.
+- V2 frame-report checker still passed.
+- V3 wrapper packet passed:
+  `build/captures/v3_material_attributes_smoke1_20260605`.
+- extracted frame-report evidence:
+  - `status=planned_not_promoted`.
+  - `beauty_output=full_scene_shader_pipeline_v2`.
+  - `default_beauty_affects=false`.
+  - `material_attributes_ready=true`.
+  - `material_attributes_resource_count=6`.
+  - `material_attributes_channel_count=17`.
+  - `material.ready=true`.
+  - `material.producer=FullSceneMaterialResolveV3`.
+  - `material.output_resource=material_attributes`.
+  - `material.ready_channel_count=17`.
+  - `material.missing_required_channel_count=0`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `material_ready_report_count=6`.
+  - failures `0`, warnings `0`.
+
+Current stopping position:
+
+- V3 material attributes are instrumented as the first real V3 domain.
+- The next major refactor slice should start `FullSceneLightingV3`: split
+  current deferred direct-light ownership into concrete V3 resources for
+  direct lighting, unshadowed direct lighting, shadow visibility, and shadow
+  loss.

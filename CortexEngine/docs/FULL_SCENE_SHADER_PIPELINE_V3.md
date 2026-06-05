@@ -406,7 +406,37 @@ Evidence:
 
 ### L004 - Material Resolve V3
 
-Status: pending.
+Status: complete.
+
+Evidence:
+
+- runtime V3 report exposes `material_attributes_ready=true`.
+- runtime V3 report exposes `material_attributes_resource_count=6`.
+- runtime V3 report exposes `material_attributes_channel_count=17`.
+- material domain is produced by `FullSceneMaterialResolveV3`.
+- material domain outputs `material_attributes`.
+- material domain is backed by:
+  `vb_gbuffer_albedo`,
+  `vb_gbuffer_normal_roughness`,
+  `vb_gbuffer_emissive_metallic`,
+  `vb_gbuffer_material_ext0`,
+  `vb_gbuffer_material_ext1`, and
+  `vb_gbuffer_material_ext2`.
+- material debug views include:
+  `VB_GBuffer_Albedo`,
+  `VB_GBuffer_NormalRoughness`,
+  `VB_GBuffer_EmissiveMetallic`,
+  `VB_GBuffer_MaterialExt0`,
+  `VB_GBuffer_MaterialExt1`,
+  `VB_GBuffer_SurfaceClass`,
+  `VB_MaterialFamilyPolicy`,
+  `VB_ReflectionPolicy`,
+  `VB_TemporalPolicy`, and
+  `VB_PostSensitivity`.
+- smoke packet:
+  `build/captures/v3_material_attributes_smoke1_20260605`.
+- packet result:
+  `material_ready_report_count=6`, failures `0`, warnings `0`.
 
 ### L005 - Lighting V3 Split
 
@@ -451,7 +481,8 @@ Required evidence:
 - V2 remains the active renderer path.
 - Default beauty remains unchanged.
 - Latest V3 placeholder packet:
-  `build/captures/v3_packet_skeleton_smoke1_20260605`.
-- Next safe implementation slice is the first real V3 domain implementation:
-  material resolve placeholders should become concrete `material_attributes`
-  resources and debug views.
+  `build/captures/v3_material_attributes_smoke1_20260605`.
+- First real V3 domain is now instrumented:
+  `FullSceneMaterialResolveV3 -> material_attributes`.
+- Next safe implementation slice is `FullSceneLightingV3`: split current
+  shadowed direct-light ownership into concrete V3 lighting resources.

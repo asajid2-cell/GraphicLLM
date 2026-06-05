@@ -371,6 +371,7 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"packet_gate_ready", context.packetGateReady},
         {"material_attributes_ready", context.materialAttributesReady},
         {"lighting_adapter_ready", context.lightingAdapterReady},
+        {"lighting_split_resources_allocated", context.lightingSplitResourcesAllocated},
         {"lighting_split_resources_ready", context.lightingSplitResourcesReady},
         {"material_attributes_resource_count", context.materialAttributesResourceCount},
         {"material_attributes_channel_count", context.materialAttributesChannelCount},

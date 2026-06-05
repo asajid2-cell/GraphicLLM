@@ -3786,3 +3786,76 @@ Current stopping position:
 - The next major refactor must allocate/split real V3 lighting resources:
   `direct_lighting`, `direct_lighting_unshadowed`, `shadow_visibility`,
   `shadow_loss`, and `indirect_lighting`.
+
+### FullSceneShaderPipeline V3 Lighting Split Resource Scaffold - 2026-06-05
+
+Implemented:
+
+- Allocated five concrete V3 lighting split render targets:
+  - `direct_lighting`.
+  - `direct_lighting_unshadowed`.
+  - `shadow_visibility`.
+  - `shadow_loss`.
+  - `indirect_lighting`.
+- Added RTV and staging SRV descriptors for each split target.
+- Added each split target to the frame-contract resource snapshot.
+- Added V3 runtime report field:
+  `lighting_split_resources_allocated`.
+- Updated the V3 analyzer to require allocated split resources when the
+  lighting adapter is ready.
+- Kept the lighting domain honest:
+  `lighting_split_resources_allocated=true` but
+  `lighting_split_resources_ready=false` until a real `FullSceneLightingV3`
+  pass writes the split targets.
+- Default beauty remains unchanged:
+  `default_beauty_affects=false`.
+
+Touched files:
+
+- `src/Graphics/RendererMainTargetState.h`.
+- `src/Graphics/Renderer_HDRTargets.cpp`.
+- `src/Graphics/Renderer_FrameContractSnapshot.cpp`.
+- `src/Graphics/Renderer_Shutdown.cpp`.
+- `src/Graphics/FullSceneShaderFrameContext.h`.
+- `src/Graphics/FrameContractJson.cpp`.
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
+- `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V3 lighting split scaffold packet passed:
+  `build/captures/v3_lighting_split_scaffold_smoke1_20260605`.
+- extracted frame-report evidence:
+  - `status=planned_not_promoted`.
+  - `beauty_output=full_scene_shader_pipeline_v2`.
+  - `default_beauty_affects=false`.
+  - `lighting_adapter_ready=true`.
+  - `lighting_split_resources_allocated=true`.
+  - `lighting_split_resources_ready=false`.
+  - `lighting_adapter_signal_count=4`.
+  - `lighting_split_resource_count=5`.
+  - `lighting.ready=false`.
+  - `lighting.producer=FullSceneLightingV3Adapter`.
+  - `lighting.output_resource=hdr_color`.
+  - `lighting.promotion_state=adapter`.
+  - `lighting.backing_resource_count=6`.
+  - `lighting.backing_resources=hdr_color,direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `lighting_adapter_ready_report_count=6`.
+  - `lighting_split_allocated_report_count=6`.
+  - `lighting_split_ready_report_count=0`.
+  - failures `0`, warnings `0`.
+
+Current stopping position:
+
+- V3 material attributes are instrumented as the first real V3 domain.
+- V3 lighting split resources are now allocated and contract-visible.
+- V3 lighting is not producer-ready; the next major slice is a real
+  `FullSceneLightingV3` pass that writes the five split resources, then proves
+  ownership through frame-contract pass/resource evidence.

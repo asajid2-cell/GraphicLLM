@@ -186,6 +186,8 @@ def main() -> int:
         '"material_attributes_ready"',
         "lightingAdapterReady",
         '"lighting_adapter_ready"',
+        "lightingSplitResourcesAllocated",
+        '"lighting_split_resources_allocated"',
         "lightingSplitResourcesReady",
         '"lighting_split_resources_ready"',
         "materialAttributesResourceCount",

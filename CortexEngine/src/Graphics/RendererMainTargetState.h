@@ -60,6 +60,50 @@ struct GBufferNormalRoughnessDescriptors {
     }
 };
 
+struct FullSceneLightingV3TargetResources {
+    ComPtr<ID3D12Resource> directLighting;
+    ComPtr<ID3D12Resource> directLightingUnshadowed;
+    ComPtr<ID3D12Resource> shadowVisibility;
+    ComPtr<ID3D12Resource> shadowLoss;
+    ComPtr<ID3D12Resource> indirectLighting;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        directLighting.Reset();
+        directLightingUnshadowed.Reset();
+        shadowVisibility.Reset();
+        shadowLoss.Reset();
+        indirectLighting.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct FullSceneLightingV3TargetDescriptors {
+    DescriptorHandle directLightingRTV;
+    DescriptorHandle directLightingSRV;
+    DescriptorHandle directLightingUnshadowedRTV;
+    DescriptorHandle directLightingUnshadowedSRV;
+    DescriptorHandle shadowVisibilityRTV;
+    DescriptorHandle shadowVisibilitySRV;
+    DescriptorHandle shadowLossRTV;
+    DescriptorHandle shadowLossSRV;
+    DescriptorHandle indirectLightingRTV;
+    DescriptorHandle indirectLightingSRV;
+
+    void Reset() {
+        directLightingRTV = {};
+        directLightingSRV = {};
+        directLightingUnshadowedRTV = {};
+        directLightingUnshadowedSRV = {};
+        shadowVisibilityRTV = {};
+        shadowVisibilitySRV = {};
+        shadowLossRTV = {};
+        shadowLossSRV = {};
+        indirectLightingRTV = {};
+        indirectLightingSRV = {};
+    }
+};
+
 struct HDRRenderTargetState {
     HDRRenderTargetResources resources;
     HDRRenderTargetDescriptors descriptors;
@@ -238,9 +282,131 @@ struct GBufferNormalRoughnessTargetState {
     }
 };
 
+struct FullSceneLightingV3TargetState {
+    FullSceneLightingV3TargetResources resources;
+    FullSceneLightingV3TargetDescriptors descriptors;
+
+    [[nodiscard]] Result<void> CreateTargets(ID3D12Device* device,
+                                             DescriptorHeapManager* descriptorManager,
+                                             UINT width,
+                                             UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for FullSceneLightingV3 target creation");
+        }
+
+        resources.Reset();
+
+        auto createTarget = [&](const char* label,
+                                ComPtr<ID3D12Resource>& target,
+                                DescriptorHandle& rtv,
+                                DescriptorHandle& srv) -> Result<void> {
+            D3D12_RESOURCE_DESC desc = {};
+            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            desc.Width = width;
+            desc.Height = height;
+            desc.DepthOrArraySize = 1;
+            desc.MipLevels = 1;
+            desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            desc.SampleDesc.Count = 1;
+            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+            D3D12_CLEAR_VALUE clearValue = {};
+            clearValue.Format = desc.Format;
+            clearValue.Color[0] = 0.0f;
+            clearValue.Color[1] = 0.0f;
+            clearValue.Color[2] = 0.0f;
+            clearValue.Color[3] = 1.0f;
+
+            const auto heapProps = MainTargetDefaultHeapProperties();
+            const HRESULT hr = device->CreateCommittedResource(
+                &heapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                &clearValue,
+                IID_PPV_ARGS(&target));
+            if (FAILED(hr)) {
+                resources.Reset();
+                return Result<void>::Err(std::string("Failed to create FullSceneLightingV3 target: ") + label);
+            }
+
+            if (!rtv.IsValid()) {
+                auto rtvResult = descriptorManager->AllocateRTV();
+                if (rtvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate RTV for FullSceneLightingV3 target: ") +
+                                             label + ": " + rtvResult.Error());
+                }
+                rtv = rtvResult.Value();
+            }
+
+            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+            rtvDesc.Format = desc.Format;
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+            device->CreateRenderTargetView(target.Get(), &rtvDesc, rtv.cpu);
+
+            if (!srv.IsValid()) {
+                auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+                if (srvResult.IsErr()) {
+                    return Result<void>::Err(std::string("Failed to allocate SRV for FullSceneLightingV3 target: ") +
+                                             label + ": " + srvResult.Error());
+                }
+                srv = srvResult.Value();
+            }
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = desc.Format;
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srvDesc.Texture2D.MipLevels = 1;
+            device->CreateShaderResourceView(target.Get(), &srvDesc, srv.cpu);
+
+            return Result<void>::Ok();
+        };
+
+        auto direct = createTarget("direct_lighting",
+                                   resources.directLighting,
+                                   descriptors.directLightingRTV,
+                                   descriptors.directLightingSRV);
+        if (direct.IsErr()) return direct;
+
+        auto unshadowed = createTarget("direct_lighting_unshadowed",
+                                       resources.directLightingUnshadowed,
+                                       descriptors.directLightingUnshadowedRTV,
+                                       descriptors.directLightingUnshadowedSRV);
+        if (unshadowed.IsErr()) return unshadowed;
+
+        auto visibility = createTarget("shadow_visibility",
+                                       resources.shadowVisibility,
+                                       descriptors.shadowVisibilityRTV,
+                                       descriptors.shadowVisibilitySRV);
+        if (visibility.IsErr()) return visibility;
+
+        auto loss = createTarget("shadow_loss",
+                                 resources.shadowLoss,
+                                 descriptors.shadowLossRTV,
+                                 descriptors.shadowLossSRV);
+        if (loss.IsErr()) return loss;
+
+        auto indirect = createTarget("indirect_lighting",
+                                     resources.indirectLighting,
+                                     descriptors.indirectLightingRTV,
+                                     descriptors.indirectLightingSRV);
+        if (indirect.IsErr()) return indirect;
+
+        resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        return Result<void>::Ok();
+    }
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
 struct MainRenderTargetState {
     HDRRenderTargetState hdr;
     GBufferNormalRoughnessTargetState normalRoughness;
+    FullSceneLightingV3TargetState lightingV3;
 
     void ResetHDR() {
         hdr.Reset();
@@ -250,9 +416,14 @@ struct MainRenderTargetState {
         normalRoughness.Reset();
     }
 
+    void ResetLightingV3() {
+        lightingV3.Reset();
+    }
+
     void ResetResources() {
         ResetHDR();
         ResetGBufferNormalRoughness();
+        ResetLightingV3();
     }
 };
 

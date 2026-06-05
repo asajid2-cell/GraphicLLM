@@ -1028,3 +1028,71 @@ Next recommended implementation:
     `FullSceneMaterialModel` readiness once the runtime model owns family,
     texture evidence, feature bits, reflection policy, temporal policy, and
     post sensitivity.
+
+## Full Scene Shader Refactor Planning Checkpoint - 2026-06-05
+
+User direction:
+
+- Move from individual scene polish and flicker-specific fixes into full-scene
+  shaders capable of breathtaking Unreal-like visuals.
+- Plan the entire refactor before completing/promoting the goal feature.
+- Keep this as a renderer architecture migration, not a beauty tweak.
+
+Plan update:
+
+- `docs/FULL_SCENE_SHADER_PIPELINE_V2.md` now has a `Master Refactor Plan`.
+- The central rule is that final beauty pixels must be assembled from
+  scene-owned facts, not pass-local guesses.
+- Target runtime dataflow:
+
+```text
+ScenePreset / SceneGraph / AssetRegistry
+  -> SceneVisualContract
+  -> FullSceneMaterialTable
+  -> FullSceneLightRig
+  -> FullSceneProbeSet
+  -> FullSceneRenderGraph
+  -> FullSceneFrameData / GBuffer
+  -> Lighting + Reflections + Shadows
+  -> Material-aware Temporal
+  -> HDR Presentation
+  -> Evidence Packet + Beauty
+```
+
+Promotion ladder:
+
+- `Instrumented`: report ownership/readiness/fallback; V1 beauty remains.
+- `Shadow Output`: V2 runs beside V1 and emits compare/debug views.
+- `Candidate`: selected scenes can render V2 beauty under packet gates.
+- `Default Ready`: cross-family evidence passes and user accepts visual
+  direction.
+
+Implementation order:
+
+1. Material truth: `FullSceneMaterialModel` becomes real runtime evidence.
+2. Frame data/GBuffer: carry material/object/policy facts to shaders.
+3. Scene-local lighting: semantic rigs for scene families.
+4. Local reflection ownership: room, hero, planar, SSR, RT, neutral, external.
+5. Shadow/contact stability: bias/filter/contact policy by scene/material.
+6. Material-aware temporal: different history policies for glass, metal, water,
+   emissive, tile, fabric, paint, and matte surfaces.
+7. Named HDR post: exposure, rolloff, bloom, grade, clarity, sharpening.
+8. Render graph ownership: pass/resource/debug producer validation.
+9. Cross-family promotion: gallery, kitchen, office, gym, concert, and at
+   least one wet/glass-heavy scene.
+
+Current state remains:
+
+- V2 facade and packet harness are implemented and pushed.
+- Fresh V2 gallery facade packet passed with `7` views and `70` evidence rows.
+- Beauty output remains `v1_fallback`.
+- Material remains the first real blocker: `material` is instrumented but not
+  ready because `FullSceneMaterialModel` is not promoted.
+
+Next safe implementation checkpoint:
+
+- Do Track B material truth first.
+- Do not start with bloom, IBL blur, one-off reflection tweaks, or screenshot
+  styling.
+- The first implementation should make material readiness evidence real and
+  keep beauty output on V1 until material packets prove ownership.

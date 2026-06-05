@@ -131,6 +131,109 @@ The current V1 path remains the playable fallback until V2 proves equivalent
 or stronger gates. Every phase must ship with a visible debug mode, frame-report
 fields, and a packet gate before its beauty output becomes trusted.
 
+### Master Refactor Plan
+
+The V2 refactor has one central rule: the final beauty pixel must be assembled
+from scene-owned facts, not pass-local guesses. Today, several systems can still
+make independent decisions about material meaning, environment lighting,
+reflection fallback, temporal rejection, and post treatment. That is the ceiling
+that keeps the renderer below Unreal-like full-scene quality. The refactor must
+turn those independent choices into a single frame contract.
+
+The target runtime architecture is:
+
+```text
+ScenePreset / SceneGraph / AssetRegistry
+  -> SceneVisualContract
+  -> FullSceneMaterialTable
+  -> FullSceneLightRig
+  -> FullSceneProbeSet
+  -> FullSceneRenderGraph
+  -> FullSceneFrameData / GBuffer
+  -> Lighting + Reflections + Shadows
+  -> Material-aware Temporal
+  -> HDR Presentation
+  -> Evidence Packet + Beauty
+```
+
+Each layer has a narrow job:
+
+- `SceneVisualContract` defines the place: enclosed/outdoor, mood, allowed
+  background visibility, lighting family, reflection family, temporal family,
+  post family, and the scene family being rendered.
+- `FullSceneMaterialTable` defines what things are: shader family, authored
+  parameters, texture slots, procedural detail, material class, reflectance
+  behavior, transparency/transmission behavior, and temporal behavior.
+- `FullSceneLightRig` defines why light exists: key, fill, practical, accent,
+  display, stage, sun, skylight, high-bay, or emergency/fallback.
+- `FullSceneProbeSet` defines where indirect and reflection energy comes from:
+  room probes, hero probes, planar probes, SSR, RT, neutral fallback, or visible
+  external environment. Unauthorized environment fallback is a bug.
+- `FullSceneRenderGraph` defines pass order and resource ownership. A debug
+  view must know which pass produced it and which resources it consumed.
+- `FullSceneFrameData` carries compact per-pixel truth: object id, material id,
+  material family, normal, velocity, roughness, metallic, AO, emissive,
+  clearcoat/transmission, opacity, shadow policy, reflection policy, and
+  temporal policy.
+- The final lighting/temporal/post passes consume those facts. They do not
+  infer scene intent from whether an IBL, texture, or fallback buffer happens
+  to be bound.
+
+Promotion works in four explicit stages:
+
+1. `Instrumented`
+   - The domain reports owner, fallback owner, missing evidence, and readiness.
+   - Beauty still uses the V1 path.
+2. `Shadow Output`
+   - The V2 domain runs beside V1 and exports debug/compare views.
+   - Beauty still uses V1 unless a debug flag explicitly selects V2.
+3. `Candidate`
+   - V2 can render beauty for selected scenes, but packet gates still compare
+     against V1 stability and visual contracts.
+4. `Default Ready`
+   - V2 becomes the default only after cross-family packets pass and the user
+     accepts that the visual direction is materially better.
+
+The order of work is intentionally data-first:
+
+1. Make material truth real.
+   - Runtime materials must stop being broad style hints. Every visible object
+     needs a `FullSceneMaterialModel` with family, texture/procedural evidence,
+     reflectance/transmission, temporal policy, and post sensitivity.
+   - This is the prerequisite for good metal, glass, tile, wood, fabric, neon,
+     water, mirror, and wall paint.
+2. Make the frame carry that truth.
+   - Extend/debug the GBuffer and visibility data so lighting, reflections,
+     shadows, temporal, and post all agree on the same material/object ids.
+3. Make lighting scene-local.
+   - Replace ad hoc brightness with semantic rigs and stable units/contracts:
+     kitchen practicals, gym high-bays, concert beams, office soft panels,
+     gallery spots, outdoor sun/sky.
+4. Make reflections local and owned.
+   - Add room/hero/planar probe ownership and keep enclosed scenes from
+     reflecting unrelated HDRI content.
+5. Make shadows/contact stable.
+   - Normalize bias/filtering/contact policy through the same scene contract.
+     This includes small object contacts and smooth camera motion stability.
+6. Make temporal material-aware.
+   - Glass, water, polished metal, emissive signs, patterned tile, and matte
+     walls need different history confidence and clamp behavior.
+7. Make post a named HDR pipeline.
+   - Exposure, rolloff, bloom, color grade, clarity, and sharpening must be
+     explicit stages with packet-visible metrics.
+8. Move pass ownership into a render graph.
+   - Once the domains exist, the graph becomes the enforcement mechanism:
+     missing producers, stale resources, wrong pass order, or unowned debug
+     views fail validation.
+9. Run cross-family promotion.
+   - Gallery alone is insufficient. The gate must include gallery, kitchen,
+     office, gym, concert, plus at least one wet/glass-heavy scene.
+
+The acceptance bar for this plan is not "a nicer screenshot." The acceptance
+bar is that the renderer can explain the sources of material, light,
+reflection, shadow, temporal history, and post for the final image, and that
+the evidence stays stable under camera motion.
+
 ### Whole-Renderer Refactor Strategy
 
 The target is not a larger collection of nicer shaders. The target is a

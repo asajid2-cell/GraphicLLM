@@ -4735,3 +4735,26 @@ Next safe pass:
 3. Do not promote default beauty from the two-family smoke. The smoke only
    proves the previous kitchen device-removal blocker is cleared for the tested
    packet shape.
+
+Additional reflective stress validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -StressSceneFilter rt_showcase:reflection_closeup -ViewFilter beauty,shadow_factor,direct_light,direct_light_unshadowed,direct_light_shadow_loss,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta -SmokeFrames 32 -CaptureFrame 16 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflective_stress_vb_motion_guard_smoke1_20260605
+```
+
+Result:
+
+- scene-local packet passed.
+- V2 evidence passed.
+- V3 placeholder artifacts coherent.
+- `reports=16`.
+- V3 lighting motion measured 11 view sequences across 1 stress family.
+- promotion status: `review_packet_passed`.
+- no device removal in the reflective/metallic stress row.
+
+Updated next safe pass:
+
+1. Run a longer kitchen `camera_sweep` if device-removal risk reappears while
+   implementing candidate beauty.
+2. Begin the opt-in `FullSceneCandidateBeautyV3` switch and side-by-side
+   capture support.

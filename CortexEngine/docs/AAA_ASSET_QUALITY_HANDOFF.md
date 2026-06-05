@@ -2823,3 +2823,65 @@ Current stopping position:
   stress surfaces, preferably with a resolved local reflection radiance buffer
   or actual local probe texture binding in post.
 - Do not call the V2 reflection path default-ready.
+
+### Authorized Reflection Source Candidate Activation - 2026-06-05
+
+Root cause fixed:
+
+- `reflection_source_weights` counted authorized IBL/prelit source potential.
+- The V2 candidate sheen gate only used `sceneLocalReflectionPotential`.
+- As a result, `material_lab:metal_closeup` and
+  `glass_water_courtyard:water_closeup` were wired but inactive because their
+  valid stress source was authorized external/prelit radiance.
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl`
+  - V2 candidate sheen gate now uses `authorizedPrelitReflectionPotential`.
+  - `SamplePostSceneLocalReflectionSource` still enforces ownership:
+    authorized external IBL only when allowed by `g_EnvParams`, otherwise
+    scene-local radiance.
+  - default beauty remains unchanged.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:metal_closeup,glass_water_courtyard:water_closeup" -ViewFilter "beauty,roughness,metallic,reflection_source_weights,reflection_source_authority,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_authorized_source_stress_smoke_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_authorized_source_stress_smoke_20260605`.
+- source-signal families: `3/3`.
+- candidate-delta families: `3/3`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+
+After-patch candidate signal:
+
+| Stress Family | Status | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `meaningful_delta` | `0.00047534` | `0.00544705` |
+| `stress_material_lab_metal_closeup` | `meaningful_delta` | `0.01294731` | `0.09842122` |
+| `stress_rt_showcase_reflection_closeup` | `meaningful_delta` | `0.02150589` | `0.17567708` |
+
+After-patch stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `0.00158056` | `0.00158097` | `1.000` |
+| `stress_material_lab_metal_closeup` | `0.00246855` | `0.00244604` | `0.991` |
+| `stress_rt_showcase_reflection_closeup` | `0.00803785` | `0.00798630` | `0.994` |
+
+Current stopping position:
+
+- The immediate wired-but-inactive stress reflection bug is fixed.
+- Do not promote V2 reflection default yet.
+- Next shader gate should run a broader glossy stress packet:
+  `material_lab:glass_emissive`,
+  `glass_water_courtyard:glass_canopy`,
+  `dragon_over_water:floor_reflection_closeup`, and
+  `rt_showcase:reflection_closeup`.

@@ -2288,3 +2288,39 @@ Current interpretation:
 - Static gallery delta is near zero, so the next proof must be motion and
   cross-family comparison rather than claiming visual improvement from this
   slice.
+
+### Reflection Candidate Mouse-Jitter Packet - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 3 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_mouse_jitter_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_mouse_jitter_packet_20260605`.
+- stability motion mode: `mouse_jitter`.
+- capture sequence count: `3`.
+- captured views: `19`.
+- evidence rows: `190`.
+- frame-report failures: `0`.
+- measured debug views: `19`.
+- metric failures: `0`.
+- key motion metrics:
+  - `reflection_resolver_candidate` mean RGB:
+    `0.619970, 0.591707, 0.550361`.
+  - `reflection_resolver_candidate_delta` mean RGB:
+    `0.000000055, 0.000000043, 0.000000034`.
+  - `reflection_resolver_candidate_delta` nonblack ratio:
+    `0.00000217`.
+
+Current interpretation:
+
+- Candidate and delta views are stable enough to capture under mouse jitter.
+- This is not visual-improvement proof because the tested gallery frame
+  produces almost no candidate/current delta.
+- Next proof should target cross-family or a reflection-stress scene.

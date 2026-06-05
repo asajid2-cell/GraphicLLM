@@ -256,6 +256,52 @@ float FBM(float2 p)
     return value;
 }
 
+float3 LiquidReflectionPalette(float3 R,
+                               uint liquidType,
+                               float flowNoise,
+                               float3 ambientTint,
+                               float3 sunTint,
+                               float3 shallowTint)
+{
+    float up = saturate(R.y * 0.5f + 0.5f);
+    float horizon = pow(saturate(1.0f - abs(R.y)), 2.0f);
+    float3 safeAmbient = max(ambientTint, 0.015f.xxx);
+    float3 safeSun = max(sunTint, 0.0f.xxx);
+    float3 safeShallow = max(shallowTint, 0.0f.xxx);
+    float3 skyBase = lerp(float3(0.055f, 0.120f, 0.115f), safeAmbient * 1.85f + safeShallow * 0.34f, 0.62f);
+    float3 skyHigh = lerp(float3(0.32f, 0.46f, 0.54f), safeAmbient * 2.55f + safeSun * 0.16f, 0.42f);
+    float3 coolCeiling = lerp(skyBase, skyHigh, up);
+    float3 wetHorizon = lerp(float3(0.24f, 0.34f, 0.25f), safeShallow * 1.28f + safeAmbient * 1.10f, 0.42f);
+    float3 warmHorizon = lerp(float3(1.0f, 0.58f, 0.25f), safeSun, 0.60f) * (0.20f + 0.18f * flowNoise);
+    float3 reflectedRoom = lerp(coolCeiling, wetHorizon, horizon * 0.72f) + warmHorizon * horizon;
+
+    if (liquidType == 1u)
+    {
+        return lerp(float3(0.36f, 0.055f, 0.015f), float3(1.0f, 0.42f, 0.055f), horizon * 0.65f + flowNoise * 0.20f);
+    }
+    if (liquidType == 2u)
+    {
+        return lerp(reflectedRoom, float3(1.0f, 0.74f, 0.20f), 0.48f);
+    }
+    if (liquidType == 3u)
+    {
+        return lerp(float3(0.045f, 0.026f, 0.014f), warmHorizon, horizon * 0.34f);
+    }
+    return reflectedRoom;
+}
+
+float LiquidSpecularGlint(float3 R, float3 L, float NdotV, float viscosity, float flowNoise)
+{
+    float alignment = saturate(dot(R, L));
+    float sharpPower = lerp(240.0f, 42.0f, viscosity);
+    float broadPower = lerp(36.0f, 12.0f, viscosity);
+    float sharp = pow(alignment, sharpPower);
+    float broad = pow(alignment, broadPower) * (0.35f + 0.65f * viscosity);
+    float grazing = pow(saturate(1.0f - NdotV), 1.65f);
+    float brokenSurface = 0.74f + 0.26f * flowNoise;
+    return (sharp + broad * 0.42f + grazing * 0.08f) * brokenSurface;
+}
+
 float4 WaterPS(PSInput input) : SV_TARGET
 {
     float3 N = normalize(input.normal);
@@ -280,6 +326,13 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float meniscusStrength = saturate(g_CoatParams.y);
     float sloshStrength = saturate(g_CoatParams.z);
     float flowSpeed = max(g_CoatParams.w, 0.0f);
+
+    float t = g_TimeAndExposure.x;
+    float microFreq = lerp(3.20f, 0.85f, viscosity);
+    float microAmp = lerp(0.16f, 0.035f, viscosity) * (1.0f + sloshStrength * 0.65f);
+    float2 microP = input.worldPos.xz * microFreq + float2(t * 0.06f, -t * 0.045f) * max(flowSpeed, 0.15f);
+    float2 microRipple = float2(FBM(microP), FBM(microP + 19.37f)) * 2.0f - 1.0f;
+    N = normalize(N + float3(microRipple.x, 0.0f, microRipple.y) * microAmp);
 
     // Keep water relatively smooth by default; the hybrid SSR/RT reflection
     // pass adds the high-frequency mirror component. Viscous liquids keep broad,
@@ -307,11 +360,25 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float thicknessDepth = saturate(bodyThickness * 0.42f + meniscus * 0.35f);
     float depthMix = saturate(lerp(basinDepth, waveDepth, 0.28f) + absorption * 0.22f + thicknessDepth);
 
-    float t = g_TimeAndExposure.x;
     float flowNoise = FBM(input.worldPos.xz * lerp(0.17f, 0.32f, 1.0f - viscosity) +
                           float2(t * 0.035f, -t * 0.025f) * max(flowSpeed, 0.1f));
+    float suspendedMatter = smoothstep(0.22f, 0.88f, FBM(input.worldPos.xz * 0.42f + float2(t * 0.012f, -t * 0.018f)));
+    float bankNoise = FBM(input.worldPos.xz * 0.82f + float2(-t * 0.008f, t * 0.006f));
+    float bankDarkening = saturate((0.18f - edgeDistance) * 4.2f) * (0.45f + 0.55f * bankNoise);
+    float surfaceFilm = smoothstep(0.48f, 0.86f, FBM(input.worldPos.xz * 1.15f + float2(t * 0.010f, -t * 0.014f)));
+    float3 localSilt = lerp(float3(0.12f, 0.15f, 0.085f), float3(0.24f, 0.21f, 0.13f), suspendedMatter);
     float3 baseColor = lerp(shallowProfile, deepProfile, depthMix);
+    if (liquidType == 0u)
+    {
+        float turbidity = saturate(absorption * 0.55f + bodyThickness * 0.40f);
+        baseColor = lerp(baseColor, localSilt, turbidity * 0.34f * (1.0f - depthMix * 0.30f));
+        baseColor = lerp(baseColor, deepProfile * 0.78f + localSilt * 0.20f, bankDarkening * 0.34f);
+        baseColor = lerp(baseColor, baseColor * lerp(0.92f, 1.08f, surfaceFilm), 0.12f);
+    }
     baseColor = lerp(baseColor, g_Albedo.rgb, liquidType == 0u ? 0.16f : 0.08f);
+    float opticalDepth = absorption * (0.35f + depthMix * 1.15f + bodyThickness * 1.35f + meniscus * 0.55f);
+    float3 channelAbsorption = lerp(1.0f.xxx, saturate(deepProfile + 0.08f.xxx), saturate(opticalDepth));
+    baseColor *= channelAbsorption;
 
     float fresnelStrength = clamp(g_SpecularParams.x, 0.0f, 3.0f);
     if (fresnelStrength <= 0.0f)
@@ -352,7 +419,8 @@ float4 WaterPS(PSInput input) : SV_TARGET
     if (liquidType == 0u)
     {
         float skyFacing = saturate(N.y * 0.65f + pow(1.0f - NdotV, 2.0f) * 0.35f);
-        depthTint = lerp(baseColor, float3(0.06f, 0.34f, 0.68f), 0.20f * skyFacing);
+        float3 sceneWaterSky = lerp(shallowProfile, max(g_AmbientColor.rgb * 1.35f, shallowProfile), 0.45f);
+        depthTint = lerp(baseColor, sceneWaterSky, 0.18f * skyFacing);
     }
     else if (liquidType == 1u)
     {
@@ -382,8 +450,47 @@ float4 WaterPS(PSInput input) : SV_TARGET
     float3 foamColor = liquidType == 0u ? float3(0.90f, 0.97f, 1.0f) :
                        (liquidType == 2u ? float3(1.0f, 0.82f, 0.34f) : depthTint);
 
-    float3 ambient = g_AmbientColor.rgb * depthTint;
+    float3 ambient = (g_AmbientColor.rgb * 1.15f + shallowProfile * 0.10f) * depthTint;
     float3 color = ambient + lighting;
+
+    float3 R = reflect(-V, N);
+    float3 reflectedRoom = LiquidReflectionPalette(R, liquidType, flowNoise, g_AmbientColor.rgb, radiance, shallowProfile);
+    float grazingReflect = pow(saturate(1.0f - NdotV), 2.1f);
+    float reflectionWeight = lerp(0.68f, 0.24f, viscosity) * (0.52f + 0.64f * grazingReflect);
+    if (liquidType == 1u)
+    {
+        reflectionWeight *= 0.34f;
+    }
+    else if (liquidType == 2u)
+    {
+        reflectionWeight *= 0.62f;
+    }
+    else if (liquidType == 3u)
+    {
+        reflectionWeight *= 0.46f;
+    }
+    reflectionWeight *= saturate(1.0f - depthMix * 0.28f + meniscus * 0.25f);
+    if (liquidType == 0u)
+    {
+        reflectionWeight *= saturate(1.0f - bankDarkening * 0.22f + surfaceFilm * 0.16f);
+        reflectedRoom = lerp(reflectedRoom, reflectedRoom * float3(0.78f, 0.88f, 0.74f), bankDarkening * 0.22f);
+    }
+    color += reflectedRoom * reflectionWeight;
+
+    float glint = LiquidSpecularGlint(R, L, NdotV, viscosity, flowNoise);
+    float3 glintTint = (liquidType == 0u) ? lerp(float3(0.74f, 0.90f, 0.78f), max(radiance, float3(0.70f, 0.82f, 0.72f)), 0.45f) :
+                       (liquidType == 1u) ? float3(1.0f, 0.52f, 0.12f) :
+                       (liquidType == 2u) ? float3(1.0f, 0.80f, 0.26f) :
+                                            float3(0.92f, 0.56f, 0.24f);
+    color += glint * glintTint * lerp(0.48f, 0.22f, depthMix) * (0.55f + 0.45f * fresnelStrength);
+
+    float causticNoiseA = FBM(input.worldPos.xz * 2.15f + float2(t * 0.08f, -t * 0.05f));
+    float causticNoiseB = FBM(input.worldPos.xz * 4.10f - float2(t * 0.035f, t * 0.045f));
+    float caustic = smoothstep(0.58f, 0.92f, causticNoiseA) * smoothstep(0.36f, 0.82f, causticNoiseB);
+    float causticStrength = (liquidType == 0u) ? 0.18f : (liquidType == 2u ? 0.10f : 0.04f);
+    color += caustic * causticStrength * (1.0f - depthMix * 0.45f) * saturate(NdotL + 0.25f) * depthTint;
+    float backScatter = pow(saturate(1.0f - NdotV), 2.5f) * saturate(absorption + bodyThickness * 0.65f);
+    color += depthTint * backScatter * (liquidType == 1u ? 0.18f : 0.11f);
 
     // Blend foam over the lit surface; modulate slightly by viewing angle so
     // foam is more visible at grazing angles.
@@ -392,18 +499,25 @@ float4 WaterPS(PSInput input) : SV_TARGET
     color = lerp(color, foamColor, foamAmount);
     color = lerp(color, color * (0.72f + depthTint * 0.55f), saturate(meniscus * 0.65f + bodyThickness * 0.12f));
 
-    float3 fresnelGlow = F * pow(1.0f - NdotV, 1.5f) * (liquidType == 0u ? float3(0.14f, 0.32f, 0.55f) : depthTint);
+    float3 fresnelGlow = F * pow(1.0f - NdotV, 1.5f) *
+        (liquidType == 0u ? lerp(depthTint, max(g_AmbientColor.rgb * 1.8f, depthTint), 0.48f) : depthTint);
     color += fresnelGlow;
 
     if (liquidType == 0u)
     {
-        float3 blueBody = depthTint * (0.95f + 0.25f * NdotL) + float3(0.0f, 0.055f, 0.14f);
-        color = lerp(color, blueBody + specular * 0.35f, 0.48f);
+        float3 naturalBody = depthTint * (0.86f + 0.28f * NdotL) + localSilt * (0.10f + absorption * 0.11f);
+        naturalBody = lerp(naturalBody, naturalBody * 0.72f + localSilt * 0.24f, bankDarkening * 0.42f);
+        naturalBody += surfaceFilm * float3(0.020f, 0.034f, 0.018f) * (1.0f - depthMix * 0.35f);
+        float3 sunSheen = glintTint * specular * (0.26f + 0.22f * grazingReflect);
+        color = lerp(color, naturalBody + reflectedRoom * reflectionWeight * 0.92f + sunSheen, 0.42f);
     }
     else if (liquidType == 1u)
     {
         float heatPulse = 0.65f + 0.35f * sin(t * 1.7f + flowNoise * 6.28318f);
-        color += depthTint * max(emissiveHeat, 1.0f) * heatPulse;
+        float crustBreakup = smoothstep(0.34f, 0.86f, FBM(input.worldPos.xz * 3.25f + float2(t * 0.025f, -t * 0.018f)));
+        float3 moltenCore = depthTint * (1.15f + max(emissiveHeat, 1.0f) * 0.42f) * heatPulse;
+        float3 coolingSkin = depthTint * float3(0.40f, 0.16f, 0.075f);
+        color = lerp(color + moltenCore, coolingSkin + moltenCore * 0.38f, crustBreakup * 0.42f);
     }
     else if (liquidType == 2u)
     {

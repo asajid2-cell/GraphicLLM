@@ -24,6 +24,9 @@ SURFACE_CLASSIFICATION_SHADER_PATH = ROOT / "assets" / "shaders" / "SurfaceClass
 DEFERRED_LIGHTING_SHADER_PATH = ROOT / "assets" / "shaders" / "DeferredLighting.hlsl"
 POST_PROCESS_SHADER_PATH = ROOT / "assets" / "shaders" / "PostProcess.hlsl"
 RAYTRACED_REFLECTIONS_SHADER_PATH = ROOT / "assets" / "shaders" / "RaytracedReflections.hlsl"
+BASIC_SHADER_PATH = ROOT / "assets" / "shaders" / "Basic.hlsl"
+PROCEDURAL_SKY_SHADER_PATH = ROOT / "assets" / "shaders" / "ProceduralSky.hlsl"
+WATER_SHADER_PATH = ROOT / "assets" / "shaders" / "Water.hlsl"
 SHADER_TYPES_HEADER_PATH = ROOT / "src" / "Graphics" / "ShaderTypes.h"
 FRAME_POST_CONSTANTS_SOURCE_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
 DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
@@ -443,6 +446,83 @@ def validate_runtime_reflection_surface() -> list[str]:
     return errors
 
 
+def validate_runtime_scene_local_environment_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        BASIC_SHADER_PATH,
+        PROCEDURAL_SKY_SHADER_PATH,
+        WATER_SHADER_PATH,
+        SHADER_TYPES_HEADER_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing scene-local environment shader source: {path}")
+    if errors:
+        return errors
+
+    basic_shader = BASIC_SHADER_PATH.read_text(encoding="utf-8")
+    sky_shader = PROCEDURAL_SKY_SHADER_PATH.read_text(encoding="utf-8")
+    water_shader = WATER_SHADER_PATH.read_text(encoding="utf-8")
+    shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
+
+    require_source_token(
+        errors,
+        shader_types,
+        "glm::vec4 ambientColor",
+        "ShaderTypes ambient/background blur params",
+    )
+    require_source_token(
+        errors,
+        basic_shader,
+        "EnvReflectionFootprintMip",
+        "Basic forward IBL footprint filtering",
+    )
+    require_source_token(
+        errors,
+        basic_shader,
+        "reflectionSafeMipFloor = saturate(g_AmbientColor.w) * maxMip",
+        "Basic forward background-blur reflection floor",
+    )
+    require_source_token(
+        errors,
+        basic_shader,
+        "StableIblMipRoughness",
+        "Basic forward stable IBL roughness policy",
+    )
+    require_source_token(
+        errors,
+        sky_shader,
+        "local outdoor scenes rather than generic HDRI replacement",
+        "ProceduralSky scene-local atmosphere contract",
+    )
+    require_source_token(
+        errors,
+        sky_shader,
+        "CloudMask(viewDir, horizon, up)",
+        "ProceduralSky local cloud shaping",
+    )
+    require_source_token(
+        errors,
+        water_shader,
+        "LiquidReflectionPalette",
+        "Water scene-local reflection palette",
+    )
+    require_source_token(
+        errors,
+        water_shader,
+        "max(g_AmbientColor.rgb * 1.35f, shallowProfile)",
+        "Water ambient-owned sky tint",
+    )
+    require_source_token(
+        errors,
+        water_shader,
+        "LiquidSpecularGlint",
+        "Water cinematic specular glint",
+    )
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
@@ -486,6 +566,7 @@ def main() -> int:
     errors.extend(validate_runtime_material_policy_surface())
     errors.extend(validate_runtime_temporal_surface())
     errors.extend(validate_runtime_reflection_surface())
+    errors.extend(validate_runtime_scene_local_environment_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

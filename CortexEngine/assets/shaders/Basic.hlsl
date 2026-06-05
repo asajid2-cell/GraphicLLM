@@ -316,6 +316,58 @@ static const uint LIGHT_TYPE_POINT       = 1;
 static const uint LIGHT_TYPE_SPOT        = 2;
 static const uint LIGHT_TYPE_AREA_RECT   = 3;
 
+static const uint FIXTURE_CLASS_GENERIC   = 0;
+static const uint FIXTURE_CLASS_SOFT      = 1;
+static const uint FIXTURE_CLASS_EMISSIVE  = 2;
+static const uint FIXTURE_CLASS_STAGE     = 3;
+static const uint FIXTURE_CLASS_PRACTICAL = 4;
+
+uint DecodeFixtureClass(uint type, Light light) {
+    if (type == LIGHT_TYPE_AREA_RECT) {
+        return (uint)max(0.0f, round(light.direction_cosInner.w));
+    }
+    if (type == LIGHT_TYPE_POINT || type == LIGHT_TYPE_SPOT) {
+        return (uint)max(0.0f, round(light.params.z));
+    }
+    return FIXTURE_CLASS_GENERIC;
+}
+
+float FixtureRadianceScale(uint fixtureClass) {
+    if (fixtureClass == FIXTURE_CLASS_EMISSIVE) {
+        return 1.14f;
+    }
+    if (fixtureClass == FIXTURE_CLASS_STAGE) {
+        return 1.08f;
+    }
+    if (fixtureClass == FIXTURE_CLASS_SOFT) {
+        return 1.05f;
+    }
+    return 1.0f;
+}
+
+float FixtureWrappedNdotL(float rawNdotL, uint fixtureClass) {
+    if (fixtureClass == FIXTURE_CLASS_SOFT) {
+        return saturate((rawNdotL + 0.18f) / 1.18f);
+    }
+    if (fixtureClass == FIXTURE_CLASS_EMISSIVE) {
+        return saturate((rawNdotL + 0.10f) / 1.10f);
+    }
+    return rawNdotL;
+}
+
+float FixtureRoughnessForSpecular(float roughness, uint fixtureClass, bool isAreaRect) {
+    if (fixtureClass == FIXTURE_CLASS_SOFT) {
+        return saturate(roughness * 1.70f + 0.08f);
+    }
+    if (fixtureClass == FIXTURE_CLASS_EMISSIVE) {
+        return saturate(roughness * 1.35f + 0.04f);
+    }
+    if (isAreaRect) {
+        return saturate(roughness * 1.5f + 0.05f);
+    }
+    return roughness;
+}
+
 // --- Fractal noise helpers (2D hash + value noise + fbm) ---
 
 float2 Hash2(float2 p) {
@@ -467,6 +519,40 @@ float3 RotateEnvironmentDirection(float3 dir)
     float s, c;
     sincos(g_CinematicParams.y, s, c);
     return normalize(float3(c * dir.x + s * dir.z, dir.y, -s * dir.x + c * dir.z));
+}
+
+float EnvReflectionFootprintMip(float2 uv, float width, float height, float maxMip)
+{
+    float2 dx = ddx(uv);
+    float2 dy = ddy(uv);
+
+    // Lat-long reflections wrap horizontally; keep seam crossings from
+    // becoming false full-texture derivatives.
+    dx.x = frac(dx.x + 0.5f) - 0.5f;
+    dy.x = frac(dy.x + 0.5f) - 0.5f;
+
+    float2 texelDx = dx * float2(width, height);
+    float2 texelDy = dy * float2(width, height);
+    float footprint = max(length(texelDx), length(texelDy));
+    float mip = log2(max(footprint, 1.0f));
+    return clamp(mip, 0.0f, maxMip);
+}
+
+float StableIblMipRoughness(float roughness, float metallic, bool isMirror, bool isGlass, bool isWaterLike, bool isBrushedMetal)
+{
+    if (isMirror) {
+        return roughness;
+    }
+    if (isGlass || isWaterLike) {
+        return max(roughness, 0.06f);
+    }
+    if (isBrushedMetal) {
+        return max(roughness, 0.28f);
+    }
+    if (metallic > 0.85f) {
+        return max(roughness, 0.24f);
+    }
+    return roughness;
 }
 
 float SamplePCF(float2 shadowUV, float currentDepth, float bias, float pcfRadius, uint cascadeIndex)
@@ -853,9 +939,14 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     float wetness = saturate(g_ExtraParams.w);
     if (wetness > 0.001f)
     {
-        roughness = lerp(roughness, min(roughness, 0.06f), wetness);
-        clearCoatWeight = saturate(max(clearCoatWeight, wetness * 0.85f));
-        clearCoatRoughness = lerp(clearCoatRoughness, min(clearCoatRoughness, 0.12f), wetness);
+        float wetPatch = ProceduralMaterialMask(uv * 0.65f + worldPos.xz * 0.035f, worldPos);
+        float wetStreak = smoothstep(0.18f, 0.82f, wetPatch);
+        float pooledWetness = saturate(wetness * lerp(0.46f, 1.0f, wetStreak));
+        float targetWetRoughness = lerp(0.18f, 0.045f, wetStreak);
+        roughness = lerp(roughness, min(roughness, targetWetRoughness), pooledWetness);
+        clearCoatWeight = saturate(max(clearCoatWeight, pooledWetness * 0.92f));
+        clearCoatRoughness = lerp(clearCoatRoughness, min(clearCoatRoughness, lerp(0.18f, 0.055f, wetStreak)), pooledWetness);
+        albedo = lerp(albedo, albedo * lerp(0.92f, 0.72f, wetStreak), wetness * 0.28f);
     }
     ao = saturate(ao);
 
@@ -904,10 +995,11 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
     {
         Light light = g_Lights[i];
         uint type = (uint)light.position_type.w;
+        uint fixtureClass = DecodeFixtureClass(type, light);
 
         float3 lightDir;
         float attenuation = 1.0f;
-        float3 radiance = light.color_range.rgb;
+        float3 radiance = light.color_range.rgb * FixtureRadianceScale(fixtureClass);
 
         const bool isPointLike = (type == LIGHT_TYPE_POINT ||
                                   type == LIGHT_TYPE_SPOT  ||
@@ -942,7 +1034,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
                 // minimum attenuation so they do not fall off as aggressively
                 // as point lights and stay visually present across a larger
                 // portion of the scene.
-                attenuation = max(attenuation, 0.35f);
+                attenuation = max(attenuation, fixtureClass == FIXTURE_CLASS_EMISSIVE ? 0.42f : 0.35f);
             }
         }
         else
@@ -965,14 +1057,7 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float3 F = FresnelSchlick(VdotH, F0);
         float  D;
-        float  roughForLight = roughness;
-        // Area lights produce broader highlights; approximate this by using
-        // a slightly higher effective roughness for their specular lobe so
-        // they read as large soft sources in the studio / Cornell scenes.
-        if (type == LIGHT_TYPE_AREA_RECT)
-        {
-            roughForLight = saturate(roughness * 1.5f + 0.05f);
-        }
+        float  roughForLight = FixtureRoughnessForSpecular(roughness, fixtureClass, type == LIGHT_TYPE_AREA_RECT);
         if (anisotropy > 0.01f)
         {
             // Anisotropic GGX distribution using different roughness along
@@ -1071,7 +1156,8 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float3 lightColor = radiance;
 
-        float3 contribution = (diffuse + specular) * lightColor * NdotL * attenuation;
+        const float fixtureNdotL = FixtureWrappedNdotL(NdotL, fixtureClass);
+        float3 contribution = (diffuse + specular) * lightColor * fixtureNdotL * attenuation;
 
         // Softly compress per-light luminance to keep extremely bright spots
         // from dominating the frame and fighting temporal filtering. Using a
@@ -1393,7 +1479,19 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
 
         float3 R = reflect(-V, N);
         float2 specUV = DirectionToLatLong(RotateEnvironmentDirection(R));
-        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, roughness * maxMip).rgb;
+        // Treat authored background blur as a reflection-safe mip floor too.
+        // A sharp HDRI backdrop that is visually blurred for presentation must
+        // not remain mip-0 sharp inside glossy surfaces during mouse-look.
+        float reflectionSafeMipFloor = saturate(g_AmbientColor.w) * maxMip;
+        float reflectionFootprintMip = EnvReflectionFootprintMip(specUV, (float)specWidth, (float)specHeight, maxMip);
+        float iblMipRoughness = StableIblMipRoughness(roughness,
+                                                       metallic,
+                                                       isMirror,
+                                                       isGlass,
+                                                       wetness > 0.5f,
+                                                       anisoMetalFlag);
+        float specMip = max(max(iblMipRoughness * maxMip, reflectionSafeMipFloor), reflectionFootprintMip);
+        float3 prefiltered = g_EnvSpecular.SampleLevel(g_Sampler, specUV, specMip).rgb;
 
         float3 Fibl = FresnelSchlickRoughness(NdotV, F0, roughness);
         specularIBL = prefiltered * Fibl;
@@ -1440,8 +1538,9 @@ float3 CalculateLighting(float3 normal, float3 worldPos, float3 albedo, float me
         }
         else if (debugView == 12)
         {
-            // Visualize roughness -> mip mapping (0 = sharpest, 1 = blurriest).
-            float mipVis = (specMips > 1) ? (roughness * maxMip) / maxMip : roughness;
+            // Visualize final specular environment mip selection
+            // (0 = sharpest, 1 = blurriest), including reflection footprint.
+            float mipVis = (maxMip > 0.0f) ? specMip / maxMip : roughness;
             return mipVis.xxx;
         }
     }

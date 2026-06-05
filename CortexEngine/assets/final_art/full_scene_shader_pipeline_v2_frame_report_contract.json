@@ -58,6 +58,7 @@
       "readiness_fields": [
         "enabled",
         "semantic_light_rig_ready",
+        "scene_local_environment_shader_ready",
         "light_owner_report_available",
         "rect_area_light_count",
         "practical_fixture_count",

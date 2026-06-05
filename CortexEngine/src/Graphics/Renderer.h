@@ -189,6 +189,7 @@ public:
     void ApplyLightingRig(LightingRig rig, Scene::ECS_Registry* registry);
     void SetLightingRigContract(std::string rigId, std::string source, bool safeVariantActive);
     void SetWorldShaderPaletteContract(std::string paletteId, std::string lightingScriptId);
+    void SetSceneVisualContract(FrameContract::SceneVisualInfo contract);
     // Image-based lighting / environment controls
     void SetEnvironmentPreset(const std::string& name);
     // Manually load a limited number of deferred environment maps from disk
@@ -204,9 +205,11 @@ public:
     [[nodiscard]] float GetIBLDiffuseIntensity() const;
     [[nodiscard]] float GetIBLSpecularIntensity() const;
     void SetIBLIntensity(float diffuseIntensity, float specularIntensity);
+    void SetLocalReflectionProbeRadiance(bool enabled, float diffuseIntensity, float specularIntensity);
     void SetIBLEnabled(bool enabled);
     void SetBackgroundPresentation(bool visible, float exposure, float blur);
     void SetEnvironmentRotation(float degrees);
+    void SetAmbientLighting(const glm::vec3& color, float intensity);
     void CycleEnvironmentPreset();
     void SetColorGrade(float warm, float cool);
     void SetToneGrade(float contrast, float saturation);
@@ -225,9 +228,12 @@ public:
     void SetSSRParams(float maxDistance, float thickness, float strength);
     void SetPCSS(bool enabled);
     void SetFXAAEnabled(bool enabled);
+    void SetV2ReflectionCandidateEnabled(bool enabled);
     void SetTAAEnabled(bool enabled);
     [[nodiscard]] bool IsTAAEnabled() const;
     void ToggleTAA();
+    void SetVisibilityBufferEnabled(bool enabled);
+    [[nodiscard]] bool IsVisibilityBufferEnabled() const;
 
     // Per-scene particle toggle so heavy layouts on 8 GB GPUs can turn off
     // billboard particles without affecting global renderer state.
@@ -251,6 +257,7 @@ public:
     [[nodiscard]] float GetFogFalloff() const;
     [[nodiscard]] bool IsPCSS() const;
     [[nodiscard]] bool IsFXAAEnabled() const;
+    [[nodiscard]] bool IsV2ReflectionCandidateEnabled() const;
     [[nodiscard]] bool GetSSAOEnabled() const;
     [[nodiscard]] bool GetIBLEnabled() const;
     [[nodiscard]] bool GetSSREnabled() const;
@@ -553,6 +560,9 @@ private:
                                             const FrameConstantCameraState& cameraState);
     void PublishFrameConstants(FrameConstants& frameData,
                                const FrameConstantCameraState& cameraState);
+    [[nodiscard]] glm::vec4 BuildCinematicStabilityParams() const;
+    [[nodiscard]] glm::vec4 BuildCinematicLookParams() const;
+    [[nodiscard]] glm::vec4 BuildCinematicExposureParams() const;
 #ifdef CORTEX_ENABLE_HYPER_EXPERIMENT
     Result<void> EnsureHyperGeometryScene(Scene::ECS_Registry* registry);
 #endif
@@ -610,6 +620,7 @@ private:
     void ProcessPendingEnvironmentMaps(uint32_t maxPerFrame);
     void EnforceIBLResidencyLimit();
     void PrewarmMaterialDescriptors(Scene::ECS_Registry* registry);
+    void PrepareMaterialResources(Scene::RenderableComponent& renderable);
     void RefreshMaterialDescriptors(Scene::RenderableComponent& renderable);
     void EnsureMaterialTextures(Scene::RenderableComponent& renderable);
     void FillMaterialTextureIndices(const Scene::RenderableComponent& renderable,
@@ -814,6 +825,7 @@ public:
     RendererDebugViewState m_debugViewState;
 
     RendererLightingState m_lightingState;
+    FrameContract::SceneVisualInfo m_sceneVisualContract;
     RendererQualityRuntimeState m_qualityRuntimeState;
     // Temporal anti-aliasing (camera-only) state
     TemporalAAState m_temporalAAState;

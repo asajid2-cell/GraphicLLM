@@ -35,6 +35,10 @@ bool Renderer::IsFXAAEnabled() const {
     return GetFeatureState().fxaaEnabled;
 }
 
+bool Renderer::IsV2ReflectionCandidateEnabled() const {
+    return GetFeatureState().v2ReflectionCandidateEnabled;
+}
+
 bool Renderer::GetSSAOEnabled() const {
     return GetFeatureState().ssaoEnabled;
 }
@@ -129,6 +133,14 @@ void Renderer::SetPCSS(bool enabled) {
 
 void Renderer::SetFXAAEnabled(bool enabled) {
     m_postProcessState.fxaaEnabled = enabled;
+}
+
+void Renderer::SetV2ReflectionCandidateEnabled(bool enabled) {
+    if (m_postProcessState.v2ReflectionCandidateEnabled == enabled) {
+        return;
+    }
+    m_postProcessState.v2ReflectionCandidateEnabled = enabled;
+    spdlog::info("V2 reflection candidate beauty {}", enabled ? "ENABLED" : "DISABLED");
 }
 
 bool Renderer::IsTAAEnabled() const {

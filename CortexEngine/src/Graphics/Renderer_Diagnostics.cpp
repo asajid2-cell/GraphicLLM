@@ -27,6 +27,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -60,6 +61,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     FeatureState state{};
     state.taaEnabled = m_temporalAAState.enabled;
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
+    state.v2ReflectionCandidateEnabled = m_postProcessState.v2ReflectionCandidateEnabled;
     state.pcssEnabled = m_shadowResources.controls.pcssEnabled;
     state.ssaoEnabled = m_ssaoResources.controls.enabled;
     state.ssaoRadius = m_ssaoResources.controls.radius;
@@ -162,11 +164,15 @@ Renderer::HealthState Renderer::BuildHealthState() const {
     const DescriptorStats descriptors = GetDescriptorStats();
     state.descriptorPersistentUsed = descriptors.persistentUsed;
     state.descriptorPersistentBudget = descriptors.persistentReserve;
-    state.descriptorTransientUsed =
+    state.descriptorTransientBudget =
         descriptors.transientEnd > descriptors.transientStart
             ? descriptors.transientEnd - descriptors.transientStart
             : 0u;
-    state.descriptorTransientBudget = state.descriptorTransientUsed;
+    state.descriptorTransientUsed =
+        descriptors.shaderVisibleUsed > descriptors.transientStart
+            ? std::min(descriptors.shaderVisibleUsed - descriptors.transientStart,
+                       state.descriptorTransientBudget)
+            : 0u;
 
     const VRAMBreakdown vram = GetEstimatedVRAMBreakdown();
     state.estimatedVRAMBytes = vram.TotalBytes();
@@ -255,6 +261,43 @@ float Renderer::GetLastBloomTimeMS() const {
 
 const FrameContract& Renderer::GetFrameContract() const {
     return m_frameDiagnostics.contract.contract;
+}
+
+void Renderer::SetSceneVisualContract(FrameContract::SceneVisualInfo contract) {
+    if (contract.profileId.empty()) {
+        contract.profileId = "unprofiled";
+    }
+    if (contract.family.empty()) {
+        contract.family = "unknown";
+    }
+    if (contract.source.empty()) {
+        contract.source = "unknown";
+    }
+    if (contract.environmentOwner.empty()) {
+        contract.environmentOwner = "unknown";
+    }
+    if (contract.reflectionOwner.empty()) {
+        contract.reflectionOwner = "unknown";
+    }
+    if (contract.lightRigId.empty()) {
+        contract.lightRigId = "custom";
+    }
+    if (contract.materialPaletteId.empty()) {
+        contract.materialPaletteId = "default";
+    }
+    if (contract.lightingScriptId.empty()) {
+        contract.lightingScriptId = "custom";
+    }
+    if (contract.temporalPolicyId.empty()) {
+        contract.temporalPolicyId = "default";
+    }
+    if (contract.postPolicyId.empty()) {
+        contract.postPolicyId = "default";
+    }
+    if (contract.toneMapperPreset.empty()) {
+        contract.toneMapperPreset = "aces";
+    }
+    m_sceneVisualContract = std::move(contract);
 }
 
 void Renderer::MarkPassComplete(const char* passName) {

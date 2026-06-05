@@ -50,7 +50,8 @@ cbuffer FrameConstants : register(b1)
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     float4   g_AOParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
-    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255
+    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255,
+    // bit24 = V2 reflection resolver candidate beauty review toggle
     float4   g_BloomParams;
     // x,y = jitter delta in UV (prevJitter - currJitter),
     // z = TAA blend factor, w = TAA history valid (>0.5)
@@ -1540,12 +1541,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
     //   bits 5-7: RT reflection composition strength quantized to 0..7
     //   bits 8-15: lens dirt amount quantized to 0..255
     //   bits 16-23: RT reflection denoise alpha quantized to 0..255
+    //   bit24: V2 reflection resolver candidate drives beauty (debug/review)
     uint postFxFlags = (uint)(g_BloomParams.w + 0.5f);
     bool ssrEnabled = ((postFxFlags & 1u) != 0u);
     bool rtReflEnabled = ((postFxFlags & 2u) != 0u);
     bool rtReflHistoryValid = ((postFxFlags & 4u) != 0u);
     bool rtReflTemporalOff = ((postFxFlags & 8u) != 0u);
     bool vbActive = ((postFxFlags & 16u) != 0u);
+    bool v2ReflectionCandidateBeauty = ((postFxFlags & (1u << 24u)) != 0u);
     float rtReflectionCompositionStrength = (float)((postFxFlags >> 5u) & 7u) * (1.0f / 7.0f);
     float lensDirtAmount = (float)((postFxFlags >> 8u) & 255u) * (1.0f / 255.0f);
     float rtReflectionDenoiseAlpha = max((float)((postFxFlags >> 16u) & 255u) * (1.0f / 255.0f), 0.02f);
@@ -2051,7 +2054,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
             materialReflectance,
             rtReflectionFireflyClampLuma);
     }
-    if (g_DebugMode.x == 58.0f)
+    if (g_DebugMode.x == 58.0f || v2ReflectionCandidateBeauty)
     {
         hdrColor = candidateReflectionCompositeColor;
     }

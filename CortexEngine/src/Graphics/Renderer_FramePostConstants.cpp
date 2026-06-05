@@ -264,6 +264,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     //   bit4: visibility-buffer path active this frame (HUD / debug)
     //   bits 5-7: RT reflection composition strength quantized to 0..7
     //   bits 16-23: RT reflection denoise alpha quantized to 0..255
+    //   bit24: V2 reflection resolver candidate drives beauty (debug/review)
     m_visibilityBufferState.plannedThisFrame = false;
     if (m_visibilityBufferState.enabled && m_services.visibilityBuffer && registry) {
         auto renderableView = registry->View<Scene::RenderableComponent>();
@@ -282,11 +283,19 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     uint32_t postFxFlags = 0u;
     static bool s_checkedRtReflPostFxEnv = false;
     static bool s_disableRtReflTemporal = false;
+    static bool s_checkedV2ReflectionCandidateEnv = false;
     if (!s_checkedRtReflPostFxEnv) {
         s_checkedRtReflPostFxEnv = true;
         if (std::getenv("CORTEX_RTREFL_DISABLE_TEMPORAL")) {
             s_disableRtReflTemporal = true;
             spdlog::warn("Renderer: CORTEX_RTREFL_DISABLE_TEMPORAL set; disabling RT reflection temporal accumulation (debug)");
+        }
+    }
+    if (!s_checkedV2ReflectionCandidateEnv) {
+        s_checkedV2ReflectionCandidateEnv = true;
+        if (std::getenv("CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY")) {
+            m_postProcessState.v2ReflectionCandidateEnabled = true;
+            spdlog::warn("Renderer: CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY set; V2 reflection candidate drives beauty (review)");
         }
     }
     if (m_ssrResources.frame.activeThisFrame) {
@@ -311,6 +320,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
     postFxFlags |= (rtReflectionComposition & 0x7u) << 5u;
     postFxFlags |= m_postProcessState.EncodedLensDirtByte() << 8u;
     postFxFlags |= (rtReflectionAlpha & 0xFFu) << 16u;
+    if (m_postProcessState.v2ReflectionCandidateEnabled) {
+        postFxFlags |= 1u << 24u;
+    }
     frameData.bloomParams = glm::vec4(
         m_bloomResources.controls.threshold,
         m_bloomResources.controls.softKnee,

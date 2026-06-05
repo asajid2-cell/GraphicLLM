@@ -2972,3 +2972,71 @@ Current interpretation:
 - Next work can either expose an interactive runtime candidate toggle or deepen
   the candidate into a resolved local reflection radiance buffer before any
   default-beauty promotion.
+
+### Interactive Candidate Beauty Toggle - 2026-06-05
+
+Implemented:
+
+- `src/Graphics/RendererPostProcessState.h`
+  - adds default-off `v2ReflectionCandidateEnabled`.
+- `src/Graphics/Renderer_DiagnosticsTypes.h` and
+  `src/Graphics/Renderer_Diagnostics.cpp`
+  - expose the flag in `RendererFeatureState`.
+- `src/Graphics/Renderer_FeatureSettings.cpp` and
+  `src/Graphics/Renderer.h`
+  - add `SetV2ReflectionCandidateEnabled` and
+    `IsV2ReflectionCandidateEnabled`.
+- `src/Graphics/RendererControlApplier.h` and
+  `src/Graphics/RendererControlApplier_Runtime.cpp`
+  - add `RendererFeatureToggle::V2ReflectionCandidate`.
+- `src/UI/PerformanceWindow.cpp`
+  - adds a P-menu checkbox:
+    `V2 reflection candidate (review)`.
+- `src/Graphics/Renderer_FramePostConstants.cpp`
+  - packs the review toggle into post bit `24`.
+  - supports `CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY=1` for packet validation.
+- `assets/shaders/PostProcess.hlsl`
+  - uses the V2 candidate as beauty only when bit `24` is set or debug view
+    `58` is active.
+  - default beauty remains unchanged.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+$env:CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive" -ViewFilter "beauty,reflection_resolver_candidate,reflection_resolver_candidate_delta,reflection_source_weights,reflection_source_authority" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_candidate_beauty_toggle_smoke_20260605; Remove-Item Env:\CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY -ErrorAction SilentlyContinue
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_candidate_beauty_toggle_smoke_20260605`.
+- source-signal families: `2/2`.
+- candidate-delta families: `2/2`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+- logs confirm:
+  `CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY set; V2 reflection candidate drives beauty (review)`.
+
+Candidate-beauty signal:
+
+| Stress Family | Delta Luma | Delta Nonblack |
+|---|---:|---:|
+| `stress_material_lab_glass_emissive` | `0.01586410` | `0.13685547` |
+| `stress_rt_showcase_reflection_closeup` | `0.02374713` | `0.17570312` |
+
+Candidate-beauty sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_material_lab_glass_emissive` | `0.00257806` | `0.00257806` | `1.000` |
+| `stress_rt_showcase_reflection_closeup` | `0.00802251` | `0.00802251` | `1.000` |
+
+Current interpretation:
+
+- The V2 reflection candidate can now be reviewed interactively from the P menu
+  without changing defaults.
+- The env hook proves the same beauty-toggle path in packet automation.
+- The candidate is still not default-ready; user/visual review should happen
+  through the checkbox before promotion.

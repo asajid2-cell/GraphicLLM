@@ -127,7 +127,8 @@ struct FrameConstants {
     // x = SSAO enabled (>0.5), y = radius, z = bias, w = intensity
     glm::vec4 aoParams;
     // x = bloom threshold, y = soft-knee factor, z = max bloom contribution,
-    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255
+    // w = post-process flags: low bits = SSR/RT/debug flags, bits 8-15 = lens dirt 0..255,
+    // bit24 = V2 reflection resolver candidate beauty review toggle
     glm::vec4 bloomParams;
     // x = jitterX, y = jitterY, z = TAA blend factor, w = TAA enabled (>0.5)
     glm::vec4 taaParams;

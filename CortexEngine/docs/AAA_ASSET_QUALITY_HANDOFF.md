@@ -2975,3 +2975,57 @@ Current stopping position:
   - add a runtime/P-menu candidate toggle for interactive user review, or
   - move from post candidate sheen to a resolved local reflection radiance
     buffer if we want stronger visual impact before exposing the toggle.
+
+### Interactive Candidate Beauty Toggle - 2026-06-05
+
+Implemented:
+
+- Default-off renderer state:
+  `RendererPostProcessState::v2ReflectionCandidateEnabled`.
+- Renderer API:
+  `SetV2ReflectionCandidateEnabled` and
+  `IsV2ReflectionCandidateEnabled`.
+- Runtime control enum:
+  `RendererFeatureToggle::V2ReflectionCandidate`.
+- P-menu checkbox:
+  `V2 reflection candidate (review)`.
+- Post bit:
+  `g_BloomParams.w` bit `24`.
+- Packet/env hook:
+  `CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY=1`.
+- Shader behavior:
+  `PostProcess.hlsl` uses the candidate as beauty only when bit `24` is set
+  or debug view `58` is active.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+$env:CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive" -ViewFilter "beauty,reflection_resolver_candidate,reflection_resolver_candidate_delta,reflection_source_weights,reflection_source_authority" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_candidate_beauty_toggle_smoke_20260605; Remove-Item Env:\CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY -ErrorAction SilentlyContinue
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_candidate_beauty_toggle_smoke_20260605`.
+- source-signal families: `2/2`.
+- candidate-delta families: `2/2`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+- logs confirm the env hook drove candidate beauty.
+
+Candidate-beauty signal:
+
+| Stress Family | Delta Luma | Delta Nonblack |
+|---|---:|---:|
+| `stress_material_lab_glass_emissive` | `0.01586410` | `0.13685547` |
+| `stress_rt_showcase_reflection_closeup` | `0.02374713` | `0.17570312` |
+
+Current stopping position:
+
+- User can now review V2 reflection candidate output from the P menu without
+  editing commands.
+- Default beauty remains unchanged unless the checkbox or env hook is enabled.
+- Next work should be interactive visual review or a stronger resolved local
+  reflection radiance buffer if the candidate is too subtle.

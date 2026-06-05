@@ -27,19 +27,21 @@ enum ControlIdPerf : int {
 
     IDC_PERF_RENDER_SCALE   = 4030,
     IDC_PERF_BLOOM          = 4031,
+    IDC_PERF_BACKGROUND_BLUR = 4032,
 
     IDC_PERF_RT_MASTER      = 4040,
     IDC_PERF_RT_REFL        = 4041,
     IDC_PERF_RT_GI          = 4042,
     IDC_PERF_TAA            = 4043,
     IDC_PERF_FXAA           = 4044,
-    IDC_PERF_SSR            = 4045,
-    IDC_PERF_SSAO           = 4046,
-    IDC_PERF_IBL            = 4047,
-    IDC_PERF_FOG            = 4048,
-    IDC_PERF_PARTICLES      = 4049,
-    IDC_PERF_IBL_LIMIT      = 4050,
-    IDC_PERF_PCSS           = 4051,
+    IDC_PERF_V2_REFL_CANDIDATE = 4045,
+    IDC_PERF_SSR            = 4046,
+    IDC_PERF_SSAO           = 4047,
+    IDC_PERF_IBL            = 4048,
+    IDC_PERF_FOG            = 4049,
+    IDC_PERF_PARTICLES      = 4050,
+    IDC_PERF_IBL_LIMIT      = 4051,
+    IDC_PERF_PCSS           = 4052,
 
     IDC_PERF_LOAD_ENV_ONE   = 4060,
     IDC_PERF_LOAD_ENV_ALL   = 4061,
@@ -65,12 +67,15 @@ struct PerfWindowState {
 
     HWND sliderRenderScale = nullptr;
     HWND sliderBloom       = nullptr;
+    HWND sliderBackgroundBlur = nullptr;
+    HWND lblBackgroundBlur = nullptr;
 
     HWND chkRTMaster = nullptr;
     HWND chkRTRefl   = nullptr;
     HWND chkRTGI     = nullptr;
     HWND chkTAA      = nullptr;
     HWND chkFXAA     = nullptr;
+    HWND chkV2ReflCandidate = nullptr;
     HWND chkSSR      = nullptr;
     HWND chkSSAO     = nullptr;
     HWND chkIBL      = nullptr;
@@ -118,6 +123,16 @@ bool GetCheckbox(HWND hwnd) {
     return SendMessage(hwnd, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
+void UpdateBackgroundBlurLabel(float blur) {
+    if (!g_perf.lblBackgroundBlur) {
+        return;
+    }
+
+    wchar_t label[96];
+    swprintf_s(label, L"IBL Blur: %.2f", blur);
+    SetWindowTextW(g_perf.lblBackgroundBlur, label);
+}
+
 const wchar_t* kPerfWindowClassName = L"CortexPerformanceWindow";
 
 void RefreshControlsFromState() {
@@ -146,12 +161,19 @@ void RefreshControlsFromState() {
                        0.0f,
                        5.0f);
 
+    SetSliderFromFloat(g_perf.sliderBackgroundBlur,
+                       features.backgroundBlur,
+                       0.0f,
+                       1.0f);
+    UpdateBackgroundBlurLabel(features.backgroundBlur);
+
     // Feature toggles
     SetCheckbox(g_perf.chkRTMaster, rt.supported && rt.enabled);
     SetCheckbox(g_perf.chkRTRefl,   rt.reflectionsEnabled);
     SetCheckbox(g_perf.chkRTGI,     rt.giEnabled);
     SetCheckbox(g_perf.chkTAA,      features.taaEnabled);
     SetCheckbox(g_perf.chkFXAA,     features.fxaaEnabled);
+    SetCheckbox(g_perf.chkV2ReflCandidate, features.v2ReflectionCandidateEnabled);
     SetCheckbox(g_perf.chkSSR,      features.ssrEnabled);
     SetCheckbox(g_perf.chkSSAO,     features.ssaoEnabled);
     SetCheckbox(g_perf.chkIBL,      features.iblEnabled);
@@ -415,6 +437,10 @@ void RegisterPerfWindowClass() {
             g_perf.sliderBloom = makeSlider(IDC_PERF_BLOOM, y);
             y += sliderHeight + rowGap * 2;
 
+            g_perf.lblBackgroundBlur = makeLabel(0, L"IBL Blur: --", y);
+            g_perf.sliderBackgroundBlur = makeSlider(IDC_PERF_BACKGROUND_BLUR, y);
+            y += sliderHeight + rowGap * 2;
+
             g_perf.chkRTMaster   = makeCheckbox(IDC_PERF_RT_MASTER,   L"RTX (global)", y);
             y += checkHeight + rowGap;
             g_perf.chkRTRefl     = makeCheckbox(IDC_PERF_RT_REFL,     L"RT Reflections", y);
@@ -424,6 +450,8 @@ void RegisterPerfWindowClass() {
             g_perf.chkTAA        = makeCheckbox(IDC_PERF_TAA,         L"TAA (temporal AA)", y);
             y += checkHeight + rowGap;
             g_perf.chkFXAA       = makeCheckbox(IDC_PERF_FXAA,        L"FXAA", y);
+            y += checkHeight + rowGap;
+            g_perf.chkV2ReflCandidate = makeCheckbox(IDC_PERF_V2_REFL_CANDIDATE, L"V2 reflection candidate (review)", y);
             y += checkHeight + rowGap;
             g_perf.chkSSR        = makeCheckbox(IDC_PERF_SSR,         L"SSR (screen-space reflections)", y);
             y += checkHeight + rowGap;
@@ -563,6 +591,11 @@ void RegisterPerfWindowClass() {
                 if (scrollCode == TB_ENDTRACK || scrollCode == TB_THUMBPOSITION) {
                     Graphics::ApplyBloomIntensityControl(*renderer, SliderToFloat(slider, 0.0f, 5.0f));
                 }
+            } else if (slider == g_perf.sliderBackgroundBlur) {
+                const float blur = SliderToFloat(slider, 0.0f, 1.0f);
+                if (Graphics::ApplyBackgroundBlurControl(*renderer, blur)) {
+                    UpdateBackgroundBlurLabel(blur);
+                }
             }
             return 0;
         }
@@ -617,6 +650,11 @@ void RegisterPerfWindowClass() {
                 case IDC_PERF_FXAA: {
                     bool enabled = GetCheckbox(g_perf.chkFXAA);
                     Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::FXAA, enabled);
+                    break;
+                }
+                case IDC_PERF_V2_REFL_CANDIDATE: {
+                    bool enabled = GetCheckbox(g_perf.chkV2ReflCandidate);
+                    Graphics::ApplyFeatureToggleControl(*renderer, Graphics::RendererFeatureToggle::V2ReflectionCandidate, enabled);
                     break;
                 }
                 case IDC_PERF_SSR: {

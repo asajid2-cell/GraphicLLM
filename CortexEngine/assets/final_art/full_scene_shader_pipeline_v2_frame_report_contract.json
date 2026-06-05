@@ -54,11 +54,19 @@
       "readiness_fields": [
         "enabled",
         "channel_inventory_available",
+        "albedo_channel_ready",
+        "normal_roughness_channel_ready",
+        "emissive_metallic_channel_ready",
+        "extended_material_channels_ready",
+        "semantic_material_policy_channel_ready",
         "object_id_channel_ready",
         "material_id_channel_ready",
         "material_policy_channel_ready",
         "velocity_channel_ready",
-        "extended_material_channels_ready"
+        "producer_ownership_available",
+        "debug_view_source_report_available",
+        "missing_required_channel_count",
+        "missing_ownership_channel_count"
       ],
       "debug_views": [
         "gbuffer_albedo",

@@ -2924,3 +2924,51 @@ Current interpretation:
   a review packet/contact sheet comparing default beauty against the V2
   candidate on these stress views, then a decision on whether to expose a
   runtime candidate toggle for interactive review.
+
+### Stress Review Sheet Export - 2026-06-05
+
+Implemented:
+
+- `tools/build_full_scene_shader_v2_review_sheet.py`
+  - reads a V2 packet `manifest.json`.
+  - groups captures by packet family/stress bookmark.
+  - exports a side-by-side review sheet for selected views.
+  - default columns:
+    `beauty`, `reflection_resolver_candidate`,
+    `reflection_resolver_candidate_delta`, `reflection_source_authority`, and
+    `reflection_source_weights`.
+  - emits JSON/Markdown summaries with missing-cell accounting.
+
+Validation:
+
+```powershell
+python tools\build_full_scene_shader_v2_review_sheet.py --manifest build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\manifest.json --output build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.jpg --summary-json build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.json --summary-md build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.md
+python -m py_compile tools\build_full_scene_shader_v2_review_sheet.py
+```
+
+Generated review artifacts:
+
+- image:
+  `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.jpg`.
+- JSON:
+  `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.json`.
+- Markdown:
+  `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.md`.
+
+Review summary:
+
+- rows: `4`.
+- views:
+  `beauty`, `reflection_resolver_candidate`,
+  `reflection_resolver_candidate_delta`, `reflection_source_authority`,
+  `reflection_source_weights`.
+- missing cells: `0`.
+
+Current interpretation:
+
+- The V2 candidate now has a human-readable review packet, not only metrics.
+- The visual delta is subtle but consistently localized to the intended
+  reflective/glossy regions.
+- Next work can either expose an interactive runtime candidate toggle or deepen
+  the candidate into a resolved local reflection radiance buffer before any
+  default-beauty promotion.

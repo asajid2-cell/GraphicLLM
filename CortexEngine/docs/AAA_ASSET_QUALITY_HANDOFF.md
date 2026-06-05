@@ -2932,3 +2932,46 @@ Current stopping position:
 - Next work should produce a review packet/contact sheet comparing default
   beauty and V2 candidate on these stress views, then decide whether to expose
   an interactive runtime candidate toggle for user review.
+
+### Stress Review Sheet Export - 2026-06-05
+
+Implemented:
+
+- `tools/build_full_scene_shader_v2_review_sheet.py`
+  - reads V2 packet manifests.
+  - groups rows by stress family/bookmark.
+  - exports side-by-side columns for:
+    `beauty`, `reflection_resolver_candidate`,
+    `reflection_resolver_candidate_delta`, `reflection_source_authority`, and
+    `reflection_source_weights`.
+  - writes JSON and Markdown summaries.
+
+Validation:
+
+```powershell
+python tools\build_full_scene_shader_v2_review_sheet.py --manifest build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\manifest.json --output build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.jpg --summary-json build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.json --summary-md build\captures\full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605\v2_stress_review_sheet.md
+python -m py_compile tools\build_full_scene_shader_v2_review_sheet.py
+```
+
+Generated artifacts:
+
+- `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.jpg`.
+- `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.json`.
+- `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605/v2_stress_review_sheet.md`.
+
+Review summary:
+
+- rows: `4`.
+- missing cells: `0`.
+- visual sanity: sheet is readable; candidate changes are subtle but localized
+  to glossy/reflection-relevant regions and supported by delta/authority/weight
+  columns.
+
+Current stopping position:
+
+- V2 reflection candidate has metric and visual-review packet evidence.
+- Do not promote default beauty yet.
+- Next work should either:
+  - add a runtime/P-menu candidate toggle for interactive user review, or
+  - move from post candidate sheen to a resolved local reflection radiance
+    buffer if we want stronger visual impact before exposing the toggle.

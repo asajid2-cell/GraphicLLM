@@ -1534,3 +1534,75 @@ Current state:
 - V2 beauty is still intentionally `v1_fallback`.
 - The next architecture step is full runtime material-table promotion, not
   visual tuning.
+
+## Full Scene Shader V2 Runtime Material Table Slice - 2026-06-05
+
+Implemented:
+
+- `FullSceneMaterialModelEvidence` now distinguishes sampled-material evidence
+  from shader-facing material-table readiness.
+- Added packet-visible evidence fields:
+  - `shader_material_table_ready`.
+  - `shader_material_policy_rows_ready`.
+  - `gbuffer_policy_channel_backed_by_material_table`.
+  - `shader_material_table_row_count`.
+  - `shader_material_policy_column_count`.
+- `BuildFullSceneMaterialModelEvidence` now receives the visibility-buffer
+  material table row count and GBuffer policy-channel readiness.
+- `fullSceneMaterialModelReady` now requires the shader material table and
+  GBuffer policy channel, not only policy counts and descriptor evidence.
+- Updated the V2 frame-report contract and checker to require the new fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\MaterialModel.h src\Graphics\MaterialModel.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\check_full_scene_shader_pipeline_v2_frame_report.py
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_material_table_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- diff check: passed.
+- focused object build: passed.
+- full `CortexEngine` target build: passed.
+- V2 packet: passed.
+- `ctest`: ran but reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_material_table_packet_20260605`.
+- captured views: `9`.
+- evidence rows: `90`.
+- failures: `0`.
+
+Gallery beauty material evidence:
+
+- `sampled_material_count=60`.
+- `shader_material_table_row_count=36`.
+- `shader_material_policy_column_count=4`.
+- `runtime_policy_bridge_ready=true`.
+- `shader_material_policy_rows_ready=true`.
+- `shader_material_table_ready=true`.
+- `gbuffer_policy_channel_backed_by_material_table=true`.
+- `texture_evidence_available=true`.
+- `unknown_material_family_count=0`.
+- `validation_error_count=0`.
+- `material.domain_ready=true`.
+
+Current state:
+
+- V2 has both per-pixel identity and a packet-visible shader material table.
+- This gives later lighting, reflections, shadows, temporal, and post a common
+  material truth layer.
+- V2 beauty is still intentionally `v1_fallback`.
+- Next slice should add material policy debug views before promoting any
+  lighting/reflection beauty behavior.

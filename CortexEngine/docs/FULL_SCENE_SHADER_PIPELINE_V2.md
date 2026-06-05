@@ -1242,3 +1242,100 @@ Next recommended implementation:
   policy, and post sensitivity.
 - After material-table debug views are packet-proved, move to scene-local light
   rig ownership and local reflection/probe ownership.
+
+## Full Scene Shader Pipeline V2 Runtime Material Table Slice - 2026-06-05
+
+Purpose:
+
+- Start Phase 2 by turning the existing visibility-buffer material upload into
+  an explicit `FullSceneMaterialTable` contract.
+- Stop treating material readiness as only sampled-material counts.
+- Prove that the shader-facing material table has policy rows and backs the
+  GBuffer material policy channel before later lighting, reflection, temporal,
+  or post passes consume it.
+
+Implemented:
+
+- Extended `FullSceneMaterialModelEvidence` with:
+  - `shaderMaterialTableReady`.
+  - `shaderMaterialPolicyRowsReady`.
+  - `gbufferPolicyChannelBackedByMaterialTable`.
+  - `shaderMaterialTableRowCount`.
+  - `shaderMaterialPolicyColumnCount`.
+- `BuildFullSceneMaterialModelEvidence` now receives:
+  - visibility-buffer material-table row count.
+  - GBuffer material-policy channel readiness.
+- `fullSceneMaterialModelReady` now requires:
+  - runtime policy coverage.
+  - populated shader material table.
+  - complete 4-column policy rows.
+  - GBuffer policy channel backed by that table.
+  - texture/descriptor evidence.
+  - no unknown material family.
+  - no validation errors.
+- The V2 frame-report contract and checker require the new material-table
+  fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\MaterialModel.h src\Graphics\MaterialModel.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\check_full_scene_shader_pipeline_v2_frame_report.py
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_material_table_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- focused changed-object build: passed.
+- full `CortexEngine` target build: passed and linked.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_material_table_packet_20260605`.
+- captured views: `9`.
+- evidence rows: `90`.
+- failures: `0`.
+
+Gallery beauty material evidence:
+
+- `sampled_material_count=60`.
+- `shader_material_table_row_count=36`.
+- `shader_material_policy_column_count=4`.
+- `runtime_policy_bridge_ready=true`.
+- `shader_material_policy_rows_ready=true`.
+- `shader_material_table_ready=true`.
+- `gbuffer_policy_channel_backed_by_material_table=true`.
+- `family_counts_available=true`.
+- `reflection_policies_available=true`.
+- `temporal_policies_available=true`.
+- `post_policies_available=true`.
+- `texture_evidence_available=true`.
+- `shader_feature_flags_available=true`.
+- `unknown_material_family_count=0`.
+- `validation_error_count=0`.
+- `material.domain_ready=true`.
+
+Current interpretation:
+
+- The material domain now has a packet-visible shader-table contract.
+- Later V2 lighting/reflection/temporal/post work can depend on the table rows
+  and policy channel instead of re-inferring material meaning.
+- V2 beauty remains `v1_fallback`.
+
+Next recommended implementation:
+
+- Add material policy debug views for material family, texture readiness,
+  reflection policy, temporal policy, and post sensitivity.
+- Then start scene-local light-rig ownership and local reflection/probe
+  ownership.

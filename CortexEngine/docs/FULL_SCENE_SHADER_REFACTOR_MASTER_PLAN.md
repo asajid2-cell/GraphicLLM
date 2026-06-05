@@ -985,3 +985,175 @@ Next implementation feature:
   evidence. It must carry material family, PBR/texture readiness, reflection
   policy, temporal policy, and post sensitivity so lighting, reflections,
   temporal, and post consume the same material truth.
+
+## 2026-06-05 AAA Full-Scene Shader Refactor Checkpoint
+
+This checkpoint reframes the remaining V2 work as a whole-renderer migration.
+The target is Unreal-like full-scene visual richness, but the work must not
+start with cinematic grading, bloom, blur, or one-scene shader polish. Those
+are presentation layers. The engine first needs a dependable chain of scene
+facts that every shader domain consumes.
+
+The current blocker is architectural:
+
+- V2 identity, GBuffer, material-policy, lighting, reflection, shadow, and
+  temporal evidence exists.
+- V2 reflection candidate/debug paths exist.
+- Cross-family packets prove the reflection candidate is not meaningfully
+  exercised outside gallery because model-authored families do not yet provide
+  post-resolver reflection-source signal.
+- Therefore the next "pretty" shader change would still be underfed. It would
+  tune around missing scene-local source data instead of fixing the source of
+  the visual ceiling.
+
+### Visual Target, In Engine Terms
+
+"Breathtaking Unreal-like visuals" means the renderer can reliably produce:
+
+- rich PBR response from authored material families: tile, painted wall, wood,
+  fabric, brushed metal, polished metal, glass, water, neon, screen, concrete,
+  rubber, and mirror.
+- believable scene-local light rigs: gallery spots, kitchen practicals, office
+  soft panels, gym high-bays, concert beams and screens, wet/glass highlights,
+  outdoor sun/sky when authorized.
+- owned reflection and indirect sources: room probes, hero probes, planar
+  probes, SSR, RT, neutral fallback, or explicitly visible outdoor environment.
+- stable shadows and contacts under mouse motion.
+- material-aware temporal resolve so polished metal, glass, water, emissive,
+  patterned tile, and matte walls do not pop differently.
+- measured HDR presentation: exposure, bloom, rolloff, tone map, color grade,
+  clarity, and output encoding as named packet-visible stages.
+
+If any of those domains is missing source data or ownership evidence, V2 beauty
+stays candidate-only.
+
+### Refactor Spine
+
+The refactor should be implemented as one spine with eight joints. Each joint
+must emit frame-report evidence, debug views, and packet metrics before it can
+drive default beauty.
+
+```text
+SceneVisualContract
+  -> FullSceneMaterialTable
+  -> FullSceneFrameData / GBuffer
+  -> FullSceneLightRig
+  -> FullSceneProbeSet
+  -> FullSceneLightingReflectionShadowComposite
+  -> FullSceneTemporalResolve
+  -> FullScenePost
+  -> FullSceneRenderGraphEvidence
+```
+
+The critical rule is that downstream shaders consume the same facts. Lighting
+does not guess material intent. Reflections do not guess whether an HDRI is
+allowed. Temporal does not apply one global history rule to glass, metal, wall
+paint, and neon. Post does not hide failed inputs.
+
+### Planned Refactor Order
+
+1. `FSSP-V2-002C`: Scene visual contract consolidation.
+   - Create a single runtime contract for family, enclosure, environment
+     visibility, lighting family, reflection family, temporal family, and post
+     profile.
+   - Existing `SceneCinematicProfile`, `RendererSceneProfile`, and
+     frame-report fields can feed it, but shader constants should stop
+     independently inferring scene intent.
+   - Exit when every target family reports an explicit scene contract.
+
+2. `FSSP-V2-004C`: Scene-local source plumbing.
+   - Convert light-rig and probe evidence into shader-facing source buffers or
+     constants for all target families.
+   - Specifically fix the current cross-family reflection source gap:
+     kitchen, office, gym, and concert must produce authorized local reflection
+     source signal instead of zero source weights.
+   - Exit when the signal audit reports nonzero local source signal for at
+     least gallery plus three model-authored families.
+
+3. `FSSP-V2-002D`: Full material table promotion.
+   - Move material model data from evidence into the upload path.
+   - Encode material family, PBR texture readiness, procedural detail,
+     reflection policy, temporal policy, and post sensitivity.
+   - Exit when hero pixels in target scenes have known material families and
+     policy ids, not fallback/default material classes.
+
+4. `FSSP-V2-004D`: Lighting V2 shadow output.
+   - Build a semantic light buffer from the scene contract.
+   - Run direct lighting V2 beside V1 and capture direct-light, unshadowed,
+     shadow-loss, light-id, and exposure views.
+   - Exit when gallery, kitchen, gym, and concert have nonzero semantic lighting
+     signal without clipping or emergency exposure hacks.
+
+5. `FSSP-V2-005C`: Reflection V2 shadow output.
+   - Route SSR, RT, room probes, hero probes, planar probes, neutral fallback,
+     and authorized external environment through one resolver.
+   - Reflection debug must report the actual source owner per pixel.
+   - Exit when enclosed scenes have zero unauthorized external HDRI reflection
+     and smooth/metal surfaces retain stable source ownership under motion.
+
+6. `FSSP-V2-006C`: Shadow/contact V2 policy.
+   - Centralize cascade, local shadow, contact shadow, RT shadow, bias, and
+     filter policy.
+   - Use scene units, light type, receiver slope, and material receiver class.
+   - Exit when mouse-jiggle packets show stable wall/floor/object contact
+     shadows without disabling shadows.
+
+7. `FSSP-V2-007C`: Material-aware temporal candidate.
+   - Use material id, object id, velocity, depth, normal, roughness, emissive,
+     and temporal policy in one history-coordinate contract.
+   - Give glass, water, polished metal, neon, patterned tile, and matte wall
+     distinct confidence and clamp behavior.
+   - Exit when motion packets show reduced popping on smooth/metallic surfaces
+     without blur or feature disablement.
+
+8. `FSSP-V2-008B`: HDR post V2 candidate.
+   - Split post into named stages and emit per-stage metrics.
+   - Add profile-owned color grading only after lighting, reflection, shadow,
+     and temporal domains have passed source/readiness gates.
+   - Exit when beauty improves through richer source domains rather than
+     hiding defects.
+
+9. `FSSP-V2-009B`: Render graph enforcement.
+   - Declare every V2 pass, input, output, fallback owner, debug view, and
+     producer/consumer relationship.
+   - Exit when packet tools can reconstruct the final image dependency graph
+     and fail missing or ambiguous resources.
+
+10. `FSSP-V2-010C`: Cross-family candidate promotion.
+    - Run gallery, kitchen, office, gym, concert, and wet/glass-heavy scenes.
+    - Candidate beauty is allowed only for scenes whose material, source,
+      lighting, reflection, shadow, temporal, post, and graph gates are honest.
+    - Default-ready remains blocked until user review accepts the cross-family
+      visual direction.
+
+### First Goal-Feature Slice
+
+The next implementation slice should be `FSSP-V2-004C`, not another local
+resolver tweak.
+
+Reason:
+
+- The reflection candidate infrastructure exists.
+- The signal audit proves the resolver has no useful source input in most
+  model-authored families.
+- Full-scene shader quality depends on local light/probe/material sources
+  reaching the shader, not on a smarter blend of empty inputs.
+
+Expected deliverables:
+
+- A shader-facing scene-local source contract for model-authored families.
+- Frame-report fields for source readiness per family.
+- Debug view and analyzer updates so source weights can distinguish local room
+  probe, hero probe, planar probe, SSR, RT, neutral fallback, and authorized
+  external environment.
+- A cross-family packet showing nonzero local source signal in gallery plus at
+  least three model-authored scenes.
+- No default beauty promotion yet.
+
+### Why This Is Better Than More Polish
+
+Manual polish and isolated shader tuning can improve a screenshot, but they do
+not make the engine generally capable. This refactor makes the renderer's
+inputs explicit and then promotes domains only when they have source signal,
+ownership, stability, and packet evidence. That is the path from stable
+blockout rendering toward production-quality full-scene shading.

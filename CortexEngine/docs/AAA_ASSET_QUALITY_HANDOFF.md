@@ -458,8 +458,30 @@ Current interpretation:
   - promote domains only by packet evidence, not screenshots.
   - failed V2 domains must report their failure and fall back to V1 beauty
     output until cross-family gates pass.
-- The next implementation slice should add frame-report placeholders for V2
-  domains, then upgrade material/asset evidence before changing visual output.
+- Runtime frame-report placeholders now emit `full_scene_shader_pipeline_v2`
+  from `FrameContractJson.cpp` without changing beauty output:
+  - status `runtime_placeholder_v1_fallback`.
+  - beauty output `v1_fallback`.
+  - all required material, GBuffer, lighting, reflection, shadow, temporal,
+    post, render-graph, asset-evidence, and packet-gate readiness fields are
+    present.
+  - values are deliberately derived from current V1 ownership/diagnostic data
+    and remain conservative until V2 domains are promoted.
+- Validation for this checkpoint:
+  - `python tools\validate_full_scene_shader_pipeline_v2_plan.py` passed.
+  - `python tools\check_full_scene_shader_pipeline_v2_frame_report.py` passed
+    and now checks that `FrameContractJson.cpp` emits the required runtime
+    sections/fields.
+  - `python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py`
+    passed.
+  - `git -c core.autocrlf=false diff --check` passed for the focused
+    frame-report files.
+  - `.\build.ps1 -Config Release` and direct `ninja -C build CortexEngine -v`
+    both timed out in CMake/Ninja regeneration without compiler output in this
+    environment; stopped the spawned build processes and did not leave them
+    running.
+- The next implementation slice should upgrade material model and registry
+  material evidence before changing visual output.
 - The first frame-report contract is external because the current renderer C++
   worktree already has broad uncommitted frame-contract changes. Runtime C++
   integration should use this external contract after those changes are

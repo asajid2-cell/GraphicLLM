@@ -15,6 +15,7 @@ PIPELINE_CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipe
 FRAME_REPORT_CONTRACT_PATH = (
     ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_frame_report_contract.json"
 )
+FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
 
 
 def fail(message: str) -> int:
@@ -102,6 +103,37 @@ def validate_contracts() -> list[str]:
     return errors
 
 
+def validate_runtime_source_surface() -> list[str]:
+    errors: list[str] = []
+    if not FRAME_CONTRACT_JSON_SOURCE_PATH.exists():
+        return [f"missing runtime frame contract JSON source: {FRAME_CONTRACT_JSON_SOURCE_PATH}"]
+
+    source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
+    frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
+    report_key = frame_contract.get("report_key", "")
+    if f'"{report_key}"' not in source:
+        errors.append(f"runtime JSON source does not emit {report_key}")
+    if "runtime_placeholder_v1_fallback" not in source:
+        errors.append("runtime JSON source must label the V2 report as a V1 fallback placeholder")
+    if "FullSceneShaderPipelineV2ToJson" not in source:
+        errors.append("runtime JSON source must use a named V2 report builder")
+
+    for section in frame_contract.get("required_sections", []):
+        if not isinstance(section, dict):
+            continue
+        section_path = section.get("report_path", "")
+        section_name = section_path.rsplit(".", 1)[-1]
+        if section_name and f'"{section_name}"' not in source:
+            errors.append(f"runtime JSON source missing V2 section {section_name}")
+        for field in section.get("readiness_fields", []):
+            if f'"{field}"' not in source:
+                errors.append(
+                    f"runtime JSON source missing V2 readiness field {section_name}.{field}"
+                )
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
@@ -141,6 +173,7 @@ def main() -> int:
     args = parser.parse_args()
 
     errors = validate_contracts()
+    errors.extend(validate_runtime_source_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

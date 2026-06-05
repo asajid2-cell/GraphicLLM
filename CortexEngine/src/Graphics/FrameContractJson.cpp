@@ -30,6 +30,207 @@ json FeatureFlagsToJson(const FrameContract::FeatureFlags& features) {
         {"voxel_backend_enabled", features.voxelBackendEnabled}
     };
 }
+
+uint32_t SceneMaterialFamilyCount(const FrameContract::MaterialStats& materials) {
+    return materials.sceneMaterialDefault +
+           materials.sceneMaterialPaintedWall +
+           materials.sceneMaterialCeramicTile +
+           materials.sceneMaterialPolishedWood +
+           materials.sceneMaterialBrushedMetal +
+           materials.sceneMaterialPolishedMetal +
+           materials.sceneMaterialGlassPane +
+           materials.sceneMaterialFabric +
+           materials.sceneMaterialPlastic +
+           materials.sceneMaterialWetSurface +
+           materials.sceneMaterialEmissiveNeon +
+           materials.sceneMaterialScreenPanel +
+           materials.sceneMaterialConcrete +
+           materials.sceneMaterialRubber +
+           materials.sceneMaterialWater +
+           materials.sceneMaterialMirror;
+}
+
+uint32_t MaterialReflectionPreferenceCount(const FrameContract::MaterialStats& materials) {
+    return materials.materialReflectionNeutralFallback +
+           materials.materialReflectionLocalProbe +
+           materials.materialReflectionProbeGrid +
+           materials.materialReflectionPlanarProbe +
+           materials.materialReflectionSSR +
+           materials.materialReflectionRT;
+}
+
+uint32_t MaterialTemporalPolicyCount(const FrameContract::MaterialStats& materials) {
+    return materials.materialTemporalStableDiffuse +
+           materials.materialTemporalStableGlossy +
+           materials.materialTemporalMirrorLocked +
+           materials.materialTemporalEmissiveLocked +
+           materials.materialTemporalWaterViewDependent;
+}
+
+bool HasResource(const FrameContract& contract, const char* name) {
+    return std::any_of(
+        contract.resources.begin(),
+        contract.resources.end(),
+        [name](const FrameContract::ResourceInfo& resource) {
+            return resource.name == name && resource.valid && resource.sizeMatchesContract;
+        });
+}
+
+bool HasExecutedPass(const FrameContract& contract, const char* name) {
+    return std::any_of(
+        contract.passes.begin(),
+        contract.passes.end(),
+        [name](const FrameContract::PassRecord& pass) {
+            return pass.name == name && pass.executed;
+        });
+}
+
+json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
+    const bool familyCountsAvailable =
+        contract.materials.sampled > 0 &&
+        SceneMaterialFamilyCount(contract.materials) == contract.materials.sampled;
+    const bool reflectionPoliciesAvailable =
+        contract.materials.sampled > 0 &&
+        MaterialReflectionPreferenceCount(contract.materials) == contract.materials.sampled;
+    const bool temporalPoliciesAvailable =
+        contract.materials.sampled > 0 &&
+        MaterialTemporalPolicyCount(contract.materials) == contract.materials.sampled;
+    const bool extendedMaterialChannelsReady =
+        HasResource(contract, "vb_gbuffer_material_ext0") &&
+        HasResource(contract, "vb_gbuffer_material_ext1") &&
+        HasResource(contract, "vb_gbuffer_material_ext2");
+    const bool velocityReady = HasResource(contract, "velocity") &&
+        contract.motionVectors.planned &&
+        contract.motionVectors.executed;
+    const bool reflectionOwnerAvailable =
+        contract.sceneVisual.pixelReflectionOwnerHistogramAvailable ||
+        contract.sceneVisual.reflectionOwnerDebugViewMode != 0;
+    const bool unknownReflectionOwner =
+        contract.sceneVisual.reflectionOwner.empty() ||
+        contract.sceneVisual.reflectionOwner == "unknown";
+    const bool postNamedStagesReady =
+        contract.cinematicPost.enabled &&
+        contract.cinematicPost.postProcessPlanned &&
+        contract.cinematicPost.postProcessExecuted;
+    const bool explicitPassGraphReady =
+        contract.renderGraph.active &&
+        contract.renderGraph.passRecords > 0 &&
+        contract.renderGraph.transientValidationRan;
+
+    return {
+        {"schema", "cortex.full_scene_shader_pipeline_v2.runtime_report.v1"},
+        {"status", "runtime_placeholder_v1_fallback"},
+        {"beauty_output", "v1_fallback"},
+        {"material", {
+            {"enabled", false},
+            {"full_scene_material_model_ready", false},
+            {"family_counts_available", familyCountsAvailable},
+            {"texture_evidence_available",
+             contract.materials.resourcePrepareCalls > 0 &&
+                 contract.materials.descriptorTablesMissingAfterPrepare == 0},
+            {"missing_hero_texture_evidence_count", 0},
+            {"unknown_material_family_count", contract.materials.sceneMaterialDefault},
+            {"facade_owner", "MaterialResolver/SceneMaterialClassId"},
+            {"fallback_reason", "FullSceneMaterialModel not promoted to runtime beauty output"}
+        }},
+        {"gbuffer", {
+            {"enabled", contract.features.visibilityBufferEnabled},
+            {"channel_inventory_available",
+             HasResource(contract, "vb_gbuffer_albedo") &&
+                 HasResource(contract, "vb_gbuffer_normal_roughness")},
+            {"object_id_channel_ready", false},
+            {"material_id_channel_ready", HasResource(contract, "vb_gbuffer_material_ext2")},
+            {"velocity_channel_ready", velocityReady},
+            {"extended_material_channels_ready", extendedMaterialChannelsReady},
+            {"facade_owner", "VisibilityBufferRenderer"}
+        }},
+        {"lighting", {
+            {"enabled", contract.lighting.lightCount > 0 || contract.features.iblEnabled},
+            {"semantic_light_rig_ready",
+             !contract.lighting.rigId.empty() && contract.lighting.rigId != "custom"},
+            {"light_owner_report_available", contract.lighting.semanticFixtureLightCount > 0},
+            {"rect_area_light_count", contract.lighting.areaRectLightCount},
+            {"practical_fixture_count", contract.lighting.practicalFixtureLightCount},
+            {"exposure_clipping_gate_passed", false},
+            {"facade_owner", "SceneVisualContract/LightingState"},
+            {"rig_id", contract.lighting.rigId},
+            {"shadow_policy_id", contract.lighting.shadowPolicyId},
+            {"exposure_policy_id", contract.lighting.exposurePolicyId}
+        }},
+        {"reflections", {
+            {"enabled", contract.features.ssrEnabled || contract.features.rtReflectionsEnabled ||
+                contract.environment.localReflectionProbeCount > 0},
+            {"room_probe_count", contract.environment.localReflectionProbeCount},
+            {"hero_probe_count", 0},
+            {"planar_probe_count", 0},
+            {"unauthorized_external_hdri_ratio",
+             contract.sceneVisual.invalidExternalHDRI ? 1.0 : 0.0},
+            {"unknown_reflection_owner_ratio", unknownReflectionOwner ? 1.0 : 0.0},
+            {"reflection_owner_report_available", reflectionOwnerAvailable},
+            {"reflection_policies_available", reflectionPoliciesAvailable},
+            {"facade_owner", "SceneVisualContract/EnvironmentState"},
+            {"owner", contract.sceneVisual.reflectionOwner}
+        }},
+        {"shadows", {
+            {"enabled", contract.features.shadowsEnabled},
+            {"shadow_policy_report_available",
+             !contract.lighting.shadowPolicyId.empty() &&
+                 contract.lighting.shadowPolicyId != "default"},
+            {"cascade_debug_available", HasResource(contract, "shadow_map")},
+            {"local_shadow_atlas_ready", contract.lighting.shadowCastingLightCount > 0},
+            {"contact_shadow_ready", false},
+            {"shadow_stability_gate_passed", false},
+            {"facade_owner", "ShadowResources/SceneVisualContract"}
+        }},
+        {"temporal", {
+            {"enabled", contract.features.taaEnabled},
+            {"motion_vectors_ready", velocityReady},
+            {"material_aware_rejection_ready", temporalPoliciesAvailable},
+            {"history_clamp_ready", HasResource(contract, "taa_history")},
+            {"smooth_surface_motion_gate_passed", false},
+            {"camera_sweep_gate_passed", false},
+            {"facade_owner", "TemporalMask/FrameDiagnostics"}
+        }},
+        {"post", {
+            {"enabled", contract.cinematicPost.enabled},
+            {"named_post_stages_ready", postNamedStagesReady},
+            {"exposure_report_available", contract.cinematicPost.exposurePolicyActive},
+            {"tone_map_report_available", !contract.cinematicPost.toneMapperPreset.empty()},
+            {"visual_quality_gate_passed", false},
+            {"shader_warning_regression_count", 0},
+            {"facade_owner", "CinematicPostInfo"},
+            {"quality_set_id", contract.cinematicPost.qualitySetId}
+        }},
+        {"render_graph", {
+            {"enabled", contract.renderGraph.active},
+            {"explicit_pass_graph_ready", explicitPassGraphReady},
+            {"resource_producer_report_available", contract.renderGraph.passRecords > 0},
+            {"resource_state_report_available", contract.renderGraph.transientValidationRan},
+            {"debug_view_source_report_available", false},
+            {"missing_producer_count", 0},
+            {"facade_owner", "FrameDiagnostics/RenderGraphInfo"}
+        }},
+        {"asset_evidence", {
+            {"enabled", false},
+            {"asset_registry_v2_linked", false},
+            {"hero_surface_readiness_available", false},
+            {"pbr_texture_readiness_available", false},
+            {"shader_feature_flags_available", familyCountsAvailable},
+            {"missing_registry_material_count", 0},
+            {"facade_owner", "external_material_evidence_report"}
+        }},
+        {"packet_gate", {
+            {"enabled", false},
+            {"gallery_packet_passed", false},
+            {"kitchen_packet_passed", false},
+            {"office_packet_passed", false},
+            {"gym_packet_passed", false},
+            {"concert_packet_passed", false},
+            {"v1_baseline_preserved", true},
+            {"facade_owner", "external_cross_family_packet_gate"}
+        }}
+    };
+}
 }
 
 json FrameContractToJson(const FrameContract& contract) {
@@ -94,6 +295,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"fallback_reason", contract.environment.fallbackReason},
             {"manifest_present", contract.environment.manifestPresent},
             {"ibl_limit_enabled", contract.environment.iblLimitEnabled},
+            {"image_based_lighting_textures_bound", contract.environment.imageBasedLightingTexturesBound},
             {"background_visible", contract.environment.backgroundVisible},
             {"background_exposure", contract.environment.backgroundExposure},
             {"background_blur", contract.environment.backgroundBlur},
@@ -107,7 +309,10 @@ json FrameContractToJson(const FrameContract& contract) {
             {"resident_bytes", contract.environment.residentBytes},
             {"local_reflection_probe_count", contract.environment.localReflectionProbeCount},
             {"local_reflection_probe_skipped", contract.environment.localReflectionProbeSkipped},
-            {"local_reflection_probe_table_valid", contract.environment.localReflectionProbeTableValid}
+            {"local_reflection_probe_table_valid", contract.environment.localReflectionProbeTableValid},
+            {"local_reflection_probe_radiance_enabled", contract.environment.localReflectionProbeRadianceEnabled},
+            {"local_reflection_probe_diffuse_intensity", contract.environment.localReflectionProbeDiffuseIntensity},
+            {"local_reflection_probe_specular_intensity", contract.environment.localReflectionProbeSpecularIntensity}
         }},
         {"graphics_preset", {
             {"id", contract.graphicsPreset.id},
@@ -115,6 +320,47 @@ json FrameContractToJson(const FrameContract& contract) {
             {"dirty_from_ui", contract.graphicsPreset.dirtyFromUI},
             {"render_scale", contract.graphicsPreset.renderScale}
         }},
+        {"scene_visual_contract", {
+            {"active", contract.sceneVisual.active},
+            {"profile_id", contract.sceneVisual.profileId},
+            {"family", contract.sceneVisual.family},
+            {"source", contract.sceneVisual.source},
+            {"enclosed_scene", contract.sceneVisual.enclosedScene},
+            {"visible_external_hdri_allowed", contract.sceneVisual.visibleExternalHDRIAllowed},
+            {"external_hdri_visible", contract.sceneVisual.externalHDRIVisible},
+            {"invalid_external_hdri", contract.sceneVisual.invalidExternalHDRI},
+            {"environment_owner", contract.sceneVisual.environmentOwner},
+            {"reflection_owner", contract.sceneVisual.reflectionOwner},
+            {"local_reflection_probe_rig_id", contract.sceneVisual.localReflectionProbeRigId},
+            {"light_rig_id", contract.sceneVisual.lightRigId},
+            {"shadow_policy_id", contract.sceneVisual.shadowPolicyId},
+            {"exposure_policy_id", contract.sceneVisual.exposurePolicyId},
+            {"profile_light_fixture_count", contract.sceneVisual.profileLightFixtureCount},
+            {"material_palette_id", contract.sceneVisual.materialPaletteId},
+            {"lighting_script_id", contract.sceneVisual.lightingScriptId},
+            {"lighting_balance_policy_id", contract.sceneVisual.lightingBalancePolicyId},
+            {"lighting_balance_policy_active", contract.sceneVisual.lightingBalancePolicyActive},
+            {"lighting_balance_sun_scale", contract.sceneVisual.lightingBalanceSunScale},
+            {"lighting_balance_ambient_scale", contract.sceneVisual.lightingBalanceAmbientScale},
+            {"lighting_balance_local_fixture_scale", contract.sceneVisual.lightingBalanceLocalFixtureScale},
+            {"lighting_balance_local_probe_diffuse_scale", contract.sceneVisual.lightingBalanceLocalProbeDiffuseScale},
+            {"lighting_balance_local_probe_specular_scale", contract.sceneVisual.lightingBalanceLocalProbeSpecularScale},
+            {"lighting_balance_exposure_scale", contract.sceneVisual.lightingBalanceExposureScale},
+            {"lighting_balance_ssao_scale", contract.sceneVisual.lightingBalanceSSAOScale},
+            {"material_class_set_id", contract.sceneVisual.materialClassSetId},
+            {"material_layer_set_id", contract.sceneVisual.materialLayerSetId},
+            {"temporal_policy_id", contract.sceneVisual.temporalPolicyId},
+            {"post_policy_id", contract.sceneVisual.postPolicyId},
+            {"post_quality_set_id", contract.sceneVisual.postQualitySetId},
+            {"tone_mapper_preset", contract.sceneVisual.toneMapperPreset},
+            {"material_class_debug_view_mode", contract.sceneVisual.materialClassDebugViewMode},
+            {"material_policy_debug_view_mode", contract.sceneVisual.materialPolicyDebugViewMode},
+            {"local_reflection_probe_debug_view_mode", contract.sceneVisual.localReflectionProbeDebugViewMode},
+            {"reflection_owner_debug_view_mode", contract.sceneVisual.reflectionOwnerDebugViewMode},
+            {"pixel_reflection_owner_histogram_available",
+             contract.sceneVisual.pixelReflectionOwnerHistogramAvailable}
+        }},
+        {"full_scene_shader_pipeline_v2", FullSceneShaderPipelineV2ToJson(contract)},
         {"features", FeatureFlagsToJson(contract.features)},
         {"planned_features", FeatureFlagsToJson(contract.plannedFeatures)},
         {"executed_features", FeatureFlagsToJson(contract.executedFeatures)},
@@ -173,6 +419,44 @@ json FrameContractToJson(const FrameContract& contract) {
             {"advanced_wetness", contract.materials.advancedWetness},
             {"advanced_emissive_bloom", contract.materials.advancedEmissiveBloom},
             {"advanced_procedural_mask", contract.materials.advancedProceduralMask},
+            {"material_class_policy_applied", contract.materials.materialClassPolicyApplied},
+            {"material_policy_roughness_clamped", contract.materials.materialPolicyRoughnessClamped},
+            {"material_policy_normal_clamped", contract.materials.materialPolicyNormalClamped},
+            {"material_policy_procedural_clamped", contract.materials.materialPolicyProceduralClamped},
+            {"material_policy_reflection_stable", contract.materials.materialPolicyReflectionStable},
+            {"material_policy_albedo_luminance_clamped", contract.materials.materialPolicyAlbedoLuminanceClamped},
+            {"material_policy_albedo_chroma_clamped", contract.materials.materialPolicyAlbedoChromaClamped},
+            {"scene_material_default", contract.materials.sceneMaterialDefault},
+            {"scene_material_painted_wall", contract.materials.sceneMaterialPaintedWall},
+            {"scene_material_ceramic_tile", contract.materials.sceneMaterialCeramicTile},
+            {"scene_material_polished_wood", contract.materials.sceneMaterialPolishedWood},
+            {"scene_material_brushed_metal", contract.materials.sceneMaterialBrushedMetal},
+            {"scene_material_polished_metal", contract.materials.sceneMaterialPolishedMetal},
+            {"scene_material_glass_pane", contract.materials.sceneMaterialGlassPane},
+            {"scene_material_fabric", contract.materials.sceneMaterialFabric},
+            {"scene_material_plastic", contract.materials.sceneMaterialPlastic},
+            {"scene_material_wet_surface", contract.materials.sceneMaterialWetSurface},
+            {"scene_material_emissive_neon", contract.materials.sceneMaterialEmissiveNeon},
+            {"scene_material_screen_panel", contract.materials.sceneMaterialScreenPanel},
+            {"scene_material_concrete", contract.materials.sceneMaterialConcrete},
+            {"scene_material_rubber", contract.materials.sceneMaterialRubber},
+            {"scene_material_water", contract.materials.sceneMaterialWater},
+            {"scene_material_mirror", contract.materials.sceneMaterialMirror},
+            {"material_reflection_neutral_fallback", contract.materials.materialReflectionNeutralFallback},
+            {"material_reflection_local_probe", contract.materials.materialReflectionLocalProbe},
+            {"material_reflection_probe_grid", contract.materials.materialReflectionProbeGrid},
+            {"material_reflection_planar_probe", contract.materials.materialReflectionPlanarProbe},
+            {"material_reflection_ssr", contract.materials.materialReflectionSSR},
+            {"material_reflection_rt", contract.materials.materialReflectionRT},
+            {"material_temporal_stable_diffuse", contract.materials.materialTemporalStableDiffuse},
+            {"material_temporal_stable_glossy", contract.materials.materialTemporalStableGlossy},
+            {"material_temporal_mirror_locked", contract.materials.materialTemporalMirrorLocked},
+            {"material_temporal_emissive_locked", contract.materials.materialTemporalEmissiveLocked},
+            {"material_temporal_water_view_dependent", contract.materials.materialTemporalWaterViewDependent},
+            {"material_post_normal", contract.materials.materialPostNormal},
+            {"material_post_bloom_emitter", contract.materials.materialPostBloomEmitter},
+            {"material_post_exposure_protected", contract.materials.materialPostExposureProtected},
+            {"material_post_wet_highlight", contract.materials.materialPostWetHighlight},
             {"surface_default", contract.materials.surfaceDefault},
             {"surface_glass", contract.materials.surfaceGlass},
             {"surface_mirror", contract.materials.surfaceMirror},
@@ -195,13 +479,31 @@ json FrameContractToJson(const FrameContract& contract) {
             {"validation_errors", contract.materials.validationErrors},
             {"blend_transmission", contract.materials.blendTransmission},
             {"metallic_transmission", contract.materials.metallicTransmission},
-            {"low_roughness_normal", contract.materials.lowRoughnessNormal}
+            {"low_roughness_normal", contract.materials.lowRoughnessNormal},
+            {"resource_prepare_calls", contract.materials.resourcePrepareCalls},
+            {"descriptor_refresh_checks", contract.materials.descriptorRefreshChecks},
+            {"descriptor_table_writes", contract.materials.descriptorTableWrites},
+            {"descriptor_table_allocations", contract.materials.descriptorTableAllocations},
+            {"descriptor_refresh_failures", contract.materials.descriptorRefreshFailures},
+            {"descriptor_tables_ready_after_prepare", contract.materials.descriptorTablesReadyAfterPrepare},
+            {"descriptor_tables_missing_after_prepare", contract.materials.descriptorTablesMissingAfterPrepare}
         }},
         {"lighting", {
             {"rig_id", contract.lighting.rigId},
             {"rig_source", contract.lighting.rigSource},
+            {"shadow_policy_id", contract.lighting.shadowPolicyId},
+            {"exposure_policy_id", contract.lighting.exposurePolicyId},
             {"world_shader_palette_id", contract.lighting.worldShaderPaletteId},
             {"lighting_script_id", contract.lighting.lightingScriptId},
+            {"lighting_balance_policy_id", contract.lighting.lightingBalancePolicyId},
+            {"lighting_balance_policy_active", contract.lighting.lightingBalancePolicyActive},
+            {"lighting_balance_sun_scale", contract.lighting.lightingBalanceSunScale},
+            {"lighting_balance_ambient_scale", contract.lighting.lightingBalanceAmbientScale},
+            {"lighting_balance_local_fixture_scale", contract.lighting.lightingBalanceLocalFixtureScale},
+            {"lighting_balance_local_probe_diffuse_scale", contract.lighting.lightingBalanceLocalProbeDiffuseScale},
+            {"lighting_balance_local_probe_specular_scale", contract.lighting.lightingBalanceLocalProbeSpecularScale},
+            {"lighting_balance_exposure_scale", contract.lighting.lightingBalanceExposureScale},
+            {"lighting_balance_ssao_scale", contract.lighting.lightingBalanceSSAOScale},
             {"safe_rig_on_low_vram", contract.lighting.safeRigOnLowVRAM},
             {"safe_rig_variant_active", contract.lighting.safeRigVariantActive},
             {"exposure", contract.lighting.exposure},
@@ -224,6 +526,15 @@ json FrameContractToJson(const FrameContract& contract) {
             {"shadow_pcf_radius", contract.lighting.shadowPCFRadius},
             {"cascade_split_lambda", contract.lighting.cascadeSplitLambda},
             {"light_count", contract.lighting.lightCount},
+            {"point_light_count", contract.lighting.pointLightCount},
+            {"spot_light_count", contract.lighting.spotLightCount},
+            {"area_rect_light_count", contract.lighting.areaRectLightCount},
+            {"two_sided_area_light_count", contract.lighting.twoSidedAreaLightCount},
+            {"semantic_fixture_light_count", contract.lighting.semanticFixtureLightCount},
+            {"soft_fixture_light_count", contract.lighting.softFixtureLightCount},
+            {"emissive_fixture_light_count", contract.lighting.emissiveFixtureLightCount},
+            {"stage_fixture_light_count", contract.lighting.stageFixtureLightCount},
+            {"practical_fixture_light_count", contract.lighting.practicalFixtureLightCount},
             {"shadow_casting_light_count", contract.lighting.shadowCastingLightCount},
             {"total_light_intensity", contract.lighting.totalLightIntensity},
             {"max_light_intensity", contract.lighting.maxLightIntensity}
@@ -356,6 +667,7 @@ json FrameContractToJson(const FrameContract& contract) {
             {"grass_capacity", contract.vegetation.grassCapacity}
         }},
         {"cinematic_post", {
+            {"quality_set_id", contract.cinematicPost.qualitySetId},
             {"enabled", contract.cinematicPost.enabled},
             {"post_process_planned", contract.cinematicPost.postProcessPlanned},
             {"post_process_executed", contract.cinematicPost.postProcessExecuted},
@@ -388,7 +700,22 @@ json FrameContractToJson(const FrameContract& contract) {
             {"dof_aperture", contract.cinematicPost.dofAperture},
             {"warm", contract.cinematicPost.warm},
             {"cool", contract.cinematicPost.cool},
-            {"god_ray_intensity", contract.cinematicPost.godRayIntensity}
+            {"god_ray_intensity", contract.cinematicPost.godRayIntensity},
+            {"stability_policy_active", contract.cinematicPost.stabilityPolicyActive},
+            {"material_motion_damping", contract.cinematicPost.materialMotionDamping},
+            {"reflection_debug_stability", contract.cinematicPost.reflectionDebugStability},
+            {"shadow_softness_scale", contract.cinematicPost.shadowSoftnessScale},
+            {"highlight_protection", contract.cinematicPost.highlightProtection},
+            {"look_policy_active", contract.cinematicPost.lookPolicyActive},
+            {"black_toe_lift", contract.cinematicPost.blackToeLift},
+            {"highlight_rolloff", contract.cinematicPost.highlightRolloff},
+            {"color_separation", contract.cinematicPost.colorSeparation},
+            {"halation_strength", contract.cinematicPost.halationStrength},
+            {"exposure_policy_active", contract.cinematicPost.exposurePolicyActive},
+            {"profile_exposure_trim", contract.cinematicPost.profileExposureTrim},
+            {"hdr_shoulder_start", contract.cinematicPost.hdrShoulderStart},
+            {"hdr_shoulder_strength", contract.cinematicPost.hdrShoulderStrength},
+            {"post_white_compression", contract.cinematicPost.postWhiteCompression}
         }},
         {"motion_vectors", {
             {"planned", contract.motionVectors.planned},

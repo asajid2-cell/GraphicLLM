@@ -78,6 +78,18 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.assetMemory.rtStructureBudgetExceeded) {
         warn("asset_rt_structure_budget_exceeded");
     }
+    if (contract.health.descriptorTransientBudget > 0 &&
+        contract.health.descriptorTransientUsed > contract.health.descriptorTransientBudget) {
+        warn("descriptor_transient_usage_exceeds_budget:used=" +
+             std::to_string(contract.health.descriptorTransientUsed) +
+             ":budget=" + std::to_string(contract.health.descriptorTransientBudget));
+    }
+    if (contract.health.descriptorPersistentBudget > 0 &&
+        contract.health.descriptorPersistentUsed > contract.health.descriptorPersistentBudget) {
+        warn("descriptor_persistent_usage_exceeds_reserved_budget:used=" +
+             std::to_string(contract.health.descriptorPersistentUsed) +
+             ":budget=" + std::to_string(contract.health.descriptorPersistentBudget));
+    }
     if (contract.environment.loaded && contract.environment.active.empty()) {
         warn("environment_loaded_without_active_id");
     }
@@ -110,6 +122,74 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.environment.rotationDegrees < 0.0f ||
         contract.environment.rotationDegrees >= 360.0f) {
         warn("environment_rotation_out_of_range");
+    }
+    if (contract.sceneVisual.active) {
+        if (contract.sceneVisual.profileId.empty() ||
+            contract.sceneVisual.profileId == "unprofiled") {
+            warn("scene_visual_profile_missing");
+        }
+        if (contract.sceneVisual.environmentOwner.empty() ||
+            contract.sceneVisual.environmentOwner == "unknown") {
+            warn("scene_visual_environment_owner_unknown");
+        }
+        if (contract.sceneVisual.reflectionOwner.empty() ||
+            contract.sceneVisual.reflectionOwner == "unknown") {
+            warn("scene_visual_reflection_owner_unknown");
+        }
+        if (contract.sceneVisual.shadowPolicyId.empty() ||
+            contract.sceneVisual.shadowPolicyId == "default") {
+            warn("scene_visual_shadow_policy_missing");
+        }
+        if (contract.sceneVisual.exposurePolicyId.empty() ||
+            contract.sceneVisual.exposurePolicyId == "default") {
+            warn("scene_visual_exposure_policy_missing");
+        }
+        if (contract.sceneVisual.materialClassSetId.empty() ||
+            contract.sceneVisual.materialClassSetId == "default") {
+            warn("scene_visual_material_class_set_missing");
+        }
+        if (contract.sceneVisual.materialLayerSetId.empty() ||
+            contract.sceneVisual.materialLayerSetId == "default") {
+            warn("scene_visual_material_layer_set_missing");
+        }
+        if (contract.sceneVisual.postQualitySetId.empty() ||
+            contract.sceneVisual.postQualitySetId == "default") {
+            warn("scene_visual_post_quality_set_missing");
+        }
+        if (contract.sceneVisual.enclosedScene &&
+            contract.sceneVisual.invalidExternalHDRI) {
+            warn("scene_visual_enclosed_external_hdri_visible:profile=" +
+                 contract.sceneVisual.profileId +
+                 ":environment_owner=" + contract.sceneVisual.environmentOwner);
+        }
+        if (contract.sceneVisual.enclosedScene &&
+            contract.sceneVisual.reflectionOwner.find("visible_ibl") != std::string::npos &&
+            !contract.sceneVisual.visibleExternalHDRIAllowed) {
+            warn("scene_visual_enclosed_visible_ibl_reflection_owner:profile=" +
+                 contract.sceneVisual.profileId +
+                 ":reflection_owner=" + contract.sceneVisual.reflectionOwner);
+        }
+        if (contract.sceneVisual.enclosedScene &&
+            contract.features.visibilityBufferEnabled &&
+            contract.sceneVisual.localReflectionProbeRigId != "none") {
+            if (!contract.environment.localReflectionProbeRadianceEnabled) {
+                warn("scene_visual_local_probe_radiance_disabled:profile=" +
+                     contract.sceneVisual.profileId +
+                     ":probe_rig=" + contract.sceneVisual.localReflectionProbeRigId);
+            }
+            if (contract.environment.localReflectionProbeDiffuseIntensity <= 0.0f &&
+                contract.environment.localReflectionProbeSpecularIntensity <= 0.0f) {
+                warn("scene_visual_local_probe_radiance_zero:profile=" +
+                     contract.sceneVisual.profileId +
+                     ":probe_rig=" + contract.sceneVisual.localReflectionProbeRigId);
+            }
+            if (contract.environment.localReflectionProbeCount == 0 ||
+                !contract.environment.localReflectionProbeTableValid) {
+                warn("scene_visual_local_probe_table_missing:profile=" +
+                     contract.sceneVisual.profileId +
+                     ":probe_rig=" + contract.sceneVisual.localReflectionProbeRigId);
+            }
+        }
     }
 
     if (!contract.features.voxelBackendEnabled) {
@@ -252,11 +332,44 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     if (contract.lighting.rigSource.empty()) {
         warn("lighting_rig_source_missing");
     }
+    if (contract.sceneVisual.active &&
+        contract.lighting.shadowPolicyId != contract.sceneVisual.shadowPolicyId) {
+        warn("lighting_shadow_policy_mismatch:lighting=" +
+             contract.lighting.shadowPolicyId +
+             ":scene_visual=" + contract.sceneVisual.shadowPolicyId);
+    }
+    if (contract.sceneVisual.active &&
+        contract.lighting.exposurePolicyId != contract.sceneVisual.exposurePolicyId) {
+        warn("lighting_exposure_policy_mismatch:lighting=" +
+             contract.lighting.exposurePolicyId +
+             ":scene_visual=" + contract.sceneVisual.exposurePolicyId);
+    }
     if (contract.lighting.worldShaderPaletteId.empty()) {
         warn("lighting_world_shader_palette_missing");
     }
     if (contract.lighting.lightingScriptId.empty()) {
         warn("lighting_script_id_missing");
+    }
+    if (contract.sceneVisual.active &&
+        contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+        !contract.lighting.lightingBalancePolicyActive) {
+        warn("lighting_balance_policy_inactive");
+    }
+    if (contract.lighting.lightingBalancePolicyActive &&
+        (contract.lighting.lightingBalancePolicyId.empty() ||
+         contract.lighting.lightingBalanceSunScale <= 0.0f ||
+         contract.lighting.lightingBalanceAmbientScale <= 0.0f ||
+         contract.lighting.lightingBalanceLocalFixtureScale <= 0.0f ||
+         contract.lighting.lightingBalanceLocalProbeDiffuseScale < 0.0f ||
+         contract.lighting.lightingBalanceLocalProbeSpecularScale < 0.0f ||
+         contract.lighting.lightingBalanceExposureScale <= 0.0f ||
+         contract.lighting.lightingBalanceSSAOScale <= 0.0f ||
+         contract.lighting.lightingBalanceSunScale > 1.25f ||
+         contract.lighting.lightingBalanceAmbientScale > 1.25f ||
+         contract.lighting.lightingBalanceLocalFixtureScale > 1.25f ||
+         contract.lighting.lightingBalanceExposureScale > 1.25f ||
+         contract.lighting.lightingBalanceSSAOScale > 2.5f)) {
+        warn("lighting_balance_policy_invalid");
     }
     if (contract.lighting.safeRigVariantActive && contract.lighting.rigId == "custom") {
         warn("lighting_safe_variant_active_for_custom_rig");
@@ -318,6 +431,61 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
              std::to_string(materialClassTotal) +
              ":sampled=" + std::to_string(contract.materials.sampled));
     }
+    const uint32_t sceneMaterialClassTotal =
+        contract.materials.sceneMaterialDefault +
+        contract.materials.sceneMaterialPaintedWall +
+        contract.materials.sceneMaterialCeramicTile +
+        contract.materials.sceneMaterialPolishedWood +
+        contract.materials.sceneMaterialBrushedMetal +
+        contract.materials.sceneMaterialPolishedMetal +
+        contract.materials.sceneMaterialGlassPane +
+        contract.materials.sceneMaterialFabric +
+        contract.materials.sceneMaterialPlastic +
+        contract.materials.sceneMaterialWetSurface +
+        contract.materials.sceneMaterialEmissiveNeon +
+        contract.materials.sceneMaterialScreenPanel +
+        contract.materials.sceneMaterialConcrete +
+        contract.materials.sceneMaterialRubber +
+        contract.materials.sceneMaterialWater +
+        contract.materials.sceneMaterialMirror;
+    if (sceneMaterialClassTotal != contract.materials.sampled) {
+        warn("scene_material_class_count_mismatch:classes=" +
+             std::to_string(sceneMaterialClassTotal) +
+             ":sampled=" + std::to_string(contract.materials.sampled));
+    }
+    const uint32_t materialReflectionPreferenceTotal =
+        contract.materials.materialReflectionNeutralFallback +
+        contract.materials.materialReflectionLocalProbe +
+        contract.materials.materialReflectionProbeGrid +
+        contract.materials.materialReflectionPlanarProbe +
+        contract.materials.materialReflectionSSR +
+        contract.materials.materialReflectionRT;
+    if (materialReflectionPreferenceTotal != contract.materials.sampled) {
+        warn("material_reflection_preference_count_mismatch:preferences=" +
+             std::to_string(materialReflectionPreferenceTotal) +
+             ":sampled=" + std::to_string(contract.materials.sampled));
+    }
+    const uint32_t materialTemporalPolicyTotal =
+        contract.materials.materialTemporalStableDiffuse +
+        contract.materials.materialTemporalStableGlossy +
+        contract.materials.materialTemporalMirrorLocked +
+        contract.materials.materialTemporalEmissiveLocked +
+        contract.materials.materialTemporalWaterViewDependent;
+    if (materialTemporalPolicyTotal != contract.materials.sampled) {
+        warn("material_temporal_policy_count_mismatch:policies=" +
+             std::to_string(materialTemporalPolicyTotal) +
+             ":sampled=" + std::to_string(contract.materials.sampled));
+    }
+    const uint32_t materialPostSensitivityTotal =
+        contract.materials.materialPostNormal +
+        contract.materials.materialPostBloomEmitter +
+        contract.materials.materialPostExposureProtected +
+        contract.materials.materialPostWetHighlight;
+    if (materialPostSensitivityTotal != contract.materials.sampled) {
+        warn("material_post_sensitivity_count_mismatch:policies=" +
+             std::to_string(materialPostSensitivityTotal) +
+             ":sampled=" + std::to_string(contract.materials.sampled));
+    }
     auto materialCountExceedsSampled = [&](uint32_t count, const char* name) {
         if (count > contract.materials.sampled) {
             warn(std::string("material_advanced_count_exceeds_sampled:") + name +
@@ -337,6 +505,16 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
     materialCountExceedsSampled(contract.materials.advancedWetness, "advanced_wetness");
     materialCountExceedsSampled(contract.materials.advancedEmissiveBloom, "advanced_emissive_bloom");
     materialCountExceedsSampled(contract.materials.advancedProceduralMask, "advanced_procedural_mask");
+    materialCountExceedsSampled(contract.materials.materialClassPolicyApplied,
+                                "material_class_policy_applied");
+    materialCountExceedsSampled(contract.materials.materialPolicyRoughnessClamped,
+                                "material_policy_roughness_clamped");
+    materialCountExceedsSampled(contract.materials.materialPolicyNormalClamped,
+                                "material_policy_normal_clamped");
+    materialCountExceedsSampled(contract.materials.materialPolicyProceduralClamped,
+                                "material_policy_procedural_clamped");
+    materialCountExceedsSampled(contract.materials.materialPolicyReflectionStable,
+                                "material_policy_reflection_stable");
     const uint32_t advancedFeatureSum =
         contract.materials.advancedClearcoat +
         contract.materials.advancedTransmission +
@@ -350,6 +528,24 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.materials.advancedProceduralMask;
     if (contract.materials.advancedFeatureMaterials > 0 && advancedFeatureSum == 0) {
         warn("material_advanced_feature_materials_without_feature_counts");
+    }
+    if (contract.materials.resourcePrepareCalls > 0 &&
+        contract.materials.descriptorRefreshFailures > 0) {
+        warn("material_descriptor_refresh_failures:count=" +
+             std::to_string(contract.materials.descriptorRefreshFailures));
+    }
+    if (contract.materials.resourcePrepareCalls > 0 &&
+        contract.materials.descriptorTablesMissingAfterPrepare > 0) {
+        warn("material_descriptor_tables_missing_after_prepare:count=" +
+             std::to_string(contract.materials.descriptorTablesMissingAfterPrepare));
+    }
+    if (contract.materials.descriptorTablesReadyAfterPrepare >
+        contract.materials.resourcePrepareCalls) {
+        warn("material_descriptor_ready_count_exceeds_prepare_calls");
+    }
+    if (contract.materials.descriptorTableWrites >
+        contract.materials.descriptorRefreshChecks) {
+        warn("material_descriptor_writes_exceed_refresh_checks");
     }
     auto classMismatch = [](uint32_t a, uint32_t b) {
         return static_cast<uint32_t>(std::abs(static_cast<int64_t>(a) - static_cast<int64_t>(b)));
@@ -771,6 +967,67 @@ void ValidateFrameContractSnapshot(FrameContract& contract,
         contract.cinematicPost.dofAperture < 0.0f ||
         contract.cinematicPost.dofAperture > 8.0f) {
         warn("cinematic_post_params_out_of_range");
+    }
+    if (contract.sceneVisual.active &&
+        contract.cinematicPost.qualitySetId != contract.sceneVisual.postQualitySetId) {
+        warn("cinematic_post_quality_set_mismatch:post=" +
+             contract.cinematicPost.qualitySetId +
+             ":scene_visual=" + contract.sceneVisual.postQualitySetId);
+    }
+    if (contract.sceneVisual.active &&
+        contract.sceneVisual.postQualitySetId != "default" &&
+        contract.cinematicPost.enabled) {
+        if (contract.cinematicPost.bloomIntensity > 0.0f &&
+            (!contract.cinematicPost.bloomPlanned || !contract.cinematicPost.bloomExecuted)) {
+            warn("cinematic_post_bloom_intensity_without_executed_bloom");
+        }
+        if (contract.cinematicPost.vignette <= 0.0f &&
+            contract.cinematicPost.lensDirt <= 0.0f &&
+            contract.cinematicPost.bloomIntensity <= 0.0f &&
+            contract.cinematicPost.contrast <= 1.0f &&
+            contract.cinematicPost.saturation <= 1.0f) {
+            warn("cinematic_post_quality_set_has_no_active_shape");
+        }
+        if (contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+            !contract.cinematicPost.stabilityPolicyActive) {
+            warn("cinematic_post_stability_policy_inactive");
+        }
+        if (contract.cinematicPost.stabilityPolicyActive &&
+            (contract.cinematicPost.materialMotionDamping <= 0.0f ||
+             contract.cinematicPost.shadowSoftnessScale < 1.0f ||
+             contract.cinematicPost.highlightProtection <= 0.0f)) {
+            warn("cinematic_post_stability_policy_invalid");
+        }
+        if (contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+            !contract.cinematicPost.lookPolicyActive) {
+            warn("cinematic_post_look_policy_inactive");
+        }
+        if (contract.cinematicPost.lookPolicyActive &&
+            (contract.cinematicPost.blackToeLift < 0.0f ||
+             contract.cinematicPost.blackToeLift > 0.18f ||
+             contract.cinematicPost.highlightRolloff <= 0.0f ||
+             contract.cinematicPost.highlightRolloff > 0.55f ||
+             contract.cinematicPost.colorSeparation < 0.0f ||
+             contract.cinematicPost.colorSeparation > 0.55f ||
+             contract.cinematicPost.halationStrength < 0.0f ||
+             contract.cinematicPost.halationStrength > 0.65f)) {
+            warn("cinematic_post_look_policy_invalid");
+        }
+        if (contract.sceneVisual.postQualitySetId == "scene_local_cinematic_post_quality_v1" &&
+            !contract.cinematicPost.exposurePolicyActive) {
+            warn("cinematic_post_exposure_policy_inactive");
+        }
+        if (contract.cinematicPost.exposurePolicyActive &&
+            (contract.cinematicPost.profileExposureTrim < 0.50f ||
+             contract.cinematicPost.profileExposureTrim > 1.10f ||
+             contract.cinematicPost.hdrShoulderStart < 1.0f ||
+             contract.cinematicPost.hdrShoulderStart > 24.0f ||
+             contract.cinematicPost.hdrShoulderStrength < 0.0f ||
+             contract.cinematicPost.hdrShoulderStrength > 0.80f ||
+             contract.cinematicPost.postWhiteCompression < 0.0f ||
+             contract.cinematicPost.postWhiteCompression > 0.70f)) {
+            warn("cinematic_post_exposure_policy_invalid");
+        }
     }
     if (contract.cinematicPost.colorGradePreset.empty()) {
         warn("cinematic_post_color_grade_preset_missing");

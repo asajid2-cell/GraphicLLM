@@ -942,6 +942,133 @@ float3 SamplePostSceneLocalReflectionSource(float3 reflectionDir,
     return SoftLimitReflectionLuma(source, fireflyClampLuma);
 }
 
+float3 ComputePostSceneLocalReflectionStructure(float3 reflectionDir,
+                                                float3 worldPos,
+                                                float3 normal,
+                                                uint surfaceClass,
+                                                uint sceneMaterialClass,
+                                                float roughness,
+                                                float metallic)
+{
+    reflectionDir = normalize(reflectionDir);
+    normal = normalize(normal);
+
+    float3 keyColor = NormalizedPostKeyLightColor();
+    float3 keyDir = PostKeyLightDirection();
+    float3 ambientBase = max(g_AmbientColor.rgb, 0.012f.xxx);
+
+    const bool glassLike =
+        surfaceClass == SURFACE_CLASS_GLASS ||
+        sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE ||
+        surfaceClass == SURFACE_CLASS_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR;
+    const bool waterLike =
+        SurfaceIsWater(surfaceClass) ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER ||
+        sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE;
+    const bool metalLike =
+        surfaceClass == SURFACE_CLASS_BRUSHED_METAL ||
+        sceneMaterialClass == SCENE_MATERIAL_BRUSHED_METAL ||
+        sceneMaterialClass == SCENE_MATERIAL_POLISHED_METAL ||
+        metallic > 0.62f;
+
+    float gloss = saturate(1.0f - roughness);
+    float horizon = 1.0f - abs(reflectionDir.y);
+    float ceiling = saturate(reflectionDir.y * 0.5f + 0.5f);
+    float floorBounce = saturate(-reflectionDir.y * 0.5f + 0.5f);
+    float frontKey = saturate(
+        dot(normalize(reflectionDir.xz + 1e-4f.xx), normalize(keyDir.xz + 1e-4f.xx)) * 0.5f + 0.5f);
+
+    float broadWindow = pow(frontKey, lerp(8.0f, 22.0f, gloss));
+    float horizonLine = pow(saturate(horizon), lerp(3.0f, 10.0f, gloss));
+    float floorLine = pow(floorBounce, 5.0f) * horizonLine;
+
+    // Stable, low-frequency world-space variation: enough structure for
+    // glossy surfaces to read as reflecting a local room, but not screen-space
+    // detail that jitters with mouse-look.
+    float roomStripeA = 0.5f + 0.5f * sin(dot(worldPos.xz, float2(0.115f, 0.073f)) + g_CinematicParams.y * 0.03f);
+    float roomStripeB = 0.5f + 0.5f * sin(worldPos.y * 0.170f + worldPos.x * 0.045f);
+    float architecturalBreakup = lerp(roomStripeA, roomStripeA * roomStripeB, 0.35f);
+    architecturalBreakup = smoothstep(0.18f, 0.92f, architecturalBreakup);
+
+    float3 upperTint = ambientBase * 0.55f + keyColor * 0.050f;
+    float3 lowerTint = ambientBase * 0.42f + float3(0.040f, 0.034f, 0.028f);
+    if (glassLike || waterLike) {
+        upperTint += float3(0.020f, 0.060f, 0.100f);
+    }
+    if (metalLike) {
+        upperTint = lerp(upperTint, float3(0.090f, 0.100f, 0.115f), 0.35f);
+        lowerTint = lerp(lowerTint, float3(0.050f, 0.045f, 0.040f), 0.35f);
+    }
+
+    float3 structured = lerp(lowerTint, upperTint, ceiling);
+    structured += keyColor * broadWindow * lerp(0.035f, 0.180f, gloss);
+    structured += lerp(float3(0.050f, 0.070f, 0.090f), keyColor, 0.35f) *
+                  horizonLine *
+                  lerp(0.014f, 0.080f, gloss) *
+                  lerp(0.65f, 1.25f, architecturalBreakup);
+    structured += float3(0.070f, 0.052f, 0.034f) *
+                  floorLine *
+                  lerp(0.015f, 0.070f, gloss);
+
+    float normalFacing = saturate(abs(dot(normal, reflectionDir)) * 0.35f + 0.65f);
+    float materialBoost = 1.0f;
+    if (glassLike) {
+        materialBoost = 1.16f;
+    } else if (waterLike) {
+        materialBoost = 1.24f;
+    } else if (metalLike) {
+        materialBoost = 1.10f;
+    }
+
+    return max(structured * normalFacing * materialBoost, 0.0f.xxx);
+}
+
+float3 ResolveV2SceneLocalReflectionRadiance(float3 reflectionDir,
+                                             float3 worldPos,
+                                             float3 normal,
+                                             uint surfaceClass,
+                                             uint sceneMaterialClass,
+                                             float roughness,
+                                             float metallic,
+                                             float fireflyClampLuma)
+{
+    float3 ownedSource = SamplePostSceneLocalReflectionSource(
+        reflectionDir,
+        surfaceClass,
+        sceneMaterialClass,
+        roughness,
+        metallic,
+        fireflyClampLuma);
+
+    float3 localStructure = ComputePostSceneLocalReflectionStructure(
+        reflectionDir,
+        worldPos,
+        normal,
+        surfaceClass,
+        sceneMaterialClass,
+        roughness,
+        metallic);
+
+    float gloss = saturate(1.0f - roughness);
+    float localProbeActive = (g_LocalProbeParams.z > 0.5f) ? 1.0f : 0.0f;
+    float enclosedBias = saturate(localProbeActive + (1.0f - g_EnvParams.z) * 0.5f);
+    float structureWeight = saturate(enclosedBias * lerp(0.26f, 0.58f, gloss));
+    if (sceneMaterialClass == SCENE_MATERIAL_WATER ||
+        sceneMaterialClass == SCENE_MATERIAL_WET_SURFACE ||
+        surfaceClass == SURFACE_CLASS_WATER) {
+        structureWeight = max(structureWeight, 0.42f);
+    }
+    if (sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE ||
+        surfaceClass == SURFACE_CLASS_GLASS ||
+        surfaceClass == SURFACE_CLASS_MIRROR) {
+        structureWeight = max(structureWeight, 0.36f);
+    }
+
+    float3 resolved = lerp(ownedSource, max(ownedSource, localStructure), structureWeight);
+    return SoftLimitReflectionLuma(resolved, fireflyClampLuma);
+}
+
 float3 SceneMaterialCinematicReflectionTint(uint sceneMaterialClass,
                                             uint surfaceClass,
                                             float roughness,
@@ -2021,8 +2148,9 @@ float4 PSMain(VSOutput input) : SV_TARGET
             rtReflectionFireflyClampLuma);
     }
     // Gate the V2 source sheen with the same owned-source potential reported by
-    // debug view 56. The sampler below still chooses between authorized IBL and
-    // scene-local radiance, so enclosed scenes remain protected from HDRI bleed.
+    // debug view 56. The resolver below still chooses between authorized IBL and
+    // scene-local radiance, then adds stable room-local structure only inside
+    // the opt-in candidate path.
     float candidateLocalProbeWeight =
         saturate(authorizedPrelitReflectionPotential * 10.0f) *
         saturate(reflectionStabilityScale) *
@@ -2031,12 +2159,14 @@ float4 PSMain(VSOutput input) : SV_TARGET
             roughness,
             metallic,
             transmission,
-            dielectricFresnel) * 0.55f);
-    candidateLocalProbeWeight *= lerp(1.0f, 0.35f, saturate(candidateWeightSum));
+            dielectricFresnel) * 0.72f);
+    candidateLocalProbeWeight *= lerp(1.0f, 0.52f, saturate(candidateWeightSum));
     if (candidateLocalProbeWeight > 1e-4f)
     {
-        float3 localProbeSheenColor = SamplePostSceneLocalReflectionSource(
+        float3 localProbeSheenColor = ResolveV2SceneLocalReflectionRadiance(
             reflect(-viewForFresnel, gbufNormal),
+            worldForFresnel,
+            gbufNormal,
             surfaceClass,
             sceneMaterialClass,
             roughness,

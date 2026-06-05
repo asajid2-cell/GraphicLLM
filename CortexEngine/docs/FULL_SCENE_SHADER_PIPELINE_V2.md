@@ -3040,3 +3040,82 @@ Current interpretation:
 - The env hook proves the same beauty-toggle path in packet automation.
 - The candidate is still not default-ready; user/visual review should happen
   through the checkbox before promotion.
+
+### Structured Scene-Local Reflection Candidate - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/PostProcess.hlsl`
+  - adds `ComputePostSceneLocalReflectionStructure`.
+  - adds `ResolveV2SceneLocalReflectionRadiance`.
+  - replaces the older one-source V2 local sheen call with the resolved
+    scene-local radiance path.
+  - uses stable reflection-direction/world-position terms for broad
+    architectural breakup, horizon/floor bounce, and key-light strips.
+  - keeps the path behind debug view `58` or the default-off
+    `V2 reflection candidate (review)` toggle.
+  - default beauty remains unchanged when the review toggle is off.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive,glass_water_courtyard:glass_canopy,dragon_over_water:floor_reflection_closeup" -ViewFilter "beauty,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_struct_refl_20260605
+python tools\build_full_scene_shader_v2_review_sheet.py --manifest build\captures\v2_struct_refl_20260605\manifest.json --output build\captures\v2_struct_refl_20260605\v2_structured_reflection_review_sheet.jpg --summary-json build\captures\v2_struct_refl_20260605\v2_structured_reflection_review_sheet.json --summary-md build\captures\v2_struct_refl_20260605\v2_structured_reflection_review_sheet.md
+$env:CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive" -ViewFilter "beauty,reflection_resolver_candidate,reflection_resolver_candidate_delta,reflection_source_weights,reflection_source_authority" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/v2_struct_refl_toggle_20260605; Remove-Item Env:\CORTEX_V2_REFLECTION_CANDIDATE_BEAUTY -ErrorAction SilentlyContinue
+```
+
+Results:
+
+- packet:
+  `build/captures/v2_struct_refl_20260605`.
+- captured views: `24`.
+- source-signal families: `4/4`.
+- candidate-delta families: `4/4`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+- review sheet:
+  `build/captures/v2_struct_refl_20260605/v2_structured_reflection_review_sheet.jpg`.
+- env/P-menu beauty-toggle path packet:
+  `build/captures/v2_struct_refl_toggle_20260605`.
+- beauty-toggle source-signal families: `2/2`.
+- beauty-toggle candidate-delta families: `2/2`.
+- beauty-toggle reflection candidate warnings/failures: `0/0`.
+- beauty-toggle sequence stability warnings/failures: `0/0`.
+
+Candidate delta compared with the previous broader glossy gate:
+
+| Stress Family | Previous Delta Luma | Structured Delta Luma | Previous Delta Nonblack | Structured Delta Nonblack |
+|---|---:|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00955596` | `0.01253093` | `0.07552409` | `0.07989692` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00991124` | `0.01315398` | `0.16202257` | `0.16984158` |
+| `stress_material_lab_glass_emissive` | `0.01555773` | `0.01941374` | `0.13664931` | `0.13757161` |
+| `stress_rt_showcase_reflection_closeup` | `0.02144538` | `0.02852098` | `0.17576714` | `0.18127604` |
+
+Structured candidate stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00291844` | `0.00289316` | `0.991` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00121205` | `0.00117808` | `0.972` |
+| `stress_material_lab_glass_emissive` | `0.00152219` | `0.00148692` | `0.977` |
+| `stress_rt_showcase_reflection_closeup` | `0.00487044` | `0.00478890` | `0.983` |
+
+Operational note:
+
+- An initial packet using the longer output folder
+  `full_scene_shader_pipeline_v2_structured_reflection_candidate_20260605`
+  failed because one dragon delta BMP capture path was too long to open.
+  The same packet passed under the shorter `v2_struct_refl_20260605` root.
+
+Current interpretation:
+
+- The V2 review candidate now has a stronger scene-local glossy response on
+  all four stress bookmarks.
+- The stronger candidate still does not increase motion instability versus
+  beauty in the stress packet.
+- This is still a candidate/review path, not default beauty.
+- Next work should either run interactive user review from the P-menu checkbox
+  or begin the real render-graph reflection-radiance buffer that can replace
+  the post-only approximation.

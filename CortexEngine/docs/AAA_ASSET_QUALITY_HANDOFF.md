@@ -1365,3 +1365,81 @@ Next concrete feature:
   instance id readiness.
 - Keep `gbuffer.domain_ready=false` until material id/object id/debug-source
   ownership is genuinely promoted.
+
+## Full Scene Shader V2 Identity Ownership Slice - 2026-06-05
+
+Implemented:
+
+- `visibility_buffer` is now reported as a frame-contract resource.
+- draw counts now include:
+  - `visibility_buffer_materials`.
+  - `visibility_buffer_invalid_stable_ids`.
+- V2 GBuffer evidence now includes:
+  - `visibility_payload_channel_ready`.
+  - `visibility_payload_producer_ready`.
+  - `instance_identity_table_ready`.
+  - `instance_material_lookup_ready`.
+  - `stable_instance_id_available`.
+  - `visibility_buffer_instance_count`.
+  - `visibility_buffer_material_count`.
+  - `invalid_stable_instance_id_count`.
+- `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  and `tools/check_full_scene_shader_pipeline_v2_frame_report.py` require the
+  new identity evidence.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\FrameContract.h src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\Renderer_VisibilityBufferCollection.cpp src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json tools\check_full_scene_shader_pipeline_v2_frame_report.py
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- diff check: passed.
+- executable target build: passed.
+- V2 packet: passed.
+- `ctest`: ran but reported `No tests were found`.
+
+Build caveat:
+
+- `.\build.ps1 -Config Release` hung in `tools/sync_assets.cmake`.
+- The stuck `cmake`/`ninja` processes were stopped.
+- The direct `CortexEngine` target build with the VS environment passed.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605`.
+- captured views: `7`.
+- evidence rows: `70`.
+- failures: `0`.
+- gallery beauty GBuffer identity:
+  - `visibility_payload_channel_ready=true`.
+  - `visibility_payload_producer_ready=true`.
+  - `instance_identity_table_ready=true`.
+  - `instance_material_lookup_ready=true`.
+  - `stable_instance_id_available=true`.
+  - `visibility_buffer_instance_count=55`.
+  - `visibility_buffer_material_count=36`.
+  - `invalid_stable_instance_id_count=0`.
+  - `missing_required_channel_count=0`.
+  - `missing_ownership_channel_count=3`.
+  - `gbuffer.domain_ready=false`.
+  - failure reason:
+    `Stable per-pixel material-id channel is not promoted`.
+
+Next:
+
+- Continue with `FSSP-V2-003B Per-Pixel Identity Debug`.
+- Add or expose material-id/object-id debug views from the visibility payload
+  and instance/material tables.
+- Do not promote V2 beauty yet.

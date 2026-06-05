@@ -173,6 +173,15 @@ def validate_runtime_source_surface() -> list[str]:
         "BuildFullSceneShaderFrameContext",
         "BuildFullSceneMaterialModelEvidence(contract.materials)",
         "BuildFullSceneGBufferEvidence",
+        "visibilityPayloadChannelReady",
+        "visibilityPayloadProducerReady",
+        "instanceIdentityTableReady",
+        "instanceMaterialLookupReady",
+        "stableInstanceIdAvailable",
+        "visibilityBufferInstanceCount",
+        "visibilityBufferMaterialCount",
+        "invalidStableInstanceIdCount",
+        "FullSceneShaderHasResource(contract, \"visibility_buffer\")",
         "Stable per-pixel material-id channel is not promoted",
         "Stable per-pixel object-id channel is not promoted",
         "Debug-view producer ownership is not reported",
@@ -187,6 +196,14 @@ def validate_runtime_source_surface() -> list[str]:
     for field in frame_contract.get("common_evidence_fields", []):
         if f'"{field}"' not in source:
             errors.append(f"runtime JSON source missing common evidence field {field}")
+
+    for token in [
+        '"visibility_buffer"',
+        '"visibility_buffer_materials"',
+        '"visibility_buffer_invalid_stable_ids"',
+    ]:
+        if token not in runtime_surface:
+            errors.append(f"runtime JSON source missing identity ownership token {token}")
 
     for section in frame_contract.get("required_sections", []):
         if not isinstance(section, dict):

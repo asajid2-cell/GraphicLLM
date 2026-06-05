@@ -729,6 +729,8 @@ struct FrameContract {
         uint32_t shadowDraws = 0;
         uint32_t opaqueDraws = 0;
         uint32_t visibilityBufferInstances = 0;
+        uint32_t visibilityBufferMaterials = 0;
+        uint32_t visibilityBufferInvalidStableIds = 0;
         uint32_t visibilityBufferMeshes = 0;
         uint32_t visibilityBufferDrawBatches = 0;
         uint32_t indirectExecuteCalls = 0;

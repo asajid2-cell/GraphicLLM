@@ -33,11 +33,14 @@ Implemented baseline:
 - V2 packet harness exists and can capture gallery debug evidence.
 - Runtime material evidence is promoted for the gallery packet.
 - GBuffer required resources and producers are reported.
+- Visibility payload, instance identity table, material lookup table, and
+  stable instance id evidence are packet-proved for the gallery packet.
 
 Known blockers:
 
 - GBuffer ownership is still incomplete because stable per-pixel material id,
-  object id, and debug producer-source ownership are not promoted.
+  object id, and debug producer-source ownership are not promoted. The broad
+  identity substrate exists; the remaining gap is per-pixel/debug exposure.
 - Lighting is still partly profile/bootstrap driven instead of a semantic
   scene light rig.
 - Reflection ownership still needs local room, hero, planar, SSR, RT, neutral,

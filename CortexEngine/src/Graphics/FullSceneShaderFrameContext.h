@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <utility>
 
@@ -64,6 +65,28 @@ struct FullSceneShaderFrameContext {
     bool explicitPassGraphReady = false;
 
     FullSceneMaterialModelEvidence materialModelEvidence;
+
+    struct FullSceneGBufferEvidence {
+        bool enabled = false;
+        bool ready = false;
+        bool channelInventoryAvailable = false;
+        bool albedoChannelReady = false;
+        bool normalRoughnessChannelReady = false;
+        bool emissiveMetallicChannelReady = false;
+        bool extendedMaterialChannelsReady = false;
+        bool semanticMaterialPolicyChannelReady = false;
+        bool materialIdChannelReady = false;
+        bool objectIdChannelReady = false;
+        bool velocityChannelReady = false;
+        bool producerOwnershipAvailable = false;
+        bool debugViewSourceReportAvailable = false;
+        uint32_t missingRequiredChannelCount = 0;
+        uint32_t missingOwnershipChannelCount = 0;
+        std::string owner = "VisibilityBufferRenderer/FullSceneGBufferEvidence";
+        std::string failureReason = "Visibility buffer is not enabled";
+    };
+
+    FullSceneGBufferEvidence gbufferEvidence;
 
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
@@ -129,6 +152,123 @@ inline bool FullSceneShaderHasResource(const FrameContract& contract, const char
         });
 }
 
+inline bool FullSceneShaderPassWritesResource(
+    const FrameContract& contract,
+    const char* passName,
+    const char* resourceName) {
+    return std::any_of(
+        contract.passes.begin(),
+        contract.passes.end(),
+        [passName, resourceName](const FrameContract::PassRecord& pass) {
+            return pass.name == passName &&
+                   pass.planned &&
+                   pass.executed &&
+                   std::any_of(
+                       pass.writes.begin(),
+                       pass.writes.end(),
+                       [resourceName](const std::string& write) {
+                           return write == resourceName;
+                       });
+        });
+}
+
+inline bool FullSceneShaderExecutedProducerWrites(
+    const FrameContract& contract,
+    const char* passName,
+    std::initializer_list<const char*> resourceNames) {
+    return std::all_of(
+        resourceNames.begin(),
+        resourceNames.end(),
+        [&contract, passName](const char* resourceName) {
+            return FullSceneShaderPassWritesResource(contract, passName, resourceName);
+        });
+}
+
+inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBufferEvidence(
+    const FrameContract& contract,
+    bool velocityReady,
+    bool materialPolicyChannelReady,
+    bool extendedMaterialChannelsReady) {
+    FullSceneShaderFrameContext::FullSceneGBufferEvidence evidence;
+    evidence.enabled = contract.features.visibilityBufferEnabled;
+    evidence.albedoChannelReady = FullSceneShaderHasResource(contract, "vb_gbuffer_albedo");
+    evidence.normalRoughnessChannelReady =
+        FullSceneShaderHasResource(contract, "vb_gbuffer_normal_roughness");
+    evidence.emissiveMetallicChannelReady =
+        FullSceneShaderHasResource(contract, "vb_gbuffer_emissive_metallic");
+    evidence.extendedMaterialChannelsReady = extendedMaterialChannelsReady;
+    evidence.semanticMaterialPolicyChannelReady = materialPolicyChannelReady;
+    evidence.velocityChannelReady = velocityReady;
+    evidence.producerOwnershipAvailable =
+        FullSceneShaderExecutedProducerWrites(
+            contract,
+            "VisibilityBuffer",
+            {"vb_gbuffer_albedo",
+             "vb_gbuffer_normal_roughness",
+             "vb_gbuffer_emissive_metallic",
+             "vb_gbuffer_material_ext0",
+             "vb_gbuffer_material_ext1",
+             "vb_gbuffer_material_ext2"}) &&
+        FullSceneShaderPassWritesResource(contract, "MotionVectors", "velocity");
+    evidence.channelInventoryAvailable =
+        evidence.albedoChannelReady &&
+        evidence.normalRoughnessChannelReady &&
+        evidence.emissiveMetallicChannelReady &&
+        evidence.extendedMaterialChannelsReady;
+
+    const bool requiredChannels[] = {
+        evidence.albedoChannelReady,
+        evidence.normalRoughnessChannelReady,
+        evidence.emissiveMetallicChannelReady,
+        evidence.extendedMaterialChannelsReady,
+        evidence.semanticMaterialPolicyChannelReady,
+        evidence.velocityChannelReady,
+        evidence.producerOwnershipAvailable,
+    };
+    for (bool ready : requiredChannels) {
+        if (!ready) {
+            ++evidence.missingRequiredChannelCount;
+        }
+    }
+
+    // These are intentionally false until V2 carries stable per-pixel ids.
+    evidence.materialIdChannelReady = false;
+    evidence.objectIdChannelReady = false;
+    evidence.debugViewSourceReportAvailable = false;
+
+    const bool ownershipChannels[] = {
+        evidence.materialIdChannelReady,
+        evidence.objectIdChannelReady,
+        evidence.debugViewSourceReportAvailable,
+    };
+    for (bool ready : ownershipChannels) {
+        if (!ready) {
+            ++evidence.missingOwnershipChannelCount;
+        }
+    }
+
+    evidence.ready =
+        evidence.enabled &&
+        evidence.missingRequiredChannelCount == 0 &&
+        evidence.missingOwnershipChannelCount == 0;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "Visibility buffer is not enabled";
+    } else if (evidence.missingRequiredChannelCount > 0) {
+        evidence.failureReason = "Required GBuffer resources or producers are missing";
+    } else if (!evidence.materialIdChannelReady) {
+        evidence.failureReason = "Stable per-pixel material-id channel is not promoted";
+    } else if (!evidence.objectIdChannelReady) {
+        evidence.failureReason = "Stable per-pixel object-id channel is not promoted";
+    } else if (!evidence.debugViewSourceReportAvailable) {
+        evidence.failureReason = "Debug-view producer ownership is not reported";
+    } else {
+        evidence.failureReason = "FullSceneFrameData GBuffer ownership is ready";
+    }
+
+    return evidence;
+}
+
 inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
     std::string id,
     bool enabled,
@@ -167,6 +307,11 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         FullSceneShaderHasResource(contract, "velocity") &&
         contract.motionVectors.planned &&
         contract.motionVectors.executed;
+    context.gbufferEvidence = BuildFullSceneGBufferEvidence(
+        contract,
+        context.velocityReady,
+        context.materialPolicyChannelReady,
+        context.extendedMaterialChannelsReady);
     context.jitterReprojectionReady =
         contract.features.taaEnabled &&
         context.velocityReady &&
@@ -206,12 +351,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.materialModelEvidence.failureReason);
     context.gbuffer = MakeFullSceneShaderDomainEvidence(
         "gbuffer",
-        contract.features.visibilityBufferEnabled,
-        context.extendedMaterialChannelsReady &&
-            context.materialPolicyChannelReady &&
-            context.velocityReady,
-        "VisibilityBufferRenderer",
-        "V2 GBuffer policy channels are reported but object-id/debug ownership is not promoted");
+        context.gbufferEvidence.enabled,
+        context.gbufferEvidence.ready,
+        context.gbufferEvidence.owner,
+        context.gbufferEvidence.failureReason);
     context.lighting = MakeFullSceneShaderDomainEvidence(
         "lighting",
         contract.lighting.lightCount > 0 || contract.features.iblEnabled,

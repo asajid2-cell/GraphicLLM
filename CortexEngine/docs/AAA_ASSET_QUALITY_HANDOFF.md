@@ -1201,3 +1201,118 @@ Next recommended implementation:
   broad material policy channels.
 - Keep cross-family promotion blocked until material readiness is shown beyond
   the gallery packet.
+
+## Full Scene Shader Pipeline V2 GBuffer Ownership Evidence Slice - 2026-06-05
+
+Purpose:
+
+- Make Track C honest and actionable.
+- Stop reporting the V2 GBuffer domain as ready merely because broad material
+  policy channels and velocity exist.
+- Separate "required GBuffer resources exist" from "full frame data ownership
+  exists".
+
+Implemented:
+
+- Added `FullSceneGBufferEvidence` inside
+  `src/Graphics/FullSceneShaderFrameContext.h`.
+- The evidence now reports:
+  - channel inventory availability
+  - albedo channel readiness
+  - normal/roughness channel readiness
+  - emissive/metallic channel readiness
+  - extended material channel readiness
+  - semantic material-policy channel readiness
+  - velocity channel readiness
+  - producer ownership availability from pass records
+  - material-id channel readiness
+  - object-id channel readiness
+  - debug-view source ownership readiness
+  - missing required channel count
+  - missing ownership channel count
+- `FrameContractJson.cpp` now emits these sub-gates under
+  `full_scene_shader_pipeline_v2.gbuffer`.
+- The V2 frame-report contract now requires the new GBuffer readiness fields.
+- The V2 checker now requires the GBuffer evidence struct and the explicit
+  not-promoted failure reasons for material id, object id, and debug producer
+  ownership.
+
+Important behavior change:
+
+- `gbuffer.domain_ready` is now `false` until stable per-pixel material ids,
+  object ids, and debug-view source ownership are promoted.
+- This is intentional. The previous green GBuffer row was too broad for the
+  full-scene shader plan.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- src\Graphics\FullSceneShaderFrameContext.h src\Graphics\FrameContractJson.cpp tools\check_full_scene_shader_pipeline_v2_frame_report.py assets\final_art\full_scene_shader_pipeline_v2_frame_report_contract.json
+.\build.ps1 -Config Release
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_gbuffer_ownership_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- native Release build produced a fresh executable at `2026-06-05 03:00:40`.
+  The shell wrapper timed out while waiting, but the underlying CMake/Ninja
+  processes completed and the executable timestamp updated.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- manifest:
+  `build/captures/full_scene_shader_pipeline_v2_gbuffer_ownership_packet_20260605/manifest.json`
+- summary:
+  `build/captures/full_scene_shader_pipeline_v2_gbuffer_ownership_packet_20260605/v2_frame_report_evidence_summary.json`
+- captured views: `7`
+- evidence rows: `70`
+- failures: `0`
+
+GBuffer evidence from the packet:
+
+- `enabled=true`
+- `domain_ready=false`
+- `channel_inventory_available=true`
+- `albedo_channel_ready=true`
+- `normal_roughness_channel_ready=true`
+- `emissive_metallic_channel_ready=true`
+- `extended_material_channels_ready=true`
+- `semantic_material_policy_channel_ready=true`
+- `velocity_channel_ready=true`
+- `producer_ownership_available=true`
+- `missing_required_channel_count=0`
+- `material_id_channel_ready=false`
+- `object_id_channel_ready=false`
+- `debug_view_source_report_available=false`
+- `missing_ownership_channel_count=3`
+- failure reason: `Stable per-pixel material-id channel is not promoted`
+- facade owner: `VisibilityBufferRenderer/FullSceneGBufferEvidence`
+
+Current state:
+
+- Material domain is ready for the gallery packet.
+- Required GBuffer resources and producers are present for the gallery packet.
+- V2 frame-data ownership is still blocked by missing stable material-id,
+  object-id, and debug producer-source reporting.
+- Beauty output remains intentionally `v1_fallback`.
+
+Next recommended implementation:
+
+- Continue Track C by adding a stable per-pixel material-id/object-id ownership
+  contract.
+- Prefer a shadow/debug path first:
+  1. inventory what `visibility_buffer` currently encodes,
+  2. decide whether it can serve as object/instance id evidence or whether a
+     new `vb_gbuffer_object_id`/`vb_gbuffer_material_id` target is required,
+  3. expose producer/debug source reporting in frame reports,
+  4. only then allow `gbuffer.domain_ready=true`.

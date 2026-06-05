@@ -972,7 +972,7 @@ Validation:
 | Domain | Required Evidence | Current Status |
 |---|---|---|
 | Material | material families, texture evidence, debug views | runtime material evidence ready for gallery packet; asset-registry/hero texture evidence still pending |
-| GBuffer | channel inventory, object/material ids, velocity | planned |
+| GBuffer | channel inventory, object/material ids, velocity | required resources/producers reported; stable material-id/object-id/debug-source ownership still blocking |
 | Lighting | semantic light rigs, owner/debug reports | planned |
 | Reflection | room/hero/planar/local ownership | planned |
 | Shadow | cascade/local/contact debug and stability | planned |
@@ -994,7 +994,8 @@ Validation:
 7. Landed runtime frame-report placeholders for V2 domains without changing
    rendering.
 8. Landed runtime material model readiness evidence for the gallery V2 packet.
-9. Expand GBuffer/debug channel inventory and material/object-id ownership.
+9. Landed GBuffer resource/producer ownership evidence; material/object-id
+   ownership remains the next Track C blocker.
 10. Add local reflection probe ownership before chasing more shiny materials.
 11. Add semantic light rigs and shadow/contact stability.
 12. Refactor post into named HDR stages.

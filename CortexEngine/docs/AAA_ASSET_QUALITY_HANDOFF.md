@@ -646,6 +646,50 @@ Current caveat:
   on enclosed scenes with IBL enabled/background controls before V2 reflection
   gates can be promoted.
 
+### Checkpoint - 2026-06-05 Early AM
+
+Pushed commits:
+
+- `d81dad4 Add scene material policy shader bridge`
+- `7f5d57c Add jitter-aware temporal reprojection contract`
+- `5e0b9e6 Add RT reflection miss ownership contract`
+
+Latest focused validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python tools\validate_full_scene_shader_material_fulfillment_v2.py
+```
+
+Result:
+
+- all three passed.
+- fulfillment remains correctly `PENDING`: `56` requests, `56` pending,
+  `0` admitted.
+
+Native build attempt:
+
+```powershell
+.\build.ps1 -Config Release
+```
+
+Result:
+
+- timed out after about `124s`.
+- leftover `cmake`/`ninja` processes were found and stopped.
+- do not treat this as a passing native build.
+
+Next recommended slice:
+
+- Either run a longer/cleaner native build outside the CMake regeneration hang,
+  or continue focused V2 domain slices with static validators until the build
+  path is made reliable.
+- Strong next code target: finish scene-local environment/background ownership
+  across forward/basic, sky, water, and UI/debug controls, then add a packet
+  command that captures reflection-owner/material-policy/temporal debug views
+  on one enclosed scene.
+
 ## Resume Commands
 
 ```powershell

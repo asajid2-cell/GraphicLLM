@@ -3,6 +3,7 @@
 #include "Debug/GPUProfiler.h"
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
+#include "Passes/LocalReflectionRadiancePass.h"
 #include "Passes/PostProcessGraphPass.h"
 #include "Passes/RenderPassScope.h"
 #include "RenderGraph.h"
@@ -72,6 +73,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle taaHandle{};
     RGResourceHandle rtReflHandle{};
     RGResourceHandle rtReflHistHandle{};
+    RGResourceHandle localReflRadianceHandle{};
     RGResourceHandle backBufferHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
@@ -249,6 +251,54 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             hzbHandle = m_services.renderGraph->ImportResource(m_hzbResources.resources.texture.Get(), m_hzbResources.resources.resourceState, "HZB_Debug");
         }
 
+        if (m_pipelineState.localReflectionRadianceCompute &&
+            m_localReflectionRadianceState.descriptors.valid &&
+            depthPpHandle.IsValid() &&
+            normalHandle.IsValid() &&
+            emissiveMetallicHandle.IsValid() &&
+            materialExt1Handle.IsValid() &&
+            materialExt2Handle.IsValid() &&
+            hdrHandle.IsValid()) {
+            auto& localSrvTable =
+                m_localReflectionRadianceState.descriptors.srvTables[m_frameRuntime.frameIndex % kFrameCount];
+            auto& localUavTable =
+                m_localReflectionRadianceState.descriptors.uavTables[m_frameRuntime.frameIndex % kFrameCount];
+
+            ID3D12Resource* envSpecularResource = nullptr;
+            DXGI_FORMAT envSpecularFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+            if (const EnvironmentMaps* env = m_environmentState.ActiveEnvironment()) {
+                if (env->specularPrefiltered && env->specularPrefiltered->GetResource()) {
+                    envSpecularResource = env->specularPrefiltered->GetResource();
+                    envSpecularFormat = env->specularPrefiltered->GetFormat();
+                }
+            }
+
+            LocalReflectionRadiancePass::GraphContext localRadianceContext{};
+            localRadianceContext.resources.depth = depthPpHandle;
+            localRadianceContext.resources.normalRoughness = normalHandle;
+            localRadianceContext.resources.emissiveMetallic = emissiveMetallicHandle;
+            localRadianceContext.resources.materialExt1 = materialExt1Handle;
+            localRadianceContext.resources.materialExt2 = materialExt2Handle;
+            localRadianceContext.resources.sceneColor = hdrHandle;
+            localRadianceContext.dispatch.device = m_services.device->GetDevice();
+            localRadianceContext.dispatch.descriptorManager = m_services.descriptorManager.get();
+            localRadianceContext.dispatch.rootSignature = m_pipelineState.computeRootSignature->GetRootSignature();
+            localRadianceContext.dispatch.pipeline = m_pipelineState.localReflectionRadianceCompute.get();
+            localRadianceContext.dispatch.frameConstants = m_constantBuffers.currentFrameGPU;
+            localRadianceContext.dispatch.srvTable =
+                std::span<DescriptorHandle>(localSrvTable.data(), localSrvTable.size());
+            localRadianceContext.dispatch.uavTable =
+                std::span<DescriptorHandle>(localUavTable.data(), localUavTable.size());
+            localRadianceContext.dispatch.envSpecular = envSpecularResource;
+            localRadianceContext.dispatch.envSpecularFormat = envSpecularFormat;
+            localRadianceContext.dispatch.width = m_services.window->GetWidth();
+            localRadianceContext.dispatch.height = m_services.window->GetHeight();
+            localRadianceContext.status.failed = &bloomStageFailed;
+            localRadianceContext.status.stage = &postProcessGraphStageError;
+            localReflRadianceHandle =
+                LocalReflectionRadiancePass::AddToGraph(*m_services.renderGraph, localRadianceContext);
+        }
+
         const PostProcessGraphPass::ResourceHandles postProcessResources{
             hdrHandle,
             bloomHandle,
@@ -264,7 +314,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             taaHandle,
             rtReflHandle,
             rtReflHistHandle,
-            {},
+            localReflRadianceHandle,
             hzbHandle,
             backBufferHandle,
             wantsHzbDebug,
@@ -273,6 +323,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         PostProcessGraphPass::ExecuteContext executeContext{};
         executeContext.useBloomOverride = wantsFusedBloomThisFrame && bloomHandle.IsValid();
         executeContext.bloom = bloomHandle;
+        executeContext.localReflectionRadiance = localReflRadianceHandle;
         auto& postTable = m_temporalScreenState.postProcessSrvTables[m_frameRuntime.frameIndex % kFrameCount];
         executeContext.descriptorUpdate.device = m_services.device ? m_services.device->GetDevice() : nullptr;
         executeContext.descriptorUpdate.srvTable = std::span<DescriptorHandle>(postTable.data(), postTable.size());

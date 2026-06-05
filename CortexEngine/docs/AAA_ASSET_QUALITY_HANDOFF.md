@@ -3232,3 +3232,48 @@ Next implementation pass:
 - Bind the produced SRV into post slot `13`.
 - Require debug view `61` to show nonzero producer-owned signal before feeding
   it into the V2 reflection candidate.
+
+### Render-Graph Local Reflection Radiance Producer - 2026-06-05
+
+Implemented the producer pass promised by the previous slot checkpoint:
+
+- new `LocalReflectionRadiancePass` compute render-graph pass.
+- transient `R16G16B16A16_FLOAT` local radiance target.
+- per-frame local radiance SRV/UAV descriptor tables.
+- local radiance compute pipeline compiled from
+  `assets/shaders/LocalReflectionRadiance.hlsl`.
+- render-graph end-frame inserts `LocalReflectionRadiance` before post when
+  depth, GBuffer material channels, scene color, and compute descriptors are
+  available.
+- post resolves the graph-produced radiance resource at execution time and
+  binds it to `t13`.
+
+Validation:
+
+- build:
+  `ninja -C build CortexEngine -v` passed; a first build invocation timed out
+  after tool timeout but the rerun reported `ninja: no work to do`.
+- shader prep:
+  post shader copy passed; `LocalReflectionRadiance.hlsl` DXC compile passed.
+- packet:
+  `build/captures/v2_local_radiance_producer_smoke1_20260605`.
+- V2 packet evidence passed with `6` captured views.
+- debug metrics:
+  `local_reflection_radiance` luma `0.0950`, nonblack `1.0000`.
+- this is distinct from source-authority:
+  `reflection_source_authority` luma `0.0661`, nonblack `0.4109`.
+- candidate signal remained valid:
+  source luma `0.12212419`, delta luma `0.02840133`.
+- validators passed:
+  `check_full_scene_shader_pipeline_v2_frame_report.py`,
+  `validate_full_scene_shader_pipeline_v2_plan.py`, and checker py_compile.
+- `ctest` found no registered tests in this build.
+
+Current stopping position:
+
+- Local reflection radiance is now a real render-graph-owned producer signal,
+  not a post-only approximation and not a null-slot proof.
+- Default beauty is unchanged.
+- Next slice should consume `g_LocalReflectionRadiance` in the V2 reflection
+  candidate behind the existing P-menu review toggle, then rerun broad glossy
+  stress packets before considering any promotion.

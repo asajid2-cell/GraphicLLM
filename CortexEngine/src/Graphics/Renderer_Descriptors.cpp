@@ -128,6 +128,7 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
         }
     }
     m_rtReflectionSignalState.descriptors.ResetHandles();
+    m_localReflectionRadianceState.descriptors.Reset();
     m_ssaoResources.descriptors.descriptorTablesValid = false;
     for (auto& table : m_ssaoResources.descriptors.srvTables) {
         for (auto& handle : table) {
@@ -215,6 +216,18 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     if (rtDenoiseUavTableResult.IsErr()) {
         return rtDenoiseUavTableResult;
     }
+    auto localRadianceSrvResult = allocateTableSet(
+        m_localReflectionRadianceState.descriptors.srvTables,
+        "local reflection radiance SRV");
+    if (localRadianceSrvResult.IsErr()) {
+        return localRadianceSrvResult;
+    }
+    auto localRadianceUavResult = allocateTableSet(
+        m_localReflectionRadianceState.descriptors.uavTables,
+        "local reflection radiance UAV");
+    if (localRadianceUavResult.IsErr()) {
+        return localRadianceUavResult;
+    }
     auto temporalMaskSrvTableResult = allocateTableSet(m_temporalMaskState.srvTables, "temporal mask SRV");
     if (temporalMaskSrvTableResult.IsErr()) {
         return temporalMaskSrvTableResult;
@@ -283,6 +296,8 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     bool ssaoUavValid = false;
     bool rtDenoiseSrvValid = false;
     bool rtDenoiseUavValid = false;
+    bool localRadianceSrvValid = false;
+    bool localRadianceUavValid = false;
     bool temporalMaskSrvValid = false;
     bool temporalMaskUavValid = false;
     bool temporalMaskStatsSrvValid = false;
@@ -295,6 +310,14 @@ Result<void> Renderer::InitializePostProcessDescriptorTable() {
     validateTableSet(m_rtDenoiseState.srvTables, rtDenoiseSrvValid, "RT denoise SRV");
     validateTableSet(m_rtDenoiseState.uavTables, rtDenoiseUavValid, "RT denoise UAV");
     m_rtDenoiseState.descriptorTablesValid = rtDenoiseSrvValid && rtDenoiseUavValid;
+    validateTableSet(m_localReflectionRadianceState.descriptors.srvTables,
+                     localRadianceSrvValid,
+                     "Local reflection radiance SRV");
+    validateTableSet(m_localReflectionRadianceState.descriptors.uavTables,
+                     localRadianceUavValid,
+                     "Local reflection radiance UAV");
+    m_localReflectionRadianceState.descriptors.valid =
+        localRadianceSrvValid && localRadianceUavValid;
     validateTableSet(m_temporalMaskState.srvTables, temporalMaskSrvValid, "Temporal mask SRV");
     validateTableSet(m_temporalMaskState.uavTables, temporalMaskUavValid, "Temporal mask UAV");
     m_temporalMaskState.descriptorTablesValid = temporalMaskSrvValid && temporalMaskUavValid;

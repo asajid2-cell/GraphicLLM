@@ -45,6 +45,7 @@
 #include "Graphics/RendererGPUCullingState.h"
 #include "Graphics/RendererHZBState.h"
 #include "Graphics/RendererLocalShadowState.h"
+#include "Graphics/RendererLocalReflectionState.h"
 #include "Graphics/RendererMainTargetState.h"
 #include "Graphics/RendererMaterialTextureState.h"
 #include "Graphics/RendererParticleState.h"
@@ -812,6 +813,7 @@ public:
     SSAOPassState m_ssaoResources;
 
     SSRPassState m_ssrResources;
+    LocalReflectionRadianceState m_localReflectionRadianceState;
 
     TemporalScreenPassState m_temporalScreenState;
     TemporalMaskPassState m_temporalMaskState;

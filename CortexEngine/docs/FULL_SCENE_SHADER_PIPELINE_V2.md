@@ -2201,3 +2201,45 @@ Current interpretation:
 - Next proof should use mouse-jiggle/camera-sweep and cross-family packets so
   the candidate can show whether it reduces smooth/metallic instability under
   motion before any default beauty promotion.
+
+### Reflection Resolver Candidate Mouse-Jitter Packet - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 3 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_mouse_jitter_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_mouse_jitter_packet_20260605`.
+- stability motion mode: `mouse_jitter`.
+- capture sequence count: `3`.
+- captured views: `19`.
+- evidence rows: `190`.
+- frame-report failures: `0`.
+- measured debug views: `19`.
+- metric failures: `0`.
+- key motion metrics:
+  - `reflection_source_weights` mean RGB:
+    `0.000001, 0.069131, 0.060542`.
+  - `reflection_stability_policy` mean RGB:
+    `0.159872, 0.110794, 0.343249`.
+  - `reflection_resolver_candidate` mean RGB:
+    `0.619970, 0.591707, 0.550361`.
+  - `reflection_resolver_candidate_delta` mean RGB:
+    `0.000000055, 0.000000043, 0.000000034`.
+  - `reflection_resolver_candidate_delta` nonblack ratio:
+    `0.00000217`.
+
+Interpretation:
+
+- Mouse-jitter packet generation works with the candidate and delta views.
+- The candidate remains effectively identical to current output on this
+  gallery frame under the captured jitter sequence.
+- This is still not a promotion proof. The next useful packet should use
+  cross-family and/or a reflection-stress scene where SSR/RT ownership changes
+  enough for the candidate delta to become meaningful.

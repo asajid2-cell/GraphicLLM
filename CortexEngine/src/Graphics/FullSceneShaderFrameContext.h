@@ -1183,12 +1183,20 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool lightingSplitResourcesAllocated = false;
     bool lightingSplitResourcesReady = false;
     bool sceneLocalEnvironmentReady = false;
+    bool reflectionV3Ready = false;
+    bool reflectionRadianceReady = false;
+    bool reflectionConfidenceReady = false;
+    bool reflectionSourceIdReady = false;
+    bool reflectionTemporalDeltaReady = false;
     uint32_t materialAttributesResourceCount = 0;
     uint32_t materialAttributesChannelCount = 0;
     uint32_t lightingAdapterSignalCount = 0;
     uint32_t lightingSplitResourceCount = 0;
     uint32_t sceneLocalEnvironmentChannelCount = 0;
+    uint32_t reflectionV3ChannelCount = 0;
+    uint32_t reflectionV3SourceCount = 0;
     std::string sceneLocalEnvironmentMode = "unknown";
+    std::string reflectionV3SourceContract = "unknown";
     std::string contractPath = "assets/final_art/full_scene_shader_pipeline_v3_contract.json";
     std::string planPath = "docs/FULL_SCENE_SHADER_PIPELINE_V3.md";
     std::vector<std::string> requiredSceneFamilies = {
@@ -1480,6 +1488,133 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     environmentDomain.missingRequiredChannelCount =
         environmentDomain.requiredChannelCount - environmentDomain.readyChannelCount;
 
+    const bool reflectionOwnerReportAvailable =
+        contract.sceneVisual.pixelReflectionOwnerHistogramAvailable ||
+        contract.sceneVisual.reflectionOwnerDebugViewMode != 0;
+    const bool reflectionPoliciesAvailable =
+        materialResolveReady &&
+        contract.materials.reflectionEligible > 0 &&
+        (contract.materials.materialReflectionNeutralFallback +
+         contract.materials.materialReflectionLocalProbe +
+         contract.materials.materialReflectionProbeGrid +
+         contract.materials.materialReflectionPlanarProbe +
+         contract.materials.materialReflectionSSR +
+         contract.materials.materialReflectionRT) > 0;
+    const bool externalIblVisibilityAuthorized =
+        !contract.sceneVisual.invalidExternalHDRI &&
+        (!contract.sceneVisual.externalHDRIVisible ||
+         contract.sceneVisual.visibleExternalHDRIAllowed);
+    const bool localProbeSourceReady =
+        contract.environment.localReflectionProbeCount > 0 &&
+        contract.environment.localReflectionProbeSkipped == 0 &&
+        contract.environment.localReflectionProbeTableValid &&
+        contract.environment.localReflectionProbeRadianceEnabled &&
+        (contract.environment.localReflectionProbeDiffuseIntensity > 0.0f ||
+         contract.environment.localReflectionProbeSpecularIntensity > 0.0f);
+    const bool ssrSourceReady = contract.features.ssrEnabled;
+    const bool rtSourceReady =
+        contract.features.rtReflectionsEnabled &&
+        contract.rayTracing.reflectionDispatchReady &&
+        contract.rayTracing.reflectionHasOutput &&
+        contract.rayTracing.reflectionHasDepth &&
+        contract.rayTracing.reflectionHasNormalRoughness &&
+        contract.rayTracing.reflectionHasMaterialExt2 &&
+        contract.rayTracing.reflectionHasEnvironmentTable;
+    const bool iblSourceReady =
+        contract.features.iblEnabled &&
+        externalIblVisibilityAuthorized;
+    uint32_t readyReflectionSources = 0;
+    readyReflectionSources += localProbeSourceReady ? 1u : 0u;
+    readyReflectionSources += ssrSourceReady ? 1u : 0u;
+    readyReflectionSources += rtSourceReady ? 1u : 0u;
+    readyReflectionSources += iblSourceReady ? 1u : 0u;
+    const bool enclosedMissFallbackSafe =
+        !contract.sceneVisual.enclosedScene ||
+        localProbeSourceReady ||
+        contract.environment.backgroundExposure <= 0.001f ||
+        !contract.features.iblEnabled ||
+        contract.sceneVisual.visibleExternalHDRIAllowed;
+    const bool sourceContractReady =
+        reflectionOwnerKnown &&
+        reflectionOwnerReportAvailable &&
+        externalIblVisibilityAuthorized &&
+        enclosedMissFallbackSafe &&
+        readyReflectionSources > 0;
+    context.reflectionRadianceReady =
+        context.sceneLocalEnvironmentReady &&
+        sourceContractReady;
+    context.reflectionSourceIdReady =
+        reflectionOwnerKnown &&
+        reflectionOwnerReportAvailable;
+    context.reflectionConfidenceReady =
+        context.reflectionRadianceReady &&
+        reflectionPoliciesAvailable;
+    context.reflectionTemporalDeltaReady =
+        (contract.rayTracing.reflectionHistorySignalValid &&
+         contract.rayTracing.reflectionHistorySignalReadbackLatencyFrames <= 8u) ||
+        (contract.features.taaEnabled &&
+         contract.materials.materialTemporalStableGlossy > 0 &&
+         FullSceneShaderHasResource(contract, "taa_history"));
+    uint32_t readyReflectionChannels = 0;
+    readyReflectionChannels += context.reflectionRadianceReady ? 1u : 0u;
+    readyReflectionChannels += context.reflectionConfidenceReady ? 1u : 0u;
+    readyReflectionChannels += context.reflectionSourceIdReady ? 1u : 0u;
+    readyReflectionChannels += context.reflectionTemporalDeltaReady ? 1u : 0u;
+    context.reflectionV3ChannelCount = readyReflectionChannels;
+    context.reflectionV3SourceCount = readyReflectionSources;
+    context.reflectionV3SourceContract =
+        localProbeSourceReady ? "local_probe" :
+        rtSourceReady ? "ray_query_reflection" :
+        ssrSourceReady ? "screen_space_reflection" :
+        iblSourceReady ? "scene_local_environment" :
+        "unknown";
+    context.reflectionV3Ready = readyReflectionChannels == 4u;
+
+    FullSceneShaderPipelineV3DomainEvidence reflectionDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "reflection",
+            "FullSceneReflectionV3",
+            "reflection_radiance",
+            "reflection_confidence",
+            context.reflectionV3Ready
+                ? "FullSceneReflectionV3 is backed by source radiance, source-id, confidence, and temporal-delta ownership contracts"
+                : "FullSceneReflectionV3 is missing one or more reflection ownership channels");
+    reflectionDomain.enabled =
+        contract.sceneVisual.active &&
+        (contract.features.ssrEnabled ||
+         contract.features.rtReflectionsEnabled ||
+         contract.features.iblEnabled ||
+         contract.environment.localReflectionProbeCount > 0);
+    reflectionDomain.ready = context.reflectionV3Ready;
+    reflectionDomain.promotionState =
+        context.reflectionV3Ready ? "instrumented" : "planned";
+    reflectionDomain.backingResources = {
+        "scene_local_environment",
+        "scene_visual_reflection_owner",
+        "material_reflection_policy",
+        "local_reflection_radiance",
+        "rt_reflection_signal_history",
+    };
+    reflectionDomain.debugViews = {
+        "reflection_radiance",
+        "reflection_confidence",
+        "reflection_source_id",
+        "reflection_temporal_delta",
+        "reflection_rejected_source_mask",
+    };
+    reflectionDomain.channels = {
+        context.reflectionRadianceReady ? "reflection_radiance_owned" : "reflection_radiance_missing",
+        context.reflectionConfidenceReady ? "reflection_confidence_owned" : "reflection_confidence_missing",
+        context.reflectionSourceIdReady ? "reflection_source_id_owned" : "reflection_source_id_missing",
+        context.reflectionTemporalDeltaReady ? "reflection_temporal_delta_owned" : "reflection_temporal_delta_missing",
+        std::string("primary_source=") + context.reflectionV3SourceContract,
+    };
+    reflectionDomain.backingResourceCount = readyReflectionChannels;
+    reflectionDomain.requiredChannelCount = 4u;
+    reflectionDomain.readyChannelCount = readyReflectionChannels;
+    reflectionDomain.missingRequiredChannelCount =
+        reflectionDomain.requiredChannelCount - reflectionDomain.readyChannelCount;
+
     context.domains = {
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "render_graph",
@@ -1489,12 +1624,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             "V3 render-graph resources are planned but not allocated"),
         materialDomain,
         lightingDomain,
-        MakeFullSceneShaderPipelineV3DomainEvidence(
-            "reflection",
-            "FullSceneReflectionV3",
-            "reflection_radiance",
-            "reflection_confidence",
-            "FullSceneReflectionV3 resolver is planned but not implemented"),
+        reflectionDomain,
         environmentDomain,
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "cinematic_post",

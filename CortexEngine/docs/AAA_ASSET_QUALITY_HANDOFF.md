@@ -212,6 +212,46 @@ SceneLocalEnvironmentV3 evidence-domain slice:
   - gallery mode: `neutral_lab`.
   - gallery environment channel count: `5`.
 
+ReflectionV3 evidence-domain slice:
+
+- Runtime V3 frame reports now expose:
+  - `reflection_v3_ready`.
+  - `reflection_radiance_ready`.
+  - `reflection_confidence_ready`.
+  - `reflection_source_id_ready`.
+  - `reflection_temporal_delta_ready`.
+  - `reflection_v3_source_contract`.
+  - `reflection_v3_channel_count`.
+  - `reflection_v3_source_count`.
+- `FullSceneReflectionV3` is now a real V3 domain entry derived from:
+  `scene_local_environment`, `scene_visual_reflection_owner`,
+  `material_reflection_policy`, `local_reflection_radiance`, and
+  `rt_reflection_signal_history`.
+- Current logical output: `reflection_radiance`.
+- Current debug view: `reflection_confidence`.
+- Current readiness channels:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`, and
+  `reflection_temporal_delta`.
+- Current source contract chooses the first ready source among:
+  `local_probe`, `ray_query_reflection`, `screen_space_reflection`, and
+  `scene_local_environment`.
+- The V3 placeholder analyzer now permits and validates `reflection` as a
+  ready domain only after `SceneLocalEnvironmentV3` is ready.
+- This is not a new resolver shader/pass and does not change default beauty.
+  It gives ReflectionV3 explicit source/confidence/temporal ownership before
+  composite or beauty promotion work.
+- Runtime smoke:
+  `build/captures/v3_reflection_contract_smoke1_20260605`.
+  - reports: `16`.
+  - `reflection_v3_ready_report_count=16`.
+  - `scene_local_environment_ready_report_count=16`.
+  - `lighting_split_ready_report_count=16`.
+  - failures: `0`.
+  - warnings: `0`.
+  - gallery source contract: `local_probe`.
+  - gallery reflection channel count: `4`.
+  - gallery reflection source count: `4`.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:

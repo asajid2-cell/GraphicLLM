@@ -805,7 +805,57 @@ Required next evidence for completion/promotion:
 
 ### L006 - Reflection V3 Resolver
 
-Status: pending.
+Status: in progress.
+
+Current evidence-domain implementation:
+
+- runtime V3 frame report now exposes:
+  - `reflection_v3_ready`.
+  - `reflection_radiance_ready`.
+  - `reflection_confidence_ready`.
+  - `reflection_source_id_ready`.
+  - `reflection_temporal_delta_ready`.
+  - `reflection_v3_source_contract`.
+  - `reflection_v3_channel_count`.
+  - `reflection_v3_source_count`.
+- `FullSceneReflectionV3` is now a real V3 domain entry rather than a
+  planned-only placeholder.
+- current producer is `FullSceneReflectionV3`.
+- current output resource is the logical ownership contract
+  `reflection_radiance`.
+- current debug view is `reflection_confidence`.
+- current source contract chooses the first ready source among:
+  `local_probe`, `ray_query_reflection`, `screen_space_reflection`, and
+  `scene_local_environment`.
+- current readiness channels are:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`, and
+  `reflection_temporal_delta`.
+- current backing contracts are:
+  `scene_local_environment`, `scene_visual_reflection_owner`,
+  `material_reflection_policy`, `local_reflection_radiance`, and
+  `rt_reflection_signal_history`.
+- the placeholder packet analyzer now allows and validates the `reflection`
+  domain when these four channels are owned and `SceneLocalEnvironmentV3` is
+  already ready.
+- first runtime smoke:
+  `build/captures/v3_reflection_contract_smoke1_20260605`.
+- first runtime smoke result:
+  `report_count=16`,
+  `reflection_v3_ready_report_count=16`,
+  `scene_local_environment_ready_report_count=16`,
+  `lighting_split_ready_report_count=16`,
+  failures `0`, warnings `0`.
+- gallery smoke reflection evidence:
+  `reflection_v3_source_contract=local_probe`,
+  `reflection_v3_channel_count=4`,
+  `reflection_v3_source_count=4`,
+  all four channel flags ready.
+
+Important limitation:
+
+- This slice does not add the final reflection resolver shader or change
+  default beauty. It promotes the reflection problem from hidden renderer state
+  into named V3 evidence that later resolver/composite work can consume.
 
 ### L007 - Scene Local Environment V3
 

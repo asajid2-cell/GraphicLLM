@@ -482,6 +482,15 @@ Current interpretation:
     running.
 - The next implementation slice should upgrade material model and registry
   material evidence before changing visual output.
+- Material evidence has been upgraded with a runtime-policy bridge:
+  - every registry asset now emits scene material class, reflection preference,
+    temporal policy, post sensitivity, required texture slots, and missing
+    texture slots.
+  - `runtime_policy_bridge_asset_count=33`.
+  - provider request packs carry `runtime_policy`, `runtime_policy_candidates`,
+    `required_pbr_maps`, and `missing_texture_slots` in `material_contract`.
+  - material evidence still correctly remains `BLOCKED`; this is contract
+    precision, not an asset-quality claim.
 - The first frame-report contract is external because the current renderer C++
   worktree already has broad uncommitted frame-contract changes. Runtime C++
   integration should use this external contract after those changes are

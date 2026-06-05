@@ -28,6 +28,7 @@
     "material_families": [
       "wood"
     ],
+    "primary_material_family": "wood",
     "shader_feature_flags": [
       "base_color_texture",
       "detail_normal",
@@ -36,10 +37,38 @@
     ],
     "required_pbr_maps": [
       "base_color",
+      "detail_normal_or_height",
       "normal",
-      "orm_or_separate_occlusion_roughness_metallic",
-      "detail_normal_or_height_optional"
+      "orm_or_separate_occlusion_roughness_metallic"
     ],
+    "missing_texture_slots": [
+      "base_color",
+      "detail_normal_or_height",
+      "normal",
+      "orm_or_separate_occlusion_roughness_metallic"
+    ],
+    "runtime_policy": {
+      "scene_material_class": "PolishedWood",
+      "scene_material_class_id": 3,
+      "reflection_preference": "LocalProbe",
+      "reflection_preference_id": 1,
+      "temporal_policy": "StableDiffuse",
+      "temporal_policy_id": 0,
+      "post_sensitivity": "Normal",
+      "post_sensitivity_id": 0
+    },
+    "runtime_policy_candidates": {
+      "wood": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      }
+    },
     "texture_resolution_min": 1024,
     "texture_resolution_target": 2048,
     "uvs_required": true,
@@ -71,6 +100,41 @@
   "semantic_roles": [
     "desk"
   ],
+  "primary_material_family": "wood",
+  "required_texture_slots": [
+    "base_color",
+    "detail_normal_or_height",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "missing_texture_slots": [
+    "base_color",
+    "detail_normal_or_height",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "runtime_policy": {
+    "scene_material_class": "PolishedWood",
+    "scene_material_class_id": 3,
+    "reflection_preference": "LocalProbe",
+    "reflection_preference_id": 1,
+    "temporal_policy": "StableDiffuse",
+    "temporal_policy_id": 0,
+    "post_sensitivity": "Normal",
+    "post_sensitivity_id": 0
+  },
+  "runtime_policy_candidates": {
+    "wood": {
+      "scene_material_class": "PolishedWood",
+      "scene_material_class_id": 3,
+      "reflection_preference": "LocalProbe",
+      "reflection_preference_id": 1,
+      "temporal_policy": "StableDiffuse",
+      "temporal_policy_id": 0,
+      "post_sensitivity": "Normal",
+      "post_sensitivity_id": 0
+    }
+  },
   "hero_surface_reference_count": 1,
   "object_reference_count": 1,
   "needed_evidence": [
@@ -86,6 +150,7 @@
     "missing PBR texture evidence for V2 material model",
     "missing collision evidence for V2 final asset",
     "missing collision proxy",
-    "missing complete PBR texture set"
+    "missing complete PBR texture set",
+    "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
   ]
 }

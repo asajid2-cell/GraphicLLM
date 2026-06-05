@@ -10,7 +10,7 @@
     "hunyuan3d_2_1",
     "trellis_image_large"
   ],
-  "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_backboard role backboard. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+  "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_backboard role backboard. Use glass material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
   "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
   "accepted_outputs": [
     "gltf",
@@ -27,18 +27,24 @@
   ],
   "material_contract": {
     "material_families": [
-      "dielectric"
+      "glass"
     ],
-    "shader_feature_flags": [
-      "base_color_texture",
-      "normal_texture",
-      "orm_texture"
-    ],
+    "primary_material_family": "glass",
+    "shader_feature_flags": [],
     "required_pbr_maps": [
       "base_color",
       "normal",
-      "orm_or_separate_occlusion_roughness_metallic"
+      "orm_or_separate_occlusion_roughness_metallic",
+      "opacity_or_transmission"
     ],
+    "missing_texture_slots": [
+      "base_color",
+      "normal",
+      "orm_or_separate_occlusion_roughness_metallic",
+      "opacity_or_transmission"
+    ],
+    "runtime_policy": {},
+    "runtime_policy_candidates": {},
     "texture_resolution_min": 1024,
     "texture_resolution_target": 2048,
     "uvs_required": true,

@@ -76,6 +76,180 @@ FAMILY_FEATURES: dict[str, set[str]] = {
     "unknown": set(),
 }
 
+FEATURE_TEXTURE_SLOTS: dict[str, str] = {
+    "base_color_texture": "base_color",
+    "normal_texture": "normal",
+    "orm_texture": "orm_or_separate_occlusion_roughness_metallic",
+    "emissive_texture": "emissive",
+    "transmission": "opacity_or_transmission",
+    "opacity": "opacity_or_transmission",
+    "detail_normal": "detail_normal_or_height",
+    "parallax": "height_or_parallax",
+}
+
+RUNTIME_POLICY_BY_FAMILY: dict[str, dict[str, Any]] = {
+    "dielectric": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "metal": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "brushed_metal": {
+        "scene_material_class": "BrushedMetal",
+        "scene_material_class_id": 4,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "glass": {
+        "scene_material_class": "GlassPane",
+        "scene_material_class_id": 6,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "water": {
+        "scene_material_class": "Water",
+        "scene_material_class_id": 14,
+        "reflection_preference": "PlanarProbe",
+        "reflection_preference_id": 3,
+        "temporal_policy": "WaterViewDependent",
+        "temporal_policy_id": 4,
+        "post_sensitivity": "WetHighlight",
+        "post_sensitivity_id": 3,
+    },
+    "emissive": {
+        "scene_material_class": "EmissiveNeon",
+        "scene_material_class_id": 10,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "EmissiveLocked",
+        "temporal_policy_id": 3,
+        "post_sensitivity": "BloomEmitter",
+        "post_sensitivity_id": 1,
+    },
+    "wood": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "fabric": {
+        "scene_material_class": "Fabric",
+        "scene_material_class_id": 7,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "ceramic": {
+        "scene_material_class": "CeramicTile",
+        "scene_material_class_id": 2,
+        "reflection_preference": "SSR",
+        "reflection_preference_id": 4,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "tile": {
+        "scene_material_class": "CeramicTile",
+        "scene_material_class_id": 2,
+        "reflection_preference": "SSR",
+        "reflection_preference_id": 4,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "painted_wall": {
+        "scene_material_class": "PaintedWall",
+        "scene_material_class_id": 1,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "rubber": {
+        "scene_material_class": "Rubber",
+        "scene_material_class_id": 13,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "plastic": {
+        "scene_material_class": "Plastic",
+        "scene_material_class_id": 8,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+    "mirror": {
+        "scene_material_class": "Mirror",
+        "scene_material_class_id": 15,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "MirrorLocked",
+        "temporal_policy_id": 2,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2,
+    },
+    "screen": {
+        "scene_material_class": "ScreenPanel",
+        "scene_material_class_id": 11,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "EmissiveLocked",
+        "temporal_policy_id": 3,
+        "post_sensitivity": "BloomEmitter",
+        "post_sensitivity_id": 1,
+    },
+    "unknown": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0,
+    },
+}
+
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -97,6 +271,21 @@ def material_family(material: str, role: str) -> str:
         if token in text:
             return family
     return "dielectric" if text.strip() else "unknown"
+
+
+def texture_slots_for_features(feature_flags: list[str]) -> list[str]:
+    return sorted(
+        {
+            slot
+            for feature in feature_flags
+            for slot in [FEATURE_TEXTURE_SLOTS.get(feature, "")]
+            if slot
+        }
+    )
+
+
+def runtime_policy_for_family(family: str) -> dict[str, Any]:
+    return dict(RUNTIME_POLICY_BY_FAMILY.get(family, RUNTIME_POLICY_BY_FAMILY["unknown"]))
 
 
 def registry_by_id(registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -131,6 +320,18 @@ def infer_asset_evidence(asset: dict[str, Any], refs: list[dict[str, Any]]) -> d
         families = ["unknown"]
 
     feature_flags = sorted({flag for family in families for flag in FAMILY_FEATURES.get(family, set())})
+    required_texture_slots = texture_slots_for_features(feature_flags)
+    primary_family = families[0] if families else "unknown"
+    runtime_policy = runtime_policy_for_family(primary_family)
+    runtime_policy_candidates = {
+        family: runtime_policy_for_family(family)
+        for family in families
+    }
+    missing_texture_slots = (
+        []
+        if readiness.get("pbr_textures_complete", False)
+        else required_texture_slots
+    )
     hero_refs = [ref for ref in refs if bool(ref.get("hero_role", False))]
     blockers = list(asset.get("quality_blockers", []))
     if "unknown" in families:
@@ -145,6 +346,8 @@ def infer_asset_evidence(asset: dict[str, Any], refs: list[dict[str, Any]]) -> d
         blockers.append("hero surface lacks PBR texture readiness")
     if not feature_flags:
         blockers.append("missing shader feature flags")
+    if missing_texture_slots:
+        blockers.append("missing required V2 texture slots: " + ", ".join(missing_texture_slots))
 
     v2_material_ready = all(
         [
@@ -164,7 +367,12 @@ def infer_asset_evidence(asset: dict[str, Any], refs: list[dict[str, Any]]) -> d
         "scene_families": asset.get("scene_families", []),
         "semantic_roles": asset.get("semantic_roles", []),
         "material_families": families,
+        "primary_material_family": primary_family,
         "shader_feature_flags": feature_flags,
+        "required_texture_slots": required_texture_slots,
+        "missing_texture_slots": missing_texture_slots,
+        "runtime_policy": runtime_policy,
+        "runtime_policy_candidates": runtime_policy_candidates,
         "readiness": readiness,
         "v2_material_ready": v2_material_ready,
         "hero_surface_reference_count": len(hero_refs),
@@ -215,6 +423,11 @@ def markdown_report(report: dict[str, Any]) -> str:
     lines.extend(["", "## Material Families", ""])
     for key, value in report["material_family_counts"].items():
         lines.append(f"- `{key}`: `{value}`")
+    lines.extend(["", "## Runtime Policy Bridge", ""])
+    for policy_group, counts in report["runtime_policy_counts"].items():
+        lines.append(f"### {policy_group}")
+        for key, value in counts.items():
+            lines.append(f"- `{key}`: `{value}`")
     lines.extend(["", "## Scenes", ""])
     lines.append("| Scene | Objects | Registry Bound | Hero Registry Bound | Primitive Hero Blockers | Missing Registry Material |")
     lines.append("|---|---:|---:|---:|---:|---:|")
@@ -253,11 +466,19 @@ def main() -> int:
 
     material_family_counts: Counter[str] = Counter()
     feature_counts: Counter[str] = Counter()
+    runtime_scene_class_counts: Counter[str] = Counter()
+    runtime_reflection_counts: Counter[str] = Counter()
+    runtime_temporal_counts: Counter[str] = Counter()
+    runtime_post_counts: Counter[str] = Counter()
     for asset in asset_reports:
         for family in asset["material_families"]:
             material_family_counts[family] += 1
         for flag in asset["shader_feature_flags"]:
             feature_counts[flag] += 1
+        runtime_scene_class_counts[asset["runtime_policy"]["scene_material_class"]] += 1
+        runtime_reflection_counts[asset["runtime_policy"]["reflection_preference"]] += 1
+        runtime_temporal_counts[asset["runtime_policy"]["temporal_policy"]] += 1
+        runtime_post_counts[asset["runtime_policy"]["post_sensitivity"]] += 1
 
     scenes = [scene_summary(scene) for scene in bindings.get("scenes", [])]
     v2_ready_count = sum(1 for asset in asset_reports if asset["v2_material_ready"])
@@ -287,10 +508,19 @@ def main() -> int:
             "missing_hero_texture_evidence_count": missing_hero_texture,
             "unknown_material_family_asset_count": unknown_family_count,
             "primitive_hero_material_blocker_count": primitive_hero_count,
+            "runtime_policy_bridge_asset_count": sum(
+                1 for asset in asset_reports if asset.get("runtime_policy")
+            ),
             "scene_count": len(scenes),
         },
         "material_family_counts": dict(sorted(material_family_counts.items())),
         "shader_feature_flag_counts": dict(sorted(feature_counts.items())),
+        "runtime_policy_counts": {
+            "scene_material_class": dict(sorted(runtime_scene_class_counts.items())),
+            "reflection_preference": dict(sorted(runtime_reflection_counts.items())),
+            "temporal_policy": dict(sorted(runtime_temporal_counts.items())),
+            "post_sensitivity": dict(sorted(runtime_post_counts.items())),
+        },
         "assets": asset_reports,
         "scenes": scenes,
     }

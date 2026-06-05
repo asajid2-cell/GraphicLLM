@@ -11,6 +11,7 @@
     "summary",
     "material_family_counts",
     "shader_feature_flag_counts",
+    "runtime_policy_counts",
     "assets",
     "scenes"
   ],
@@ -19,7 +20,12 @@
     "runtime_asset",
     "source_class",
     "material_families",
+    "primary_material_family",
     "shader_feature_flags",
+    "required_texture_slots",
+    "missing_texture_slots",
+    "runtime_policy",
+    "runtime_policy_candidates",
     "readiness",
     "v2_material_ready",
     "hero_surface_reference_count",
@@ -55,5 +61,24 @@
     "parallax",
     "detail_normal",
     "procedural_micro_detail"
+  ],
+  "runtime_policy_fields": [
+    "scene_material_class",
+    "scene_material_class_id",
+    "reflection_preference",
+    "reflection_preference_id",
+    "temporal_policy",
+    "temporal_policy_id",
+    "post_sensitivity",
+    "post_sensitivity_id"
+  ],
+  "texture_slots": [
+    "base_color",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic",
+    "emissive",
+    "opacity_or_transmission",
+    "detail_normal_or_height",
+    "height_or_parallax"
   ]
 }

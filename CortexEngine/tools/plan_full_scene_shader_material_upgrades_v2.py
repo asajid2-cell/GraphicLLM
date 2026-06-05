@@ -22,6 +22,32 @@ DEFAULT_OUT_MD = (
     / "docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_upgrade_work_orders.md"
 )
 
+MATERIAL_FAMILY_TOKENS: list[tuple[str, str]] = [
+    ("emissive", "emissive"),
+    ("neon", "emissive"),
+    ("screen", "screen"),
+    ("display", "screen"),
+    ("mirror", "mirror"),
+    ("glass", "glass"),
+    ("water", "water"),
+    ("wet", "water"),
+    ("brushed", "brushed_metal"),
+    ("metal", "metal"),
+    ("steel", "metal"),
+    ("chrome", "metal"),
+    ("wood", "wood"),
+    ("cabinet", "wood"),
+    ("fabric", "fabric"),
+    ("seat", "fabric"),
+    ("tile", "tile"),
+    ("ceramic", "ceramic"),
+    ("wall", "painted_wall"),
+    ("concrete", "painted_wall"),
+    ("rubber", "rubber"),
+    ("plastic", "plastic"),
+    ("floor", "tile"),
+]
+
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -39,6 +65,14 @@ def write_text(text: str, path: Path) -> None:
 
 def slug(value: str) -> str:
     return "".join(ch.lower() if ch.isalnum() else "_" for ch in value).strip("_")
+
+
+def material_family(material: str, role: str) -> str:
+    text = f"{material} {role}".lower()
+    for token, family in MATERIAL_FAMILY_TOKENS:
+        if token in text:
+            return family
+    return "dielectric" if text.strip() else "unknown"
 
 
 def providers_for(families: list[str], kind: str) -> list[str]:
@@ -83,6 +117,7 @@ def primitive_hero_orders(bindings: dict[str, Any]) -> list[dict[str, Any]]:
             material = str(binding.get("material", "unknown_material"))
             object_id = str(binding.get("object", "unknown_object"))
             order_id = f"{slug(scene_id)}__primitive_hero_material__{slug(object_id)}"
+            family = material_family(material, role)
             orders.append(
                 {
                     "id": order_id,
@@ -92,6 +127,7 @@ def primitive_hero_orders(bindings: dict[str, Any]) -> list[dict[str, Any]]:
                     "object": object_id,
                     "role": role,
                     "material": material,
+                    "material_families": [family],
                     "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
                     "needed_evidence": [
                         "registry-backed replacement asset or admitted architecture material kit",
@@ -132,7 +168,12 @@ def asset_orders(evidence: dict[str, Any]) -> list[dict[str, Any]]:
                 "scene_families": asset.get("scene_families", []),
                 "semantic_roles": asset.get("semantic_roles", []),
                 "material_families": families,
+                "primary_material_family": asset.get("primary_material_family", ""),
                 "shader_feature_flags": asset.get("shader_feature_flags", []),
+                "required_texture_slots": asset.get("required_texture_slots", []),
+                "missing_texture_slots": asset.get("missing_texture_slots", []),
+                "runtime_policy": asset.get("runtime_policy", {}),
+                "runtime_policy_candidates": asset.get("runtime_policy_candidates", {}),
                 "hero_surface_reference_count": hero_refs,
                 "object_reference_count": asset.get("object_reference_count", 0),
                 "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",

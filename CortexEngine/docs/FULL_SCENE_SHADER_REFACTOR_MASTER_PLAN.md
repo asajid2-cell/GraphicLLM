@@ -1157,3 +1157,94 @@ not make the engine generally capable. This refactor makes the renderer's
 inputs explicit and then promotes domains only when they have source signal,
 ownership, stability, and packet evidence. That is the path from stable
 blockout rendering toward production-quality full-scene shading.
+
+## 2026-06-05 Goal Feature Completion Contract
+
+The "full scene shaders" goal feature is not a single shader, material preset,
+or post-process look. It is a candidate V2 beauty path assembled from owned
+scene facts. Completion must mean the renderer can render a scene through the
+V2 chain and explain every major visual contribution.
+
+The feature is complete only when this chain exists in runtime code:
+
+```text
+SceneVisualContract
+  -> FullSceneMaterialTable
+  -> FullSceneSourceBuffers
+  -> FullSceneLightingV2
+  -> FullSceneReflectionRadiance
+  -> FullSceneShadowContactComposite
+  -> MaterialAwareTemporalResolve
+  -> FullSceneHdrPost
+  -> RenderGraphEvidence + Review Packet
+```
+
+### Refactor Before Feature Promotion
+
+The next implementation work should not promote V2 beauty directly. It should
+first refactor the missing shared inputs:
+
+1. Scene visual contract as one runtime source of truth.
+   - Output: every frame reports family, enclosure, environment visibility,
+     lighting family, reflection family, temporal family, and post profile.
+   - Reason: lighting, reflections, temporal, and post must stop inferring
+     scene intent independently.
+
+2. Shader-facing source buffers.
+   - Output: semantic light and local probe sources reach shaders for gallery,
+     kitchen, office, gym, concert, and wet/glass scenes.
+   - Reason: the current V2 reflection candidate can be stable but still weak
+     if model-authored scenes provide little or no local source signal.
+
+3. Runtime material table promotion.
+   - Output: visible pixels carry material family, PBR/readiness state,
+     reflection policy, temporal policy, and post sensitivity from one uploaded
+     table.
+   - Reason: Unreal-like surfaces require material truth, not roughness-only
+     guesses.
+
+4. Render-graph-owned radiance and shadow outputs.
+   - Output: local reflection radiance, direct light, shadow/contact, temporal,
+     and HDR post resources are declared producers/consumers with debug views.
+   - Reason: V2 beauty cannot depend on invisible pass-local fallback state.
+
+5. Candidate beauty assembly.
+   - Output: a default-off `FullSceneShaderV2BeautyCandidate` path composites
+     the V2 lighting, local reflection radiance, shadow/contact, temporal, and
+     HDR post outputs.
+   - Reason: the user needs to review real engine output without changing
+     defaults.
+
+### Required Proof Before Default-Ready
+
+Do not mark this goal feature default-ready until all of these are true:
+
+- Cross-family packet includes gallery, kitchen, office, gym, concert, and one
+  wet/glass-heavy scene.
+- Each packet includes beauty, material family, object id, source weights,
+  reflection owner, light id, shadow factor, temporal rejection, HDR stage, and
+  final dependency graph views.
+- Enclosed scenes report zero unauthorized external HDRI reflection/background
+  ownership.
+- Smooth/metal/glass/water surfaces stay stable under mouse-jiggle and camera
+  sweep packets.
+- V2 beauty is visibly richer because lighting/material/reflection inputs are
+  richer, not because post crushed, blurred, or hid failures.
+- Default V1 remains available until the user accepts the V2 visual direction.
+
+### Immediate Next Slice
+
+The next code slice is:
+
+```text
+FSSP-V2-004C scene-local source plumbing
+  -> reserve/bind local reflection radiance resource
+  -> add shader-facing local source readiness
+  -> expose source debug views and analyzer gates
+  -> prove nonzero source signal across gallery plus three model-authored scenes
+```
+
+This is the shortest practical path toward breathtaking full-scene visuals
+because it gives the renderer real light/probe/reflection input to shade with.
+After that, material-table promotion and HDR post become meaningful instead of
+being cosmetic.

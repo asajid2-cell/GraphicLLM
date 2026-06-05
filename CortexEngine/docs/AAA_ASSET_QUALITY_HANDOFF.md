@@ -4173,3 +4173,101 @@ Next safe pass:
 4. If the V3 split views pass, commit and push this focused checkpoint.
 5. If they fail, fix `PSMainV3LightingSplit` or the debug-blit/resource-state
    path before moving to Reflection V3.
+
+### FullSceneShaderPipeline V3 Concrete Split Packet Verified - 2026-06-05
+
+Build blocker diagnosis:
+
+- The earlier Ninja "hang" was not a C++ compiler failure.
+- Root causes found:
+  - multiple stale `cmake -P tools/sync_assets.cmake` processes survived from
+    timed-out asset-sync attempts.
+  - `CortexAssets` was dirty because `.ninja_log` had no command-line entry for
+    `cortex_assets.stamp`.
+  - launching Ninja outside `VsDevCmd` produced the misleading MSVC standard
+    library error: `fatal error C1083: Cannot open include file: 'string'`.
+- Cleanup/fix:
+  - killed only the stale CortexEngine asset-sync `cmake` processes.
+  - left unrelated T6 capture PowerShell processes untouched.
+  - ran `CortexAssets` once with `CORTEX_SKIP_ASSET_SYNC=1` to populate the
+    Ninja command log without copying the large generated asset tree.
+  - rebuilt inside the Visual Studio environment.
+
+Successful build:
+
+```powershell
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set CORTEX_SKIP_ASSET_SYNC=1 && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+```
+
+Result:
+
+- `build/bin/CortexEngine.exe` linked successfully.
+- Existing warnings remain, mostly unused parameters/internal-linkage warnings
+  in unrelated files and third-party headers.
+
+Concrete split packet:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -OutputRoot build/captures/v3_lighting_split_concrete_debug_smoke1_20260605 -SmokeFrames 30 -CaptureFrame 15 -CaptureSequenceCount 1
+```
+
+Packet result:
+
+- Scene-local cinematic packet passed.
+- V2 packet evidence passed.
+- V3 placeholder/concrete split evidence passed.
+- `reports=16`.
+- `v3_signal.json`:
+  `build/captures/v3_lighting_split_concrete_debug_smoke1_20260605/v3_signal.json`.
+- `v3_stability.json`:
+  `build/captures/v3_lighting_split_concrete_debug_smoke1_20260605/v3_stability.json`.
+
+`v3_stability.json` evidence:
+
+- `report_count=16`.
+- `default_beauty_affects_any=false`.
+- `promoted_report_count=0`.
+- `material_ready_report_count=16`.
+- `lighting_adapter_ready_report_count=16`.
+- `lighting_split_allocated_report_count=16`.
+- `lighting_split_ready_report_count=16`.
+- `full_scene_lighting_v3_executed_report_count=16`.
+- `lighting_signal_metrics_ready=true`.
+- failures `0`, warnings `0`.
+
+Concrete V3 split metrics from `v3_signal.json`:
+
+- `v3_direct_lighting.mean_luma=0.431061`, `nonblack_ratio=1.0`.
+- `v3_direct_lighting_unshadowed.mean_luma=0.470903`,
+  `nonblack_ratio=1.0`.
+- `v3_shadow_visibility.mean_luma=0.350934`, `nonblack_ratio=1.0`.
+- `v3_shadow_loss.mean_luma=0.175254`, `nonblack_ratio=1.0`.
+- `v3_indirect_lighting.mean_luma=0.193502`, `nonblack_ratio=1.0`.
+
+Legacy comparison metrics from the same packet:
+
+- `direct_light.mean_luma=0.426833`.
+- `direct_light_unshadowed.mean_luma=0.457904`.
+- `direct_light_shadow_loss.mean_luma=0.222995`.
+- `shadow_factor.mean_luma=0.350900`.
+- `ambient_ibl.mean_luma=0.196344`.
+
+Current stopping position:
+
+- The concrete V3 split debug-view slice is now built and packet-verified.
+- V3 direct and unshadowed lighting are close to legacy luma in the static
+  gallery packet.
+- V3 shadow visibility is close to legacy shadow factor in the static gallery
+  packet.
+- V3 shadow loss is lower than the legacy shadow-loss debug view but passes the
+  current conservative nonblank/coherence gate.
+- V3 indirect is close to legacy ambient IBL mean luma but has a higher hot
+  pixel ratio; this should be tracked during reflection/environment V3 work.
+
+Next safe pass:
+
+1. Add motion stability gates for the five concrete V3 split buffers.
+2. Add cross-family packets for at least kitchen, office, gym, and concert V3
+   split debug views.
+3. Begin `FullSceneReflectionV3` scaffolding only after split lighting remains
+   stable under motion.

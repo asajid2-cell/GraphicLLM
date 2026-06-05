@@ -501,6 +501,14 @@ Current producer evidence:
   `lighting_split_ready_report_count=6`,
   `lighting_signal_metrics_ready=true`,
   failures `0`, warnings `0`.
+- concrete split-buffer packet:
+  `build/captures/v3_lighting_split_concrete_debug_smoke1_20260605`.
+- concrete split-buffer packet result:
+  `report_count=16`,
+  `lighting_split_ready_report_count=16`,
+  `full_scene_lighting_v3_executed_report_count=16`,
+  `lighting_signal_metrics_ready=true`,
+  failures `0`, warnings `0`.
 - pass evidence:
   `FullSceneLightingV3.executed=true`,
   `FullSceneLightingV3.draw_count=1`,
@@ -511,13 +519,19 @@ Current producer evidence:
   `direct_light_shadow_loss.mean_luma=0.223022`,
   `shadow_factor.mean_luma=0.350937`, and
   `ambient_ibl.mean_luma=0.196339`.
+- concrete split signal evidence:
+  `v3_direct_lighting.mean_luma=0.431061`,
+  `v3_direct_lighting_unshadowed.mean_luma=0.470903`,
+  `v3_shadow_visibility.mean_luma=0.350934`,
+  `v3_shadow_loss.mean_luma=0.175254`, and
+  `v3_indirect_lighting.mean_luma=0.193502`.
 
 Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
-- run the concrete split-resource packet after native build availability is
-  restored and compare V3 split outputs against the legacy deferred terms.
+- compare V3 split outputs against the legacy deferred terms under motion and
+  cross-family packets, not just the static gallery packet.
 - keep default beauty unchanged until the consumer/composite path and packet
   gates prove promotion quality.
 

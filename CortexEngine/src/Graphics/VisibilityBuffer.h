@@ -394,6 +394,9 @@ public:
     // Get visibility buffer for debug visualization
     [[nodiscard]] ID3D12Resource* GetVisibilityBuffer() const { return m_visibilityBuffer.Get(); }
     [[nodiscard]] const DescriptorHandle& GetVisibilitySRVHandle() const { return m_visibilitySRV; }
+    [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetInstanceBufferAddress() const {
+        return m_instanceBuffer[m_frameIndex] ? m_instanceBuffer[m_frameIndex]->GetGPUVirtualAddress() : 0;
+    }
 
     enum class DebugBlitBuffer : uint32_t {
         Albedo = 0,
@@ -402,6 +405,12 @@ public:
         MaterialExt0,
         MaterialExt1,
         MaterialExt2,
+    };
+
+    enum class DebugBlitVisibilityMode : uint32_t {
+        PayloadInstance = 0,
+        MaterialId = 1,
+        StableObjectId = 2,
     };
 
     // Debug: Blit albedo to HDR buffer for visualization
@@ -423,7 +432,8 @@ public:
     Result<void> DebugBlitVisibilityToHDR(
         ID3D12GraphicsCommandList* cmdList,
         ID3D12Resource* hdrTarget,
-        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+        DebugBlitVisibilityMode mode = DebugBlitVisibilityMode::PayloadInstance
     );
 
     // Debug: Visualize an external depth buffer (R32_FLOAT SRV expected).

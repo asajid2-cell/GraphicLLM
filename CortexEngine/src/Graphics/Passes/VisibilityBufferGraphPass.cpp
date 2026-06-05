@@ -270,7 +270,8 @@ bool DebugBlit(const DebugBlitContext& context) {
         debugResult = context.renderer->DebugBlitVisibilityToHDR(
             context.commandList,
             context.hdrTarget,
-            context.hdrRTV);
+            context.hdrRTV,
+            context.visibilityMode);
     } else if (context.debugDepth) {
         debugResult = context.renderer->DebugBlitDepthToHDR(
             context.commandList,

@@ -1120,7 +1120,7 @@ function Invoke-FullSceneShaderV2Packet {
     $args = @(
         "-OutputRoot", "build/captures/full_scene_shader_pipeline_v2_facade_packet",
         "-FamilyFilter", "gallery",
-        "-ViewFilter", "beauty,surface_policy,reflection_owner,shadow_factor,direct_light,ambient_ibl,taa_blend",
+        "-ViewFilter", "beauty,surface_policy,material_id,object_id,reflection_owner,shadow_factor,direct_light,ambient_ibl,taa_blend",
         "-NoBuild",
         "-SkipSceneAnalyzers"
     )

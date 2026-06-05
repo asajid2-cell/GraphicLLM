@@ -77,6 +77,8 @@ struct DebugBlitContext {
     bool debugVisibility = false;
     bool debugDepth = false;
     bool debugGBuffer = false;
+    VisibilityBufferRenderer::DebugBlitVisibilityMode visibilityMode =
+        VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
     VisibilityBufferRenderer::DebugBlitBuffer gbufferSource =
         VisibilityBufferRenderer::DebugBlitBuffer::Albedo;
     D3D12_RESOURCE_STATES* hdrState = nullptr;

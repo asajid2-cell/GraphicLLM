@@ -127,7 +127,8 @@ Result<void> VisibilityBufferRenderer::DebugBlitGBufferToHDR(
 Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
     ID3D12GraphicsCommandList* cmdList,
     ID3D12Resource* hdrTarget,
-    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+    DebugBlitVisibilityMode mode
 ) {
     (void)hdrTarget;
 
@@ -136,6 +137,11 @@ Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
     }
     if (!m_blitVisibilityPipeline || !m_blitRootSignature || !m_blitSamplerHeap) {
         return Result<void>::Err("Visibility debug blit pipeline not initialized");
+    }
+    const bool needsInstanceTable = mode != DebugBlitVisibilityMode::PayloadInstance;
+    const D3D12_GPU_VIRTUAL_ADDRESS instanceAddress = GetInstanceBufferAddress();
+    if (needsInstanceTable && (instanceAddress == 0 || m_instanceCount == 0)) {
+        return Result<void>::Err("Visibility identity debug blit requires a populated instance table");
     }
 
     constexpr D3D12_RESOURCE_STATES kSrvState =
@@ -170,6 +176,16 @@ Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
 
     cmdList->SetGraphicsRootDescriptorTable(0, m_visibilitySRV.gpu);
     cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
+    const uint32_t constants[4] = {
+        static_cast<uint32_t>(mode),
+        m_instanceCount,
+        0u,
+        0u,
+    };
+    cmdList->SetGraphicsRoot32BitConstants(2, 4, constants, 0);
+    if (instanceAddress != 0) {
+        cmdList->SetGraphicsRootShaderResourceView(3, instanceAddress);
+    }
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->DrawInstanced(3, 1, 0, 0);

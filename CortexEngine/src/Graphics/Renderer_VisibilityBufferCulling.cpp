@@ -31,13 +31,18 @@ constexpr uint32_t kVBDebugGBufferEmissive = 5;
 constexpr uint32_t kVBDebugGBufferExt0 = 6;
 constexpr uint32_t kVBDebugGBufferExt1 = 7;
 constexpr uint32_t kVBDebugGBufferExt2 = 8;
+constexpr uint32_t kVBDebugMaterialId = 9;
+constexpr uint32_t kVBDebugStableObjectId = 10;
 
 bool IsVisibilityBufferDebugView(uint32_t debugView) {
     return debugView != kVBDebugNone;
 }
 
 bool IsVisibilityBufferUnculledDebugView(uint32_t debugView) {
-    return debugView == kVBDebugVisibility || debugView == kVBDebugDepth;
+    return debugView == kVBDebugVisibility ||
+           debugView == kVBDebugDepth ||
+           debugView == kVBDebugMaterialId ||
+           debugView == kVBDebugStableObjectId;
 }
 
 bool IsVisibilityBufferGBufferDebugView(uint32_t debugView) {
@@ -54,6 +59,8 @@ uint32_t Renderer::GetVisibilityBufferDebugView() const {
         case 38u: return kVBDebugGBufferExt0;
         case 39u: return kVBDebugGBufferExt1;
         case 40u: return kVBDebugGBufferExt2;
+        case 48u: return kVBDebugMaterialId;
+        case 49u: return kVBDebugStableObjectId;
         default: return kVBDebugNone;
     }
 }

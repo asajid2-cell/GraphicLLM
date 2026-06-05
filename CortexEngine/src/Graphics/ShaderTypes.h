@@ -105,6 +105,8 @@ struct FrameConstants {
     //                      29 = water debug (height/slope/foam),
     //                      40 = VB material class target,
     //                      41 = material class overlay),
+    //                      46 = reflection owner classification,
+    //                      47 = material class policy overlay,
     //     w = RT history valid (>0.5), y/z reserved
     glm::vec4 debugMode;
     // x = 1 / screenWidth, y = 1 / screenHeight,
@@ -162,6 +164,15 @@ struct FrameConstants {
       glm::vec4 cinematicParams;
       // x = authored DOF focus distance, y = authored aperture, z/w reserved
       glm::vec4 cinematicDofParams;
+      // x = material/specular motion damping, y = reflection debug stability,
+      // z = shadow softness scale, w = highlight/exposure protection.
+      glm::vec4 cinematicStabilityParams;
+      // x = black/toe lift, y = highlight rolloff strength,
+      // z = color separation strength, w = bloom halation strength.
+      glm::vec4 cinematicLookParams;
+      // x = profile exposure trim, y = HDR shoulder start,
+      // z = HDR shoulder strength, w = post-tonemap white compression.
+      glm::vec4 cinematicExposureParams;
 };
 
 // The visibility-buffer material resolve path reads vertices via ByteAddressBuffer

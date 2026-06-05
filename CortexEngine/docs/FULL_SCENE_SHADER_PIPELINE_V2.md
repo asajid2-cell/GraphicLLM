@@ -67,6 +67,11 @@ V2 is organized as contracts, not scattered features.
      albedo, world normal, roughness, metallic, AO, emissive, material id,
      object id, velocity, clearcoat, transmission, opacity, and optional detail
      masks.
+   - The GBuffer must carry named scene material policy data, not just broad
+     surface class. `MaterialExt2.w` is the current bridge for encoded scene
+     material class so lighting, reflections, temporal, and post can agree on
+     whether a pixel is wall paint, ceramic tile, wood, metal, glass, fabric,
+     wet surface, neon, screen, water, mirror, and related classes.
    - Debug views must expose each channel.
 
 3. Scene-Local Lighting Contract
@@ -258,6 +263,9 @@ Completion evidence:
 - runtime frame-report JSON emits a `full_scene_shader_pipeline_v2` section
   with all required readiness fields, labeled as `runtime_placeholder_v1_fallback`
   until V2 domains are promoted.
+- runtime material-policy source is statically checked across CPU material
+  resolution, VB material constants, HLSL material resolve, and the scene
+  material GBuffer channel.
 - material evidence report derives shader-family and PBR/hero-surface blockers
   from Asset Registry V2 and the scene binding overlay.
 - material upgrade plan converts blocked material evidence into P0/P1 work

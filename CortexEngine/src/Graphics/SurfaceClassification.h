@@ -54,6 +54,10 @@ enum class SurfaceClass : uint32_t {
 }
 
 [[nodiscard]] inline SurfaceClass ClassifySurface(const MaterialModel& material) {
+    if (material.classPolicy.applied && material.classPolicy.surfaceClassId <= ToSurfaceClassId(SurfaceClass::Water)) {
+        return static_cast<SurfaceClass>(material.classPolicy.surfaceClassId);
+    }
+
     const float emissiveLuminance =
         glm::dot(material.emissiveColor, glm::vec3(0.2126f, 0.7152f, 0.0722f)) *
         std::max(material.emissiveStrength, 0.0f);

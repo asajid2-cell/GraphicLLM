@@ -39,6 +39,7 @@
         "channel_inventory_available",
         "object_id_channel_ready",
         "material_id_channel_ready",
+        "material_policy_channel_ready",
         "velocity_channel_ready",
         "extended_material_channels_ready"
       ],

@@ -347,6 +347,133 @@ RendererSceneSnapshot BuildRendererSceneSnapshot(Scene::ECS_Registry* registry,
             advancedProceduralMask) {
             ++snapshot.materials.advancedFeatureMaterials;
         }
+        if (materialModel.classPolicy.applied) {
+            ++snapshot.materials.materialClassPolicyApplied;
+        }
+        if (materialModel.classPolicy.roughnessFloorApplied) {
+            ++snapshot.materials.materialPolicyRoughnessClamped;
+        }
+        if (materialModel.classPolicy.normalScaleClamped) {
+            ++snapshot.materials.materialPolicyNormalClamped;
+        }
+        if (materialModel.classPolicy.proceduralMaskClamped) {
+            ++snapshot.materials.materialPolicyProceduralClamped;
+        }
+        if (materialModel.classPolicy.reflectionStabilityApplied) {
+            ++snapshot.materials.materialPolicyReflectionStable;
+        }
+        if (materialModel.classPolicy.albedoLuminanceClamped) {
+            ++snapshot.materials.materialPolicyAlbedoLuminanceClamped;
+        }
+        if (materialModel.classPolicy.albedoChromaClamped) {
+            ++snapshot.materials.materialPolicyAlbedoChromaClamped;
+        }
+        switch (static_cast<SceneMaterialClassId>(materialModel.classPolicy.sceneMaterialClassId)) {
+        case SceneMaterialClassId::PaintedWall:
+            ++snapshot.materials.sceneMaterialPaintedWall;
+            break;
+        case SceneMaterialClassId::CeramicTile:
+            ++snapshot.materials.sceneMaterialCeramicTile;
+            break;
+        case SceneMaterialClassId::PolishedWood:
+            ++snapshot.materials.sceneMaterialPolishedWood;
+            break;
+        case SceneMaterialClassId::BrushedMetal:
+            ++snapshot.materials.sceneMaterialBrushedMetal;
+            break;
+        case SceneMaterialClassId::PolishedMetal:
+            ++snapshot.materials.sceneMaterialPolishedMetal;
+            break;
+        case SceneMaterialClassId::GlassPane:
+            ++snapshot.materials.sceneMaterialGlassPane;
+            break;
+        case SceneMaterialClassId::Fabric:
+            ++snapshot.materials.sceneMaterialFabric;
+            break;
+        case SceneMaterialClassId::Plastic:
+            ++snapshot.materials.sceneMaterialPlastic;
+            break;
+        case SceneMaterialClassId::WetSurface:
+            ++snapshot.materials.sceneMaterialWetSurface;
+            break;
+        case SceneMaterialClassId::EmissiveNeon:
+            ++snapshot.materials.sceneMaterialEmissiveNeon;
+            break;
+        case SceneMaterialClassId::ScreenPanel:
+            ++snapshot.materials.sceneMaterialScreenPanel;
+            break;
+        case SceneMaterialClassId::Concrete:
+            ++snapshot.materials.sceneMaterialConcrete;
+            break;
+        case SceneMaterialClassId::Rubber:
+            ++snapshot.materials.sceneMaterialRubber;
+            break;
+        case SceneMaterialClassId::Water:
+            ++snapshot.materials.sceneMaterialWater;
+            break;
+        case SceneMaterialClassId::Mirror:
+            ++snapshot.materials.sceneMaterialMirror;
+            break;
+        case SceneMaterialClassId::Default:
+        default:
+            ++snapshot.materials.sceneMaterialDefault;
+            break;
+        }
+        switch (static_cast<MaterialReflectionPreferenceId>(
+            materialModel.classPolicy.reflectionPreferenceId)) {
+        case MaterialReflectionPreferenceId::LocalProbe:
+            ++snapshot.materials.materialReflectionLocalProbe;
+            break;
+        case MaterialReflectionPreferenceId::ProbeGrid:
+            ++snapshot.materials.materialReflectionProbeGrid;
+            break;
+        case MaterialReflectionPreferenceId::PlanarProbe:
+            ++snapshot.materials.materialReflectionPlanarProbe;
+            break;
+        case MaterialReflectionPreferenceId::SSR:
+            ++snapshot.materials.materialReflectionSSR;
+            break;
+        case MaterialReflectionPreferenceId::RTReflection:
+            ++snapshot.materials.materialReflectionRT;
+            break;
+        case MaterialReflectionPreferenceId::NeutralFallback:
+        default:
+            ++snapshot.materials.materialReflectionNeutralFallback;
+            break;
+        }
+        switch (static_cast<MaterialTemporalPolicyId>(materialModel.classPolicy.temporalPolicyId)) {
+        case MaterialTemporalPolicyId::StableGlossy:
+            ++snapshot.materials.materialTemporalStableGlossy;
+            break;
+        case MaterialTemporalPolicyId::MirrorLocked:
+            ++snapshot.materials.materialTemporalMirrorLocked;
+            break;
+        case MaterialTemporalPolicyId::EmissiveLocked:
+            ++snapshot.materials.materialTemporalEmissiveLocked;
+            break;
+        case MaterialTemporalPolicyId::WaterViewDependent:
+            ++snapshot.materials.materialTemporalWaterViewDependent;
+            break;
+        case MaterialTemporalPolicyId::StableDiffuse:
+        default:
+            ++snapshot.materials.materialTemporalStableDiffuse;
+            break;
+        }
+        switch (static_cast<MaterialPostSensitivityId>(materialModel.classPolicy.postSensitivityId)) {
+        case MaterialPostSensitivityId::BloomEmitter:
+            ++snapshot.materials.materialPostBloomEmitter;
+            break;
+        case MaterialPostSensitivityId::ExposureProtected:
+            ++snapshot.materials.materialPostExposureProtected;
+            break;
+        case MaterialPostSensitivityId::WetHighlight:
+            ++snapshot.materials.materialPostWetHighlight;
+            break;
+        case MaterialPostSensitivityId::Normal:
+        default:
+            ++snapshot.materials.materialPostNormal;
+            break;
+        }
 
         const std::vector<MaterialValidationIssue> materialIssues =
             MaterialResolver::Validate(materialModel);

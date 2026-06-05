@@ -67,6 +67,13 @@ uint32_t MaterialTemporalPolicyCount(const FrameContract::MaterialStats& materia
            materials.materialTemporalWaterViewDependent;
 }
 
+uint32_t MaterialPostSensitivityCount(const FrameContract::MaterialStats& materials) {
+    return materials.materialPostNormal +
+           materials.materialPostBloomEmitter +
+           materials.materialPostExposureProtected +
+           materials.materialPostWetHighlight;
+}
+
 bool HasResource(const FrameContract& contract, const char* name) {
     return std::any_of(
         contract.resources.begin(),
@@ -95,10 +102,19 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
     const bool temporalPoliciesAvailable =
         contract.materials.sampled > 0 &&
         MaterialTemporalPolicyCount(contract.materials) == contract.materials.sampled;
+    const bool postPoliciesAvailable =
+        contract.materials.sampled > 0 &&
+        MaterialPostSensitivityCount(contract.materials) == contract.materials.sampled;
     const bool extendedMaterialChannelsReady =
         HasResource(contract, "vb_gbuffer_material_ext0") &&
         HasResource(contract, "vb_gbuffer_material_ext1") &&
         HasResource(contract, "vb_gbuffer_material_ext2");
+    const bool materialPolicyChannelReady =
+        HasResource(contract, "vb_gbuffer_material_ext2") &&
+        familyCountsAvailable &&
+        reflectionPoliciesAvailable &&
+        temporalPoliciesAvailable &&
+        postPoliciesAvailable;
     const bool velocityReady = HasResource(contract, "velocity") &&
         contract.motionVectors.planned &&
         contract.motionVectors.executed;
@@ -140,6 +156,7 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
                  HasResource(contract, "vb_gbuffer_normal_roughness")},
             {"object_id_channel_ready", false},
             {"material_id_channel_ready", HasResource(contract, "vb_gbuffer_material_ext2")},
+            {"material_policy_channel_ready", materialPolicyChannelReady},
             {"velocity_channel_ready", velocityReady},
             {"extended_material_channels_ready", extendedMaterialChannelsReady},
             {"facade_owner", "VisibilityBufferRenderer"}

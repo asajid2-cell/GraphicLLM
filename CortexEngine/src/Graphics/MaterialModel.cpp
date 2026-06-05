@@ -8,12 +8,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace Cortex::Graphics {
 
 namespace {
 
 constexpr float kDefaultEpsilon = 1.0e-4f;
+
+enum : uint32_t {
+    kSurfaceClassDefault = 0u,
+    kSurfaceClassGlass = 1u,
+    kSurfaceClassMirror = 2u,
+    kSurfaceClassPlastic = 3u,
+    kSurfaceClassMasonry = 4u,
+    kSurfaceClassEmissive = 5u,
+    kSurfaceClassBrushedMetal = 6u,
+    kSurfaceClassWood = 7u,
+    kSurfaceClassWater = 8u,
+};
 
 bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
                         const DX12Texture* fallback,
@@ -39,6 +52,436 @@ bool HasAuthoredTexture(const std::shared_ptr<DX12Texture>& texture,
 [[nodiscard]] bool IsNearWhite(const glm::vec3& value) {
     return glm::all(glm::lessThanEqual(glm::abs(value - glm::vec3(1.0f)),
                                        glm::vec3(kDefaultEpsilon)));
+}
+
+[[nodiscard]] bool PresetContains(const MaterialModel& model, const char* token) {
+    if (!token) {
+        return false;
+    }
+    if (MaterialPresetRegistry::ContainsToken(model.presetName, token)) {
+        return true;
+    }
+    const std::string canonicalPreset = MaterialPresetRegistry::Canonicalize(model.presetName);
+    return canonicalPreset != model.presetName &&
+           MaterialPresetRegistry::ContainsToken(canonicalPreset, token);
+}
+
+[[nodiscard]] bool MaterialTypeNear(const MaterialModel& model, float expectedType) {
+    return model.materialType > expectedType - 0.5f && model.materialType < expectedType + 0.5f;
+}
+
+[[nodiscard]] uint32_t ToId(SceneMaterialClassId id) {
+    return static_cast<uint32_t>(id);
+}
+
+[[nodiscard]] uint32_t ToId(MaterialReflectionPreferenceId id) {
+    return static_cast<uint32_t>(id);
+}
+
+[[nodiscard]] uint32_t ToId(MaterialTemporalPolicyId id) {
+    return static_cast<uint32_t>(id);
+}
+
+[[nodiscard]] uint32_t ToId(MaterialPostSensitivityId id) {
+    return static_cast<uint32_t>(id);
+}
+
+[[nodiscard]] SceneMaterialClassId ResolveSceneMaterialClass(const MaterialModel& model) {
+    const float emissiveLuminance =
+        glm::dot(model.emissiveColor, glm::vec3(0.2126f, 0.7152f, 0.0722f)) *
+        std::max(model.emissiveStrength, 0.0f);
+
+    if (PresetContains(model, "water") ||
+        PresetContains(model, "lava") ||
+        PresetContains(model, "honey") ||
+        PresetContains(model, "molasses")) {
+        return SceneMaterialClassId::Water;
+    }
+    if (PresetContains(model, "wet") ||
+        PresetContains(model, "puddle") ||
+        model.wetnessFactor > 0.05f) {
+        return SceneMaterialClassId::WetSurface;
+    }
+    if (model.transmissionFactor > 0.01f ||
+        MaterialTypeNear(model, 1.0f) ||
+        PresetContains(model, "glass")) {
+        return SceneMaterialClassId::GlassPane;
+    }
+    if (MaterialTypeNear(model, 2.0f) || PresetContains(model, "mirror")) {
+        return SceneMaterialClassId::Mirror;
+    }
+    if (PresetContains(model, "screen") ||
+        PresetContains(model, "display") ||
+        PresetContains(model, "monitor") ||
+        PresetContains(model, "television")) {
+        return SceneMaterialClassId::ScreenPanel;
+    }
+    if (MaterialTypeNear(model, 5.0f) ||
+        PresetContains(model, "emissive") ||
+        PresetContains(model, "neon") ||
+        emissiveLuminance > 0.05f) {
+        return SceneMaterialClassId::EmissiveNeon;
+    }
+    if (PresetContains(model, "ceramic") ||
+        PresetContains(model, "tile") ||
+        PresetContains(model, "porcelain")) {
+        return SceneMaterialClassId::CeramicTile;
+    }
+    if (PresetContains(model, "painted_wall") ||
+        PresetContains(model, "drywall") ||
+        PresetContains(model, "plaster") ||
+        PresetContains(model, "wall_paint")) {
+        return SceneMaterialClassId::PaintedWall;
+    }
+    if (PresetContains(model, "fabric") ||
+        PresetContains(model, "cloth") ||
+        PresetContains(model, "upholstery") ||
+        PresetContains(model, "carpet")) {
+        return SceneMaterialClassId::Fabric;
+    }
+    if (PresetContains(model, "rubber") ||
+        PresetContains(model, "matte_black") ||
+        PresetContains(model, "gym_mat")) {
+        return SceneMaterialClassId::Rubber;
+    }
+    if (PresetContains(model, "polished_metal") ||
+        PresetContains(model, "chrome") ||
+        PresetContains(model, "gold")) {
+        return SceneMaterialClassId::PolishedMetal;
+    }
+    if (MaterialTypeNear(model, 6.0f) ||
+        PresetContains(model, "brushed_metal") ||
+        PresetContains(model, "metal")) {
+        return SceneMaterialClassId::BrushedMetal;
+    }
+    if (MaterialTypeNear(model, 3.0f) || PresetContains(model, "plastic")) {
+        return SceneMaterialClassId::Plastic;
+    }
+    if (MaterialTypeNear(model, 4.0f) ||
+        PresetContains(model, "brick") ||
+        PresetContains(model, "concrete") ||
+        PresetContains(model, "stone") ||
+        PresetContains(model, "masonry")) {
+        return SceneMaterialClassId::Concrete;
+    }
+    if (MaterialTypeNear(model, 7.0f) || PresetContains(model, "wood")) {
+        return SceneMaterialClassId::PolishedWood;
+    }
+    if (model.metallic > 0.85f && model.roughness < 0.20f) {
+        return SceneMaterialClassId::Mirror;
+    }
+    return SceneMaterialClassId::Default;
+}
+
+[[nodiscard]] uint32_t ResolvePolicySurfaceClass(SceneMaterialClassId sceneClass) {
+    switch (sceneClass) {
+        case SceneMaterialClassId::GlassPane:
+            return kSurfaceClassGlass;
+        case SceneMaterialClassId::Mirror:
+            return kSurfaceClassMirror;
+        case SceneMaterialClassId::Plastic:
+        case SceneMaterialClassId::Rubber:
+            return kSurfaceClassPlastic;
+        case SceneMaterialClassId::PaintedWall:
+            return kSurfaceClassMasonry;
+        case SceneMaterialClassId::CeramicTile:
+        case SceneMaterialClassId::Concrete:
+            return kSurfaceClassMasonry;
+        case SceneMaterialClassId::EmissiveNeon:
+        case SceneMaterialClassId::ScreenPanel:
+            return kSurfaceClassEmissive;
+        case SceneMaterialClassId::BrushedMetal:
+        case SceneMaterialClassId::PolishedMetal:
+            return kSurfaceClassBrushedMetal;
+        case SceneMaterialClassId::PolishedWood:
+        case SceneMaterialClassId::Fabric:
+            return kSurfaceClassWood;
+        case SceneMaterialClassId::Water:
+        case SceneMaterialClassId::WetSurface:
+            return kSurfaceClassWater;
+        case SceneMaterialClassId::Default:
+        default:
+            return kSurfaceClassDefault;
+    }
+}
+
+struct MaterialClassPolicy {
+    float roughnessFloor = 0.20f;
+    float normalScaleCeiling = 0.42f;
+    float proceduralMaskCeiling = 0.38f;
+    float reflectionStabilityScale = 0.44f;
+    float albedoLuminanceCeiling = 0.78f;
+    float albedoChromaCeiling = 0.75f;
+    MaterialReflectionPreferenceId reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+    MaterialTemporalPolicyId temporalPolicy = MaterialTemporalPolicyId::StableDiffuse;
+    MaterialPostSensitivityId postSensitivity = MaterialPostSensitivityId::Normal;
+    bool reflectionStabilityApplied = false;
+    bool forceDielectric = false;
+};
+
+[[nodiscard]] MaterialClassPolicy ResolveMaterialClassPolicy(const MaterialModel& model,
+                                                             SceneMaterialClassId sceneClassId,
+                                                             uint32_t surfaceClassId) {
+    MaterialClassPolicy policy{};
+    switch (sceneClassId) {
+        case SceneMaterialClassId::GlassPane:
+            policy.roughnessFloor = 0.03f;
+            policy.normalScaleCeiling = 0.18f;
+            policy.proceduralMaskCeiling = 0.16f;
+            policy.reflectionStabilityScale = 0.78f;
+            policy.albedoLuminanceCeiling = 0.72f;
+            policy.albedoChromaCeiling = 0.55f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::RTReflection;
+            policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            policy.postSensitivity = MaterialPostSensitivityId::ExposureProtected;
+            policy.reflectionStabilityApplied = true;
+            policy.forceDielectric = true;
+            break;
+        case SceneMaterialClassId::Mirror:
+            policy.roughnessFloor = 0.015f;
+            policy.normalScaleCeiling = 0.08f;
+            policy.proceduralMaskCeiling = 0.10f;
+            policy.reflectionStabilityScale = 1.00f;
+            policy.albedoLuminanceCeiling = 0.78f;
+            policy.albedoChromaCeiling = 0.40f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::RTReflection;
+            policy.temporalPolicy = MaterialTemporalPolicyId::MirrorLocked;
+            policy.postSensitivity = MaterialPostSensitivityId::ExposureProtected;
+            policy.reflectionStabilityApplied = true;
+            break;
+        case SceneMaterialClassId::Plastic:
+            policy.roughnessFloor = 0.24f;
+            policy.normalScaleCeiling = 0.45f;
+            policy.proceduralMaskCeiling = 0.48f;
+            policy.reflectionStabilityScale = 0.50f;
+            policy.albedoLuminanceCeiling = 0.58f;
+            policy.albedoChromaCeiling = 0.72f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::LocalProbe;
+            policy.reflectionStabilityApplied = true;
+            break;
+        case SceneMaterialClassId::Rubber:
+            policy.roughnessFloor = 0.52f;
+            policy.normalScaleCeiling = 0.34f;
+            policy.proceduralMaskCeiling = 0.36f;
+            policy.reflectionStabilityScale = 0.28f;
+            policy.albedoLuminanceCeiling = 0.42f;
+            policy.albedoChromaCeiling = 0.50f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+            break;
+        case SceneMaterialClassId::PaintedWall:
+            policy.roughnessFloor = 0.20f;
+            policy.normalScaleCeiling = 0.42f;
+            policy.proceduralMaskCeiling = 0.38f;
+            policy.reflectionStabilityScale = 0.28f;
+            policy.albedoLuminanceCeiling = 0.56f;
+            policy.albedoChromaCeiling = 0.62f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+            break;
+        case SceneMaterialClassId::CeramicTile:
+            policy.roughnessFloor = 0.18f;
+            policy.normalScaleCeiling = 0.22f;
+            policy.proceduralMaskCeiling = 0.30f;
+            policy.reflectionStabilityScale = 0.58f;
+            policy.albedoLuminanceCeiling = 0.68f;
+            policy.albedoChromaCeiling = 0.66f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::SSR;
+            policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            policy.reflectionStabilityApplied = true;
+            break;
+        case SceneMaterialClassId::Concrete:
+            policy.roughnessFloor = 0.42f;
+            policy.normalScaleCeiling = 0.68f;
+            policy.proceduralMaskCeiling = 0.78f;
+            policy.reflectionStabilityScale = 0.36f;
+            policy.albedoLuminanceCeiling = 0.58f;
+            policy.albedoChromaCeiling = 0.48f;
+            break;
+        case SceneMaterialClassId::EmissiveNeon:
+            policy.roughnessFloor = 0.30f;
+            policy.normalScaleCeiling = 0.22f;
+            policy.proceduralMaskCeiling = 0.16f;
+            policy.reflectionStabilityScale = 0.42f;
+            policy.albedoLuminanceCeiling = 1.0f;
+            policy.albedoChromaCeiling = 1.0f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+            policy.temporalPolicy = MaterialTemporalPolicyId::EmissiveLocked;
+            policy.postSensitivity = MaterialPostSensitivityId::BloomEmitter;
+            policy.forceDielectric = true;
+            break;
+        case SceneMaterialClassId::ScreenPanel:
+            policy.roughnessFloor = 0.20f;
+            policy.normalScaleCeiling = 0.12f;
+            policy.proceduralMaskCeiling = 0.12f;
+            policy.reflectionStabilityScale = 0.38f;
+            policy.albedoLuminanceCeiling = 1.0f;
+            policy.albedoChromaCeiling = 1.0f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+            policy.temporalPolicy = MaterialTemporalPolicyId::EmissiveLocked;
+            policy.postSensitivity = MaterialPostSensitivityId::BloomEmitter;
+            policy.forceDielectric = true;
+            break;
+        case SceneMaterialClassId::PolishedMetal:
+            policy.roughnessFloor = 0.05f;
+            policy.normalScaleCeiling = 0.18f;
+            policy.proceduralMaskCeiling = 0.22f;
+            policy.reflectionStabilityScale = 0.78f;
+            policy.albedoLuminanceCeiling = 0.70f;
+            policy.albedoChromaCeiling = 0.44f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::RTReflection;
+            policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            policy.postSensitivity = MaterialPostSensitivityId::ExposureProtected;
+            policy.reflectionStabilityApplied = true;
+            break;
+        case SceneMaterialClassId::BrushedMetal:
+            policy.roughnessFloor = 0.24f;
+            policy.normalScaleCeiling = 0.36f;
+            policy.proceduralMaskCeiling = 0.36f;
+            policy.reflectionStabilityScale = 0.66f;
+            policy.albedoLuminanceCeiling = 0.60f;
+            policy.albedoChromaCeiling = 0.52f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::LocalProbe;
+            policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            policy.reflectionStabilityApplied = true;
+            break;
+        case SceneMaterialClassId::PolishedWood:
+            policy.roughnessFloor = 0.30f;
+            policy.normalScaleCeiling = 0.68f;
+            policy.proceduralMaskCeiling = 0.78f;
+            policy.reflectionStabilityScale = 0.36f;
+            policy.albedoLuminanceCeiling = 0.58f;
+            policy.albedoChromaCeiling = 0.65f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::LocalProbe;
+            break;
+        case SceneMaterialClassId::Fabric:
+            policy.roughnessFloor = 0.58f;
+            policy.normalScaleCeiling = 0.42f;
+            policy.proceduralMaskCeiling = 0.58f;
+            policy.reflectionStabilityScale = 0.24f;
+            policy.albedoLuminanceCeiling = 0.54f;
+            policy.albedoChromaCeiling = 0.68f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::NeutralFallback;
+            break;
+        case SceneMaterialClassId::WetSurface:
+            policy.roughnessFloor = 0.06f;
+            policy.normalScaleCeiling = 0.38f;
+            policy.proceduralMaskCeiling = 0.26f;
+            policy.reflectionStabilityScale = 0.88f;
+            policy.albedoLuminanceCeiling = 0.58f;
+            policy.albedoChromaCeiling = 0.55f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::PlanarProbe;
+            policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            policy.postSensitivity = MaterialPostSensitivityId::WetHighlight;
+            policy.reflectionStabilityApplied = true;
+            policy.forceDielectric = true;
+            break;
+        case SceneMaterialClassId::Water:
+            policy.roughnessFloor = 0.03f;
+            policy.normalScaleCeiling = 0.45f;
+            policy.proceduralMaskCeiling = 0.24f;
+            policy.reflectionStabilityScale = 1.00f;
+            policy.albedoLuminanceCeiling = 0.70f;
+            policy.albedoChromaCeiling = 0.60f;
+            policy.reflectionPreference = MaterialReflectionPreferenceId::PlanarProbe;
+            policy.temporalPolicy = MaterialTemporalPolicyId::WaterViewDependent;
+            policy.postSensitivity = MaterialPostSensitivityId::WetHighlight;
+            policy.reflectionStabilityApplied = true;
+            policy.forceDielectric = true;
+            break;
+        default:
+            if (surfaceClassId == kSurfaceClassBrushedMetal || model.metallic > 0.85f) {
+                policy.reflectionPreference = MaterialReflectionPreferenceId::LocalProbe;
+                policy.temporalPolicy = MaterialTemporalPolicyId::StableGlossy;
+            }
+            break;
+    }
+    return policy;
+}
+
+[[nodiscard]] float AlbedoLuminance(const glm::vec3& color) {
+    return glm::dot(color, glm::vec3(0.2126f, 0.7152f, 0.0722f));
+}
+
+[[nodiscard]] float AlbedoChromaSpan(const glm::vec3& color) {
+    return std::max(color.r, std::max(color.g, color.b)) -
+           std::min(color.r, std::min(color.g, color.b));
+}
+
+glm::vec3 ApplyAlbedoTonePolicy(const glm::vec3& color,
+                                const MaterialClassPolicy& policy,
+                                bool& luminanceClamped,
+                                bool& chromaClamped) {
+    glm::vec3 result = glm::clamp(color, glm::vec3(0.0f), glm::vec3(1.0f));
+    float luma = AlbedoLuminance(result);
+    if (luma > policy.albedoLuminanceCeiling && luma > kDefaultEpsilon) {
+        result *= policy.albedoLuminanceCeiling / luma;
+        luminanceClamped = true;
+        luma = AlbedoLuminance(result);
+    }
+
+    const float chroma = AlbedoChromaSpan(result);
+    if (chroma > policy.albedoChromaCeiling) {
+        const float t = 1.0f - (policy.albedoChromaCeiling / std::max(chroma, kDefaultEpsilon));
+        result = glm::mix(result, glm::vec3(luma), glm::clamp(t, 0.0f, 1.0f));
+        chromaClamped = true;
+    }
+    return glm::clamp(result, glm::vec3(0.0f), glm::vec3(1.0f));
+}
+
+void ApplyMaterialClassPolicy(MaterialModel& model) {
+    const SceneMaterialClassId sceneClassId = ResolveSceneMaterialClass(model);
+    const uint32_t surfaceClassId = ResolvePolicySurfaceClass(sceneClassId);
+    const MaterialClassPolicy policy = ResolveMaterialClassPolicy(model, sceneClassId, surfaceClassId);
+
+    MaterialClassPolicyEvidence evidence{};
+    evidence.surfaceClassId = surfaceClassId;
+    evidence.sceneMaterialClassId = ToId(sceneClassId);
+    evidence.reflectionPreferenceId = ToId(policy.reflectionPreference);
+    evidence.temporalPolicyId = ToId(policy.temporalPolicy);
+    evidence.postSensitivityId = ToId(policy.postSensitivity);
+    evidence.applied = true;
+    evidence.roughnessFloor = policy.roughnessFloor;
+    evidence.normalScaleCeiling = policy.normalScaleCeiling;
+    evidence.proceduralMaskCeiling = policy.proceduralMaskCeiling;
+    evidence.reflectionStabilityScale = policy.reflectionStabilityScale;
+    evidence.albedoLuminanceCeiling = policy.albedoLuminanceCeiling;
+    evidence.albedoChromaCeiling = policy.albedoChromaCeiling;
+    evidence.reflectionStabilityApplied = policy.reflectionStabilityApplied;
+
+    const float originalRoughness = model.roughness;
+    const float originalNormalScale = model.normalScale;
+    const float originalProceduralMask = model.proceduralMaskStrength;
+    const glm::vec3 originalAlbedo = glm::vec3(model.albedo);
+
+    model.roughness = std::max(model.roughness, policy.roughnessFloor);
+    model.normalScale = std::min(model.normalScale, policy.normalScaleCeiling);
+    model.proceduralMaskStrength = std::min(model.proceduralMaskStrength, policy.proceduralMaskCeiling);
+    bool albedoLuminanceClamped = false;
+    bool albedoChromaClamped = false;
+    if (sceneClassId != SceneMaterialClassId::EmissiveNeon &&
+        sceneClassId != SceneMaterialClassId::ScreenPanel) {
+        model.albedo = glm::vec4(
+            ApplyAlbedoTonePolicy(originalAlbedo,
+                                  policy,
+                                  albedoLuminanceClamped,
+                                  albedoChromaClamped),
+            model.albedo.a);
+    }
+    if (policy.forceDielectric) {
+        model.metallic = 0.0f;
+    }
+
+    evidence.roughnessFloorApplied = model.roughness > originalRoughness + kDefaultEpsilon;
+    evidence.normalScaleClamped = model.normalScale + kDefaultEpsilon < originalNormalScale;
+    evidence.proceduralMaskClamped =
+        model.proceduralMaskStrength + kDefaultEpsilon < originalProceduralMask;
+    evidence.albedoLuminanceClamped = albedoLuminanceClamped;
+    evidence.albedoChromaClamped = albedoChromaClamped;
+    model.classPolicy = evidence;
+}
+
+[[nodiscard]] bool MaterialNormalMapsDisabledForDiagnostics() {
+    const char* value = std::getenv("CORTEX_DISABLE_MATERIAL_NORMAL_MAPS");
+    return value && value[0] != '\0' && value[0] != '0';
 }
 
 void ApplyPresetDefaults(MaterialModel& model, const MaterialPresetInfo& preset) {
@@ -119,6 +562,10 @@ MaterialModel MaterialResolver::ResolveRenderable(
         renderable.textures.albedo, fallbacks.albedo, renderable.textures.albedoPath);
     model.textures.normal = HasAuthoredTexture(
         renderable.textures.normal, fallbacks.normal, renderable.textures.normalPath);
+    if (MaterialNormalMapsDisabledForDiagnostics()) {
+        model.textures.normal = false;
+        model.normalScale = 0.0f;
+    }
     model.textures.metallic = HasAuthoredTexture(
         renderable.textures.metallic, fallbacks.metallic, renderable.textures.metallicPath);
     model.textures.roughness = HasAuthoredTexture(
@@ -156,6 +603,17 @@ MaterialModel MaterialResolver::ResolveRenderable(
         model.clearcoatFactor = glm::clamp(renderable.clearcoatFactor, 0.0f, 1.0f);
         model.clearcoatRoughnessFactor = glm::clamp(renderable.clearcoatRoughnessFactor, 0.0f, 1.0f);
     }
+
+    if (model.alphaMode == MaterialAlphaMode::Blend && model.transmissionFactor > 0.0f) {
+        // Current transparent overlays composite after the opaque G-buffer and
+        // do not publish matching material/normal data for post refraction.
+        // Keep alpha-blended glass visually transparent through opacity and
+        // glass surface classification, but keep deferred/post transmission
+        // disabled until the renderer has an OIT/transparent-G-buffer path.
+        model.transmissionFactor = 0.0f;
+    }
+
+    ApplyMaterialClassPolicy(model);
 
     return model;
 }
@@ -338,6 +796,11 @@ VBMaterialConstants MaterialResolver::BuildVBMaterialConstants(
     material.alphaMode = static_cast<uint32_t>(model.alphaMode);
     material.doubleSided = model.doubleSided ? 1u : 0u;
     material.materialClass = materialClass;
+    material.policyParams = glm::uvec4(
+        model.classPolicy.sceneMaterialClassId,
+        model.classPolicy.reflectionPreferenceId,
+        model.classPolicy.temporalPolicyId,
+        model.classPolicy.postSensitivityId);
     return material;
 }
 

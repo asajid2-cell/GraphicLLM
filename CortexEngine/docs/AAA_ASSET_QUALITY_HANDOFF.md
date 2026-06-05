@@ -525,6 +525,52 @@ Current interpretation:
 - Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
   gates or provide stronger replacement evidence.
 
+### Full Scene Shader Pipeline V2 Runtime Material Policy Slice
+
+Purpose:
+
+- Move from broad surface classes toward scene-wide shader semantics that later
+  lighting, reflection, temporal, and post passes can trust per pixel.
+- Do not claim beauty-output promotion yet; V2 still reports
+  `runtime_placeholder_v1_fallback`.
+
+Implementation state:
+
+- `FrameContractJson.cpp` now reports
+  `full_scene_shader_pipeline_v2.gbuffer.material_policy_channel_ready`.
+- The field is true only when:
+  - `vb_gbuffer_material_ext2` exists and matches the frame contract.
+  - scene material family counts cover every sampled material.
+  - reflection preference counts cover every sampled material.
+  - temporal policy counts cover every sampled material.
+  - post sensitivity counts cover every sampled material.
+- The V2 frame-report contract requires that readiness field.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py` now statically
+  checks the runtime material-policy bridge:
+  - `VisibilityBuffer.h` has `VBMaterialConstants.policyParams`.
+  - `MaterialModel.h/.cpp` define/apply material policy evidence.
+  - `MaterialResolve.hlsl` reads `mat.policyParams.x`.
+  - `MaterialResolve.hlsl` writes encoded scene material class to
+    `MaterialExt2.w`.
+  - `SurfaceClassification.hlsli` owns the scene material vocabulary and
+    encoders.
+  - `DeferredLighting.hlsl` decodes the same channel and derives subsurface,
+    direct/indirect BRDF shaping, local probe shaping, shadow softness, and
+    material-policy debug color from the named scene material class.
+  - `PostProcess.hlsl` decodes the same channel for reflection grading,
+    contact AO, temporal/reflection stability shaping, and material-policy
+    debug views.
+  - CPU constant upload paths expose the matching cinematic stability and
+    local ambient/probe parameters.
+
+Current caveat:
+
+- This is a contract and data-path slice. It hardens the substrate for AAA
+  shaders but does not by itself prove final visual quality.
+- Full native build has previously timed out in CMake/Ninja regeneration in
+  this environment; use the focused Python validators first and only run the
+  native build with a bounded timeout.
+
 ## Resume Commands
 
 ```powershell

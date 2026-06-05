@@ -11,6 +11,159 @@
 
 namespace Cortex::Graphics {
 
+glm::vec4 Renderer::BuildCinematicStabilityParams() const {
+    const bool active = m_sceneVisualContract.active &&
+        m_sceneVisualContract.postQualitySetId == "scene_local_cinematic_post_quality_v1";
+    if (!active) {
+        return glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+    }
+
+    const bool enclosed = m_sceneVisualContract.enclosedScene;
+    const bool stableShadowPolicy =
+        m_sceneVisualContract.shadowPolicyId == "scene_local_soft_stable_shadows_v1";
+    const bool manualExposurePolicy =
+        m_sceneVisualContract.exposurePolicyId == "scene_local_manual_exposure_v1";
+
+    const float motionSpecularDamping = enclosed ? 0.24f : 0.14f;
+    const float reflectionDebugStability = enclosed ? 0.30f : 0.18f;
+    const float shadowSoftnessScale = stableShadowPolicy ? (enclosed ? 1.18f : 1.10f) : 1.0f;
+    const float highlightProtection = manualExposurePolicy ? (enclosed ? 0.24f : 0.14f) : 0.0f;
+
+    return glm::vec4(motionSpecularDamping,
+                     reflectionDebugStability,
+                     shadowSoftnessScale,
+                     highlightProtection);
+}
+
+glm::vec4 Renderer::BuildCinematicLookParams() const {
+    const bool active = m_sceneVisualContract.active &&
+        m_sceneVisualContract.postQualitySetId == "scene_local_cinematic_post_quality_v1";
+    if (!active) {
+        return glm::vec4(0.0f);
+    }
+
+    float toeLift = m_sceneVisualContract.enclosedScene ? 0.050f : 0.035f;
+    float highlightRolloff = 0.22f;
+    float colorSeparation = 0.18f;
+    float halationStrength = 0.16f;
+
+    const std::string& toneMapper = m_sceneVisualContract.toneMapperPreset;
+    if (toneMapper == "punchy") {
+        toeLift = 0.035f;
+        highlightRolloff = 0.30f;
+        colorSeparation = 0.32f;
+        halationStrength = 0.34f;
+    } else if (toneMapper == "filmic_soft") {
+        toeLift = 0.060f;
+        highlightRolloff = 0.24f;
+        colorSeparation = 0.20f;
+        halationStrength = 0.18f;
+    } else if (toneMapper == "reinhard") {
+        toeLift = 0.040f;
+        highlightRolloff = 0.16f;
+        colorSeparation = 0.10f;
+        halationStrength = 0.10f;
+    }
+
+    const std::string& palette = m_sceneVisualContract.materialPaletteId;
+    if (palette.find("kitchen") != std::string::npos) {
+        colorSeparation += 0.06f;
+        halationStrength += 0.05f;
+    } else if (palette.find("office") != std::string::npos) {
+        toeLift += 0.02f;
+        colorSeparation += 0.04f;
+    } else if (palette.find("gym") != std::string::npos ||
+               palette.find("classroom") != std::string::npos) {
+        highlightRolloff += 0.04f;
+        halationStrength -= 0.04f;
+    } else if (palette.find("concert") != std::string::npos ||
+               palette.find("red_light") != std::string::npos) {
+        colorSeparation += 0.10f;
+        halationStrength += 0.14f;
+    } else if (palette.find("stadium") != std::string::npos) {
+        highlightRolloff += 0.08f;
+        colorSeparation += 0.08f;
+    }
+
+    return glm::vec4(glm::clamp(toeLift, 0.0f, 0.18f),
+                     glm::clamp(highlightRolloff, 0.0f, 0.55f),
+                     glm::clamp(colorSeparation, 0.0f, 0.55f),
+                     glm::clamp(halationStrength, 0.0f, 0.65f));
+}
+
+glm::vec4 Renderer::BuildCinematicExposureParams() const {
+    const bool active = m_sceneVisualContract.active &&
+        m_sceneVisualContract.postQualitySetId == "scene_local_cinematic_post_quality_v1";
+    if (!active) {
+        return glm::vec4(1.0f, 24.0f, 0.0f, 0.0f);
+    }
+
+    float exposureTrim = m_sceneVisualContract.enclosedScene ? 0.90f : 0.96f;
+    float hdrShoulderStart = 5.8f;
+    float hdrShoulderStrength = 0.22f;
+    float postWhiteCompression = 0.16f;
+
+    const std::string& toneMapper = m_sceneVisualContract.toneMapperPreset;
+    if (toneMapper == "punchy") {
+        exposureTrim = 0.95f;
+        hdrShoulderStart = 7.0f;
+        hdrShoulderStrength = 0.14f;
+        postWhiteCompression = 0.10f;
+    } else if (toneMapper == "filmic_soft") {
+        exposureTrim = 0.88f;
+        hdrShoulderStart = 5.2f;
+        hdrShoulderStrength = 0.26f;
+        postWhiteCompression = 0.18f;
+    } else if (toneMapper == "reinhard") {
+        exposureTrim = 0.92f;
+        hdrShoulderStart = 6.5f;
+        hdrShoulderStrength = 0.12f;
+        postWhiteCompression = 0.10f;
+    }
+
+    const std::string& profile = m_sceneVisualContract.profileId;
+    const std::string& palette = m_sceneVisualContract.materialPaletteId;
+    if (profile.find("gallery") != std::string::npos) {
+        exposureTrim = std::min(exposureTrim, 0.76f);
+        hdrShoulderStart = std::min(hdrShoulderStart, 3.8f);
+        hdrShoulderStrength = std::max(hdrShoulderStrength, 0.42f);
+        postWhiteCompression = std::max(postWhiteCompression, 0.36f);
+    }
+    if (palette.find("kitchen") != std::string::npos) {
+        exposureTrim = std::min(exposureTrim, 0.72f);
+        hdrShoulderStart = std::min(hdrShoulderStart, 3.8f);
+        hdrShoulderStrength = std::max(hdrShoulderStrength, 0.42f);
+        postWhiteCompression = std::max(postWhiteCompression, 0.36f);
+    } else if (palette.find("office") != std::string::npos) {
+        exposureTrim = std::min(exposureTrim, 0.72f);
+        hdrShoulderStart = std::min(hdrShoulderStart, 3.6f);
+        hdrShoulderStrength = std::max(hdrShoulderStrength, 0.44f);
+        postWhiteCompression = std::max(postWhiteCompression, 0.38f);
+    } else if (palette.find("gym") != std::string::npos ||
+               palette.find("classroom") != std::string::npos) {
+        exposureTrim = std::min(exposureTrim, 0.46f);
+        hdrShoulderStart = std::min(hdrShoulderStart, 2.2f);
+        hdrShoulderStrength = std::max(hdrShoulderStrength, 0.74f);
+        postWhiteCompression = std::max(postWhiteCompression, 0.68f);
+    } else if (palette.find("concert") != std::string::npos ||
+               palette.find("red_light") != std::string::npos) {
+        exposureTrim = std::max(exposureTrim, 0.94f);
+        hdrShoulderStart = std::max(hdrShoulderStart, 6.8f);
+        hdrShoulderStrength = std::min(hdrShoulderStrength, 0.20f);
+        postWhiteCompression = std::min(postWhiteCompression, 0.16f);
+    } else if (palette.find("stadium") != std::string::npos) {
+        exposureTrim = std::min(exposureTrim, 0.62f);
+        hdrShoulderStart = std::min(hdrShoulderStart, 3.0f);
+        hdrShoulderStrength = std::max(hdrShoulderStrength, 0.56f);
+        postWhiteCompression = std::max(postWhiteCompression, 0.48f);
+    }
+
+    return glm::vec4(glm::clamp(exposureTrim, 0.42f, 1.10f),
+                     glm::clamp(hdrShoulderStart, 1.0f, 24.0f),
+                     glm::clamp(hdrShoulderStrength, 0.0f, 0.80f),
+                     glm::clamp(postWhiteCompression, 0.0f, 0.70f));
+}
+
 void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
                                                  Scene::ECS_Registry* registry,
                                                  const FrameConstantCameraState& cameraState) {
@@ -222,6 +375,9 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_postProcessState.dofAperture,
         0.0f,
         0.0f);
+    frameData.cinematicStabilityParams = BuildCinematicStabilityParams();
+    frameData.cinematicLookParams = BuildCinematicLookParams();
+    frameData.cinematicExposureParams = BuildCinematicExposureParams();
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

@@ -16,6 +16,18 @@ FRAME_REPORT_CONTRACT_PATH = (
     ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_frame_report_contract.json"
 )
 FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
+VISIBILITY_BUFFER_HEADER_PATH = ROOT / "src" / "Graphics" / "VisibilityBuffer.h"
+MATERIAL_MODEL_HEADER_PATH = ROOT / "src" / "Graphics" / "MaterialModel.h"
+MATERIAL_MODEL_SOURCE_PATH = ROOT / "src" / "Graphics" / "MaterialModel.cpp"
+MATERIAL_RESOLVE_SHADER_PATH = ROOT / "assets" / "shaders" / "MaterialResolve.hlsl"
+SURFACE_CLASSIFICATION_SHADER_PATH = ROOT / "assets" / "shaders" / "SurfaceClassification.hlsli"
+DEFERRED_LIGHTING_SHADER_PATH = ROOT / "assets" / "shaders" / "DeferredLighting.hlsl"
+POST_PROCESS_SHADER_PATH = ROOT / "assets" / "shaders" / "PostProcess.hlsl"
+SHADER_TYPES_HEADER_PATH = ROOT / "src" / "Graphics" / "ShaderTypes.h"
+FRAME_POST_CONSTANTS_SOURCE_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
+DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
+    ROOT / "src" / "Graphics" / "Renderer_VisibilityBufferDeferredLighting.cpp"
+)
 
 
 def fail(message: str) -> int:
@@ -134,6 +146,172 @@ def validate_runtime_source_surface() -> list[str]:
     return errors
 
 
+def require_source_token(errors: list[str], source: str, token: str, label: str) -> None:
+    if token not in source:
+        errors.append(f"{label} missing required token: {token}")
+
+
+def validate_runtime_material_policy_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        VISIBILITY_BUFFER_HEADER_PATH,
+        MATERIAL_MODEL_HEADER_PATH,
+        MATERIAL_MODEL_SOURCE_PATH,
+        MATERIAL_RESOLVE_SHADER_PATH,
+        SURFACE_CLASSIFICATION_SHADER_PATH,
+        DEFERRED_LIGHTING_SHADER_PATH,
+        POST_PROCESS_SHADER_PATH,
+        SHADER_TYPES_HEADER_PATH,
+        FRAME_POST_CONSTANTS_SOURCE_PATH,
+        DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing runtime material policy source: {path}")
+    if errors:
+        return errors
+
+    vb_header = VISIBILITY_BUFFER_HEADER_PATH.read_text(encoding="utf-8")
+    model_header = MATERIAL_MODEL_HEADER_PATH.read_text(encoding="utf-8")
+    model_source = MATERIAL_MODEL_SOURCE_PATH.read_text(encoding="utf-8")
+    material_shader = MATERIAL_RESOLVE_SHADER_PATH.read_text(encoding="utf-8")
+    surface_shader = SURFACE_CLASSIFICATION_SHADER_PATH.read_text(encoding="utf-8")
+    deferred_shader = DEFERRED_LIGHTING_SHADER_PATH.read_text(encoding="utf-8")
+    post_shader = POST_PROCESS_SHADER_PATH.read_text(encoding="utf-8")
+    shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
+    frame_post_source = FRAME_POST_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
+    deferred_lighting_source = DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
+
+    require_source_token(
+        errors,
+        vb_header,
+        "alignas(16) glm::uvec4 policyParams",
+        "VisibilityBuffer VBMaterialConstants",
+    )
+    require_source_token(
+        errors,
+        model_header,
+        "struct MaterialClassPolicyEvidence",
+        "MaterialModel policy evidence",
+    )
+    require_source_token(
+        errors,
+        model_header,
+        "MaterialReflectionPreferenceId",
+        "MaterialModel policy enum",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "ApplyMaterialClassPolicy(model)",
+        "MaterialResolver policy application",
+    )
+    require_source_token(
+        errors,
+        model_source,
+        "material.policyParams = glm::uvec4",
+        "MaterialResolver VB policy upload",
+    )
+    require_source_token(
+        errors,
+        material_shader,
+        "uint4 policyParams",
+        "MaterialResolve VBMaterialConstants",
+    )
+    require_source_token(
+        errors,
+        material_shader,
+        "sceneMaterialClass = mat.policyParams.x",
+        "MaterialResolve policy unpack",
+    )
+    require_source_token(
+        errors,
+        material_shader,
+        "EncodeSceneMaterialClass(sceneMaterialClass)",
+        "MaterialResolve GBuffer policy write",
+    )
+    require_source_token(
+        errors,
+        material_shader,
+        "named scene material class",
+        "MaterialResolve MaterialExt2 contract comment",
+    )
+    require_source_token(
+        errors,
+        surface_shader,
+        "SCENE_MATERIAL_PAINTED_WALL",
+        "SurfaceClassification scene material vocabulary",
+    )
+    require_source_token(
+        errors,
+        surface_shader,
+        "float EncodeSceneMaterialClass",
+        "SurfaceClassification scene material encoder",
+    )
+    require_source_token(
+        errors,
+        surface_shader,
+        "float SurfaceReflectionStabilityScale",
+        "SurfaceClassification reflection stability policy",
+    )
+    require_source_token(
+        errors,
+        deferred_shader,
+        "uint sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a)",
+        "DeferredLighting scene material policy read",
+    )
+    require_source_token(
+        errors,
+        deferred_shader,
+        "SceneMaterialSubsurfaceWrap(sceneMaterialClass)",
+        "DeferredLighting subsurface policy replacement",
+    )
+    require_source_token(
+        errors,
+        deferred_shader,
+        "SceneMaterialPolicyDebugColor(sceneMaterialClass",
+        "DeferredLighting material policy debug view",
+    )
+    require_source_token(
+        errors,
+        post_shader,
+        "uint   sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a)",
+        "PostProcess scene material policy read",
+    )
+    require_source_token(
+        errors,
+        post_shader,
+        "CompositeSceneMaterialCinematicReflection",
+        "PostProcess scene material reflection shaping",
+    )
+    require_source_token(
+        errors,
+        post_shader,
+        "ApplySceneMaterialCinematicContactAo",
+        "PostProcess scene material contact AO",
+    )
+    require_source_token(
+        errors,
+        shader_types,
+        "glm::vec4 cinematicStabilityParams",
+        "ShaderTypes post constants",
+    )
+    require_source_token(
+        errors,
+        frame_post_source,
+        "frameData.cinematicStabilityParams",
+        "Frame post constant upload",
+    )
+    require_source_token(
+        errors,
+        deferred_lighting_source,
+        "deferredParams.cinematicStabilityParams",
+        "Deferred lighting constant upload",
+    )
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
@@ -174,6 +352,7 @@ def main() -> int:
 
     errors = validate_contracts()
     errors.extend(validate_runtime_source_surface())
+    errors.extend(validate_runtime_material_policy_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

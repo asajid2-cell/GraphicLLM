@@ -21,6 +21,7 @@ struct RendererPostProcessState {
     float lensDirt = 0.0f;
     bool motionBlurEnabled = true;
     bool depthOfFieldEnabled = true;
+    bool v2ReflectionCandidateEnabled = false;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
     float dofFocusDistance = 18.0f;

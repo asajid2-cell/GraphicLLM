@@ -59,6 +59,19 @@ bool ApplyBloomIntensityControl(Renderer& renderer, float intensity) {
     return true;
 }
 
+bool ApplyBackgroundBlurControl(Renderer& renderer, float blur) {
+    blur = std::clamp(blur, 0.0f, 1.0f);
+    const auto features = renderer.GetFeatureState();
+    if (std::fabs(blur - features.backgroundBlur) <= 0.001f) {
+        return false;
+    }
+
+    renderer.SetBackgroundPresentation(features.backgroundVisible,
+                                       features.backgroundExposure,
+                                       blur);
+    return true;
+}
+
 void ApplyBloomShapeControl(Renderer& renderer, float threshold, float softKnee, float maxContribution) {
     renderer.SetBloomShape(std::clamp(threshold, 0.1f, 10.0f),
                            std::clamp(softKnee, 0.0f, 1.0f),
@@ -89,6 +102,9 @@ void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle,
         break;
     case RendererFeatureToggle::FXAA:
         renderer.SetFXAAEnabled(enabled);
+        break;
+    case RendererFeatureToggle::V2ReflectionCandidate:
+        renderer.SetV2ReflectionCandidateEnabled(enabled);
         break;
     case RendererFeatureToggle::SSR:
         renderer.SetSSREnabled(enabled);
@@ -138,6 +154,9 @@ bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle) {
         break;
     case RendererFeatureToggle::FXAA:
         current = features.fxaaEnabled;
+        break;
+    case RendererFeatureToggle::V2ReflectionCandidate:
+        current = features.v2ReflectionCandidateEnabled;
         break;
     case RendererFeatureToggle::SSR:
         current = features.ssrEnabled;

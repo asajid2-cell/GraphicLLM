@@ -18,6 +18,7 @@ enum class RendererFeatureToggle {
     RTGI,
     TAA,
     FXAA,
+    V2ReflectionCandidate,
     SSR,
     SSAO,
     IBL,
@@ -53,6 +54,7 @@ void ApplyEditorTimeOfDayControls(Renderer& renderer,
 bool ApplyRenderScaleControl(Renderer& renderer, float scale);
 bool ApplyExposureControl(Renderer& renderer, float exposure);
 bool ApplyBloomIntensityControl(Renderer& renderer, float intensity);
+bool ApplyBackgroundBlurControl(Renderer& renderer, float blur);
 void ApplyBloomShapeControl(Renderer& renderer, float threshold, float softKnee, float maxContribution);
 void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle, bool enabled);
 bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle);

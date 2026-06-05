@@ -170,6 +170,7 @@ struct RendererQualityState {
 struct RendererFeatureState {
     bool taaEnabled = false;
     bool fxaaEnabled = false;
+    bool v2ReflectionCandidateEnabled = false;
     bool pcssEnabled = false;
     bool ssaoEnabled = false;
     float ssaoRadius = 0.25f;

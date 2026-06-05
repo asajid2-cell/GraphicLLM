@@ -96,9 +96,39 @@ Latest V3 motion-harness checkpoint:
     `full_scene_lighting_v3_executed_report_count=11`,
     `lighting_signal_metrics_ready=true`.
 - Important limitation:
-  - this is a harness proof, not a Lighting V3 promotion.
-  - next required run is the full motion/cross-family matrix for at least
-    gallery, kitchen, gym, and concert with mouse-jiggle and camera-sweep.
+  - the gallery smoke was a harness proof, not a Lighting V3 promotion.
+
+Latest cross-family probe:
+
+- Ran:
+  `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`.
+- Artifact:
+  `build/captures/v3_lighting_motion_matrix_cross_family_probe2_20260605`.
+- Scope:
+  - families: `gallery,kitchen,gym,concert`.
+  - modes: `mouse_jitter,camera_sweep`.
+  - views: `beauty`, five legacy lighting terms, five concrete V3 lighting
+    buffers.
+  - sequence count: `2`.
+- Result:
+  - aggregate rows: `40`.
+  - hard failures: `0`.
+  - warnings: `1`.
+  - mouse-jiggle V3 stability: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`.
+  - camera-sweep V3 stability: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`.
+- Current blocker to diagnose before promotion:
+  `concert/v3_indirect_lighting` under mouse-jiggle has V3 motion delta
+  `0.00395094` vs legacy ambient delta `0.00115572`, ratio `3.419`.
+- Next renderer step:
+  diagnose why V3 indirect lighting moves more than the legacy ambient/IBL term
+  in the concert family, then rerun the matrix with promotion-grade frame counts
+  before moving to SceneLocalEnvironmentV3 or ReflectionV3.
 
 ## 2026-06-05 AAA Gate Refactor
 

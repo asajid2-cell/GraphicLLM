@@ -38,6 +38,7 @@ foreach ($mode in $modeList) {
 
 $rows = New-Object System.Collections.Generic.List[object]
 $failures = New-Object System.Collections.Generic.List[string]
+$warnings = New-Object System.Collections.Generic.List[string]
 
 foreach ($mode in $modeList) {
     $modeOutputRoot = Join-Path $OutputRoot $mode
@@ -96,6 +97,9 @@ foreach ($mode in $modeList) {
     foreach ($failure in @($report.failures)) {
         $failures.Add("$mode`: $failure") | Out-Null
     }
+    foreach ($warning in @($report.warnings)) {
+        $warnings.Add("$mode`: $warning") | Out-Null
+    }
 }
 
 $summary = [ordered]@{
@@ -108,6 +112,7 @@ $summary = [ordered]@{
     capture_sequence_count = $CaptureSequenceCount
     row_count = $rows.Count
     failures = @($failures.ToArray())
+    warnings = @($warnings.ToArray())
     rows = @($rows.ToArray())
 }
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $matrixJson
@@ -121,6 +126,7 @@ $md.Add(("- stress scenes: ``{0}``" -f $StressSceneFilter)) | Out-Null
 $md.Add(("- motion modes: ``{0}``" -f ($modeList -join ","))) | Out-Null
 $md.Add(("- rows: {0}" -f $rows.Count)) | Out-Null
 $md.Add(("- failures: {0}" -f $failures.Count)) | Out-Null
+$md.Add(("- warnings: {0}" -f $warnings.Count)) | Out-Null
 $md.Add("") | Out-Null
 $md.Add("| Motion | Family | View | Status | V3 Delta | Legacy Delta | V3/Legacy | Beauty Delta | V3/Beauty | Active Delta |") | Out-Null
 $md.Add("|---|---|---|---|---:|---:|---:|---:|---:|---:|") | Out-Null
@@ -143,6 +149,14 @@ if ($failures.Count -gt 0) {
     $md.Add("") | Out-Null
     foreach ($failure in $failures.ToArray()) {
         $md.Add("- $failure") | Out-Null
+    }
+}
+if ($warnings.Count -gt 0) {
+    $md.Add("") | Out-Null
+    $md.Add("## Warnings") | Out-Null
+    $md.Add("") | Out-Null
+    foreach ($warning in $warnings.ToArray()) {
+        $md.Add("- $warning") | Out-Null
     }
 }
 $md | Set-Content -Encoding UTF8 $matrixMd

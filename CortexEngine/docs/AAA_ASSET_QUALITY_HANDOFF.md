@@ -145,6 +145,8 @@ Why this matters:
      V2.
    - scene objects should reference semantic roles and admitted asset IDs.
    - primitive fallback must be tagged as blockout, not final art.
+   - implemented as an overlay in the 2026-06-05 binding pass below; engine
+     runtime consumption is still pending.
 
 3. AAA Replacement Planner
    - reads the AAA report.
@@ -276,11 +278,88 @@ Current interpretation:
   - update scene seeds to use registry-backed assets.
   - rerun AAA gate and renderer packet.
 
+## 2026-06-05 Scene Asset Binding Overlay
+
+Implemented:
+
+- `assets/final_art/scene_asset_bindings_v1.schema.json`
+  - documents the scene-object binding overlay schema.
+- `tools/build_scene_asset_bindings_v1.py`
+  - scans target admitted scene seeds.
+  - maps every `runtime_asset` object to Asset Registry V2 where possible.
+  - classifies primitives as:
+    - `primitive_blockout_allowed`
+    - `primitive_hero_blocker`
+    - `primitive_scene_detail`
+  - records unresolved runtime asset paths.
+- `tools/analyze_aaa_asset_quality.py`
+  - now reads `assets/final_art/scene_asset_bindings_v1.json`.
+  - report table includes registry-bound object counts and primitive hero
+    blocker counts.
+- `tools/FinalArtPipeline.ps1`
+  - adds action `SceneAssetBindings`.
+  - `AAAReplacementPlan` now depends on `SceneAssetBindings`.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAProviderRequests
+python -m py_compile tools\build_asset_registry_v2.py tools\build_scene_asset_bindings_v1.py tools\analyze_aaa_asset_quality.py tools\plan_aaa_asset_replacements.py tools\export_aaa_provider_requests.py
+```
+
+Generated artifact:
+
+- `assets/final_art/scene_asset_bindings_v1.json`
+
+Binding baseline:
+
+- Object count: `545`.
+- Registry-bound object instances: `120`.
+- Allowlisted primitive/blockout shell objects: `33`.
+- Primitive hero blockers: `24`.
+- Unresolved runtime asset paths: `0`.
+- AAA-ready bound object instances: `0`.
+
+Per-scene binding summary:
+
+- `home_kitchen_lantern`
+  - objects `135`.
+  - registry-bound `27`.
+  - allowlisted blockout primitives `6`.
+  - primitive hero blockers `2`.
+- `home_office_evening`
+  - objects `131`.
+  - registry-bound `24`.
+  - allowlisted blockout primitives `5`.
+  - primitive hero blockers `8`.
+- `basketball_gym_day`
+  - objects `125`.
+  - registry-bound `30`.
+  - allowlisted blockout primitives `17`.
+  - primitive hero blockers `7`.
+- `neon_streamer_concert`
+  - objects `154`.
+  - registry-bound `39`.
+  - allowlisted blockout primitives `5`.
+  - primitive hero blockers `7`.
+- `rt_showcase_gallery`
+  - missing scene seed inventory for this overlay.
+
+Current interpretation:
+
+- This is the missing bridge between semantic scene seeds and Asset Registry V2.
+- The runtime still uses direct `runtime_asset` strings, but every target seed
+  now has an external asset-ID overlay suitable for engine integration.
+- Next structural refactor should make the runtime/frame report expose asset
+  source class and registry readiness for visible/loaded objects, so validation
+  can fail hero pixels dominated by primitive/proxy sources.
+
 ## Resume Commands
 
 ```powershell
 git -c submodule.recurse=false status --short --ignore-submodules=all
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AssetRegistryV2
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action SceneAssetBindings
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAAssetQuality
 python tools\plan_aaa_asset_replacements.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAProviderRequests

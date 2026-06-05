@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for scene seed to Asset Registry V2 binding overlays.",
+  "binding_path": "assets/final_art/scene_asset_bindings_v1.json",
+  "required_root_fields": [
+    "schema",
+    "generated_by",
+    "source_registry",
+    "scene_count",
+    "summary",
+    "scenes"
+  ],
+  "required_scene_fields": [
+    "scene",
+    "seed",
+    "object_count",
+    "registry_bound_count",
+    "primitive_blockout_count",
+    "primitive_hero_blocker_count",
+    "unresolved_runtime_asset_count",
+    "bindings"
+  ],
+  "required_binding_fields": [
+    "object",
+    "role",
+    "kind",
+    "runtime_asset",
+    "registry_asset_id",
+    "binding_status",
+    "blockout_allowed",
+    "hero_role",
+    "material"
+  ],
+  "binding_status_values": [
+    "registry_bound",
+    "primitive_blockout_allowed",
+    "primitive_hero_blocker",
+    "primitive_scene_detail",
+    "unresolved_runtime_asset",
+    "non_asset_object"
+  ]
+}

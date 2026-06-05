@@ -65,9 +65,12 @@ def prompt_for(order: dict[str, Any]) -> str:
 def request_for_order(order: dict[str, Any]) -> dict[str, Any]:
     families = list(order.get("material_families", []))
     shader_flags = list(order.get("shader_feature_flags", []))
+    required_texture_slots = list(order.get("required_texture_slots", []))
     if not families and order["kind"] == "replace_primitive_hero_material_surface":
         families = ["dielectric"]
         shader_flags = ["base_color_texture", "normal_texture", "orm_texture"]
+    if not required_texture_slots:
+        required_texture_slots = pbr_maps_for(families)
 
     request: dict[str, Any] = {
         "schema": "cortex.full_scene_shader_material_provider_request.v2",
@@ -91,8 +94,12 @@ def request_for_order(order: dict[str, Any]) -> dict[str, Any]:
         ],
         "material_contract": {
             "material_families": families,
+            "primary_material_family": order.get("primary_material_family", families[0] if families else ""),
             "shader_feature_flags": shader_flags,
-            "required_pbr_maps": pbr_maps_for(families),
+            "required_pbr_maps": required_texture_slots,
+            "missing_texture_slots": order.get("missing_texture_slots", required_texture_slots),
+            "runtime_policy": order.get("runtime_policy", {}),
+            "runtime_policy_candidates": order.get("runtime_policy_candidates", {}),
             "texture_resolution_min": 1024,
             "texture_resolution_target": 2048,
             "uvs_required": True,
@@ -126,6 +133,11 @@ def request_for_order(order: dict[str, Any]) -> dict[str, Any]:
         "source_class",
         "scene_families",
         "semantic_roles",
+        "primary_material_family",
+        "required_texture_slots",
+        "missing_texture_slots",
+        "runtime_policy",
+        "runtime_policy_candidates",
         "hero_surface_reference_count",
         "object_reference_count",
         "needed_evidence",

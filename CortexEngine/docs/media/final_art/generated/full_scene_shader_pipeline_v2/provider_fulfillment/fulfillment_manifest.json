@@ -29,9 +29,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -278,9 +278,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -526,15 +526,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "opacity_or_transmission"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "glass"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -577,11 +574,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -626,13 +619,9 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "metal"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -675,13 +664,9 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "metal"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -724,13 +709,9 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "metal"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -773,11 +754,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -820,15 +797,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "painted_wall"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -871,11 +845,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -918,15 +888,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "wood"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -969,11 +936,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1018,11 +981,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1067,11 +1026,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1116,13 +1071,9 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "metal"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1163,15 +1114,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "painted_wall"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1212,15 +1160,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "wood"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1261,15 +1206,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "wood"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1310,15 +1252,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "wood"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1361,11 +1300,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1410,11 +1345,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1459,11 +1390,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1508,11 +1435,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1557,11 +1480,7 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
           "dielectric"
         ],
@@ -1604,15 +1523,12 @@
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "emissive"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "screen"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1655,13 +1571,9 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "shader_feature_flags": [],
         "material_families": [
-          "dielectric"
+          "metal"
         ],
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048
@@ -1701,9 +1613,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -1752,9 +1664,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -1950,9 +1862,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2001,9 +1913,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2052,9 +1964,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2250,9 +2162,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2451,9 +2363,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2502,9 +2414,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",
@@ -2651,9 +2563,9 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
         "shader_feature_flags": [
           "base_color_texture",

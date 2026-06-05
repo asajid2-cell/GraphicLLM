@@ -45,6 +45,7 @@
           "fabric",
           "plastic"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -53,10 +54,58 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          },
+          "fabric": {
+            "scene_material_class": "Fabric",
+            "scene_material_class_id": 7,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          },
+          "plastic": {
+            "scene_material_class": "Plastic",
+            "scene_material_class_id": 8,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -92,6 +141,61 @@
         "chair",
         "stadium_seat_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "fabric": {
+          "scene_material_class": "Fabric",
+          "scene_material_class_id": 7,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 21,
       "object_reference_count": 49,
       "needed_evidence": [
@@ -107,7 +211,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__chair.json"
     },
@@ -141,6 +246,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -151,6 +257,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -185,6 +318,39 @@
         "book_mesh",
         "countertop_prop"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 5,
       "needed_evidence": [
@@ -200,7 +366,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__books.json"
     },
@@ -234,6 +401,7 @@
         "material_families": [
           "plastic"
         ],
+        "primary_material_family": "plastic",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -244,6 +412,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "plastic": {
+            "scene_material_class": "Plastic",
+            "scene_material_class_id": 8,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -275,6 +470,39 @@
       "semantic_roles": [
         "chair"
       ],
+      "primary_material_family": "plastic",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Plastic",
+        "scene_material_class_id": 8,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -290,7 +518,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__chairdesk.json"
     },
@@ -324,6 +553,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -334,6 +564,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -366,6 +623,39 @@
         "keyboard",
         "keyboard_mesh"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 2,
       "needed_evidence": [
@@ -381,7 +671,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__computerkeyboard.json"
     },
@@ -415,6 +706,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -425,6 +717,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -456,6 +775,39 @@
       "semantic_roles": [
         "monitor"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -471,7 +823,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__computerscreen.json"
     },
@@ -505,6 +858,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -513,10 +867,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -548,6 +930,41 @@
       "semantic_roles": [
         "desk"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -563,7 +980,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__desk.json"
     },
@@ -597,6 +1015,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -607,6 +1026,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -638,6 +1084,39 @@
       "semantic_roles": [
         "fridge"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -653,7 +1132,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__kitchenfridge.json"
     },
@@ -687,6 +1167,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -697,6 +1178,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -728,6 +1236,39 @@
       "semantic_roles": [
         "sink"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -743,7 +1284,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__kitchensink.json"
     },
@@ -777,6 +1319,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -787,6 +1330,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -820,6 +1390,39 @@
         "stage_surface_prop_mesh",
         "task_lamp"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 3,
       "needed_evidence": [
@@ -835,7 +1438,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__lamproundtable.json"
     },
@@ -869,6 +1473,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -879,6 +1484,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -910,6 +1542,39 @@
       "semantic_roles": [
         "tabletop_surface"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -925,7 +1590,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p0/shader_material__upgrade_hero_asset_material_evidence__table.json"
     },
@@ -941,7 +1607,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_backboard role backboard. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_backboard role backboard. Use glass material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -958,18 +1624,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "glass"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "glass",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "opacity_or_transmission"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "opacity_or_transmission"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1016,7 +1688,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_ball role ball. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_ball role ball. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1035,16 +1707,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1091,7 +1767,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_0 role bleacher. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_0 role bleacher. Use metal material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1108,18 +1784,22 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "metal"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "metal",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1166,7 +1846,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_1 role bleacher. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_1 role bleacher. Use metal material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1183,18 +1863,22 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "metal"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "metal",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1241,7 +1925,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_2 role bleacher. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_bleacher_row_2 role bleacher. Use metal material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1258,18 +1942,22 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "metal"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "metal",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1316,7 +2004,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_rim role hoop. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_rim role hoop. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1335,16 +2023,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1391,7 +2083,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_scoreboard role scoreboard. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for basketball_gym_day object sak_gym_scoreboard role scoreboard. Use painted_wall material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1408,18 +2100,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "painted_wall"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "painted_wall",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1466,7 +2164,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_kitchen_lantern object sak_kitchen_countertop role countertop. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_kitchen_lantern object sak_kitchen_countertop role countertop. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1485,16 +2183,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1541,7 +2243,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_kitchen_lantern object sak_kitchen_lower_cabinets role cabinet. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_kitchen_lantern object sak_kitchen_lower_cabinets role cabinet. Use wood material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1558,18 +2260,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "wood"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "wood",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1616,7 +2324,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_0 role book. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_0 role book. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1635,16 +2343,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1691,7 +2403,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_1 role book. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_1 role book. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1710,16 +2422,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1766,7 +2482,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_2 role book. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_book_2 role book. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1785,16 +2501,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1841,7 +2561,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_keyboard role keyboard. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_keyboard role keyboard. Use metal material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1858,18 +2578,22 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "metal"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "metal",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1916,7 +2640,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_monitor role monitor. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_monitor role monitor. Use painted_wall material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -1933,18 +2657,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "painted_wall"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "painted_wall",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -1991,7 +2721,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_0 role shelf. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_0 role shelf. Use wood material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2008,18 +2738,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "wood"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "wood",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2066,7 +2802,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_1 role shelf. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_1 role shelf. Use wood material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2083,18 +2819,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "wood"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "wood",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2141,7 +2883,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_2 role shelf. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for home_office_evening object sak_office_shelf_2 role shelf. Use wood material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2158,18 +2900,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "wood"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "wood",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "detail_normal_or_height_optional"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2216,7 +2964,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_0 role stage_light. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_0 role stage_light. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2235,16 +2983,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2291,7 +3043,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_1 role stage_light. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_1 role stage_light. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2310,16 +3062,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2366,7 +3122,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_2 role stage_light. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_2 role stage_light. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2385,16 +3141,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2441,7 +3201,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_3 role stage_light. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_3 role stage_light. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2460,16 +3220,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2516,7 +3280,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_4 role stage_light. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_floor_light_4 role stage_light. Use dielectric material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2535,16 +3299,20 @@
         "material_families": [
           "dielectric"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "dielectric",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2591,7 +3359,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_screen role hero_screen. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_screen role hero_screen. Use screen material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2608,18 +3376,24 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "screen"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "screen",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic"
+          "orm_or_separate_occlusion_roughness_metallic",
+          "emissive"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic",
+          "emissive"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2666,7 +3440,7 @@
         "hunyuan3d_2_1",
         "trellis_image_large"
       ],
-      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_stage role stage. Use physically based material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
+      "prompt": "Create an AAA game-ready replacement material/asset surface for neon_streamer_concert object sak_concert_stage role stage. Use metal material treatment, clean scale, separated editable mesh or architecture material kit, complete PBR maps, support/contact anchors, LODs, collision, and preview.",
       "negative_prompt": "low detail, melted geometry, fused scene, whole-room mesh, no UVs, missing normal map, missing roughness/metallic/AO, wrong scale, text labels, watermark",
       "accepted_outputs": [
         "gltf",
@@ -2683,18 +3457,22 @@
       ],
       "material_contract": {
         "material_families": [
-          "dielectric"
+          "metal"
         ],
-        "shader_feature_flags": [
-          "base_color_texture",
-          "normal_texture",
-          "orm_texture"
-        ],
+        "primary_material_family": "metal",
+        "shader_feature_flags": [],
         "required_pbr_maps": [
           "base_color",
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {},
+        "runtime_policy_candidates": {},
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2759,6 +3537,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -2767,10 +3546,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2802,6 +3609,41 @@
       "semantic_roles": [
         "sideline_equipment_mesh"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -2815,7 +3657,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__bench.json"
     },
@@ -2849,6 +3692,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -2857,10 +3701,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2893,6 +3765,41 @@
         "office_wall_system_mesh",
         "shelf_mesh"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "needed_evidence": [
@@ -2906,7 +3813,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__bookcaseopen.json"
     },
@@ -2940,6 +3848,7 @@
         "material_families": [
           "plastic"
         ],
+        "primary_material_family": "plastic",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -2950,6 +3859,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "plastic": {
+            "scene_material_class": "Plastic",
+            "scene_material_class_id": 8,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -2983,6 +3919,39 @@
         "courtside_chair_mesh",
         "foreground_audience_chair_mesh"
       ],
+      "primary_material_family": "plastic",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Plastic",
+        "scene_material_class_id": 8,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 8,
       "needed_evidence": [
@@ -2996,7 +3965,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__chairmoderncushion.json"
     },
@@ -3030,6 +4000,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3040,6 +4011,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3071,6 +4069,39 @@
       "semantic_roles": [
         "range_hood"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3084,7 +4115,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__hoodmodern.json"
     },
@@ -3118,6 +4150,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3128,6 +4161,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3159,6 +4219,39 @@
       "semantic_roles": [
         "faucet_mesh"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3175,7 +4268,8 @@
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
         "missing complete PBR texture set",
-        "missing preview evidence"
+        "missing preview evidence",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchen_faucet_gooseneck.json"
     },
@@ -3209,6 +4303,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -3217,10 +4312,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3252,6 +4375,41 @@
       "semantic_roles": [
         "upper_cabinet_mesh"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "needed_evidence": [
@@ -3265,7 +4423,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupper.json"
     },
@@ -3299,6 +4458,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -3307,10 +4467,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3342,6 +4530,41 @@
       "semantic_roles": [
         "upper_cabinet_mesh"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "needed_evidence": [
@@ -3355,7 +4578,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperdouble.json"
     },
@@ -3389,6 +4613,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -3397,10 +4622,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3432,6 +4685,41 @@
       "semantic_roles": [
         "cabinet_mesh"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3445,7 +4733,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencabinetupperlow.json"
     },
@@ -3479,6 +4768,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3489,6 +4779,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3520,6 +4837,39 @@
       "semantic_roles": [
         "countertop_prop"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3533,7 +4883,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchencoffeemachine.json"
     },
@@ -3567,6 +4918,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3577,6 +4929,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3608,6 +4987,39 @@
       "semantic_roles": [
         "appliance"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3621,7 +5033,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchenmicrowave.json"
     },
@@ -3655,6 +5068,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3665,6 +5079,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3696,6 +5137,39 @@
       "semantic_roles": [
         "stove_mesh"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3709,7 +5183,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__kitchenstove.json"
     },
@@ -3745,6 +5220,7 @@
           "metal",
           "painted_wall"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -3753,10 +5229,58 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          },
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          },
+          "painted_wall": {
+            "scene_material_class": "PaintedWall",
+            "scene_material_class_id": 1,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3790,6 +5314,61 @@
         "lamp_mesh",
         "office_wall_fixture_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "painted_wall": {
+          "scene_material_class": "PaintedWall",
+          "scene_material_class_id": 1,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "needed_evidence": [
@@ -3803,7 +5382,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__lampwall.json"
     },
@@ -3837,6 +5417,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3847,6 +5428,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3878,6 +5486,39 @@
       "semantic_roles": [
         "desk_prop"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -3891,7 +5532,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__laptop.json"
     },
@@ -3926,6 +5568,7 @@
           "dielectric",
           "plastic"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -3936,6 +5579,43 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          },
+          "plastic": {
+            "scene_material_class": "Plastic",
+            "scene_material_class_id": 8,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -3968,6 +5648,49 @@
       "semantic_roles": [
         "chair_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 5,
       "needed_evidence": [
@@ -3981,7 +5704,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__loungedesignchair.json"
     },
@@ -4015,6 +5739,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -4025,6 +5750,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4056,6 +5808,39 @@
       "semantic_roles": [
         "venue_silhouette_prop_mesh"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "needed_evidence": [
@@ -4069,7 +5854,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__paneling.json"
     },
@@ -4103,6 +5889,7 @@
         "material_families": [
           "wood"
         ],
+        "primary_material_family": "wood",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -4111,10 +5898,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4146,6 +5961,41 @@
       "semantic_roles": [
         "countertop_prop"
       ],
+      "primary_material_family": "wood",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -4159,7 +6009,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__plantsmall2.json"
     },
@@ -4193,6 +6044,7 @@
         "material_families": [
           "tile"
         ],
+        "primary_material_family": "tile",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -4201,10 +6053,38 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "CeramicTile",
+          "scene_material_class_id": 2,
+          "reflection_preference": "SSR",
+          "reflection_preference_id": 4,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "tile": {
+            "scene_material_class": "CeramicTile",
+            "scene_material_class_id": 2,
+            "reflection_preference": "SSR",
+            "reflection_preference_id": 4,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4238,6 +6118,41 @@
         "floor_mat",
         "floor_mat_mesh"
       ],
+      "primary_material_family": "tile",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "CeramicTile",
+        "scene_material_class_id": 2,
+        "reflection_preference": "SSR",
+        "reflection_preference_id": 4,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "tile": {
+          "scene_material_class": "CeramicTile",
+          "scene_material_class_id": 2,
+          "reflection_preference": "SSR",
+          "reflection_preference_id": 4,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 3,
       "needed_evidence": [
@@ -4251,7 +6166,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__rugrectangle.json"
     },
@@ -4285,6 +6201,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -4295,6 +6212,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4329,6 +6273,39 @@
         "speaker_mesh",
         "speaker_stack_mesh"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 7,
       "needed_evidence": [
@@ -4342,7 +6319,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__speaker.json"
     },
@@ -4376,6 +6354,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -4386,6 +6365,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4417,6 +6423,39 @@
       "semantic_roles": [
         "stage_surface_prop_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "needed_evidence": [
@@ -4430,7 +6469,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__speakersmall.json"
     },
@@ -4465,6 +6505,7 @@
           "dielectric",
           "wood"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "detail_normal",
@@ -4473,10 +6514,48 @@
         ],
         "required_pbr_maps": [
           "base_color",
+          "detail_normal_or_height",
           "normal",
-          "orm_or_separate_occlusion_roughness_metallic",
-          "detail_normal_or_height_optional"
+          "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "detail_normal_or_height",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          },
+          "wood": {
+            "scene_material_class": "PolishedWood",
+            "scene_material_class_id": 3,
+            "reflection_preference": "LocalProbe",
+            "reflection_preference_id": 1,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4509,6 +6588,51 @@
       "semantic_roles": [
         "table_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "needed_evidence": [
@@ -4522,7 +6646,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__tableround.json"
     },
@@ -4556,6 +6681,7 @@
         "material_families": [
           "dielectric"
         ],
+        "primary_material_family": "dielectric",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -4566,6 +6692,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "runtime_policy_candidates": {
+          "dielectric": {
+            "scene_material_class": "Default",
+            "scene_material_class_id": 0,
+            "reflection_preference": "NeutralFallback",
+            "reflection_preference_id": 0,
+            "temporal_policy": "StableDiffuse",
+            "temporal_policy_id": 0,
+            "post_sensitivity": "Normal",
+            "post_sensitivity_id": 0
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4597,6 +6750,39 @@
       "semantic_roles": [
         "monitor_mesh"
       ],
+      "primary_material_family": "dielectric",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -4610,7 +6796,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__televisionantenna.json"
     },
@@ -4644,6 +6831,7 @@
         "material_families": [
           "metal"
         ],
+        "primary_material_family": "metal",
         "shader_feature_flags": [
           "base_color_texture",
           "normal_texture",
@@ -4654,6 +6842,33 @@
           "normal",
           "orm_or_separate_occlusion_roughness_metallic"
         ],
+        "missing_texture_slots": [
+          "base_color",
+          "normal",
+          "orm_or_separate_occlusion_roughness_metallic"
+        ],
+        "runtime_policy": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "runtime_policy_candidates": {
+          "metal": {
+            "scene_material_class": "PolishedMetal",
+            "scene_material_class_id": 5,
+            "reflection_preference": "RTReflection",
+            "reflection_preference_id": 5,
+            "temporal_policy": "StableGlossy",
+            "temporal_policy_id": 1,
+            "post_sensitivity": "ExposureProtected",
+            "post_sensitivity_id": 2
+          }
+        },
         "texture_resolution_min": 1024,
         "texture_resolution_target": 2048,
         "uvs_required": true,
@@ -4685,6 +6900,39 @@
       "semantic_roles": [
         "countertop_prop"
       ],
+      "primary_material_family": "metal",
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "needed_evidence": [
@@ -4698,7 +6946,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "request_path": "docs/media/final_art/generated/full_scene_shader_pipeline_v2/provider_requests/p1/shader_material__upgrade_registry_asset_material_evidence__toaster.json"
     }

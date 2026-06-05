@@ -187,6 +187,36 @@ def main() -> int:
         return fail("material evidence report summary missing v2_material_ready_asset_count")
     if "primitive_hero_material_blocker_count" not in summary:
         return fail("material evidence report summary missing primitive_hero_material_blocker_count")
+    if summary.get("runtime_policy_bridge_asset_count", 0) != len(
+        material_evidence_report.get("assets", [])
+    ):
+        return fail("material evidence runtime_policy_bridge_asset_count must cover every asset")
+    runtime_policy_counts = material_evidence_report.get("runtime_policy_counts")
+    if not isinstance(runtime_policy_counts, dict):
+        return fail("material evidence report missing runtime_policy_counts")
+    required_asset_fields = material_evidence_schema.get("required_asset_fields", [])
+    required_policy_fields = material_evidence_schema.get("runtime_policy_fields", [])
+    for asset in material_evidence_report.get("assets", []):
+        missing_asset_fields = [field for field in required_asset_fields if field not in asset]
+        if missing_asset_fields:
+            return fail(
+                f"material evidence asset {asset.get('asset_id', '<missing>')} missing fields: "
+                + ", ".join(missing_asset_fields)
+            )
+        runtime_policy = asset.get("runtime_policy")
+        if not isinstance(runtime_policy, dict):
+            return fail(
+                f"material evidence asset {asset.get('asset_id', '<missing>')} missing runtime_policy"
+            )
+        missing_policy_fields = [
+            field for field in required_policy_fields if field not in runtime_policy
+        ]
+        if missing_policy_fields:
+            return fail(
+                f"material evidence asset {asset.get('asset_id', '<missing>')} "
+                "runtime_policy missing fields: "
+                + ", ".join(missing_policy_fields)
+            )
 
     required_upgrade_fields = material_upgrade_schema.get("required_root_fields")
     if not isinstance(required_upgrade_fields, list):
@@ -222,6 +252,8 @@ def main() -> int:
     if not isinstance(requests, list):
         return fail("material provider manifest requests must be a list")
     required_request_fields = material_provider_schema.get("required_request_fields", [])
+    required_material_contract_fields = material_provider_schema.get("material_contract_fields", [])
+    required_provider_policy_fields = material_provider_schema.get("runtime_policy_fields", [])
     for request in requests:
         missing_request_fields = [
             field for field in required_request_fields if field not in request
@@ -231,6 +263,31 @@ def main() -> int:
                 f"material provider request {request.get('id', '<missing>')} missing fields: "
                 + ", ".join(missing_request_fields)
             )
+        material_contract = request.get("material_contract")
+        if not isinstance(material_contract, dict):
+            return fail(
+                f"material provider request {request.get('id', '<missing>')} missing material_contract"
+            )
+        missing_material_contract_fields = [
+            field for field in required_material_contract_fields if field not in material_contract
+        ]
+        if missing_material_contract_fields:
+            return fail(
+                f"material provider request {request.get('id', '<missing>')} "
+                "material_contract missing fields: "
+                + ", ".join(missing_material_contract_fields)
+            )
+        runtime_policy = material_contract.get("runtime_policy")
+        if runtime_policy:
+            missing_policy_fields = [
+                field for field in required_provider_policy_fields if field not in runtime_policy
+            ]
+            if missing_policy_fields:
+                return fail(
+                    f"material provider request {request.get('id', '<missing>')} "
+                    "runtime_policy missing fields: "
+                    + ", ".join(missing_policy_fields)
+                )
 
     required_fulfillment_fields = material_fulfillment_schema.get("required_manifest_fields")
     if not isinstance(required_fulfillment_fields, list):

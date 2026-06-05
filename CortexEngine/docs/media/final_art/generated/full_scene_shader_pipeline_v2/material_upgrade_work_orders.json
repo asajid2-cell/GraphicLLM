@@ -44,12 +44,67 @@
         "fabric",
         "plastic"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "fabric": {
+          "scene_material_class": "Fabric",
+          "scene_material_class_id": 7,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 21,
       "object_reference_count": 49,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -60,7 +115,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -100,11 +156,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 5,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -115,7 +204,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -152,11 +242,44 @@
       "material_families": [
         "plastic"
       ],
+      "primary_material_family": "plastic",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Plastic",
+        "scene_material_class_id": 8,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -167,7 +290,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -205,11 +329,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 2,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -220,7 +377,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -257,11 +415,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -272,7 +463,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -309,12 +501,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -325,7 +552,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -362,11 +590,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -377,7 +638,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -414,11 +676,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -429,7 +724,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -468,11 +764,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 3,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -483,7 +812,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -520,11 +850,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 1,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -535,7 +898,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -564,6 +928,9 @@
       "object": "sak_gym_backboard",
       "role": "backboard",
       "material": "glass_soft",
+      "material_families": [
+        "glass"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -592,6 +959,9 @@
       "object": "sak_gym_ball",
       "role": "ball",
       "material": "accent_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -620,6 +990,9 @@
       "object": "sak_gym_bleacher_row_0",
       "role": "bleacher",
       "material": "metal_dark",
+      "material_families": [
+        "metal"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -648,6 +1021,9 @@
       "object": "sak_gym_bleacher_row_1",
       "role": "bleacher",
       "material": "metal_dark",
+      "material_families": [
+        "metal"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -676,6 +1052,9 @@
       "object": "sak_gym_bleacher_row_2",
       "role": "bleacher",
       "material": "metal_dark",
+      "material_families": [
+        "metal"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -704,6 +1083,9 @@
       "object": "sak_gym_rim",
       "role": "hoop",
       "material": "sgk_hoop_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -732,6 +1114,9 @@
       "object": "sak_gym_scoreboard",
       "role": "scoreboard",
       "material": "dark_wall",
+      "material_families": [
+        "painted_wall"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -760,6 +1145,9 @@
       "object": "sak_kitchen_countertop",
       "role": "countertop",
       "material": "counter_dark",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -788,6 +1176,9 @@
       "object": "sak_kitchen_lower_cabinets",
       "role": "cabinet",
       "material": "cabinet_warm",
+      "material_families": [
+        "wood"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -816,6 +1207,9 @@
       "object": "sak_office_book_0",
       "role": "book",
       "material": "accent_cyan",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -844,6 +1238,9 @@
       "object": "sak_office_book_1",
       "role": "book",
       "material": "accent_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -872,6 +1269,9 @@
       "object": "sak_office_book_2",
       "role": "book",
       "material": "accent_cyan",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -900,6 +1300,9 @@
       "object": "sak_office_keyboard",
       "role": "keyboard",
       "material": "metal_dark",
+      "material_families": [
+        "metal"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -928,6 +1331,9 @@
       "object": "sak_office_monitor",
       "role": "monitor",
       "material": "dark_wall",
+      "material_families": [
+        "painted_wall"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -956,6 +1362,9 @@
       "object": "sak_office_shelf_0",
       "role": "shelf",
       "material": "cabinet_warm",
+      "material_families": [
+        "wood"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -984,6 +1393,9 @@
       "object": "sak_office_shelf_1",
       "role": "shelf",
       "material": "cabinet_warm",
+      "material_families": [
+        "wood"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1012,6 +1424,9 @@
       "object": "sak_office_shelf_2",
       "role": "shelf",
       "material": "cabinet_warm",
+      "material_families": [
+        "wood"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1040,6 +1455,9 @@
       "object": "sak_concert_floor_light_0",
       "role": "stage_light",
       "material": "accent_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1068,6 +1486,9 @@
       "object": "sak_concert_floor_light_1",
       "role": "stage_light",
       "material": "accent_cyan",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1096,6 +1517,9 @@
       "object": "sak_concert_floor_light_2",
       "role": "stage_light",
       "material": "accent_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1124,6 +1548,9 @@
       "object": "sak_concert_floor_light_3",
       "role": "stage_light",
       "material": "accent_cyan",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1152,6 +1579,9 @@
       "object": "sak_concert_floor_light_4",
       "role": "stage_light",
       "material": "accent_orange",
+      "material_families": [
+        "dielectric"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1180,6 +1610,9 @@
       "object": "sak_concert_screen",
       "role": "hero_screen",
       "material": "dark_wall",
+      "material_families": [
+        "screen"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1208,6 +1641,9 @@
       "object": "sak_concert_stage",
       "role": "stage",
       "material": "metal_dark",
+      "material_families": [
+        "metal"
+      ],
       "reason": "hero surface is still a primitive/blockout material and cannot satisfy Full Scene Shader Pipeline V2",
       "needed_evidence": [
         "registry-backed replacement asset or admitted architecture material kit",
@@ -1244,12 +1680,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1259,7 +1730,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1296,12 +1768,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1311,7 +1818,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1349,11 +1857,44 @@
       "material_families": [
         "plastic"
       ],
+      "primary_material_family": "plastic",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Plastic",
+        "scene_material_class_id": 8,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 8,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1363,7 +1904,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1399,11 +1941,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1413,7 +1988,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1449,11 +2025,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1465,7 +2074,8 @@
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
         "missing complete PBR texture set",
-        "missing preview evidence"
+        "missing preview evidence",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1502,12 +2112,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1517,7 +2162,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1553,12 +2199,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1568,7 +2249,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1604,12 +2286,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1619,7 +2336,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1655,11 +2373,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1669,7 +2420,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1705,11 +2457,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1719,7 +2504,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1755,11 +2541,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1769,7 +2588,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1809,12 +2629,67 @@
         "metal",
         "painted_wall"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        },
+        "painted_wall": {
+          "scene_material_class": "PaintedWall",
+          "scene_material_class_id": 1,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1824,7 +2699,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1860,11 +2736,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1874,7 +2783,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1912,11 +2822,54 @@
         "dielectric",
         "plastic"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "plastic": {
+          "scene_material_class": "Plastic",
+          "scene_material_class_id": 8,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 5,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1926,7 +2879,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -1962,11 +2916,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 4,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -1976,7 +2963,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2012,12 +3000,47 @@
       "material_families": [
         "wood"
       ],
+      "primary_material_family": "wood",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedWood",
+        "scene_material_class_id": 3,
+        "reflection_preference": "LocalProbe",
+        "reflection_preference_id": 1,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2027,7 +3050,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2065,12 +3089,47 @@
       "material_families": [
         "tile"
       ],
+      "primary_material_family": "tile",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "CeramicTile",
+        "scene_material_class_id": 2,
+        "reflection_preference": "SSR",
+        "reflection_preference_id": 4,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "tile": {
+          "scene_material_class": "CeramicTile",
+          "scene_material_class_id": 2,
+          "reflection_preference": "SSR",
+          "reflection_preference_id": 4,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 3,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2080,7 +3139,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2119,11 +3179,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 7,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2133,7 +3226,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2169,11 +3263,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2183,7 +3310,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2221,12 +3349,57 @@
         "dielectric",
         "wood"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "detail_normal",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "detail_normal_or_height",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        },
+        "wood": {
+          "scene_material_class": "PolishedWood",
+          "scene_material_class_id": 3,
+          "reflection_preference": "LocalProbe",
+          "reflection_preference_id": 1,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 2,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2236,7 +3409,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2272,11 +3446,44 @@
       "material_families": [
         "dielectric"
       ],
+      "primary_material_family": "dielectric",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "runtime_policy_candidates": {
+        "dielectric": {
+          "scene_material_class": "Default",
+          "scene_material_class_id": 0,
+          "reflection_preference": "NeutralFallback",
+          "reflection_preference_id": 0,
+          "temporal_policy": "StableDiffuse",
+          "temporal_policy_id": 0,
+          "post_sensitivity": "Normal",
+          "post_sensitivity_id": 0
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2286,7 +3493,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",
@@ -2322,11 +3530,44 @@
       "material_families": [
         "metal"
       ],
+      "primary_material_family": "metal",
       "shader_feature_flags": [
         "base_color_texture",
         "normal_texture",
         "orm_texture"
       ],
+      "required_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "missing_texture_slots": [
+        "base_color",
+        "normal",
+        "orm_or_separate_occlusion_roughness_metallic"
+      ],
+      "runtime_policy": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "runtime_policy_candidates": {
+        "metal": {
+          "scene_material_class": "PolishedMetal",
+          "scene_material_class_id": 5,
+          "reflection_preference": "RTReflection",
+          "reflection_preference_id": 5,
+          "temporal_policy": "StableGlossy",
+          "temporal_policy_id": 1,
+          "post_sensitivity": "ExposureProtected",
+          "post_sensitivity_id": 2
+        }
+      },
       "hero_surface_reference_count": 0,
       "object_reference_count": 1,
       "reason": "registered asset lacks the material evidence required by Full Scene Shader Pipeline V2",
@@ -2336,7 +3577,8 @@
         "missing PBR texture evidence for V2 material model",
         "missing collision evidence for V2 final asset",
         "missing collision proxy",
-        "missing complete PBR texture set"
+        "missing complete PBR texture set",
+        "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
       ],
       "needed_evidence": [
         "complete PBR texture set: base color, normal, ORM/roughness/metallic/AO",

@@ -35,5 +35,27 @@
     "orm_or_separate_occlusion_roughness_metallic",
     "emissive_when_needed",
     "opacity_or_transmission_when_needed"
+  ],
+  "material_contract_fields": [
+    "material_families",
+    "primary_material_family",
+    "shader_feature_flags",
+    "required_pbr_maps",
+    "missing_texture_slots",
+    "runtime_policy",
+    "runtime_policy_candidates",
+    "texture_resolution_min",
+    "texture_resolution_target",
+    "uvs_required"
+  ],
+  "runtime_policy_fields": [
+    "scene_material_class",
+    "scene_material_class_id",
+    "reflection_preference",
+    "reflection_preference_id",
+    "temporal_policy",
+    "temporal_policy_id",
+    "post_sensitivity",
+    "post_sensitivity_id"
   ]
 }

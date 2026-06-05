@@ -11,6 +11,7 @@ Status: `BLOCKED`
 - `missing_hero_texture_evidence_count`: `10`
 - `unknown_material_family_asset_count`: `0`
 - `primitive_hero_material_blocker_count`: `24`
+- `runtime_policy_bridge_asset_count`: `33`
 - `scene_count`: `5`
 
 ## Material Families
@@ -22,6 +23,26 @@ Status: `BLOCKED`
 - `plastic`: `4`
 - `tile`: `1`
 - `wood`: `8`
+
+## Runtime Policy Bridge
+
+### scene_material_class
+- `CeramicTile`: `1`
+- `Default`: `11`
+- `Plastic`: `2`
+- `PolishedMetal`: `12`
+- `PolishedWood`: `7`
+### reflection_preference
+- `LocalProbe`: `9`
+- `NeutralFallback`: `11`
+- `RTReflection`: `12`
+- `SSR`: `1`
+### temporal_policy
+- `StableDiffuse`: `20`
+- `StableGlossy`: `13`
+### post_sensitivity
+- `ExposureProtected`: `13`
+- `Normal`: `20`
 
 ## Scenes
 

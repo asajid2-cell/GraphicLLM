@@ -324,6 +324,17 @@ Runtime V2 frame-report placeholder baseline:
 - checker now verifies that `FrameContractJson.cpp` emits every required V2
   readiness field.
 
+Material runtime-policy bridge baseline:
+
+- every registry asset now carries a V2 runtime policy bridge in material
+  evidence: scene material class, reflection preference, temporal policy, post
+  sensitivity, required texture slots, and missing texture slots.
+- `runtime_policy_bridge_asset_count`: `33`.
+- provider request packs now include `runtime_policy`, `runtime_policy_candidates`,
+  `required_pbr_maps`, and `missing_texture_slots` inside `material_contract`.
+- material evidence remains `BLOCKED`: the bridge improves contract precision,
+  but does not claim assets are PBR/AAA-ready.
+
 ### FSSP-V2-002 Material Model Upgrade
 
 Status: PLANNED

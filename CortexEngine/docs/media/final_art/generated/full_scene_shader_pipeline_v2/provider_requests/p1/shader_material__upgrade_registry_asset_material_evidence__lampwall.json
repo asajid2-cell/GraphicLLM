@@ -30,6 +30,7 @@
       "metal",
       "painted_wall"
     ],
+    "primary_material_family": "dielectric",
     "shader_feature_flags": [
       "base_color_texture",
       "detail_normal",
@@ -38,10 +39,58 @@
     ],
     "required_pbr_maps": [
       "base_color",
+      "detail_normal_or_height",
       "normal",
-      "orm_or_separate_occlusion_roughness_metallic",
-      "detail_normal_or_height_optional"
+      "orm_or_separate_occlusion_roughness_metallic"
     ],
+    "missing_texture_slots": [
+      "base_color",
+      "detail_normal_or_height",
+      "normal",
+      "orm_or_separate_occlusion_roughness_metallic"
+    ],
+    "runtime_policy": {
+      "scene_material_class": "Default",
+      "scene_material_class_id": 0,
+      "reflection_preference": "NeutralFallback",
+      "reflection_preference_id": 0,
+      "temporal_policy": "StableDiffuse",
+      "temporal_policy_id": 0,
+      "post_sensitivity": "Normal",
+      "post_sensitivity_id": 0
+    },
+    "runtime_policy_candidates": {
+      "dielectric": {
+        "scene_material_class": "Default",
+        "scene_material_class_id": 0,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      },
+      "metal": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      },
+      "painted_wall": {
+        "scene_material_class": "PaintedWall",
+        "scene_material_class_id": 1,
+        "reflection_preference": "NeutralFallback",
+        "reflection_preference_id": 0,
+        "temporal_policy": "StableDiffuse",
+        "temporal_policy_id": 0,
+        "post_sensitivity": "Normal",
+        "post_sensitivity_id": 0
+      }
+    },
     "texture_resolution_min": 1024,
     "texture_resolution_target": 2048,
     "uvs_required": true,
@@ -75,6 +124,61 @@
     "lamp_mesh",
     "office_wall_fixture_mesh"
   ],
+  "primary_material_family": "dielectric",
+  "required_texture_slots": [
+    "base_color",
+    "detail_normal_or_height",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "missing_texture_slots": [
+    "base_color",
+    "detail_normal_or_height",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "runtime_policy": {
+    "scene_material_class": "Default",
+    "scene_material_class_id": 0,
+    "reflection_preference": "NeutralFallback",
+    "reflection_preference_id": 0,
+    "temporal_policy": "StableDiffuse",
+    "temporal_policy_id": 0,
+    "post_sensitivity": "Normal",
+    "post_sensitivity_id": 0
+  },
+  "runtime_policy_candidates": {
+    "dielectric": {
+      "scene_material_class": "Default",
+      "scene_material_class_id": 0,
+      "reflection_preference": "NeutralFallback",
+      "reflection_preference_id": 0,
+      "temporal_policy": "StableDiffuse",
+      "temporal_policy_id": 0,
+      "post_sensitivity": "Normal",
+      "post_sensitivity_id": 0
+    },
+    "metal": {
+      "scene_material_class": "PolishedMetal",
+      "scene_material_class_id": 5,
+      "reflection_preference": "RTReflection",
+      "reflection_preference_id": 5,
+      "temporal_policy": "StableGlossy",
+      "temporal_policy_id": 1,
+      "post_sensitivity": "ExposureProtected",
+      "post_sensitivity_id": 2
+    },
+    "painted_wall": {
+      "scene_material_class": "PaintedWall",
+      "scene_material_class_id": 1,
+      "reflection_preference": "NeutralFallback",
+      "reflection_preference_id": 0,
+      "temporal_policy": "StableDiffuse",
+      "temporal_policy_id": 0,
+      "post_sensitivity": "Normal",
+      "post_sensitivity_id": 0
+    }
+  },
   "hero_surface_reference_count": 0,
   "object_reference_count": 4,
   "needed_evidence": [
@@ -88,6 +192,7 @@
     "missing PBR texture evidence for V2 material model",
     "missing collision evidence for V2 final asset",
     "missing collision proxy",
-    "missing complete PBR texture set"
+    "missing complete PBR texture set",
+    "missing required V2 texture slots: base_color, detail_normal_or_height, normal, orm_or_separate_occlusion_roughness_metallic"
   ]
 }

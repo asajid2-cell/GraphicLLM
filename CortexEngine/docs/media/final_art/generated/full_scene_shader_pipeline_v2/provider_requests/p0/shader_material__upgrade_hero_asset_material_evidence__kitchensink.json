@@ -28,6 +28,7 @@
     "material_families": [
       "metal"
     ],
+    "primary_material_family": "metal",
     "shader_feature_flags": [
       "base_color_texture",
       "normal_texture",
@@ -38,6 +39,33 @@
       "normal",
       "orm_or_separate_occlusion_roughness_metallic"
     ],
+    "missing_texture_slots": [
+      "base_color",
+      "normal",
+      "orm_or_separate_occlusion_roughness_metallic"
+    ],
+    "runtime_policy": {
+      "scene_material_class": "PolishedMetal",
+      "scene_material_class_id": 5,
+      "reflection_preference": "RTReflection",
+      "reflection_preference_id": 5,
+      "temporal_policy": "StableGlossy",
+      "temporal_policy_id": 1,
+      "post_sensitivity": "ExposureProtected",
+      "post_sensitivity_id": 2
+    },
+    "runtime_policy_candidates": {
+      "metal": {
+        "scene_material_class": "PolishedMetal",
+        "scene_material_class_id": 5,
+        "reflection_preference": "RTReflection",
+        "reflection_preference_id": 5,
+        "temporal_policy": "StableGlossy",
+        "temporal_policy_id": 1,
+        "post_sensitivity": "ExposureProtected",
+        "post_sensitivity_id": 2
+      }
+    },
     "texture_resolution_min": 1024,
     "texture_resolution_target": 2048,
     "uvs_required": true,
@@ -69,6 +97,39 @@
   "semantic_roles": [
     "sink"
   ],
+  "primary_material_family": "metal",
+  "required_texture_slots": [
+    "base_color",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "missing_texture_slots": [
+    "base_color",
+    "normal",
+    "orm_or_separate_occlusion_roughness_metallic"
+  ],
+  "runtime_policy": {
+    "scene_material_class": "PolishedMetal",
+    "scene_material_class_id": 5,
+    "reflection_preference": "RTReflection",
+    "reflection_preference_id": 5,
+    "temporal_policy": "StableGlossy",
+    "temporal_policy_id": 1,
+    "post_sensitivity": "ExposureProtected",
+    "post_sensitivity_id": 2
+  },
+  "runtime_policy_candidates": {
+    "metal": {
+      "scene_material_class": "PolishedMetal",
+      "scene_material_class_id": 5,
+      "reflection_preference": "RTReflection",
+      "reflection_preference_id": 5,
+      "temporal_policy": "StableGlossy",
+      "temporal_policy_id": 1,
+      "post_sensitivity": "ExposureProtected",
+      "post_sensitivity_id": 2
+    }
+  },
   "hero_surface_reference_count": 1,
   "object_reference_count": 1,
   "needed_evidence": [
@@ -84,6 +145,7 @@
     "missing PBR texture evidence for V2 material model",
     "missing collision evidence for V2 final asset",
     "missing collision proxy",
-    "missing complete PBR texture set"
+    "missing complete PBR texture set",
+    "missing required V2 texture slots: base_color, normal, orm_or_separate_occlusion_roughness_metallic"
   ]
 }

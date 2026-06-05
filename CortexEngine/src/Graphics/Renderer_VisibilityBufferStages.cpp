@@ -31,13 +31,18 @@ constexpr uint32_t kVBDebugGBufferEmissive = 5;
 constexpr uint32_t kVBDebugGBufferExt0 = 6;
 constexpr uint32_t kVBDebugGBufferExt1 = 7;
 constexpr uint32_t kVBDebugGBufferExt2 = 8;
+constexpr uint32_t kVBDebugMaterialId = 9;
+constexpr uint32_t kVBDebugStableObjectId = 10;
 
 bool IsVisibilityBufferDebugView(uint32_t debugView) {
     return debugView != kVBDebugNone;
 }
 
 bool IsVisibilityBufferUnculledDebugView(uint32_t debugView) {
-    return debugView == kVBDebugVisibility || debugView == kVBDebugDepth;
+    return debugView == kVBDebugVisibility ||
+           debugView == kVBDebugDepth ||
+           debugView == kVBDebugMaterialId ||
+           debugView == kVBDebugStableObjectId;
 }
 
 bool IsVisibilityBufferGBufferDebugView(uint32_t debugView) {
@@ -79,8 +84,20 @@ bool Renderer::RenderVisibilityBufferVisibilityStage(D3D12_GPU_VIRTUAL_ADDRESS c
     m_frameDiagnostics.contract.drawCounts.visibilityBufferMeshes = static_cast<uint32_t>(m_visibilityBufferState.meshDraws.size());
     m_frameDiagnostics.contract.drawCounts.visibilityBufferDrawBatches = vbDrawBatches;
 
-    if (debugView == kVBDebugVisibility) {
-        auto dbg = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(m_commandResources.graphicsList.Get(), m_mainTargets.hdr.resources.color.Get(), m_mainTargets.hdr.descriptors.rtv.cpu);
+    if (debugView == kVBDebugVisibility ||
+        debugView == kVBDebugMaterialId ||
+        debugView == kVBDebugStableObjectId) {
+        auto mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
+        if (debugView == kVBDebugMaterialId) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialId;
+        } else if (debugView == kVBDebugStableObjectId) {
+            mode = VisibilityBufferRenderer::DebugBlitVisibilityMode::StableObjectId;
+        }
+        auto dbg = m_services.visibilityBuffer->DebugBlitVisibilityToHDR(
+            m_commandResources.graphicsList.Get(),
+            m_mainTargets.hdr.resources.color.Get(),
+            m_mainTargets.hdr.descriptors.rtv.cpu,
+            mode);
         if (dbg.IsErr()) {
             spdlog::warn("VB debug blit (visibility) failed: {}", dbg.Error());
         }

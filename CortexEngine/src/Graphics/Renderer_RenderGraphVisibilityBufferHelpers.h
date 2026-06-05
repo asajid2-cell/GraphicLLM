@@ -16,11 +16,29 @@ inline constexpr uint32_t kVBDebugGBufferEmissive = 5;
 inline constexpr uint32_t kVBDebugGBufferExt0 = 6;
 inline constexpr uint32_t kVBDebugGBufferExt1 = 7;
 inline constexpr uint32_t kVBDebugGBufferExt2 = 8;
+inline constexpr uint32_t kVBDebugMaterialId = 9;
+inline constexpr uint32_t kVBDebugStableObjectId = 10;
 inline constexpr D3D12_RESOURCE_STATES kVBShaderResourceState =
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
 inline bool IsVBGBufferDebugView(uint32_t debugView) {
     return debugView >= kVBDebugGBufferAlbedo && debugView <= kVBDebugGBufferExt2;
+}
+
+inline bool IsVBVisibilityIdentityDebugView(uint32_t debugView) {
+    return debugView == kVBDebugVisibility ||
+           debugView == kVBDebugMaterialId ||
+           debugView == kVBDebugStableObjectId;
+}
+
+inline VisibilityBufferRenderer::DebugBlitVisibilityMode SelectVBVisibilityDebugMode(uint32_t debugView) {
+    if (debugView == kVBDebugMaterialId) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::MaterialId;
+    }
+    if (debugView == kVBDebugStableObjectId) {
+        return VisibilityBufferRenderer::DebugBlitVisibilityMode::StableObjectId;
+    }
+    return VisibilityBufferRenderer::DebugBlitVisibilityMode::PayloadInstance;
 }
 
 struct VisibilityBufferGraphResources {

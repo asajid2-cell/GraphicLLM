@@ -1118,3 +1118,127 @@ Next recommended implementation:
   and instance/material tables.
 - Only promote `material_id_channel_ready`, `object_id_channel_ready`, or
   `debug_view_source_report_available` after the packet captures those views.
+
+## Full Scene Shader Pipeline V2 Per-Pixel Identity Debug Slice - 2026-06-05
+
+Purpose:
+
+- Complete `FSSP-V2-003B` by exposing per-pixel material and object identity
+  views from the visibility-buffer payload and instance table.
+- Promote GBuffer ownership only after the packet captures both identity views.
+- Keep V2 beauty on the V1 fallback while the identity substrate becomes
+  available to later lighting, reflection, shadow, temporal, and post work.
+
+Implemented:
+
+- Added `DebugBlitVisibilityMode` with:
+  - `PayloadInstance`.
+  - `MaterialId`.
+  - `StableObjectId`.
+- `DebugBlitVisibility.hlsl` now decodes the visibility payload and can color:
+  - payload instance id.
+  - per-pixel material id via the visibility instance table.
+  - per-pixel stable object id via the stable culling id.
+- Expanded the shared visibility debug-blit root signature with:
+  - debug mode constants.
+  - visibility instance-table root SRV.
+- Wired debug modes through both immediate and render-graph visibility paths.
+- Added public debug-view modes:
+  - `48 = VB_MaterialId`.
+  - `49 = VB_StableObjectId`.
+- Updated V2 packet defaults to capture:
+  - `material_id`.
+  - `object_id`.
+- `FullSceneGBufferEvidence` now derives:
+  - `material_id_channel_ready` from visibility payload plus instance-material
+    lookup readiness.
+  - `object_id_channel_ready` from visibility payload plus stable instance-id
+    readiness.
+  - `debug_view_source_report_available` from visibility payload producer
+    ownership plus both identity channels.
+- The V2 checker now validates the identity-debug runtime surface and packet
+  view set.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- assets\shaders\DebugBlitVisibility.hlsl src\Graphics\VisibilityBuffer.h src\Graphics\VisibilityBuffer_DebugBlit.cpp src\Graphics\VisibilityBuffer_DebugBlitPipelines.cpp src\Graphics\Renderer_VisibilityBufferStages.cpp src\Graphics\Renderer_VisibilityBufferCulling.cpp src\Graphics\Renderer_VisibilityBufferOrchestration.cpp src\Graphics\Renderer_RenderGraphVisibilityBufferHelpers.h src\Graphics\Passes\VisibilityBufferGraphPass.h src\Graphics\Passes\VisibilityBufferGraphPass.cpp src\Graphics\Renderer_RenderGraphVisibilityBuffer.cpp src\Graphics\Renderer_DebugSettings.cpp tools\run_full_scene_shader_pipeline_v2_packet.ps1 tools\check_full_scene_shader_pipeline_v2_frame_report.py src\Graphics\FullSceneShaderFrameContext.h tools\FinalArtPipeline.ps1
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_per_pixel_identity_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- diff whitespace check: passed.
+- focused changed-object build: passed.
+- full `CortexEngine` target build: passed and linked
+  `build/bin/CortexEngine.exe`.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_per_pixel_identity_packet_20260605`.
+- captured views: `9`.
+- evidence rows: `90`.
+- failures: `0`.
+- captured views:
+  - `beauty`.
+  - `surface_policy`.
+  - `material_id`.
+  - `object_id`.
+  - `reflection_owner`.
+  - `shadow_factor`.
+  - `direct_light`.
+  - `ambient_ibl`.
+  - `taa_blend`.
+
+Gallery beauty GBuffer identity evidence:
+
+- `visibility_payload_channel_ready=true`.
+- `visibility_payload_producer_ready=true`.
+- `instance_identity_table_ready=true`.
+- `instance_material_lookup_ready=true`.
+- `stable_instance_id_available=true`.
+- `material_id_channel_ready=true`.
+- `object_id_channel_ready=true`.
+- `debug_view_source_report_available=true`.
+- `visibility_buffer_instance_count=55`.
+- `visibility_buffer_material_count=36`.
+- `invalid_stable_instance_id_count=0`.
+- `missing_required_channel_count=0`.
+- `missing_ownership_channel_count=0`.
+- `gbuffer.domain_ready=true`.
+- failure reason:
+  `FullSceneFrameData GBuffer ownership is ready`.
+
+Build caveat:
+
+- The first build attempt timed out in `tools/sync_assets.cmake`.
+- Stale CortexEngine `cmake`/`ninja` workers were stopped.
+- Touching only the local build stamp under `build/` allowed the generated
+  build to proceed; the subsequent full target build completed and linked.
+
+Current interpretation:
+
+- `FSSP-V2-003B` is complete for the gallery packet.
+- The V2 GBuffer domain now has a stable per-pixel identity substrate.
+- This does not promote V2 beauty. It only gives later domains a reliable
+  material/object truth layer.
+
+Next recommended implementation:
+
+- Start the full runtime material-table promotion work.
+- Material records should move from evidence-only into shader-facing upload
+  data for material family, texture readiness, reflection policy, temporal
+  policy, and post sensitivity.
+- After material-table debug views are packet-proved, move to scene-local light
+  rig ownership and local reflection/probe ownership.

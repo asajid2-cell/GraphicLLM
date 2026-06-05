@@ -1443,3 +1443,94 @@ Next:
 - Add or expose material-id/object-id debug views from the visibility payload
   and instance/material tables.
 - Do not promote V2 beauty yet.
+
+## Full Scene Shader V2 Per-Pixel Identity Debug Slice - 2026-06-05
+
+Implemented:
+
+- Added visibility debug modes for per-pixel material id and stable object id.
+- `DebugBlitVisibility.hlsl` now uses the visibility payload plus the
+  visibility instance table to visualize:
+  - payload/instance id.
+  - material id.
+  - stable object id.
+- Expanded the debug-blit root signature to carry mode constants and the
+  instance-table root SRV.
+- Wired identity debug modes through the immediate visibility path and the
+  render-graph visibility path.
+- Added debug menu modes:
+  - `48 = VB_MaterialId`.
+  - `49 = VB_StableObjectId`.
+- V2 packet defaults now include `material_id` and `object_id`.
+- `FullSceneGBufferEvidence` now marks ownership ready when the packet-proved
+  visibility payload, producer, instance/material lookup, and stable id
+  evidence are all present.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+git diff --check -- assets\shaders\DebugBlitVisibility.hlsl src\Graphics\VisibilityBuffer.h src\Graphics\VisibilityBuffer_DebugBlit.cpp src\Graphics\VisibilityBuffer_DebugBlitPipelines.cpp src\Graphics\Renderer_VisibilityBufferStages.cpp src\Graphics\Renderer_VisibilityBufferCulling.cpp src\Graphics\Renderer_VisibilityBufferOrchestration.cpp src\Graphics\Renderer_RenderGraphVisibilityBufferHelpers.h src\Graphics\Passes\VisibilityBufferGraphPass.h src\Graphics\Passes\VisibilityBufferGraphPass.cpp src\Graphics\Renderer_RenderGraphVisibilityBuffer.cpp src\Graphics\Renderer_DebugSettings.cpp tools\run_full_scene_shader_pipeline_v2_packet.ps1 tools\check_full_scene_shader_pipeline_v2_frame_report.py src\Graphics\FullSceneShaderFrameContext.h tools\FinalArtPipeline.ps1
+cmake --build build --config Release --target CortexEngine --parallel
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_per_pixel_identity_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static checker: passed.
+- plan validator: passed.
+- Python compile: passed.
+- diff check: passed.
+- focused changed-object build: passed.
+- full `CortexEngine` target build: passed.
+- V2 packet: passed.
+- `ctest`: ran but reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_per_pixel_identity_packet_20260605`.
+- captured views: `9`.
+- evidence rows: `90`.
+- failures: `0`.
+- new views:
+  - `material_id`.
+  - `object_id`.
+
+Gallery beauty GBuffer evidence:
+
+- `visibility_payload_channel_ready=true`.
+- `visibility_payload_producer_ready=true`.
+- `instance_identity_table_ready=true`.
+- `instance_material_lookup_ready=true`.
+- `stable_instance_id_available=true`.
+- `material_id_channel_ready=true`.
+- `object_id_channel_ready=true`.
+- `debug_view_source_report_available=true`.
+- `visibility_buffer_instance_count=55`.
+- `visibility_buffer_material_count=36`.
+- `invalid_stable_instance_id_count=0`.
+- `missing_required_channel_count=0`.
+- `missing_ownership_channel_count=0`.
+- `gbuffer.domain_ready=true`.
+- failure reason:
+  `FullSceneFrameData GBuffer ownership is ready`.
+
+Build caveat:
+
+- The first direct build attempt timed out in `tools/sync_assets.cmake`.
+- Stale CortexEngine build workers were stopped.
+- After refreshing only the local build stamp under `build/`, focused object
+  builds and the full `CortexEngine` target build passed.
+
+Current state:
+
+- `FSSP-V2-003B` is packet-proved for the gallery target.
+- V2 now has the per-pixel identity substrate needed by material-aware
+  lighting, reflections, shadows, temporal resolve, and HDR post.
+- V2 beauty is still intentionally `v1_fallback`.
+- The next architecture step is full runtime material-table promotion, not
+  visual tuning.

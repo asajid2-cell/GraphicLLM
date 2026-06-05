@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 42u;
+constexpr uint32_t kMaxDebugViewMode = 49u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -51,6 +51,13 @@ void Renderer::CycleDebugViewMode() {
     // 40 = VB G-buffer material ext2 / surface class
     // 41 = post-process material class overlay
     // 42 = local reflection-probe blend weight
+    // 43 = VB deferred shadow factor
+    // 44 = VB deferred direct light
+    // 45 = VB deferred ambient / IBL
+    // 46 = reflection owner classification
+    // 47 = material class policy overlay
+    // 48 = VB material id
+    // 49 = VB stable object id
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -97,6 +104,13 @@ void Renderer::CycleDebugViewMode() {
         case 40: label = "VB_GBuffer_SurfaceClass"; break;
         case 41: label = "SurfaceClass_Overlay"; break;
         case 42: label = "LocalReflectionProbeWeight"; break;
+        case 43: label = "VB_DeferredShadowFactor"; break;
+        case 44: label = "VB_DeferredDirectLight"; break;
+        case 45: label = "VB_DeferredAmbientIBL"; break;
+        case 46: label = "ReflectionOwner"; break;
+        case 47: label = "MaterialPolicy"; break;
+        case 48: label = "VB_MaterialId"; break;
+        case 49: label = "VB_StableObjectId"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

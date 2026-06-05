@@ -688,7 +688,8 @@ late because it should present good inputs, not mask bad ones.
 
 ## First Concrete Feature After Planning
 
-The first implementation feature should be `FSSP-V2-003A Identity Ownership`.
+The first implementation feature was `FSSP-V2-003A Identity Ownership`, followed
+by `FSSP-V2-003B Per-Pixel Identity Debug`.
 
 Deliverables:
 
@@ -698,8 +699,32 @@ Deliverables:
 - V2 GBuffer evidence fields for visibility payload readiness, producer
   readiness, instance identity table readiness, material lookup readiness, and
   stable instance id readiness.
-- debug contract entry or explicit blocker for material id/object id views.
-- packet summary showing the GBuffer domain still fails only on remaining
-  debug/per-pixel id ownership gaps, not on missing basic identity data.
+- material id and object id debug views from the visibility payload and
+  instance table.
+- packet summary showing the GBuffer domain ready only after material id,
+  object id, and debug producer-source ownership are all present.
 
 That is the correct bridge from planning into real shader refactor work.
+
+Status as of 2026-06-05:
+
+- `FSSP-V2-003A` packet:
+  `build/captures/full_scene_shader_pipeline_v2_identity_ownership_packet_20260605`.
+- `FSSP-V2-003B` packet:
+  `build/captures/full_scene_shader_pipeline_v2_per_pixel_identity_packet_20260605`.
+- `FSSP-V2-003B` captured `9` views, `90` evidence rows, and `0` failures.
+- Gallery beauty GBuffer evidence reports:
+  - `material_id_channel_ready=true`.
+  - `object_id_channel_ready=true`.
+  - `debug_view_source_report_available=true`.
+  - `missing_required_channel_count=0`.
+  - `missing_ownership_channel_count=0`.
+  - `gbuffer.domain_ready=true`.
+
+Next implementation feature:
+
+- Start Phase 2, full runtime material-table promotion.
+- The material table should become shader-facing data, not only report
+  evidence. It must carry material family, PBR/texture readiness, reflection
+  policy, temporal policy, and post sensitivity so lighting, reflections,
+  temporal, and post consume the same material truth.

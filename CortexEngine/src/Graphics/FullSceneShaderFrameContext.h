@@ -259,10 +259,16 @@ inline FullSceneShaderFrameContext::FullSceneGBufferEvidence BuildFullSceneGBuff
         }
     }
 
-    // These are intentionally false until V2 carries stable per-pixel ids.
-    evidence.materialIdChannelReady = false;
-    evidence.objectIdChannelReady = false;
-    evidence.debugViewSourceReportAvailable = false;
+    evidence.materialIdChannelReady =
+        evidence.visibilityPayloadChannelReady &&
+        evidence.instanceMaterialLookupReady;
+    evidence.objectIdChannelReady =
+        evidence.visibilityPayloadChannelReady &&
+        evidence.stableInstanceIdAvailable;
+    evidence.debugViewSourceReportAvailable =
+        evidence.visibilityPayloadProducerReady &&
+        evidence.materialIdChannelReady &&
+        evidence.objectIdChannelReady;
 
     const bool ownershipChannels[] = {
         evidence.materialIdChannelReady,

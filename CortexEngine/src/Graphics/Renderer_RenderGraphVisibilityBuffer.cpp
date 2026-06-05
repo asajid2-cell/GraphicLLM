@@ -40,7 +40,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
 
         const D3D12_GPU_VIRTUAL_ADDRESS vbCullMaskAddress = ResolveVisibilityBufferCullMask(vbDebugView);
         LogVisibilityBufferFirstFrame();
-        const bool debugVisibility = (vbDebugView == kVBDebugVisibility);
+        const bool debugVisibility = IsVBVisibilityIdentityDebugView(vbDebugView);
         const bool debugDepth = (vbDebugView == kVBDebugDepth);
         const bool debugGBuffer = IsVBGBufferDebugView(vbDebugView);
         const bool debugPath = (vbDebugView != kVBDebugNone);
@@ -142,6 +142,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugBlit.debugVisibility = debugVisibility;
         vbGraphContext.debugBlit.debugDepth = debugDepth;
         vbGraphContext.debugBlit.debugGBuffer = debugGBuffer;
+        vbGraphContext.debugBlit.visibilityMode = SelectVBVisibilityDebugMode(vbDebugView);
         vbGraphContext.debugBlit.gbufferSource = SelectVBGBufferDebugBuffer(vbDebugView);
         vbGraphContext.debugBlit.hdrState = &m_mainTargets.hdr.resources.state;
         vbGraphContext.debugBlit.depthState = &m_depthResources.resources.resourceState;

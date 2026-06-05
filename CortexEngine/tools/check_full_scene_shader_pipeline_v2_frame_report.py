@@ -145,10 +145,13 @@ def validate_runtime_source_surface() -> list[str]:
         return [f"missing runtime frame contract JSON source: {FRAME_CONTRACT_JSON_SOURCE_PATH}"]
     if not FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.exists():
         return [f"missing runtime V2 facade: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}"]
+    if not VISIBILITY_BUFFER_HEADER_PATH.exists():
+        return [f"missing visibility buffer runtime surface: {VISIBILITY_BUFFER_HEADER_PATH}"]
 
     source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
     facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
-    runtime_surface = source + "\n" + facade_source
+    visibility_source = VISIBILITY_BUFFER_HEADER_PATH.read_text(encoding="utf-8")
+    runtime_surface = source + "\n" + facade_source + "\n" + visibility_source
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
     report_key = frame_contract.get("report_key", "")
     if f'"{report_key}"' not in runtime_surface:
@@ -192,6 +195,15 @@ def validate_runtime_source_surface() -> list[str]:
     for token in facade_tokens:
         if token not in facade_source:
             errors.append(f"runtime V2 facade missing required token: {token}")
+
+    identity_debug_tokens = [
+        "enum class DebugBlitVisibilityMode",
+        "MaterialId = 1",
+        "StableObjectId = 2",
+    ]
+    for token in identity_debug_tokens:
+        if token not in runtime_surface:
+            errors.append(f"runtime identity debug surface missing required token: {token}")
 
     for field in frame_contract.get("common_evidence_fields", []):
         if f'"{field}"' not in source:
@@ -647,6 +659,8 @@ def validate_v2_packet_runner_surface() -> list[str]:
         "v2_frame_report_evidence_summary.md",
         "check_full_scene_shader_pipeline_v2_frame_report.py",
         "surface_policy",
+        "material_id",
+        "object_id",
         "reflection_owner",
         "shadow_factor",
         "direct_light",

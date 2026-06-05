@@ -125,10 +125,39 @@ Latest cross-family probe:
 - Current blocker to diagnose before promotion:
   `concert/v3_indirect_lighting` under mouse-jiggle has V3 motion delta
   `0.00395094` vs legacy ambient delta `0.00115572`, ratio `3.419`.
+
+V3 indirect parity fix:
+
+- Root cause:
+  `PSMainV3LightingSplit` used a simplified indirect path instead of the
+  legacy scene-local `ambient_ibl` contract.
+  - It applied local probe diffuse/specular everywhere when local probes were
+    enabled instead of gating by probe weight.
+  - It skipped box-projected probe direction, reflection-footprint mip
+    filtering, specular ceiling, split AO, local fill, and sheen parity.
+  - It included emissive in `indirect_lighting`, which made concert neon/stage
+    pixels move differently from the legacy ambient debug term.
+- Fix:
+  `assets/shaders/DeferredLighting.hlsl` V3 split path now uses the same
+  scene-local ambient/probe contract as the legacy path and leaves emissive for
+  the future composite stage.
+- Targeted verification:
+  `build/captures/v3_lighting_concert_indirect_parity_probe2_20260605`.
+  - `v3_indirect_lighting.delta=0.00115572`.
+  - legacy `ambient_ibl.delta=0.00115572`.
+  - V3/legacy ratio `1.000`.
+  - failures `0`, warnings `0`.
+- Post-fix cross-family verification:
+  `build/captures/v3_lighting_motion_matrix_cross_family_after_indirect_fix1_20260605`.
+  - families: `gallery,kitchen,gym,concert`.
+  - modes: `mouse_jitter,camera_sweep`.
+  - rows: `40`.
+  - failures: `0`.
+  - warnings: `0`.
 - Next renderer step:
-  diagnose why V3 indirect lighting moves more than the legacy ambient/IBL term
-  in the concert family, then rerun the matrix with promotion-grade frame counts
-  before moving to SceneLocalEnvironmentV3 or ReflectionV3.
+  repeat the V3 lighting motion matrix with promotion-grade frame counts and
+  then add the missing office/red-room/stadium packet families before moving to
+  SceneLocalEnvironmentV3 or ReflectionV3.
 
 ## 2026-06-05 AAA Gate Refactor
 

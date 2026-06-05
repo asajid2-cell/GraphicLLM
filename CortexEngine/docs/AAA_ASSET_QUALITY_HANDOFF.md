@@ -2324,3 +2324,58 @@ Current interpretation:
 - This is not visual-improvement proof because the tested gallery frame
   produces almost no candidate/current delta.
 - Next proof should target cross-family or a reflection-stress scene.
+
+## Full Scene Shader V2 Reflection Candidate Signal Audit - 2026-06-05
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_reflection_candidate_signal.py`.
+  - consumes packet `debug_view_metrics.json`.
+  - audits whether `reflection_source_weights` has signal.
+  - audits whether `reflection_resolver_candidate_delta` is meaningful.
+  - emits:
+    - `reflection_candidate_signal.json`.
+    - `reflection_candidate_signal.md`.
+- Updated `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+  - integrated the signal report after debug-view metrics.
+- Updated `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+  - requires the signal analyzer and packet output names.
+
+Validation:
+
+```powershell
+python tools\analyze_full_scene_shader_reflection_candidate_signal.py --metrics build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\debug_view_metrics.json --output-json build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\reflection_candidate_signal.json --output-md build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\reflection_candidate_signal.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_signal_integrated_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_reflection_candidate_signal.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Integrated packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_signal_integrated_packet_20260605`.
+- requested families: `5`.
+- captured views: `30`.
+- evidence rows: `300`.
+- frame-report failures: `0`.
+- measured debug views: `30`.
+- metric failures: `0`.
+- source-signal families: `1`.
+- candidate-delta families: `0`.
+- signal warnings: `5`.
+- signal statuses:
+  - `gallery`: `wired_no_delta`, source luma `0.05381363`,
+    delta luma `0.00000004`.
+  - `kitchen`: `no_reflection_source_signal`.
+  - `office`: `no_reflection_source_signal`.
+  - `gym`: `no_reflection_source_signal`.
+  - `concert`: `no_reflection_source_signal`.
+
+Current interpretation:
+
+- Cross-family packet success is now separate from reflection-candidate
+  usefulness.
+- The next renderer architecture target is scene-local reflection source
+  plumbing for model-authored families, because the post resolver currently has
+  no source signal to improve in kitchen/office/gym/concert.

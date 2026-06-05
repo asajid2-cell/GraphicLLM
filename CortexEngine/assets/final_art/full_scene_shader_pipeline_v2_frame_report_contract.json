@@ -115,6 +115,7 @@
         "direct_light_debug_view_ready",
         "direct_light_unshadowed_debug_view_ready",
         "direct_light_shadow_loss_debug_view_ready",
+        "lighting_v2_shadow_output_ready",
         "exposure_policy_ready",
         "rect_area_light_count",
         "point_light_count",
@@ -129,7 +130,9 @@
         "total_light_intensity",
         "max_light_intensity",
         "missing_lighting_contract_count",
-        "exposure_clipping_gate_passed"
+        "exposure_clipping_gate_passed",
+        "lighting_v2_pass_owner",
+        "lighting_v2_output_resource"
       ],
       "debug_views": [
         "direct_light",

@@ -158,6 +158,8 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
              context.lightingEvidence.directLightUnshadowedDebugViewReady},
             {"direct_light_shadow_loss_debug_view_ready",
              context.lightingEvidence.directLightShadowLossDebugViewReady},
+            {"lighting_v2_shadow_output_ready",
+             context.lightingEvidence.lightingV2ShadowOutputReady},
             {"exposure_policy_ready", context.lightingEvidence.exposurePolicyReady},
             {"rect_area_light_count", context.lightingEvidence.rectAreaLightCount},
             {"point_light_count", context.lightingEvidence.pointLightCount},
@@ -179,7 +181,9 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"rig_id", contract.lighting.rigId},
             {"rig_source", contract.lighting.rigSource},
             {"shadow_policy_id", contract.lighting.shadowPolicyId},
-            {"exposure_policy_id", contract.lighting.exposurePolicyId}
+            {"exposure_policy_id", contract.lighting.exposurePolicyId},
+            {"lighting_v2_pass_owner", context.lightingEvidence.lightingV2PassOwner},
+            {"lighting_v2_output_resource", context.lightingEvidence.lightingV2OutputResource}
         }},
         {"reflections", {
             {"enabled", context.reflectionEvidence.enabled},

@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "purpose": "Schema summary for Full Scene Shader Pipeline V2 material evidence derived from Asset Registry V2 and scene bindings.",
+  "report_path": "assets/final_art/full_scene_shader_material_evidence_v2.json",
+  "required_root_fields": [
+    "schema",
+    "generated_by",
+    "source_registry",
+    "source_bindings",
+    "status",
+    "summary",
+    "material_family_counts",
+    "shader_feature_flag_counts",
+    "assets",
+    "scenes"
+  ],
+  "required_asset_fields": [
+    "asset_id",
+    "runtime_asset",
+    "source_class",
+    "material_families",
+    "shader_feature_flags",
+    "readiness",
+    "v2_material_ready",
+    "hero_surface_reference_count",
+    "blockers"
+  ],
+  "material_families": [
+    "dielectric",
+    "metal",
+    "brushed_metal",
+    "glass",
+    "water",
+    "emissive",
+    "wood",
+    "fabric",
+    "ceramic",
+    "tile",
+    "painted_wall",
+    "rubber",
+    "plastic",
+    "mirror",
+    "screen",
+    "unknown"
+  ],
+  "shader_feature_flags": [
+    "base_color_texture",
+    "normal_texture",
+    "orm_texture",
+    "emissive_texture",
+    "clearcoat",
+    "anisotropy",
+    "transmission",
+    "opacity",
+    "parallax",
+    "detail_normal",
+    "procedural_micro_detail"
+  ]
+}

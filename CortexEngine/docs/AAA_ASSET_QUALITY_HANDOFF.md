@@ -389,6 +389,16 @@ Implemented:
   - validates the external frame-report contract against the main V2 contract.
   - can optionally inspect a runtime frame report and fail when V2 sections are
     missing.
+- `assets/final_art/full_scene_shader_material_evidence_v2.schema.json`
+  - schema summary for shader-facing material evidence.
+- `tools/build_full_scene_shader_material_evidence_v2.py`
+  - derives V2 material-family, shader-feature, PBR readiness, hero-surface,
+    and primitive material blocker evidence from Asset Registry V2 and scene
+    bindings.
+- `assets/final_art/full_scene_shader_material_evidence_v2.json`
+  - generated baseline evidence report.
+- `docs/media/final_art/generated/full_scene_shader_pipeline_v2/material_evidence_report.md`
+  - human-readable material evidence summary.
 
 Validation:
 
@@ -397,6 +407,8 @@ python tools\validate_full_scene_shader_pipeline_v2_plan.py
 python -m py_compile tools\validate_full_scene_shader_pipeline_v2_plan.py
 python tools\check_full_scene_shader_pipeline_v2_frame_report.py
 python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialEvidence
+python -m py_compile tools\build_full_scene_shader_material_evidence_v2.py
 ```
 
 Current interpretation:
@@ -411,6 +423,14 @@ Current interpretation:
   worktree already has broad uncommitted frame-contract changes. Runtime C++
   integration should use this external contract after those changes are
   reconciled.
+- V2 material evidence baseline:
+  - status `BLOCKED`.
+  - assets `33`.
+  - V2 material-ready assets `1`.
+  - PBR texture-ready assets `1`.
+  - missing hero texture evidence `10`.
+  - primitive hero material blockers `24`.
+  - unknown material-family assets `0`.
 - Renderer V1 remains the baseline. V2 work must preserve the final seq8 packet
   gates or provide stronger replacement evidence.
 
@@ -430,6 +450,7 @@ Get-Content docs\media\final_art\generated\aaa_asset_quality\provider_requests\m
 Get-Content docs\FULL_SCENE_SHADER_PIPELINE_V2.md
 python tools\validate_full_scene_shader_pipeline_v2_plan.py
 python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderMaterialEvidence
 ```
 
 ## Git Policy

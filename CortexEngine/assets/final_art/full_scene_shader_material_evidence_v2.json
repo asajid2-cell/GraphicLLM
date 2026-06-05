@@ -1,0 +1,1555 @@
+{
+  "schema": "cortex.full_scene_shader_material_evidence_v2",
+  "generated_by": "tools/build_full_scene_shader_material_evidence_v2.py",
+  "source_registry": "assets/final_art/asset_registry_v2.json",
+  "source_bindings": "assets/final_art/scene_asset_bindings_v1.json",
+  "status": "BLOCKED",
+  "summary": {
+    "asset_count": 33,
+    "v2_material_ready_asset_count": 1,
+    "v2_material_ready_asset_ratio": 0.0303,
+    "pbr_texture_ready_asset_count": 1,
+    "missing_hero_texture_evidence_count": 10,
+    "unknown_material_family_asset_count": 0,
+    "primitive_hero_material_blocker_count": 24,
+    "scene_count": 5
+  },
+  "material_family_counts": {
+    "dielectric": 11,
+    "fabric": 1,
+    "metal": 13,
+    "painted_wall": 1,
+    "plastic": 4,
+    "tile": 1,
+    "wood": 8
+  },
+  "shader_feature_flag_counts": {
+    "base_color_texture": 33,
+    "detail_normal": 11,
+    "normal_texture": 33,
+    "orm_texture": 33
+  },
+  "assets": [
+    {
+      "asset_id": "bench",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bench/bench.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "basketball_gym_day"
+      ],
+      "semantic_roles": [
+        "sideline_equipment_mesh"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "bookcaseopen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseOpen/bookcaseOpen.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "office_wall_system_mesh",
+        "shelf_mesh"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 4,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "books",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "book",
+        "book_mesh",
+        "countertop_prop"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 5,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "chair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chair/chair.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "basketball_gym_day",
+        "home_kitchen_lantern",
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "auditorium_seat",
+        "chair",
+        "stadium_seat_mesh"
+      ],
+      "material_families": [
+        "dielectric",
+        "fabric",
+        "plastic"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 21,
+      "object_reference_count": 49,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "chairdesk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "chair"
+      ],
+      "material_families": [
+        "plastic"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "chairmoderncushion",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairModernCushion/chairModernCushion.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "courtside_chair_mesh",
+        "foreground_audience_chair_mesh"
+      ],
+      "material_families": [
+        "plastic"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 8,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "computerkeyboard",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerKeyboard/computerKeyboard.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "keyboard",
+        "keyboard_mesh"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 2,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "computerscreen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerScreen/computerScreen.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "monitor"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "desk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "desk"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "hoodmodern",
+      "runtime_asset": "assets/models/kenney_furniture_kit/hoodModern/hoodModern.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "range_hood"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchen_faucet_gooseneck",
+      "runtime_asset": "assets/generated/final_art_fidelity_meshes/kitchen_faucet_gooseneck/kitchen_faucet_gooseneck.gltf",
+      "source_class": "engine_generated_fidelity_mesh",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "faucet_mesh"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": false,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "engine proxy mesh; useful detail but not AAA final asset",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set",
+        "missing preview evidence"
+      ]
+    },
+    {
+      "asset_id": "kitchencabinetupper",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpper/kitchenCabinetUpper.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "upper_cabinet_mesh"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 2,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchencabinetupperdouble",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpperDouble/kitchenCabinetUpperDouble.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "upper_cabinet_mesh"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 2,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchencabinetupperlow",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpperLow/kitchenCabinetUpperLow.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "cabinet_mesh"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchencoffeemachine",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCoffeeMachine/kitchenCoffeeMachine.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchenfridge",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenFridge/kitchenFridge.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "fridge"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchenmicrowave",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenMicrowave/kitchenMicrowave.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "appliance"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchensink",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenSink/kitchenSink.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "sink"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "kitchenstove",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenStove/kitchenStove.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "stove_mesh"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "lamproundtable",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundTable/lampRoundTable.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening",
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "stage_surface_prop_mesh",
+        "task_lamp"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 3,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "lampwall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampWall/lampWall.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "lamp_mesh",
+        "office_wall_fixture_mesh"
+      ],
+      "material_families": [
+        "dielectric",
+        "metal",
+        "painted_wall"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 4,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "lantern_01_1k",
+      "runtime_asset": "assets/models/naturalistic_showcase/Lantern_01/Lantern_01_1k.gltf",
+      "source_class": "artist_authored_pbr",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "warm_fixture"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": true,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": true,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "asset_id": "laptop",
+      "runtime_asset": "assets/models/kenney_furniture_kit/laptop/laptop.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "desk_prop"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "loungedesignchair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeDesignChair/loungeDesignChair.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "chair_mesh"
+      ],
+      "material_families": [
+        "dielectric",
+        "plastic"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 5,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "paneling",
+      "runtime_asset": "assets/models/kenney_furniture_kit/paneling/paneling.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "venue_silhouette_prop_mesh"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 4,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "plantsmall2",
+      "runtime_asset": "assets/models/kenney_furniture_kit/plantSmall2/plantSmall2.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "material_families": [
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "rugrectangle",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRectangle/rugRectangle.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "floor_mat",
+        "floor_mat_mesh"
+      ],
+      "material_families": [
+        "tile"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 3,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "speaker",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speaker/speaker.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "sideline_equipment_mesh",
+        "speaker_mesh",
+        "speaker_stack_mesh"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 7,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "speakersmall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speakerSmall/speakerSmall.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "neon_streamer_concert"
+      ],
+      "semantic_roles": [
+        "stage_surface_prop_mesh"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 2,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "table",
+      "runtime_asset": "assets/models/kenney_furniture_kit/table/table.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "tabletop_surface"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 1,
+      "object_reference_count": 1,
+      "blockers": [
+        "hero surface lacks PBR texture readiness",
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "tableround",
+      "runtime_asset": "assets/models/kenney_furniture_kit/tableRound/tableRound.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "table_mesh"
+      ],
+      "material_families": [
+        "dielectric",
+        "wood"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "detail_normal",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 2,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "televisionantenna",
+      "runtime_asset": "assets/models/kenney_furniture_kit/televisionAntenna/televisionAntenna.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "semantic_roles": [
+        "monitor_mesh"
+      ],
+      "material_families": [
+        "dielectric"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    },
+    {
+      "asset_id": "toaster",
+      "runtime_asset": "assets/models/kenney_furniture_kit/toaster/toaster.gltf",
+      "source_class": "cc0_curated_library",
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "material_families": [
+        "metal"
+      ],
+      "shader_feature_flags": [
+        "base_color_texture",
+        "normal_texture",
+        "orm_texture"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "v2_material_ready": false,
+      "hero_surface_reference_count": 0,
+      "object_reference_count": 1,
+      "blockers": [
+        "missing LOD chain",
+        "missing LOD evidence for V2 final asset",
+        "missing PBR texture evidence for V2 material model",
+        "missing collision evidence for V2 final asset",
+        "missing collision proxy",
+        "missing complete PBR texture set"
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "scene": "home_kitchen_lantern",
+      "status": "BOUND",
+      "object_count": 135,
+      "registry_bound_count": 27,
+      "hero_registry_bound_count": 4,
+      "primitive_hero_blocker_count": 2,
+      "missing_registry_material_count": 2,
+      "material_family_counts": {
+        "brushed_metal": 4,
+        "dielectric": 26,
+        "glass": 1,
+        "metal": 57,
+        "painted_wall": 10,
+        "plastic": 4,
+        "tile": 21,
+        "wood": 12
+      }
+    },
+    {
+      "scene": "home_office_evening",
+      "status": "BOUND",
+      "object_count": 131,
+      "registry_bound_count": 24,
+      "hero_registry_bound_count": 6,
+      "primitive_hero_blocker_count": 8,
+      "missing_registry_material_count": 8,
+      "material_family_counts": {
+        "dielectric": 56,
+        "glass": 1,
+        "metal": 28,
+        "painted_wall": 14,
+        "plastic": 2,
+        "screen": 9,
+        "tile": 10,
+        "wood": 11
+      }
+    },
+    {
+      "scene": "basketball_gym_day",
+      "status": "BOUND",
+      "object_count": 125,
+      "registry_bound_count": 30,
+      "hero_registry_bound_count": 0,
+      "primitive_hero_blocker_count": 7,
+      "missing_registry_material_count": 7,
+      "material_family_counts": {
+        "dielectric": 43,
+        "fabric": 24,
+        "glass": 1,
+        "metal": 41,
+        "painted_wall": 10,
+        "plastic": 4,
+        "wood": 2
+      }
+    },
+    {
+      "scene": "neon_streamer_concert",
+      "status": "BOUND",
+      "object_count": 154,
+      "registry_bound_count": 39,
+      "hero_registry_bound_count": 21,
+      "primitive_hero_blocker_count": 7,
+      "missing_registry_material_count": 7,
+      "material_family_counts": {
+        "dielectric": 36,
+        "fabric": 21,
+        "metal": 52,
+        "painted_wall": 10,
+        "plastic": 4,
+        "screen": 16,
+        "tile": 15
+      }
+    },
+    {
+      "scene": "rt_showcase_gallery",
+      "status": "MISSING_SEED",
+      "object_count": 0,
+      "registry_bound_count": 0,
+      "hero_registry_bound_count": 0,
+      "primitive_hero_blocker_count": 0,
+      "missing_registry_material_count": 0,
+      "material_family_counts": {}
+    }
+  ]
+}

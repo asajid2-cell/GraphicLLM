@@ -18,6 +18,7 @@ param(
         "PretrainedVisualRejection",
         "AssetRegistryV2",
         "SceneAssetBindings",
+        "FullSceneShaderMaterialEvidence",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1075,6 +1076,14 @@ function Invoke-SceneAssetBindings {
     }
 }
 
+function Invoke-FullSceneShaderMaterialEvidence {
+    Invoke-SceneAssetBindings
+    python (Join-Path $Root "tools/build_full_scene_shader_material_evidence_v2.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 material evidence build failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-AAAReplacementPlan {
     Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
@@ -1124,6 +1133,7 @@ switch ($Action) {
     "PretrainedVisualRejection" { Invoke-PretrainedVisualRejection }
     "AssetRegistryV2" { Invoke-AssetRegistryV2 }
     "SceneAssetBindings" { Invoke-SceneAssetBindings }
+    "FullSceneShaderMaterialEvidence" { Invoke-FullSceneShaderMaterialEvidence }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

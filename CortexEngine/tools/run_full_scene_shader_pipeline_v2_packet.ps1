@@ -10,7 +10,8 @@ param(
     [string]$StabilityMotionMode = "static",
     [switch]$NoBuild,
     [switch]$StressSceneOnly,
-    [switch]$SkipSceneAnalyzers
+    [switch]$SkipSceneAnalyzers,
+    [switch]$NoStressScene
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,12 +48,14 @@ $packetArgs = @(
     "-OutputRoot", $OutputRoot,
     "-FamilyFilter", $FamilyFilter,
     "-ViewFilter", $ViewFilter,
-    "-StressSceneFilter", $StressSceneFilter,
     "-SmokeFrames", [string]$SmokeFrames,
     "-CaptureFrame", [string]$CaptureFrame,
     "-CaptureSequenceCount", [string]$CaptureSequenceCount,
     "-StabilityMotionMode", $StabilityMotionMode
 )
+if (-not $NoStressScene) {
+    $packetArgs += @("-StressSceneFilter", $StressSceneFilter)
+}
 if ($NoBuild) {
     $packetArgs += "-NoBuild"
 }

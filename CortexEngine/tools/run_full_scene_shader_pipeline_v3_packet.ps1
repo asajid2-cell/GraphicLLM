@@ -9,28 +9,34 @@ param(
     [string]$StabilityMotionMode = "static",
     [switch]$NoBuild,
     [switch]$SkipSceneAnalyzers,
-    [switch]$StressSceneOnly
+    [switch]$StressSceneOnly,
+    [switch]$NoStressScene
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $v2Packet = Join-Path $root "tools/run_full_scene_shader_pipeline_v2_packet.ps1"
 $v3Analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_placeholders.py"
+$v3LightingMotionAnalyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_lighting_motion.py"
 $outputPath = Join-Path $root $OutputRoot
 $signalOutput = Join-Path $outputPath "v3_signal.json"
 $stabilityOutput = Join-Path $outputPath "v3_stability.json"
+$lightingMotionOutput = Join-Path $outputPath "v3_lighting_motion.json"
+$lightingMotionMarkdown = Join-Path $outputPath "v3_lighting_motion.md"
 $previousFullSceneLightingV3 = $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT
 
 $packetArgs = @(
     "-OutputRoot", $OutputRoot,
     "-FamilyFilter", $FamilyFilter,
-    "-StressSceneFilter", $StressSceneFilter,
     "-ViewFilter", $ViewFilter,
     "-SmokeFrames", "$SmokeFrames",
     "-CaptureFrame", "$CaptureFrame",
     "-CaptureSequenceCount", "$CaptureSequenceCount",
     "-StabilityMotionMode", $StabilityMotionMode
 )
+if (-not $NoStressScene) {
+    $packetArgs += @("-StressSceneFilter", $StressSceneFilter)
+}
 
 if ($NoBuild) {
     $packetArgs += "-NoBuild"
@@ -40,6 +46,9 @@ if ($SkipSceneAnalyzers) {
 }
 if ($StressSceneOnly) {
     $packetArgs += "-StressSceneOnly"
+}
+if ($NoStressScene) {
+    $packetArgs += "-NoStressScene"
 }
 
 try {
@@ -54,6 +63,14 @@ try {
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    if ($CaptureSequenceCount -ge 2) {
+        $manifestPath = Join-Path $outputPath "manifest.json"
+        & python $v3LightingMotionAnalyzer --manifest $manifestPath --output-json $lightingMotionOutput --output-md $lightingMotionMarkdown --min-sequence-count $CaptureSequenceCount
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
 } finally {
     if ($null -eq $previousFullSceneLightingV3) {
         Remove-Item Env:\CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT -ErrorAction SilentlyContinue
@@ -65,3 +82,6 @@ try {
 Write-Host "Full Scene Shader Pipeline V3 placeholder packet evidence passed."
 Write-Host "signal=$signalOutput"
 Write-Host "stability=$stabilityOutput"
+if ($CaptureSequenceCount -ge 2) {
+    Write-Host "lighting_motion=$lightingMotionOutput"
+}

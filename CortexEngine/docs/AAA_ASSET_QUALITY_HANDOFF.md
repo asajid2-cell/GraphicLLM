@@ -73,6 +73,33 @@ Next renderer slice:
 Do not promote V3 domains into default beauty until the packet/promotion gate
 has motion and cross-family evidence.
 
+Latest V3 motion-harness checkpoint:
+
+- Added `tools/analyze_full_scene_shader_v3_lighting_motion.py`.
+  - Reads packet manifests and capture sequences.
+  - Measures per-view frame-to-frame luma deltas for the five concrete V3
+    lighting buffers.
+  - Compares each V3 buffer against its legacy deferred debug counterpart.
+- Added `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`.
+  - Runs V3 packets across selected motion modes/families.
+  - Aggregates `v3_lighting_motion_matrix.json/md`.
+- Added `-NoStressScene` support to V3/V2 packet runners so clean family-only
+  matrix rows can be captured without the default stress target.
+- Verified narrow smoke:
+  `build/captures/v3_lighting_motion_matrix_gallery_smoke3_20260605`.
+  - mode: `mouse_jitter`.
+  - family: `gallery`.
+  - rows: `5`.
+  - failures: `0`.
+  - stability: `report_count=11`,
+    `lighting_split_ready_report_count=11`,
+    `full_scene_lighting_v3_executed_report_count=11`,
+    `lighting_signal_metrics_ready=true`.
+- Important limitation:
+  - this is a harness proof, not a Lighting V3 promotion.
+  - next required run is the full motion/cross-family matrix for at least
+    gallery, kitchen, gym, and concert with mouse-jiggle and camera-sweep.
+
 ## 2026-06-05 AAA Gate Refactor
 
 Implemented:

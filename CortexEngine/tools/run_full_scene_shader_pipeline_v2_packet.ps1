@@ -18,6 +18,7 @@ $outRootAbs = Join-Path $root $OutputRoot
 $packetRunner = Join-Path $root "tools/run_scene_local_cinematic_renderer_v1_packets.ps1"
 $v2Checker = Join-Path $root "tools/check_full_scene_shader_pipeline_v2_frame_report.py"
 $debugMetricsTool = Join-Path $root "tools/analyze_full_scene_shader_debug_view_metrics.py"
+$reflectionSignalTool = Join-Path $root "tools/analyze_full_scene_shader_reflection_candidate_signal.py"
 
 if (-not (Test-Path $packetRunner)) {
     throw "Scene-local packet runner missing: $packetRunner"
@@ -27,6 +28,9 @@ if (-not (Test-Path $v2Checker)) {
 }
 if (-not (Test-Path $debugMetricsTool)) {
     throw "Full Scene Shader Pipeline V2 debug-view metrics tool missing: $debugMetricsTool"
+}
+if (-not (Test-Path $reflectionSignalTool)) {
+    throw "Full Scene Shader Pipeline V2 reflection signal tool missing: $reflectionSignalTool"
 }
 
 $packetArgs = @(
@@ -161,6 +165,9 @@ $checkerStdoutPath = Join-Path $outRootAbs "v2_frame_report_checker_stdout.txt"
 $debugMetricsJsonPath = Join-Path $outRootAbs "debug_view_metrics.json"
 $debugMetricsMdPath = Join-Path $outRootAbs "debug_view_metrics.md"
 $debugMetricsStdoutPath = Join-Path $outRootAbs "debug_view_metrics_stdout.txt"
+$reflectionSignalJsonPath = Join-Path $outRootAbs "reflection_candidate_signal.json"
+$reflectionSignalMdPath = Join-Path $outRootAbs "reflection_candidate_signal.md"
+$reflectionSignalStdoutPath = Join-Path $outRootAbs "reflection_candidate_signal_stdout.txt"
 
 $summary | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $summaryJsonPath
 $checkerOutput | Set-Content -Encoding UTF8 $checkerStdoutPath
@@ -193,6 +200,10 @@ $debugMetricsExit = $LASTEXITCODE
 $debugMetricsOutput | Set-Content -Encoding UTF8 $debugMetricsStdoutPath
 if ($debugMetricsExit -ne 0) {
     $failures.Add("debug-view metrics failed; see $debugMetricsStdoutPath") | Out-Null
+}
+if ($debugMetricsExit -eq 0) {
+    $reflectionSignalOutput = & python $reflectionSignalTool --metrics $debugMetricsJsonPath --output-json $reflectionSignalJsonPath --output-md $reflectionSignalMdPath 2>&1
+    $reflectionSignalOutput | Set-Content -Encoding UTF8 $reflectionSignalStdoutPath
 }
 
 if ($failures.Count -gt 0) {

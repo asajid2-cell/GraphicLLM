@@ -2243,3 +2243,77 @@ Interpretation:
 - This is still not a promotion proof. The next useful packet should use
   cross-family and/or a reflection-stress scene where SSR/RT ownership changes
   enough for the candidate delta to become meaningful.
+
+## Full Scene Shader Pipeline V2 Reflection Candidate Signal Audit - 2026-06-05
+
+Purpose:
+
+- Make the reflection candidate proof honest by distinguishing packet success
+  from meaningful reflection-source/candidate signal.
+- Surface when a family has no SSR/RT/IBL post-reflection source weight, or
+  when the candidate path is wired but produces near-zero delta.
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_reflection_candidate_signal.py`.
+  - consumes `debug_view_metrics.json`.
+  - audits `reflection_source_weights`,
+    `reflection_resolver_candidate`, and
+    `reflection_resolver_candidate_delta`.
+  - emits `reflection_candidate_signal.json` and
+    `reflection_candidate_signal.md`.
+  - reports per-family source luma, source nonblack ratio, delta luma, delta
+    nonblack ratio, source-signal family count, candidate-delta family count,
+    warnings, and failures.
+- Updated `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+  - every V2 packet now emits the reflection candidate signal report after
+    debug-view metrics.
+- Updated `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+  - requires the signal analyzer and packet output names.
+
+Validation:
+
+```powershell
+python tools\analyze_full_scene_shader_reflection_candidate_signal.py --metrics build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\debug_view_metrics.json --output-json build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\reflection_candidate_signal.json --output-md build\captures\full_scene_shader_pipeline_v2_reflection_candidate_cross_family_mouse_jitter_packet_20260605\reflection_candidate_signal.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_candidate_signal_integrated_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_reflection_candidate_signal.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Results:
+
+- standalone signal analyzer: passed on the previous cross-family packet.
+- integrated V2 packet with signal report: passed.
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+
+Integrated packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_candidate_signal_integrated_packet_20260605`.
+- requested families: `5`.
+- captured views: `30`.
+- evidence rows: `300`.
+- frame-report failures: `0`.
+- measured debug views: `30`.
+- metric failures: `0`.
+- source-signal families: `1`.
+- candidate-delta families: `0`.
+- signal warnings: `5`.
+- signal statuses:
+  - `gallery`: `wired_no_delta`, source luma `0.05381363`,
+    delta luma `0.00000004`.
+  - `kitchen`: `no_reflection_source_signal`.
+  - `office`: `no_reflection_source_signal`.
+  - `gym`: `no_reflection_source_signal`.
+  - `concert`: `no_reflection_source_signal`.
+
+Current interpretation:
+
+- The cross-family packet succeeds technically, but it proves the current V2
+  candidate is not being meaningfully exercised outside gallery.
+- The next real renderer architecture target is not another candidate tweak;
+  it is making model-authored families feed scene-local reflection/probe/SSR/RT
+  source signal into the post resolver, then rerunning this signal audit.

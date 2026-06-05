@@ -43,6 +43,9 @@ TEMPORAL_REJECTION_SHADER_PATH = ROOT / "assets" / "shaders" / "TemporalRejectio
 TEMPORAL_REJECTION_SOURCE_PATH = ROOT / "src" / "Graphics" / "TemporalRejectionMask.cpp"
 RUN_FULL_SCENE_SHADER_PACKET_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v2_packet.ps1"
 DEBUG_VIEW_METRICS_TOOL_PATH = ROOT / "tools" / "analyze_full_scene_shader_debug_view_metrics.py"
+REFLECTION_CANDIDATE_SIGNAL_TOOL_PATH = (
+    ROOT / "tools" / "analyze_full_scene_shader_reflection_candidate_signal.py"
+)
 
 
 def fail(message: str) -> int:
@@ -1031,11 +1034,15 @@ def validate_v2_packet_runner_surface() -> list[str]:
 
     packet_script = RUN_FULL_SCENE_SHADER_PACKET_PATH.read_text(encoding="utf-8")
     metrics_tool = DEBUG_VIEW_METRICS_TOOL_PATH.read_text(encoding="utf-8")
+    reflection_signal_tool = REFLECTION_CANDIDATE_SIGNAL_TOOL_PATH.read_text(encoding="utf-8")
     required_tokens = [
         "run_scene_local_cinematic_renderer_v1_packets.ps1",
         "analyze_full_scene_shader_debug_view_metrics.py",
+        "analyze_full_scene_shader_reflection_candidate_signal.py",
         "debug_view_metrics.json",
         "debug_view_metrics.md",
+        "reflection_candidate_signal.json",
+        "reflection_candidate_signal.md",
         "full_scene_shader_pipeline_v2",
         "frame_contract.full_scene_shader_pipeline_v2",
         "promotion_state",
@@ -1078,6 +1085,17 @@ def validate_v2_packet_runner_surface() -> list[str]:
     ]:
         if token not in metrics_tool:
             errors.append(f"V2 debug-view metrics tool missing required token: {token}")
+
+    for token in [
+        "cortex.full_scene_shader_pipeline_v2.reflection_candidate_signal.v1",
+        "reflection_source_weights",
+        "reflection_resolver_candidate",
+        "reflection_resolver_candidate_delta",
+        "candidate_delta_family_count",
+        "no_reflection_source_signal",
+    ]:
+        if token not in reflection_signal_tool:
+            errors.append(f"V2 reflection candidate signal tool missing required token: {token}")
 
     return errors
 

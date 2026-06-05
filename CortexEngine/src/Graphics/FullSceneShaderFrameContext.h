@@ -183,6 +183,37 @@ struct FullSceneShaderFrameContext {
 
     FullSceneShadowContactEvidence shadowEvidence;
 
+    struct FullSceneTemporalEvidence {
+        bool enabled = false;
+        bool ready = false;
+        bool motionVectorsReady = false;
+        bool visibilityBufferMotionReady = false;
+        bool previousTransformHistoryReady = false;
+        bool temporalMaskReady = false;
+        bool temporalMaskStatsReady = false;
+        bool temporalMaskLatencyReady = false;
+        bool jitterReprojectionReady = false;
+        bool materialAwareRejectionReady = false;
+        bool historyClampReady = false;
+        bool taaHistoryReady = false;
+        bool taaHistoryVelocityReprojectionReady = false;
+        bool taaHistoryDisocclusionRejectionReady = false;
+        bool smoothSurfaceMotionGatePassed = false;
+        bool cameraSweepGatePassed = false;
+        float temporalMaskAcceptedRatio = 0.0f;
+        float temporalMaskDisocclusionRatio = 0.0f;
+        float temporalMaskHighMotionRatio = 0.0f;
+        float temporalMaskOutOfBoundsRatio = 0.0f;
+        uint32_t temporalMaskReadbackLatencyFrames = 0;
+        float taaHistoryAccumulationAlpha = 0.0f;
+        uint64_t taaHistoryAgeFrames = 0;
+        uint32_t missingTemporalContractCount = 0;
+        std::string owner = "TemporalMask/FullSceneTemporalEvidence";
+        std::string failureReason = "Material-aware temporal evidence is not populated";
+    };
+
+    FullSceneTemporalEvidence temporalEvidence;
+
     FullSceneShaderDomainEvidence material;
     FullSceneShaderDomainEvidence gbuffer;
     FullSceneShaderDomainEvidence lighting;
@@ -265,6 +296,18 @@ inline bool FullSceneShaderPassWritesResource(
                            return write == resourceName;
                        });
         });
+}
+
+inline const FrameContract::HistoryInfo* FullSceneShaderFindHistory(
+    const FrameContract& contract,
+    const char* name) {
+    auto it = std::find_if(
+        contract.histories.begin(),
+        contract.histories.end(),
+        [name](const FrameContract::HistoryInfo& history) {
+            return history.name == name;
+        });
+    return it != contract.histories.end() ? &(*it) : nullptr;
 }
 
 inline bool FullSceneShaderExecutedProducerWrites(
@@ -688,6 +731,132 @@ inline FullSceneShaderFrameContext::FullSceneShadowContactEvidence BuildFullScen
     return evidence;
 }
 
+inline FullSceneShaderFrameContext::FullSceneTemporalEvidence BuildFullSceneTemporalEvidence(
+    const FrameContract& contract,
+    bool velocityReady,
+    bool jitterReprojectionReady,
+    bool temporalPoliciesAvailable) {
+    FullSceneShaderFrameContext::FullSceneTemporalEvidence evidence;
+    evidence.enabled = contract.features.taaEnabled;
+    evidence.motionVectorsReady = velocityReady;
+    evidence.visibilityBufferMotionReady =
+        contract.motionVectors.visibilityBufferMotion &&
+        !contract.motionVectors.cameraOnlyFallback;
+    evidence.previousTransformHistoryReady =
+        !contract.motionVectors.previousTransformHistoryReset &&
+        contract.motionVectors.instanceCount > 0 &&
+        contract.motionVectors.previousWorldMatrices >= contract.motionVectors.instanceCount;
+    evidence.temporalMaskReady =
+        FullSceneShaderHasResource(contract, "temporal_rejection_mask") &&
+        contract.temporalMask.built &&
+        contract.temporalMask.valid;
+    evidence.temporalMaskAcceptedRatio = contract.temporalMask.acceptedRatio;
+    evidence.temporalMaskDisocclusionRatio = contract.temporalMask.disocclusionRatio;
+    evidence.temporalMaskHighMotionRatio = contract.temporalMask.highMotionRatio;
+    evidence.temporalMaskOutOfBoundsRatio = contract.temporalMask.outOfBoundsRatio;
+    evidence.temporalMaskReadbackLatencyFrames = contract.temporalMask.readbackLatencyFrames;
+    evidence.temporalMaskStatsReady =
+        evidence.temporalMaskReady &&
+        contract.temporalMask.pixelCount > 0 &&
+        contract.temporalMask.acceptedRatio >= 0.0f &&
+        contract.temporalMask.acceptedRatio <= 1.0f &&
+        contract.temporalMask.disocclusionRatio >= 0.0f &&
+        contract.temporalMask.disocclusionRatio <= 1.0f &&
+        contract.temporalMask.highMotionRatio >= 0.0f &&
+        contract.temporalMask.highMotionRatio <= 1.0f &&
+        contract.temporalMask.outOfBoundsRatio >= 0.0f &&
+        contract.temporalMask.outOfBoundsRatio <= 1.0f;
+    evidence.temporalMaskLatencyReady =
+        evidence.temporalMaskReady &&
+        contract.temporalMask.readbackLatencyFrames <= 8u;
+    evidence.jitterReprojectionReady = jitterReprojectionReady;
+    evidence.materialAwareRejectionReady =
+        temporalPoliciesAvailable &&
+        FullSceneShaderHasResource(contract, "vb_gbuffer_material_ext2");
+    const FrameContract::HistoryInfo* taaHistory = FullSceneShaderFindHistory(contract, "taa_color");
+    evidence.historyClampReady = FullSceneShaderHasResource(contract, "taa_history");
+    evidence.taaHistoryReady =
+        taaHistory != nullptr &&
+        taaHistory->valid &&
+        taaHistory->resourceValid &&
+        taaHistory->width == contract.renderWidth &&
+        taaHistory->height == contract.renderHeight;
+    if (taaHistory != nullptr) {
+        evidence.taaHistoryAccumulationAlpha = taaHistory->accumulationAlpha;
+        evidence.taaHistoryAgeFrames = taaHistory->ageFrames;
+        evidence.taaHistoryVelocityReprojectionReady = taaHistory->usesVelocityReprojection;
+        evidence.taaHistoryDisocclusionRejectionReady = taaHistory->usesDisocclusionRejection;
+    }
+    evidence.smoothSurfaceMotionGatePassed =
+        evidence.materialAwareRejectionReady &&
+        evidence.taaHistoryReady &&
+        evidence.taaHistoryVelocityReprojectionReady &&
+        evidence.taaHistoryDisocclusionRejectionReady &&
+        evidence.taaHistoryAccumulationAlpha > 0.0f &&
+        evidence.taaHistoryAccumulationAlpha <= 0.5f;
+    evidence.cameraSweepGatePassed =
+        evidence.temporalMaskStatsReady &&
+        evidence.temporalMaskLatencyReady &&
+        evidence.temporalMaskAcceptedRatio >= 0.50f &&
+        evidence.temporalMaskHighMotionRatio <= 0.35f &&
+        evidence.temporalMaskOutOfBoundsRatio <= 0.10f;
+
+    const bool requiredContracts[] = {
+        evidence.motionVectorsReady,
+        evidence.visibilityBufferMotionReady,
+        evidence.previousTransformHistoryReady,
+        evidence.temporalMaskReady,
+        evidence.temporalMaskStatsReady,
+        evidence.temporalMaskLatencyReady,
+        evidence.jitterReprojectionReady,
+        evidence.materialAwareRejectionReady,
+        evidence.historyClampReady,
+        evidence.taaHistoryReady,
+        evidence.taaHistoryVelocityReprojectionReady,
+        evidence.taaHistoryDisocclusionRejectionReady,
+        evidence.smoothSurfaceMotionGatePassed,
+        evidence.cameraSweepGatePassed,
+    };
+    for (bool ready : requiredContracts) {
+        if (!ready) {
+            ++evidence.missingTemporalContractCount;
+        }
+    }
+
+    evidence.ready = evidence.enabled && evidence.missingTemporalContractCount == 0;
+
+    if (!evidence.enabled) {
+        evidence.failureReason = "TAA is disabled";
+    } else if (!evidence.motionVectorsReady) {
+        evidence.failureReason = "Velocity resource or motion-vector pass is missing";
+    } else if (!evidence.visibilityBufferMotionReady) {
+        evidence.failureReason = "Visibility-buffer motion is missing or camera-only fallback is active";
+    } else if (!evidence.previousTransformHistoryReady) {
+        evidence.failureReason = "Previous transform history is missing or was reset";
+    } else if (!evidence.temporalMaskReady || !evidence.temporalMaskStatsReady) {
+        evidence.failureReason = "Temporal rejection mask or statistics are missing";
+    } else if (!evidence.temporalMaskLatencyReady) {
+        evidence.failureReason = "Temporal rejection mask statistics are too stale";
+    } else if (!evidence.jitterReprojectionReady) {
+        evidence.failureReason = "Jitter-aware reprojection contract is missing";
+    } else if (!evidence.materialAwareRejectionReady) {
+        evidence.failureReason = "Material temporal policies are not complete";
+    } else if (!evidence.taaHistoryReady) {
+        evidence.failureReason = "TAA history resource is missing or invalid";
+    } else if (!evidence.taaHistoryVelocityReprojectionReady ||
+               !evidence.taaHistoryDisocclusionRejectionReady) {
+        evidence.failureReason = "TAA history does not report velocity/disocclusion rejection";
+    } else if (!evidence.smoothSurfaceMotionGatePassed) {
+        evidence.failureReason = "Smooth-surface temporal history gate has not passed";
+    } else if (!evidence.cameraSweepGatePassed) {
+        evidence.failureReason = "Camera-sweep temporal rejection gate has not passed";
+    } else {
+        evidence.failureReason = "Material-aware temporal stability is ready";
+    }
+
+    return evidence;
+}
+
 inline FullSceneShaderDomainEvidence MakeFullSceneShaderDomainEvidence(
     std::string id,
     bool enabled,
@@ -778,6 +947,11 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.reflectionPoliciesAvailable,
         context.rtMissEnvironmentPolicyReady);
     context.shadowEvidence = BuildFullSceneShadowContactEvidence(contract);
+    context.temporalEvidence = BuildFullSceneTemporalEvidence(
+        contract,
+        context.velocityReady,
+        context.jitterReprojectionReady,
+        context.temporalPoliciesAvailable);
     context.postNamedStagesReady =
         contract.cinematicPost.enabled &&
         contract.cinematicPost.postProcessPlanned &&
@@ -819,12 +993,10 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
         context.shadowEvidence.failureReason);
     context.temporal = MakeFullSceneShaderDomainEvidence(
         "temporal",
-        contract.features.taaEnabled,
-        context.jitterReprojectionReady &&
-            context.temporalPoliciesAvailable &&
-            FullSceneShaderHasResource(contract, "taa_history"),
-        "TemporalMask/FrameDiagnostics",
-        "Material-aware temporal clamp is not promoted across packet gates");
+        context.temporalEvidence.enabled,
+        context.temporalEvidence.ready,
+        context.temporalEvidence.owner,
+        context.temporalEvidence.failureReason);
     context.post = MakeFullSceneShaderDomainEvidence(
         "post",
         contract.cinematicPost.enabled,

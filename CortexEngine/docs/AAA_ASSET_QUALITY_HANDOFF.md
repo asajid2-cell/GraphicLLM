@@ -1896,3 +1896,78 @@ Current implementation state after planning:
   - shadow/contact evidence.
 - Next concrete implementation should be `FSSP-V2-007A`, because the reported
   remaining issue is motion-dependent material/reflection/shadow instability.
+
+## Full Scene Shader V2 Material-Aware Temporal Evidence - 2026-06-05
+
+Implemented:
+
+- Added `FullSceneTemporalEvidence` to
+  `src/Graphics/FullSceneShaderFrameContext.h`.
+- Added `BuildFullSceneTemporalEvidence`.
+- V2 temporal evidence now reports:
+  - motion-vector readiness.
+  - visibility-buffer motion readiness.
+  - previous-transform history readiness.
+  - temporal rejection-mask readiness/stat readiness/latency readiness.
+  - jitter reprojection readiness.
+  - material-aware rejection readiness.
+  - TAA history readiness.
+  - TAA history velocity reprojection and disocclusion rejection readiness.
+  - smooth-surface motion gate status.
+  - camera-sweep gate status.
+  - temporal-mask ratios and readback latency.
+  - TAA history age and accumulation alpha.
+  - missing temporal-contract count.
+- Updated `src/Graphics/FrameContractJson.cpp` to emit those fields under
+  `full_scene_shader_pipeline_v2.temporal`.
+- Updated
+  `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  to require the new temporal fields.
+- Updated `tools/check_full_scene_shader_pipeline_v2_frame_report.py` to
+  require the temporal evidence builder and JSON fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_temporal_evidence_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_temporal_evidence_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- gallery beauty temporal evidence:
+  - `missing_temporal_contract_count=0`.
+  - `motion_vectors_ready=true`.
+  - `visibility_buffer_motion_ready=true`.
+  - `previous_transform_history_ready=true`.
+  - `temporal_mask_ready=true`.
+  - `temporal_mask_stats_ready=true`.
+  - `temporal_mask_latency_ready=true`.
+  - `temporal_mask_readback_latency_frames=3`.
+  - `temporal_mask_accepted_ratio=1.0`.
+  - `temporal_mask_high_motion_ratio=0.0`.
+  - `temporal_mask_out_of_bounds_ratio=0.0`.
+  - `taa_history_ready=true`.
+  - `taa_history_velocity_reprojection_ready=true`.
+  - `taa_history_disocclusion_rejection_ready=true`.
+  - `taa_history_age_frames=0`.
+  - `taa_history_accumulation_alpha=0.05999999865889549`.
+  - `smooth_surface_motion_gate_passed=true`.
+  - `camera_sweep_gate_passed=true`.
+  - `temporal.domain_ready=true`.
+
+Current interpretation:
+
+- `FSSP-V2-007A` is packet-proved for the gallery target.
+- V2 beauty remains `v1_fallback`.
+- Next architecture slice should start semantic light buffers and V2
+  direct-light shadow output.

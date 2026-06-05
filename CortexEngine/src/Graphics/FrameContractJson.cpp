@@ -32,15 +32,6 @@ json FeatureFlagsToJson(const FrameContract::FeatureFlags& features) {
     };
 }
 
-bool HasResource(const FrameContract& contract, const char* name) {
-    return std::any_of(
-        contract.resources.begin(),
-        contract.resources.end(),
-        [name](const FrameContract::ResourceInfo& resource) {
-            return resource.name == name && resource.valid && resource.sizeMatchesContract;
-        });
-}
-
 json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
     const FullSceneShaderFrameContext context = BuildFullSceneShaderFrameContext(contract);
     auto domainEvidence = [](const FullSceneShaderDomainEvidence& evidence) {
@@ -237,13 +228,43 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
             {"evidence", domainEvidence(context.shadows)}
         }},
         {"temporal", {
-            {"enabled", contract.features.taaEnabled},
-            {"motion_vectors_ready", context.velocityReady},
-            {"jitter_reprojection_ready", context.jitterReprojectionReady},
-            {"material_aware_rejection_ready", context.temporalPoliciesAvailable},
-            {"history_clamp_ready", HasResource(contract, "taa_history")},
-            {"smooth_surface_motion_gate_passed", false},
-            {"camera_sweep_gate_passed", false},
+            {"enabled", context.temporalEvidence.enabled},
+            {"motion_vectors_ready", context.temporalEvidence.motionVectorsReady},
+            {"visibility_buffer_motion_ready",
+             context.temporalEvidence.visibilityBufferMotionReady},
+            {"previous_transform_history_ready",
+             context.temporalEvidence.previousTransformHistoryReady},
+            {"temporal_mask_ready", context.temporalEvidence.temporalMaskReady},
+            {"temporal_mask_stats_ready", context.temporalEvidence.temporalMaskStatsReady},
+            {"temporal_mask_latency_ready",
+             context.temporalEvidence.temporalMaskLatencyReady},
+            {"jitter_reprojection_ready", context.temporalEvidence.jitterReprojectionReady},
+            {"material_aware_rejection_ready",
+             context.temporalEvidence.materialAwareRejectionReady},
+            {"history_clamp_ready", context.temporalEvidence.historyClampReady},
+            {"taa_history_ready", context.temporalEvidence.taaHistoryReady},
+            {"taa_history_velocity_reprojection_ready",
+             context.temporalEvidence.taaHistoryVelocityReprojectionReady},
+            {"taa_history_disocclusion_rejection_ready",
+             context.temporalEvidence.taaHistoryDisocclusionRejectionReady},
+            {"smooth_surface_motion_gate_passed",
+             context.temporalEvidence.smoothSurfaceMotionGatePassed},
+            {"camera_sweep_gate_passed", context.temporalEvidence.cameraSweepGatePassed},
+            {"temporal_mask_accepted_ratio",
+             context.temporalEvidence.temporalMaskAcceptedRatio},
+            {"temporal_mask_disocclusion_ratio",
+             context.temporalEvidence.temporalMaskDisocclusionRatio},
+            {"temporal_mask_high_motion_ratio",
+             context.temporalEvidence.temporalMaskHighMotionRatio},
+            {"temporal_mask_out_of_bounds_ratio",
+             context.temporalEvidence.temporalMaskOutOfBoundsRatio},
+            {"temporal_mask_readback_latency_frames",
+             context.temporalEvidence.temporalMaskReadbackLatencyFrames},
+            {"taa_history_age_frames", context.temporalEvidence.taaHistoryAgeFrames},
+            {"taa_history_accumulation_alpha",
+             context.temporalEvidence.taaHistoryAccumulationAlpha},
+            {"missing_temporal_contract_count",
+             context.temporalEvidence.missingTemporalContractCount},
             {"evidence", domainEvidence(context.temporal)}
         }},
         {"post", {

@@ -2762,3 +2762,64 @@ Current next work:
   sequence analyzer before any default-beauty promotion.
 - Then choose between actual local probe texture binding in post and a
   resolved local reflection radiance buffer.
+
+### Glossy Surface Stress Packet Harness - 2026-06-05
+
+Implemented:
+
+- `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`
+  - new `-StressSceneFilter` accepts comma-separated `scene:camera_bookmark`
+    entries.
+  - validates targets against `assets/config/showcase_scenes.json`.
+  - records stress targets as packet families such as
+    `stress_rt_showcase_reflection_closeup`.
+  - new `-StressSceneOnly` runs just stress targets without the normal family
+    set.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - forwards `-StressSceneFilter` and `-StressSceneOnly`.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:metal_closeup,glass_water_courtyard:water_closeup" -ViewFilter "beauty,roughness,metallic,reflection_source_weights,reflection_source_authority,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_glossy_stress_only_smoke2_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_sequence_stability.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_glossy_stress_only_smoke2_20260605`.
+- captured views: `21`.
+- stress families: `3`.
+- V2 packet evidence: passed.
+- sequence stability warnings/failures: `0/0`.
+- reflection candidate warnings/failures: `2/0`.
+
+Stress stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `0.00158056` | `0.00158056` | `1.000` |
+| `stress_material_lab_metal_closeup` | `0.00246855` | `0.00246855` | `1.000` |
+| `stress_rt_showcase_reflection_closeup` | `0.00803787` | `0.00798941` | `0.994` |
+
+Stress reflection signal:
+
+| Stress Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `wired_no_delta` | `0.00024963` | `0.03081489` | `0.00000000` | `0.00000000` |
+| `stress_material_lab_metal_closeup` | `wired_no_delta` | `0.00527105` | `0.17212348` | `0.00000000` | `0.00000000` |
+| `stress_rt_showcase_reflection_closeup` | `meaningful_delta` | `0.12203094` | `0.41034071` | `0.02113077` | `0.17418837` |
+
+Current stopping position:
+
+- The V2 stress harness exists and passes on three glossy/material-heavy
+  closeups.
+- It proves motion stability, but also exposes that the current reflection
+  candidate is visually inactive on metal lab and water courtyard closeups.
+- Next work should make local reflection radiance materially active on these
+  stress surfaces, preferably with a resolved local reflection radiance buffer
+  or actual local probe texture binding in post.
+- Do not call the V2 reflection path default-ready.

@@ -20,8 +20,10 @@ param(
     [switch]$SkipStabilityAnalysis,
     [switch]$SkipVisualQualityAnalysis,
     [switch]$VisualQualityFailOnReview,
+    [switch]$StressSceneOnly,
     [string]$FamilyFilter = "",
     [string]$ViewFilter = "",
+    [string]$StressSceneFilter = "",
     [string]$KitchenSeed = "",
     [string]$OfficeSeed = "",
     [string]$GymSeed = "",
@@ -83,6 +85,75 @@ function Split-FilterSet([string]$Filter) {
         }
     }
     return $set
+}
+
+function Get-SafePacketName([string]$Name) {
+    $safe = ($Name.ToLowerInvariant() -replace '[^a-z0-9]+', '_').Trim('_')
+    if ([string]::IsNullOrWhiteSpace($safe)) {
+        return "unnamed"
+    }
+    return $safe
+}
+
+function Get-ShowcaseSceneMap {
+    $path = Join-Path $script:root "assets/config/showcase_scenes.json"
+    $scenes = @{}
+    if (-not (Test-Path $path)) {
+        return $scenes
+    }
+    $doc = Get-Content $path -Raw | ConvertFrom-Json
+    foreach ($scene in @($doc.scenes)) {
+        $sceneId = [string]$scene.id
+        if ([string]::IsNullOrWhiteSpace($sceneId)) {
+            continue
+        }
+        $bookmarks = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($bookmark in @($scene.camera_bookmarks)) {
+            $bookmarkId = [string]$bookmark.id
+            if (-not [string]::IsNullOrWhiteSpace($bookmarkId)) {
+                [void]$bookmarks.Add($bookmarkId)
+            }
+        }
+        $scenes[$sceneId] = $bookmarks
+    }
+    return $scenes
+}
+
+function Parse-StressSceneTargets([string]$Filter) {
+    $targets = New-Object System.Collections.Generic.List[object]
+    if ([string]::IsNullOrWhiteSpace($Filter)) {
+        return $targets
+    }
+
+    $showcaseScenes = Get-ShowcaseSceneMap
+    foreach ($item in ($Filter -split ",")) {
+        $trimmed = $item.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed)) {
+            continue
+        }
+        $parts = @($trimmed -split ":", 3)
+        if ($parts.Count -lt 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+            throw "StressSceneFilter entry '$trimmed' must use 'scene:camera_bookmark'."
+        }
+        $scene = $parts[0].Trim()
+        $bookmark = $parts[1].Trim()
+        if ($showcaseScenes.Count -gt 0) {
+            if (-not $showcaseScenes.ContainsKey($scene)) {
+                throw "StressSceneFilter scene '$scene' is not present in assets/config/showcase_scenes.json."
+            }
+            if (-not $showcaseScenes[$scene].Contains($bookmark)) {
+                throw "StressSceneFilter bookmark '$bookmark' is not present on scene '$scene'."
+            }
+        }
+        $family = "stress_{0}_{1}" -f (Get-SafePacketName $scene), (Get-SafePacketName $bookmark)
+        $targets.Add([pscustomobject]@{
+            Family = $family
+            Scene = $scene
+            CameraBookmark = $bookmark
+            Seed = ""
+        }) | Out-Null
+    }
+    return $targets
 }
 
 $familyFilterSet = Split-FilterSet $FamilyFilter
@@ -335,6 +406,7 @@ function Invoke-PacketCapture([string]$Family,
 }
 
 $families = New-Object System.Collections.Generic.List[object]
+$stressTargets = Parse-StressSceneTargets $StressSceneFilter
 if ($familyFilterSet.Count -gt 0) {
     $knownFamilies = @("gallery", "kitchen", "office", "gym", "concert")
     foreach ($requestedFamily in $familyFilterSet) {
@@ -343,9 +415,10 @@ if ($familyFilterSet.Count -gt 0) {
         }
     }
 }
-$includeGallery = (-not $SkipGallery) -and
+$includeGallery = (-not $StressSceneOnly) -and
+    (-not $SkipGallery) -and
     ($familyFilterSet.Count -eq 0 -or $familyFilterSet.Contains("gallery"))
-$includeModelFamilies = (-not $OnlyGallery)
+$includeModelFamilies = (-not $StressSceneOnly) -and (-not $OnlyGallery)
 if ($familyFilterSet.Count -gt 0) {
     $includeModelFamilies = $includeModelFamilies -and (
         $familyFilterSet.Contains("kitchen") -or
@@ -390,9 +463,12 @@ if ($includeModelFamilies) {
         $resolvedSeeds[$key] = ""
     }
 }
+foreach ($target in $stressTargets) {
+    $families.Add($target) | Out-Null
+}
 
 if ($families.Count -eq 0) {
-    throw "No families selected. Check SkipGallery, OnlyGallery, and FamilyFilter."
+    throw "No families or stress scenes selected. Check SkipGallery, OnlyGallery, FamilyFilter, and StressSceneFilter."
 }
 if ($views.Count -eq 0) {
     throw "No views selected. Check ViewFilter."
@@ -430,6 +506,8 @@ $manifest = [ordered]@{
     fixed_delta_time = $FixedDeltaTime
     family_filter = $FamilyFilter
     view_filter = $ViewFilter
+    stress_scene_filter = $StressSceneFilter
+    requested_stress_scene_count = $stressTargets.Count
     requested_family_count = $families.Count
     captured_view_count = $results.Count
     resolved_seeds = $resolvedSeeds

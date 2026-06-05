@@ -22,6 +22,7 @@ param(
         "FullSceneShaderMaterialUpgradePlan",
         "FullSceneShaderMaterialProviderRequests",
         "FullSceneShaderMaterialFulfillmentBaseline",
+        "FullSceneShaderV2Packet",
         "AAAAssetQuality",
         "AAAReplacementPlan",
         "AAAProviderRequests",
@@ -1115,6 +1116,20 @@ function Invoke-FullSceneShaderMaterialFulfillmentBaseline {
     }
 }
 
+function Invoke-FullSceneShaderV2Packet {
+    $args = @(
+        "-OutputRoot", "build/captures/full_scene_shader_pipeline_v2_facade_packet",
+        "-FamilyFilter", "gallery",
+        "-ViewFilter", "beauty,surface_policy,reflection_owner,shadow_factor,direct_light,ambient_ibl,taa_blend",
+        "-NoBuild",
+        "-SkipSceneAnalyzers"
+    )
+    powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "tools/run_full_scene_shader_pipeline_v2_packet.ps1") @args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Full Scene Shader Pipeline V2 packet evidence failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-AAAReplacementPlan {
     Invoke-SceneAssetBindings
     Invoke-AAAAssetQuality
@@ -1168,6 +1183,7 @@ switch ($Action) {
     "FullSceneShaderMaterialUpgradePlan" { Invoke-FullSceneShaderMaterialUpgradePlan }
     "FullSceneShaderMaterialProviderRequests" { Invoke-FullSceneShaderMaterialProviderRequests }
     "FullSceneShaderMaterialFulfillmentBaseline" { Invoke-FullSceneShaderMaterialFulfillmentBaseline }
+    "FullSceneShaderV2Packet" { Invoke-FullSceneShaderV2Packet }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
     "AAAProviderRequests" { Invoke-AAAProviderRequests }

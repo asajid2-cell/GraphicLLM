@@ -904,3 +904,66 @@ Next recommended implementation:
   debug atlases and the frame-report JSON.
 - After that, start Track B material truth by moving richer material evidence
   into the runtime material model.
+
+## Full Scene Shader Pipeline V2 Packet Harness Slice - 2026-06-05
+
+Purpose:
+
+- Make the runtime facade verifiable through a repeatable packet command,
+  rather than only through static source checks.
+
+Implemented:
+
+- Added `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+- The script wraps `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`
+  instead of duplicating launch/capture logic.
+- Default packet scope is intentionally narrow:
+  - family: `gallery`
+  - views:
+    `beauty`, `surface_policy`, `reflection_owner`, `shadow_factor`,
+    `direct_light`, `ambient_ibl`, `taa_blend`
+- The packet validates every emitted report with:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py --frame-report <report> --strict-frame-report
+```
+
+- The packet writes:
+  - `v2_frame_report_evidence_summary.json`
+  - `v2_frame_report_evidence_summary.md`
+  - `v2_frame_report_checker_stdout.txt`
+- The checker now accepts the real engine report shape where V2 data lives
+  under `frame_contract.full_scene_shader_pipeline_v2`.
+- The checker now verifies the packet runner exists and includes required V2
+  debug views/evidence fields.
+- `tools/FinalArtPipeline.ps1` now exposes:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action FullSceneShaderV2Packet
+```
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+powershell -NoProfile -Command "`$null = [scriptblock]::Create((Get-Content 'tools\run_full_scene_shader_pipeline_v2_packet.ps1' -Raw)); `$null = [scriptblock]::Create((Get-Content 'tools\FinalArtPipeline.ps1' -Raw)); Write-Output 'scripts parse ok'"
+```
+
+Result:
+
+- all passed.
+
+Current caveat:
+
+- The packet was not run against a freshly built executable because the native
+  build timed out in the previous slice.
+- Running the packet before a successful build may validate an older
+  executable that does not contain `FullSceneShaderFrameContext`.
+
+Next recommended implementation:
+
+- Fix or work around the native build timeout enough to produce a fresh
+  executable.
+- Run `FullSceneShaderV2Packet` and admit the generated evidence summary.
+- Then move into Track B material truth.

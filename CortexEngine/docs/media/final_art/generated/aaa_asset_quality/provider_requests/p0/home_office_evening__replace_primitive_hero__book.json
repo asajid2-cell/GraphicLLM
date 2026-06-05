@@ -1,0 +1,42 @@
+{
+  "schema": "cortex.aaa_provider_request.v1",
+  "id": "home_office_evening__replace_primitive_hero__book",
+  "priority": "P0",
+  "source_work_order": "home_office_evening__replace_primitive_hero__book",
+  "scene": "home_office_evening",
+  "role": "book",
+  "kind": "new_or_replacement_asset",
+  "provider_preferences": [
+    "cc0_curated_library",
+    "hunyuan3d_2_1",
+    "trellis_image_large"
+  ],
+  "prompt": "AAA game-ready PBR book asset for home office evening, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+  "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+  "accepted_outputs": [
+    "gltf",
+    "glb"
+  ],
+  "forbidden_outputs": [
+    "whole_scene_mesh",
+    "gaussian_only",
+    "radiance_field_only",
+    "uneditable_blob"
+  ],
+  "asset_contract": {
+    "editable_separated_mesh": true,
+    "complete_pbr_textures": true,
+    "lod_chain_required": true,
+    "collision_proxy_required": true,
+    "preview_required": true,
+    "scale_bounds_required": true,
+    "support_contact_anchors_required": true,
+    "semantic_role": "book"
+  },
+  "admission_gate": {
+    "must_register_in_asset_registry_v2": true,
+    "must_clear_source_work_order": true,
+    "must_improve_aaa_asset_quality_report": true,
+    "must_render_in_scene_packet": true
+  }
+}

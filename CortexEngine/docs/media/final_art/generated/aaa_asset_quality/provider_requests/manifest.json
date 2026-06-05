@@ -1,0 +1,1834 @@
+{
+  "schema": "cortex.aaa_provider_request_manifest.v1",
+  "source_work_orders": "docs/media/final_art/generated/aaa_asset_quality/aaa_asset_replacement_work_orders.json",
+  "request_count": 49,
+  "priority_counts": {
+    "P0": 29,
+    "P1": 20
+  },
+  "requests": [
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__add_missing_required_role__ceiling_light",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__add_missing_required_role__ceiling_light",
+      "scene": "basketball_gym_day",
+      "role": "ceiling_light",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR ceiling light asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "ceiling_light"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__add_missing_required_role__ceiling_light.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__add_missing_required_role__stadium_seat",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__add_missing_required_role__stadium_seat",
+      "scene": "basketball_gym_day",
+      "role": "stadium_seat",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR stadium seat asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "stadium_seat"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__add_missing_required_role__stadium_seat.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__replace_primitive_hero__backboard",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__replace_primitive_hero__backboard",
+      "scene": "basketball_gym_day",
+      "role": "backboard",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR backboard asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "backboard"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__replace_primitive_hero__backboard.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__replace_primitive_hero__ball",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__replace_primitive_hero__ball",
+      "scene": "basketball_gym_day",
+      "role": "ball",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR ball asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "ball"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__replace_primitive_hero__ball.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__replace_primitive_hero__bleacher",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__replace_primitive_hero__bleacher",
+      "scene": "basketball_gym_day",
+      "role": "bleacher",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR bleacher asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "bleacher"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__replace_primitive_hero__bleacher.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__replace_primitive_hero__hoop",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__replace_primitive_hero__hoop",
+      "scene": "basketball_gym_day",
+      "role": "hoop",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR hoop asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "hoop"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__replace_primitive_hero__hoop.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "basketball_gym_day__replace_primitive_hero__scoreboard",
+      "priority": "P0",
+      "source_work_order": "basketball_gym_day__replace_primitive_hero__scoreboard",
+      "scene": "basketball_gym_day",
+      "role": "scoreboard",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR scoreboard asset for basketball gym day, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "scoreboard"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/basketball_gym_day__replace_primitive_hero__scoreboard.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_kitchen_lantern__add_missing_required_role__kitchen_wall",
+      "priority": "P0",
+      "source_work_order": "home_kitchen_lantern__add_missing_required_role__kitchen_wall",
+      "scene": "home_kitchen_lantern",
+      "role": "kitchen_wall",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR kitchen wall asset for home kitchen lantern, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "kitchen_wall"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_kitchen_lantern__add_missing_required_role__kitchen_wall.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_kitchen_lantern__add_missing_required_role__tile_floor",
+      "priority": "P0",
+      "source_work_order": "home_kitchen_lantern__add_missing_required_role__tile_floor",
+      "scene": "home_kitchen_lantern",
+      "role": "tile_floor",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR tile floor asset for home kitchen lantern, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "tile_floor"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_kitchen_lantern__add_missing_required_role__tile_floor.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_kitchen_lantern__replace_primitive_hero__cabinet",
+      "priority": "P0",
+      "source_work_order": "home_kitchen_lantern__replace_primitive_hero__cabinet",
+      "scene": "home_kitchen_lantern",
+      "role": "cabinet",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR cabinet asset for home kitchen lantern, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "cabinet"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_kitchen_lantern__replace_primitive_hero__cabinet.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_kitchen_lantern__replace_primitive_hero__countertop",
+      "priority": "P0",
+      "source_work_order": "home_kitchen_lantern__replace_primitive_hero__countertop",
+      "scene": "home_kitchen_lantern",
+      "role": "countertop",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR countertop asset for home kitchen lantern, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "countertop"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_kitchen_lantern__replace_primitive_hero__countertop.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_office_evening__replace_primitive_hero__book",
+      "priority": "P0",
+      "source_work_order": "home_office_evening__replace_primitive_hero__book",
+      "scene": "home_office_evening",
+      "role": "book",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR book asset for home office evening, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "book"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_office_evening__replace_primitive_hero__book.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_office_evening__replace_primitive_hero__keyboard",
+      "priority": "P0",
+      "source_work_order": "home_office_evening__replace_primitive_hero__keyboard",
+      "scene": "home_office_evening",
+      "role": "keyboard",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR keyboard asset for home office evening, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "keyboard"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_office_evening__replace_primitive_hero__keyboard.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_office_evening__replace_primitive_hero__monitor",
+      "priority": "P0",
+      "source_work_order": "home_office_evening__replace_primitive_hero__monitor",
+      "scene": "home_office_evening",
+      "role": "monitor",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR monitor asset for home office evening, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "monitor"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_office_evening__replace_primitive_hero__monitor.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "home_office_evening__replace_primitive_hero__shelf",
+      "priority": "P0",
+      "source_work_order": "home_office_evening__replace_primitive_hero__shelf",
+      "scene": "home_office_evening",
+      "role": "shelf",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR shelf asset for home office evening, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "shelf"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/home_office_evening__replace_primitive_hero__shelf.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__audience_riser",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__audience_riser",
+      "scene": "neon_streamer_concert",
+      "role": "audience_riser",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR audience riser asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "audience_riser"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__audience_riser.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__ceiling_plane",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__ceiling_plane",
+      "scene": "neon_streamer_concert",
+      "role": "ceiling_plane",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR ceiling plane asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "ceiling_plane"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__ceiling_plane.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__desk",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__desk",
+      "scene": "neon_streamer_concert",
+      "role": "desk",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR desk asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "desk"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__desk.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__overhead_light",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__overhead_light",
+      "scene": "neon_streamer_concert",
+      "role": "overhead_light",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR overhead light asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "overhead_light"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__overhead_light.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__venue_floor",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__venue_floor",
+      "scene": "neon_streamer_concert",
+      "role": "venue_floor",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR venue floor asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "venue_floor"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__venue_floor.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__add_missing_required_role__venue_wall",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__add_missing_required_role__venue_wall",
+      "scene": "neon_streamer_concert",
+      "role": "venue_wall",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "cc0_curated_library",
+        "artist_authored_pbr"
+      ],
+      "prompt": "AAA game-ready PBR venue wall asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "venue_wall"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__add_missing_required_role__venue_wall.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__replace_primitive_hero__hero_screen",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__replace_primitive_hero__hero_screen",
+      "scene": "neon_streamer_concert",
+      "role": "hero_screen",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR hero screen asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "hero_screen"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__replace_primitive_hero__hero_screen.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__replace_primitive_hero__stage",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__replace_primitive_hero__stage",
+      "scene": "neon_streamer_concert",
+      "role": "stage",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR stage asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "stage"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__replace_primitive_hero__stage.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "neon_streamer_concert__replace_primitive_hero__stage_light",
+      "priority": "P0",
+      "source_work_order": "neon_streamer_concert__replace_primitive_hero__stage_light",
+      "scene": "neon_streamer_concert",
+      "role": "stage_light",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "artist_authored_pbr",
+        "hunyuan3d_2_1",
+        "trellis_image_large"
+      ],
+      "prompt": "AAA game-ready PBR stage light asset for neon streamer concert, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "stage_light"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/neon_streamer_concert__replace_primitive_hero__stage_light.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "rt_showcase_gallery__add_missing_required_role__hero_liquid_pair",
+      "priority": "P0",
+      "source_work_order": "rt_showcase_gallery__add_missing_required_role__hero_liquid_pair",
+      "scene": "rt_showcase_gallery",
+      "role": "hero_liquid_pair",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR hero liquid pair asset for rt showcase gallery, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "hero_liquid_pair"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/rt_showcase_gallery__add_missing_required_role__hero_liquid_pair.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "rt_showcase_gallery__add_missing_required_role__plinth",
+      "priority": "P0",
+      "source_work_order": "rt_showcase_gallery__add_missing_required_role__plinth",
+      "scene": "rt_showcase_gallery",
+      "role": "plinth",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR plinth asset for rt showcase gallery, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "plinth"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/rt_showcase_gallery__add_missing_required_role__plinth.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "rt_showcase_gallery__add_missing_required_role__reflection_card",
+      "priority": "P0",
+      "source_work_order": "rt_showcase_gallery__add_missing_required_role__reflection_card",
+      "scene": "rt_showcase_gallery",
+      "role": "reflection_card",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR reflection card asset for rt showcase gallery, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "reflection_card"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/rt_showcase_gallery__add_missing_required_role__reflection_card.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "rt_showcase_gallery__add_missing_required_role__spill_contact",
+      "priority": "P0",
+      "source_work_order": "rt_showcase_gallery__add_missing_required_role__spill_contact",
+      "scene": "rt_showcase_gallery",
+      "role": "spill_contact",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR spill contact asset for rt showcase gallery, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "spill_contact"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/rt_showcase_gallery__add_missing_required_role__spill_contact.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "rt_showcase_gallery__add_missing_required_role__vessel_rim",
+      "priority": "P0",
+      "source_work_order": "rt_showcase_gallery__add_missing_required_role__vessel_rim",
+      "scene": "rt_showcase_gallery",
+      "role": "vessel_rim",
+      "kind": "new_or_replacement_asset",
+      "provider_preferences": [
+        "hunyuan3d_2_1",
+        "trellis_image_large",
+        "cc0_curated_library"
+      ],
+      "prompt": "AAA game-ready PBR vessel rim asset for rt showcase gallery, separated editable mesh, correct scale, clean silhouette, complete material maps, LOD0/LOD1/LOD2 and collision proxy",
+      "negative_prompt": "low detail, melted geometry, fused room, single scene blob, wrong scale, text labels, watermark, no material separation, no collision proxy",
+      "accepted_outputs": [
+        "gltf",
+        "glb"
+      ],
+      "forbidden_outputs": [
+        "whole_scene_mesh",
+        "gaussian_only",
+        "radiance_field_only",
+        "uneditable_blob"
+      ],
+      "asset_contract": {
+        "editable_separated_mesh": true,
+        "complete_pbr_textures": true,
+        "lod_chain_required": true,
+        "collision_proxy_required": true,
+        "preview_required": true,
+        "scale_bounds_required": true,
+        "support_contact_anchors_required": true,
+        "semantic_role": "vessel_rim"
+      },
+      "admission_gate": {
+        "must_register_in_asset_registry_v2": true,
+        "must_clear_source_work_order": true,
+        "must_improve_aaa_asset_quality_report": true,
+        "must_render_in_scene_packet": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/rt_showcase_gallery__add_missing_required_role__vessel_rim.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__bench",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__bench",
+      "kind": "upgrade_existing_asset",
+      "asset": "bench",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bench/bench.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "basketball_gym_day"
+      ],
+      "roles": [
+        "sideline_equipment_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__bench.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__bookcaseopen",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__bookcaseopen",
+      "kind": "upgrade_existing_asset",
+      "asset": "bookcaseopen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseOpen/bookcaseOpen.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening"
+      ],
+      "roles": [
+        "office_wall_system_mesh",
+        "shelf_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__bookcaseopen.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__books",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__books",
+      "kind": "upgrade_existing_asset",
+      "asset": "books",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "roles": [
+        "book",
+        "book_mesh",
+        "countertop_prop"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__books.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__chair",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__chair",
+      "kind": "upgrade_existing_asset",
+      "asset": "chair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chair/chair.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "basketball_gym_day",
+        "home_kitchen_lantern",
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "auditorium_seat",
+        "chair",
+        "stadium_seat_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__chair.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__chairdesk",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__chairdesk",
+      "kind": "upgrade_existing_asset",
+      "asset": "chairdesk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening"
+      ],
+      "roles": [
+        "chair"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__chairdesk.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__chairmoderncushion",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__chairmoderncushion",
+      "kind": "upgrade_existing_asset",
+      "asset": "chairmoderncushion",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairModernCushion/chairModernCushion.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "courtside_chair_mesh",
+        "foreground_audience_chair_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__chairmoderncushion.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__computerkeyboard",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__computerkeyboard",
+      "kind": "upgrade_existing_asset",
+      "asset": "computerkeyboard",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerKeyboard/computerKeyboard.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening"
+      ],
+      "roles": [
+        "keyboard",
+        "keyboard_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__computerkeyboard.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__computerscreen",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__computerscreen",
+      "kind": "upgrade_existing_asset",
+      "asset": "computerscreen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerScreen/computerScreen.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening"
+      ],
+      "roles": [
+        "monitor"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__computerscreen.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__desk",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__desk",
+      "kind": "upgrade_existing_asset",
+      "asset": "desk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening"
+      ],
+      "roles": [
+        "desk"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__desk.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__hoodmodern",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__hoodmodern",
+      "kind": "upgrade_existing_asset",
+      "asset": "hoodmodern",
+      "runtime_asset": "assets/models/kenney_furniture_kit/hoodModern/hoodModern.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern"
+      ],
+      "roles": [
+        "range_hood"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__hoodmodern.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__kitchencabinetupper",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__kitchencabinetupper",
+      "kind": "upgrade_existing_asset",
+      "asset": "kitchencabinetupper",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpper/kitchenCabinetUpper.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern"
+      ],
+      "roles": [
+        "upper_cabinet_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__kitchencabinetupper.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__kitchencabinetupperdouble",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__kitchencabinetupperdouble",
+      "kind": "upgrade_existing_asset",
+      "asset": "kitchencabinetupperdouble",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpperDouble/kitchenCabinetUpperDouble.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern"
+      ],
+      "roles": [
+        "upper_cabinet_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__kitchencabinetupperdouble.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__lamproundtable",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__lamproundtable",
+      "kind": "upgrade_existing_asset",
+      "asset": "lamproundtable",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundTable/lampRoundTable.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_office_evening",
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "stage_surface_prop_mesh",
+        "task_lamp"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__lamproundtable.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__lampwall",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__lampwall",
+      "kind": "upgrade_existing_asset",
+      "asset": "lampwall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampWall/lampWall.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "roles": [
+        "lamp_mesh",
+        "office_wall_fixture_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__lampwall.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__loungedesignchair",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__loungedesignchair",
+      "kind": "upgrade_existing_asset",
+      "asset": "loungedesignchair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeDesignChair/loungeDesignChair.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "roles": [
+        "chair_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__loungedesignchair.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__paneling",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__paneling",
+      "kind": "upgrade_existing_asset",
+      "asset": "paneling",
+      "runtime_asset": "assets/models/kenney_furniture_kit/paneling/paneling.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "venue_silhouette_prop_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__paneling.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__rugrectangle",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__rugrectangle",
+      "kind": "upgrade_existing_asset",
+      "asset": "rugrectangle",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRectangle/rugRectangle.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "roles": [
+        "floor_mat",
+        "floor_mat_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__rugrectangle.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__speaker",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__speaker",
+      "kind": "upgrade_existing_asset",
+      "asset": "speaker",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speaker/speaker.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "sideline_equipment_mesh",
+        "speaker_mesh",
+        "speaker_stack_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__speaker.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__speakersmall",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__speakersmall",
+      "kind": "upgrade_existing_asset",
+      "asset": "speakersmall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speakerSmall/speakerSmall.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "neon_streamer_concert"
+      ],
+      "roles": [
+        "stage_surface_prop_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__speakersmall.json"
+    },
+    {
+      "schema": "cortex.aaa_provider_request.v1",
+      "id": "registry__upgrade__tableround",
+      "priority": "P1",
+      "source_work_order": "registry__upgrade__tableround",
+      "kind": "upgrade_existing_asset",
+      "asset": "tableround",
+      "runtime_asset": "assets/models/kenney_furniture_kit/tableRound/tableRound.gltf",
+      "source_class": "cc0_curated_library",
+      "scenes": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "roles": [
+        "table_mesh"
+      ],
+      "upgrade_contract": {
+        "complete_pbr_textures": "author or acquire texture set and register paths",
+        "lod_chain": "generate/register LOD0 LOD1 LOD2",
+        "collision_proxy": "generate/register simplified collision mesh",
+        "preview": "render and register preview image",
+        "provenance": "record license/provider/source metadata"
+      },
+      "admission_gate": {
+        "asset_registry_v2_readiness_aaa_ready": true,
+        "must_improve_aaa_asset_quality_report": true
+      },
+      "request_path": "docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/registry__upgrade__tableround.json"
+    }
+  ]
+}

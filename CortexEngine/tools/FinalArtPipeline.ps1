@@ -19,6 +19,7 @@ param(
         "AssetRegistryV2",
         "AAAAssetQuality",
         "AAAReplacementPlan",
+        "AAAProviderRequests",
         "PretrainedAll",
         "All"
     )]
@@ -1074,6 +1075,14 @@ function Invoke-AAAReplacementPlan {
     }
 }
 
+function Invoke-AAAProviderRequests {
+    Invoke-AAAReplacementPlan
+    python (Join-Path $Root "tools/export_aaa_provider_requests.py")
+    if ($LASTEXITCODE -ne 0) {
+        throw "AAA provider request export failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-All {
     Invoke-KernelContracts
     Invoke-AssetNormalization
@@ -1107,6 +1116,7 @@ switch ($Action) {
     "AssetRegistryV2" { Invoke-AssetRegistryV2 }
     "AAAAssetQuality" { Invoke-AAAAssetQuality }
     "AAAReplacementPlan" { Invoke-AAAReplacementPlan }
+    "AAAProviderRequests" { Invoke-AAAProviderRequests }
     "PretrainedAll" { Invoke-PretrainedAll }
     "All" { Invoke-All }
 }

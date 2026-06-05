@@ -2661,3 +2661,38 @@ Current interpretation:
 - This is still candidate/debug output only. Do not promote to default beauty
   until motion/stability packets compare glossy surfaces under camera sweeps
   and the user accepts the visual direction.
+
+### Camera-Sweep Motion Proof - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 120 -CaptureFrame 60 -CaptureSequenceCount 3 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_camera_sweep_packet_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_post_owned_local_probe_source_camera_sweep_packet_20260605`.
+- source-signal families: `5/5`.
+- candidate-delta families: `5/5`.
+- warnings: `0`.
+- failures: `0`.
+
+Camera-sweep candidate signal:
+
+| Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| gallery | `meaningful_delta` | `0.05388108` | `0.32298611` | `0.01119955` | `0.08748481` |
+| kitchen | `meaningful_delta` | `0.00071762` | `0.17505534` | `0.00205583` | `0.08955838` |
+| office | `meaningful_delta` | `0.00022964` | `0.05770833` | `0.00061088` | `0.01438151` |
+| gym | `meaningful_delta` | `0.00028623` | `0.09729167` | `0.00063635` | `0.01116862` |
+| concert | `meaningful_delta` | `0.00088398` | `0.16769206` | `0.00243640` | `0.12174154` |
+
+Interpretation:
+
+- The owned local probe candidate remains measurable under camera-sweep packet
+  motion.
+- This is stronger than the prior mouse-jitter packet, but still not default
+  promotion. The next gate should compare actual beauty/candidate stability on
+  explicit glossy/metal/glass close-up stress surfaces.

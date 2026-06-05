@@ -138,19 +138,18 @@ foreach ($result in @($manifest.results)) {
     }
 }
 
-$summary = [ordered]@{
-    schema = "cortex.full_scene_shader_pipeline_v2.packet_evidence_summary.v1"
-    output_root = $outRootAbs
-    manifest = $manifestPath
-    family_filter = $FamilyFilter
-    view_filter = $ViewFilter
-    captured_view_count = @($manifest.results).Count
-    evidence_row_count = $rows.Count
-    sections = $sections
-    common_evidence_fields = $commonEvidence
-    failures = @($failures)
-    rows = @($rows)
-}
+$summary = [ordered]@{}
+$summary.schema = "cortex.full_scene_shader_pipeline_v2.packet_evidence_summary.v1"
+$summary.output_root = [string]$outRootAbs
+$summary.manifest = [string]$manifestPath
+$summary.family_filter = [string]$FamilyFilter
+$summary.view_filter = [string]$ViewFilter
+$summary.captured_view_count = [int]@($manifest.results).Count
+$summary.evidence_row_count = [int]$rows.Count
+$summary.sections = @($sections)
+$summary.common_evidence_fields = @($commonEvidence)
+$summary.failures = @($failures.ToArray())
+$summary.rows = @($rows.ToArray())
 
 $summaryJsonPath = Join-Path $outRootAbs "v2_frame_report_evidence_summary.json"
 $summaryMdPath = Join-Path $outRootAbs "v2_frame_report_evidence_summary.md"
@@ -169,7 +168,7 @@ $md.Add(("- failures: {0}" -f $failures.Count)) | Out-Null
 $md.Add("") | Out-Null
 $md.Add("| Family | View | Section | Enabled | Ready | Promotion | Owner | Fallback |") | Out-Null
 $md.Add("|---|---|---|---:|---:|---|---|---|") | Out-Null
-foreach ($row in @($rows)) {
+foreach ($row in $rows.ToArray()) {
     $md.Add(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |" -f `
         $row.family,
         $row.view,

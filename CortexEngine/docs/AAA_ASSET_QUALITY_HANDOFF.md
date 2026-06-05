@@ -967,3 +967,64 @@ Next recommended implementation:
   executable.
 - Run `FullSceneShaderV2Packet` and admit the generated evidence summary.
 - Then move into Track B material truth.
+
+## Full Scene Shader Pipeline V2 Fresh Build And Packet Admission - 2026-06-05
+
+Build diagnosis:
+
+- Direct `cmake --build build --config Release --target CortexEngine` failed
+  because the current shell had empty `INCLUDE` and `LIB`; MSVC could not find
+  the standard library header `string`.
+- `build.ps1` imports the Visual Studio developer environment via
+  `VsDevCmd.bat`, so that is the correct build entry point.
+
+Fresh build:
+
+```powershell
+.\build.ps1 -Config Release
+```
+
+Result:
+
+- passed.
+- build time: about `112.4s`.
+- executable: `build\bin\CortexEngine.exe`.
+- warnings remain in existing code/vendor paths; no V2 facade compile failure.
+
+Runtime V2 packet:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_facade_packet_20260605
+```
+
+Result:
+
+- passed.
+- manifest:
+  `build/captures/full_scene_shader_pipeline_v2_facade_packet_20260605/manifest.json`
+- summary:
+  `build/captures/full_scene_shader_pipeline_v2_facade_packet_20260605/v2_frame_report_evidence_summary.json`
+- captured views: `7`
+- evidence rows: `70`
+- failures: `0`
+
+Observed V2 packet state:
+
+- `gbuffer`, `lighting`, `reflections`, `shadows`, `temporal`, and `post`
+  reported `instrumented` evidence with `domain_ready=true` for the gallery
+  packet views.
+- `material` remains `instrumented` but not ready because
+  `FullSceneMaterialModel` is not promoted.
+- `render_graph` remains `instrumented` but not ready because explicit
+  producer/debug ownership is not promoted.
+- `asset_evidence` and `packet_gate` remain `planned`.
+- beauty output remains intentionally `v1_fallback`.
+
+Next recommended implementation:
+
+- Start Track B material truth:
+  - move richer material evidence into runtime `MaterialModel`.
+  - replace the current material-domain `domain_ready=false` with actual
+    `FullSceneMaterialModel` readiness once the runtime model owns family,
+    texture evidence, feature bits, reflection policy, temporal policy, and
+    post sensitivity.

@@ -579,8 +579,13 @@ Runtime packet harness baseline:
   - `v2_frame_report_checker_stdout.txt`
 - `tools/FinalArtPipeline.ps1` exposes the command as
   `-Action FullSceneShaderV2Packet`.
-- This harness is ready for runtime packet execution once a fresh native build
-  includes the facade changes.
+- Fresh runtime evidence:
+  - `.\build.ps1 -Config Release` passed and produced
+    `build/bin/CortexEngine.exe`.
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1` passed on the gallery
+    packet with `7` captured views, `70` evidence rows, and `0` failures.
+  - Runtime summary:
+    `build/captures/full_scene_shader_pipeline_v2_facade_packet_20260605/v2_frame_report_evidence_summary.json`.
 
 Material runtime-policy bridge baseline:
 

@@ -1150,4 +1150,116 @@ inline FullSceneShaderFrameContext BuildFullSceneShaderFrameContext(const FrameC
     return context;
 }
 
+struct FullSceneShaderPipelineV3DomainEvidence {
+    std::string id;
+    bool enabled = false;
+    bool ready = false;
+    std::string producer = "planned";
+    std::string outputResource = "none";
+    std::string debugView = "none";
+    std::string packetGate = "pending";
+    std::string promotionState = "planned";
+    std::string failureReason = "V3 domain is planned but not implemented";
+};
+
+struct FullSceneShaderPipelineV3FrameContext {
+    std::string schema = "cortex.full_scene_shader_pipeline_v3.runtime_report.v1";
+    std::string status = "planned_not_promoted";
+    std::string beautyOutput = "v2_or_legacy_beauty";
+    bool defaultBeautyAffects = false;
+    bool runtimePlaceholdersReady = true;
+    bool contractGrounded = true;
+    bool packetGateReady = false;
+    std::string contractPath = "assets/final_art/full_scene_shader_pipeline_v3_contract.json";
+    std::string planPath = "docs/FULL_SCENE_SHADER_PIPELINE_V3.md";
+    std::vector<std::string> requiredSceneFamilies = {
+        "gallery",
+        "kitchen",
+        "office",
+        "gym",
+        "concert",
+        "red_room",
+        "stadium",
+    };
+    std::vector<std::string> requiredOutputs = {
+        "material_attributes",
+        "direct_lighting",
+        "indirect_lighting",
+        "shadow_visibility",
+        "reflection_radiance",
+        "reflection_confidence",
+        "scene_local_environment",
+        "hdr_scene_color",
+        "ldr_cinematic_output",
+    };
+    std::vector<FullSceneShaderPipelineV3DomainEvidence> domains;
+};
+
+inline FullSceneShaderPipelineV3DomainEvidence MakeFullSceneShaderPipelineV3DomainEvidence(
+    std::string id,
+    std::string producer,
+    std::string outputResource,
+    std::string debugView,
+    std::string failureReason) {
+    FullSceneShaderPipelineV3DomainEvidence evidence;
+    evidence.id = std::move(id);
+    evidence.producer = std::move(producer);
+    evidence.outputResource = std::move(outputResource);
+    evidence.debugView = std::move(debugView);
+    evidence.failureReason = std::move(failureReason);
+    return evidence;
+}
+
+inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3FrameContext(
+    const FrameContract& contract) {
+    FullSceneShaderPipelineV3FrameContext context;
+    context.defaultBeautyAffects = false;
+    context.beautyOutput = contract.sceneVisual.active ? "full_scene_shader_pipeline_v2" : "legacy_beauty";
+    context.domains = {
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "render_graph",
+            "FullSceneShaderPipelineV3",
+            "v3_resource_registry",
+            "v3_resource_ownership",
+            "V3 render-graph resources are planned but not allocated"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "material",
+            "FullSceneMaterialResolveV3",
+            "material_attributes",
+            "material_missing_channel_mask",
+            "FullSceneMaterialResolveV3 is planned but not implemented"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "lighting",
+            "FullSceneLightingV3",
+            "direct_lighting",
+            "shadow_visibility",
+            "FullSceneLightingV3 split outputs are planned but not implemented"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "reflection",
+            "FullSceneReflectionV3",
+            "reflection_radiance",
+            "reflection_confidence",
+            "FullSceneReflectionV3 resolver is planned but not implemented"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "environment",
+            "SceneLocalEnvironmentV3",
+            "scene_local_environment",
+            "environment_mode",
+            "SceneLocalEnvironmentV3 is planned but not implemented"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "cinematic_post",
+            "CinematicPostV3",
+            "ldr_cinematic_output",
+            "exposure_meter",
+            "CinematicPostV3 is planned but not implemented"),
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "validation",
+            "FullSceneShaderPipelineV3PacketGate",
+            "v3_signal.json",
+            "contact_sheet.png",
+            "V3 packet gate is planned but not implemented"),
+    };
+    return context;
+}
+
 } // namespace Cortex::Graphics

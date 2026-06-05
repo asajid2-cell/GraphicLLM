@@ -362,21 +362,30 @@ Evidence:
 
 ### L002 - V3 Plan Validator Exists
 
-Status: pending.
+Status: complete.
 
-Required evidence:
+Evidence:
 
 - `tools/validate_full_scene_shader_pipeline_v3_plan.py`.
-- validator passes in CI/local shell.
+- validator passes in local shell.
+- validator checks the plan, contract JSON, and runtime placeholder source.
 
 ### L003 - V3 Frame Contract Placeholders
 
-Status: pending.
+Status: complete.
 
-Required evidence:
+Evidence:
 
 - runtime frame report has `full_scene_shader_pipeline_v3`.
 - all domains default to not ready until implemented.
+- `default_beauty_affects=false`.
+- `status=planned_not_promoted`.
+- smoke packet:
+  `build/captures/v3_runtime_placeholder_smoke2_20260605`.
+- extracted frame report:
+  `full_scene_shader_pipeline_v3.schema=cortex.full_scene_shader_pipeline_v3.runtime_report.v1`.
+- extracted frame report:
+  `required_outputs=9`, `domains=7`, `packet_gate_ready=false`.
 
 ### L004 - Material Resolve V3
 
@@ -421,8 +430,11 @@ Required evidence:
 
 ## Current Stopping Position
 
-- V3 is planned and contract-grounded.
+- V3 is planned, contract-grounded, and frame-report visible as not promoted.
 - V2 remains the active renderer path.
 - Default beauty remains unchanged.
-- Next safe implementation slice is P0: add the V3 plan validator and runtime
-  frame-report placeholders before touching visual output.
+- Latest V3 placeholder packet:
+  `build/captures/v3_runtime_placeholder_smoke2_20260605`.
+- Next safe implementation slice is a V3 packet harness skeleton for the
+  required debug views and placeholder `v3_signal.json`/`v3_stability.json`
+  artifacts.

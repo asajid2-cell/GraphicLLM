@@ -3105,3 +3105,45 @@ Current stopping position:
 - Next work should be either interactive user review through the checkbox or
   the first render-graph/local-radiance-buffer step that moves this beyond a
   post-only approximation.
+
+### Local Reflection Radiance Buffer Kernel - 2026-06-05
+
+Implemented:
+
+- `assets/shaders/LocalReflectionRadiance.hlsl`
+  - compute shader for the first render-graph-ready local reflection radiance
+    buffer.
+  - input SRVs:
+    depth `t0`, normal/roughness `t1`, emissive/metallic `t2`,
+    material ext1 `t3`, material ext2 `t4`, scene color `t5`, env specular `t6`.
+  - output UAV:
+    `g_OutputRadiance` `u0`, with `rgb = resolved local reflection radiance`
+    and `a = confidence/admission weight`.
+  - uses `SurfaceClassification.hlsli` so material-class ownership matches the
+    post-process candidate.
+  - reconstructs world position/reflection direction from `FrameConstants`.
+  - resolves local architectural reflection structure, floor/horizon bounce,
+    key-light strips, material-class boosts, local probe confidence, and
+    authorized IBL contribution.
+  - rejects sky/background and zero-confidence pixels.
+  - soft-limits extreme radiance using the RT reflection firefly clamp.
+
+Validation:
+
+```powershell
+build\vcpkg_installed\x64-windows\tools\directx-dxc\dxc.exe -T cs_6_3 -E CSMain -O3 -Qstrip_debug -I assets\shaders -Fo build\bin\assets\shaders\LocalReflectionRadiance.dxil assets\shaders\LocalReflectionRadiance.hlsl
+```
+
+Result:
+
+- DXC compile passed.
+- Generated:
+  `build/bin/assets/shaders/LocalReflectionRadiance.dxil`.
+
+Current stopping position:
+
+- The local reflection radiance producer shader exists and compiles.
+- It is not yet bound into default rendering or the V2 review toggle.
+- Next pass should add the C++ resource/descriptor/render-graph dispatch
+  plumbing and feed the produced radiance texture into the V2 post resolver
+  behind the existing review toggle.

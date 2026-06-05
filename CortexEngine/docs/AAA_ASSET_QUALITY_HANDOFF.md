@@ -165,13 +165,72 @@ Why this matters:
    - validation packets should fail if hero pixels are dominated by blockout
      sources.
 
+## 2026-06-05 AAA Replacement Planner
+
+Implemented:
+
+- `tools/plan_aaa_asset_replacements.py`
+  - reads the registry-backed AAA asset-quality report.
+  - emits concrete replacement and enrichment work orders.
+- `tools/FinalArtPipeline.ps1`
+  - adds action `AAAReplacementPlan`.
+  - action runs:
+    1. `AssetRegistryV2`
+    2. `AAAAssetQuality`
+    3. `plan_aaa_asset_replacements.py`
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAReplacementPlan
+python -m py_compile tools\build_asset_registry_v2.py tools\analyze_aaa_asset_quality.py tools\plan_aaa_asset_replacements.py
+```
+
+Generated work-order artifacts:
+
+- JSON:
+  `docs/media/final_art/generated/aaa_asset_quality/aaa_asset_replacement_work_orders.json`
+- Markdown:
+  `docs/media/final_art/generated/aaa_asset_quality/aaa_asset_replacement_work_orders.md`
+
+Work-order baseline:
+
+- Status: `READY`.
+- Work orders: `49`.
+- P0 orders: `29`.
+  - primitive hero-role replacements.
+  - missing required-role additions.
+- P1 orders: `20`.
+  - existing registry asset upgrades for PBR textures, LOD chains, collision
+    proxies, previews, and provenance/readiness.
+
+High-priority examples:
+
+- `basketball_gym_day__replace_primitive_hero__hoop`
+- `basketball_gym_day__replace_primitive_hero__backboard`
+- `home_kitchen_lantern__replace_primitive_hero__cabinet`
+- `home_kitchen_lantern__replace_primitive_hero__countertop`
+- `home_office_evening__replace_primitive_hero__monitor`
+- `neon_streamer_concert__replace_primitive_hero__stage`
+- `rt_showcase_gallery__add_missing_required_role__hero_liquid_pair`
+
+Current interpretation:
+
+- We now have an actionable queue instead of a vague "make it better" target.
+- The next implementation slice should choose a P0-heavy scene family and
+  replace primitive hero roles through registry-backed assets, then rerun:
+  `AAAReplacementPlan`, renderer V1 packet, and visual review sheet.
+
 ## Resume Commands
 
 ```powershell
 git -c submodule.recurse=false status --short --ignore-submodules=all
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AssetRegistryV2
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAAssetQuality
+python tools\plan_aaa_asset_replacements.py
 python tools\analyze_aaa_asset_quality.py --renderer-manifest build\captures\scene_local_cinematic_renderer_v1_final_gate_20260605\warm_micro_jitter_full_seq8\manifest.json
 Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_quality_report.md
+Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_replacement_work_orders.md
 ```
 
 ## Git Policy

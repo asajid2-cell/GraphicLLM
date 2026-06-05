@@ -2097,3 +2097,70 @@ Current interpretation:
   - add packet delta metrics for direct-light shadow comparison.
   - or move to reflection-source resolver shadow-output if lighting comparison
     is enough for this slice.
+
+## Full Scene Shader V2 Reflection Resolver Debug - 2026-06-05
+
+Implemented:
+
+- Added post-composite reflection resolver debug surfaces in
+  `assets/shaders/PostProcess.hlsl`.
+  - `reflection_source_weights`, debug view `56`:
+    - R = SSR post-composite weight.
+    - G = RT post-composite weight.
+    - B = IBL/prelit reflection potential.
+  - `reflection_stability_policy`, debug view `57`:
+    - R = material reflectance.
+    - G = gloss.
+    - B = scene/material reflection stability scale.
+- Updated `src/Graphics/Renderer_DebugSettings.cpp`.
+  - max debug mode is now `57`.
+  - labels added:
+    - `PostReflectionSourceWeights`.
+    - `PostReflectionStabilityPolicy`.
+- Updated packet surfaces:
+  - `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`.
+  - `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+- Updated V2 frame-report contract/checker:
+  - `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`.
+  - `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && cmake --build build --config Release --target CortexEngine --parallel 8 && cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl && cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Build note:
+
+- The first build attempt failed because the plain shell did not have the VS
+  C++ include environment loaded.
+- Build passed after loading:
+  `C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat`.
+- Full asset sync remains skipped for this pass; edited shaders were copied
+  explicitly into `build/bin/assets/shaders`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605`.
+- captured views: `17`.
+- evidence rows: `170`.
+- failures: `0`.
+- captured reflection resolver views:
+  - `reflection_owner`, debug view `46`.
+  - `reflection_source_weights`, debug view `56`.
+  - `reflection_stability_policy`, debug view `57`.
+
+Current interpretation:
+
+- Smooth/metallic reflection behavior now has packet-visible source weights
+  and material/stability policy evidence.
+- V2 beauty remains `v1_fallback`.
+- Next implementation should use these surfaces for numeric deltas or an
+  opt-in reflection resolver candidate path instead of guessing from beauty
+  captures alone.

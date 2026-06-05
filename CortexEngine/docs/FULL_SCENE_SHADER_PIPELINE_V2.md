@@ -1965,3 +1965,81 @@ Current interpretation:
   shadow-output candidate path with per-view delta metrics, or move to the
   reflection source resolver shadow-output slice if lighting comparison is
   sufficient for now.
+
+## Full Scene Shader Pipeline V2 Reflection Resolver Debug Slice - 2026-06-05
+
+Purpose:
+
+- Continue `FSSP-V2-005B` by making post-composite reflection source decisions
+  numeric and packet-visible.
+- Expose whether smooth/metallic reflection instability is coming from SSR
+  weight, RT weight, IBL/prelit potential, material reflectance, gloss, or the
+  scene/material stability scale.
+- Keep V1 beauty as fallback while adding resolver debug surfaces.
+
+Implemented:
+
+- `PostProcess.hlsl`
+  - added `iblReflectionPotential` beside the existing SSR/RT resolver.
+  - debug mode `56` outputs reflection source weights:
+    - R = SSR post-composite weight.
+    - G = RT post-composite weight.
+    - B = IBL/prelit reflection potential.
+  - debug mode `57` outputs reflection stability policy:
+    - R = material reflectance.
+    - G = gloss.
+    - B = scene/material reflection stability scale.
+- `Renderer_DebugSettings.cpp`
+  - expands the debug view range to `57`.
+  - labels:
+    - `PostReflectionSourceWeights`.
+    - `PostReflectionStabilityPolicy`.
+- Packet runners now expose:
+  - `reflection_source_weights`.
+  - `reflection_stability_policy`.
+- The V2 frame-report contract and checker require the new resolver views.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set CORTEX_SKIP_ASSET_SYNC=1 && cmake --build build --config Release --target CortexEngine --parallel 8 && cmake -E copy_if_different assets\shaders\PostProcess.hlsl build\bin\assets\shaders\PostProcess.hlsl && cmake -E copy_if_different assets\shaders\DeferredLighting.hlsl build\bin\assets\shaders\DeferredLighting.hlsl'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed with `CORTEX_SKIP_ASSET_SYNC=1`
+  after loading Visual Studio 18 `VsDevCmd.bat`.
+- Updated `PostProcess.hlsl` and `DeferredLighting.hlsl` were copied into
+  `build/bin/assets/shaders`.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605`.
+- captured views: `17`.
+- evidence rows: `170`.
+- failures: `0`.
+- reflection resolver views:
+  - `reflection_owner`, debug view `46`.
+  - `reflection_source_weights`, debug view `56`.
+  - `reflection_stability_policy`, debug view `57`.
+
+Current interpretation:
+
+- V2 reflections now have a packet-visible source-weight and stability-policy
+  comparison surface at the post resolver.
+- This does not promote V2 beauty. It gives the next pass enough evidence to
+  make candidate resolver changes without guessing whether SSR, RT, IBL, or
+  material stability policy owns the artifact.
+- Next implementation should add per-view numeric delta metrics or start an
+  opt-in reflection resolver candidate path behind a debug/profile flag.

@@ -1671,3 +1671,49 @@ Current state:
 - V2 beauty is still intentionally `v1_fallback`.
 - Next architecture slice should start scene-local semantic light-rig ownership
   and then local reflection/probe ownership.
+
+## Full Scene Shader V2 Semantic Light Rig Evidence - 2026-06-05
+
+Implemented:
+
+- Added `FullSceneLightingRigEvidence` as the V2 lighting-domain readiness
+  source.
+- V2 lighting now reports semantic rig/source readiness, scene-local
+  environment readiness, semantic light roles, policy-id consistency, lighting
+  balance policy, local fixture contract readiness, shadowed-light ownership,
+  exposure-policy readiness, intensity bounds, and missing contract count.
+- The V2 checker requires the lighting evidence builder and the new JSON fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_semantic_light_rig_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_semantic_light_rig_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- gallery V2 lighting:
+  - `missing_lighting_contract_count=0`.
+  - `semantic_fixture_light_count=4`.
+  - `stage_fixture_light_count=2`.
+  - `rect_area_light_count=2`.
+  - `shadow_casting_light_count=1`.
+  - `lighting.domain_ready=true`.
+
+Current state:
+
+- `FSSP-V2-004A` is packet-proved for the gallery target.
+- V2 lighting is now contract-owned enough to begin the actual shader-side
+  semantic lighting pass work.
+- Next architecture slice should build local reflection/probe ownership and RT
+  miss fallback evidence.

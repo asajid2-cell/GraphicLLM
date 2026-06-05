@@ -568,6 +568,53 @@ def validate_runtime_material_policy_surface() -> list[str]:
     return errors
 
 
+def validate_runtime_lighting_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        FULL_SCENE_SHADER_FRAME_CONTEXT_PATH,
+        FRAME_CONTRACT_JSON_SOURCE_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing runtime lighting evidence source: {path}")
+    if errors:
+        return errors
+
+    facade_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    json_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
+
+    for token in [
+        "struct FullSceneLightingRigEvidence",
+        "BuildFullSceneLightingRigEvidence",
+        "semanticLightRolesAvailable",
+        "rigPolicyIdsConsistent",
+        "lightingBalancePolicyReady",
+        "localFixtureContractReady",
+        "shadowedLightContractReady",
+        "exposurePolicyReady",
+        "missingLightingContractCount",
+        "Scene-local semantic light-rig ownership is ready",
+    ]:
+        require_source_token(errors, facade_source, token, "FullScene lighting rig evidence")
+
+    for token in [
+        '"semantic_light_roles_available"',
+        '"rig_policy_ids_consistent"',
+        '"lighting_balance_policy_ready"',
+        '"local_fixture_contract_ready"',
+        '"shadowed_light_contract_ready"',
+        '"exposure_policy_ready"',
+        '"semantic_fixture_light_count"',
+        '"stage_fixture_light_count"',
+        '"shadow_casting_light_count"',
+        '"missing_lighting_contract_count"',
+        '"rig_source"',
+    ]:
+        require_source_token(errors, json_source, token, "FullScene lighting frame-report JSON")
+
+    return errors
+
+
 def validate_runtime_temporal_surface() -> list[str]:
     errors: list[str] = []
     required_paths = [
@@ -863,6 +910,7 @@ def main() -> int:
     errors = validate_contracts()
     errors.extend(validate_runtime_source_surface())
     errors.extend(validate_runtime_material_policy_surface())
+    errors.extend(validate_runtime_lighting_surface())
     errors.extend(validate_runtime_temporal_surface())
     errors.extend(validate_runtime_reflection_surface())
     errors.extend(validate_runtime_scene_local_environment_surface())

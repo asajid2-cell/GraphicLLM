@@ -41,11 +41,14 @@ Implemented baseline:
   and GBuffer policy-channel backing.
 - Material-family, reflection-policy, temporal-policy, and post-sensitivity
   policy columns are per-pixel debug-visible from the material table.
+- Scene-local semantic light-rig ownership is packet-proved for the gallery
+  packet through `FullSceneLightingRigEvidence`.
 
 Known blockers:
 
-- Lighting is still partly profile/bootstrap driven instead of a semantic
-  scene light rig.
+- Lighting still renders through the V1 beauty fallback. The semantic rig
+  evidence exists, but the full-scene lighting shader pass has not yet been
+  promoted to V2 beauty output.
 - Reflection ownership still needs local room, hero, planar, SSR, RT, neutral,
   and authorized external environment sources in one resolver.
 - Shadow/contact stability needs a formal policy and packet gates.

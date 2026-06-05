@@ -1427,3 +1427,100 @@ Next recommended implementation:
 - Start scene-local semantic light-rig ownership.
 - Then build local reflection/probe ownership so enclosed scenes no longer
   depend on unauthorized environment fallback.
+
+## Full Scene Shader Pipeline V2 Semantic Light Rig Evidence Slice - 2026-06-05
+
+Purpose:
+
+- Start Phase 3 by replacing the thin `rig_id != custom` lighting check with a
+  real scene-local semantic light-rig evidence contract.
+- Make V2 lighting prove that scene-owned lights, policy ids, balance policy,
+  local fixtures, shadowed-light ownership, and exposure bounds are present
+  before later full-scene lighting shaders depend on them.
+
+Implemented:
+
+- Added `FullSceneLightingRigEvidence` to `FullSceneShaderFrameContext`.
+- V2 lighting readiness now checks:
+  - semantic rig id/source.
+  - scene-local environment shader readiness.
+  - light-owner/semantic fixture evidence.
+  - semantic light roles.
+  - rig/shadow/exposure policy consistency against the scene visual contract.
+  - scene-local lighting balance policy.
+  - usable local fixture ownership.
+  - shadow-casting light ownership when shadows are enabled.
+  - named exposure policy and bounded exposure/light-intensity values.
+- V2 frame reports now emit:
+  - `semantic_light_roles_available`.
+  - `rig_policy_ids_consistent`.
+  - `lighting_balance_policy_ready`.
+  - `local_fixture_contract_ready`.
+  - `shadowed_light_contract_ready`.
+  - `exposure_policy_ready`.
+  - semantic fixture, soft fixture, emissive fixture, stage fixture, practical
+    fixture, shadow-casting light, total intensity, max intensity, and missing
+    lighting-contract counts.
+- The V2 checker now requires the runtime lighting evidence builder and the
+  new frame-report fields.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8 --verbose
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_semantic_light_rig_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Results:
+
+- static V2 frame-report checker: passed.
+- V2 plan validator: passed.
+- Python compile: passed.
+- Release `CortexEngine` target build: passed and linked.
+- V2 runtime packet: passed.
+- `ctest`: completed, but this build directory reported `No tests were found`.
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_semantic_light_rig_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+
+Gallery beauty lighting evidence:
+
+- `semantic_light_rig_ready=true`.
+- `scene_local_environment_shader_ready=true`.
+- `light_owner_report_available=true`.
+- `semantic_light_roles_available=true`.
+- `rig_policy_ids_consistent=true`.
+- `lighting_balance_policy_ready=true`.
+- `local_fixture_contract_ready=true`.
+- `shadowed_light_contract_ready=true`.
+- `exposure_policy_ready=true`.
+- `exposure_clipping_gate_passed=true`.
+- `semantic_fixture_light_count=4`.
+- `soft_fixture_light_count=2`.
+- `stage_fixture_light_count=2`.
+- `rect_area_light_count=2`.
+- `shadow_casting_light_count=1`.
+- `total_light_intensity=18.039999`.
+- `max_light_intensity=5.455999`.
+- `missing_lighting_contract_count=0`.
+- `lighting.domain_ready=true`.
+- failure reason:
+  `Scene-local semantic light-rig ownership is ready`.
+
+Current interpretation:
+
+- `FSSP-V2-004A` is complete for the gallery packet.
+- Lighting still renders through the V1 beauty fallback, but V2 now has a
+  packet-proved semantic lighting contract that full-scene lighting shaders can
+  consume.
+- Next architecture slice should build local reflection/probe ownership and RT
+  miss fallback evidence with the same contract-first pattern.

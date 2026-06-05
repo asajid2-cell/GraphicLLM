@@ -2379,3 +2379,74 @@ Current interpretation:
 - The next renderer architecture target is scene-local reflection source
   plumbing for model-authored families, because the post resolver currently has
   no source signal to improve in kitchen/office/gym/concert.
+
+## 2026-06-05 Full-Scene Shader Refactor Planning Checkpoint
+
+User direction:
+
+- Move toward full-scene shaders and Unreal-like final visuals.
+- Plan the whole refactor before completing the next goal feature.
+- Do not restart scene-authoring automation or hand-polish screenshots.
+
+Plan recorded in:
+
+- `docs/FULL_SCENE_SHADER_REFACTOR_MASTER_PLAN.md`
+  - section: `2026-06-05 AAA Full-Scene Shader Refactor Checkpoint`.
+
+Key decision:
+
+- The next slice should be `FSSP-V2-004C`: scene-local source plumbing.
+- Do not continue with another isolated reflection resolver tweak.
+- Reason: the reflection resolver candidate is wired, but cross-family signal
+  audit showed:
+  - gallery has reflection-source signal but near-zero candidate delta.
+  - kitchen, office, gym, and concert have `no_reflection_source_signal`.
+- Therefore richer full-scene shading is blocked by missing scene-local source
+  data reaching shader/post paths, not by the resolver formula alone.
+
+Refactor spine:
+
+```text
+SceneVisualContract
+  -> FullSceneMaterialTable
+  -> FullSceneFrameData / GBuffer
+  -> FullSceneLightRig
+  -> FullSceneProbeSet
+  -> FullSceneLightingReflectionShadowComposite
+  -> FullSceneTemporalResolve
+  -> FullScenePost
+  -> FullSceneRenderGraphEvidence
+```
+
+Implementation order now preferred:
+
+1. Consolidate scene visual contract.
+2. Plumb scene-local light/probe/reflection sources into shader-facing data.
+3. Promote full material table into upload path.
+4. Promote lighting V2 as shadow output.
+5. Promote reflection V2 as shadow output.
+6. Centralize shadow/contact policy.
+7. Build material-aware temporal candidate.
+8. Build HDR post V2 candidate.
+9. Enforce V2 render graph ownership.
+10. Run cross-family candidate promotion packets.
+
+Next concrete work:
+
+- Trace current model-authored family scene profiles and post constants to find
+  why `reflection_source_weights` is zero outside gallery.
+- Implement a scene-local source contract that can report local room probe,
+  hero probe, planar probe, SSR, RT, neutral fallback, and authorized external
+  environment source signal.
+- Rerun cross-family packet:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen,office,gym,concert" -ViewFilter "beauty,reflection_owner,reflection_source_weights,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 90 -CaptureFrame 45 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build/captures/full_scene_shader_pipeline_v2_scene_local_source_plumbing_packet_20260605
+```
+
+Success condition for next slice:
+
+- Source-signal families should increase from `1/5` to at least `4/5`.
+- Candidate delta does not need to be visually large yet.
+- Default beauty must remain V1/candidate-gated until source ownership,
+  stability, and visual packet evidence pass.

@@ -221,6 +221,61 @@ Current interpretation:
   replace primitive hero roles through registry-backed assets, then rerun:
   `AAAReplacementPlan`, renderer V1 packet, and visual review sheet.
 
+## 2026-06-05 AAA Provider Request Export
+
+Implemented:
+
+- `tools/export_aaa_provider_requests.py`
+  - converts replacement work orders into provider/library request packs.
+  - P0 role orders become `new_or_replacement_asset` requests.
+  - P1 registry orders become `upgrade_existing_asset` requests.
+  - every request includes accepted formats, forbidden whole-scene output
+    modes, PBR/LOD/collision/preview/support-anchor requirements, and
+    admission gates.
+- `tools/FinalArtPipeline.ps1`
+  - adds action `AAAProviderRequests`.
+  - action runs:
+    1. `AssetRegistryV2`
+    2. `AAAAssetQuality`
+    3. `AAAReplacementPlan`
+    4. `export_aaa_provider_requests.py`
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAProviderRequests
+python -m py_compile tools\build_asset_registry_v2.py tools\analyze_aaa_asset_quality.py tools\plan_aaa_asset_replacements.py tools\export_aaa_provider_requests.py
+```
+
+Generated request artifacts:
+
+- Manifest JSON:
+  `docs/media/final_art/generated/aaa_asset_quality/provider_requests/manifest.json`
+- Manifest Markdown:
+  `docs/media/final_art/generated/aaa_asset_quality/provider_requests/manifest.md`
+- Request packs:
+  `docs/media/final_art/generated/aaa_asset_quality/provider_requests/p0/*.json`
+  and
+  `docs/media/final_art/generated/aaa_asset_quality/provider_requests/p1/*.json`
+
+Provider request baseline:
+
+- Request count: `49`.
+- P0 request count: `29`.
+- P1 request count: `20`.
+- Request files on disk including manifests: `51`.
+
+Current interpretation:
+
+- The asset-quality pipeline is now executable up to provider/library handoff:
+  gate -> registry -> work orders -> request packs.
+- No AAA assets have been fulfilled yet. The next major implementation step is
+  a fulfillment/import loop:
+  - consume request packs from a high-quality provider or curated CC0 source.
+  - write/import assets into registry V2 with PBR/LOD/collision readiness.
+  - update scene seeds to use registry-backed assets.
+  - rerun AAA gate and renderer packet.
+
 ## Resume Commands
 
 ```powershell
@@ -228,9 +283,11 @@ git -c submodule.recurse=false status --short --ignore-submodules=all
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AssetRegistryV2
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAAssetQuality
 python tools\plan_aaa_asset_replacements.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\FinalArtPipeline.ps1 -Action AAAProviderRequests
 python tools\analyze_aaa_asset_quality.py --renderer-manifest build\captures\scene_local_cinematic_renderer_v1_final_gate_20260605\warm_micro_jitter_full_seq8\manifest.json
 Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_quality_report.md
 Get-Content docs\media\final_art\generated\aaa_asset_quality\aaa_asset_replacement_work_orders.md
+Get-Content docs\media\final_art\generated\aaa_asset_quality\provider_requests\manifest.md
 ```
 
 ## Git Policy

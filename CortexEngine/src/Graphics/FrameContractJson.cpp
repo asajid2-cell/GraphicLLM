@@ -333,6 +333,41 @@ json FullSceneShaderPipelineV2ToJson(const FrameContract& contract) {
         }}
     };
 }
+
+json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
+    const FullSceneShaderPipelineV3FrameContext context =
+        BuildFullSceneShaderPipelineV3FrameContext(contract);
+
+    json domains = json::array();
+    for (const auto& domain : context.domains) {
+        domains.push_back({
+            {"id", domain.id},
+            {"enabled", domain.enabled},
+            {"ready", domain.ready},
+            {"producer", domain.producer},
+            {"output_resource", domain.outputResource},
+            {"debug_view", domain.debugView},
+            {"packet_gate", domain.packetGate},
+            {"promotion_state", domain.promotionState},
+            {"failure_reason", domain.failureReason}
+        });
+    }
+
+    return {
+        {"schema", context.schema},
+        {"status", context.status},
+        {"beauty_output", context.beautyOutput},
+        {"default_beauty_affects", context.defaultBeautyAffects},
+        {"runtime_placeholders_ready", context.runtimePlaceholdersReady},
+        {"contract_grounded", context.contractGrounded},
+        {"packet_gate_ready", context.packetGateReady},
+        {"contract_path", context.contractPath},
+        {"plan_path", context.planPath},
+        {"required_scene_families", context.requiredSceneFamilies},
+        {"required_outputs", context.requiredOutputs},
+        {"domains", std::move(domains)}
+    };
+}
 }
 
 json FrameContractToJson(const FrameContract& contract) {
@@ -463,6 +498,7 @@ json FrameContractToJson(const FrameContract& contract) {
              contract.sceneVisual.pixelReflectionOwnerHistogramAvailable}
         }},
         {"full_scene_shader_pipeline_v2", FullSceneShaderPipelineV2ToJson(contract)},
+        {"full_scene_shader_pipeline_v3", FullSceneShaderPipelineV3ToJson(contract)},
         {"features", FeatureFlagsToJson(contract.features)},
         {"planned_features", FeatureFlagsToJson(contract.plannedFeatures)},
         {"executed_features", FeatureFlagsToJson(contract.executedFeatures)},

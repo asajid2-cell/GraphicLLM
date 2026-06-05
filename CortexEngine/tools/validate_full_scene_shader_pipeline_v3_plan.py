@@ -9,6 +9,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "docs" / "FULL_SCENE_SHADER_PIPELINE_V3.md"
 CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v3_contract.json"
+FRAME_CONTRACT_JSON_SOURCE_PATH = ROOT / "src" / "Graphics" / "FrameContractJson.cpp"
+FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneShaderFrameContext.h"
 
 
 REQUIRED_PLAN_TOKENS = [
@@ -71,6 +73,16 @@ def main() -> int:
 
     require(PLAN_PATH.exists(), errors, f"Missing V3 plan: {PLAN_PATH}")
     require(CONTRACT_PATH.exists(), errors, f"Missing V3 contract: {CONTRACT_PATH}")
+    require(
+        FRAME_CONTRACT_JSON_SOURCE_PATH.exists(),
+        errors,
+        f"Missing frame contract JSON source: {FRAME_CONTRACT_JSON_SOURCE_PATH}",
+    )
+    require(
+        FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.exists(),
+        errors,
+        f"Missing full scene shader frame context: {FULL_SCENE_SHADER_FRAME_CONTEXT_PATH}",
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}")
@@ -78,6 +90,9 @@ def main() -> int:
 
     plan = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    frame_contract_source = FRAME_CONTRACT_JSON_SOURCE_PATH.read_text(encoding="utf-8")
+    frame_context_source = FULL_SCENE_SHADER_FRAME_CONTEXT_PATH.read_text(encoding="utf-8")
+    runtime_surface = frame_contract_source + "\n" + frame_context_source
 
     for token in REQUIRED_PLAN_TOKENS:
         require(token in plan, errors, f"V3 plan missing token: {token}")
@@ -104,6 +119,7 @@ def main() -> int:
     render_graph_outputs = set(domains.get("render_graph", {}).get("required_outputs", []))
     for output in REQUIRED_OUTPUTS:
         require(output in render_graph_outputs, errors, f"V3 render graph missing output: {output}")
+        require(output in runtime_surface, errors, f"V3 runtime placeholder missing output: {output}")
 
     validation_gates = set(domains.get("validation", {}).get("required_gates", []))
     for gate in [
@@ -113,6 +129,29 @@ def main() -> int:
         "default_beauty_unchanged_until_promotion",
     ]:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
+
+    for token in [
+        "FullSceneShaderPipelineV3ToJson",
+        "BuildFullSceneShaderPipelineV3FrameContext",
+        "FullSceneShaderPipelineV3FrameContext",
+        '"full_scene_shader_pipeline_v3"',
+        "cortex.full_scene_shader_pipeline_v3.runtime_report.v1",
+        "planned_not_promoted",
+        "defaultBeautyAffects = false",
+        '"default_beauty_affects"',
+        "runtimePlaceholdersReady",
+        '"runtime_placeholders_ready"',
+        "contractGrounded",
+        '"contract_grounded"',
+        "packetGateReady",
+        '"packet_gate_ready"',
+        "FullSceneMaterialResolveV3",
+        "FullSceneLightingV3",
+        "FullSceneReflectionV3",
+        "SceneLocalEnvironmentV3",
+        "CinematicPostV3",
+    ]:
+        require(token in runtime_surface, errors, f"V3 runtime surface missing token: {token}")
 
     if errors:
         for error in errors:

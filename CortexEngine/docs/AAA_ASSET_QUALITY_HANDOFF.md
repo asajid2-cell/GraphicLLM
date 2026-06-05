@@ -3557,3 +3557,54 @@ Current stopping position:
 - Next safe implementation slice is P0: add runtime frame-report placeholders
   for `full_scene_shader_pipeline_v3` and packet skeletons while preserving the
   current default beauty path.
+
+### FullSceneShaderPipeline V3 Runtime Placeholder Contract - 2026-06-05
+
+Implemented:
+
+- Added `FullSceneShaderPipelineV3FrameContext` to
+  `src/Graphics/FullSceneShaderFrameContext.h`.
+- Added `FullSceneShaderPipelineV3ToJson` to
+  `src/Graphics/FrameContractJson.cpp`.
+- Runtime frame reports now expose `full_scene_shader_pipeline_v3`.
+- V3 reports are explicitly `status=planned_not_promoted`.
+- V3 reports expose `default_beauty_affects=false`.
+- V3 domains are visible but not ready:
+  render graph, material, lighting, reflection, environment, cinematic post,
+  and validation.
+- The V3 plan validator now checks both the plan/contract and the runtime
+  placeholder surface.
+
+Current stopping position:
+
+- V3 has a frame-report-visible placeholder contract without touching beauty.
+- Next safe slice is the V3 packet harness skeleton for required debug views and
+  placeholder `v3_signal.json`/`v3_stability.json` artifacts.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V3 validator passed:
+  `python tools\validate_full_scene_shader_pipeline_v3_plan.py`.
+- V2 frame-report checker still passed:
+  `python tools\check_full_scene_shader_pipeline_v2_frame_report.py`.
+- focused V3 placeholder packet passed after rerunning with the complete
+  reflection view set:
+  `build/captures/v3_runtime_placeholder_smoke2_20260605`.
+- strict V2 frame-report validation still passed on:
+  `build/captures/v3_runtime_placeholder_smoke2_20260605/stress_rt_showcase_reflection_closeup/beauty/frame_report_shutdown.json`.
+
+Extracted V3 frame-report evidence:
+
+- `schema=cortex.full_scene_shader_pipeline_v3.runtime_report.v1`.
+- `status=planned_not_promoted`.
+- `beauty_output=full_scene_shader_pipeline_v2`.
+- `default_beauty_affects=false`.
+- `runtime_placeholders_ready=true`.
+- `contract_grounded=true`.
+- `packet_gate_ready=false`.
+- `required_outputs=9`.
+- domains are present and not ready:
+  render_graph, material, lighting, reflection, environment, cinematic_post,
+  and validation.

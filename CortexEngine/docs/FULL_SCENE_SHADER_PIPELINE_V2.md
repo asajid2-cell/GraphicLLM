@@ -2696,3 +2696,51 @@ Interpretation:
 - This is stronger than the prior mouse-jitter packet, but still not default
   promotion. The next gate should compare actual beauty/candidate stability on
   explicit glossy/metal/glass close-up stress surfaces.
+
+### Sequence Stability Analyzer Integration - 2026-06-05
+
+Implemented:
+
+- `tools/analyze_full_scene_shader_sequence_stability.py`
+  - reads packet `manifest.json`.
+  - consumes each result's `capture_sequence`.
+  - measures consecutive frame-to-frame mean absolute luma/RGB deltas.
+  - compares `reflection_resolver_candidate` motion delta against `beauty`
+    per family.
+  - emits:
+    - `sequence_stability.json`.
+    - `sequence_stability.md`.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - now runs sequence stability after debug metrics and reflection signal.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`
+  - now requires the sequence stability analyzer and packet outputs.
+
+Integrated smoke:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -FamilyFilter "gallery,kitchen" -ViewFilter "beauty,reflection_source_weights,reflection_source_authority,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_sequence_stability_integrated_smoke_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_sequence_stability_integrated_smoke_20260605`.
+- source-signal families: `2/2`.
+- candidate-delta families: `2/2`.
+- sequence stability warnings: `0`.
+- sequence stability failures: `0`.
+
+Sequence stability smoke:
+
+| Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| gallery | `0.00311596` | `0.00310690` | `0.997` |
+| kitchen | `0.00385527` | `0.00383711` | `0.995` |
+
+Current interpretation:
+
+- V2 packets now carry first-class sequence stability evidence.
+- The current owned local-probe candidate did not add motion instability in
+  the integrated smoke or the full cross-family camera-sweep packet.
+- This still does not promote default beauty; it only strengthens the harness
+  needed for safe promotion later.

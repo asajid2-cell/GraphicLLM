@@ -8,7 +8,7 @@
 namespace Cortex::Graphics {
 
 namespace {
-constexpr uint32_t kMaxDebugViewMode = 49u;
+constexpr uint32_t kMaxDebugViewMode = 53u;
 }
 
 int Renderer::GetDebugViewMode() const {
@@ -58,6 +58,10 @@ void Renderer::CycleDebugViewMode() {
     // 47 = material class policy overlay
     // 48 = VB material id
     // 49 = VB stable object id
+    // 50 = VB material family policy
+    // 51 = VB reflection policy
+    // 52 = VB temporal policy
+    // 53 = VB post sensitivity
     m_debugViewState.mode = (m_debugViewState.mode + 1) % (kMaxDebugViewMode + 1u);
     const char* label = nullptr;
     switch (m_debugViewState.mode) {
@@ -111,6 +115,10 @@ void Renderer::CycleDebugViewMode() {
         case 47: label = "MaterialPolicy"; break;
         case 48: label = "VB_MaterialId"; break;
         case 49: label = "VB_StableObjectId"; break;
+        case 50: label = "VB_MaterialFamilyPolicy"; break;
+        case 51: label = "VB_ReflectionPolicy"; break;
+        case 52: label = "VB_TemporalPolicy"; break;
+        case 53: label = "VB_PostSensitivity"; break;
         default: label = "Unknown"; break;
     }
     spdlog::info("Debug view mode: {}", label);

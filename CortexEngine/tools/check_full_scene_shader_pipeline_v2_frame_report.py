@@ -20,6 +20,12 @@ FULL_SCENE_SHADER_FRAME_CONTEXT_PATH = ROOT / "src" / "Graphics" / "FullSceneSha
 VISIBILITY_BUFFER_HEADER_PATH = ROOT / "src" / "Graphics" / "VisibilityBuffer.h"
 MATERIAL_MODEL_HEADER_PATH = ROOT / "src" / "Graphics" / "MaterialModel.h"
 MATERIAL_MODEL_SOURCE_PATH = ROOT / "src" / "Graphics" / "MaterialModel.cpp"
+DEBUG_BLIT_VISIBILITY_SHADER_PATH = ROOT / "assets" / "shaders" / "DebugBlitVisibility.hlsl"
+VISIBILITY_BUFFER_DEBUG_BLIT_SOURCE_PATH = ROOT / "src" / "Graphics" / "VisibilityBuffer_DebugBlit.cpp"
+VISIBILITY_BUFFER_DEBUG_BLIT_PIPELINE_SOURCE_PATH = (
+    ROOT / "src" / "Graphics" / "VisibilityBuffer_DebugBlitPipelines.cpp"
+)
+RENDERER_DEBUG_SETTINGS_SOURCE_PATH = ROOT / "src" / "Graphics" / "Renderer_DebugSettings.cpp"
 MATERIAL_RESOLVE_SHADER_PATH = ROOT / "assets" / "shaders" / "MaterialResolve.hlsl"
 SURFACE_CLASSIFICATION_SHADER_PATH = ROOT / "assets" / "shaders" / "SurfaceClassification.hlsli"
 DEFERRED_LIGHTING_SHADER_PATH = ROOT / "assets" / "shaders" / "DeferredLighting.hlsl"
@@ -228,6 +234,10 @@ def validate_runtime_source_surface() -> list[str]:
         "enum class DebugBlitVisibilityMode",
         "MaterialId = 1",
         "StableObjectId = 2",
+        "MaterialFamily = 3",
+        "ReflectionPolicy = 4",
+        "TemporalPolicy = 5",
+        "PostSensitivity = 6",
     ]
     for token in identity_debug_tokens:
         if token not in runtime_surface:
@@ -276,6 +286,10 @@ def validate_runtime_material_policy_surface() -> list[str]:
         SURFACE_CLASSIFICATION_SHADER_PATH,
         DEFERRED_LIGHTING_SHADER_PATH,
         POST_PROCESS_SHADER_PATH,
+        DEBUG_BLIT_VISIBILITY_SHADER_PATH,
+        VISIBILITY_BUFFER_DEBUG_BLIT_SOURCE_PATH,
+        VISIBILITY_BUFFER_DEBUG_BLIT_PIPELINE_SOURCE_PATH,
+        RENDERER_DEBUG_SETTINGS_SOURCE_PATH,
         SHADER_TYPES_HEADER_PATH,
         FRAME_POST_CONSTANTS_SOURCE_PATH,
         DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH,
@@ -293,6 +307,12 @@ def validate_runtime_material_policy_surface() -> list[str]:
     surface_shader = SURFACE_CLASSIFICATION_SHADER_PATH.read_text(encoding="utf-8")
     deferred_shader = DEFERRED_LIGHTING_SHADER_PATH.read_text(encoding="utf-8")
     post_shader = POST_PROCESS_SHADER_PATH.read_text(encoding="utf-8")
+    debug_blit_shader = DEBUG_BLIT_VISIBILITY_SHADER_PATH.read_text(encoding="utf-8")
+    debug_blit_source = VISIBILITY_BUFFER_DEBUG_BLIT_SOURCE_PATH.read_text(encoding="utf-8")
+    debug_blit_pipeline_source = VISIBILITY_BUFFER_DEBUG_BLIT_PIPELINE_SOURCE_PATH.read_text(
+        encoding="utf-8"
+    )
+    renderer_debug_source = RENDERER_DEBUG_SETTINGS_SOURCE_PATH.read_text(encoding="utf-8")
     shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
     frame_post_source = FRAME_POST_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
     deferred_lighting_source = DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
@@ -483,6 +503,67 @@ def validate_runtime_material_policy_surface() -> list[str]:
         "deferredParams.cinematicStabilityParams",
         "Deferred lighting constant upload",
     )
+    require_source_token(
+        errors,
+        debug_blit_shader,
+        "StructuredBuffer<VBMaterialConstants> g_Materials : register(t2)",
+        "DebugBlitVisibility material table binding",
+    )
+    require_source_token(
+        errors,
+        debug_blit_shader,
+        "id = material.policyParams.x",
+        "DebugBlitVisibility material family policy column",
+    )
+    require_source_token(
+        errors,
+        debug_blit_shader,
+        "id = material.policyParams.y",
+        "DebugBlitVisibility reflection policy column",
+    )
+    require_source_token(
+        errors,
+        debug_blit_shader,
+        "id = material.policyParams.z",
+        "DebugBlitVisibility temporal policy column",
+    )
+    require_source_token(
+        errors,
+        debug_blit_shader,
+        "id = material.policyParams.w",
+        "DebugBlitVisibility post sensitivity policy column",
+    )
+    require_source_token(
+        errors,
+        debug_blit_source,
+        "Visibility material-policy debug blit requires a populated material table",
+        "VisibilityBuffer material-policy debug readiness guard",
+    )
+    require_source_token(
+        errors,
+        debug_blit_source,
+        "SetGraphicsRootShaderResourceView(4, materialAddress)",
+        "VisibilityBuffer material-policy root SRV binding",
+    )
+    require_source_token(
+        errors,
+        debug_blit_pipeline_source,
+        "params[4].Descriptor.ShaderRegister = 2",
+        "VisibilityBuffer material-policy root signature SRV",
+    )
+    require_source_token(
+        errors,
+        renderer_debug_source,
+        "constexpr uint32_t kMaxDebugViewMode = 53u",
+        "Renderer debug mode range",
+    )
+    for token in [
+        "VB_MaterialFamilyPolicy",
+        "VB_ReflectionPolicy",
+        "VB_TemporalPolicy",
+        "VB_PostSensitivity",
+    ]:
+        require_source_token(errors, renderer_debug_source, token, "Renderer material-policy debug label")
 
     return errors
 
@@ -711,6 +792,10 @@ def validate_v2_packet_runner_surface() -> list[str]:
         "v2_frame_report_evidence_summary.md",
         "check_full_scene_shader_pipeline_v2_frame_report.py",
         "surface_policy",
+        "material_family",
+        "reflection_policy",
+        "temporal_policy",
+        "post_sensitivity",
         "material_id",
         "object_id",
         "reflection_owner",

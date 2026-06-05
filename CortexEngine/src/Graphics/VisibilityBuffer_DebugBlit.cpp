@@ -143,6 +143,15 @@ Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
     if (needsInstanceTable && (instanceAddress == 0 || m_instanceCount == 0)) {
         return Result<void>::Err("Visibility identity debug blit requires a populated instance table");
     }
+    const bool needsMaterialTable =
+        mode == DebugBlitVisibilityMode::MaterialFamily ||
+        mode == DebugBlitVisibilityMode::ReflectionPolicy ||
+        mode == DebugBlitVisibilityMode::TemporalPolicy ||
+        mode == DebugBlitVisibilityMode::PostSensitivity;
+    const D3D12_GPU_VIRTUAL_ADDRESS materialAddress = GetMaterialBufferAddress();
+    if (needsMaterialTable && (materialAddress == 0 || m_materialCount == 0)) {
+        return Result<void>::Err("Visibility material-policy debug blit requires a populated material table");
+    }
 
     constexpr D3D12_RESOURCE_STATES kSrvState =
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
@@ -179,12 +188,15 @@ Result<void> VisibilityBufferRenderer::DebugBlitVisibilityToHDR(
     const uint32_t constants[4] = {
         static_cast<uint32_t>(mode),
         m_instanceCount,
-        0u,
+        m_materialCount,
         0u,
     };
     cmdList->SetGraphicsRoot32BitConstants(2, 4, constants, 0);
     if (instanceAddress != 0) {
         cmdList->SetGraphicsRootShaderResourceView(3, instanceAddress);
+    }
+    if (materialAddress != 0) {
+        cmdList->SetGraphicsRootShaderResourceView(4, materialAddress);
     }
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

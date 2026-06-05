@@ -711,13 +711,37 @@ Current producer evidence:
   shadow visibility `1.305`,
   shadow loss `0.810`,
   indirect `0.257`.
+- first cross-family V3 lighting motion matrix probe:
+  `build/captures/v3_lighting_motion_matrix_cross_family_probe2_20260605`.
+- cross-family probe scope:
+  families `gallery,kitchen,gym,concert`;
+  modes `mouse_jitter,camera_sweep`;
+  sequence count `2`;
+  views `beauty`, five legacy lighting terms, and five concrete V3 lighting
+  buffers.
+- cross-family aggregate result:
+  `rows=40`, failures `0`, warnings `1`.
+- per-mode V3 stability:
+  - `mouse_jitter`: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`,
+    failures `0`, warnings `0`.
+  - `camera_sweep`: `report_count=44`,
+    `lighting_split_ready_report_count=44`,
+    `full_scene_lighting_v3_executed_report_count=44`,
+    `lighting_signal_metrics_ready=true`,
+    failures `0`, warnings `0`.
+- current cross-family motion blocker:
+  `mouse_jitter: concert/v3_indirect_lighting` has motion delta `0.00395094`,
+  legacy `ambient_ibl` delta `0.00115572`, V3/legacy ratio `3.419`.
 
 Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
-- run the new V3 lighting motion matrix across at least gallery, kitchen, gym,
-  and concert, with both `mouse_jitter` and `camera_sweep`.
+- repeat the V3 lighting motion matrix with promotion-grade frame counts after
+  diagnosing the concert indirect-lighting motion warning.
 - compare V3 split outputs against the legacy deferred terms under those
   motion and cross-family packets, not just the static/gallery smoke.
 - keep default beauty unchanged until the consumer/composite path and packet

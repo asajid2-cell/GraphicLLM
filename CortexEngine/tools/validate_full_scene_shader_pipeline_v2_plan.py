@@ -19,6 +19,12 @@ CONTRACT_PATH = ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_c
 FRAME_REPORT_CONTRACT_PATH = (
     ROOT / "assets" / "final_art" / "full_scene_shader_pipeline_v2_frame_report_contract.json"
 )
+MATERIAL_EVIDENCE_SCHEMA_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_material_evidence_v2.schema.json"
+)
+MATERIAL_EVIDENCE_REPORT_PATH = (
+    ROOT / "assets" / "final_art" / "full_scene_shader_material_evidence_v2.json"
+)
 
 
 REQUIRED_DOMAIN_IDS = {
@@ -60,10 +66,16 @@ def main() -> int:
         return fail(f"missing contract: {CONTRACT_PATH}")
     if not FRAME_REPORT_CONTRACT_PATH.exists():
         return fail(f"missing frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
+    if not MATERIAL_EVIDENCE_SCHEMA_PATH.exists():
+        return fail(f"missing material evidence schema: {MATERIAL_EVIDENCE_SCHEMA_PATH}")
+    if not MATERIAL_EVIDENCE_REPORT_PATH.exists():
+        return fail(f"missing material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
 
     plan_text = PLAN_PATH.read_text(encoding="utf-8")
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     frame_report_contract = json.loads(FRAME_REPORT_CONTRACT_PATH.read_text(encoding="utf-8"))
+    material_evidence_schema = json.loads(MATERIAL_EVIDENCE_SCHEMA_PATH.read_text(encoding="utf-8"))
+    material_evidence_report = json.loads(MATERIAL_EVIDENCE_REPORT_PATH.read_text(encoding="utf-8"))
 
     missing_terms = sorted(term for term in REQUIRED_PLAN_TERMS if term not in plan_text)
     if missing_terms:
@@ -113,6 +125,24 @@ def main() -> int:
     if frame_report_contract.get("report_key") != "full_scene_shader_pipeline_v2":
         return fail("frame-report contract report_key must be full_scene_shader_pipeline_v2")
 
+    required_material_fields = material_evidence_schema.get("required_root_fields")
+    if not isinstance(required_material_fields, list):
+        return fail("material evidence schema required_root_fields must be a list")
+    missing_material_fields = [
+        field for field in required_material_fields if field not in material_evidence_report
+    ]
+    if missing_material_fields:
+        return fail("material evidence report missing fields: " + ", ".join(missing_material_fields))
+    if material_evidence_report.get("schema") != "cortex.full_scene_shader_material_evidence_v2":
+        return fail("material evidence report schema id is invalid")
+    summary = material_evidence_report.get("summary")
+    if not isinstance(summary, dict):
+        return fail("material evidence report summary must be an object")
+    if "v2_material_ready_asset_count" not in summary:
+        return fail("material evidence report summary missing v2_material_ready_asset_count")
+    if "primitive_hero_material_blocker_count" not in summary:
+        return fail("material evidence report summary missing primitive_hero_material_blocker_count")
+
     target_families = contract.get("target_families")
     if target_families != ["gallery", "kitchen", "office", "gym", "concert"]:
         return fail("target_families must preserve the Renderer V1 five-family gate order")
@@ -125,6 +155,7 @@ def main() -> int:
     print(f"Plan: {PLAN_PATH}")
     print(f"Contract: {CONTRACT_PATH}")
     print(f"Frame-report contract: {FRAME_REPORT_CONTRACT_PATH}")
+    print(f"Material evidence report: {MATERIAL_EVIDENCE_REPORT_PATH}")
     print(f"Domains: {len(domains)}")
     return 0
 

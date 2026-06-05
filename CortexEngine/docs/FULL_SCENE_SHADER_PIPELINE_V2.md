@@ -86,6 +86,10 @@ V2 is organized as contracts, not scattered features.
    - Enclosed scenes use local room probes, hero probes, planar probes, or
      neutral fallback with explicit ownership.
    - Visible external HDRI is allowed only for authored outdoor/gallery cases.
+   - Ray-traced reflection misses must follow the scene-local environment
+     contract. In an authored enclosed scene with zero background exposure, a
+     miss may not synthesize a visible sky/office/HDRI lobe; it must return an
+     owned neutral fallback or local ambient term.
    - Reflection-owner debug remains mandatory.
 
 5. Shadow Contract

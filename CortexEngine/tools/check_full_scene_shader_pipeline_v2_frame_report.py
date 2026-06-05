@@ -23,6 +23,7 @@ MATERIAL_RESOLVE_SHADER_PATH = ROOT / "assets" / "shaders" / "MaterialResolve.hl
 SURFACE_CLASSIFICATION_SHADER_PATH = ROOT / "assets" / "shaders" / "SurfaceClassification.hlsli"
 DEFERRED_LIGHTING_SHADER_PATH = ROOT / "assets" / "shaders" / "DeferredLighting.hlsl"
 POST_PROCESS_SHADER_PATH = ROOT / "assets" / "shaders" / "PostProcess.hlsl"
+RAYTRACED_REFLECTIONS_SHADER_PATH = ROOT / "assets" / "shaders" / "RaytracedReflections.hlsl"
 SHADER_TYPES_HEADER_PATH = ROOT / "src" / "Graphics" / "ShaderTypes.h"
 FRAME_POST_CONSTANTS_SOURCE_PATH = ROOT / "src" / "Graphics" / "Renderer_FramePostConstants.cpp"
 DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
@@ -379,6 +380,69 @@ def validate_runtime_temporal_surface() -> list[str]:
     return errors
 
 
+def validate_runtime_reflection_surface() -> list[str]:
+    errors: list[str] = []
+    required_paths = [
+        RAYTRACED_REFLECTIONS_SHADER_PATH,
+        SHADER_TYPES_HEADER_PATH,
+        FRAME_POST_CONSTANTS_SOURCE_PATH,
+    ]
+    for path in required_paths:
+        if not path.exists():
+            errors.append(f"missing runtime reflection source: {path}")
+    if errors:
+        return errors
+
+    rt_reflections_shader = RAYTRACED_REFLECTIONS_SHADER_PATH.read_text(encoding="utf-8")
+    shader_types = SHADER_TYPES_HEADER_PATH.read_text(encoding="utf-8")
+    frame_post_source = FRAME_POST_CONSTANTS_SOURCE_PATH.read_text(encoding="utf-8")
+
+    require_source_token(
+        errors,
+        shader_types,
+        "glm::vec4 ambientColor",
+        "ShaderTypes ambient/background blur params",
+    )
+    require_source_token(
+        errors,
+        shader_types,
+        "glm::vec4 envParams",
+        "ShaderTypes environment params",
+    )
+    require_source_token(
+        errors,
+        frame_post_source,
+        "m_environmentState.backgroundExposure",
+        "Frame environment background exposure upload",
+    )
+    require_source_token(
+        errors,
+        rt_reflections_shader,
+        "background exposure to zero, so misses must not synthesize a sky lobe",
+        "RaytracedReflections enclosed miss policy comment",
+    )
+    require_source_token(
+        errors,
+        rt_reflections_shader,
+        "return (g_EnvParams.w <= 0.001f) ? float3(0.0f, 0.0f, 0.0f) : g_AmbientColor.rgb",
+        "RaytracedReflections zero-exposure miss fallback",
+    )
+    require_source_token(
+        errors,
+        rt_reflections_shader,
+        "reflectionSafeMipFloor = saturate(g_AmbientColor.w) * kApproxEnvMaxMip",
+        "RaytracedReflections background-blur mip floor",
+    )
+    require_source_token(
+        errors,
+        rt_reflections_shader,
+        "authoredInteriorNoEnvironment",
+        "RaytracedReflections authored interior ambient policy",
+    )
+
+    return errors
+
+
 def validate_frame_report(frame_report_path: Path, strict: bool) -> list[str]:
     errors: list[str] = []
     frame_contract = load_json(FRAME_REPORT_CONTRACT_PATH)
@@ -421,6 +485,7 @@ def main() -> int:
     errors.extend(validate_runtime_source_surface())
     errors.extend(validate_runtime_material_policy_surface())
     errors.extend(validate_runtime_temporal_surface())
+    errors.extend(validate_runtime_reflection_surface())
     if args.frame_report:
         if not args.frame_report.exists():
             errors.append(f"missing frame report: {args.frame_report}")

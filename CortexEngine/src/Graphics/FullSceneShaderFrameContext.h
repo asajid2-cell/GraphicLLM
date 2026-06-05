@@ -107,10 +107,19 @@ struct FullSceneShaderFrameContext {
         bool lightingBalancePolicyReady = false;
         bool localFixtureContractReady = false;
         bool shadowedLightContractReady = false;
+        bool shaderLightArrayReady = false;
+        bool semanticLightPayloadReady = false;
+        bool areaLightPayloadReady = false;
+        bool clusteredLightListReady = false;
+        bool directLightPassReady = false;
+        bool directLightShadowOutputReady = false;
         bool exposurePolicyReady = false;
         bool exposureClippingGatePassed = false;
         uint32_t lightCount = 0;
+        uint32_t pointLightCount = 0;
+        uint32_t spotLightCount = 0;
         uint32_t rectAreaLightCount = 0;
+        uint32_t twoSidedAreaLightCount = 0;
         uint32_t semanticFixtureLightCount = 0;
         uint32_t softFixtureLightCount = 0;
         uint32_t emissiveFixtureLightCount = 0;
@@ -298,6 +307,26 @@ inline bool FullSceneShaderPassWritesResource(
         });
 }
 
+inline bool FullSceneShaderPassReadsResource(
+    const FrameContract& contract,
+    const char* passName,
+    const char* resourceName) {
+    return std::any_of(
+        contract.passes.begin(),
+        contract.passes.end(),
+        [passName, resourceName](const FrameContract::PassRecord& pass) {
+            return pass.name == passName &&
+                   pass.planned &&
+                   pass.executed &&
+                   std::any_of(
+                       pass.reads.begin(),
+                       pass.reads.end(),
+                       [resourceName](const std::string& read) {
+                           return read == resourceName;
+                       });
+        });
+}
+
 inline const FrameContract::HistoryInfo* FullSceneShaderFindHistory(
     const FrameContract& contract,
     const char* name) {
@@ -446,7 +475,10 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         !contract.lighting.rigSource.empty() &&
         contract.lighting.rigSource != "manual";
     evidence.lightCount = contract.lighting.lightCount;
+    evidence.pointLightCount = contract.lighting.pointLightCount;
+    evidence.spotLightCount = contract.lighting.spotLightCount;
     evidence.rectAreaLightCount = contract.lighting.areaRectLightCount;
+    evidence.twoSidedAreaLightCount = contract.lighting.twoSidedAreaLightCount;
     evidence.semanticFixtureLightCount = contract.lighting.semanticFixtureLightCount;
     evidence.softFixtureLightCount = contract.lighting.softFixtureLightCount;
     evidence.emissiveFixtureLightCount = contract.lighting.emissiveFixtureLightCount;
@@ -491,6 +523,30 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         (evidence.shadowCastingLightCount > 0 &&
          !contract.lighting.shadowPolicyId.empty() &&
          contract.lighting.shadowPolicyId != "default");
+    evidence.shaderLightArrayReady =
+        evidence.lightCount > 0 &&
+        evidence.lightCount <= 16u;
+    evidence.semanticLightPayloadReady =
+        evidence.semanticLightRolesAvailable &&
+        evidence.semanticFixtureLightCount > 0;
+    evidence.areaLightPayloadReady =
+        evidence.rectAreaLightCount == 0 ||
+        (evidence.rectAreaLightCount <= evidence.lightCount &&
+         contract.lighting.areaLightSizeScale > 0.0f);
+    evidence.clusteredLightListReady =
+        FullSceneShaderPassReadsResource(contract, "VBClusteredLights", "local_lights") &&
+        FullSceneShaderPassWritesResource(contract, "VBClusteredLights", "cluster_ranges") &&
+        FullSceneShaderPassWritesResource(contract, "VBClusteredLights", "cluster_light_indices");
+    evidence.directLightPassReady =
+        FullSceneShaderPassReadsResource(contract, "VBDeferredLighting", "gbuffer_albedo") &&
+        FullSceneShaderPassReadsResource(contract, "VBDeferredLighting", "gbuffer_normal_roughness") &&
+        FullSceneShaderPassReadsResource(contract, "VBDeferredLighting", "gbuffer_material_ext2") &&
+        FullSceneShaderPassWritesResource(contract, "VBDeferredLighting", "hdr_color");
+    evidence.directLightShadowOutputReady =
+        evidence.directLightPassReady &&
+        evidence.shadowedLightContractReady &&
+        (!contract.features.shadowsEnabled ||
+         FullSceneShaderPassReadsResource(contract, "VBDeferredLighting", "shadow_map"));
     evidence.exposurePolicyReady =
         !contract.lighting.exposurePolicyId.empty() &&
         contract.lighting.exposurePolicyId != "default" &&
@@ -513,6 +569,12 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.lightingBalancePolicyReady,
         evidence.localFixtureContractReady,
         evidence.shadowedLightContractReady,
+        evidence.shaderLightArrayReady,
+        evidence.semanticLightPayloadReady,
+        evidence.areaLightPayloadReady,
+        evidence.clusteredLightListReady,
+        evidence.directLightPassReady,
+        evidence.directLightShadowOutputReady,
         evidence.exposurePolicyReady,
         evidence.exposureClippingGatePassed,
     };
@@ -538,6 +600,18 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.failureReason = "Local fixture contract has no usable scene-owned lights";
     } else if (!evidence.shadowedLightContractReady) {
         evidence.failureReason = "Shadowed light contract is missing shadow-casting light ownership";
+    } else if (!evidence.shaderLightArrayReady) {
+        evidence.failureReason = "Shader-facing light array is empty or over budget";
+    } else if (!evidence.semanticLightPayloadReady) {
+        evidence.failureReason = "Semantic light payload is not encoded in shader-facing lights";
+    } else if (!evidence.areaLightPayloadReady) {
+        evidence.failureReason = "Area-light payload is missing or outside valid bounds";
+    } else if (!evidence.clusteredLightListReady) {
+        evidence.failureReason = "Clustered light-list pass/resource ownership is missing";
+    } else if (!evidence.directLightPassReady) {
+        evidence.failureReason = "V2 direct-light pass inputs or HDR output are missing";
+    } else if (!evidence.directLightShadowOutputReady) {
+        evidence.failureReason = "V2 direct-light shadow output is not connected to shadow_map";
     } else if (!evidence.exposureClippingGatePassed) {
         evidence.failureReason = "Exposure or light intensity contract is outside V2 bounds";
     } else {

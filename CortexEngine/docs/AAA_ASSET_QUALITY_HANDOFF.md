@@ -1971,3 +1971,65 @@ Current interpretation:
 - V2 beauty remains `v1_fallback`.
 - Next architecture slice should start semantic light buffers and V2
   direct-light shadow output.
+
+## Full Scene Shader V2 Semantic Light Buffer Evidence - 2026-06-05
+
+Implemented:
+
+- Extended `FullSceneLightingRigEvidence` in
+  `src/Graphics/FullSceneShaderFrameContext.h`.
+- Added `FullSceneShaderPassReadsResource`.
+- V2 lighting now reports:
+  - shader light-array readiness.
+  - semantic light-payload readiness.
+  - area-light payload readiness.
+  - clustered light-list readiness.
+  - direct-light pass readiness.
+  - direct-light shadow-output readiness.
+  - point, spot, rect-area, and two-sided area-light counts.
+- Updated `src/Graphics/FrameContractJson.cpp` to emit those fields under
+  `full_scene_shader_pipeline_v2.lighting`.
+- Updated
+  `assets/final_art/full_scene_shader_pipeline_v2_frame_report_contract.json`
+  and `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+
+Validation:
+
+```powershell
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+cmake --build build --config Release --target CortexEngine --parallel 8
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_light_buffer_packet_20260605
+ctest --test-dir build --output-on-failure -C Release
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_light_buffer_packet_20260605`.
+- captured views: `13`.
+- evidence rows: `130`.
+- failures: `0`.
+- gallery beauty lighting evidence:
+  - `missing_lighting_contract_count=0`.
+  - `shader_light_array_ready=true`.
+  - `semantic_light_payload_ready=true`.
+  - `area_light_payload_ready=true`.
+  - `clustered_light_list_ready=true`.
+  - `direct_light_pass_ready=true`.
+  - `direct_light_shadow_output_ready=true`.
+  - `point_light_count=1`.
+  - `spot_light_count=3`.
+  - `rect_area_light_count=2`.
+  - `semantic_fixture_light_count=4`.
+  - `shadow_casting_light_count=1`.
+  - `lighting.domain_ready=true`.
+
+Current interpretation:
+
+- `FSSP-V2-004B` is packet-proved for the gallery target at the evidence
+  layer.
+- V2 beauty remains `v1_fallback`.
+- Next shader-side lighting work should add a V2 direct-light shadow
+  output/debug comparison path.

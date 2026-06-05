@@ -37,6 +37,11 @@ constexpr uint32_t kVBDebugMaterialFamily = 11;
 constexpr uint32_t kVBDebugReflectionPolicy = 12;
 constexpr uint32_t kVBDebugTemporalPolicy = 13;
 constexpr uint32_t kVBDebugPostSensitivity = 14;
+constexpr uint32_t kVBDebugLightingV3Direct = 15;
+constexpr uint32_t kVBDebugLightingV3DirectUnshadowed = 16;
+constexpr uint32_t kVBDebugLightingV3ShadowVisibility = 17;
+constexpr uint32_t kVBDebugLightingV3ShadowLoss = 18;
+constexpr uint32_t kVBDebugLightingV3Indirect = 19;
 
 bool IsVisibilityBufferDebugView(uint32_t debugView) {
     return debugView != kVBDebugNone;
@@ -73,6 +78,11 @@ uint32_t Renderer::GetVisibilityBufferDebugView() const {
         case 51u: return kVBDebugReflectionPolicy;
         case 52u: return kVBDebugTemporalPolicy;
         case 53u: return kVBDebugPostSensitivity;
+        case 62u: return kVBDebugLightingV3Direct;
+        case 63u: return kVBDebugLightingV3DirectUnshadowed;
+        case 64u: return kVBDebugLightingV3ShadowVisibility;
+        case 65u: return kVBDebugLightingV3ShadowLoss;
+        case 66u: return kVBDebugLightingV3Indirect;
         default: return kVBDebugNone;
     }
 }

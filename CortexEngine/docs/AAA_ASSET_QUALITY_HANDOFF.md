@@ -4083,3 +4083,93 @@ Current stopping position:
   - add explicit debug views that sample the actual V3 MRT split resources.
   - then compare those concrete split outputs against the legacy debug terms and
     close parity gaps in `PSMainV3LightingSplit`.
+
+### FullSceneShaderPipeline V3 Concrete Split Debug Views - 2026-06-05
+
+Implemented in the current working tree:
+
+- Added a generic `VisibilityBufferRenderer::DebugBlitTextureSRVToHDR` helper.
+  - It copies a staging SRV descriptor into a transient shader-visible SRV and
+    uses the existing fullscreen blit pipeline.
+- Added render-graph support for a post-V3 external-SRV debug blit.
+  - Early `VBDebugBlit` remains for visibility/depth/GBuffer debug modes.
+  - V3 lighting debug modes now run material resolve, deferred lighting, and
+    `FullSceneLightingV3`, then blit the selected concrete split resource to
+    HDR through `FullSceneLightingV3DebugBlit`.
+- Added debug modes:
+  - `62`: `VB_V3DirectLighting`.
+  - `63`: `VB_V3DirectLightingUnshadowed`.
+  - `64`: `VB_V3ShadowVisibility`.
+  - `65`: `VB_V3ShadowLoss`.
+  - `66`: `VB_V3IndirectLighting`.
+- Added packet view names:
+  - `v3_direct_lighting`.
+  - `v3_direct_lighting_unshadowed`.
+  - `v3_shadow_visibility`.
+  - `v3_shadow_loss`.
+  - `v3_indirect_lighting`.
+- Tightened the V3 analyzer's lighting signal metrics to require concrete V3
+  split-buffer metrics in addition to legacy deferred lighting metrics.
+- Updated V2/V3 validators for the expanded debug mode range.
+- Updated `docs/FULL_SCENE_SHADER_PIPELINE_V3.md` L005 with the concrete split
+  debug-view contract.
+
+Focused files touched:
+
+- `src/Graphics/VisibilityBuffer.h`.
+- `src/Graphics/VisibilityBuffer_DebugBlit.cpp`.
+- `src/Graphics/Passes/VisibilityBufferGraphPass.h`.
+- `src/Graphics/Passes/VisibilityBufferGraphPass.cpp`.
+- `src/Graphics/Renderer_RenderGraphVisibilityBufferHelpers.h`.
+- `src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp`.
+- `src/Graphics/Renderer_VisibilityBufferCulling.cpp`.
+- `src/Graphics/Renderer_DebugSettings.cpp`.
+- `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+- `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+- `docs/AAA_ASSET_QUALITY_HANDOFF.md`.
+
+Validation completed:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+git -c submodule.recurse=false diff --check -- src\Graphics\VisibilityBuffer.h src\Graphics\VisibilityBuffer_DebugBlit.cpp src\Graphics\Passes\VisibilityBufferGraphPass.h src\Graphics\Passes\VisibilityBufferGraphPass.cpp src\Graphics\Renderer_RenderGraphVisibilityBuffer.cpp src\Graphics\Renderer_RenderGraphVisibilityBufferHelpers.h src\Graphics\Renderer_VisibilityBufferCulling.cpp src\Graphics\Renderer_DebugSettings.cpp tools\run_scene_local_cinematic_renderer_v1_packets.ps1 tools\run_full_scene_shader_pipeline_v3_packet.ps1 tools\analyze_full_scene_shader_v3_placeholders.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+cl /Zs src\Graphics\Passes\VisibilityBufferGraphPass.cpp
+cl /Zs src\Graphics\Renderer_RenderGraphVisibilityBuffer.cpp
+cl /Zs src\Graphics\Renderer_VisibilityBufferCulling.cpp
+cl /Zs src\Graphics\Renderer_DebugSettings.cpp
+cl /Zs src\Graphics\VisibilityBuffer_DebugBlit.cpp
+```
+
+Validation result:
+
+- Python compile passed.
+- V3 plan validator passed.
+- V2 frame-report validator passed.
+- `git diff --check` passed.
+- Direct MSVC syntax checks passed for the touched C++ translation units above.
+
+Native build status:
+
+- Attempted full `ninja -C build CortexEngine` and focused touched-object
+  builds after `VsDevCmd`.
+- Both attempts timed out and left a zero-CPU stale `ninja` wrapper with no
+  active `cl`/`link` process.
+- Stale wrappers were killed.
+- Treat full native link/build and V3 packet capture as pending, not passed.
+
+Next safe pass:
+
+1. Restore/diagnose the local Ninja build wrapper enough to complete a native
+   build.
+2. Run:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -OutputRoot build/captures/v3_lighting_split_concrete_debug_smoke1_20260605 -SmokeFrames 30 -CaptureFrame 15 -CaptureSequenceCount 1`.
+3. Inspect `debug_view_metrics.json` and `v3_signal.json` for the five concrete
+   V3 split views.
+4. If the V3 split views pass, commit and push this focused checkpoint.
+5. If they fail, fix `PSMainV3LightingSplit` or the debug-blit/resource-state
+   path before moving to Reflection V3.

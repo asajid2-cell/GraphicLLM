@@ -82,7 +82,10 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
     return context.renderer &&
            context.commandList &&
            context.hdrTarget &&
-           (context.debugVisibility || (context.debugDepth && context.depthBuffer) || context.debugGBuffer);
+           (context.debugVisibility ||
+            (context.debugDepth && context.depthBuffer) ||
+            context.debugGBuffer ||
+            (context.debugExternalSRV && context.externalSRV.IsValid()));
 }
 
 [[nodiscard]] bool IsValid(const BRDFLUTContext& context) {
@@ -304,6 +307,12 @@ bool DebugBlit(const DebugBlitContext& context) {
             context.hdrTarget,
             context.hdrRTV,
             context.gbufferSource);
+    } else if (context.debugExternalSRV) {
+        debugResult = context.renderer->DebugBlitTextureSRVToHDR(
+            context.commandList,
+            context.hdrTarget,
+            context.hdrRTV,
+            context.externalSRV);
     }
 
     context.renderer->SetTransitionSkipControls(previousControls);
@@ -526,7 +535,7 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
         Fail(context, "visibility_buffer_material_resolve_contract");
         return false;
     }
-    if (context.debugPath && !IsValid(context.debugBlit)) {
+    if ((context.debugPath || context.lightingV3DebugBlit) && !IsValid(context.debugBlit)) {
         Fail(context, "visibility_buffer_debug_contract");
         return false;
     }
@@ -541,6 +550,11 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     if (context.fullSceneLightingV3Enabled &&
         (!HasFullSceneLightingV3Resources(resources) || !IsValid(context.fullSceneLightingV3))) {
         Fail(context, "full_scene_lighting_v3_contract");
+        return false;
+    }
+    if (context.lightingV3DebugBlit &&
+        (!context.fullSceneLightingV3Enabled || !resources.lightingV3DebugSource.IsValid())) {
+        Fail(context, "full_scene_lighting_v3_debug_contract");
         return false;
     }
 
@@ -683,6 +697,21 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
                 [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
                     (void)ApplyFullSceneLightingV3(context.fullSceneLightingV3);
                 });
+
+            if (context.lightingV3DebugBlit) {
+                graph.AddPass(
+                    "FullSceneLightingV3DebugBlit",
+                    [resources](RGPassBuilder& builder) {
+                        builder.SetType(RGPassType::Graphics);
+                        if (resources.lightingV3DebugSource.IsValid()) {
+                            builder.Read(resources.lightingV3DebugSource, RGResourceUsage::ShaderResource);
+                        }
+                        builder.Write(resources.hdr, RGResourceUsage::RenderTarget);
+                    },
+                    [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
+                        (void)DebugBlit(context.debugBlit);
+                    });
+            }
         }
     }
 

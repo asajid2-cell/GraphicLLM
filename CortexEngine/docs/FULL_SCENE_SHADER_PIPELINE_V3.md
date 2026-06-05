@@ -481,6 +481,18 @@ Current producer evidence:
   `VB_DeferredDirectLightShadowLoss`,
   `VB_DeferredShadowFactor`, and
   `VB_DeferredAmbientIBL`.
+- concrete V3 split debug modes are wired for direct MRT inspection:
+  `VB_V3DirectLighting`,
+  `VB_V3DirectLightingUnshadowed`,
+  `VB_V3ShadowVisibility`,
+  `VB_V3ShadowLoss`, and
+  `VB_V3IndirectLighting`.
+- packet view names for the concrete split buffers are:
+  `v3_direct_lighting`,
+  `v3_direct_lighting_unshadowed`,
+  `v3_shadow_visibility`,
+  `v3_shadow_loss`, and
+  `v3_indirect_lighting`.
 - smoke packet:
   `build/captures/v3_lighting_split_mrt_smoke3_strict_20260605`.
 - packet result:
@@ -504,8 +516,8 @@ Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
-- add split-resource debug views that sample the concrete V3 MRT outputs
-  directly rather than relying on the legacy debug-view naming surface.
+- run the concrete split-resource packet after native build availability is
+  restored and compare V3 split outputs against the legacy deferred terms.
 - keep default beauty unchanged until the consumer/composite path and packet
   gates prove promotion quality.
 

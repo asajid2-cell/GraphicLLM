@@ -476,6 +476,15 @@ public:
         ID3D12Resource* depthBuffer
     );
 
+    // Debug: Blit an arbitrary staging SRV into the HDR target. The staging
+    // descriptor is copied to a transient shader-visible descriptor before draw.
+    Result<void> DebugBlitTextureSRVToHDR(
+        ID3D12GraphicsCommandList* cmdList,
+        ID3D12Resource* hdrTarget,
+        D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+        const DescriptorHandle& sourceSRV
+    );
+
     // Statistics
     [[nodiscard]] uint32_t GetWidth() const { return m_width; }
     [[nodiscard]] uint32_t GetHeight() const { return m_height; }

@@ -15,6 +15,33 @@ namespace Cortex::Graphics {
 
 using namespace VisibilityBufferGraphDetail;
 
+namespace {
+
+DescriptorHandle SelectVBFullSceneLightingV3DebugSRV(const FullSceneLightingV3TargetDescriptors& descriptors,
+                                                     uint32_t debugView) {
+    switch (debugView) {
+        case kVBDebugLightingV3DirectUnshadowed: return descriptors.directLightingUnshadowedSRV;
+        case kVBDebugLightingV3ShadowVisibility: return descriptors.shadowVisibilitySRV;
+        case kVBDebugLightingV3ShadowLoss: return descriptors.shadowLossSRV;
+        case kVBDebugLightingV3Indirect: return descriptors.indirectLightingSRV;
+        case kVBDebugLightingV3Direct:
+        default: return descriptors.directLightingSRV;
+    }
+}
+
+const char* SelectVBFullSceneLightingV3DebugResourceName(uint32_t debugView) {
+    switch (debugView) {
+        case kVBDebugLightingV3DirectUnshadowed: return "direct_lighting_unshadowed";
+        case kVBDebugLightingV3ShadowVisibility: return "shadow_visibility";
+        case kVBDebugLightingV3ShadowLoss: return "shadow_loss";
+        case kVBDebugLightingV3Indirect: return "indirect_lighting";
+        case kVBDebugLightingV3Direct:
+        default: return "direct_lighting";
+    }
+}
+
+} // namespace
+
 Renderer::RenderGraphPassResult
 Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
     RenderGraphPassResult result{};
@@ -44,14 +71,17 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         const bool debugVisibility = IsVBVisibilityIdentityDebugView(vbDebugView);
         const bool debugDepth = (vbDebugView == kVBDebugDepth);
         const bool debugGBuffer = IsVBGBufferDebugView(vbDebugView);
-        const bool debugPath = (vbDebugView != kVBDebugNone);
+        const bool debugLightingV3 = IsVBFullSceneLightingV3DebugView(vbDebugView);
+        const bool debugPath = (vbDebugView != kVBDebugNone) && !debugLightingV3;
         const bool needsMaterialResolve = !debugVisibility && !debugDepth;
         const auto deferredInputs = debugPath
             ? VisibilityBufferDeferredLightingInputs{}
             : PrepareVisibilityBufferDeferredLighting(registry);
+        const bool fullSceneLightingV3Requested =
+            debugLightingV3 || std::getenv("CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT") != nullptr;
         const bool fullSceneLightingV3Enabled =
             !debugPath &&
-            std::getenv("CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT") != nullptr &&
+            fullSceneLightingV3Requested &&
             m_mainTargets.lightingV3.resources.directLighting &&
             m_mainTargets.lightingV3.resources.directLightingUnshadowed &&
             m_mainTargets.lightingV3.resources.shadowVisibility &&
@@ -112,6 +142,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbPassResources.shadowLoss = vbResources.shadowLoss;
         vbPassResources.indirectLighting = vbResources.indirectLighting;
         vbPassResources.debugSource = SelectVBGBufferDebugHandle(vbResources, vbDebugView);
+        vbPassResources.lightingV3DebugSource = SelectVBFullSceneLightingV3DebugHandle(vbResources, vbDebugView);
 
         VisibilityBufferGraphPass::GraphContext vbGraphContext{};
         vbGraphContext.resources = vbPassResources;
@@ -123,6 +154,7 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.brdfGraphOwned = brdfGraphOwned;
         vbGraphContext.clusterGraphOwned = clusterGraphOwned;
         vbGraphContext.fullSceneLightingV3Enabled = fullSceneLightingV3Enabled;
+        vbGraphContext.lightingV3DebugBlit = debugLightingV3;
         VisibilityBufferGraphPass::StageFailureContext vbFailure{
             &vbStageFailed,
             &vbStageFailureStage,
@@ -163,6 +195,9 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
         vbGraphContext.debugBlit.debugVisibility = debugVisibility;
         vbGraphContext.debugBlit.debugDepth = debugDepth;
         vbGraphContext.debugBlit.debugGBuffer = debugGBuffer;
+        vbGraphContext.debugBlit.debugExternalSRV = debugLightingV3;
+        vbGraphContext.debugBlit.externalSRV =
+            SelectVBFullSceneLightingV3DebugSRV(m_mainTargets.lightingV3.descriptors, vbDebugView);
         vbGraphContext.debugBlit.visibilityMode = SelectVBVisibilityDebugMode(vbDebugView);
         vbGraphContext.debugBlit.gbufferSource = SelectVBGBufferDebugBuffer(vbDebugView);
         vbGraphContext.debugBlit.hdrState = &m_mainTargets.hdr.resources.state;
@@ -331,6 +366,12 @@ Renderer::ExecuteVisibilityBufferInRenderGraph(Scene::ECS_Registry* registry) {
                                  "brdf_lut", "cluster_ranges", "cluster_light_indices", "shadow_map"},
                                 {"direct_lighting", "direct_lighting_unshadowed", "shadow_visibility",
                                  "shadow_loss", "indirect_lighting"},
+                                false, nullptr, true);
+            }
+            if (debugLightingV3) {
+                RecordFramePass("FullSceneLightingV3DebugBlit", true, m_visibilityBufferState.renderedThisFrame, 1,
+                                {SelectVBFullSceneLightingV3DebugResourceName(vbDebugView)},
+                                {"hdr_color"},
                                 false, nullptr, true);
             }
             result.executed = m_visibilityBufferState.renderedThisFrame;

@@ -259,6 +259,62 @@ Result<void> VisibilityBufferRenderer::DebugBlitDepthToHDR(
 
     return Result<void>::Ok();
 }
+
+Result<void> VisibilityBufferRenderer::DebugBlitTextureSRVToHDR(
+    ID3D12GraphicsCommandList* cmdList,
+    ID3D12Resource* hdrTarget,
+    D3D12_CPU_DESCRIPTOR_HANDLE hdrRTV,
+    const DescriptorHandle& sourceSRV
+) {
+    (void)hdrTarget;
+
+    if (!cmdList) {
+        return Result<void>::Err("Texture SRV debug blit requires a valid command list");
+    }
+    if (!sourceSRV.IsValid()) {
+        return Result<void>::Err("Texture SRV debug blit requires a valid source SRV");
+    }
+    if (!m_blitPipeline || !m_blitRootSignature || !m_blitSamplerHeap) {
+        return Result<void>::Err("Texture SRV debug blit pipeline not initialized");
+    }
+
+    auto transientResult = m_descriptorManager->AllocateTransientCBV_SRV_UAV();
+    if (transientResult.IsErr()) {
+        return Result<void>::Err("Texture SRV debug blit failed to allocate transient SRV: " +
+                                 transientResult.Error());
+    }
+    DescriptorHandle transientSRV = transientResult.Value();
+    m_device->GetDevice()->CopyDescriptorsSimple(
+        1,
+        transientSRV.cpu,
+        sourceSRV.cpu,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    cmdList->OMSetRenderTargets(1, &hdrRTV, FALSE, nullptr);
+
+    D3D12_VIEWPORT viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
+    D3D12_RECT scissor = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    cmdList->RSSetViewports(1, &viewport);
+    cmdList->RSSetScissorRects(1, &scissor);
+
+    cmdList->SetPipelineState(m_blitPipeline.Get());
+    cmdList->SetGraphicsRootSignature(m_blitRootSignature.Get());
+
+    ID3D12DescriptorHeap* heaps[] = {
+        m_descriptorManager->GetCBV_SRV_UAV_Heap(),
+        m_blitSamplerHeap.Get()
+    };
+    cmdList->SetDescriptorHeaps(2, heaps);
+
+    cmdList->SetGraphicsRootDescriptorTable(0, transientSRV.gpu);
+    cmdList->SetGraphicsRootDescriptorTable(1, m_blitSamplerHeap->GetGPUDescriptorHandleForHeapStart());
+
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->DrawInstanced(3, 1, 0, 0);
+
+    return Result<void>::Ok();
+}
+
 D3D12_GPU_DESCRIPTOR_HANDLE VisibilityBufferRenderer::GetMaterialExt0SRV() const {
     return m_materialExt0SRV.gpu;
 }

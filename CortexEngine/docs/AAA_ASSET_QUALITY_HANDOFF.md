@@ -2164,3 +2164,53 @@ Current interpretation:
 - Next implementation should use these surfaces for numeric deltas or an
   opt-in reflection resolver candidate path instead of guessing from beauty
   captures alone.
+
+## Full Scene Shader V2 Debug View Metrics - 2026-06-05
+
+Implemented:
+
+- Added `tools/analyze_full_scene_shader_debug_view_metrics.py`.
+  - reads a packet manifest.
+  - parses captured BMPs without external image dependencies.
+  - emits per-view width, height, mean RGB, max RGB, mean/max luma, nonblack
+    ratio, and hot-pixel ratio.
+- Updated `tools/run_full_scene_shader_pipeline_v2_packet.ps1`.
+  - integrated metrics outputs:
+    - `debug_view_metrics.json`.
+    - `debug_view_metrics.md`.
+    - `debug_view_metrics_stdout.txt`.
+- Updated `tools/check_full_scene_shader_pipeline_v2_frame_report.py`.
+  - requires the metrics analyzer and packet output names.
+
+Validation:
+
+```powershell
+python tools\analyze_full_scene_shader_debug_view_metrics.py --manifest build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\manifest.json --output-json build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\debug_view_metrics.json --output-md build\captures\full_scene_shader_pipeline_v2_reflection_resolver_debug_packet_20260605\debug_view_metrics.md
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -SmokeFrames 90 -CaptureFrame 45 -OutputRoot build/captures/full_scene_shader_pipeline_v2_debug_view_metrics_packet_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_debug_view_metrics.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\validate_full_scene_shader_pipeline_v2_plan.py
+```
+
+Packet evidence:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_debug_view_metrics_packet_20260605`.
+- captured views: `17`.
+- evidence rows: `170`.
+- frame-report failures: `0`.
+- measured debug views: `17`.
+- metric failures: `0`.
+- key reflection metrics:
+  - `reflection_source_weights` mean RGB:
+    `0.000001, 0.069131, 0.060542`.
+  - `reflection_source_weights` nonblack ratio: `0.322766`.
+  - `reflection_stability_policy` mean RGB:
+    `0.159872, 0.110794, 0.343249`.
+  - `reflection_stability_policy` nonblack ratio: `1.0`.
+
+Current interpretation:
+
+- Debug packet outputs are now measurable artifacts, not only images.
+- This gives future V2 candidate passes a cheap regression gate for source
+  ownership and visual signal before subjective review.

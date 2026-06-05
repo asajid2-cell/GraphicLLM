@@ -42,6 +42,7 @@ DEFERRED_LIGHTING_CONSTANTS_SOURCE_PATH = (
 TEMPORAL_REJECTION_SHADER_PATH = ROOT / "assets" / "shaders" / "TemporalRejectionMask.hlsl"
 TEMPORAL_REJECTION_SOURCE_PATH = ROOT / "src" / "Graphics" / "TemporalRejectionMask.cpp"
 RUN_FULL_SCENE_SHADER_PACKET_PATH = ROOT / "tools" / "run_full_scene_shader_pipeline_v2_packet.ps1"
+DEBUG_VIEW_METRICS_TOOL_PATH = ROOT / "tools" / "analyze_full_scene_shader_debug_view_metrics.py"
 
 
 def fail(message: str) -> int:
@@ -1021,8 +1022,12 @@ def validate_v2_packet_runner_surface() -> list[str]:
         return [f"missing V2 packet runner: {RUN_FULL_SCENE_SHADER_PACKET_PATH}"]
 
     packet_script = RUN_FULL_SCENE_SHADER_PACKET_PATH.read_text(encoding="utf-8")
+    metrics_tool = DEBUG_VIEW_METRICS_TOOL_PATH.read_text(encoding="utf-8")
     required_tokens = [
         "run_scene_local_cinematic_renderer_v1_packets.ps1",
+        "analyze_full_scene_shader_debug_view_metrics.py",
+        "debug_view_metrics.json",
+        "debug_view_metrics.md",
         "full_scene_shader_pipeline_v2",
         "frame_contract.full_scene_shader_pipeline_v2",
         "promotion_state",
@@ -1053,6 +1058,16 @@ def validate_v2_packet_runner_surface() -> list[str]:
     for token in required_tokens:
         if token not in packet_script:
             errors.append(f"V2 packet runner missing required token: {token}")
+
+    for token in [
+        "cortex.full_scene_shader_pipeline_v2.debug_view_metrics.v1",
+        "read_bmp_rgb",
+        "mean_rgb",
+        "nonblack_ratio",
+        "hot_pixel_ratio",
+    ]:
+        if token not in metrics_tool:
+            errors.append(f"V2 debug-view metrics tool missing required token: {token}")
 
     return errors
 

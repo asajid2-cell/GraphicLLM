@@ -30,7 +30,7 @@ REQUIRED_DOMAINS = {
     "validation",
 }
 
-ALLOWED_READY_DOMAINS = {"material"}
+ALLOWED_READY_DOMAINS = {"material", "lighting"}
 
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
@@ -131,10 +131,18 @@ def analyze_report(path: pathlib.Path) -> dict[str, Any]:
         if not isinstance(lighting_domain, dict):
             failures.append("lighting adapter ready but lighting domain is missing")
         else:
-            if lighting_domain.get("producer") != "FullSceneLightingV3Adapter":
-                failures.append("lighting adapter must be produced by FullSceneLightingV3Adapter")
-            if lighting_domain.get("output_resource") != "hdr_color":
-                failures.append("lighting adapter must honestly name hdr_color as current output")
+            if v3.get("lighting_split_resources_ready") is True:
+                if lighting_domain.get("producer") != "FullSceneLightingV3":
+                    failures.append("ready lighting domain must be produced by FullSceneLightingV3")
+                if lighting_domain.get("output_resource") != "lighting_split":
+                    failures.append("ready lighting domain must expose lighting_split as its output")
+                if lighting_domain.get("promotion_state") != "producer":
+                    failures.append("ready lighting domain must be in producer promotion_state")
+            else:
+                if lighting_domain.get("producer") != "FullSceneLightingV3Adapter":
+                    failures.append("lighting adapter must be produced by FullSceneLightingV3Adapter")
+                if lighting_domain.get("output_resource") != "hdr_color":
+                    failures.append("lighting adapter must honestly name hdr_color as current output")
             if v3.get("lighting_split_resources_allocated") is not True:
                 failures.append("lighting adapter packet must expose allocated split lighting resources")
             if lighting_domain.get("ready") is True and v3.get("lighting_split_resources_ready") is not True:

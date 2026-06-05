@@ -78,6 +78,11 @@ struct VisibilityBufferGraphResources {
     RGResourceHandle shadow;
     RGResourceHandle rtShadow;
     RGResourceHandle rtGI;
+    RGResourceHandle directLighting;
+    RGResourceHandle directLightingUnshadowed;
+    RGResourceHandle shadowVisibility;
+    RGResourceHandle shadowLoss;
+    RGResourceHandle indirectLighting;
 };
 
 inline RGResourceHandle ImportOptionalResource(RenderGraph& graph,
@@ -102,7 +107,13 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
     ID3D12Resource* rtShadowMask,
     D3D12_RESOURCE_STATES rtShadowMaskState,
     ID3D12Resource* rtGIColor,
-    D3D12_RESOURCE_STATES rtGIState) {
+    D3D12_RESOURCE_STATES rtGIState,
+    ID3D12Resource* directLighting = nullptr,
+    ID3D12Resource* directLightingUnshadowed = nullptr,
+    ID3D12Resource* shadowVisibility = nullptr,
+    ID3D12Resource* shadowLoss = nullptr,
+    ID3D12Resource* indirectLighting = nullptr,
+    D3D12_RESOURCE_STATES lightingSplitState = D3D12_RESOURCE_STATE_COMMON) {
     VisibilityBufferGraphResources resources{};
     resources.initialStates = visibilityBuffer.GetResourceStateSnapshot();
 
@@ -135,6 +146,16 @@ inline VisibilityBufferGraphResources ImportVisibilityBufferGraphResources(
     resources.shadow = ImportOptionalResource(graph, shadowMap, shadowMapState, "ShadowMap_VB");
     resources.rtShadow = ImportOptionalResource(graph, rtShadowMask, rtShadowMaskState, "RTShadowMask_VB");
     resources.rtGI = ImportOptionalResource(graph, rtGIColor, rtGIState, "RTGI_VB");
+    resources.directLighting = ImportOptionalResource(
+        graph, directLighting, lightingSplitState, "FullSceneV3_DirectLighting");
+    resources.directLightingUnshadowed = ImportOptionalResource(
+        graph, directLightingUnshadowed, lightingSplitState, "FullSceneV3_DirectLightingUnshadowed");
+    resources.shadowVisibility = ImportOptionalResource(
+        graph, shadowVisibility, lightingSplitState, "FullSceneV3_ShadowVisibility");
+    resources.shadowLoss = ImportOptionalResource(
+        graph, shadowLoss, lightingSplitState, "FullSceneV3_ShadowLoss");
+    resources.indirectLighting = ImportOptionalResource(
+        graph, indirectLighting, lightingSplitState, "FullSceneV3_IndirectLighting");
     return resources;
 }
 

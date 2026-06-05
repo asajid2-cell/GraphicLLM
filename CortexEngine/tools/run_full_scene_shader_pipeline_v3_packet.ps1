@@ -19,6 +19,7 @@ $v3Analyzer = Join-Path $root "tools/analyze_full_scene_shader_v3_placeholders.p
 $outputPath = Join-Path $root $OutputRoot
 $signalOutput = Join-Path $outputPath "v3_signal.json"
 $stabilityOutput = Join-Path $outputPath "v3_stability.json"
+$previousFullSceneLightingV3 = $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT
 
 $packetArgs = @(
     "-OutputRoot", $OutputRoot,
@@ -41,14 +42,24 @@ if ($StressSceneOnly) {
     $packetArgs += "-StressSceneOnly"
 }
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File $v2Packet @packetArgs
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
+try {
+    $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT = "1"
 
-& python $v3Analyzer --input $outputPath --signal-output $signalOutput --stability-output $stabilityOutput
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $v2Packet @packetArgs
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & python $v3Analyzer --input $outputPath --signal-output $signalOutput --stability-output $stabilityOutput
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+} finally {
+    if ($null -eq $previousFullSceneLightingV3) {
+        Remove-Item Env:\CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT -ErrorAction SilentlyContinue
+    } else {
+        $env:CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT = $previousFullSceneLightingV3
+    }
 }
 
 Write-Host "Full Scene Shader Pipeline V3 placeholder packet evidence passed."

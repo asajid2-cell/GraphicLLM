@@ -50,6 +50,14 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
            resources.materialExt2.IsValid();
 }
 
+[[nodiscard]] bool HasFullSceneLightingV3Resources(const ResourceHandles& resources) {
+    return resources.directLighting.IsValid() &&
+           resources.directLightingUnshadowed.IsValid() &&
+           resources.shadowVisibility.IsValid() &&
+           resources.shadowLoss.IsValid() &&
+           resources.indirectLighting.IsValid();
+}
+
 [[nodiscard]] bool IsValid(const ClearContext& context) {
     return context.renderer && context.commandList;
 }
@@ -89,6 +97,18 @@ void RecordFailure(const StageFailureContext& failure, const char* stage, const 
     return context.renderer &&
            context.commandList &&
            context.hdrTarget &&
+           context.depthBuffer;
+}
+
+[[nodiscard]] bool IsValid(const FullSceneLightingV3Context& context) {
+    return context.enabled &&
+           context.renderer &&
+           context.commandList &&
+           context.targets.directLighting &&
+           context.targets.directLightingUnshadowed &&
+           context.targets.shadowVisibility &&
+           context.targets.shadowLoss &&
+           context.targets.indirectLighting &&
            context.depthBuffer;
 }
 
@@ -425,6 +445,73 @@ bool ApplyDeferredLighting(const DeferredLightingContext& context) {
     return true;
 }
 
+bool ApplyFullSceneLightingV3(const FullSceneLightingV3Context& context) {
+    if (HasFailed(context.failure)) {
+        return false;
+    }
+    if (!IsValid(context)) {
+        RecordFailure(context.failure, "full_scene_lighting_v3", "FullSceneLightingV3 context incomplete");
+        return false;
+    }
+
+    if (context.depthState) {
+        *context.depthState = kDepthSampleState;
+    }
+    if (context.lightingSplitState) {
+        *context.lightingSplitState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+    if (context.shadowValid && context.shadowState) {
+        *context.shadowState = kVBShaderResourceState;
+    }
+    if (context.rtShadowValid && context.rtShadowState) {
+        *context.rtShadowState = kVBShaderResourceState;
+    }
+    if (context.rtGIValid && context.rtGIState) {
+        *context.rtGIState = kVBShaderResourceState;
+    }
+
+    auto states = context.renderer->GetResourceStateSnapshot();
+    states.albedo = kVBShaderResourceState;
+    states.normalRoughness = kVBShaderResourceState;
+    states.emissiveMetallic = kVBShaderResourceState;
+    states.materialExt0 = kVBShaderResourceState;
+    states.materialExt1 = kVBShaderResourceState;
+    states.materialExt2 = kVBShaderResourceState;
+    if (context.brdfLutValid) {
+        states.brdfLut = kVBShaderResourceState;
+    }
+    if (context.clusterGraphOwned) {
+        states.clusterRanges = kVBShaderResourceState;
+        states.clusterLightIndices = kVBShaderResourceState;
+    }
+    context.renderer->ApplyResourceStateSnapshot(states);
+
+    auto controls = context.renderer->GetTransitionSkipControls();
+    const auto previousControls = controls;
+    controls.deferredLighting = true;
+    if (context.clusterGraphOwned) {
+        controls.clusteredLights = true;
+    }
+    context.renderer->SetTransitionSkipControls(controls);
+    auto lightingResult = context.renderer->ApplyFullSceneLightingV3(
+        context.commandList,
+        context.targets,
+        context.depthBuffer,
+        context.depthSRV,
+        context.envDiffuseResource,
+        context.envSpecularResource,
+        context.envFormat,
+        context.shadowMapSRV,
+        context.params);
+    context.renderer->SetTransitionSkipControls(previousControls);
+    if (lightingResult.IsErr()) {
+        RecordFailure(context.failure, "full_scene_lighting_v3", lightingResult.Error());
+        return false;
+    }
+
+    return true;
+}
+
 bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     const ResourceHandles& resources = context.resources;
     if (!HasBaseResources(resources) || !IsValid(context.clear) || !IsValid(context.visibility)) {
@@ -449,6 +536,11 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
     }
     if (!context.debugPath && context.clusterGraphOwned && !IsValid(context.clusteredLights)) {
         Fail(context, "visibility_buffer_clustered_lights_contract");
+        return false;
+    }
+    if (context.fullSceneLightingV3Enabled &&
+        (!HasFullSceneLightingV3Resources(resources) || !IsValid(context.fullSceneLightingV3))) {
+        Fail(context, "full_scene_lighting_v3_contract");
         return false;
     }
 
@@ -561,6 +653,37 @@ bool AddStagedPath(RenderGraph& graph, const GraphContext& context) {
             [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
                 (void)ApplyDeferredLighting(context.deferredLighting);
             });
+
+        if (context.fullSceneLightingV3Enabled) {
+            graph.AddPass(
+                "FullSceneLightingV3",
+                [context, resources](RGPassBuilder& builder) {
+                    builder.SetType(RGPassType::Graphics);
+                    builder.Read(resources.depth, RGResourceUsage::ShaderResource | RGResourceUsage::DepthStencilRead);
+                    builder.Read(resources.albedo, RGResourceUsage::ShaderResource);
+                    builder.Read(resources.normalRoughness, RGResourceUsage::ShaderResource);
+                    builder.Read(resources.emissiveMetallic, RGResourceUsage::ShaderResource);
+                    builder.Read(resources.materialExt0, RGResourceUsage::ShaderResource);
+                    builder.Read(resources.materialExt1, RGResourceUsage::ShaderResource);
+                    builder.Read(resources.materialExt2, RGResourceUsage::ShaderResource);
+                    if (resources.brdfLut.IsValid()) builder.Read(resources.brdfLut, RGResourceUsage::ShaderResource);
+                    if (context.clusterGraphOwned) {
+                        builder.Read(resources.clusterRanges, RGResourceUsage::ShaderResource);
+                        builder.Read(resources.clusterLightIndices, RGResourceUsage::ShaderResource);
+                    }
+                    if (resources.shadow.IsValid()) builder.Read(resources.shadow, RGResourceUsage::ShaderResource);
+                    if (resources.rtShadow.IsValid()) builder.Read(resources.rtShadow, RGResourceUsage::ShaderResource);
+                    if (resources.rtGI.IsValid()) builder.Read(resources.rtGI, RGResourceUsage::ShaderResource);
+                    builder.Write(resources.directLighting, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.directLightingUnshadowed, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.shadowVisibility, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.shadowLoss, RGResourceUsage::RenderTarget);
+                    builder.Write(resources.indirectLighting, RGResourceUsage::RenderTarget);
+                },
+                [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
+                    (void)ApplyFullSceneLightingV3(context.fullSceneLightingV3);
+                });
+        }
     }
 
     return true;

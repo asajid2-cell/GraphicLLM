@@ -286,6 +286,31 @@ public:
         const DeferredLightingParams& params
     );
 
+    struct FullSceneLightingV3Targets {
+        ID3D12Resource* directLighting = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE directLightingRTV{};
+        ID3D12Resource* directLightingUnshadowed = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE directLightingUnshadowedRTV{};
+        ID3D12Resource* shadowVisibility = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowVisibilityRTV{};
+        ID3D12Resource* shadowLoss = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE shadowLossRTV{};
+        ID3D12Resource* indirectLighting = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE indirectLightingRTV{};
+    };
+
+    Result<void> ApplyFullSceneLightingV3(
+        ID3D12GraphicsCommandList* cmdList,
+        const FullSceneLightingV3Targets& targets,
+        ID3D12Resource* depthBuffer,
+        const DescriptorHandle& depthSRV,
+        ID3D12Resource* envDiffuseResource,
+        ID3D12Resource* envSpecularResource,
+        DXGI_FORMAT envFormat,
+        const DescriptorHandle& shadowMapSRV,
+        const DeferredLightingParams& params
+    );
+
     // Optional: Build per-cluster light lists for the current frame (clustered deferred).
     Result<void> BuildClusteredLightLists(ID3D12GraphicsCommandList* cmdList, const DeferredLightingParams& params);
 

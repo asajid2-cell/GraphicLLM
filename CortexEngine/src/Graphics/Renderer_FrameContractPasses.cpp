@@ -69,6 +69,11 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "depth") return resourceBytes(m_depthResources.resources.buffer.Get());
         if (resource == "hdr_color") return resourceBytes(m_mainTargets.hdr.resources.color.Get());
         if (resource == "gbuffer_normal_roughness") return resourceBytes(m_mainTargets.normalRoughness.resources.texture.Get());
+        if (resource == "direct_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.directLighting.Get());
+        if (resource == "direct_lighting_unshadowed") return resourceBytes(m_mainTargets.lightingV3.resources.directLightingUnshadowed.Get());
+        if (resource == "shadow_visibility") return resourceBytes(m_mainTargets.lightingV3.resources.shadowVisibility.Get());
+        if (resource == "shadow_loss") return resourceBytes(m_mainTargets.lightingV3.resources.shadowLoss.Get());
+        if (resource == "indirect_lighting") return resourceBytes(m_mainTargets.lightingV3.resources.indirectLighting.Get());
         if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());
         if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());
@@ -100,6 +105,8 @@ void Renderer::RecordFramePass(const char* name,
                 return std::string("reduced_resolution");
             }
             if (write == "depth" || write == "hdr_color" ||
+                write == "direct_lighting" || write == "direct_lighting_unshadowed" ||
+                write == "shadow_visibility" || write == "shadow_loss" || write == "indirect_lighting" ||
                 write == "gbuffer_normal_roughness" || write == "velocity" ||
                 write == "temporal_rejection_mask" || write == "taa_history" || write == "ssr_color") {
                 return std::string("render_resolution");

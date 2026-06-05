@@ -3859,3 +3859,81 @@ Current stopping position:
 - V3 lighting is not producer-ready; the next major slice is a real
   `FullSceneLightingV3` pass that writes the five split resources, then proves
   ownership through frame-contract pass/resource evidence.
+
+### FullSceneShaderPipeline V3 Lighting Split Producer - 2026-06-05
+
+Implemented:
+
+- Added an opt-in `FullSceneLightingV3` render-graph pass enabled by:
+  `CORTEX_ENABLE_FULL_SCENE_LIGHTING_V3_SPLIT=1`.
+- The pass writes all five V3 lighting split resources:
+  - `direct_lighting`.
+  - `direct_lighting_unshadowed`.
+  - `shadow_visibility`.
+  - `shadow_loss`.
+  - `indirect_lighting`.
+- The first producer implementation reuses the existing deferred lighting term
+  debug paths and writes the five targets with five full-screen draws.
+- This is producer proof and resource ownership scaffolding, not the final
+  single-pass HDR split-lighting architecture.
+- Normal/default gameplay does not run the extra split pass unless the opt-in
+  env flag is present.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1` now enables the flag
+  around packet capture and restores the caller's environment afterward.
+- V3 runtime report now promotes lighting from adapter evidence to producer
+  evidence when frame-contract pass writes prove all five split resources:
+  - producer: `FullSceneLightingV3`.
+  - output resource: `lighting_split`.
+  - promotion state: `producer`.
+  - ready: `true`.
+- Default beauty remains unchanged:
+  `default_beauty_affects=false`.
+
+Touched files:
+
+- `src/Graphics/VisibilityBuffer.h`.
+- `src/Graphics/VisibilityBuffer_DeferredLighting.cpp`.
+- `src/Graphics/Passes/VisibilityBufferGraphPass.h`.
+- `src/Graphics/Passes/VisibilityBufferGraphPass.cpp`.
+- `src/Graphics/Renderer_RenderGraphVisibilityBufferHelpers.h`.
+- `src/Graphics/Renderer_RenderGraphVisibilityBuffer.cpp`.
+- `src/Graphics/Renderer_FrameContractPasses.cpp`.
+- `src/Graphics/FullSceneShaderFrameContext.h`.
+- `tools/analyze_full_scene_shader_v3_placeholders.py`.
+- `tools/run_full_scene_shader_pipeline_v3_packet.ps1`.
+- `docs/FULL_SCENE_SHADER_PIPELINE_V3.md`.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V3 lighting split producer packet passed:
+  `build/captures/v3_lighting_split_producer_smoke1_20260605`.
+- extracted frame-report evidence:
+  - `lighting_split_resources_allocated=true`.
+  - `lighting_split_resources_ready=true`.
+  - `lighting_split_resource_count=5`.
+  - `lighting.ready=true`.
+  - `lighting.producer=FullSceneLightingV3`.
+  - `lighting.output_resource=lighting_split`.
+  - `lighting.promotion_state=producer`.
+  - `FullSceneLightingV3.pass_executed=true`.
+  - `FullSceneLightingV3.pass_draw_count=5`.
+  - `FullSceneLightingV3.pass_writes=direct_lighting,direct_lighting_unshadowed,shadow_visibility,shadow_loss,indirect_lighting`.
+- `v3_stability.json`:
+  - `report_count=6`.
+  - `default_beauty_affects_any=false`.
+  - `promoted_report_count=0`.
+  - `lighting_adapter_ready_report_count=6`.
+  - `lighting_split_allocated_report_count=6`.
+  - `lighting_split_ready_report_count=6`.
+  - failures `0`, warnings `0`.
+
+Current stopping position:
+
+- V3 material is producer-ready through `FullSceneMaterialResolveV3`.
+- V3 lighting is producer-ready under the opt-in split flag through
+  `FullSceneLightingV3`.
+- The next major renderer slice should replace the five debug-term redraws with
+  a direct split-output lighting shader/pass, then add lighting signal gates
+  for direct, indirect, shadow visibility, and shadow loss.

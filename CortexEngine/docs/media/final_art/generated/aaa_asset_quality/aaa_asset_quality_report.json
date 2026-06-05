@@ -1,0 +1,298 @@
+{
+  "schema": "cortex.aaa_asset_quality.report.v1",
+  "status": "BLOCKED",
+  "contract": "assets/final_art/aaa_asset_quality_contract.json",
+  "catalog": "assets/final_art/final_art_scene_catalog.json",
+  "import_manifest": "assets/generated/pretrained_assets/import_manifest.json",
+  "asset_registry": "assets/final_art/asset_registry_v2.json",
+  "renderer_manifest": "build/captures/scene_local_cinematic_renderer_v1_final_gate_20260605/warm_micro_jitter_full_seq8/manifest.json",
+  "scene_count": 5,
+  "passed_scene_count": 0,
+  "blocked_scene_count": 5,
+  "minimums": {
+    "scene_score": 0.82,
+    "hero_runtime_mesh_ratio": 0.85,
+    "all_runtime_mesh_ratio": 0.55,
+    "primitive_ratio_max": 0.45,
+    "required_role_coverage": 0.95,
+    "pbr_texture_asset_ratio": 0.65,
+    "lod_ready_asset_ratio": 0.7,
+    "collision_ready_asset_ratio": 0.7,
+    "provenance_ready_asset_ratio": 0.95,
+    "min_runtime_mesh_instances": 18,
+    "min_unique_runtime_assets": 10,
+    "min_material_presets": 12,
+    "min_scene_detail_objects": 45
+  },
+  "scenes": [
+    {
+      "id": "home_kitchen_lantern",
+      "renderer_family": "kitchen",
+      "seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_kitchen/scene_seed.json",
+      "status": "BLOCKED",
+      "score": 0.6014,
+      "blockers": [
+        "collision readiness ratio below minimum",
+        "hero role still primitive/blockout",
+        "lod readiness ratio below minimum",
+        "pbr texture ratio below minimum",
+        "required role coverage below minimum"
+      ],
+      "warnings": [
+        "non-allowlisted primitive ratio above target",
+        "scene score below AAA minimum"
+      ],
+      "metrics": {
+        "object_count": 135,
+        "runtime_mesh_instances": 27,
+        "unique_runtime_assets": 19,
+        "primitive_count": 108,
+        "non_allowlisted_primitive_count": 102,
+        "material_preset_count": 30,
+        "hero_object_count": 6,
+        "hero_runtime_mesh_ratio": 0.6667,
+        "all_runtime_mesh_ratio": 0.2,
+        "primitive_ratio": 0.7556,
+        "required_role_coverage": 0.7778,
+        "pbr_texture_asset_ratio": 0.037,
+        "lod_ready_asset_ratio": 0.0,
+        "collision_ready_asset_ratio": 0.0,
+        "provenance_ready_asset_ratio": 1.0
+      },
+      "missing_required_roles": [
+        "kitchen_wall",
+        "tile_floor"
+      ],
+      "primitive_hero_roles": [
+        "cabinet",
+        "countertop"
+      ],
+      "renderer_evidence": {
+        "capture": "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\captures\\scene_local_cinematic_renderer_v1_final_gate_20260605\\warm_micro_jitter_full_seq8\\kitchen\\beauty\\visual_validation_frame_0028.bmp",
+        "external_hdri_visible": false,
+        "invalid_external_hdri": false,
+        "environment_owner": "scene_local_neutral",
+        "reflection_owner": "local_room_no_visible_hdri",
+        "profile_id": "kitchen_morning_warm_scene_local_v1"
+      },
+      "asset_registry_coverage": 1.0
+    },
+    {
+      "id": "home_office_evening",
+      "renderer_family": "office",
+      "seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_office/scene_seed.json",
+      "status": "BLOCKED",
+      "score": 0.5774,
+      "blockers": [
+        "collision readiness ratio below minimum",
+        "hero role still primitive/blockout",
+        "lod readiness ratio below minimum",
+        "pbr texture ratio below minimum"
+      ],
+      "warnings": [
+        "non-allowlisted primitive ratio above target",
+        "scene score below AAA minimum"
+      ],
+      "metrics": {
+        "object_count": 131,
+        "runtime_mesh_instances": 24,
+        "unique_runtime_assets": 14,
+        "primitive_count": 107,
+        "non_allowlisted_primitive_count": 102,
+        "material_preset_count": 36,
+        "hero_object_count": 14,
+        "hero_runtime_mesh_ratio": 0.4286,
+        "all_runtime_mesh_ratio": 0.1832,
+        "primitive_ratio": 0.7786,
+        "required_role_coverage": 1.0,
+        "pbr_texture_asset_ratio": 0.0,
+        "lod_ready_asset_ratio": 0.0,
+        "collision_ready_asset_ratio": 0.0,
+        "provenance_ready_asset_ratio": 1.0
+      },
+      "missing_required_roles": [],
+      "primitive_hero_roles": [
+        "book",
+        "keyboard",
+        "monitor",
+        "shelf"
+      ],
+      "renderer_evidence": {
+        "capture": "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\captures\\scene_local_cinematic_renderer_v1_final_gate_20260605\\warm_micro_jitter_full_seq8\\office\\beauty\\visual_validation_frame_0028.bmp",
+        "external_hdri_visible": false,
+        "invalid_external_hdri": false,
+        "environment_owner": "scene_local_neutral",
+        "reflection_owner": "local_room_no_visible_hdri",
+        "profile_id": "office_evening_scene_local_v1"
+      },
+      "asset_registry_coverage": 1.0
+    },
+    {
+      "id": "basketball_gym_day",
+      "renderer_family": "gym",
+      "seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_basketball_gym/scene_seed.json",
+      "status": "BLOCKED",
+      "score": 0.4827,
+      "blockers": [
+        "collision readiness ratio below minimum",
+        "hero role still primitive/blockout",
+        "lod readiness ratio below minimum",
+        "pbr texture ratio below minimum",
+        "required role coverage below minimum",
+        "unique runtime asset count below minimum"
+      ],
+      "warnings": [
+        "non-allowlisted primitive ratio above target",
+        "scene score below AAA minimum"
+      ],
+      "metrics": {
+        "object_count": 125,
+        "runtime_mesh_instances": 30,
+        "unique_runtime_assets": 4,
+        "primitive_count": 95,
+        "non_allowlisted_primitive_count": 78,
+        "material_preset_count": 21,
+        "hero_object_count": 7,
+        "hero_runtime_mesh_ratio": 0.0,
+        "all_runtime_mesh_ratio": 0.24,
+        "primitive_ratio": 0.624,
+        "required_role_coverage": 0.8,
+        "pbr_texture_asset_ratio": 0.0,
+        "lod_ready_asset_ratio": 0.0,
+        "collision_ready_asset_ratio": 0.0,
+        "provenance_ready_asset_ratio": 1.0
+      },
+      "missing_required_roles": [
+        "ceiling_light",
+        "stadium_seat"
+      ],
+      "primitive_hero_roles": [
+        "backboard",
+        "ball",
+        "bleacher",
+        "hoop",
+        "scoreboard"
+      ],
+      "renderer_evidence": {
+        "capture": "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\captures\\scene_local_cinematic_renderer_v1_final_gate_20260605\\warm_micro_jitter_full_seq8\\gym\\beauty\\visual_validation_frame_0028.bmp",
+        "external_hdri_visible": false,
+        "invalid_external_hdri": false,
+        "environment_owner": "scene_local_neutral",
+        "reflection_owner": "local_room_no_visible_hdri",
+        "profile_id": "basketball_gym_bright_scene_local_v1"
+      },
+      "asset_registry_coverage": 1.0
+    },
+    {
+      "id": "neon_streamer_concert",
+      "renderer_family": "concert",
+      "seed": "assets/scenes/model_authored/scene_authoring_admitted_v1/admitted_concert/scene_seed.json",
+      "status": "BLOCKED",
+      "score": 0.5658,
+      "blockers": [
+        "collision readiness ratio below minimum",
+        "hero role still primitive/blockout",
+        "lod readiness ratio below minimum",
+        "pbr texture ratio below minimum",
+        "required role coverage below minimum",
+        "unique runtime asset count below minimum"
+      ],
+      "warnings": [
+        "non-allowlisted primitive ratio above target",
+        "scene score below AAA minimum"
+      ],
+      "metrics": {
+        "object_count": 154,
+        "runtime_mesh_instances": 39,
+        "unique_runtime_assets": 6,
+        "primitive_count": 115,
+        "non_allowlisted_primitive_count": 110,
+        "material_preset_count": 19,
+        "hero_object_count": 28,
+        "hero_runtime_mesh_ratio": 0.75,
+        "all_runtime_mesh_ratio": 0.2532,
+        "primitive_ratio": 0.7143,
+        "required_role_coverage": 0.4545,
+        "pbr_texture_asset_ratio": 0.0,
+        "lod_ready_asset_ratio": 0.0,
+        "collision_ready_asset_ratio": 0.0,
+        "provenance_ready_asset_ratio": 1.0
+      },
+      "missing_required_roles": [
+        "audience_riser",
+        "ceiling_plane",
+        "desk",
+        "overhead_light",
+        "venue_floor",
+        "venue_wall"
+      ],
+      "primitive_hero_roles": [
+        "hero_screen",
+        "stage",
+        "stage_light"
+      ],
+      "renderer_evidence": {
+        "capture": "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\captures\\scene_local_cinematic_renderer_v1_final_gate_20260605\\warm_micro_jitter_full_seq8\\concert\\beauty\\visual_validation_frame_0028.bmp",
+        "external_hdri_visible": false,
+        "invalid_external_hdri": false,
+        "environment_owner": "scene_local_neutral",
+        "reflection_owner": "local_room_no_visible_hdri",
+        "profile_id": "neon_concert_auditorium_scene_local_v1"
+      },
+      "asset_registry_coverage": 1.0
+    },
+    {
+      "id": "rt_showcase_gallery",
+      "renderer_family": "gallery",
+      "seed": "",
+      "status": "BLOCKED",
+      "score": 0.1,
+      "blockers": [
+        "collision readiness ratio below minimum",
+        "lod readiness ratio below minimum",
+        "pbr texture ratio below minimum",
+        "provenance readiness ratio below minimum",
+        "required role coverage below minimum",
+        "runtime mesh instance count below minimum",
+        "unique runtime asset count below minimum"
+      ],
+      "warnings": [
+        "scene score below AAA minimum"
+      ],
+      "metrics": {
+        "object_count": 0,
+        "runtime_mesh_instances": 0,
+        "unique_runtime_assets": 0,
+        "primitive_count": 0,
+        "non_allowlisted_primitive_count": 0,
+        "material_preset_count": 0,
+        "hero_object_count": 0,
+        "hero_runtime_mesh_ratio": 0.0,
+        "all_runtime_mesh_ratio": 0.0,
+        "primitive_ratio": 0.0,
+        "required_role_coverage": 0.0,
+        "pbr_texture_asset_ratio": 0.0,
+        "lod_ready_asset_ratio": 0.0,
+        "collision_ready_asset_ratio": 0.0,
+        "provenance_ready_asset_ratio": 0.0
+      },
+      "missing_required_roles": [
+        "hero_liquid_pair",
+        "plinth",
+        "reflection_card",
+        "spill_contact",
+        "vessel_rim"
+      ],
+      "primitive_hero_roles": [],
+      "renderer_evidence": {
+        "capture": "Z:\\328\\CMPUT328-A2\\codexworks\\301\\graphics\\CortexEngine\\build\\captures\\scene_local_cinematic_renderer_v1_final_gate_20260605\\warm_micro_jitter_full_seq8\\gallery\\beauty\\visual_validation_frame_0028.bmp",
+        "external_hdri_visible": true,
+        "invalid_external_hdri": false,
+        "environment_owner": "authored_visible_gallery_ibl",
+        "reflection_owner": "gallery_visible_ibl_plus_local_panels",
+        "profile_id": "gallery_public_cinematic_v1"
+      },
+      "asset_registry_coverage": 0.0
+    }
+  ]
+}

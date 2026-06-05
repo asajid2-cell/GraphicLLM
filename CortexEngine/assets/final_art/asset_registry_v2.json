@@ -1,0 +1,2047 @@
+{
+  "schema": "cortex.asset_registry_v2",
+  "generated_by": "tools/build_asset_registry_v2.py",
+  "asset_count": 33,
+  "source_scene_count": 4,
+  "summary": {
+    "aaa_ready_asset_count": 0,
+    "aaa_ready_asset_ratio": 0.0,
+    "source_class_counts": {
+      "artist_authored_pbr": 1,
+      "cc0_curated_library": 31,
+      "engine_generated_fidelity_mesh": 1
+    }
+  },
+  "assets": [
+    {
+      "id": "kitchen_faucet_gooseneck",
+      "runtime_asset": "assets/generated/final_art_fidelity_meshes/kitchen_faucet_gooseneck/kitchen_faucet_gooseneck.gltf",
+      "source_class": "engine_generated_fidelity_mesh",
+      "provenance": {
+        "provider": "cortex_engine_generated_mesh",
+        "source_model": "tools/generate_final_art_fidelity_meshes.py",
+        "license_policy": "project_authored_generated_asset",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_faucet_base",
+          "role": "faucet_mesh",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "faucet_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": false,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy",
+        "missing preview evidence",
+        "engine proxy mesh; useful detail but not AAA final asset"
+      ]
+    },
+    {
+      "id": "bench",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bench/bench.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_score_table_mesh",
+          "role": "sideline_equipment_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "sideline_equipment_mesh"
+      ],
+      "scene_families": [
+        "basketball_gym_day"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "bookcaseopen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/bookcaseOpen/bookcaseOpen.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_bookcase_mesh",
+          "role": "office_wall_system_mesh",
+          "material": "cabinet_warm"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_shelf_0",
+          "role": "shelf_mesh",
+          "material": "cabinet_warm"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_shelf_1",
+          "role": "shelf_mesh",
+          "material": "cabinet_warm"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_shelf_2",
+          "role": "shelf_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "office_wall_system_mesh",
+        "shelf_mesh"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "books",
+      "runtime_asset": "assets/models/kenney_furniture_kit/books/books.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_table_books_mesh",
+          "role": "countertop_prop",
+          "material": "accent_magenta"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_books_mesh_a",
+          "role": "book",
+          "material": "accent_cyan"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_book_0",
+          "role": "book_mesh",
+          "material": "accent_cyan"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_book_1",
+          "role": "book_mesh",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_book_2",
+          "role": "book_mesh",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "book",
+        "book_mesh",
+        "countertop_prop"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "chair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chair/chair.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_chair_0",
+          "role": "chair",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_chair_1",
+          "role": "chair",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_chair_2",
+          "role": "chair",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_chair_3",
+          "role": "chair",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_0",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_1",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_2",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_3",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_4",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_5",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_6",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_0_7",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_0",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_1",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_2",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_3",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_4",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_5",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_6",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_1_7",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_0",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_1",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_2",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_3",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_4",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_5",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_6",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_seat_2_7",
+          "role": "stadium_seat_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_0",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_1",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_2",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_3",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_4",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_5",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_0_6",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_0",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_1",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_2",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_3",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_4",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_5",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_1_6",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_0",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_1",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_2",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_3",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_4",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_5",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_audience_seat_2_6",
+          "role": "auditorium_seat",
+          "material": "plastic_blue"
+        }
+      ],
+      "semantic_roles": [
+        "auditorium_seat",
+        "chair",
+        "stadium_seat_mesh"
+      ],
+      "scene_families": [
+        "basketball_gym_day",
+        "home_kitchen_lantern",
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "chairdesk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairDesk/chairDesk.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_chair",
+          "role": "chair",
+          "material": "plastic_blue"
+        }
+      ],
+      "semantic_roles": [
+        "chair"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "chairmoderncushion",
+      "runtime_asset": "assets/models/kenney_furniture_kit/chairModernCushion/chairModernCushion.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_courtside_chair_0",
+          "role": "courtside_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_courtside_chair_1",
+          "role": "courtside_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_courtside_chair_2",
+          "role": "courtside_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_courtside_chair_3",
+          "role": "courtside_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_chair_0",
+          "role": "foreground_audience_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_chair_1",
+          "role": "foreground_audience_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_chair_2",
+          "role": "foreground_audience_chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_chair_3",
+          "role": "foreground_audience_chair_mesh",
+          "material": "plastic_blue"
+        }
+      ],
+      "semantic_roles": [
+        "courtside_chair_mesh",
+        "foreground_audience_chair_mesh"
+      ],
+      "scene_families": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "computerkeyboard",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerKeyboard/computerKeyboard.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_keyboard_mesh",
+          "role": "keyboard",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_keyboard",
+          "role": "keyboard_mesh",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "keyboard",
+        "keyboard_mesh"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "computerscreen",
+      "runtime_asset": "assets/models/kenney_furniture_kit/computerScreen/computerScreen.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_monitor_mesh",
+          "role": "monitor",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "monitor"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "desk",
+      "runtime_asset": "assets/models/kenney_furniture_kit/desk/desk.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_desk",
+          "role": "desk",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "desk"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "hoodmodern",
+      "runtime_asset": "assets/models/kenney_furniture_kit/hoodModern/hoodModern.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_range_hood",
+          "role": "range_hood",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "range_hood"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchencabinetupper",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpper/kitchenCabinetUpper.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_upper_cabinets_1",
+          "role": "upper_cabinet_mesh",
+          "material": "cabinet_warm"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_upper_cabinets_3",
+          "role": "upper_cabinet_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "upper_cabinet_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchencabinetupperdouble",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpperDouble/kitchenCabinetUpperDouble.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_upper_cabinets_0",
+          "role": "upper_cabinet_mesh",
+          "material": "cabinet_warm"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_upper_cabinets_2",
+          "role": "upper_cabinet_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "upper_cabinet_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchencabinetupperlow",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCabinetUpperLow/kitchenCabinetUpperLow.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_lower_cabinets",
+          "role": "cabinet_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "cabinet_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchencoffeemachine",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenCoffeeMachine/kitchenCoffeeMachine.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_coffee_machine_mesh",
+          "role": "countertop_prop",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchenfridge",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenFridge/kitchenFridge.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_fridge",
+          "role": "fridge",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "fridge"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchenmicrowave",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenMicrowave/kitchenMicrowave.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_microwave",
+          "role": "appliance",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "appliance"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchensink",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenSink/kitchenSink.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_sink",
+          "role": "sink",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "sink"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "kitchenstove",
+      "runtime_asset": "assets/models/kenney_furniture_kit/kitchenStove/kitchenStove.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_stove",
+          "role": "stove_mesh",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "stove_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "lamproundtable",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampRoundTable/lampRoundTable.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_table_lamp_mesh",
+          "role": "task_lamp",
+          "material": "warm_light"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_stage_prop_mesh_1",
+          "role": "stage_surface_prop_mesh",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_stage_prop_mesh_3",
+          "role": "stage_surface_prop_mesh",
+          "material": "accent_orange"
+        }
+      ],
+      "semantic_roles": [
+        "stage_surface_prop_mesh",
+        "task_lamp"
+      ],
+      "scene_families": [
+        "home_office_evening",
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "lampwall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/lampWall/lampWall.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_lantern_mesh",
+          "role": "lamp_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_wall_lamp_mesh",
+          "role": "office_wall_fixture_mesh",
+          "material": "warm_light"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_table_lamp_mesh",
+          "role": "lamp_mesh",
+          "material": "warm_light"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_lamp",
+          "role": "lamp_mesh",
+          "material": "warm_light"
+        }
+      ],
+      "semantic_roles": [
+        "lamp_mesh",
+        "office_wall_fixture_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "laptop",
+      "runtime_asset": "assets/models/kenney_furniture_kit/laptop/laptop.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_laptop_mesh",
+          "role": "desk_prop",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "desk_prop"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "loungedesignchair",
+      "runtime_asset": "assets/models/kenney_furniture_kit/loungeDesignChair/loungeDesignChair.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_chair_0",
+          "role": "chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_chair_1",
+          "role": "chair_mesh",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_chair_2",
+          "role": "chair_mesh",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_chair_3",
+          "role": "chair_mesh",
+          "material": "plastic_blue"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_chair",
+          "role": "chair_mesh",
+          "material": "plastic_blue"
+        }
+      ],
+      "semantic_roles": [
+        "chair_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "paneling",
+      "runtime_asset": "assets/models/kenney_furniture_kit/paneling/paneling.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_side_panel_mesh_0",
+          "role": "venue_silhouette_prop_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_side_panel_mesh_1",
+          "role": "venue_silhouette_prop_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_acoustic_panel_mesh_0",
+          "role": "venue_silhouette_prop_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_foreground_acoustic_panel_mesh_1",
+          "role": "venue_silhouette_prop_mesh",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "venue_silhouette_prop_mesh"
+      ],
+      "scene_families": [
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "plantsmall2",
+      "runtime_asset": "assets/models/kenney_furniture_kit/plantSmall2/plantSmall2.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_plant",
+          "role": "countertop_prop",
+          "material": "floor_wood"
+        }
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "rugrectangle",
+      "runtime_asset": "assets/models/kenney_furniture_kit/rugRectangle/rugRectangle.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_floor_mat",
+          "role": "floor_mat_mesh",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "sak_office_rug_mesh",
+          "role": "floor_mat",
+          "material": "accent_orange"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_floor_mat",
+          "role": "floor_mat_mesh",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "floor_mat",
+        "floor_mat_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "speaker",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speaker/speaker.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "basketball_gym_day",
+          "object": "sak_gym_sideline_equipment",
+          "role": "sideline_equipment_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_left",
+          "role": "speaker_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_right",
+          "role": "speaker_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_stack_mesh_0",
+          "role": "speaker_stack_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_stack_mesh_1",
+          "role": "speaker_stack_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_stack_mesh_2",
+          "role": "speaker_stack_mesh",
+          "material": "metal_dark"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_speaker_stack_mesh_3",
+          "role": "speaker_stack_mesh",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "sideline_equipment_mesh",
+        "speaker_mesh",
+        "speaker_stack_mesh"
+      ],
+      "scene_families": [
+        "basketball_gym_day",
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "speakersmall",
+      "runtime_asset": "assets/models/kenney_furniture_kit/speakerSmall/speakerSmall.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_stage_prop_mesh_0",
+          "role": "stage_surface_prop_mesh",
+          "material": "accent_cyan"
+        },
+        {
+          "scene": "neon_streamer_concert",
+          "object": "sak_concert_stage_prop_mesh_2",
+          "role": "stage_surface_prop_mesh",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "stage_surface_prop_mesh"
+      ],
+      "scene_families": [
+        "neon_streamer_concert"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "table",
+      "runtime_asset": "assets/models/kenney_furniture_kit/table/table.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_table",
+          "role": "tabletop_surface",
+          "material": "counter_dark"
+        }
+      ],
+      "semantic_roles": [
+        "tabletop_surface"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "tableround",
+      "runtime_asset": "assets/models/kenney_furniture_kit/tableRound/tableRound.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "asset_enrich_sak_kitchen_table",
+          "role": "table_mesh",
+          "material": "counter_dark"
+        },
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_desk",
+          "role": "table_mesh",
+          "material": "cabinet_warm"
+        }
+      ],
+      "semantic_roles": [
+        "table_mesh"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern",
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "televisionantenna",
+      "runtime_asset": "assets/models/kenney_furniture_kit/televisionAntenna/televisionAntenna.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_office_evening",
+          "object": "asset_enrich_sak_office_monitor_mesh",
+          "role": "monitor_mesh",
+          "material": "accent_cyan"
+        }
+      ],
+      "semantic_roles": [
+        "monitor_mesh"
+      ],
+      "scene_families": [
+        "home_office_evening"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "toaster",
+      "runtime_asset": "assets/models/kenney_furniture_kit/toaster/toaster.gltf",
+      "source_class": "cc0_curated_library",
+      "provenance": {
+        "provider": "kenney_cc0_furniture_kit",
+        "source_model": "",
+        "license_policy": "cc0_reference_compatible",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_toaster_mesh",
+          "role": "countertop_prop",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "countertop_prop"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": false,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing complete PBR texture set",
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    },
+    {
+      "id": "lantern_01_1k",
+      "runtime_asset": "assets/models/naturalistic_showcase/Lantern_01/Lantern_01_1k.gltf",
+      "source_class": "artist_authored_pbr",
+      "provenance": {
+        "provider": "repo_artist_authored",
+        "source_model": "",
+        "license_policy": "project_approved_runtime_asset",
+        "triangle_count": 0,
+        "texture_megabytes": 0.0,
+        "preview_image": "",
+        "visual_preview_score": 0.0
+      },
+      "referenced_by": [
+        {
+          "scene": "home_kitchen_lantern",
+          "object": "sak_kitchen_lantern_mesh",
+          "role": "warm_fixture",
+          "material": "metal_dark"
+        }
+      ],
+      "semantic_roles": [
+        "warm_fixture"
+      ],
+      "scene_families": [
+        "home_kitchen_lantern"
+      ],
+      "readiness": {
+        "editable_mesh": true,
+        "separated_object": true,
+        "provenance_ready": true,
+        "pbr_textures_complete": true,
+        "lod_chain_ready": false,
+        "collision_proxy_ready": false,
+        "scale_bounds_known": true,
+        "support_anchor_known": true,
+        "preview_ready": true,
+        "aaa_ready": false
+      },
+      "quality_blockers": [
+        "missing LOD chain",
+        "missing collision proxy"
+      ]
+    }
+  ]
+}

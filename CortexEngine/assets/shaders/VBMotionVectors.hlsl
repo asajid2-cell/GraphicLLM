@@ -9,7 +9,8 @@ cbuffer MotionConstants : register(b0)
     float g_RcpWidth;
     float g_RcpHeight;
     uint  g_MeshCount;
-    uint3 _pad0;
+    uint  g_InstanceCount;
+    uint2 _pad0;
 };
 
 // FrameConstants layout (subset copied from MotionVectors.hlsl for consistent offsets).
@@ -128,6 +129,23 @@ uint3 LoadTriangleIndices(ByteAddressBuffer indexBuffer, uint triangleID, uint f
     return indices;
 }
 
+bool IsInvalidMeshTableEntry(VBMeshTableEntry mesh)
+{
+    if (mesh.vertexBufferIndex == 0xFFFFFFFFu || mesh.indexBufferIndex == 0xFFFFFFFFu)
+    {
+        return true;
+    }
+    if (mesh.vertexStrideBytes < 48u || mesh.vertexStrideBytes > 512u)
+    {
+        return true;
+    }
+    if (mesh.indexFormat > 1u)
+    {
+        return true;
+    }
+    return false;
+}
+
 // Compute screen-space barycentrics using edge functions.
 // This matches the GPU rasterizer's approach for determining triangle coverage.
 // Edge functions are more numerically stable for thin triangles.
@@ -185,6 +203,12 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
     }
 
+    if (g_InstanceCount == 0u || instanceID >= g_InstanceCount)
+    {
+        g_VelocityOut[pixelCoord] = float2(0.0f, 0.0f);
+        return;
+    }
+
     VBInstanceData instance = g_Instances[instanceID];
     if (g_MeshCount == 0u || instance.meshIndex >= g_MeshCount)
     {
@@ -193,16 +217,21 @@ void CSMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     // Robustness guard: skip invalid triangle IDs.
-    const uint first = instance.firstIndex;
     const uint count = instance.indexCount;
-    const uint triFirst = first + triangleID * 3u;
-    if (count < 3u || triFirst + 2u >= first + count)
+    const uint triangleCount = count / 3u;
+    if (triangleCount == 0u || triangleID >= triangleCount)
     {
         g_VelocityOut[pixelCoord] = float2(0.0f, 0.0f);
         return;
     }
 
     VBMeshTableEntry mesh = g_MeshTable[instance.meshIndex];
+    if (IsInvalidMeshTableEntry(mesh))
+    {
+        g_VelocityOut[pixelCoord] = float2(0.0f, 0.0f);
+        return;
+    }
+
     ByteAddressBuffer vertexBuffer = ResourceDescriptorHeap[mesh.vertexBufferIndex];
     ByteAddressBuffer indexBuffer = ResourceDescriptorHeap[mesh.indexBufferIndex];
 

@@ -4666,3 +4666,72 @@ Refactor phases:
 Do not claim completion from a screenshot. Completion requires opt-in candidate
 beauty, real V3 shader resources, cross-family packet evidence, no device
 removal, explanatory debug views, and user acceptance before default promotion.
+
+### Phase 0 Stability: VB Motion Vector Guard - 2026-06-05
+
+Root fix:
+
+- `assets/shaders/VBMotionVectors.hlsl` now matches the safer material-resolve
+  pattern and bounds-checks visibility-buffer instance IDs before reading
+  `g_Instances`.
+- `src/Graphics/VisibilityBuffer_Resolve.cpp` now passes `m_instanceCount` in
+  the existing 8-dword motion-vector root constants.
+- motion-vector shader now rejects:
+  - `g_InstanceCount == 0`.
+  - `instanceID >= g_InstanceCount`.
+  - empty triangle ranges.
+  - malformed mesh-table entries with invalid bindless indices, bad stride, or
+    invalid index format before touching `ResourceDescriptorHeap`.
+
+Why this was root-aligned:
+
+- failing packets reported `lastGpuMarker='MotionVectors'`.
+- DRED reported page fault at `GPU VA=0x0000000000000000`.
+- `VBMotionVectors.hlsl` previously read `g_Instances[instanceID]` without an
+  instance-count guard, unlike `MaterialResolve.hlsl`.
+- a stale/corrupt visibility-buffer pixel could therefore fault before any
+  existing mesh-index guard ran.
+
+Validation:
+
+```powershell
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_scene_local_cinematic_renderer_v1_packets.ps1 -NoBuild -SkipOwnerAnalysis -SkipMaterialAnalysis -SkipStabilityAnalysis -SkipVisualQualityAnalysis -FamilyFilter kitchen -ViewFilter beauty -SmokeFrames 28 -CaptureFrame 14 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\kitchen_vb_motion_guard_smoke1_20260605
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery,kitchen -ViewFilter beauty,shadow_factor,direct_light,direct_light_unshadowed,direct_light_shadow_loss,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta -SmokeFrames 28 -CaptureFrame 14 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_promotion_decision_gate_smoke6_20260605
+```
+
+Results:
+
+- build passed.
+- focused kitchen beauty mouse-jitter packet passed.
+- broad gallery+kitchen V3 packet passed.
+- `v3_promotion_decision_gate_smoke6_20260605`:
+  - `reports=32`.
+  - material, lighting, environment, reflection, composite, cinematic post all
+    ready in `32/32` reports.
+  - `v3_lighting_motion`: 22 view sequences across 2 families, failures `0`,
+    warnings `0`.
+  - promotion status: `review_packet_passed`.
+  - default beauty promotable: `false`.
+  - expected remaining warnings: missing families
+    `concert,gym,office,red_room,stadium`; missing motion modes
+    `camera_sweep,static`.
+
+Important verification note:
+
+- The first post-build packet still used the stale copied runtime shader under
+  `build/bin/assets/shaders/VBMotionVectors.hlsl` because the build used
+  `CORTEX_SKIP_ASSET_SYNC=1`.
+- For shader-only fixes, either run asset sync intentionally or copy the changed
+  shader into `build/bin/assets/shaders/` before packet verification.
+
+Next safe pass:
+
+1. Keep Phase 0 open for one more stress row: rerun the same guard under a
+   reflective/metallic stress scene and a longer kitchen jitter/camera-sweep
+   packet.
+2. After that passes, implement the opt-in `FullSceneCandidateBeautyV3` switch
+   and side-by-side capture support.
+3. Do not promote default beauty from the two-family smoke. The smoke only
+   proves the previous kitchen device-removal blocker is cleared for the tested
+   packet shape.

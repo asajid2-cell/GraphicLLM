@@ -275,13 +275,15 @@ Result<void> VisibilityBufferRenderer::ComputeMotionVectors(
         float rcpWidth;
         float rcpHeight;
         uint32_t meshCount;
-        uint32_t pad[3];
+        uint32_t instanceCount;
+        uint32_t pad[2];
     } mv{};
     mv.width = m_width;
     mv.height = m_height;
     mv.rcpWidth = (m_width > 0) ? (1.0f / static_cast<float>(m_width)) : 0.0f;
     mv.rcpHeight = (m_height > 0) ? (1.0f / static_cast<float>(m_height)) : 0.0f;
     mv.meshCount = m_meshCount;
+    mv.instanceCount = m_instanceCount;
     cmdList->SetComputeRoot32BitConstants(0, 8, &mv, 0);
 
     cmdList->SetComputeRootConstantBufferView(1, frameConstantsAddress);

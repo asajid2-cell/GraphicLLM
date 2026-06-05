@@ -681,13 +681,45 @@ Current producer evidence:
   `v3_shadow_visibility.mean_luma=0.350934`,
   `v3_shadow_loss.mean_luma=0.175254`, and
   `v3_indirect_lighting.mean_luma=0.193502`.
+- V3 lighting motion analyzer:
+  `tools/analyze_full_scene_shader_v3_lighting_motion.py`.
+- V3 lighting motion matrix runner:
+  `tools/run_full_scene_shader_pipeline_v3_lighting_motion_matrix.ps1`.
+- the V3 packet runner now emits `v3_lighting_motion.json` and
+  `v3_lighting_motion.md` whenever `CaptureSequenceCount >= 2`.
+- no-stress packet wiring exists for clean family-only matrix rows:
+  `-NoStressScene` on V3/V2 packet runners.
+- gallery-only mouse-jiggle matrix smoke:
+  `build/captures/v3_lighting_motion_matrix_gallery_smoke3_20260605`.
+- gallery-only mouse-jiggle matrix result:
+  `rows=5`, failures `0`.
+- gallery-only mouse-jiggle stability result:
+  `report_count=11`,
+  `lighting_split_ready_report_count=11`,
+  `full_scene_lighting_v3_executed_report_count=11`,
+  `lighting_signal_metrics_ready=true`,
+  failures `0`, warnings `0`.
+- gallery-only mouse-jiggle motion evidence:
+  `v3_direct_lighting.delta=0.02786466`,
+  `v3_direct_lighting_unshadowed.delta=0.02834359`,
+  `v3_shadow_visibility.delta=0.01748130`,
+  `v3_shadow_loss.delta=0.01939935`,
+  `v3_indirect_lighting.delta=0.00789734`.
+- gallery-only V3/legacy motion ratios:
+  direct `1.045`,
+  unshadowed `1.077`,
+  shadow visibility `1.305`,
+  shadow loss `0.810`,
+  indirect `0.257`.
 
 Required next evidence for completion/promotion:
 
 - close parity gaps between `PSMainV3LightingSplit` and the current default
   deferred beauty lighting path, especially local probe and environment terms.
-- compare V3 split outputs against the legacy deferred terms under motion and
-  cross-family packets, not just the static gallery packet.
+- run the new V3 lighting motion matrix across at least gallery, kitchen, gym,
+  and concert, with both `mouse_jitter` and `camera_sweep`.
+- compare V3 split outputs against the legacy deferred terms under those
+  motion and cross-family packets, not just the static/gallery smoke.
 - keep default beauty unchanged until the consumer/composite path and packet
   gates prove promotion quality.
 

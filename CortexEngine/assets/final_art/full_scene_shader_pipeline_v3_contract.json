@@ -156,6 +156,28 @@
         "atmosphere"
       ]
     },
+    "composite": {
+      "producer": "FullSceneCompositeV3",
+      "adapter_producer": "FullSceneCompositeV3Adapter",
+      "adapter_output_resource": "hdr_color",
+      "required_inputs": [
+        "material_attributes",
+        "direct_lighting",
+        "indirect_lighting",
+        "reflection_radiance",
+        "scene_local_environment"
+      ],
+      "required_outputs": [
+        "hdr_scene_color",
+        "energy_clamp_policy",
+        "overbright_diagnostics"
+      ],
+      "required_debug_views": [
+        "hdr_scene_color",
+        "energy_clamp_mask",
+        "overbright_mask"
+      ]
+    },
     "cinematic_post": {
       "producer": "CinematicPostV3",
       "required_stages": [

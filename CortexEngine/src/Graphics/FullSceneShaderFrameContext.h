@@ -1188,6 +1188,17 @@ struct FullSceneShaderPipelineV3FrameContext {
     bool reflectionConfidenceReady = false;
     bool reflectionSourceIdReady = false;
     bool reflectionTemporalDeltaReady = false;
+    bool compositeV3Ready = false;
+    bool hdrSceneColorReady = false;
+    bool compositeInputsReady = false;
+    bool compositeEnergyPolicyReady = false;
+    bool compositeOverbrightDiagnosticsReady = false;
+    bool cinematicPostV3Ready = false;
+    bool ldrCinematicOutputReady = false;
+    bool exposureMeterReady = false;
+    bool bloomExtractReady = false;
+    bool colorGradeReady = false;
+    bool toneMapReady = false;
     uint32_t materialAttributesResourceCount = 0;
     uint32_t materialAttributesChannelCount = 0;
     uint32_t lightingAdapterSignalCount = 0;
@@ -1195,8 +1206,12 @@ struct FullSceneShaderPipelineV3FrameContext {
     uint32_t sceneLocalEnvironmentChannelCount = 0;
     uint32_t reflectionV3ChannelCount = 0;
     uint32_t reflectionV3SourceCount = 0;
+    uint32_t compositeV3ChannelCount = 0;
+    uint32_t cinematicPostV3ChannelCount = 0;
     std::string sceneLocalEnvironmentMode = "unknown";
     std::string reflectionV3SourceContract = "unknown";
+    std::string compositeV3Producer = "unknown";
+    std::string cinematicPostV3Producer = "unknown";
     std::string contractPath = "assets/final_art/full_scene_shader_pipeline_v3_contract.json";
     std::string planPath = "docs/FULL_SCENE_SHADER_PIPELINE_V3.md";
     std::vector<std::string> requiredSceneFamilies = {
@@ -1615,6 +1630,144 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     reflectionDomain.missingRequiredChannelCount =
         reflectionDomain.requiredChannelCount - reflectionDomain.readyChannelCount;
 
+    context.hdrSceneColorReady =
+        FullSceneShaderHasResource(contract, "hdr_color") &&
+        FullSceneShaderPassWritesResource(contract, "VBDeferredLighting", "hdr_color");
+    context.compositeInputsReady =
+        materialResolveReady &&
+        context.lightingSplitResourcesReady &&
+        context.sceneLocalEnvironmentReady &&
+        context.reflectionV3Ready;
+    context.compositeEnergyPolicyReady =
+        contract.cinematicPost.exposurePolicyActive &&
+        FullSceneShaderKnownContractString(contract.sceneVisual.exposurePolicyId) &&
+        (contract.cinematicPost.hdrShoulderStrength > 0.0f ||
+         contract.cinematicPost.postWhiteCompression > 0.0f ||
+         contract.cinematicPost.highlightProtection > 0.0f);
+    context.compositeOverbrightDiagnosticsReady =
+        contract.materials.materialPostExposureProtected > 0 ||
+        contract.materials.materialPostBloomEmitter > 0 ||
+        contract.cinematicPost.bloomPlanned;
+    uint32_t readyCompositeChannels = 0;
+    readyCompositeChannels += context.hdrSceneColorReady ? 1u : 0u;
+    readyCompositeChannels += context.compositeInputsReady ? 1u : 0u;
+    readyCompositeChannels += context.compositeEnergyPolicyReady ? 1u : 0u;
+    readyCompositeChannels += context.compositeOverbrightDiagnosticsReady ? 1u : 0u;
+    context.compositeV3ChannelCount = readyCompositeChannels;
+    context.compositeV3Ready = readyCompositeChannels == 4u;
+    context.compositeV3Producer =
+        context.compositeV3Ready ? "FullSceneCompositeV3Adapter" : "planned";
+
+    FullSceneShaderPipelineV3DomainEvidence compositeDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "composite",
+            context.compositeV3Producer,
+            "hdr_scene_color",
+            "hdr_scene_color",
+            context.compositeV3Ready
+                ? "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence"
+                : "FullSceneCompositeV3 is missing HDR output, input, energy, or overbright ownership evidence");
+    compositeDomain.enabled = contract.sceneVisual.active;
+    compositeDomain.ready = context.compositeV3Ready;
+    compositeDomain.promotionState =
+        context.compositeV3Ready ? "adapter" : "planned";
+    compositeDomain.backingResources = {
+        "hdr_color",
+        "material_attributes",
+        "lighting_split",
+        "reflection_radiance",
+        "scene_local_environment",
+    };
+    compositeDomain.debugViews = {
+        "hdr_scene_color",
+        "energy_clamp_mask",
+        "overbright_mask",
+    };
+    compositeDomain.channels = {
+        context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing",
+        context.compositeInputsReady ? "composite_inputs_owned" : "composite_inputs_missing",
+        context.compositeEnergyPolicyReady ? "energy_clamp_policy_owned" : "energy_clamp_policy_missing",
+        context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing",
+    };
+    compositeDomain.backingResourceCount = readyCompositeChannels;
+    compositeDomain.requiredChannelCount = 4u;
+    compositeDomain.readyChannelCount = readyCompositeChannels;
+    compositeDomain.missingRequiredChannelCount =
+        compositeDomain.requiredChannelCount - compositeDomain.readyChannelCount;
+
+    context.ldrCinematicOutputReady =
+        FullSceneShaderPassWritesResource(contract, "PostProcess", "back_buffer") &&
+        FullSceneShaderPassReadsResource(contract, "PostProcess", "hdr_color") &&
+        contract.cinematicPost.postProcessPlanned &&
+        contract.cinematicPost.postProcessExecuted;
+    context.exposureMeterReady =
+        contract.cinematicPost.exposurePolicyActive &&
+        contract.cinematicPost.profileExposureTrim > 0.0f;
+    context.bloomExtractReady =
+        (!contract.cinematicPost.bloomPlanned && !contract.features.bloomEnabled) ||
+        (contract.cinematicPost.bloomPlanned &&
+         contract.cinematicPost.bloomExecuted &&
+         FullSceneShaderPassReadsResource(contract, "Bloom", "hdr_color"));
+    context.colorGradeReady =
+        FullSceneShaderKnownContractString(contract.cinematicPost.colorGradePreset) &&
+        contract.cinematicPost.lookPolicyActive;
+    context.toneMapReady =
+        FullSceneShaderKnownContractString(contract.cinematicPost.toneMapperPreset) &&
+        contract.cinematicPost.hdrShoulderStart > 0.0f;
+    uint32_t readyPostChannels = 0;
+    readyPostChannels += context.ldrCinematicOutputReady ? 1u : 0u;
+    readyPostChannels += context.exposureMeterReady ? 1u : 0u;
+    readyPostChannels += context.bloomExtractReady ? 1u : 0u;
+    readyPostChannels += context.colorGradeReady ? 1u : 0u;
+    readyPostChannels += context.toneMapReady ? 1u : 0u;
+    context.cinematicPostV3ChannelCount = readyPostChannels;
+    context.cinematicPostV3Ready =
+        context.compositeV3Ready &&
+        contract.cinematicPost.enabled &&
+        readyPostChannels == 5u;
+    context.cinematicPostV3Producer =
+        context.cinematicPostV3Ready ? "CinematicPostV3Adapter" : "planned";
+
+    FullSceneShaderPipelineV3DomainEvidence postDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "cinematic_post",
+            context.cinematicPostV3Producer,
+            "ldr_cinematic_output",
+            "exposure_meter",
+            context.cinematicPostV3Ready
+                ? "CinematicPostV3 adapter owns LDR output, exposure, bloom, grade, and tone-map evidence"
+                : "CinematicPostV3 is missing LDR output, exposure, bloom, grade, or tone-map evidence");
+    postDomain.enabled = contract.cinematicPost.enabled;
+    postDomain.ready = context.cinematicPostV3Ready;
+    postDomain.promotionState =
+        context.cinematicPostV3Ready ? "adapter" : "planned";
+    postDomain.backingResources = {
+        "back_buffer",
+        "hdr_scene_color",
+        "bloom",
+        "scene_post_exposure_policy",
+        "scene_color_grade_policy",
+    };
+    postDomain.debugViews = {
+        "ldr_cinematic_output",
+        "exposure_meter",
+        "bloom_extract",
+        "color_grade_delta",
+        "tone_map_curve",
+    };
+    postDomain.channels = {
+        context.ldrCinematicOutputReady ? "ldr_cinematic_output_owned" : "ldr_cinematic_output_missing",
+        context.exposureMeterReady ? "exposure_meter_owned" : "exposure_meter_missing",
+        context.bloomExtractReady ? "bloom_extract_owned" : "bloom_extract_missing",
+        context.colorGradeReady ? "color_grade_delta_owned" : "color_grade_delta_missing",
+        context.toneMapReady ? "tone_map_owned" : "tone_map_missing",
+    };
+    postDomain.backingResourceCount = readyPostChannels;
+    postDomain.requiredChannelCount = 5u;
+    postDomain.readyChannelCount = readyPostChannels;
+    postDomain.missingRequiredChannelCount =
+        postDomain.requiredChannelCount - postDomain.readyChannelCount;
+
     context.domains = {
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "render_graph",
@@ -1626,12 +1779,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         lightingDomain,
         reflectionDomain,
         environmentDomain,
-        MakeFullSceneShaderPipelineV3DomainEvidence(
-            "cinematic_post",
-            "CinematicPostV3",
-            "ldr_cinematic_output",
-            "exposure_meter",
-            "CinematicPostV3 is planned but not implemented"),
+        compositeDomain,
+        postDomain,
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "validation",
             "FullSceneShaderPipelineV3PacketGate",

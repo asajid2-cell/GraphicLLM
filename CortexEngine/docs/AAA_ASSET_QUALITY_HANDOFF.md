@@ -2885,3 +2885,50 @@ Current stopping position:
   `glass_water_courtyard:glass_canopy`,
   `dragon_over_water:floor_reflection_closeup`, and
   `rt_showcase:reflection_closeup`.
+
+### Broader Glossy Stress Gate - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive,glass_water_courtyard:glass_canopy,dragon_over_water:floor_reflection_closeup" -ViewFilter "beauty,roughness,metallic,surface_class,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605`.
+- captured views: `36`.
+- stress families: `4`.
+- source-signal families: `4/4`.
+- candidate-delta families: `4/4`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+
+Candidate signal:
+
+| Stress Family | Delta Luma | Delta Nonblack |
+|---|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00955596` | `0.07552409` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00991124` | `0.16202257` |
+| `stress_material_lab_glass_emissive` | `0.01555773` | `0.13664931` |
+| `stress_rt_showcase_reflection_closeup` | `0.02144538` | `0.17576714` |
+
+Sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty |
+|---|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00292183` | `0.00289800` | `0.992` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00121205` | `0.00118411` | `0.977` |
+| `stress_material_lab_glass_emissive` | `0.00152219` | `0.00149388` | `0.981` |
+| `stress_rt_showcase_reflection_closeup` | `0.00487044` | `0.00480172` | `0.986` |
+
+Current stopping position:
+
+- Broader glossy/glass/water stress gate passes.
+- The V2 reflection candidate is measurably active on all tested stress
+  bookmarks and remains at or below beauty motion instability.
+- Do not promote default beauty yet.
+- Next work should produce a review packet/contact sheet comparing default
+  beauty and V2 candidate on these stress views, then decide whether to expose
+  an interactive runtime candidate toggle for user review.

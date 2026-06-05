@@ -2877,3 +2877,50 @@ Current interpretation:
   the next gate is a broader glossy packet including `material_lab:glass_emissive`,
   `glass_water_courtyard:glass_canopy`, and
   `dragon_over_water:floor_reflection_closeup`, then visual review.
+
+### Broader Glossy Stress Gate - 2026-06-05
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:glass_emissive,glass_water_courtyard:glass_canopy,dragon_over_water:floor_reflection_closeup" -ViewFilter "beauty,roughness,metallic,surface_class,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 80 -CaptureFrame 40 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_broader_glossy_stress_packet_20260605`.
+- captured views: `36`.
+- stress families: `4`.
+- source-signal families: `4/4`.
+- candidate-delta families: `4/4`.
+- reflection candidate warnings/failures: `0/0`.
+- sequence stability warnings/failures: `0/0`.
+
+Candidate signal:
+
+| Stress Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `meaningful_delta` | `0.04915582` | `0.29987956` | `0.00955596` | `0.07552409` |
+| `stress_glass_water_courtyard_glass_canopy` | `meaningful_delta` | `0.00635910` | `0.37000543` | `0.00991124` | `0.16202257` |
+| `stress_material_lab_glass_emissive` | `meaningful_delta` | `0.00729248` | `0.18290799` | `0.01555773` | `0.13664931` |
+| `stress_rt_showcase_reflection_closeup` | `meaningful_delta` | `0.12236592` | `0.41124783` | `0.02144538` | `0.17576714` |
+
+Sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty | Delta View Luma Delta |
+|---|---:|---:|---:|---:|
+| `stress_dragon_over_water_floor_reflection_closeup` | `0.00292183` | `0.00289800` | `0.992` | `0.00107355` |
+| `stress_glass_water_courtyard_glass_canopy` | `0.00121205` | `0.00118411` | `0.977` | `0.00031130` |
+| `stress_material_lab_glass_emissive` | `0.00152219` | `0.00149388` | `0.981` | `0.00025119` |
+| `stress_rt_showcase_reflection_closeup` | `0.00487044` | `0.00480172` | `0.986` | `0.00260679` |
+
+Current interpretation:
+
+- The authorized-source candidate now survives a broader glossy/glass/water
+  packet without wired-no-delta regressions.
+- Candidate motion remains below beauty motion in all four stress bookmarks.
+- The next promotion step should not be another shader gate alone. It should be
+  a review packet/contact sheet comparing default beauty against the V2
+  candidate on these stress views, then a decision on whether to expose a
+  runtime candidate toggle for interactive review.

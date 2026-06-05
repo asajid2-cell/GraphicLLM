@@ -2,12 +2,14 @@ param(
     [string]$OutputRoot = "build/captures/full_scene_shader_pipeline_v2_facade_packet",
     [string]$FamilyFilter = "gallery",
     [string]$ViewFilter = "beauty,surface_policy,material_family,reflection_policy,temporal_policy,post_sensitivity,material_id,object_id,reflection_owner,reflection_source_weights,reflection_source_authority,reflection_stability_policy,reflection_resolver_candidate,reflection_resolver_candidate_delta,shadow_factor,direct_light,direct_light_unshadowed,direct_light_shadow_loss,ambient_ibl,taa_blend",
+    [string]$StressSceneFilter = "",
     [int]$SmokeFrames = 140,
     [int]$CaptureFrame = 60,
     [int]$CaptureSequenceCount = 1,
     [ValidateSet("static", "mouse_jitter", "camera_sweep")]
     [string]$StabilityMotionMode = "static",
     [switch]$NoBuild,
+    [switch]$StressSceneOnly,
     [switch]$SkipSceneAnalyzers
 )
 
@@ -41,6 +43,7 @@ $packetArgs = @(
     "-OutputRoot", $OutputRoot,
     "-FamilyFilter", $FamilyFilter,
     "-ViewFilter", $ViewFilter,
+    "-StressSceneFilter", $StressSceneFilter,
     "-SmokeFrames", [string]$SmokeFrames,
     "-CaptureFrame", [string]$CaptureFrame,
     "-CaptureSequenceCount", [string]$CaptureSequenceCount,
@@ -48,6 +51,9 @@ $packetArgs = @(
 )
 if ($NoBuild) {
     $packetArgs += "-NoBuild"
+}
+if ($StressSceneOnly) {
+    $packetArgs += "-StressSceneOnly"
 }
 if ($SkipSceneAnalyzers) {
     $packetArgs += @(

@@ -2744,3 +2744,69 @@ Current interpretation:
   the integrated smoke or the full cross-family camera-sweep packet.
 - This still does not promote default beauty; it only strengthens the harness
   needed for safe promotion later.
+
+### Glossy Surface Stress Packet Harness - 2026-06-05
+
+Implemented:
+
+- `tools/run_scene_local_cinematic_renderer_v1_packets.ps1`
+  - adds `-StressSceneFilter` with comma-separated `scene:camera_bookmark`
+    targets.
+  - validates stress scene ids and bookmarks against
+    `assets/config/showcase_scenes.json`.
+  - emits each stress view as its own packet family, for example
+    `stress_material_lab_metal_closeup`.
+  - adds `-StressSceneOnly` so expensive glossy stress packets can run without
+    the normal family set.
+- `tools/run_full_scene_shader_pipeline_v2_packet.ps1`
+  - forwards `-StressSceneFilter` and `-StressSceneOnly` into the packet runner.
+
+Validation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup,material_lab:metal_closeup,glass_water_courtyard:water_closeup" -ViewFilter "beauty,roughness,metallic,reflection_source_weights,reflection_source_authority,reflection_resolver_candidate,reflection_resolver_candidate_delta" -SmokeFrames 70 -CaptureFrame 35 -CaptureSequenceCount 2 -StabilityMotionMode camera_sweep -OutputRoot build/captures/full_scene_shader_pipeline_v2_glossy_stress_only_smoke2_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+python -m py_compile tools\analyze_full_scene_shader_sequence_stability.py tools\check_full_scene_shader_pipeline_v2_frame_report.py tools\analyze_full_scene_shader_debug_view_metrics.py tools\analyze_full_scene_shader_reflection_candidate_signal.py
+```
+
+Results:
+
+- packet:
+  `build/captures/full_scene_shader_pipeline_v2_glossy_stress_only_smoke2_20260605`.
+- captured views: `21`.
+- stress families: `3`.
+- V2 frame evidence failures: `0`.
+- debug metric failures: `0`.
+- sequence stability warnings/failures: `0/0`.
+- reflection candidate warnings/failures: `2/0`.
+
+Sequence stability:
+
+| Stress Family | Beauty Luma Delta | Candidate Luma Delta | Candidate/Beauty | Delta View Luma Delta |
+|---|---:|---:|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `0.00158056` | `0.00158056` | `1.000` | `0.00000000` |
+| `stress_material_lab_metal_closeup` | `0.00246855` | `0.00246855` | `1.000` | `0.00000001` |
+| `stress_rt_showcase_reflection_closeup` | `0.00803787` | `0.00798941` | `0.994` | `0.00363569` |
+
+Reflection candidate signal:
+
+| Stress Family | Status | Source Luma | Source Nonblack | Delta Luma | Delta Nonblack |
+|---|---|---:|---:|---:|---:|
+| `stress_glass_water_courtyard_water_closeup` | `wired_no_delta` | `0.00024963` | `0.03081489` | `0.00000000` | `0.00000000` |
+| `stress_material_lab_metal_closeup` | `wired_no_delta` | `0.00527105` | `0.17212348` | `0.00000000` | `0.00000000` |
+| `stress_rt_showcase_reflection_closeup` | `meaningful_delta` | `0.12203094` | `0.41034071` | `0.02113077` | `0.17418837` |
+
+Current interpretation:
+
+- The stress harness now gives V2 a repeatable way to test hard glossy,
+  metallic, glass, and water camera bookmarks instead of only broad scene
+  families.
+- The current candidate remains motion-stable on these closeups.
+- The current candidate is too weak on `material_lab:metal_closeup` and
+  `glass_water_courtyard:water_closeup`: the source debug views are wired, but
+  the candidate beauty delta is effectively zero.
+- Do not promote V2 reflections to default beauty. The next root refactor is
+  to make local reflection radiance materially active on these stress surfaces,
+  either by binding actual local probe radiance into post or by adding a
+  resolved local reflection radiance buffer before post.

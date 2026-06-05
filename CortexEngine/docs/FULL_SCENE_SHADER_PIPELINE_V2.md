@@ -3565,3 +3565,60 @@ Current stopping position:
 - The next major renderer refactor can split this into a real
   `FullSceneLightingV2` resource or add semantic light-buffer payloads while
   retaining the same owner/resource packet contract.
+
+### Semantic Light Payload Ownership Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now reports semantic shader payload ownership:
+  - `semantic_light_shader_payload_ready`.
+  - `semantic_light_payload_count`.
+  - `semantic_light_payload_owner`.
+  - `semantic_light_payload_channels`.
+- Runtime JSON exposes those fields under
+  `full_scene_shader_pipeline_v2.lighting`.
+- The current payload owner is `FrameConstants.lights`.
+- The current semantic payload lanes are `direction_cosInner.w_or_params.z`.
+- `check_full_scene_shader_pipeline_v2_frame_report.py` verifies both the
+  frame-report fields and the shader-facing upload path in
+  `Renderer_VisibilityBufferDeferredLighting.cpp`.
+- Default beauty remains unchanged.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build/captures/v2_semantic_light_payload_smoke1_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py --frame-report build\captures\v2_semantic_light_payload_smoke1_20260605\stress_rt_showcase_reflection_closeup\direct_light\frame_report_shutdown.json --strict-frame-report
+```
+
+Packet result:
+
+- packet:
+  `build/captures/v2_semantic_light_payload_smoke1_20260605`.
+- strict frame-report validation: passed.
+- `semantic_light_payload_ready=true`.
+- `semantic_light_shader_payload_ready=true`.
+- `semantic_light_payload_count=4`.
+- `semantic_light_payload_owner=FrameConstants.lights`.
+- `semantic_light_payload_channels=direction_cosInner.w_or_params.z`.
+- `shader_light_array_ready=true`.
+- `semantic_fixture_light_count=4`.
+- `lighting_v2_shadow_output_ready=true`.
+- `missing_lighting_contract_count=0`.
+- lighting signal:
+  - direct-signal families: `1/1`.
+  - shadow-loss families: `1/1`.
+  - `direct_light` luma `0.42689531`.
+  - `direct_light_unshadowed` luma `0.45797355`.
+  - `direct_light_shadow_loss` luma `0.22300819`.
+
+Current stopping position:
+
+- Semantic scene-local light intent now has a named shader payload ownership
+  contract.
+- V2 lighting still writes through the existing deferred lighting path; a later
+  V3 refactor should split this into dedicated lighting resources while
+  preserving the owner/count/channel evidence.

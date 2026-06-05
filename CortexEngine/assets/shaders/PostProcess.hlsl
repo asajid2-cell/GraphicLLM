@@ -77,6 +77,15 @@ cbuffer FrameConstants : register(b1)
     float4   g_CinematicParams;
     // x = authored DOF focus distance, y = authored aperture, z/w reserved
     float4   g_CinematicDofParams;
+    // x = material/specular motion damping, y = reflection debug stability,
+    // z = shadow softness scale, w = highlight/exposure protection
+    float4   g_CinematicStabilityParams;
+    // x = black/toe lift, y = highlight rolloff strength,
+    // z = color separation strength, w = bloom halation strength
+    float4   g_CinematicLookParams;
+    // x = profile exposure trim, y = HDR shoulder start,
+    // z = HDR shoulder strength, w = post-tonemap white compression
+    float4   g_CinematicExposureParams;
 };
 
 Texture2D g_SceneColor : register(t0);
@@ -513,6 +522,187 @@ float3 ApplyToneMapper(float3 color, uint mode)
     return ApplyACESFilm(color);
 }
 
+float3 ApplyPhotographicSplitTone(float3 color, float2 warmCool)
+{
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    float shadowMask = 1.0f - smoothstep(0.18f, 0.62f, luma);
+    float highlightMask = smoothstep(0.42f, 0.92f, luma);
+
+    float warm = saturate(max(warmCool.x, 0.0f));
+    float cool = saturate(max(warmCool.y, 0.0f));
+    float antiWarm = saturate(max(-warmCool.x, 0.0f));
+    float antiCool = saturate(max(-warmCool.y, 0.0f));
+
+    float3 warmTint = lerp(1.0f.xxx, float3(1.065f, 1.018f, 0.935f), warm * (0.25f + 0.75f * highlightMask));
+    float3 coolTint = lerp(1.0f.xxx, float3(0.940f, 0.985f, 1.085f), cool * (0.30f + 0.70f * shadowMask));
+    float3 antiWarmTint = lerp(1.0f.xxx, float3(0.965f, 0.990f, 1.045f), antiWarm * (0.25f + 0.75f * highlightMask));
+    float3 antiCoolTint = lerp(1.0f.xxx, float3(1.035f, 1.005f, 0.965f), antiCool * (0.30f + 0.70f * shadowMask));
+
+    return color * warmTint * coolTint * antiWarmTint * antiCoolTint;
+}
+
+float3 ApplyCinematicToeLift(float3 color, float strength)
+{
+    strength = saturate(strength);
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    float shadow = 1.0f - smoothstep(0.10f, 0.55f, luma);
+    float3 liftTint = float3(0.030f, 0.034f, 0.040f);
+    return color + liftTint * shadow * strength;
+}
+
+float3 ApplyProfileColorSeparation(float3 color, float2 warmCool, float strength)
+{
+    strength = saturate(strength);
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    float shadowMask = 1.0f - smoothstep(0.20f, 0.64f, luma);
+    float highlightMask = smoothstep(0.38f, 0.92f, luma);
+
+    float warm = saturate(max(warmCool.x, 0.0f));
+    float cool = saturate(max(warmCool.y, 0.0f));
+    float3 shadowTint = lerp(float3(0.955f, 0.980f, 1.055f), float3(1.045f, 0.972f, 0.948f), warm);
+    float3 highlightTint = lerp(float3(1.060f, 0.998f, 0.925f), float3(0.930f, 0.985f, 1.065f), cool);
+    float3 tint = lerp(1.0f.xxx, shadowTint, shadowMask * strength);
+    tint *= lerp(1.0f.xxx, highlightTint, highlightMask * strength * 0.80f);
+    return color * tint;
+}
+
+float3 ApplyHighlightSaturationRollOff(float3 color, float strength)
+{
+    strength = saturate(strength);
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    float highlight = smoothstep(0.72f, 1.0f, luma);
+    float3 gray = luma.xxx;
+    color = lerp(color, gray, highlight * lerp(0.10f, 0.28f, strength));
+
+    float shoulderStart = lerp(0.86f, 0.72f, strength);
+    if (luma > shoulderStart)
+    {
+        float targetLuma = shoulderStart + (luma - shoulderStart) * lerp(0.84f, 0.52f, strength);
+        color *= targetLuma / max(luma, 1e-4f);
+    }
+    return color;
+}
+
+float3 ApplyPostWhiteCompression(float3 color, float strength)
+{
+    strength = saturate(strength);
+    if (strength <= 0.001f)
+    {
+        return color;
+    }
+
+    float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+    float knee = lerp(0.92f, 0.76f, strength);
+    if (luma <= knee)
+    {
+        return color;
+    }
+
+    float compressed = knee + (luma - knee) * lerp(0.86f, 0.42f, strength);
+    return color * (compressed / max(luma, 1e-4f));
+}
+
+float3 ApplySceneLocalCinematicMidtoneCurve(float3 color, float strength)
+{
+    strength = saturate(strength);
+    if (strength <= 0.001f)
+    {
+        return color;
+    }
+
+    const float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+    float luma = dot(color, lumaWeights);
+    float midMask = smoothstep(0.14f, 0.42f, luma) * (1.0f - smoothstep(0.72f, 0.98f, luma));
+    float toeMask = 1.0f - smoothstep(0.08f, 0.34f, luma);
+
+    // A small photographic S-curve: lift the deepest floor slightly, then
+    // shape midtones around the display midpoint. The luma rescale keeps hue
+    // stable and avoids channel clipping.
+    float lifted = luma + toeMask * strength * 0.018f;
+    float contrast = lerp(1.0f, 1.13f, strength * midMask);
+    float curved = saturate((lifted - 0.50f) * contrast + 0.50f);
+
+    float scale = curved / max(luma, 1e-4f);
+    return max(color * scale, 0.0f.xxx);
+}
+
+float3 ApplySceneLocalCinematicChromaPolish(float3 color,
+                                            float2 warmCool,
+                                            float strength,
+                                            float highlightProtection)
+{
+    strength = saturate(strength);
+    if (strength <= 0.001f)
+    {
+        return color;
+    }
+
+    const float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+    float luma = dot(color, lumaWeights);
+    float midMask = smoothstep(0.16f, 0.50f, luma) * (1.0f - smoothstep(0.78f, 1.0f, luma));
+    float shadowMask = 1.0f - smoothstep(0.12f, 0.42f, luma);
+    float highlightMask = smoothstep(0.60f, 0.96f, luma);
+
+    float warm = saturate(max(warmCool.x, 0.0f));
+    float cool = saturate(max(warmCool.y, 0.0f));
+    float3 shadowTone = lerp(float3(0.955f, 0.980f, 1.045f),
+                             float3(1.035f, 0.975f, 0.940f),
+                             warm);
+    float3 highlightTone = lerp(float3(1.035f, 1.006f, 0.955f),
+                                float3(0.940f, 0.990f, 1.055f),
+                                cool);
+
+    float3 toned = color;
+    toned *= lerp(1.0f.xxx, shadowTone, shadowMask * strength * 0.24f);
+    toned *= lerp(1.0f.xxx, highlightTone, highlightMask * strength * 0.18f);
+
+    float3 gray = luma.xxx;
+    float saturationLift = midMask * strength * 0.12f * (1.0f - highlightProtection * highlightMask);
+    toned = lerp(gray, toned, 1.0f + saturationLift);
+
+    // Preserve local luma so the polish reads as color craft, not exposure
+    // drift. This is important for the existing white-ratio stability gates.
+    float tonedLuma = max(dot(toned, lumaWeights), 1e-4f);
+    toned *= luma / tonedLuma;
+    return saturate(toned);
+}
+
+float3 ApplySceneLocalCinematicLookPolish(float3 color,
+                                          float2 warmCool,
+                                          float4 lookParams,
+                                          float whiteCompression,
+                                          float highlightProtection)
+{
+    float polishStrength = saturate(
+        lookParams.x * 0.55f +
+        lookParams.y * 0.45f +
+        lookParams.z * 0.70f +
+        lookParams.w * 0.35f +
+        whiteCompression * 0.30f);
+    if (polishStrength <= 0.001f)
+    {
+        return color;
+    }
+
+    float3 shaped = ApplySceneLocalCinematicMidtoneCurve(color, polishStrength);
+    shaped = ApplySceneLocalCinematicChromaPolish(
+        shaped,
+        warmCool,
+        polishStrength,
+        saturate(highlightProtection));
+
+    const float3 lumaWeights = float3(0.299f, 0.587f, 0.114f);
+    float sourceLuma = max(dot(color, lumaWeights), 1e-4f);
+    float shapedLuma = max(dot(shaped, lumaWeights), 1e-4f);
+    float lumaCeiling = sourceLuma * lerp(1.02f, 1.10f, polishStrength);
+    if (shapedLuma > lumaCeiling)
+    {
+        shaped *= lumaCeiling / shapedLuma;
+    }
+
+    return saturate(shaped);
+}
+
 // Downsample + bright-pass for bloom (runs at reduced resolution, sampling g_SceneColor)
 float4 BloomDownsamplePS(VSOutput input) : SV_TARGET
 {
@@ -612,6 +802,267 @@ float3 SoftLimitReflectionLuma(float3 color, float maxLumaOverride)
     return color * saturate(limitedLuma / max(luma, 1e-5f));
 }
 
+float3 SceneMaterialCinematicReflectionTint(uint sceneMaterialClass,
+                                            uint surfaceClass,
+                                            float roughness,
+                                            float metallic)
+{
+    float3 tint = float3(1.0f, 1.0f, 1.0f);
+    switch (sceneMaterialClass) {
+        case SCENE_MATERIAL_CERAMIC_TILE:   tint = float3(0.965f, 1.010f, 1.035f); break;
+        case SCENE_MATERIAL_POLISHED_WOOD:  tint = float3(1.070f, 1.020f, 0.940f); break;
+        case SCENE_MATERIAL_BRUSHED_METAL:  tint = float3(0.975f, 0.995f, 1.030f); break;
+        case SCENE_MATERIAL_POLISHED_METAL: tint = float3(0.990f, 0.998f, 1.018f); break;
+        case SCENE_MATERIAL_GLASS_PANE:     tint = float3(0.925f, 1.020f, 1.085f); break;
+        case SCENE_MATERIAL_WET_SURFACE:    tint = float3(0.945f, 1.018f, 1.055f); break;
+        case SCENE_MATERIAL_WATER:          tint = float3(0.885f, 1.030f, 1.110f); break;
+        case SCENE_MATERIAL_MIRROR:         tint = float3(1.000f, 1.000f, 1.000f); break;
+        case SCENE_MATERIAL_SCREEN_PANEL:
+        case SCENE_MATERIAL_EMISSIVE_NEON:  tint = float3(0.970f, 1.015f, 1.055f); break;
+        default:
+            if (surfaceClass == SURFACE_CLASS_BRUSHED_METAL) {
+                tint = float3(0.980f, 0.995f, 1.025f);
+            } else if (surfaceClass == SURFACE_CLASS_WOOD) {
+                tint = float3(1.055f, 1.018f, 0.950f);
+            } else if (surfaceClass == SURFACE_CLASS_GLASS ||
+                       surfaceClass == SURFACE_CLASS_WATER) {
+                tint = float3(0.920f, 1.020f, 1.080f);
+            }
+            break;
+    }
+
+    const float gloss = saturate(1.0f - roughness);
+    const float materialWeight = saturate(gloss * 0.65f + metallic * 0.35f);
+    return lerp(1.0f.xxx, tint, materialWeight);
+}
+
+float3 ApplySceneMaterialCinematicReflectionGrade(float3 reflectionColor,
+                                                  float3 baseColor,
+                                                  uint sceneMaterialClass,
+                                                  uint surfaceClass,
+                                                  float roughness,
+                                                  float metallic,
+                                                  float materialReflectance,
+                                                  float fireflyClampLuma)
+{
+    reflectionColor = SoftLimitReflectionLuma(reflectionColor, fireflyClampLuma);
+
+    const float baseLuma = max(ReflectionLuma(baseColor), 1e-4f);
+    const float reflectionLuma = ReflectionLuma(reflectionColor);
+    if (reflectionLuma <= 1e-5f) {
+        return reflectionColor;
+    }
+
+    float3 tint = SceneMaterialCinematicReflectionTint(
+        sceneMaterialClass, surfaceClass, roughness, metallic);
+    reflectionColor *= tint;
+
+    // Keep post reflections scene-local and plausible: they can be brighter
+    // than the lit surface on glossy materials, but should not become a black
+    // replacement layer or a hot external-HDRI patch.
+    const bool strongOwner =
+        SurfaceIsMirrorClass(surfaceClass) ||
+        SurfaceIsWater(surfaceClass) ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER;
+    const float gloss = saturate(1.0f - roughness);
+    const float maxRelativeLuma = strongOwner
+        ? lerp(2.4f, 5.0f, gloss)
+        : lerp(1.12f, 2.15f, saturate(gloss * materialReflectance + metallic * 0.35f));
+    const float minRelativeLuma = strongOwner
+        ? 0.10f
+        : lerp(0.42f, 0.18f, saturate(gloss + metallic));
+
+    float gradedLuma = ReflectionLuma(reflectionColor);
+    const float maxAllowed = max(baseLuma * maxRelativeLuma, 0.08f);
+    if (gradedLuma > maxAllowed) {
+        reflectionColor *= maxAllowed / max(gradedLuma, 1e-4f);
+        gradedLuma = maxAllowed;
+    }
+
+    const float minAllowed = baseLuma * minRelativeLuma;
+    if (gradedLuma < minAllowed && !strongOwner) {
+        float lift = saturate((minAllowed - gradedLuma) / max(minAllowed, 1e-4f));
+        reflectionColor = lerp(reflectionColor, baseColor, lift * 0.28f);
+    }
+
+    return SoftLimitReflectionLuma(reflectionColor, fireflyClampLuma);
+}
+
+float3 CompositeSceneMaterialCinematicReflection(float3 baseColor,
+                                                 float3 reflectionColor,
+                                                 float reflectionBlend,
+                                                 uint sceneMaterialClass,
+                                                 uint surfaceClass,
+                                                 float roughness,
+                                                 float metallic,
+                                                 float materialReflectance,
+                                                 float fireflyClampLuma)
+{
+    reflectionBlend = saturate(reflectionBlend);
+    if (reflectionBlend <= 1e-5f) {
+        return baseColor;
+    }
+
+    float3 gradedReflection = ApplySceneMaterialCinematicReflectionGrade(
+        reflectionColor,
+        baseColor,
+        sceneMaterialClass,
+        surfaceClass,
+        roughness,
+        metallic,
+        materialReflectance,
+        fireflyClampLuma);
+
+    const bool strongOwner =
+        SurfaceIsMirrorClass(surfaceClass) ||
+        SurfaceIsWater(surfaceClass) ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER;
+    const float replacementWeight = strongOwner ? 0.92f : lerp(0.40f, 0.72f, saturate(1.0f - roughness));
+    float3 replaceComposite = lerp(baseColor, gradedReflection, reflectionBlend * replacementWeight);
+
+    // A small additive sheen preserves the base lighting and makes broad
+    // polished materials read glossy without replacing them with the raw
+    // screen/RT sample.
+    float3 positiveReflection = max(gradedReflection - baseColor * 0.20f, 0.0f.xxx);
+    float additiveStrength = reflectionBlend * (strongOwner ? 0.08f : 0.18f) * saturate(1.0f - roughness);
+    float3 additiveComposite = replaceComposite + positiveReflection * additiveStrength;
+
+    const float baseLuma = max(ReflectionLuma(baseColor), 1e-4f);
+    float compositeLuma = ReflectionLuma(additiveComposite);
+    float compositeCeiling = baseLuma * (strongOwner ? 5.2f : 2.35f);
+    compositeCeiling = min(compositeCeiling, fireflyClampLuma);
+    if (compositeLuma > compositeCeiling) {
+        additiveComposite *= compositeCeiling / max(compositeLuma, 1e-4f);
+    }
+
+    return max(additiveComposite, 0.0f.xxx);
+}
+
+float SceneMaterialCinematicContactAoStrength(uint sceneMaterialClass,
+                                              uint surfaceClass,
+                                              float roughness,
+                                              float metallic)
+{
+    if (surfaceClass == SURFACE_CLASS_EMISSIVE ||
+        surfaceClass == SURFACE_CLASS_GLASS ||
+        surfaceClass == SURFACE_CLASS_MIRROR ||
+        surfaceClass == SURFACE_CLASS_WATER ||
+        sceneMaterialClass == SCENE_MATERIAL_EMISSIVE_NEON ||
+        sceneMaterialClass == SCENE_MATERIAL_SCREEN_PANEL ||
+        sceneMaterialClass == SCENE_MATERIAL_GLASS_PANE ||
+        sceneMaterialClass == SCENE_MATERIAL_MIRROR ||
+        sceneMaterialClass == SCENE_MATERIAL_WATER) {
+        return 0.0f;
+    }
+
+    float strength = 0.62f;
+    switch (sceneMaterialClass) {
+        case SCENE_MATERIAL_PAINTED_WALL:   strength = 0.82f; break;
+        case SCENE_MATERIAL_CERAMIC_TILE:   strength = 0.70f; break;
+        case SCENE_MATERIAL_POLISHED_WOOD:  strength = 0.64f; break;
+        case SCENE_MATERIAL_BRUSHED_METAL:  strength = 0.36f; break;
+        case SCENE_MATERIAL_POLISHED_METAL: strength = 0.22f; break;
+        case SCENE_MATERIAL_FABRIC:         strength = 0.95f; break;
+        case SCENE_MATERIAL_PLASTIC:        strength = 0.66f; break;
+        case SCENE_MATERIAL_WET_SURFACE:    strength = 0.32f; break;
+        case SCENE_MATERIAL_CONCRETE:       strength = 0.90f; break;
+        case SCENE_MATERIAL_RUBBER:         strength = 0.96f; break;
+        default:
+            if (surfaceClass == SURFACE_CLASS_MASONRY) {
+                strength = 0.88f;
+            } else if (surfaceClass == SURFACE_CLASS_WOOD) {
+                strength = 0.68f;
+            } else if (surfaceClass == SURFACE_CLASS_BRUSHED_METAL) {
+                strength = 0.36f;
+            } else if (surfaceClass == SURFACE_CLASS_PLASTIC) {
+                strength = 0.62f;
+            }
+            break;
+    }
+
+    float roughReceiver = lerp(0.55f, 1.10f, saturate(roughness));
+    float conductorSuppression = lerp(1.0f, 0.42f, saturate(metallic));
+    return saturate(strength * roughReceiver * conductorSuppression);
+}
+
+float3 SceneMaterialCinematicContactAoTint(uint sceneMaterialClass,
+                                           uint surfaceClass)
+{
+    switch (sceneMaterialClass) {
+        case SCENE_MATERIAL_CERAMIC_TILE:  return float3(0.955f, 0.975f, 1.015f);
+        case SCENE_MATERIAL_POLISHED_WOOD: return float3(1.035f, 0.975f, 0.910f);
+        case SCENE_MATERIAL_FABRIC:        return float3(0.975f, 0.960f, 0.940f);
+        case SCENE_MATERIAL_CONCRETE:      return float3(0.955f, 0.960f, 0.955f);
+        case SCENE_MATERIAL_RUBBER:        return float3(0.930f, 0.935f, 0.950f);
+        case SCENE_MATERIAL_WET_SURFACE:   return float3(0.925f, 0.970f, 1.020f);
+        default:
+            if (surfaceClass == SURFACE_CLASS_WOOD) {
+                return float3(1.030f, 0.975f, 0.915f);
+            }
+            if (surfaceClass == SURFACE_CLASS_MASONRY) {
+                return float3(0.955f, 0.960f, 0.955f);
+            }
+            return float3(0.965f, 0.965f, 0.965f);
+    }
+}
+
+float3 ApplySceneMaterialCinematicContactAo(float3 color,
+                                            float ao,
+                                            uint sceneMaterialClass,
+                                            uint surfaceClass,
+                                            float roughness,
+                                            float metallic,
+                                            float3 normal,
+                                            float depthCenter)
+{
+    color = SanitizeHDRColor(color);
+    ao = saturate(ao);
+
+    const float validSceneDepth = 1.0f - smoothstep(0.985f, 1.0f, depthCenter);
+    if (validSceneDepth <= 1e-4f) {
+        return color;
+    }
+
+    const float baseAoAmount = saturate(g_AOParams.w * 0.48f);
+    float3 grounded = color * lerp(1.0f, ao, baseAoAmount * validSceneDepth);
+
+    const float cinematicActive =
+        saturate(max(g_CinematicStabilityParams.z - 1.0f, 0.0f) * 2.5f +
+                 g_CinematicStabilityParams.w * 3.0f);
+    if (cinematicActive <= 1e-4f) {
+        return grounded;
+    }
+
+    const float materialStrength = SceneMaterialCinematicContactAoStrength(
+        sceneMaterialClass, surfaceClass, roughness, metallic);
+    if (materialStrength <= 1e-4f) {
+        return grounded;
+    }
+
+    const float occlusion = pow(saturate(1.0f - ao), 1.18f);
+    const float floorLikeReceiver = lerp(0.88f, 1.08f, saturate(abs(normal.y)));
+    const float highlightProtection = saturate(g_CinematicStabilityParams.w);
+    const float luma = ReflectionLuma(grounded);
+    const float protectedHighlight = lerp(
+        1.0f,
+        1.0f - smoothstep(0.72f, 1.28f, luma),
+        highlightProtection);
+    const float contact = saturate(
+        occlusion *
+        materialStrength *
+        floorLikeReceiver *
+        validSceneDepth *
+        protectedHighlight *
+        cinematicActive);
+
+    float3 contactTint = SceneMaterialCinematicContactAoTint(sceneMaterialClass, surfaceClass);
+    float3 tinted = grounded * lerp(1.0f.xxx, contactTint, contact * 0.18f);
+    float contactDarken = 1.0f - contact * 0.42f;
+    return max(tinted * contactDarken, 0.0f.xxx);
+}
+
 // ----------------------------------------------------------------------------
 // HDR TAA resolve pass
 // ----------------------------------------------------------------------------
@@ -644,8 +1095,10 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float2 velPx = vel / safeTexel;
     float  speedPx = length(velPx);
 
-    // Disable TAA for very fast motion (in pixels) to avoid long streaks.
-    if (speedPx >= 24.0f)
+    // Disable TAA only for extreme motion. Normal mouse-look can produce large
+    // screen-space velocities on static surfaces, and those pixels still
+    // reproject correctly through the velocity/depth/normal checks below.
+    if (speedPx >= 48.0f)
     {
         if (debugView == 25u)
         {
@@ -738,11 +1191,11 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     float3 diff = abs(currClamped - historyClamped);
     float  maxDiff = max(max(diff.r, diff.g), diff.b);
 
-    // Roughness gating: shiny surfaces get dramatically less history in all
-    // regimes so fast-changing specular reflections do not leave "inner
-    // ghosts" (especially noticeable up close on chrome spheres).
-    float roughFactor = saturate(surfaceRoughness * 0.75f + 0.25f);
-    roughFactor *= roughFactor;
+    // Roughness gating: glossy surfaces still need bounded temporal history
+    // for sharp IBL/highlight stability. Reprojection, edge rejection, and
+    // reactive masking below already remove history when a specular feature
+    // diverges, so do not starve smooth metals/glass by default.
+    float roughHistoryScale = lerp(0.45f, 1.0f, saturate(surfaceRoughness / 0.6f));
 
     float finalBlend = 0.0f;
 
@@ -760,6 +1213,12 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     else if (speedPx < 10.0f && maxDiff < 0.35f)
     {
         finalBlend = taaBlendBase * 0.35f;
+    }
+    // Camera-look motion on static scene geometry: keep a small amount of
+    // history so IBL/specular detail does not collapse to single-frame shimmer.
+    else if (speedPx < 32.0f && maxDiff < 0.45f)
+    {
+        finalBlend = taaBlendBase * 0.22f;
     }
     // Otherwise treat as dynamic / disoccluded and rely on the current
     // frame only; history stays in the clamp range but does not influence
@@ -829,12 +1288,12 @@ float4 TAAResolvePS(VSOutput input) : SV_TARGET
     // disocclusion/high-motion rejection debug channels, w is in-bounds.
     float4 sharedTemporalMask = g_MaterialExt2.SampleLevel(g_Sampler, uv, 0);
     finalBlend *= sharedTemporalMask.x * sharedTemporalMask.w;
-    finalBlend *= roughFactor * (1.0f - edgeFactor) * (1.0f - reactiveMask);
+    finalBlend *= roughHistoryScale * (1.0f - edgeFactor) * (1.0f - reactiveMask);
 
     // Clamp maximum history contribution per frame. Use a tighter cap on
     // glossy surfaces where specular reflections move non-linearly and
     // camera-only motion vectors cannot reproject perfectly.
-    float roughnessClamp = lerp(0.02f, 0.25f, saturate(surfaceRoughness / 0.6f));
+    float roughnessClamp = lerp(0.08f, 0.25f, saturate(surfaceRoughness / 0.6f));
     finalBlend = min(finalBlend, roughnessClamp);
 
     finalBlend = saturate(finalBlend);
@@ -970,9 +1429,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
         return float4(sdfColor, 1.0f);
     }
 
-    // Base scene color + alpha as written by the main PBR pass. For opaque
-    // materials alpha is 1; glass / water / other transparent materials use
-    // alpha < 1 and are treated as thin transmissive surfaces in this pass.
+    // Base scene color + alpha as written by the main PBR pass. Alpha is a
+    // post-process control channel from the opaque/G-buffer path; blended
+    // overlays preserve the destination alpha because they do not publish
+    // matching normal/material buffers.
     float4 sceneSample = g_SceneColor.Sample(g_Sampler, uv);
     float3 hdrColor = sceneSample.rgb;
     float  opacity = sceneSample.a;
@@ -988,6 +1448,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float4 materialExt2 = g_MaterialExt2.Sample(g_Sampler, uv);
     float  transmission = saturate(materialExt1.a);
     uint   surfaceClass = DecodeSurfaceClass(materialExt2.r);
+    uint   sceneMaterialClass = DecodeSceneMaterialClass(materialExt2.a);
 
     if (g_DebugMode.x == 1.0f)
     {
@@ -1008,6 +1469,10 @@ float4 PSMain(VSOutput input) : SV_TARGET
     if (g_DebugMode.x == 41.0f)
     {
         return float4(SurfaceClassDebugColor(surfaceClass), 1.0f);
+    }
+    if (g_DebugMode.x == 47.0f)
+    {
+        return float4(SceneMaterialPolicyDebugColor(sceneMaterialClass, surfaceClass, roughness, metallic), 1.0f);
     }
 
     // Screen-space refraction for thin transparent materials (glass, water).
@@ -1070,6 +1535,13 @@ float4 PSMain(VSOutput input) : SV_TARGET
     float dielectricFresnel = 0.04f + 0.96f * pow(1.0f - nDotVForFresnel, 5.0f);
     float roughFresnelDamp = lerp(1.0f, 0.25f, roughness);
     float materialReflectance = lerp(saturate(dielectricFresnel * roughFresnelDamp), 1.0f, metallic);
+    float reflectionStabilityScale =
+        SceneMaterialReflectionStabilityScale(sceneMaterialClass, surfaceClass, roughness, metallic);
+    float cinematicMotionDamping = saturate(g_CinematicStabilityParams.x);
+    float glossyMotionDamp = lerp(1.0f,
+                                  0.82f,
+                                  cinematicMotionDamping * saturate(gloss * materialReflectance));
+    reflectionStabilityScale *= glossyMotionDamp;
 
     // Scale SSR coverage into a soft weight; keep some headroom so the
     // underlying BRDF/IBL specular term can still contribute. Only allow
@@ -1094,7 +1566,7 @@ float4 PSMain(VSOutput input) : SV_TARGET
     if (!isMirrorClass && roughness > 0.08f && roughness < 0.28f && ssrWeightRaw > 0.4f)
     {
         float ssrConf = ssrWeightRaw * ssrWeightRaw;
-        wSSR = ssrConf * kMaxSSRWeight * gloss * materialReflectance;
+        wSSR = ssrConf * kMaxSSRWeight * gloss * materialReflectance * reflectionStabilityScale;
     }
 
     // Optional RT reflection buffer: when RT is enabled (postParams.w > 0.5)
@@ -1227,7 +1699,51 @@ float4 PSMain(VSOutput input) : SV_TARGET
     if (isWaterClass || isPolishedConductor) {
         rtGloss = max(rtGloss, saturate(1.0f - roughness) * 0.75f);
     }
-    float  wRT = rtEnabled ? rawRTWeight * rtGloss * materialReflectance * rtReflectionCompositionStrength : 0.0f;
+    float  wRT = rtEnabled ? rawRTWeight *
+                              rtGloss *
+                              materialReflectance *
+                              rtReflectionCompositionStrength *
+                              reflectionStabilityScale : 0.0f;
+
+    if (g_DebugMode.x == 46.0f)
+    {
+        // Reflection-owner debug:
+        //   black  = no meaningful reflection owner for this pixel
+        //   blue   = screen-space reflection owns the post reflection
+        //   magenta= ray-traced reflection owns the post reflection
+        //   yellow = image-based lighting / prelit scene color remains owner
+        //   green  = scene-local neutral/local fallback owner
+        //   gray   = sky/background/no scene depth
+        float sceneDepth = g_Depth.Sample(g_Sampler, uv).r;
+        if (sceneDepth >= 1.0f - 1e-4f)
+        {
+            return float4(0.18f, 0.18f, 0.18f, 1.0f);
+        }
+
+        float reflectionDebugStability = saturate(g_CinematicStabilityParams.y);
+        float ownerStrength = saturate(max(wSSR, wRT) * 2.0f);
+        ownerStrength *= lerp(1.0f, 0.82f, reflectionDebugStability);
+        if (wSSR > 1e-5f && wSSR >= wRT)
+        {
+            return float4(0.05f, 0.32f + ownerStrength * 0.50f, 1.0f, 1.0f);
+        }
+        if (wRT > 1e-5f)
+        {
+            return float4(0.95f, 0.10f + ownerStrength * 0.30f, 0.95f, 1.0f);
+        }
+
+        float iblOwnerStrength = saturate(materialReflectance * gloss * g_EnvParams.y);
+        iblOwnerStrength *= lerp(1.0f, 0.82f, reflectionDebugStability);
+        if (g_EnvParams.z > 0.5f && iblOwnerStrength > 0.015f)
+        {
+            return float4(1.0f, 0.78f + iblOwnerStrength * 0.20f, 0.05f, 1.0f);
+        }
+        if (reflectionEligibleClass || materialReflectance * gloss > 0.015f)
+        {
+            return float4(0.05f, 0.70f, 0.22f, 1.0f);
+        }
+        return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    }
 
     float  weightSum = wSSR + wRT;
     if (weightSum > 1e-4f)
@@ -1241,12 +1757,22 @@ float4 PSMain(VSOutput input) : SV_TARGET
             metallic,
             transmission,
             dielectricFresnel);
+        maxReflBlend *= reflectionStabilityScale;
 
         // Final lerp factor: surface roughness and total reflection weight
         // gate how strongly we move towards the hybrid reflection color.
         float roughBlendGate = pow(saturate(1.0f - roughness), 2.0f);
         float reflBlend = maxReflBlend * saturate(weightSum) * roughBlendGate;
-        hdrColor = lerp(hdrColor, reflHybrid, reflBlend);
+        hdrColor = CompositeSceneMaterialCinematicReflection(
+            hdrColor,
+            reflHybrid,
+            reflBlend,
+            sceneMaterialClass,
+            surfaceClass,
+            roughness,
+            metallic,
+            materialReflectance,
+            rtReflectionFireflyClampLuma);
     }
 
     // Bloom: sample blurred bloom texture if available
@@ -1268,6 +1794,16 @@ float4 PSMain(VSOutput input) : SV_TARGET
             bloom += bloom * dirt * lensDirtAmount * 0.75f;
         }
     }
+
+    float bloomLuma = dot(bloom, float3(0.2126f, 0.7152f, 0.0722f));
+    float lookHalation = saturate(g_CinematicLookParams.w);
+    float halation = saturate(bloomLuma * lerp(0.06f, 0.16f, lookHalation)) * saturate(bloomIntensity);
+    float warmIntent = saturate(max(g_ColorGrade.x, 0.0f));
+    float coolIntent = saturate(max(g_ColorGrade.y, 0.0f));
+    float3 halationTint = lerp(float3(1.0f, 0.50f, 0.24f),
+                               float3(0.42f, 0.70f, 1.0f),
+                               coolIntent * (1.0f - warmIntent));
+    float3 halationColor = halationTint * halation * lerp(0.08f, 0.36f, lookHalation);
 
     // Start from base HDR lighting (without bloom); motion blur (when enabled)
     // operates on this term only so bloom and grading stay stable.
@@ -1529,18 +2065,47 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
     // Compose bloom after any motion blur and fog so blurred highlights remain
     // physically plausible and color-stable.
-    float3 hdrCombined = hdrBlurred + bloom;
+    float3 hdrCombined = hdrBlurred + bloom + halationColor;
 
     // Clamp HDR before tonemapping to avoid extreme spikes that can show up
     // as sudden RGB flashes when moving the camera across very bright areas.
     const float kMaxHdrBeforeTonemap = 32.0f;
     hdrCombined = min(hdrCombined, kMaxHdrBeforeTonemap.xxx);
+    float highlightProtection = saturate(g_CinematicStabilityParams.w);
+    float profileExposureTrim = clamp(g_CinematicExposureParams.x, 0.42f, 1.10f);
+    float profileShoulderStart = clamp(g_CinematicExposureParams.y, 1.0f, 24.0f);
+    float profileShoulderStrength = saturate(g_CinematicExposureParams.z);
+    float profileWhiteCompression = saturate(g_CinematicExposureParams.w);
+    float combinedShoulderStrength = saturate(highlightProtection + profileShoulderStrength);
+    if (combinedShoulderStrength > 0.001f)
+    {
+        float hdrLuma = dot(hdrCombined, float3(0.2126f, 0.7152f, 0.0722f));
+        float shoulderStart = min(lerp(24.0f, 16.0f, highlightProtection), profileShoulderStart);
+        float shoulderScale = 1.0f;
+        if (hdrLuma > shoulderStart)
+        {
+            float protectedLuma = shoulderStart + (hdrLuma - shoulderStart) * lerp(1.0f, 0.34f, combinedShoulderStrength);
+            shoulderScale = protectedLuma / max(hdrLuma, 1e-4f);
+        }
+        hdrCombined *= shoulderScale;
+    }
 
-    float exposure = max(g_TimeAndExposure.z, 0.01f);
+    float exposure = max(g_TimeAndExposure.z * profileExposureTrim, 0.01f);
     float3 color = hdrCombined * exposure;
 
     uint toneMapperMode = (uint)round(max(g_CinematicParams.x, 0.0f));
     color = ApplyToneMapper(color, toneMapperMode);
+    color = ApplyCinematicToeLift(color, g_CinematicLookParams.x);
+    color = ApplyPhotographicSplitTone(color, g_ColorGrade.xy);
+    color = ApplyProfileColorSeparation(color, g_ColorGrade.xy, g_CinematicLookParams.z);
+    color = ApplyHighlightSaturationRollOff(color, g_CinematicLookParams.y);
+    color = ApplyPostWhiteCompression(color, profileWhiteCompression);
+    color = ApplySceneLocalCinematicLookPolish(
+        color,
+        g_ColorGrade.xy,
+        g_CinematicLookParams,
+        profileWhiteCompression,
+        highlightProtection);
     color = pow(color, 1.0f / 2.2f);
 
     // GPU-driven settings overlay. When g_DebugMode.y > 0.5 the engine is
@@ -1693,14 +2258,6 @@ float4 PSMain(VSOutput input) : SV_TARGET
         }
     }
 
-    // Simple warm/cool grading driven by g_ColorGrade.xy.
-    // Positive warm shifts towards orange, positive cool shifts towards blue.
-    float warm = saturate(0.5f + g_ColorGrade.x * 0.5f); // map [-1,1] -> [0,1]
-    float cool = saturate(0.5f + g_ColorGrade.y * 0.5f);
-    float3 warmTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(1.05f, 1.0f, 0.95f), warm);
-    float3 coolTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(0.96f, 1.0f, 1.05f), cool);
-    color *= warmTint * coolTint;
-
     float saturation = clamp(g_PostGradeParams.y, 0.0f, 2.0f);
     float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
     color = lerp(luma.xxx, color, saturation);
@@ -1758,10 +2315,48 @@ float4 PSMain(VSOutput input) : SV_TARGET
 
         ao = (wAccum > 0.0f) ? saturate(aoAccum / wAccum) : 1.0f;
 
-        // Keep AO influence relatively subtle so it grounds objects without
-        // creating strong dark discs under them.
-        float aoIntensity = saturate(g_AOParams.w * 0.6f);
-        color *= lerp(1.0f, ao, aoIntensity);
+        color = ApplySceneMaterialCinematicContactAo(
+            color,
+            ao,
+            sceneMaterialClass,
+            surfaceClass,
+            roughness,
+            metallic,
+            gbufNormal,
+            depthCenter);
+    }
+
+    // Profile-owned clarity for scene-local views: use stable geometry
+    // discontinuities rather than temporal/noisy color history so silhouettes
+    // and material breaks read crisply without reintroducing mouse-look shimmer.
+    if (g_CinematicLookParams.z > 0.001f)
+    {
+        float2 texel = g_PostParams.xy;
+        float depthCenter = g_Depth.SampleLevel(g_Sampler, uv, 0).r;
+        float depthR = g_Depth.SampleLevel(g_Sampler, uv + float2(texel.x, 0.0f), 0).r;
+        float depthL = g_Depth.SampleLevel(g_Sampler, uv - float2(texel.x, 0.0f), 0).r;
+        float depthU = g_Depth.SampleLevel(g_Sampler, uv - float2(0.0f, texel.y), 0).r;
+        float depthD = g_Depth.SampleLevel(g_Sampler, uv + float2(0.0f, texel.y), 0).r;
+
+        float3 normalR = normalize(g_NormalRoughness.SampleLevel(g_Sampler, uv + float2(texel.x, 0.0f), 0).xyz * 2.0f - 1.0f);
+        float3 normalL = normalize(g_NormalRoughness.SampleLevel(g_Sampler, uv - float2(texel.x, 0.0f), 0).xyz * 2.0f - 1.0f);
+        float3 normalU = normalize(g_NormalRoughness.SampleLevel(g_Sampler, uv - float2(0.0f, texel.y), 0).xyz * 2.0f - 1.0f);
+        float3 normalD = normalize(g_NormalRoughness.SampleLevel(g_Sampler, uv + float2(0.0f, texel.y), 0).xyz * 2.0f - 1.0f);
+
+        float depthEdge = max(max(abs(depthCenter - depthR), abs(depthCenter - depthL)),
+                              max(abs(depthCenter - depthU), abs(depthCenter - depthD)));
+        float normalEdge = max(max(1.0f - dot(gbufNormal, normalR),
+                                   1.0f - dot(gbufNormal, normalL)),
+                               max(1.0f - dot(gbufNormal, normalU),
+                                   1.0f - dot(gbufNormal, normalD)));
+        float edgeMask = saturate(depthEdge * 220.0f + normalEdge * 0.90f);
+        float strength = saturate(g_CinematicLookParams.z * 0.22f + g_CinematicLookParams.y * 0.08f);
+        float luma = dot(color, float3(0.299f, 0.587f, 0.114f));
+        float midMask = smoothstep(0.08f, 0.28f, luma) * (1.0f - smoothstep(0.86f, 1.0f, luma));
+        float clarity = edgeMask * strength * midMask;
+        color *= 1.0f - clarity * 0.16f;
+        color += (color - luma.xxx) * clarity * 0.08f;
+        color = saturate(color);
     }
 
     // Optional FXAA-like smoothing (lightweight approximation). When TAA is

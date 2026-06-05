@@ -12,6 +12,8 @@ const std::vector<MaterialPresetDescriptor>& MaterialPresetRegistry::CanonicalPr
         {"brushed_metal", "Brushed Metal", "brushed_metal", true, true},
         {"plastic", "Plastic", "plastic", false, true},
         {"painted_plastic", "Painted Plastic", "plastic", true, true},
+        {"painted_wall", "Painted Wall", "masonry", false, true},
+        {"ceramic_tile", "Ceramic Tile", "masonry", true, true},
         {"matte", "Matte Ceramic", "default", false, true},
         {"brick", "Brick", "masonry", false, true},
         {"concrete", "Concrete", "masonry", false, true},
@@ -25,13 +27,18 @@ const std::vector<MaterialPresetDescriptor>& MaterialPresetRegistry::CanonicalPr
         {"honey", "Honey", "water", true, true},
         {"molasses", "Molasses", "water", true, true},
         {"emissive_panel", "Emissive Panel", "emissive", true, true},
+        {"screen_panel", "Screen Panel", "emissive", true, true},
+        {"rubber", "Rubber", "plastic", false, true},
         {"skin", "Skin", "default", true, true},
         {"skin_ish", "Skin-ish Wax", "default", true, true},
         {"cloth", "Cloth", "default", true, true},
+        {"fabric", "Fabric", "wood", true, true},
         {"velvet", "Velvet", "default", true, true},
+        {"foliage", "Foliage", "default", true, true},
         {"neon_tube", "Neon Tube", "emissive", true, true},
         {"brushed_gold", "Brushed Gold", "brushed_metal", true, true},
         {"wet_stone", "Wet Stone", "masonry", true, true},
+        {"sand", "Sand", "default", true, true},
         {"anisotropic_car_paint", "Anisotropic Car Paint", "plastic", true, true},
         {"procedural_marble", "Procedural Marble", "masonry", true, true},
     };
@@ -82,10 +89,38 @@ std::string MaterialPresetRegistry::Canonicalize(std::string_view presetName) {
         {"metal_gold", "brushed_gold"},
         {"stone_wet", "wet_stone"},
         {"marble", "procedural_marble"},
+        {"shore_sand", "sand"},
+        {"wet_sand", "sand"},
+        {"dune", "sand"},
+        {"leaf", "foliage"},
+        {"leaves", "foliage"},
+        {"plant", "foliage"},
+        {"vegetation", "foliage"},
         {"neon", "neon_tube"},
         {"emissive", "emissive_panel"},
+        {"light", "emissive_panel"},
+        {"screen", "screen_panel"},
+        {"display", "screen_panel"},
+        {"monitor", "screen_panel"},
+        {"paint", "painted_wall"},
+        {"wall_paint", "painted_wall"},
+        {"drywall", "painted_wall"},
+        {"plaster", "painted_wall"},
         {"ceramic", "matte"},
+        {"tile", "ceramic_tile"},
+        {"matte_tile", "ceramic_tile"},
+        {"floor_tile", "ceramic_tile"},
+        {"porcelain", "ceramic_tile"},
         {"matte_ceramic", "matte"},
+        {"cloth", "fabric"},
+        {"upholstery", "fabric"},
+        {"paper", "fabric"},
+        {"fiber", "fabric"},
+        {"turf", "fabric"},
+        {"matte_black", "rubber"},
+        {"gym_mat", "rubber"},
+        {"metal", "brushed_metal"},
+        {"painted_metal", "brushed_metal"},
         {"magma", "lava"},
         {"liquid_gold", "honey"},
         {"syrup", "molasses"},
@@ -118,7 +153,26 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         return presetLower.find(token) != std::string::npos;
     };
 
-    if (contains("glass")) {
+    if (contains("sand")) {
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.86f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.62f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(0.82f, 0.72f, 0.54f);
+    } else if (contains("foliage")) {
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.64f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.52f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(0.58f, 0.72f, 0.46f);
+        info.subsurfaceWrap = 0.28f;
+    } else if (contains("glass")) {
         info.materialType = 1.0f;
         info.transmissive = true;
         info.hasDefaultMetallic = true;
@@ -138,12 +192,42 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.defaultMetallic = 1.0f;
         info.hasDefaultRoughness = true;
         info.defaultRoughness = 0.02f;
+    } else if (contains("screen_panel")) {
+        info.materialType = 5.0f;
+        info.emissive = true;
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.22f;
+        info.hasDefaultEmissiveStrength = true;
+        info.defaultEmissiveStrength = 2.2f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.80f;
+        info.hasDefaultSpecularColor = true;
+        info.defaultSpecularColorFactor = glm::vec3(0.62f, 0.82f, 1.0f);
     } else if (contains("plastic") || contains("car_paint")) {
         info.materialType = 3.0f;
         info.hasDefaultMetallic = true;
         info.defaultMetallic = 0.0f;
         info.hasDefaultRoughness = true;
         info.defaultRoughness = contains("car_paint") ? 0.18f : 0.35f;
+    } else if (contains("painted_wall")) {
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.72f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.42f;
+    } else if (contains("ceramic_tile")) {
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.38f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.72f;
+        info.clearcoat = true;
+        info.clearcoatFactor = 0.22f;
+        info.clearcoatRoughnessFactor = 0.24f;
     } else if (contains("brick") || contains("concrete") || contains("stone") || contains("marble")) {
         info.materialType = 4.0f;
         info.hasDefaultMetallic = true;
@@ -263,7 +347,7 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         }
     }
 
-    if (contains("cloth") || contains("velvet")) {
+    if (contains("fabric") || contains("cloth") || contains("velvet")) {
         info.clearcoat = false;
         info.clearcoatFactor = 0.0f;
         info.sheenWeight = 1.0f;
@@ -271,6 +355,16 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.defaultMetallic = 0.0f;
         info.hasDefaultRoughness = true;
         info.defaultRoughness = 0.82f;
+    }
+    if (contains("rubber")) {
+        info.clearcoat = false;
+        info.clearcoatFactor = 0.0f;
+        info.hasDefaultMetallic = true;
+        info.defaultMetallic = 0.0f;
+        info.hasDefaultRoughness = true;
+        info.defaultRoughness = 0.72f;
+        info.hasDefaultSpecularFactor = true;
+        info.defaultSpecularFactor = 0.30f;
     }
 
     if (contains("car_paint")) {
@@ -289,7 +383,9 @@ MaterialPresetInfo MaterialPresetRegistry::Resolve(std::string_view presetName) 
         info.clearcoatRoughnessFactor = 0.12f;
     }
 
-    if (contains("skin_ish")) {
+    if (contains("foliage")) {
+        info.subsurfaceWrap = std::max(info.subsurfaceWrap, 0.28f);
+    } else if (contains("skin_ish")) {
         info.subsurfaceWrap = 0.25f;
     } else if (contains("skin")) {
         info.subsurfaceWrap = 0.35f;

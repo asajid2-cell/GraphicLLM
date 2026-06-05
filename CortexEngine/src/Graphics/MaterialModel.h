@@ -36,6 +36,70 @@ struct MaterialTexturePresence {
     bool specularColor = false;
 };
 
+enum class SceneMaterialClassId : uint32_t {
+    Default = 0u,
+    PaintedWall = 1u,
+    CeramicTile = 2u,
+    PolishedWood = 3u,
+    BrushedMetal = 4u,
+    PolishedMetal = 5u,
+    GlassPane = 6u,
+    Fabric = 7u,
+    Plastic = 8u,
+    WetSurface = 9u,
+    EmissiveNeon = 10u,
+    ScreenPanel = 11u,
+    Concrete = 12u,
+    Rubber = 13u,
+    Water = 14u,
+    Mirror = 15u,
+};
+
+enum class MaterialReflectionPreferenceId : uint32_t {
+    NeutralFallback = 0u,
+    LocalProbe = 1u,
+    ProbeGrid = 2u,
+    PlanarProbe = 3u,
+    SSR = 4u,
+    RTReflection = 5u,
+};
+
+enum class MaterialTemporalPolicyId : uint32_t {
+    StableDiffuse = 0u,
+    StableGlossy = 1u,
+    MirrorLocked = 2u,
+    EmissiveLocked = 3u,
+    WaterViewDependent = 4u,
+};
+
+enum class MaterialPostSensitivityId : uint32_t {
+    Normal = 0u,
+    BloomEmitter = 1u,
+    ExposureProtected = 2u,
+    WetHighlight = 3u,
+};
+
+struct MaterialClassPolicyEvidence {
+    uint32_t surfaceClassId = 0;
+    uint32_t sceneMaterialClassId = 0;
+    uint32_t reflectionPreferenceId = 0;
+    uint32_t temporalPolicyId = 0;
+    uint32_t postSensitivityId = 0;
+    bool applied = false;
+    bool roughnessFloorApplied = false;
+    bool normalScaleClamped = false;
+    bool proceduralMaskClamped = false;
+    bool reflectionStabilityApplied = false;
+    bool albedoLuminanceClamped = false;
+    bool albedoChromaClamped = false;
+    float roughnessFloor = 0.0f;
+    float normalScaleCeiling = 1.0f;
+    float proceduralMaskCeiling = 1.0f;
+    float reflectionStabilityScale = 1.0f;
+    float albedoLuminanceCeiling = 1.0f;
+    float albedoChromaCeiling = 1.0f;
+};
+
 enum class MaterialAlphaMode : uint32_t {
     Opaque = 0,
     Mask = 1,
@@ -69,6 +133,7 @@ struct MaterialModel {
     bool doubleSided = false;
     std::string presetName;
     MaterialTexturePresence textures{};
+    MaterialClassPolicyEvidence classPolicy{};
 };
 
 struct MaterialValidationIssue {

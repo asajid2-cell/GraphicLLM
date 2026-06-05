@@ -34,10 +34,19 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
             Light light{};
             light.position_type = glm::vec4(tc.position, static_cast<float>(lc.type));
             glm::vec3 forward = tc.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
-            light.direction_cosInner = glm::vec4(forward, std::cos(glm::radians(lc.innerConeDegrees)));
+            const float semanticClassId = static_cast<float>(lc.semanticClassId);
+            const bool isSpot = lc.type == Scene::LightType::Spot;
+            const bool isAreaRect = lc.type == Scene::LightType::AreaRect;
+            light.direction_cosInner = glm::vec4(
+                forward,
+                isSpot ? std::cos(glm::radians(lc.innerConeDegrees)) : semanticClassId);
             light.color_range = glm::vec4(lc.color * lc.intensity, lc.range);
             float outerCos = std::cos(glm::radians(lc.outerConeDegrees));
-            light.params = glm::vec4(outerCos, -1.0f, 0.0f, 0.0f);
+            const glm::vec2 areaHalfSize = isAreaRect ? 0.5f * glm::max(lc.areaSize, glm::vec2(0.0f)) : glm::vec2(0.0f);
+            light.params = glm::vec4(outerCos,
+                                      -1.0f,
+                                      isAreaRect ? areaHalfSize.x : semanticClassId,
+                                      areaHalfSize.y);
             inputs.localLights.push_back(light);
         }
     }
@@ -97,6 +106,9 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
     deferredParams.sunDirection = glm::vec4(m_lightingState.directionalDirection, 0.0f);
     deferredParams.sunRadiance =
         glm::vec4(m_lightingState.directionalColor * m_lightingState.directionalIntensity, 0.0f);
+    deferredParams.ambientColor =
+        glm::vec4(m_lightingState.ambientColor * m_lightingState.ambientIntensity,
+                  m_environmentState.backgroundBlur);
     deferredParams.cascadeSplits = m_constantBuffers.frameCPU.cascadeSplits;
     deferredParams.shadowParams = glm::vec4(
         m_shadowResources.controls.bias,
@@ -104,7 +116,10 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         m_shadowResources.controls.enabled ? 1.0f : 0.0f,
         m_shadowResources.controls.pcssEnabled ? 1.0f : 0.0f);
     deferredParams.envParams = glm::vec4(
-        m_environmentState.diffuseIntensity, m_environmentState.specularIntensity, m_environmentState.enabled ? 1.0f : 0.0f, 0.0f);
+        m_environmentState.diffuseIntensity,
+        m_environmentState.specularIntensity,
+        m_environmentState.enabled ? 1.0f : 0.0f,
+        m_environmentState.backgroundExposure);
     float invShadowDim = 1.0f / static_cast<float>(m_shadowResources.controls.mapSize);
     deferredParams.shadowInvSizeAndSpecMaxMip =
         glm::vec4(invShadowDim, invShadowDim, 8.0f, glm::radians(m_environmentState.rotationDegrees));
@@ -120,21 +135,29 @@ Renderer::PrepareVisibilityBufferDeferredLighting(Scene::ECS_Registry* registry)
         static_cast<uint32_t>(inputs.reflectionProbes.size()),
         m_debugViewState.mode,
         inputs.skippedReflectionProbes);
+    deferredParams.localProbeParams = glm::vec4(
+        m_environmentState.localProbeDiffuseIntensity,
+        m_environmentState.localProbeSpecularIntensity,
+        m_environmentState.localProbeRadianceEnabled ? 1.0f : 0.0f,
+        0.0f);
+    deferredParams.cinematicStabilityParams = BuildCinematicStabilityParams();
 
-    if (auto* env = m_environmentState.ActiveEnvironment()) {
-        if (env->diffuseIrradiance) {
-            inputs.envDiffuseResource = env->diffuseIrradiance->GetResource();
-            inputs.envFormat = env->diffuseIrradiance->GetFormat();
+    if (m_environmentState.ShouldBindImageBasedLightingTextures()) {
+        if (auto* env = m_environmentState.ActiveEnvironment()) {
+            if (env->diffuseIrradiance) {
+                inputs.envDiffuseResource = env->diffuseIrradiance->GetResource();
+                inputs.envFormat = env->diffuseIrradiance->GetFormat();
+            }
+            if (env->specularPrefiltered) {
+                inputs.envSpecularResource = env->specularPrefiltered->GetResource();
+            }
         }
-        if (env->specularPrefiltered) {
-            inputs.envSpecularResource = env->specularPrefiltered->GetResource();
+        if (!inputs.envDiffuseResource && m_materialFallbacks.albedo) {
+            inputs.envDiffuseResource = m_materialFallbacks.albedo->GetResource();
         }
-    }
-    if (!inputs.envDiffuseResource && m_materialFallbacks.albedo) {
-        inputs.envDiffuseResource = m_materialFallbacks.albedo->GetResource();
-    }
-    if (!inputs.envSpecularResource && m_materialFallbacks.albedo) {
-        inputs.envSpecularResource = m_materialFallbacks.albedo->GetResource();
+        if (!inputs.envSpecularResource && m_materialFallbacks.albedo) {
+            inputs.envSpecularResource = m_materialFallbacks.albedo->GetResource();
+        }
     }
 
     return inputs;

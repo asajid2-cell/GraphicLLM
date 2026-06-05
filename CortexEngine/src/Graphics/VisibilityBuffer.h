@@ -87,6 +87,9 @@ struct alignas(16) VBMaterialConstants {
     uint32_t alphaMode; // 0=opaque, 1=mask, 2=blend
     uint32_t doubleSided;
     uint32_t materialClass; // Shared SURFACE_CLASS_* id used by deferred/post.
+    // x = named scene material class, y = reflection preference,
+    // z = temporal policy, w = post sensitivity.
+    alignas(16) glm::uvec4 policyParams;
 };
 
 // Per-mesh lookup table entry for bindless buffer access in compute shaders.
@@ -257,14 +260,17 @@ public:
         glm::vec4 cameraPosition;                      // xyz = camera world pos
         glm::vec4 sunDirection;                        // xyz = direction-to-light (world)
         glm::vec4 sunRadiance;                         // rgb = sun radiance (color * intensity)
+        glm::vec4 ambientColor;                        // rgb = ambient color * intensity, w = background blur
         glm::vec4 cascadeSplits;                       // x,y,z = split depths (view space), w = far plane
         glm::vec4 shadowParams;                        // x=bias, y=pcfRadius(texels), z=enabled, w=pcssEnabled
-        glm::vec4 envParams;                           // x=diffuse IBL, y=specular IBL, z=enabled, w unused
+        glm::vec4 envParams;                           // x=diffuse IBL, y=specular IBL, z=enabled, w=background exposure
         glm::vec4 shadowInvSizeAndSpecMaxMip;          // xy = 1/shadowMapDim, z = specular max mip, w unused
         glm::vec4 projectionParams;                    // x=proj11, y=proj22, z=nearZ, w=farZ
         alignas(16) glm::uvec4 screenAndCluster;       // x=width, y=height, z=clusterCountX, w=clusterCountY
         alignas(16) glm::uvec4 clusterParams;          // x=clusterCountZ, y=maxLightsPerCluster, z=localLightCount, w unused
         alignas(16) glm::uvec4 reflectionProbeParams;  // x=probeTableSRVIndex, y=probeCount, z/w unused
+        glm::vec4 localProbeParams;                    // x=diffuse scale, y=specular scale, z=enabled, w unused
+        glm::vec4 cinematicStabilityParams;            // x=specular damping, y=debug stability, z=shadow softness, w=highlight protection
     };
 
     Result<void> ApplyDeferredLighting(
@@ -472,7 +478,7 @@ private:
     ComPtr<ID3D12Resource> m_gbufferEmissiveMetallic; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt0; // RGBA16_FLOAT
     ComPtr<ID3D12Resource> m_gbufferMaterialExt1; // RGBA16_FLOAT
-    ComPtr<ID3D12Resource> m_gbufferMaterialExt2; // RGBA8_UNORM: surface class / anisotropy / sheen / SSS wrap
+    ComPtr<ID3D12Resource> m_gbufferMaterialExt2; // RGBA8_UNORM: surface class / anisotropy / sheen / named scene material class
 
     DescriptorHandle m_albedoRTV, m_albedoSRV, m_albedoUAV;
     DescriptorHandle m_normalRoughnessRTV, m_normalRoughnessSRV, m_normalRoughnessUAV;

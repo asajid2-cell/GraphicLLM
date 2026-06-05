@@ -11,7 +11,7 @@
 namespace Cortex::Graphics {
 
 struct VisibilityBufferMaterialKey {
-    std::array<uint32_t, 48> words{};
+    std::array<uint32_t, 52> words{};
 
     bool operator==(const VisibilityBufferMaterialKey& other) const noexcept {
         return words == other.words;
@@ -87,6 +87,10 @@ inline VisibilityBufferMaterialKey MakeVisibilityBufferMaterialKey(
     key.words[40] = textureIndices4.z;
     key.words[41] = textureIndices4.w;
     key.words[42] = materialClass;
+    key.words[43] = material.classPolicy.sceneMaterialClassId;
+    key.words[44] = material.classPolicy.reflectionPreferenceId;
+    key.words[45] = material.classPolicy.temporalPolicyId;
+    key.words[46] = material.classPolicy.postSensitivityId;
     return key;
 }
 

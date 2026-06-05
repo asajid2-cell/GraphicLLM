@@ -130,6 +130,8 @@
       ],
       "debug_views": [
         "direct_light",
+        "direct_light_unshadowed",
+        "direct_light_shadow_loss",
         "light_owner",
         "light_type",
         "fixture_shadow_owner"

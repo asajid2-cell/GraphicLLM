@@ -116,6 +116,7 @@ struct FullSceneShaderFrameContext {
         bool directLightDebugViewReady = false;
         bool directLightUnshadowedDebugViewReady = false;
         bool directLightShadowLossDebugViewReady = false;
+        bool lightingV2ShadowOutputReady = false;
         bool exposurePolicyReady = false;
         bool exposureClippingGatePassed = false;
         uint32_t lightCount = 0;
@@ -132,6 +133,8 @@ struct FullSceneShaderFrameContext {
         float totalLightIntensity = 0.0f;
         float maxLightIntensity = 0.0f;
         uint32_t missingLightingContractCount = 0;
+        std::string lightingV2PassOwner = "none";
+        std::string lightingV2OutputResource = "none";
         std::string owner = "SceneVisualContract/FullSceneLightingRigEvidence";
         std::string failureReason = "Semantic light-rig evidence is not populated";
     };
@@ -553,6 +556,15 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
     evidence.directLightDebugViewReady = evidence.directLightPassReady;
     evidence.directLightUnshadowedDebugViewReady = evidence.directLightPassReady;
     evidence.directLightShadowLossDebugViewReady = evidence.directLightShadowOutputReady;
+    evidence.lightingV2PassOwner = evidence.directLightPassReady ? "VBDeferredLighting" : "none";
+    evidence.lightingV2OutputResource = evidence.directLightPassReady ? "hdr_color" : "none";
+    evidence.lightingV2ShadowOutputReady =
+        evidence.directLightShadowOutputReady &&
+        evidence.directLightDebugViewReady &&
+        evidence.directLightUnshadowedDebugViewReady &&
+        evidence.directLightShadowLossDebugViewReady &&
+        evidence.lightingV2PassOwner == "VBDeferredLighting" &&
+        evidence.lightingV2OutputResource == "hdr_color";
     evidence.exposurePolicyReady =
         !contract.lighting.exposurePolicyId.empty() &&
         contract.lighting.exposurePolicyId != "default" &&
@@ -584,6 +596,7 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.directLightDebugViewReady,
         evidence.directLightUnshadowedDebugViewReady,
         evidence.directLightShadowLossDebugViewReady,
+        evidence.lightingV2ShadowOutputReady,
         evidence.exposurePolicyReady,
         evidence.exposureClippingGatePassed,
     };
@@ -627,6 +640,8 @@ inline FullSceneShaderFrameContext::FullSceneLightingRigEvidence BuildFullSceneL
         evidence.failureReason = "V2 unshadowed direct-light debug view is not owned by the deferred lighting pass";
     } else if (!evidence.directLightShadowLossDebugViewReady) {
         evidence.failureReason = "V2 direct-light shadow-loss debug view is not owned by the deferred lighting pass";
+    } else if (!evidence.lightingV2ShadowOutputReady) {
+        evidence.failureReason = "FullSceneLightingV2 shadow output is not owned by VBDeferredLighting -> hdr_color";
     } else if (!evidence.exposureClippingGatePassed) {
         evidence.failureReason = "Exposure or light intensity contract is outside V2 bounds";
     } else {

@@ -3429,3 +3429,51 @@ Current stopping position:
 - Default beauty remains unchanged.
 - Next safe slice: semantic light-buffer payloads or a named
   `FullSceneLightingV2` shadow-output resource.
+
+### FullSceneLightingV2 Output Owner Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now names the current V2 lighting output edge:
+  - `lightingV2ShadowOutputReady`.
+  - `lightingV2PassOwner`.
+  - `lightingV2OutputResource`.
+- Runtime JSON exposes:
+  - `lighting_v2_shadow_output_ready`.
+  - `lighting_v2_pass_owner`.
+  - `lighting_v2_output_resource`.
+- The current owner/resource is deliberately:
+  `VBDeferredLighting -> hdr_color`.
+- This gives the lighting domain a named output contract without claiming a
+  separate lighting texture exists yet.
+
+Validation:
+
+- build passed:
+  `ninja -C build CortexEngine -v`.
+- V2 frame-report checker passed.
+- V2 plan checker passed.
+- focused packet passed:
+  `build/captures/v2_lighting_output_owner_smoke1_20260605`.
+- strict frame-report validation passed on:
+  `build/captures/v2_lighting_output_owner_smoke1_20260605/stress_rt_showcase_reflection_closeup/direct_light/frame_report_shutdown.json`.
+
+Focused packet evidence:
+
+- `lighting_v2_shadow_output_ready=true`.
+- `lighting_v2_pass_owner=VBDeferredLighting`.
+- `lighting_v2_output_resource=hdr_color`.
+- direct-light/shadow-loss debug readiness fields all `true`.
+- `missing_lighting_contract_count=0`.
+- direct-signal families: `1/1`.
+- shadow-loss families: `1/1`.
+- `direct_light` luma `0.42686641`.
+- `direct_light_unshadowed` luma `0.45795546`.
+- `direct_light_shadow_loss` luma `0.22291435`.
+
+Current stopping position:
+
+- V2 lighting now has a named, frame-report-visible output owner contract.
+- Default beauty remains unchanged.
+- Next safe slice: split into a real `FullSceneLightingV2` resource or add
+  semantic light-buffer payloads while preserving this contract.

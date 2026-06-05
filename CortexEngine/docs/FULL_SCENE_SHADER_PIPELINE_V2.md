@@ -3509,3 +3509,59 @@ Current stopping position:
 - Next work should add actual semantic light-buffer payloads or a named
   `FullSceneLightingV2` shadow output resource, using this contract as the
   admission gate.
+
+### FullSceneLightingV2 Output Owner Contract - 2026-06-05
+
+Implemented:
+
+- `FullSceneLightingRigEvidence` now reports a named V2 lighting output edge:
+  - `lighting_v2_shadow_output_ready`.
+  - `lighting_v2_pass_owner`.
+  - `lighting_v2_output_resource`.
+- The current owner is intentionally honest:
+  `VBDeferredLighting -> hdr_color`. This records the existing shadowed direct
+  lighting output as the first `FullSceneLightingV2` shadow-output contract
+  without pretending a separate lighting texture exists yet.
+- `FrameContractJson.cpp` serializes the new fields.
+- `full_scene_shader_pipeline_v2_frame_report_contract.json` requires the new
+  lighting output fields.
+- `check_full_scene_shader_pipeline_v2_frame_report.py` verifies the runtime
+  C++ and JSON surfaces keep the owner/resource fields.
+
+Validation:
+
+```powershell
+cmd.exe /d /s /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 && set "CORTEX_SKIP_ASSET_SYNC=1" && ninja -C build CortexEngine -v'
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v2_plan.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v2_packet.ps1 -NoBuild -SkipSceneAnalyzers -StressSceneOnly -FamilyFilter "gallery" -StressSceneFilter "rt_showcase:reflection_closeup" -ViewFilter "beauty,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor" -SmokeFrames 50 -CaptureFrame 25 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build/captures/v2_lighting_output_owner_smoke1_20260605
+python tools\check_full_scene_shader_pipeline_v2_frame_report.py --frame-report build\captures\v2_lighting_output_owner_smoke1_20260605\stress_rt_showcase_reflection_closeup\direct_light\frame_report_shutdown.json --strict-frame-report
+```
+
+Packet result:
+
+- packet:
+  `build/captures/v2_lighting_output_owner_smoke1_20260605`.
+- V2 packet evidence: passed.
+- strict frame-report validation on the captured `direct_light` report: passed.
+- lighting signal:
+  - direct-signal families: `1/1`.
+  - shadow-loss families: `1/1`.
+  - `direct_light` luma `0.42686641`.
+  - `direct_light_unshadowed` luma `0.45795546`.
+  - `direct_light_shadow_loss` luma `0.22291435`.
+- generated frame report:
+  - `lighting_v2_shadow_output_ready=true`.
+  - `lighting_v2_pass_owner=VBDeferredLighting`.
+  - `lighting_v2_output_resource=hdr_color`.
+  - direct-light/shadow-loss debug readiness fields are all `true`.
+  - `missing_lighting_contract_count=0`.
+
+Current stopping position:
+
+- The V2 lighting domain now has a named output ownership contract for the
+  current shadowed direct-light path.
+- This is still an instrumentation bridge, not default beauty promotion.
+- The next major renderer refactor can split this into a real
+  `FullSceneLightingV2` resource or add semantic light-buffer payloads while
+  retaining the same owner/resource packet contract.

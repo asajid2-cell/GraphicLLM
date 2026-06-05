@@ -1813,3 +1813,86 @@ Current state:
   shadow/contact promotion work.
 - Next architecture slice should formalize material-aware temporal promotion
   evidence.
+
+## Full Scene Shader V2 Beauty Candidate Refactor Plan - 2026-06-05
+
+User direction:
+
+- Move toward full-scene shader quality and Unreal-like visuals.
+- Plan the whole refactor before completing the next goal feature.
+- Do not repeat cosmetic fixes such as IBL blur, disabling reflections, or
+  per-scene tuning that hides instability.
+
+Plan update:
+
+- `docs/FULL_SCENE_SHADER_REFACTOR_MASTER_PLAN.md` now defines the next goal
+  feature as `FullSceneShaderV2BeautyCandidate`.
+- The feature is a switchable V2 path, not a single shader toggle:
+
+```text
+V1 playable path
+  -> unchanged default fallback
+
+V2 candidate path
+  -> FullSceneMaterialResolveV2
+  -> FullSceneLightingV2
+  -> FullSceneReflectionResolveV2
+  -> FullSceneShadowCompositeV2
+  -> FullSceneTemporalResolveV2
+  -> FullScenePostV2
+  -> Beauty candidate + debug atlas + frame report
+```
+
+Core rule:
+
+- The final V2 beauty pixel must be explainable from scene-owned facts:
+  scene visual contract, material table row, semantic lights, reflection
+  source, shadow policy, temporal policy, HDR post profile, and render graph
+  producer ownership.
+
+Workstreams added to the master plan:
+
+1. Shared `FullSceneFrameData`.
+   - one shader-facing source for material/object/policy identity plus normal,
+     depth, roughness, metallic, AO, emissive, and velocity.
+2. `FullSceneLightingV2`.
+   - semantic light buffers and direct lighting for key/fill/practical/display/
+     stage/high-bay/sun/skylight/accent roles.
+3. `FullSceneReflectionResolveV2`.
+   - one resolver for SSR, RT, room probes, hero probes, planar probes, neutral
+     fallback, and authorized external IBL.
+4. `FullSceneShadowCompositeV2`.
+   - centralized cascade/local/RT/contact shadow policy and debug ownership.
+5. `FullSceneTemporalResolveV2`.
+   - material/object-aware history confidence, clamp widths, jitter-consistent
+     reprojection, and high-FPS mouse-jiggle validation.
+6. `FullScenePostV2`.
+   - named HDR stages for exposure, bloom, highlight rolloff, tone map, color
+     grade, clarity/sharpen, and output encode.
+7. `FullSceneRenderGraphContract`.
+   - explicit pass/resource/debug ownership for the V2 candidate path.
+
+Milestone order:
+
+1. `FSSP-V2-007A`: material-aware temporal evidence.
+2. `FSSP-V2-004B`: semantic light buffers and direct-light shadow output.
+3. `FSSP-V2-005B`: reflection source resolver shadow output.
+4. `FSSP-V2-006B`: shadow composite policy centralization.
+5. `FSSP-V2-007B`: material-aware temporal candidate.
+6. `FSSP-V2-008A`: HDR post stage contract.
+7. `FSSP-V2-009A`: render graph contract.
+8. `FSSP-V2-010A`: cross-family V2 candidate packet.
+9. `FSSP-V2-010B`: user review packet.
+
+Current implementation state after planning:
+
+- No shader behavior was changed in this planning slice.
+- V1 remains the playable fallback.
+- Existing packet-proved V2 domains remain:
+  - GBuffer identity.
+  - material table and material policy debug views.
+  - semantic light-rig evidence.
+  - reflection/probe ownership evidence.
+  - shadow/contact evidence.
+- Next concrete implementation should be `FSSP-V2-007A`, because the reported
+  remaining issue is motion-dependent material/reflection/shadow instability.

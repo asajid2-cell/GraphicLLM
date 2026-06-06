@@ -346,6 +346,22 @@ Interpretation:
 - The next quality slice should add source-quality stabilization and admission
   policy for SSR/RT/local-probe blending, not another final-composite boost.
 
+Rejected experiment:
+
+- Tried a screen-space derivative stability gate in
+  `FullSceneReflectionResolverV3.hlsl` after this checkpoint.
+- Packet path passed, but the metrics were mixed:
+  - `reflection_radiance` motion delta improved from `0.0048307` to
+    `0.0042962`.
+  - `reflection_confidence` motion delta worsened from `0.0048070` to about
+    `0.0078880`.
+  - `reflection_source_id` motion delta worsened from `0.0039639` to about
+    `0.0065916`.
+- Decision: do not keep derivative-only admission shaping. It changes source
+  ownership in a way that makes the debug contract less stable. The proper next
+  slice is a real ReflectionV3 history/stability resource with explicit
+  source-ID hysteresis, reprojection/validity, and candidate rejection metrics.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

@@ -648,10 +648,12 @@ private:
     struct EndFrameGraphResult {
         bool attempted = false;
         bool attemptedBloom = false;
+        bool attemptedCompositeV3 = false;
         bool attemptedCandidateBeauty = false;
         bool attemptedCandidateBeautyDisplay = false;
         bool ranBloom = false;
         bool ranPostProcess = false;
+        bool ranCompositeV3 = false;
         bool ranCandidateBeauty = false;
         bool ranCandidateBeautyDisplay = false;
         bool ranHZB = false;

@@ -5083,3 +5083,86 @@ Remaining limitation:
 - The next real quality move is replacing the composite/post adapters with
   real `FullSceneCompositeV3` and `CinematicPostV3` producers that consume V3
   lighting, environment, reflection, and material resources directly.
+
+### FullSceneCompositeV3 / CinematicPostV3 Producer Slice - 2026-06-06
+
+Implemented:
+
+- Added `assets/shaders/FullSceneCompositeV3.hlsl`.
+- Added compiled shader/pipeline state:
+  - `RendererCompiledShaders::fullSceneCompositeV3PS`.
+  - `RendererPipelineState::fullSceneCompositeV3`.
+- Added `candidate_hdr_scene_color` as an HDR render target with RTV/SRV
+  descriptors and frame-contract resource accounting.
+- Added render-graph pass `FullSceneCompositeV3`:
+  - reads `direct_lighting`, `indirect_lighting`, `shadow_visibility`, and
+    legacy `hdr_color` fallback.
+  - writes `candidate_hdr_scene_color`.
+- The opt-in candidate path now routes:
+  `FullSceneCompositeV3 -> CinematicPostV3 -> candidate_ldr_cinematic_output`.
+- `CinematicPostV3` reuses the existing post shader implementation for now,
+  but it is a distinct graph pass and consumes `candidate_hdr_scene_color`.
+- Default beauty remains unchanged. Normal non-candidate rows still report
+  adapter producers.
+- Static V3 contract and validators now include:
+  - `candidate_hdr_scene_color`.
+  - `candidate_ldr_cinematic_output`.
+  - real producer acceptance for `FullSceneCompositeV3` and `CinematicPostV3`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- src\Graphics\Renderer_PipelineSetupTypes.h src\Graphics\RendererPipelineState.h src\Graphics\Renderer_ShaderCompilation.cpp src\Graphics\Renderer_ScreenComputePipelineSetup.cpp src\Graphics\Renderer.h src\Graphics\RendererMainTargetState.h src\Graphics\Renderer_HDRTargets.cpp src\Graphics\Renderer_FrameContractMemory.cpp src\Graphics\Renderer_FrameContractPasses.cpp src\Graphics\Renderer_FrameContractSnapshot.cpp src\Graphics\Renderer_Shutdown.cpp src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\FullSceneShaderFrameContext.h tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py assets\final_art\full_scene_shader_pipeline_v3_contract.json assets\shaders\FullSceneCompositeV3.hlsl
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; $env:CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_post_producer_smoke2_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed with `Required outputs: 11`.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed and linked `build/bin/CortexEngine.exe`; the existing
+  trailing `vswhere.exe` warning still appears after success.
+- first packet attempt used only `CORTEX_DISPLAY_FULL_SCENE_CANDIDATE_BEAUTY_V3`
+  and did not request candidate beauty; treat
+  `v3_composite_post_producer_smoke1_20260606` as a negative control.
+- corrected packet passed:
+  - artifact root:
+    `build/captures/v3_composite_post_producer_smoke2_20260606`.
+  - reports: `17`.
+  - promotion status: `review_packet_passed`.
+
+Direct report proof from
+`gallery/candidate_beauty_v3/frame_report_shutdown.json`:
+
+- `candidate_beauty_requested=true`.
+- `candidate_beauty_ready=true`.
+- `candidate_beauty_displayed=true`.
+- `candidate_beauty_producer=CinematicPostV3`.
+- `candidate_beauty_output=candidate_ldr_cinematic_output`.
+- `default_beauty_affects=false`.
+- `composite_v3_producer=FullSceneCompositeV3`.
+- `cinematic_post_v3_producer=CinematicPostV3`.
+- `FullSceneCompositeV3` executed, read
+  `direct_lighting`, `indirect_lighting`, `shadow_visibility`, and `hdr_color`,
+  and wrote `candidate_hdr_scene_color`.
+- `CinematicPostV3` executed, read `candidate_hdr_scene_color`, and wrote
+  `candidate_ldr_cinematic_output`.
+- `FullSceneCandidateBeautyV3Display` executed, read
+  `candidate_ldr_cinematic_output`, and wrote `back_buffer`.
+- `candidate_hdr_scene_color` and `candidate_ldr_cinematic_output` were both
+  valid `1088x612` resources with size matching the render contract.
+
+Remaining limitation:
+
+- `CinematicPostV3` is a real graph producer but still uses the existing
+  post-process shader implementation.
+- `FullSceneCompositeV3` currently combines V3 direct/indirect lighting and
+  shadow visibility with a bounded HDR fallback. Reflection/environment/media
+  are not yet split into the final V3 composite inputs.
+- Next slice should add raw debug views and motion-stability packets for
+  `candidate_hdr_scene_color`, then start moving reflection/environment inputs
+  from adapter evidence into concrete producer resources.

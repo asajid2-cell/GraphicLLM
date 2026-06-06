@@ -124,6 +124,26 @@ struct FullSceneCandidateBeautyV3TargetDescriptors {
     }
 };
 
+struct FullSceneCompositeV3TargetResources {
+    ComPtr<ID3D12Resource> hdrSceneColor;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        hdrSceneColor.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct FullSceneCompositeV3TargetDescriptors {
+    DescriptorHandle hdrSceneColorRTV;
+    DescriptorHandle hdrSceneColorSRV;
+
+    void Reset() {
+        hdrSceneColorRTV = {};
+        hdrSceneColorSRV = {};
+    }
+};
+
 struct HDRRenderTargetState {
     HDRRenderTargetResources resources;
     HDRRenderTargetDescriptors descriptors;
@@ -387,6 +407,91 @@ struct FullSceneCandidateBeautyV3TargetState {
     }
 };
 
+struct FullSceneCompositeV3TargetState {
+    FullSceneCompositeV3TargetResources resources;
+    FullSceneCompositeV3TargetDescriptors descriptors;
+
+    [[nodiscard]] Result<void> CreateTarget(ID3D12Device* device,
+                                            DescriptorHeapManager* descriptorManager,
+                                            UINT width,
+                                            UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for FullSceneCompositeV3 target creation");
+        }
+
+        resources.Reset();
+
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.SampleDesc.Count = 1;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = desc.Format;
+        clearValue.Color[0] = 0.0f;
+        clearValue.Color[1] = 0.0f;
+        clearValue.Color[2] = 0.0f;
+        clearValue.Color[3] = 1.0f;
+
+        const auto heapProps = MainTargetDefaultHeapProperties();
+        const HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            &clearValue,
+            IID_PPV_ARGS(&resources.hdrSceneColor));
+        if (FAILED(hr)) {
+            resources.Reset();
+            return Result<void>::Err("Failed to create FullSceneCompositeV3 HDR scene-color target");
+        }
+
+        resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        if (!descriptors.hdrSceneColorRTV.IsValid()) {
+            auto rtvResult = descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) {
+                return Result<void>::Err(std::string("Failed to allocate RTV for FullSceneCompositeV3 target: ") +
+                                         rtvResult.Error());
+            }
+            descriptors.hdrSceneColorRTV = rtvResult.Value();
+        }
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = desc.Format;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(resources.hdrSceneColor.Get(), &rtvDesc, descriptors.hdrSceneColorRTV.cpu);
+
+        if (!descriptors.hdrSceneColorSRV.IsValid()) {
+            auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                return Result<void>::Err(std::string("Failed to allocate SRV for FullSceneCompositeV3 target: ") +
+                                         srvResult.Error());
+            }
+            descriptors.hdrSceneColorSRV = srvResult.Value();
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(resources.hdrSceneColor.Get(), &srvDesc, descriptors.hdrSceneColorSRV.cpu);
+
+        return Result<void>::Ok();
+    }
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
 struct FullSceneLightingV3TargetState {
     FullSceneLightingV3TargetResources resources;
     FullSceneLightingV3TargetDescriptors descriptors;
@@ -512,6 +617,7 @@ struct MainRenderTargetState {
     HDRRenderTargetState hdr;
     GBufferNormalRoughnessTargetState normalRoughness;
     FullSceneLightingV3TargetState lightingV3;
+    FullSceneCompositeV3TargetState compositeV3;
     FullSceneCandidateBeautyV3TargetState candidateBeautyV3;
 
     void ResetHDR() {
@@ -526,6 +632,10 @@ struct MainRenderTargetState {
         lightingV3.Reset();
     }
 
+    void ResetCompositeV3() {
+        compositeV3.Reset();
+    }
+
     void ResetCandidateBeautyV3() {
         candidateBeautyV3.Reset();
     }
@@ -534,6 +644,7 @@ struct MainRenderTargetState {
         ResetHDR();
         ResetGBufferNormalRoughness();
         ResetLightingV3();
+        ResetCompositeV3();
         ResetCandidateBeautyV3();
     }
 };

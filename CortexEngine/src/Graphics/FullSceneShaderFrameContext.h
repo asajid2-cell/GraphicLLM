@@ -1238,7 +1238,9 @@ struct FullSceneShaderPipelineV3FrameContext {
         "reflection_confidence",
         "scene_local_environment",
         "hdr_scene_color",
+        "candidate_hdr_scene_color",
         "ldr_cinematic_output",
+        "candidate_ldr_cinematic_output",
     };
     std::vector<FullSceneShaderPipelineV3DomainEvidence> domains;
 };
@@ -1290,6 +1292,10 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.beautyOutput = contract.sceneVisual.active ? "full_scene_shader_pipeline_v2" : "legacy_beauty";
     context.candidateBeautyRequested =
         std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr ||
+        FullSceneShaderPassWritesResource(
+            contract,
+            "CinematicPostV3",
+            "candidate_ldr_cinematic_output") ||
         FullSceneShaderPassWritesResource(
             contract,
             "FullSceneCandidateBeautyV3",
@@ -1662,9 +1668,19 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     reflectionDomain.missingRequiredChannelCount =
         reflectionDomain.requiredChannelCount - reflectionDomain.readyChannelCount;
 
-    context.hdrSceneColorReady =
+    const bool legacyHdrSceneColorReady =
         FullSceneShaderHasResource(contract, "hdr_color") &&
         FullSceneShaderPassWritesResource(contract, "VBDeferredLighting", "hdr_color");
+    const bool candidateHdrSceneColorReady =
+        FullSceneShaderHasResource(contract, "candidate_hdr_scene_color") &&
+        FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "candidate_hdr_scene_color");
+    const bool compositeReadsV3Lighting =
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "direct_lighting") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "shadow_visibility") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color");
+    const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Lighting;
+    context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =
         materialResolveReady &&
         context.lightingSplitResourcesReady &&
@@ -1688,22 +1704,29 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.compositeV3ChannelCount = readyCompositeChannels;
     context.compositeV3Ready = readyCompositeChannels == 4u;
     context.compositeV3Producer =
-        context.compositeV3Ready ? "FullSceneCompositeV3Adapter" : "planned";
+        context.compositeV3Ready
+            ? (realCompositeV3ProducerReady ? "FullSceneCompositeV3" : "FullSceneCompositeV3Adapter")
+            : "planned";
 
     FullSceneShaderPipelineV3DomainEvidence compositeDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "composite",
             context.compositeV3Producer,
-            "hdr_scene_color",
-            "hdr_scene_color",
+            realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
+            realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
             context.compositeV3Ready
-                ? "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence"
+                ? (realCompositeV3ProducerReady
+                       ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 direct, indirect, and shadow visibility resources"
+                       : "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence")
                 : "FullSceneCompositeV3 is missing HDR output, input, energy, or overbright ownership evidence");
     compositeDomain.enabled = contract.sceneVisual.active;
     compositeDomain.ready = context.compositeV3Ready;
     compositeDomain.promotionState =
-        context.compositeV3Ready ? "adapter" : "planned";
+        context.compositeV3Ready
+            ? (realCompositeV3ProducerReady ? "producer" : "adapter")
+            : "planned";
     compositeDomain.backingResources = {
+        realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_color",
         "hdr_color",
         "material_attributes",
         "lighting_split",
@@ -1716,7 +1739,10 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "overbright_mask",
     };
     compositeDomain.channels = {
-        context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing",
+        realCompositeV3ProducerReady
+            ? "candidate_hdr_scene_color_owned_by_full_scene_composite_v3"
+            : (context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing"),
+        compositeReadsV3Lighting ? "v3_lighting_inputs_read" : "v3_lighting_inputs_missing",
         context.compositeInputsReady ? "composite_inputs_owned" : "composite_inputs_missing",
         context.compositeEnergyPolicyReady ? "energy_clamp_policy_owned" : "energy_clamp_policy_missing",
         context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing",
@@ -1727,11 +1753,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     compositeDomain.missingRequiredChannelCount =
         compositeDomain.requiredChannelCount - compositeDomain.readyChannelCount;
 
-    context.ldrCinematicOutputReady =
+    const bool cinematicPostV3OutputReady =
+        FullSceneShaderHasResource(contract, "candidate_ldr_cinematic_output") &&
+        FullSceneShaderPassWritesResource(contract, "CinematicPostV3", "candidate_ldr_cinematic_output") &&
+        FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "candidate_hdr_scene_color");
+    const bool legacyLdrCinematicOutputReady =
         FullSceneShaderPassWritesResource(contract, "PostProcess", "back_buffer") &&
         FullSceneShaderPassReadsResource(contract, "PostProcess", "hdr_color") &&
         contract.cinematicPost.postProcessPlanned &&
         contract.cinematicPost.postProcessExecuted;
+    context.ldrCinematicOutputReady = cinematicPostV3OutputReady || legacyLdrCinematicOutputReady;
     context.exposureMeterReady =
         contract.cinematicPost.exposurePolicyActive &&
         contract.cinematicPost.profileExposureTrim > 0.0f;
@@ -1758,22 +1789,30 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         contract.cinematicPost.enabled &&
         readyPostChannels == 5u;
     context.cinematicPostV3Producer =
-        context.cinematicPostV3Ready ? "CinematicPostV3Adapter" : "planned";
+        context.cinematicPostV3Ready
+            ? (cinematicPostV3OutputReady ? "CinematicPostV3" : "CinematicPostV3Adapter")
+            : "planned";
 
     FullSceneShaderPipelineV3DomainEvidence postDomain =
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "cinematic_post",
             context.cinematicPostV3Producer,
-            "ldr_cinematic_output",
+            cinematicPostV3OutputReady ? "candidate_ldr_cinematic_output" : "ldr_cinematic_output",
             "exposure_meter",
             context.cinematicPostV3Ready
-                ? "CinematicPostV3 adapter owns LDR output, exposure, bloom, grade, and tone-map evidence"
+                ? (cinematicPostV3OutputReady
+                       ? "CinematicPostV3 writes candidate LDR output from candidate HDR scene color while default beauty remains unchanged"
+                       : "CinematicPostV3 adapter owns LDR output, exposure, bloom, grade, and tone-map evidence")
                 : "CinematicPostV3 is missing LDR output, exposure, bloom, grade, or tone-map evidence");
     postDomain.enabled = contract.cinematicPost.enabled;
     postDomain.ready = context.cinematicPostV3Ready;
     postDomain.promotionState =
-        context.cinematicPostV3Ready ? "adapter" : "planned";
+        context.cinematicPostV3Ready
+            ? (cinematicPostV3OutputReady ? "producer" : "adapter")
+            : "planned";
     postDomain.backingResources = {
+        cinematicPostV3OutputReady ? "candidate_ldr_cinematic_output" : "back_buffer",
+        cinematicPostV3OutputReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
         "back_buffer",
         "hdr_scene_color",
         "bloom",
@@ -1788,7 +1827,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "tone_map_curve",
     };
     postDomain.channels = {
-        context.ldrCinematicOutputReady ? "ldr_cinematic_output_owned" : "ldr_cinematic_output_missing",
+        cinematicPostV3OutputReady
+            ? "candidate_ldr_cinematic_output_owned_by_cinematic_post_v3"
+            : (context.ldrCinematicOutputReady ? "ldr_cinematic_output_owned" : "ldr_cinematic_output_missing"),
         context.exposureMeterReady ? "exposure_meter_owned" : "exposure_meter_missing",
         context.bloomExtractReady ? "bloom_extract_owned" : "bloom_extract_missing",
         context.colorGradeReady ? "color_grade_delta_owned" : "color_grade_delta_missing",
@@ -1802,11 +1843,16 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
 
     const bool candidateLdrOutputReady =
         FullSceneShaderHasResource(contract, "candidate_ldr_cinematic_output") &&
-        FullSceneShaderPassWritesResource(
-            contract,
-            "FullSceneCandidateBeautyV3",
-            "candidate_ldr_cinematic_output");
+        (FullSceneShaderPassWritesResource(
+             contract,
+             "CinematicPostV3",
+             "candidate_ldr_cinematic_output") ||
+         FullSceneShaderPassWritesResource(
+             contract,
+             "FullSceneCandidateBeautyV3",
+             "candidate_ldr_cinematic_output"));
     const bool candidateReadsHdr =
+        FullSceneShaderPassReadsResource(contract, "CinematicPostV3", "candidate_hdr_scene_color") ||
         FullSceneShaderPassReadsResource(contract, "FullSceneCandidateBeautyV3", "hdr_color");
     context.candidateBeautyReady =
         context.candidateBeautyRequested &&
@@ -1815,8 +1861,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         candidateLdrOutputReady &&
         candidateReadsHdr;
     context.candidateBeautyProducer =
-        context.candidateBeautyReady ? "FullSceneCandidateBeautyV3" :
-        (context.candidateBeautyRequested ? "FullSceneCandidateBeautyV3" : "none");
+        context.candidateBeautyReady
+            ? (cinematicPostV3OutputReady ? "CinematicPostV3" : "FullSceneCandidateBeautyV3")
+            : (context.candidateBeautyRequested
+                   ? (cinematicPostV3OutputReady ? "CinematicPostV3" : "FullSceneCandidateBeautyV3")
+                   : "none");
     context.candidateBeautyOutput =
         context.candidateBeautyRequested ? "candidate_ldr_cinematic_output" : "none";
 
@@ -1827,16 +1876,19 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             context.candidateBeautyOutput,
             "candidate_beauty_v3",
             context.candidateBeautyReady
-                ? "FullSceneCandidateBeautyV3 is opt-in and writes a real candidate LDR output without affecting default beauty"
+                ? (cinematicPostV3OutputReady
+                       ? "CinematicPostV3 is opt-in and writes a real candidate LDR output without affecting default beauty"
+                       : "FullSceneCandidateBeautyV3 is opt-in and writes a real candidate LDR output without affecting default beauty")
                 : context.candidateBeautyRequested
-                ? "FullSceneCandidateBeautyV3 was requested but its output resource, pass, or upstream composite/post evidence is incomplete"
-                : "FullSceneCandidateBeautyV3 is opt-in and was not requested this frame");
+                ? "Candidate beauty was requested but its output resource, pass, or upstream composite/post evidence is incomplete"
+                : "Candidate beauty is opt-in and was not requested this frame");
     candidateBeautyDomain.enabled = context.candidateBeautyRequested;
     candidateBeautyDomain.ready = context.candidateBeautyReady;
     candidateBeautyDomain.defaultBeautyAffects = false;
     candidateBeautyDomain.promotionState =
         context.candidateBeautyReady ? "candidate" : "planned";
     candidateBeautyDomain.backingResources = {
+        realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
         "hdr_scene_color",
         "ldr_cinematic_output",
         "candidate_ldr_cinematic_output",
@@ -1854,7 +1906,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.compositeV3Ready ? "composite_ready" : "composite_missing",
         context.cinematicPostV3Ready ? "cinematic_post_ready" : "cinematic_post_missing",
         candidateLdrOutputReady ? "candidate_ldr_output_owned" : "candidate_ldr_output_missing",
-        candidateReadsHdr ? "candidate_reads_hdr_color" : "candidate_hdr_input_missing",
+        candidateReadsHdr
+            ? (cinematicPostV3OutputReady ? "candidate_reads_candidate_hdr_scene_color" : "candidate_reads_hdr_color")
+            : "candidate_hdr_input_missing",
         "default_beauty_unchanged",
     };
     candidateBeautyDomain.backingResourceCount =

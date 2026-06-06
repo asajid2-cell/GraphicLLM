@@ -24,7 +24,9 @@
         "reflection_confidence",
         "scene_local_environment",
         "hdr_scene_color",
-        "ldr_cinematic_output"
+        "candidate_hdr_scene_color",
+        "ldr_cinematic_output",
+        "candidate_ldr_cinematic_output"
       ],
       "required_contract_fields": [
         "resource_owner",
@@ -169,11 +171,13 @@
       ],
       "required_outputs": [
         "hdr_scene_color",
+        "candidate_hdr_scene_color",
         "energy_clamp_policy",
         "overbright_diagnostics"
       ],
       "required_debug_views": [
         "hdr_scene_color",
+        "candidate_hdr_scene_color",
         "energy_clamp_mask",
         "overbright_mask"
       ]
@@ -190,17 +194,21 @@
       ],
       "required_debug_views": [
         "hdr_scene_color",
+        "candidate_hdr_scene_color",
         "exposure_meter",
         "bloom_extract",
         "color_grade_delta",
-        "ldr_cinematic_output"
+        "ldr_cinematic_output",
+        "candidate_ldr_cinematic_output"
       ]
     },
     "candidate_beauty": {
-      "producer": "FullSceneCandidateBeautyV3",
+      "producer": "CinematicPostV3",
+      "legacy_bridge_producer": "FullSceneCandidateBeautyV3",
       "adapter_producer": "FullSceneCandidateBeautyV3Adapter",
       "status": "opt_in_not_default",
       "required_inputs": [
+        "candidate_hdr_scene_color",
         "hdr_scene_color",
         "ldr_cinematic_output",
         "scene_local_environment",

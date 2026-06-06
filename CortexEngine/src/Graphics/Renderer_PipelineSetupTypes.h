@@ -20,6 +20,7 @@ struct RendererCompiledShaders {
 
     ShaderBytecode postVS;
     ShaderBytecode postPS;
+    std::optional<ShaderBytecode> fullSceneCompositeV3PS;
     std::optional<ShaderBytecode> candidateBeautyDisplayPS;
     std::optional<ShaderBytecode> voxelPS;
     std::optional<ShaderBytecode> taaPS;

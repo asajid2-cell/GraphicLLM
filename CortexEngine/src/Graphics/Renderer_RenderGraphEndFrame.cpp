@@ -57,13 +57,14 @@ struct FullSceneReflectionResolverV3Context {
     RGResourceHandle rejectedSourceMask;
     RGResourceHandle temporalDelta;
     RGResourceHandle ssrSourceSignal;
+    RGResourceHandle rtSourceSignal;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
     ID3D12GraphicsCommandList* commandList = nullptr;
     DX12RootSignature* rootSignature = nullptr;
     DX12Pipeline* pipeline = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
-    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 6> outputRTVs{};
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 7> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
     bool* ran = nullptr;
@@ -195,6 +196,8 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
         !context.sourceId.IsValid() ||
         !context.rejectedSourceMask.IsValid() ||
         !context.temporalDelta.IsValid() ||
+        !context.ssrSourceSignal.IsValid() ||
+        !context.rtSourceSignal.IsValid() ||
         !context.device ||
         !context.descriptorManager ||
         !context.commandList ||
@@ -231,6 +234,7 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
             builder.Write(context.rejectedSourceMask, RGResourceUsage::RenderTarget);
             builder.Write(context.temporalDelta, RGResourceUsage::RenderTarget);
             builder.Write(context.ssrSourceSignal, RGResourceUsage::RenderTarget);
+            builder.Write(context.rtSourceSignal, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(3);
@@ -454,6 +458,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.resources.rejectedSourceMask &&
         m_mainTargets.reflectionV3.resources.temporalDelta &&
         m_mainTargets.reflectionV3.resources.ssrSourceSignal &&
+        m_mainTargets.reflectionV3.resources.rtSourceSignal &&
         m_mainTargets.reflectionV3.descriptors.radianceRTV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.radianceSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.confidenceRTV.IsValid() &&
@@ -465,11 +470,13 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.descriptors.temporalDeltaRTV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.temporalDeltaSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.ssrSourceSignalRTV.IsValid() &&
-        m_mainTargets.reflectionV3.descriptors.ssrSourceSignalSRV.IsValid();
+        m_mainTargets.reflectionV3.descriptors.ssrSourceSignalSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.rtSourceSignalRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.rtSourceSignalSRV.IsValid();
     const bool wantsReflectionResolverV3DebugViewThisFrame =
         wantsReflectionResolverV3ThisFrame &&
         m_debugViewState.mode >= 68u &&
-        m_debugViewState.mode <= 73u &&
+        m_debugViewState.mode <= 74u &&
         m_pipelineState.candidateBeautyDisplay;
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
@@ -521,6 +528,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle reflectionRejectedSourceMaskHandle{};
     RGResourceHandle reflectionTemporalDeltaHandle{};
     RGResourceHandle reflectionSSRSourceSignalHandle{};
+    RGResourceHandle reflectionRTSourceSignalHandle{};
     RGResourceHandle candidateHdrSceneColorHandle{};
     RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
@@ -739,6 +747,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get(),
                 m_mainTargets.reflectionV3.resources.state,
                 "ReflectionV3SSRSourceSignal");
+            reflectionRTSourceSignalHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.rtSourceSignal.Get(),
+                m_mainTargets.reflectionV3.resources.state,
+                "ReflectionV3RTSourceSignal");
         }
         if (wantsCandidateBeautyThisFrame) {
             candidateBeautyHandle = m_services.renderGraph->ImportResource(
@@ -811,6 +823,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             reflectionContext.rejectedSourceMask = reflectionRejectedSourceMaskHandle;
             reflectionContext.temporalDelta = reflectionTemporalDeltaHandle;
             reflectionContext.ssrSourceSignal = reflectionSSRSourceSignalHandle;
+            reflectionContext.rtSourceSignal = reflectionRTSourceSignalHandle;
             reflectionContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             reflectionContext.descriptorManager = m_services.descriptorManager.get();
             reflectionContext.commandList = m_commandResources.graphicsList.Get();
@@ -824,6 +837,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.reflectionV3.descriptors.rejectedSourceMaskRTV.cpu,
                 m_mainTargets.reflectionV3.descriptors.temporalDeltaRTV.cpu,
                 m_mainTargets.reflectionV3.descriptors.ssrSourceSignalRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.rtSourceSignalRTV.cpu,
             };
             reflectionContext.width = GetInternalRenderWidth();
             reflectionContext.height = GetInternalRenderHeight();
@@ -1086,6 +1100,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 debugSRV = m_mainTargets.reflectionV3.descriptors.ssrSourceSignalSRV;
                 debugPassName = "FullSceneReflectionV3SSRSourceSignalDebugView";
                 break;
+            case 74u:
+                debugSource = reflectionRTSourceSignalHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.rtSourceSignalSRV;
+                debugPassName = "FullSceneReflectionV3RTSourceSignalDebugView";
+                break;
             default:
                 break;
             }
@@ -1249,7 +1268,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             {"local_reflection_radiance", "ssr_color", "rt_reflection"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta",
-                             "reflection_ssr_source_signal"},
+                             "reflection_ssr_source_signal", "reflection_rt_source_signal"},
                             false,
                             nullptr,
                             true);
@@ -1344,6 +1363,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_debugViewState.mode == 71u ? "reflection_rejected_source_mask" :
                 m_debugViewState.mode == 72u ? "reflection_temporal_delta" :
                 m_debugViewState.mode == 73u ? "reflection_ssr_source_signal" :
+                m_debugViewState.mode == 74u ? "reflection_rt_source_signal" :
                 "reflection_radiance";
             RecordFramePass("FullSceneReflectionV3DebugView",
                             true,

@@ -266,6 +266,86 @@ Interpretation:
   richer source diagnostics and source-quality improvement for smooth/metallic
   surfaces across more scenes.
 
+### ReflectionV3 RT Source Signal Slice - 2026-06-06
+
+Implementation state:
+
+- Added `reflection_rt_source_signal` as a seventh `FullSceneReflectionV3`
+  render target.
+- `FullSceneReflectionResolverV3.hlsl` now writes:
+  - R: raw RT luma.
+  - G: raw RT alpha/confidence.
+  - B: resolver-shaped RT confidence.
+  - A: forced-RT rejected flag.
+- Added persistent target resource, RTV, SRV, render-graph handle, MRT binding,
+  frame-resource entry, frame-pass write entry, and pass-size accounting.
+- Added debug mode `74`:
+  `FullSceneReflectionV3RTSourceSignal`.
+- Added packet view name:
+  `reflection_rt_source_signal`.
+- V3 runtime context now exposes
+  `reflection_rt_source_signal_ready`.
+- Reflection V3 readiness now requires seven channels:
+  radiance, confidence, source ID, rejected-source mask, temporal delta, SSR
+  source signal, and RT source signal.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_rt_source_signal_forced_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_rt_source_signal_auto_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_rt_source_signal_auto_motion_smoke1_20260606
+```
+
+Results:
+
+- V3 plan validator passed with `Required outputs: 16`.
+- Native build passed; the first wrapper timed out while compile/link continued,
+  and the follow-up Ninja run reported `no work to do`.
+- Forced RT static packet passed:
+  `build/captures/v3_reflection_rt_source_signal_forced_static_smoke1_20260606`.
+- Auto static packet passed:
+  `build/captures/v3_reflection_rt_source_signal_auto_static_smoke1_20260606`.
+- Auto mouse-jitter packet passed:
+  `build/captures/v3_reflection_rt_source_signal_auto_motion_smoke1_20260606`.
+- Motion analyzer measured `19` view sequences after adding
+  `reflection_rt_source_signal`.
+
+Frame-report proof:
+
+- `reflection_v3_channel_count=7`.
+- `reflection_rt_source_signal_ready=true`.
+- `FullSceneReflectionV3.reads=local_reflection_radiance,ssr_color,rt_reflection`.
+- `FullSceneReflectionV3.writes` includes `reflection_rt_source_signal`.
+- Forced RT source contract reports `forced_ray_query_reflection`.
+- Auto source contract remains `local_probe`.
+
+Source signal metrics:
+
+- forced RT static:
+  - `reflection_rt_source_signal.mean_luma=0.2907308`.
+  - `nonblack_ratio=0.3947667`.
+  - `reflection_radiance.mean_luma=0.0547562`.
+- auto static:
+  - `reflection_rt_source_signal.mean_luma=0.2907241`.
+  - `nonblack_ratio=0.3947233`.
+  - auto still chooses `local_probe`.
+- auto mouse-jitter:
+  - `reflection_rt_source_signal.mean_abs_luma_delta=0.0046884`.
+  - `reflection_rt_source_signal.mean_active_delta_ratio=0.0248025`.
+  - `reflection_ssr_source_signal.mean_abs_luma_delta=0.0058466`.
+  - `reflection_radiance.mean_abs_luma_delta=0.0048307`.
+
+Interpretation:
+
+- RT source plumbing is real and measurable; it is not blank.
+- Auto policy correctly does not promote RT yet.
+- The next quality slice should add source-quality stabilization and admission
+  policy for SSR/RT/local-probe blending, not another final-composite boost.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

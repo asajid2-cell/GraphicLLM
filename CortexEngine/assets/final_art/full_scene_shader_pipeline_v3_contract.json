@@ -26,6 +26,7 @@
         "reflection_rejected_source_mask",
         "reflection_temporal_delta",
         "reflection_ssr_source_signal",
+        "reflection_rt_source_signal",
         "scene_local_environment",
         "hdr_scene_color",
         "candidate_hdr_scene_color",
@@ -131,7 +132,8 @@
         "reflection_source_id",
         "reflection_rejected_source_mask",
         "reflection_temporal_delta",
-        "reflection_ssr_source_signal"
+        "reflection_ssr_source_signal",
+        "reflection_rt_source_signal"
       ],
       "required_debug_views": [
         "reflection_radiance",
@@ -139,7 +141,8 @@
         "reflection_source_id",
         "reflection_temporal_delta",
         "reflection_rejected_source_mask",
-        "reflection_ssr_source_signal"
+        "reflection_ssr_source_signal",
+        "reflection_rt_source_signal"
       ]
     },
     "environment": {

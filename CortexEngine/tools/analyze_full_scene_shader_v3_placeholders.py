@@ -19,6 +19,7 @@ REQUIRED_OUTPUTS = {
     "reflection_rejected_source_mask",
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
+    "reflection_rt_source_signal",
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
@@ -443,7 +444,7 @@ def analyze_report(
                 failures.append("reflection domain must expose reflection_confidence debug view")
             if reflection_domain.get("default_beauty_affects") is not False:
                 failures.append("reflection domain must not affect default beauty yet")
-            if reflection_domain.get("ready_channel_count", 0) < 6:
+            if reflection_domain.get("ready_channel_count", 0) < 7:
                 failures.append("reflection domain ready without all required channels")
             if reflection_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("reflection domain ready with missing required channels")
@@ -465,6 +466,7 @@ def analyze_report(
             "reflection_source_id_ready",
             "reflection_temporal_delta_ready",
             "reflection_ssr_source_signal_ready",
+            "reflection_rt_source_signal_ready",
         ]:
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
@@ -486,6 +488,7 @@ def analyze_report(
                 "reflection_rejected_source_mask",
                 "reflection_temporal_delta",
                 "reflection_ssr_source_signal",
+                "reflection_rt_source_signal",
             ]:
                 if resource not in reflection_pass.get("writes", []):
                     failures.append(f"FullSceneReflectionV3 pass does not write {resource}")

@@ -72,6 +72,8 @@ Geometry / Visibility
        -> reflection_source_id
        -> reflection_rejected_source_mask
        -> reflection_temporal_delta
+       -> reflection_ssr_source_signal
+       -> reflection_rt_source_signal
   -> SceneLocalEnvironmentV3
        -> scene_local_environment
        -> ambient_lighting
@@ -132,6 +134,7 @@ void RenderFrameV3(FrameInput input) {
         input.history);
     contract.RecordResource("reflection_radiance", reflections.radiance);
     contract.RecordResource("reflection_confidence", reflections.confidence);
+    contract.RecordResource("reflection_rt_source_signal", reflections.rtSourceSignal);
 
     Texture hdr = FullSceneCompositeV3(
         material,
@@ -215,6 +218,7 @@ Deliverables:
 - per-pixel confidence.
 - temporal delta view.
 - rejected-source mask.
+- raw SSR and RT source-signal views.
 
 Admission gates:
 
@@ -903,8 +907,8 @@ First packet evidence:
 - forced RT static packet:
   `build/captures/v3_reflection_rt_input_forced_static_smoke1_20260606`.
   - status `review_packet_passed`.
-  - source contract `forced_ray_query_reflection`.
-  - `reflection_radiance.mean_luma=0.0547562`,
+- source contract `forced_ray_query_reflection`.
+- `reflection_radiance.mean_luma=0.0547562`,
     `nonblack_ratio=0.3815104`.
   - `reflection_confidence.mean_luma=0.3718455`,
     `nonblack_ratio=0.3947656`.
@@ -928,6 +932,17 @@ Interpretation:
   stable choice.
 - The next ReflectionV3 step is broader source-quality/stability work across
   smooth/metallic stress views, not default-beauty promotion.
+
+2026-06-06 RT source-signal update:
+
+- Added `reflection_rt_source_signal` as a concrete ReflectionV3 output.
+- Added debug mode `74`, `FullSceneReflectionV3RTSourceSignal`.
+- Added V3 frame-report flag `reflection_rt_source_signal_ready`.
+- Reflection readiness now requires seven channels: radiance, confidence,
+  source ID, rejected-source mask, temporal delta, SSR source signal, and RT
+  source signal.
+- Packet view filters now include `reflection_rt_source_signal` so forced RT
+  and auto motion packets can inspect raw RT source quality directly.
 
 Concrete resolver producer update, 2026-06-06:
 

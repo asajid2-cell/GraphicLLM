@@ -2,7 +2,7 @@ param(
     [string]$OutputRoot = "build/captures/full_scene_shader_pipeline_v3_placeholder_packet",
     [string]$FamilyFilter = "gallery",
     [string]$StressSceneFilter = "rt_showcase:reflection_closeup",
-    [string]$ViewFilter = "beauty,candidate_beauty_v3,candidate_hdr_scene_color,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_radiance,reflection_confidence,reflection_source_id,reflection_rejected_source_mask,reflection_temporal_delta,reflection_ssr_source_signal,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta",
+    [string]$ViewFilter = "beauty,candidate_beauty_v3,candidate_hdr_scene_color,direct_light,direct_light_unshadowed,direct_light_shadow_loss,shadow_factor,ambient_ibl,v3_direct_lighting,v3_direct_lighting_unshadowed,v3_shadow_visibility,v3_shadow_loss,v3_indirect_lighting,local_reflection_radiance,reflection_radiance,reflection_confidence,reflection_source_id,reflection_rejected_source_mask,reflection_temporal_delta,reflection_ssr_source_signal,reflection_rt_source_signal,reflection_source_authority,reflection_source_weights,reflection_resolver_candidate,reflection_resolver_candidate_delta",
     [int]$SmokeFrames = 30,
     [int]$CaptureFrame = 15,
     [int]$CaptureSequenceCount = 1,

@@ -151,6 +151,7 @@ struct FullSceneReflectionV3TargetResources {
     ComPtr<ID3D12Resource> rejectedSourceMask;
     ComPtr<ID3D12Resource> temporalDelta;
     ComPtr<ID3D12Resource> ssrSourceSignal;
+    ComPtr<ID3D12Resource> rtSourceSignal;
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
 
     void Reset() {
@@ -160,6 +161,7 @@ struct FullSceneReflectionV3TargetResources {
         rejectedSourceMask.Reset();
         temporalDelta.Reset();
         ssrSourceSignal.Reset();
+        rtSourceSignal.Reset();
         state = D3D12_RESOURCE_STATE_COMMON;
     }
 };
@@ -177,6 +179,8 @@ struct FullSceneReflectionV3TargetDescriptors {
     DescriptorHandle temporalDeltaSRV;
     DescriptorHandle ssrSourceSignalRTV;
     DescriptorHandle ssrSourceSignalSRV;
+    DescriptorHandle rtSourceSignalRTV;
+    DescriptorHandle rtSourceSignalSRV;
 
     void Reset() {
         radianceRTV = {};
@@ -191,6 +195,8 @@ struct FullSceneReflectionV3TargetDescriptors {
         temporalDeltaSRV = {};
         ssrSourceSignalRTV = {};
         ssrSourceSignalSRV = {};
+        rtSourceSignalRTV = {};
+        rtSourceSignalSRV = {};
     }
 };
 
@@ -658,6 +664,12 @@ struct FullSceneReflectionV3TargetState {
                                       descriptors.ssrSourceSignalRTV,
                                       descriptors.ssrSourceSignalSRV);
         if (ssrSignal.IsErr()) return ssrSignal;
+
+        auto rtSignal = createTarget("reflection_rt_source_signal",
+                                     resources.rtSourceSignal,
+                                     descriptors.rtSourceSignalRTV,
+                                     descriptors.rtSourceSignalSRV);
+        if (rtSignal.IsErr()) return rtSignal;
 
         resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
         return Result<void>::Ok();

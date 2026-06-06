@@ -129,6 +129,8 @@ FullSceneReflectionV3
     reflection_rejected_source_mask
     reflection_temporal_delta
     reflection_history_validity
+    reflection_ssr_source_signal
+    reflection_rt_source_signal
 
 TransparencyMediaV3
   reads: material payload, depth, lighting, reflection, atmosphere
@@ -290,6 +292,20 @@ Packet status:
 - auto mode still chose `local_probe`, which is the intended conservative
   behavior until RT/SSR source stability is better proven across smooth and
   metallic stress scenes.
+
+Follow-up source diagnostic status, 2026-06-06:
+
+- `reflection_rt_source_signal` is now part of the planned ReflectionV3
+  contract.
+- Debug mode `74`, `FullSceneReflectionV3RTSourceSignal`, is wired into the
+  renderer, frame contract, packet view registry, and V3 analyzers.
+- Forced RT static, auto static, and auto mouse-jitter gallery packets passed.
+- The RT source signal is nonblank and measurable:
+  `mean_luma=0.2907308`, `nonblack_ratio=0.3947667` in the forced RT static
+  packet.
+- Auto mode still chooses `local_probe`. Treat this as correct until RT/SSR
+  source-quality stabilization is implemented and proven across smooth/metallic
+  stress scenes.
 
 ## 2026-06-06 Refactor Plan Before Goal Feature Completion
 

@@ -5454,3 +5454,103 @@ Remaining limitation:
   ReflectionV3 quality step.
 - This is still candidate-path infrastructure. Default beauty remains
   unchanged.
+
+### ReflectionResolverV3 Source Policy Admission - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionResolverV3.hlsl` now performs explicit source admission
+  instead of blindly copying local reflection radiance.
+- Current source candidates:
+  - scene-local reflection radiance.
+  - scene-local environment fallback from frame ambient/environment/probe
+    constants.
+- Added source override lane through `FrameConstants.localProbeParams.w`.
+- Added debug environment variable:
+  `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE`.
+  - `auto` or unset: prefer scene-local radiance, then environment fallback.
+  - `local`: force scene-local radiance if available.
+  - `environment`: force scene-local environment fallback.
+  - `none`: force no reflection source for rejection-path debugging.
+- Frame reports now expose forced review contracts:
+  `forced_scene_local_radiance`, `forced_scene_local_environment`,
+  `forced_none`, or `forced_unknown`.
+- The analyzer accepts forced local/environment contracts as deliberate review
+  modes while still rejecting unknown source ownership.
+- Rejection channels now encode:
+  - local radiance rejected/missing.
+  - environment fallback rejected/missing.
+  - dynamic SSR/RT source not admitted yet.
+- Temporal delta now reports stable zero for scene-local sources and exposes
+  forced-but-unavailable policies separately.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- CortexEngine/assets/shaders/FullSceneReflectionResolverV3.hlsl CortexEngine/src/Graphics/Renderer_FramePostConstants.cpp CortexEngine/src/Graphics/ShaderTypes.h CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py
+& 'C:\Program Files\Ninja\ninja.exe' -C build -t recompact
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_source_policy_auto_static_smoke1_20260606
+$env:CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='environment'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_source_policy_environment_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_source_policy_auto_motion_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed with `Required outputs: 14`.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed and linked `build/bin/CortexEngine.exe`.
+- auto static packet passed:
+  `build/captures/v3_reflection_source_policy_auto_static_smoke1_20260606`.
+  - reports: `23`.
+  - `reflection_v3_source_contract=local_probe`.
+  - promotion status: `review_packet_passed`.
+- forced environment static packet passed:
+  `build/captures/v3_reflection_source_policy_environment_static_smoke1_20260606`.
+  - reports: `23`.
+  - `reflection_v3_source_contract=forced_scene_local_environment`.
+  - promotion status: `review_packet_passed`.
+- auto mouse-jitter packet passed:
+  `build/captures/v3_reflection_source_policy_auto_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 lighting/reflection motion measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+
+Signal evidence:
+
+- auto static:
+  - `reflection_radiance.mean_luma=0.0719490`,
+    `nonblack_ratio=0.9995692`, `hot_pixel_ratio=0.0042914`.
+  - `reflection_confidence.mean_luma=0.0334686`,
+    `nonblack_ratio=0.1463411`.
+  - `reflection_source_id.mean_luma=0.0843016`,
+    `nonblack_ratio=1.0`.
+- forced environment static:
+  - `reflection_radiance.mean_luma=0.0551851`,
+    `nonblack_ratio=1.0`, `hot_pixel_ratio=0.0`.
+  - `reflection_confidence.mean_luma=0.4980392`,
+    `nonblack_ratio=1.0`.
+  - `reflection_source_id.mean_luma=0.6409976`,
+    `nonblack_ratio=1.0`.
+
+Mouse-jitter reflection evidence:
+
+- `reflection_radiance`: mean abs luma delta `0.0024278814`, active delta
+  ratio `0.0138726128`.
+- `reflection_confidence`: mean abs luma delta `0.0007756502`, active delta
+  ratio `0.0068261719`.
+- `reflection_source_id`: mean abs luma delta `0.0006937146`, active delta
+  ratio `0.0058745660`.
+- `reflection_rejected_source_mask`: mean abs luma delta `0.0001864565`,
+  active delta ratio `0.0017708333`.
+- `reflection_temporal_delta`: mean abs luma delta `0.0`, active delta
+  ratio `0.0`.
+
+Remaining limitation:
+
+- SSR and RT/ray-query reflection are still not real inputs to the resolver.
+  They remain visible as not-admitted dynamic source debt in the rejection
+  channel until the next source-fusion slice.

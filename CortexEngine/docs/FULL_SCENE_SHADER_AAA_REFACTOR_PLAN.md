@@ -860,6 +860,21 @@ Current status, 2026-06-06:
   local probe vs SSR vs RT/ray query vs scene-local environment, with
   roughness-aware source choice and temporal-history admission. Do not redo the
   basic resource/pass/report wiring unless packet evidence regresses.
+- Source-policy admission has started:
+  - auto policy prefers scene-local radiance, then scene-local environment.
+  - `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE` can force `local`,
+    `environment`, or `none` for packet/debug review.
+  - frame reports expose forced source contracts instead of pretending the
+    local-probe path was used.
+  - packets:
+    `build/captures/v3_reflection_source_policy_auto_static_smoke1_20260606`,
+    `build/captures/v3_reflection_source_policy_environment_static_smoke1_20260606`,
+    and
+    `build/captures/v3_reflection_source_policy_auto_motion_smoke1_20260606`
+    passed.
+- Remaining source-arbitration work is to add actual SSR and RT/ray-query
+  inputs to the resolver and choose them by roughness, confidence, distance,
+  surface orientation, scene mode, and history availability.
 
 Milestone 4: scene-local environment resources.
 

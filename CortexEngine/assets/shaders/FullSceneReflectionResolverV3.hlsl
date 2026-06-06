@@ -1,9 +1,65 @@
 // Full-scene reflection resolver producer for the V3 shader stack.
 //
-// This first resolver slice wraps the scene-local reflection radiance buffer
-// into named V3 resources: radiance, confidence, source ID, rejected-source
-// mask, and temporal delta. Later slices can replace the source selection with
-// SSR/RT/environment arbitration without changing downstream contracts.
+// This resolver owns ReflectionV3 source admission. It starts with scene-local
+// reflection radiance and a scene-local environment fallback; SSR/RT source
+// inputs can join the same policy contract without changing downstream
+// composite/debug resources.
+
+cbuffer FrameConstants : register(b1)
+{
+    float4x4 g_ViewMatrix;
+    float4x4 g_ProjectionMatrix;
+    float4x4 g_ViewProjectionMatrix;
+    float4x4 g_InvProjectionMatrix;
+    float4   g_CameraPosition;
+    float4   g_TimeAndExposure;
+    float4   g_AmbientColor;
+    uint4    g_LightCount;
+    struct Light
+    {
+        float4 position_type;
+        float4 direction_cosInner;
+        float4 color_range;
+        float4 params;
+    };
+    static const uint LIGHT_MAX = 16;
+    Light    g_Lights[LIGHT_MAX];
+    float4x4 g_LightViewProjection[6];
+    float4   g_CascadeSplits;
+    float4   g_ShadowParams;
+    float4   g_DebugMode;
+    float4   g_PostParams;
+    float4   g_EnvParams;
+    float4   g_ColorGrade;
+    float4   g_FogParams;
+    float4   g_FogExtraParams;
+    float4   g_AOParams;
+    float4   g_BloomParams;
+    float4   g_TAAParams;
+    float4x4 g_ViewProjectionNoJitter;
+    float4x4 g_InvViewProjectionNoJitter;
+    float4x4 g_PrevViewProjMatrix;
+    float4x4 g_InvViewProjMatrix;
+    float4   g_WaterParams0;
+    float4   g_WaterParams1;
+    float4   g_SSRParams;
+    float4   g_PostGradeParams;
+    float4   g_RTReflectionParams;
+    uint4    g_ScreenAndCluster;
+    uint4    g_ClusterParams;
+    uint4    g_ClusterSRVIndices;
+    float4   g_ProjectionParams;
+    float4   g_CinematicParams;
+    float4   g_CinematicDofParams;
+    float4   g_CinematicStabilityParams;
+    float4   g_CinematicLookParams;
+    float4   g_CinematicExposureParams;
+    // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
+    // z = scene-local probe radiance enabled (>0.5),
+    // w = ReflectionV3 source override:
+    //     0 auto, 1 force scene-local, 4 force environment, 255 force none.
+    float4   g_LocalProbeParams;
+};
 
 Texture2D<float4> g_LocalReflectionRadiance : register(t0);
 SamplerState g_LinearClamp : register(s0);
@@ -27,27 +83,57 @@ static float Luma(float3 color) {
 
 PSOutput PSMain(VSOutput input) {
     float4 local = g_LocalReflectionRadiance.Sample(g_LinearClamp, input.texCoord);
-    float3 radiance = max(local.rgb, 0.0f.xxx);
-    float confidence = saturate(local.a);
+    float3 localRadiance = max(local.rgb, 0.0f.xxx);
+    float localConfidence = saturate(local.a);
+    float localActive = step(0.001f, localConfidence + Luma(localRadiance));
+
+    float envEnabled = max(step(0.5f, g_EnvParams.z), step(0.5f, g_LocalProbeParams.z));
+    float envScale = max(max(g_EnvParams.x, g_EnvParams.y), g_LocalProbeParams.y);
+    float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled;
+    float envConfidence = saturate(envEnabled * (0.18f + 0.32f * saturate(envScale)));
+    float envActive = step(0.001f, envConfidence + Luma(envRadiance));
+
+    uint sourceOverride = (uint)round(max(g_LocalProbeParams.w, 0.0f));
+    bool forceLocal = sourceOverride == 1u;
+    bool forceEnvironment = sourceOverride == 4u;
+    bool forceNone = sourceOverride >= 255u;
+
+    bool chooseLocal = !forceNone && ((forceLocal && localActive > 0.0f) ||
+                       (!forceLocal && !forceEnvironment && localActive > 0.0f));
+    bool chooseEnvironment = !forceNone && !chooseLocal &&
+                             ((forceEnvironment && envActive > 0.0f) ||
+                              (!forceLocal && envActive > 0.0f));
+
+    float sourceCode = chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f);
+    float3 radiance = chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx);
+    float confidence = chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f);
     float active = step(0.001f, confidence + Luma(radiance));
 
     PSOutput output;
     output.radiance = float4(radiance, confidence);
     output.confidence = float4(confidence.xxx, 1.0f);
 
-    // Encoded source ID: 0 = none, 1 = scene-local radiance.
-    output.sourceId = float4(active, confidence, 0.0f, 1.0f);
+    // Encoded source ID: R = source class normalized by 4
+    // (0 none, 0.25 scene-local radiance, 1 scene-local environment),
+    // G = confidence, B = active override normalized for policy debugging.
+    float overrideSignal = sourceOverride >= 255u ? 1.0f : saturate((float)sourceOverride / 4.0f);
+    output.sourceId = float4(sourceCode * 0.25f, confidence, overrideSignal, 1.0f);
 
-    // Channels reserve rejection classes. This slice can only prove when no
-    // scene-local source was available; SSR/RT/environment rejected bits become
-    // meaningful when the resolver owns those sources.
-    float noSceneLocalSource = 1.0f - active;
-    output.rejectedSourceMask = float4(noSceneLocalSource, 0.0f, 0.0f, 1.0f);
+    // Rejection mask: R = scene-local radiance rejected/missing, G =
+    // environment fallback rejected/missing, B = dynamic sources not admitted
+    // by this resolver slice (SSR/RT reserved until they are real inputs).
+    float localRejected = chooseLocal ? 0.0f : (1.0f - localActive);
+    float environmentRejected = chooseEnvironment ? 0.0f : (1.0f - envActive);
+    float dynamicSourceNotAdmitted = (chooseLocal || chooseEnvironment) ? 0.35f : 1.0f;
+    output.rejectedSourceMask = float4(localRejected, environmentRejected, dynamicSourceNotAdmitted, 1.0f);
 
-    // The first resolver has no temporal history owner, so the stable
-    // scene-local path emits zero delta where confidence exists and one in the
-    // no-source channel. This makes missing reflection ownership visible
-    // without claiming history filtering.
-    output.temporalDelta = float4(noSceneLocalSource, 0.0f, 0.0f, 1.0f);
+    // Stable scene-local sources do not require history. Forced policies that
+    // cannot be satisfied are visible in G so packets can prove the override
+    // was rejected instead of silently falling through.
+    float forcedButUnavailable =
+        (forceLocal && localActive <= 0.0f) || (forceEnvironment && envActive <= 0.0f) || forceNone
+            ? 1.0f
+            : 0.0f;
+    output.temporalDelta = float4(1.0f - active, forcedButUnavailable, 0.0f, 1.0f);
     return output;
 }

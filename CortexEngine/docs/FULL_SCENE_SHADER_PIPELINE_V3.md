@@ -930,6 +930,56 @@ Remaining limitation:
   admission remain future ReflectionV3 work.
 - Default beauty remains unchanged and not promoted.
 
+Source-policy admission update, 2026-06-06:
+
+- `FullSceneReflectionResolverV3` now admits either scene-local reflection
+  radiance or scene-local environment fallback.
+- `FrameConstants.localProbeParams.w` carries a ReflectionV3 source override:
+  `0` auto, `1` local, `4` environment, `255` none.
+- `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE` supports:
+  `auto`, `local`, `environment`, and `none`.
+- frame reports can now name forced review contracts:
+  `forced_scene_local_radiance`, `forced_scene_local_environment`,
+  `forced_none`, and `forced_unknown`.
+- the V3 analyzer accepts forced local/environment contracts and still rejects
+  invalid source ownership.
+- source ID debug output now exposes selected source class, confidence, and
+  override signal.
+- rejected-source mask now exposes missing/rejected local radiance,
+  missing/rejected environment fallback, and not-yet-admitted dynamic SSR/RT
+  source debt.
+- static auto packet:
+  `build/captures/v3_reflection_source_policy_auto_static_smoke1_20260606`.
+  - reports: `23`.
+  - `reflection_v3_source_contract=local_probe`.
+  - promotion status: `review_packet_passed`.
+- static forced-environment packet:
+  `build/captures/v3_reflection_source_policy_environment_static_smoke1_20260606`.
+  - reports: `23`.
+  - `reflection_v3_source_contract=forced_scene_local_environment`.
+  - promotion status: `review_packet_passed`.
+- auto mouse-jitter packet:
+  `build/captures/v3_reflection_source_policy_auto_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 lighting/reflection motion measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+- auto mouse-jitter rows:
+  - `reflection_radiance`: mean abs luma delta `0.0024278814`,
+    active delta ratio `0.0138726128`.
+  - `reflection_confidence`: mean abs luma delta `0.0007756502`,
+    active delta ratio `0.0068261719`.
+  - `reflection_source_id`: mean abs luma delta `0.0006937146`,
+    active delta ratio `0.0058745660`.
+  - `reflection_rejected_source_mask`: mean abs luma delta `0.0001864565`,
+    active delta ratio `0.0017708333`.
+  - `reflection_temporal_delta`: mean abs luma delta `0.0`,
+    active delta ratio `0.0`.
+
+Remaining limitation:
+
+- SSR and RT/ray-query reflection are not yet resolver inputs. They remain
+  explicit rejected-source debt until the next source-fusion slice.
+
 ### L007 - Scene Local Environment V3
 
 Status: in progress.

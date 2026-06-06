@@ -161,6 +161,111 @@ Next feature boundary:
   `FullSceneShaderFrameContext.h`, and
   `tools/analyze_full_scene_shader_v3_placeholders.py`.
 
+### ReflectionV3 RT Source Input Slice - 2026-06-06
+
+Implementation state:
+
+- `FullSceneReflectionResolverV3.hlsl` now samples
+  `g_RTReflection : t2`.
+- Reflection source override supports `3`, `rt`, `ray_query`,
+  `raytraced`, and `ray_traced`.
+- Resolver source IDs now encode RT as `0.75` in
+  `reflection_source_id.r`.
+- Forced RT can be requested without changing default beauty:
+  `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE=rt`.
+- The render graph imports `RTReflection`, reads it in
+  `FullSceneReflectionV3`, binds it as the third SRV, and records
+  `rt_reflection` in the pass read list.
+- The V3 frame context and placeholder analyzer now require
+  `FullSceneReflectionV3` to read `rt_reflection` before the reflection domain
+  is considered ready.
+- `forced_ray_query_reflection` is now an accepted source contract for
+  analyzer evidence.
+
+Validation still required:
+
+- copy the updated reflection resolver shader into `build/bin/assets/shaders`
+  before packet runs if asset sync is skipped.
+- run a forced RT static packet and inspect whether RT radiance is present or
+  cleanly rejected as unavailable.
+- run an auto static packet and a mouse-jitter packet to verify the local/SSR/RT
+  resolver policy remains stable.
+- do not claim RT visual quality unless the metrics prove nonblank RT source
+  signal; a passing graph/read contract only proves source ownership.
+
+Validation completed in this slice:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- CortexEngine/assets/shaders/FullSceneReflectionResolverV3.hlsl CortexEngine/src/Graphics/Renderer_RenderGraphEndFrame.cpp CortexEngine/src/Graphics/Renderer_FramePostConstants.cpp CortexEngine/src/Graphics/ShaderTypes.h CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py CortexEngine/docs/AAA_ASSET_QUALITY_HANDOFF.md CortexEngine/docs/FULL_SCENE_SHADER_PIPELINE_V3.md CortexEngine/docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item assets\shaders\FullSceneReflectionResolverV3.hlsl build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+```
+
+Packet evidence:
+
+- forced RT static:
+  `build/captures/v3_reflection_rt_input_forced_static_smoke1_20260606`.
+- auto static:
+  `build/captures/v3_reflection_rt_input_auto_static_smoke1_20260606`.
+- auto mouse-jitter:
+  `build/captures/v3_reflection_rt_input_auto_motion_smoke1_20260606`.
+
+Packet results:
+
+- all three packets passed with promotion status `review_packet_passed`.
+- forced RT source contract:
+  `forced_ray_query_reflection`.
+- auto source contract:
+  `local_probe`.
+- `FullSceneReflectionV3` reads:
+  `local_reflection_radiance`, `ssr_color`, and `rt_reflection`.
+- `FullSceneReflectionV3` writes:
+  `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, `reflection_rejected_source_mask`,
+  `reflection_temporal_delta`, and `reflection_ssr_source_signal`.
+
+Forced RT static signal:
+
+- `reflection_radiance.mean_luma=0.0547562`,
+  `nonblack_ratio=0.3815104`.
+- `reflection_confidence.mean_luma=0.3718455`,
+  `nonblack_ratio=0.3947656`.
+
+Auto static signal:
+
+- `reflection_radiance.mean_luma=0.0977650`,
+  `nonblack_ratio=0.9992958`.
+- `reflection_temporal_delta.mean_luma=0.0`,
+  `nonblack_ratio=0.0`.
+
+Auto mouse-jitter signal:
+
+- `reflection_radiance.mean_luma=0.0967341`,
+  `nonblack_ratio=0.9992339`.
+- `reflection_temporal_delta.mean_luma=0.0`,
+  `nonblack_ratio=0.0`.
+- motion deltas:
+  - `candidate_hdr_scene_color.delta=0.0091199`, active `0.0633203`.
+  - `reflection_radiance.delta=0.0048307`, active `0.0309180`.
+  - `reflection_confidence.delta=0.0048070`, active `0.0129601`.
+  - `reflection_source_id.delta=0.0039639`, active `0.0126432`.
+  - `reflection_rejected_source_mask.delta=0.0005260`, active `0.0075857`.
+  - `reflection_temporal_delta.delta=0.0`, active `0.0`.
+  - `reflection_ssr_source_signal.delta=0.0058466`, active `0.0516949`.
+
+Interpretation:
+
+- RT/ray-query is now a real resolver source input with nonblank forced signal
+  in the gallery packet.
+- Auto mode correctly remains on stable scene-local probe in this row, so the
+  RT input is diagnostic/available without destabilizing normal candidate
+  reflection.
+- The next reflection-quality work is not stronger composite blending. It is
+  richer source diagnostics and source-quality improvement for smooth/metallic
+  surfaces across more scenes.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

@@ -265,6 +265,32 @@ FullSceneReflectionV3 RT/ray-query source input
 Do not move on to stronger post or prettier lighting until the reflection
 domain can explain local, SSR, RT, and environment source choices under motion.
 
+Implementation status, 2026-06-06:
+
+- `FullSceneReflectionV3` now has RT/ray-query as a concrete source input.
+- The resolver samples `rt_reflection` alongside local reflection radiance and
+  SSR.
+- The render graph binds `rt_reflection` as the third resolver SRV and records
+  the pass read edge.
+- Source override value `3` and labels `rt`, `ray_query`, `raytraced`, and
+  `ray_traced` now map to the forced RT/ray-query contract.
+- Analyzer readiness requires `FullSceneReflectionV3` to read
+  `rt_reflection`.
+
+This completes the ownership part of the RT input slice. Packet evidence still
+has to prove whether the RT source is present and stable enough to admit in
+auto mode. Until then, RT is wired for diagnosis, not promoted as a visual
+quality solution.
+
+Packet status:
+
+- forced RT static, auto static, and auto mouse-jitter gallery packets passed.
+- forced RT produced nonblank radiance/confidence and used
+  `forced_ray_query_reflection`.
+- auto mode still chose `local_probe`, which is the intended conservative
+  behavior until RT/SSR source stability is better proven across smooth and
+  metallic stress scenes.
+
 ## 2026-06-06 Refactor Plan Before Goal Feature Completion
 
 The target is not merely "better shaders." The target is a full candidate

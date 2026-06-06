@@ -50,6 +50,7 @@ struct FullSceneCompositeV3Context {
 struct FullSceneReflectionResolverV3Context {
     RGResourceHandle localReflectionRadiance;
     RGResourceHandle ssr;
+    RGResourceHandle rtReflection;
     RGResourceHandle radiance;
     RGResourceHandle confidence;
     RGResourceHandle sourceId;
@@ -221,6 +222,9 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
             if (context.ssr.IsValid()) {
                 builder.Read(context.ssr, RGResourceUsage::ShaderResource);
             }
+            if (context.rtReflection.IsValid()) {
+                builder.Read(context.rtReflection, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.radiance, RGResourceUsage::RenderTarget);
             builder.Write(context.confidence, RGResourceUsage::RenderTarget);
             builder.Write(context.sourceId, RGResourceUsage::RenderTarget);
@@ -229,7 +233,7 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
             builder.Write(context.ssrSourceSignal, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(2);
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(3);
             if (srvResult.IsErr()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_descriptor");
                 return;
@@ -237,8 +241,9 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
 
             const DescriptorHandle inputSRV = srvResult.Value();
             const DescriptorHandle ssrSRV = context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 1u);
-            if (!ssrSRV.IsValid()) {
-                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_ssr_descriptor");
+            const DescriptorHandle rtReflectionSRV = context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 2u);
+            if (!ssrSRV.IsValid() || !rtReflectionSRV.IsValid()) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_source_descriptors");
                 return;
             }
             ID3D12Resource* localRadiance = graph.GetResource(context.localReflectionRadiance);
@@ -259,6 +264,17 @@ void FailFullSceneReflectionResolverV3(const FullSceneReflectionResolverV3Contex
                     ssr,
                     DXGI_FORMAT_R16G16B16A16_FLOAT)) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_ssr_srv");
+                return;
+            }
+            ID3D12Resource* rtReflection = context.rtReflection.IsValid()
+                ? graph.GetResource(context.rtReflection)
+                : nullptr;
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    rtReflectionSRV,
+                    rtReflection,
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_rt_srv");
                 return;
             }
 
@@ -788,6 +804,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             FullSceneReflectionResolverV3Context reflectionContext{};
             reflectionContext.localReflectionRadiance = localReflRadianceHandle;
             reflectionContext.ssr = ssrHandle;
+            reflectionContext.rtReflection = rtReflHandle;
             reflectionContext.radiance = reflectionRadianceHandle;
             reflectionContext.confidence = reflectionConfidenceHandle;
             reflectionContext.sourceId = reflectionSourceIdHandle;
@@ -1229,7 +1246,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             true,
                             ranReflectionResolverV3,
                             ranReflectionResolverV3 ? 1u : 0u,
-                            {"local_reflection_radiance", "ssr_color"},
+                            {"local_reflection_radiance", "ssr_color", "rt_reflection"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta",
                              "reflection_ssr_source_signal"},

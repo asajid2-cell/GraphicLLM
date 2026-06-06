@@ -1289,6 +1289,10 @@ inline std::string FullSceneShaderReflectionV3ForcedSourceContract() {
     if (normalized == "ssr" || normalized == "screen_space" || normalized == "2") {
         return "forced_screen_space_reflection";
     }
+    if (normalized == "rt" || normalized == "ray_query" || normalized == "raytraced" ||
+        normalized == "ray_traced" || normalized == "3") {
+        return "forced_ray_query_reflection";
+    }
     if (normalized == "environment" || normalized == "env" || normalized == "4") {
         return "forced_scene_local_environment";
     }
@@ -1621,6 +1625,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderHasResource(contract, "reflection_ssr_source_signal") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "local_reflection_radiance") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "ssr_color") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "rt_reflection") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_radiance") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_confidence") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_source_id") &&
@@ -1702,6 +1707,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_visual_reflection_owner",
         "material_reflection_policy",
         "local_reflection_radiance",
+        "rt_reflection",
         "reflection_confidence",
         "reflection_source_id",
         "reflection_rejected_source_mask",

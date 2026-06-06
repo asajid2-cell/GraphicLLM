@@ -869,6 +869,66 @@ Important limitation:
   not be blocked on RT reflection history, while dynamic reflection paths still
   require history/TAA evidence.
 
+2026-06-06 RT/ray-query source input update:
+
+- `FullSceneReflectionV3` now has a concrete RT/ray-query resolver input edge.
+- The resolver shader samples:
+  - `local_reflection_radiance` at `t0`.
+  - `ssr_color` at `t1`.
+  - `rt_reflection` at `t2`.
+- The render graph records `rt_reflection` as a read by
+  `FullSceneReflectionV3`.
+- Source overrides now include:
+  - `0`/auto.
+  - `1`/local.
+  - `2`/SSR.
+  - `3`/RT/ray-query.
+  - `4`/environment.
+  - `255`/none.
+- `reflection_source_id.r` encodes RT as `0.75`.
+- `forced_ray_query_reflection` is accepted by the analyzer as a valid
+  `reflection_v3_source_contract`.
+
+Required evidence before calling this source qualitatively useful:
+
+- forced RT packet proves either nonblank RT radiance or explicit unavailable
+  rejection through confidence/source/rejected/temporal channels.
+- auto packet proves RT does not destabilize the normal local/SSR/environment
+  policy.
+- mouse-jitter packet proves the selected reflection source is stable enough
+  for smooth and metallic surfaces.
+
+First packet evidence:
+
+- forced RT static packet:
+  `build/captures/v3_reflection_rt_input_forced_static_smoke1_20260606`.
+  - status `review_packet_passed`.
+  - source contract `forced_ray_query_reflection`.
+  - `reflection_radiance.mean_luma=0.0547562`,
+    `nonblack_ratio=0.3815104`.
+  - `reflection_confidence.mean_luma=0.3718455`,
+    `nonblack_ratio=0.3947656`.
+- auto static packet:
+  `build/captures/v3_reflection_rt_input_auto_static_smoke1_20260606`.
+  - status `review_packet_passed`.
+  - source contract remained `local_probe`.
+- auto mouse-jitter packet:
+  `build/captures/v3_reflection_rt_input_auto_motion_smoke1_20260606`.
+  - status `review_packet_passed`.
+  - source contract remained `local_probe`.
+  - `reflection_radiance.delta=0.0048307`, active `0.0309180`.
+  - `reflection_source_id.delta=0.0039639`, active `0.0126432`.
+  - `reflection_temporal_delta.delta=0.0`, active `0.0`.
+
+Interpretation:
+
+- RT is now wired and force-selectable with nonblank signal in the gallery
+  packet.
+- Auto policy does not yet admit RT in this row because local probe remains the
+  stable choice.
+- The next ReflectionV3 step is broader source-quality/stability work across
+  smooth/metallic stress views, not default-beauty promotion.
+
 Concrete resolver producer update, 2026-06-06:
 
 - added `assets/shaders/FullSceneReflectionResolverV3.hlsl`.

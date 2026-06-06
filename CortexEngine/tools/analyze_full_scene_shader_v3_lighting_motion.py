@@ -29,6 +29,8 @@ CANDIDATE_COMPOSITE_VIEWS = [
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
     "reflection_rt_source_signal",
+    "reflection_history_v3_curr",
+    "reflection_history_v3_validity",
 ]
 
 LEGACY_PAIRS = {

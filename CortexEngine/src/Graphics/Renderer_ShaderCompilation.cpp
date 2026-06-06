@@ -94,6 +94,15 @@ Result<RendererCompiledShaders> Renderer::CompileRendererPipelineShaders() {
                      fullSceneReflectionResolverV3PsResult.Error());
     }
 
+    auto fullSceneReflectionHistoryV3PsResult =
+        ShaderCompiler::CompileFromFile("assets/shaders/FullSceneReflectionHistoryV3.hlsl", "PSMain", "ps_5_1");
+    if (fullSceneReflectionHistoryV3PsResult.IsOk()) {
+        shaders.fullSceneReflectionHistoryV3PS = std::move(fullSceneReflectionHistoryV3PsResult).Value();
+    } else {
+        spdlog::warn("Failed to compile FullSceneReflectionHistoryV3 pixel shader: {}",
+                     fullSceneReflectionHistoryV3PsResult.Error());
+    }
+
     auto candidateBeautyDisplayPsResult =
         ShaderCompiler::CompileFromFile("assets/shaders/CandidateBeautyDisplay.hlsl", "PSMain", "ps_5_1");
     if (candidateBeautyDisplayPsResult.IsOk()) {

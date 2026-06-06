@@ -377,6 +377,74 @@ Next planned architecture:
 - Success must be measured by source-ID active delta and reflection radiance
   delta under mouse-jitter and smooth/metallic stress packets.
 
+### ReflectionHistoryV3 Seed Slice - 2026-06-06
+
+Implemented:
+
+- Added `assets/shaders/FullSceneReflectionHistoryV3.hlsl`.
+- Added `FullSceneReflectionHistoryV3` as a separate fullscreen pass instead
+  of expanding `FullSceneReflectionV3` beyond the D3D12 8-MRT limit.
+- Corrected `FullSceneReflectionV3` PSO target count from `5` to `7`, matching
+  its seven actual render targets.
+- Added persistent resources and debug views:
+  - `reflection_history_v3_curr`, debug mode `75`.
+  - `reflection_history_v3_validity`, debug mode `76`.
+- Added frame-report flags:
+  - `reflection_history_v3_ready`.
+  - `reflection_history_v3_validity_ready`.
+- Reflection V3 readiness now requires `9` channels.
+- Packet default view filter captures the two history views.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_history_seed_auto_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_seed_auto_motion_smoke1_20260606
+```
+
+Results:
+
+- V3 plan validator passed with `Required outputs: 18`.
+- Native build passed.
+- Static gallery packet passed:
+  `build/captures/v3_reflection_history_seed_auto_static_smoke1_20260606`.
+- Mouse-jitter gallery packet passed:
+  `build/captures/v3_reflection_history_seed_auto_motion_smoke1_20260606`.
+- Motion analyzer measured `21` view sequences after adding the two history
+  debug views.
+
+Frame-report proof:
+
+- `reflection_v3_channel_count=9`.
+- `reflection_history_v3_ready=true`.
+- `reflection_history_v3_validity_ready=true`.
+- `FullSceneReflectionHistoryV3.reads=reflection_radiance,reflection_source_id,reflection_temporal_delta`.
+- `FullSceneReflectionHistoryV3.writes=reflection_history_v3_curr,reflection_history_v3_validity`.
+
+Metrics:
+
+- static:
+  - `reflection_history_v3_curr.mean_luma=0.0977650`,
+    `nonblack_ratio=0.9992958`.
+  - `reflection_history_v3_validity.mean_luma=0.5495951`,
+    `nonblack_ratio=1.0`.
+- mouse-jitter:
+  - `reflection_history_v3_curr.mean_abs_luma_delta=0.0048307`,
+    matching current resolved radiance by design.
+  - `reflection_history_v3_validity.mean_abs_luma_delta=0.0018637`,
+    `mean_active_delta_ratio=0.0094575`.
+
+Current limitation:
+
+- This is a seed/history-contract pass only.
+- It does not yet sample `reflection_history_v3_prev`, velocity, depth, or
+  normal/roughness for source-ID hysteresis.
+- The next slice should add ping-pong previous-history ownership and only then
+  allow history to affect SSR/RT/local-probe source admission.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

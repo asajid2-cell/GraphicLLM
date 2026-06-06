@@ -74,6 +74,9 @@ Geometry / Visibility
        -> reflection_temporal_delta
        -> reflection_ssr_source_signal
        -> reflection_rt_source_signal
+  -> FullSceneReflectionHistoryV3
+       -> reflection_history_v3_curr
+       -> reflection_history_v3_validity
   -> SceneLocalEnvironmentV3
        -> scene_local_environment
        -> ambient_lighting
@@ -135,6 +138,8 @@ void RenderFrameV3(FrameInput input) {
     contract.RecordResource("reflection_radiance", reflections.radiance);
     contract.RecordResource("reflection_confidence", reflections.confidence);
     contract.RecordResource("reflection_rt_source_signal", reflections.rtSourceSignal);
+    contract.RecordResource("reflection_history_v3_curr", reflections.historyCurr);
+    contract.RecordResource("reflection_history_v3_validity", reflections.historyValidity);
 
     Texture hdr = FullSceneCompositeV3(
         material,
@@ -943,6 +948,27 @@ Interpretation:
   source signal.
 - Packet view filters now include `reflection_rt_source_signal` so forced RT
   and auto motion packets can inspect raw RT source quality directly.
+
+2026-06-06 ReflectionHistoryV3 seed update:
+
+- Added `FullSceneReflectionHistoryV3` as a separate fullscreen pass instead
+  of expanding `FullSceneReflectionV3` beyond the 8-MRT hardware limit.
+- Corrected the existing `FullSceneReflectionV3` PSO target count to `7` so
+  the PSO matches the seven resolver MRT outputs.
+- Added concrete history resources:
+  - `reflection_history_v3_curr`.
+  - `reflection_history_v3_validity`.
+- Added debug modes:
+  - mode `75`: `FullSceneReflectionHistoryV3Curr`.
+  - mode `76`: `FullSceneReflectionHistoryV3Validity`.
+- Added V3 frame-report flags:
+  - `reflection_history_v3_ready`.
+  - `reflection_history_v3_validity_ready`.
+- Reflection readiness now requires nine channels: the seven resolver outputs
+  plus current history and history validity.
+- This seed pass does not yet use previous-frame history for admission. It
+  establishes the named resources and packet-visible contract needed for the
+  next source-ID hysteresis/reprojection slice.
 
 Concrete resolver producer update, 2026-06-06:
 

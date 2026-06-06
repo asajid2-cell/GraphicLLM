@@ -6602,3 +6602,81 @@ Current limitation:
   beauty.
 - Next aligned pass: add material/roughness-aware reflection source weighting
   and verify on glossy/metal/glass closeups, then run broader family packets.
+
+### ReflectionV3 Material-Aware Source Weighting - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionV3` now reads material payload resources:
+  - `vb_gbuffer_normal_roughness`.
+  - `vb_gbuffer_emissive_metallic`.
+- `FullSceneReflectionResolverV3.hlsl` samples:
+  - `g_NormalRoughness : t6`.
+  - `g_EmissiveMetallic : t7`.
+- Auto SSR/RT confidence is weighted by roughness/metallic:
+  - rough surfaces damp sharp SSR/RT source eligibility.
+  - smooth/metallic surfaces keep stronger SSR/RT eligibility when history
+    allows it.
+  - rough nonmetallic surfaces get a small local/environment confidence boost.
+- `reflection_rejected_source_mask.a` now reports either history suppression or
+  material suppression of an otherwise active SSR/RT source.
+- Runtime readiness now requires `FullSceneReflectionV3` to read a
+  normal/roughness resource and `vb_gbuffer_emissive_metallic`.
+- The V3 JSON contract and plan validator require those resolver inputs.
+- The V3 analyzer fails if the resolver stops reading material roughness or
+  emissive/metallic.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m json.tool assets\final_art\full_scene_shader_pipeline_v3_contract.json
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_material_weighting_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 30 -CaptureFrame 15 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_material_weighting_motion_smoke1_20260606
+```
+
+Results:
+
+- Static packet passed:
+  `build/captures/v3_reflection_material_weighting_static_smoke1_20260606`.
+- Mouse-jitter packet passed:
+  `build/captures/v3_reflection_material_weighting_motion_smoke1_20260606`.
+- Motion packet promotion result:
+  `review_packet_passed`, `default beauty promotable=false`.
+- Motion packet frame-report proof from
+  `gallery/reflection_rejected_source_mask/frame_report_shutdown.json`:
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=12`.
+  - `default_beauty_affects=false`.
+  - status remains `planned_not_promoted`.
+- `FullSceneReflectionV3.reads`:
+  `local_reflection_radiance`, `ssr_color`, `rt_reflection`,
+  `reflection_history_v3_prev_source_id`,
+  `reflection_history_v3_validity`,
+  `reflection_history_v3_rejection`,
+  `vb_gbuffer_normal_roughness`, and
+  `vb_gbuffer_emissive_metallic`.
+- Mouse-jitter metrics:
+  - `reflection_radiance.delta=0.01129032`, active `0.06415907`.
+  - `reflection_source_id.delta=0.00977111`, active `0.05311198`.
+  - `reflection_rejected_source_mask.delta=0.00299466`, active
+    `0.04688477`.
+  - `reflection_ssr_source_signal.delta=0.02210732`, active `0.16835503`.
+  - `reflection_rt_source_signal.delta=0.03265910`, active `0.09600803`.
+  - `reflection_history_v3_validity.delta=0.00757453`, active
+    `0.08257053`.
+  - `reflection_history_v3_rejection.delta=0.04521344`, active
+    `0.12818034`.
+
+Current limitation:
+
+- This is material-aware weighting, not a full BRDF reflection model.
+- It does not yet add material-class-specific source policy for glass, water,
+  clearcoat, anisotropy, or transmissive surfaces.
+- Next aligned pass: add closeup stress packets for glossy metal/glass/rough
+  dielectric surfaces and split material suppression from history suppression
+  into its own debug channel or resource before candidate beauty promotion.

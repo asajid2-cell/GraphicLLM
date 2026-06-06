@@ -68,6 +68,8 @@ Texture2D<float4> g_RTReflection : register(t2);
 Texture2D<float4> g_HistoryPrevSourceId : register(t3);
 Texture2D<float4> g_HistoryValidity : register(t4);
 Texture2D<float4> g_HistoryRejection : register(t5);
+Texture2D<float4> g_NormalRoughness : register(t6);
+Texture2D<float4> g_EmissiveMetallic : register(t7);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -95,12 +97,23 @@ PSOutput PSMain(VSOutput input) {
     float localConfidence = saturate(local.a);
     float localActive = step(0.001f, localConfidence + Luma(localRadiance));
 
+    float4 normalRoughness = g_NormalRoughness.Sample(g_LinearClamp, input.texCoord);
+    float4 emissiveMetallic = g_EmissiveMetallic.Sample(g_LinearClamp, input.texCoord);
+    float roughness = saturate(normalRoughness.w);
+    float metallic = saturate(emissiveMetallic.a);
+    float smoothness = saturate(1.0f - roughness);
+    float roughReflection = smoothstep(0.45f, 0.92f, roughness);
+    float glossyMaterial = saturate(smoothness * (0.62f + 0.38f * metallic));
+    float ssrMaterialWeight = saturate(0.24f + 0.76f * glossyMaterial);
+    float rtMaterialWeight = saturate(0.32f + 0.68f * glossyMaterial);
+
     float4 ssr = g_SSRReflection.Sample(g_LinearClamp, input.texCoord);
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);
     float ssrRawConfidence = saturate(ssr.a);
     float ssrConfidence = smoothstep(0.55f, 0.86f, ssrRawConfidence);
     float ssrLuma = Luma(ssrRadiance);
     ssrConfidence *= step(0.001f, ssrLuma);
+    ssrConfidence *= ssrMaterialWeight;
     float ssrRawActive = step(0.001f, ssrRawConfidence * ssrLuma);
     float ssrForcedConfidence = max(ssrConfidence, saturate(ssrRawConfidence));
     float ssrActive = step(0.001f, ssrConfidence);
@@ -111,6 +124,7 @@ PSOutput PSMain(VSOutput input) {
     float rtLuma = Luma(rtRadiance);
     float rtConfidence = smoothstep(0.08f, 0.35f, max(rtRawConfidence, saturate(rtLuma)));
     rtConfidence *= step(0.001f, rtRawConfidence + rtLuma);
+    rtConfidence *= rtMaterialWeight;
     float rtRawActive = step(0.001f, (rtRawConfidence + rtLuma));
     float rtActive = step(0.001f, rtConfidence);
 
@@ -118,6 +132,9 @@ PSOutput PSMain(VSOutput input) {
     float envScale = max(max(g_EnvParams.x, g_EnvParams.y), g_LocalProbeParams.y);
     float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled;
     float envConfidence = saturate(envEnabled * (0.18f + 0.32f * saturate(envScale)));
+    envConfidence = saturate(envConfidence + roughReflection * (0.04f + 0.08f * (1.0f - metallic)));
+    localConfidence = saturate(localConfidence + roughReflection * (0.04f + 0.06f * (1.0f - metallic)));
+    localActive = step(0.001f, localConfidence + Luma(localRadiance));
     float envActive = step(0.001f, envConfidence + Luma(envRadiance));
 
     uint sourceOverride = (uint)round(max(g_LocalProbeParams.w, 0.0f));
@@ -189,11 +206,18 @@ PSOutput PSMain(VSOutput input) {
     float ssrRejected = chooseSSR ? 0.0f : (1.0f - ssrActive);
     float rtRejected = chooseRT ? 0.0f : (1.0f - rtActive);
     float environmentRejected = chooseEnvironment ? 0.0f : (1.0f - envActive);
+    float materialSuppressedSource =
+        (ssrRawActive > 0.0f && ssrActive <= 0.0f) || (rtRawActive > 0.0f && rtActive <= 0.0f)
+            ? 1.0f
+            : 0.0f;
     float historySuppressedSource =
         (ssrBaselineEligible && !ssrHistoryEligible) || (rtBaselineEligible && !rtHistoryEligible)
             ? 1.0f
             : 0.0f;
-    output.rejectedSourceMask = float4(localRejected, ssrRejected, max(rtRejected, environmentRejected), historySuppressedSource);
+    output.rejectedSourceMask = float4(localRejected,
+                                       ssrRejected,
+                                       max(rtRejected, environmentRejected),
+                                       max(historySuppressedSource, materialSuppressedSource));
 
     // Stable scene-local sources do not require history. Forced policies that
     // cannot be satisfied are visible in G so packets can prove the override

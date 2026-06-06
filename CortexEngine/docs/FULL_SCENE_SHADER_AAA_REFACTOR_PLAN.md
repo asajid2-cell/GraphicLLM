@@ -1602,6 +1602,9 @@ Implementation:
 - use previous source ID, history validity, and rejection diagnostics as bounded
   hysteresis inputs for auto SSR/RT admission; forced debug sources must bypass
   that hysteresis so source packets remain inspectable.
+- use material roughness/metallic as source weighting inputs so rough surfaces
+  reject sharp reflection sources and smooth/metallic surfaces admit stronger
+  SSR/RT candidates when history allows.
 - add RT/ray-query reflection as a first-class resolver source with its own
   source signal, confidence, rejection mask, and debug view.
 - keep source IDs explicit: local probe, SSR, RT/ray-query, planar/hero probe,

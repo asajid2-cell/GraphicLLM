@@ -201,6 +201,8 @@ def main() -> int:
         "reflection_history_v3_prev_source_id",
         "reflection_history_v3_validity",
         "reflection_history_v3_rejection",
+        "normal_roughness",
+        "vb_gbuffer_emissive_metallic",
     ]:
         require(
             resource in reflection_resolver_inputs,

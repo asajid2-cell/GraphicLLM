@@ -247,6 +247,9 @@ Admission gates:
 - auto SSR/RT admission reads previous source ID, history validity, and history
   rejection so smooth/metallic pixels do not flip sources on marginal
   confidence while forced debug source modes remain inspectable.
+- auto SSR/RT admission reads material normal/roughness and emissive/metallic
+  so rough surfaces damp sharp reflection sources while smooth/metallic
+  surfaces keep stronger source eligibility.
 
 ### Scene Local Environment V3
 

@@ -498,6 +498,17 @@ def analyze_report(
             ]:
                 if resource not in reflection_pass.get("reads", []):
                     failures.append(f"FullSceneReflectionV3 pass does not read {resource}")
+            if not any(
+                resource in reflection_pass.get("reads", [])
+                for resource in [
+                    "gbuffer_normal_roughness",
+                    "vb_gbuffer_normal_roughness",
+                    "normal_roughness",
+                ]
+            ):
+                failures.append("FullSceneReflectionV3 pass does not read a normal/roughness resource")
+            if "vb_gbuffer_emissive_metallic" not in reflection_pass.get("reads", []):
+                failures.append("FullSceneReflectionV3 pass does not read vb_gbuffer_emissive_metallic")
             for resource in [
                 "reflection_radiance",
                 "reflection_confidence",

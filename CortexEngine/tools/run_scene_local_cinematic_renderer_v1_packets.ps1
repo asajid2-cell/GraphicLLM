@@ -73,6 +73,7 @@ $views = @(
     [pscustomobject]@{ Name = "v3_shadow_visibility"; DebugView = 64 },
     [pscustomobject]@{ Name = "v3_shadow_loss"; DebugView = 65 },
     [pscustomobject]@{ Name = "v3_indirect_lighting"; DebugView = 66 },
+    [pscustomobject]@{ Name = "candidate_hdr_scene_color"; DebugView = 67; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "material_family"; DebugView = 50 },
     [pscustomobject]@{ Name = "reflection_policy"; DebugView = 51 },
     [pscustomobject]@{ Name = "temporal_policy"; DebugView = 52 },

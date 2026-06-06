@@ -137,6 +137,7 @@ void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const 
 }
 
 struct CandidateBeautyDisplayContext {
+    const char* passName = "FullSceneCandidateBeautyV3Display";
     RGResourceHandle candidate;
     RGResourceHandle backBuffer;
     ID3D12Device* device = nullptr;
@@ -165,6 +166,9 @@ void FailCandidateBeautyDisplay(const CandidateBeautyDisplayContext& context, co
 
 [[nodiscard]] bool AddCandidateBeautyDisplayPass(RenderGraph& graph,
                                                  const CandidateBeautyDisplayContext& context) {
+    const char* passName = (context.passName && *context.passName)
+        ? context.passName
+        : "FullSceneCandidateBeautyV3Display";
     if (!context.candidate.IsValid() ||
         !context.backBuffer.IsValid() ||
         !context.device ||
@@ -183,7 +187,7 @@ void FailCandidateBeautyDisplay(const CandidateBeautyDisplayContext& context, co
     }
 
     graph.AddPass(
-        "FullSceneCandidateBeautyV3Display",
+        passName,
         [context](RGPassBuilder& builder) {
             builder.SetType(RGPassType::Graphics);
             builder.Read(context.candidate, RGResourceUsage::ShaderResource);
@@ -268,6 +272,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.lightingV3.descriptors.indirectLightingSRV.IsValid() &&
         m_mainTargets.lightingV3.descriptors.shadowVisibilitySRV.IsValid() &&
         m_mainTargets.hdr.descriptors.srv.IsValid();
+    const bool wantsCompositeV3DebugViewThisFrame =
+        wantsCompositeV3ThisFrame &&
+        m_debugViewState.mode == 67u &&
+        m_pipelineState.candidateBeautyDisplay &&
+        m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV.IsValid();
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -279,6 +288,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     result.attempted = true;
     result.attemptedBloom = wantsFusedBloomThisFrame;
     result.attemptedCompositeV3 = wantsCompositeV3ThisFrame;
+    result.attemptedCompositeV3DebugView = wantsCompositeV3DebugViewThisFrame;
     result.attemptedCandidateBeauty = wantsCandidateBeautyThisFrame;
     result.attemptedCandidateBeautyDisplay = wantsCandidateBeautyDisplayThisFrame;
     Debug::GPUProfiler::Get().BeginScope(m_commandResources.graphicsList.Get(), "RenderGraphEndFrame", "RenderGraph");
@@ -728,6 +738,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
         if (wantsCandidateBeautyDisplayThisFrame && candidateBeautyHandle.IsValid()) {
             CandidateBeautyDisplayContext displayContext{};
+            displayContext.passName = "FullSceneCandidateBeautyV3Display";
             displayContext.candidate = candidateBeautyHandle;
             displayContext.backBuffer = backBufferHandle;
             displayContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
@@ -744,6 +755,29 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             displayContext.failed = &bloomStageFailed;
             displayContext.stage = &postProcessGraphStageError;
             if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, displayContext)) {
+                bloomStageFailed = true;
+            }
+        }
+
+        if (wantsCompositeV3DebugViewThisFrame && candidateHdrSceneColorHandle.IsValid()) {
+            CandidateBeautyDisplayContext debugContext{};
+            debugContext.passName = "FullSceneCompositeV3DebugView";
+            debugContext.candidate = candidateHdrSceneColorHandle;
+            debugContext.backBuffer = backBufferHandle;
+            debugContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
+            debugContext.descriptorManager = m_services.descriptorManager.get();
+            debugContext.commandList = m_commandResources.graphicsList.Get();
+            debugContext.rootSignature = m_pipelineState.rootSignature.get();
+            debugContext.pipeline = m_pipelineState.candidateBeautyDisplay.get();
+            debugContext.frameConstants = m_constantBuffers.currentFrameGPU;
+            debugContext.candidateSRV = m_mainTargets.compositeV3.descriptors.hdrSceneColorSRV;
+            debugContext.backBufferRTV = m_services.window->GetCurrentRTV();
+            debugContext.width = m_services.window->GetWidth();
+            debugContext.height = m_services.window->GetHeight();
+            debugContext.ran = &result.ranCompositeV3DebugView;
+            debugContext.failed = &bloomStageFailed;
+            debugContext.stage = &postProcessGraphStageError;
+            if (!AddCandidateBeautyDisplayPass(*m_services.renderGraph, debugContext)) {
                 bloomStageFailed = true;
             }
         }
@@ -913,6 +947,17 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             result.ranCandidateBeautyDisplay,
                             result.ranCandidateBeautyDisplay ? 1u : 0u,
                             {"candidate_ldr_cinematic_output"},
+                            {"back_buffer"},
+                            false,
+                            nullptr,
+                            true);
+        }
+        if (wantsCompositeV3DebugViewThisFrame) {
+            RecordFramePass("FullSceneCompositeV3DebugView",
+                            true,
+                            result.ranCompositeV3DebugView,
+                            result.ranCompositeV3DebugView ? 1u : 0u,
+                            {"candidate_hdr_scene_color"},
                             {"back_buffer"},
                             false,
                             nullptr,

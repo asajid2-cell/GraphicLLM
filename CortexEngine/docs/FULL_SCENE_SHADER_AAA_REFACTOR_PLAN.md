@@ -79,6 +79,9 @@ Current bridge status:
   `FullSceneCompositeV3` writes `candidate_hdr_scene_color` from V3 direct,
   indirect, and shadow-visibility resources; `CinematicPostV3` consumes that
   target and writes `candidate_ldr_cinematic_output`.
+- `candidate_hdr_scene_color` is now an explicit raw debug/packet view, so the
+  pre-post composite target can be inspected without relying on the LDR
+  candidate output.
 - Normal/default rows still use adapter evidence until the candidate path is
   stress-tested and explicitly promoted.
 

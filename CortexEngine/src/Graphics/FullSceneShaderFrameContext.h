@@ -1734,6 +1734,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_local_environment",
     };
     compositeDomain.debugViews = {
+        "candidate_hdr_scene_color",
         "hdr_scene_color",
         "energy_clamp_mask",
         "overbright_mask",
@@ -1820,6 +1821,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         "scene_color_grade_policy",
     };
     postDomain.debugViews = {
+        "candidate_hdr_scene_color",
+        "candidate_ldr_cinematic_output",
         "ldr_cinematic_output",
         "exposure_meter",
         "bloom_extract",
@@ -1898,6 +1901,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     };
     candidateBeautyDomain.debugViews = {
         "candidate_beauty_v3",
+        "candidate_hdr_scene_color",
         "hdr_scene_color",
         "ldr_cinematic_output",
     };

@@ -4,6 +4,7 @@
 #include "Graphics/MaterialModel.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstdint>
 #include <initializer_list>
@@ -1267,6 +1268,31 @@ inline bool FullSceneShaderKnownContractString(const std::string& value) {
     return !value.empty() && value != "unknown" && value != "none" && value != "default";
 }
 
+inline std::string FullSceneShaderReflectionV3ForcedSourceContract() {
+    const char* value = std::getenv("CORTEX_V3_REFLECTION_SOURCE_OVERRIDE");
+    if (!value || value[0] == '\0') {
+        return {};
+    }
+
+    std::string normalized(value);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (normalized == "auto" || normalized == "0") {
+        return {};
+    }
+    if (normalized == "local" || normalized == "scene_local" || normalized == "1") {
+        return "forced_scene_local_radiance";
+    }
+    if (normalized == "environment" || normalized == "env" || normalized == "4") {
+        return "forced_scene_local_environment";
+    }
+    if (normalized == "none" || normalized == "off" || normalized == "255") {
+        return "forced_none";
+    }
+    return "forced_unknown";
+}
+
 inline std::string FullSceneShaderPipelineV3EnvironmentMode(const FrameContract& contract) {
     if (!contract.sceneVisual.active) {
         return "unknown";
@@ -1631,7 +1657,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     readyReflectionChannels += reflectionResolverV3WritesOutputs ? 1u : 0u;
     context.reflectionV3ChannelCount = readyReflectionChannels;
     context.reflectionV3SourceCount = readyReflectionSources;
+    const std::string forcedReflectionSourceContract = FullSceneShaderReflectionV3ForcedSourceContract();
     context.reflectionV3SourceContract =
+        !forcedReflectionSourceContract.empty() ? forcedReflectionSourceContract :
         localProbeSourceReady ? "local_probe" :
         rtSourceReady ? "ray_query_reflection" :
         ssrSourceReady ? "screen_space_reflection" :

@@ -6,10 +6,50 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
 #include <spdlog/spdlog.h>
 
 namespace Cortex::Graphics {
+
+namespace {
+
+float ReflectionV3SourceOverrideFromEnv() {
+    static bool s_checked = false;
+    static float s_override = 0.0f;
+    if (s_checked) {
+        return s_override;
+    }
+    s_checked = true;
+
+    const char* value = std::getenv("CORTEX_V3_REFLECTION_SOURCE_OVERRIDE");
+    if (!value || value[0] == '\0') {
+        return s_override;
+    }
+
+    if (std::strcmp(value, "auto") == 0 || std::strcmp(value, "AUTO") == 0) {
+        s_override = 0.0f;
+    } else if (std::strcmp(value, "local") == 0 || std::strcmp(value, "scene_local") == 0) {
+        s_override = 1.0f;
+    } else if (std::strcmp(value, "environment") == 0 || std::strcmp(value, "env") == 0) {
+        s_override = 4.0f;
+    } else if (std::strcmp(value, "none") == 0 || std::strcmp(value, "off") == 0) {
+        s_override = 255.0f;
+    } else {
+        const int numeric = std::atoi(value);
+        if (numeric == 1 || numeric == 4 || numeric == 255) {
+            s_override = static_cast<float>(numeric);
+        } else {
+            spdlog::warn("Renderer: ignoring unsupported CORTEX_V3_REFLECTION_SOURCE_OVERRIDE='{}'", value);
+            s_override = 0.0f;
+        }
+    }
+
+    spdlog::info("Renderer: ReflectionV3 source override {}", s_override);
+    return s_override;
+}
+
+} // namespace
 
 glm::vec4 Renderer::BuildCinematicStabilityParams() const {
     const bool active = m_sceneVisualContract.active &&
@@ -394,7 +434,7 @@ void Renderer::PopulateFrameDebugAndPostConstants(FrameConstants& frameData,
         m_environmentState.localProbeDiffuseIntensity,
         m_environmentState.localProbeSpecularIntensity,
         m_environmentState.localProbeRadianceEnabled ? 1.0f : 0.0f,
-        0.0f);
+        ReflectionV3SourceOverrideFromEnv());
 
     // Default clustered-light parameters for forward+ transparency. These are
     // overridden by the VB path once the per-frame local light buffer and

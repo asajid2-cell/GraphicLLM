@@ -452,6 +452,8 @@ def analyze_report(
                 "ray_query_reflection",
                 "screen_space_reflection",
                 "scene_local_environment",
+                "forced_scene_local_radiance",
+                "forced_scene_local_environment",
             }:
                 failures.append(f"reflection domain ready with invalid source contract: {source_contract}")
         for key in [

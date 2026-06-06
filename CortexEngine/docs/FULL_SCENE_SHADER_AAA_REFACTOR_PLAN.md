@@ -75,9 +75,9 @@ Initial bridge:
 - frame reports expose `candidate_beauty_requested`,
   `candidate_beauty_ready`, `candidate_beauty_producer`, and
   `candidate_beauty_output`.
-- the first producer is `FullSceneCandidateBeautyV3Adapter`, which is allowed
-  to reuse current ready composite/post evidence while the real candidate
-  composite shader is built.
+- the first real producer is `FullSceneCandidateBeautyV3`, which may reuse the
+  current post shader initially but must render through a named candidate pass
+  into `candidate_ldr_cinematic_output`.
 - `default_beauty_affects` must remain `false`.
 
 ## Phase 0 - Stabilize Before Beauty

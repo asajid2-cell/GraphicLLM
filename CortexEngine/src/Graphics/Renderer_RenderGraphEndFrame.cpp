@@ -11,7 +11,6 @@
 #include <cstdlib>
 #include <glm/geometric.hpp>
 #include <span>
-#include <utility>
 
 namespace Cortex::Graphics {
 
@@ -38,6 +37,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_pipelineState.bloomDownsample && m_pipelineState.bloomBlurH && m_pipelineState.bloomBlurV &&
         m_pipelineState.bloomComposite && m_mainTargets.hdr.descriptors.srv.IsValid() && m_bloomResources.controls.intensity > 0.0f &&
         m_bloomResources.resources.texA[0] && m_bloomResources.resources.texB[0];
+    const bool wantsCandidateBeautyThisFrame =
+        wantsRgPostThisFrame &&
+        std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr &&
+        m_mainTargets.candidateBeautyV3.resources.ldrOutput &&
+        m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.IsValid();
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
         std::getenv("CORTEX_DISABLE_BLOOM_TRANSIENTS") == nullptr;
@@ -48,6 +52,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
 
     result.attempted = true;
     result.attemptedBloom = wantsFusedBloomThisFrame;
+    result.attemptedCandidateBeauty = wantsCandidateBeautyThisFrame;
     Debug::GPUProfiler::Get().BeginScope(m_commandResources.graphicsList.Get(), "RenderGraphEndFrame", "RenderGraph");
     m_services.renderGraph->BeginFrame();
 
@@ -75,6 +80,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle rtReflHistHandle{};
     RGResourceHandle localReflRadianceHandle{};
     RGResourceHandle backBufferHandle{};
+    RGResourceHandle candidateBeautyHandle{};
     std::array<RGResourceHandle, kBloomLevels> bloomA{};
     std::array<RGResourceHandle, kBloomLevels> bloomB{};
     std::array<ComPtr<ID3D12Resource>, kBloomLevels> savedBloomA{};
@@ -245,6 +251,12 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_services.window->GetCurrentBackBuffer(),
             D3D12_RESOURCE_STATE_PRESENT,
             "BackBuffer");
+        if (wantsCandidateBeautyThisFrame) {
+            candidateBeautyHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.candidateBeautyV3.resources.ldrOutput.Get(),
+                m_mainTargets.candidateBeautyV3.resources.state,
+                "CandidateBeautyV3Output");
+        }
 
         const bool wantsHzbDebug = (m_debugViewState.mode == 32u);
         if (wantsHzbDebug && m_hzbResources.resources.texture && !hzbHandle.IsValid()) {
@@ -393,9 +405,32 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         executeContext.status.stage = &postProcessGraphStageError;
         executeContext.ranPostProcess = &result.ranPostProcess;
 
+        if (candidateBeautyHandle.IsValid()) {
+            PostProcessGraphPass::ResourceHandles candidateBeautyResources = postProcessResources;
+            candidateBeautyResources.backBuffer = candidateBeautyHandle;
+
+            PostProcessGraphPass::ExecuteContext candidateExecuteContext = executeContext;
+            candidateExecuteContext.draw.targetRtv = m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.cpu;
+            candidateExecuteContext.backBufferUsedAsRenderTarget = nullptr;
+            candidateExecuteContext.runRtReflectionDebugClear = false;
+            candidateExecuteContext.ranPostProcess = &result.ranCandidateBeauty;
+
+            PostProcessGraphPass::GraphContext candidateBeautyContext{};
+            candidateBeautyContext.passName = "FullSceneCandidateBeautyV3";
+            candidateBeautyContext.resources = candidateBeautyResources;
+            candidateBeautyContext.execute = candidateExecuteContext;
+            candidateBeautyContext.status.failed = &bloomStageFailed;
+            candidateBeautyContext.status.stage = &postProcessGraphStageError;
+            const RGResourceHandle candidateBeautyResult =
+                PostProcessGraphPass::AddToGraph(*m_services.renderGraph, candidateBeautyContext);
+            if (!candidateBeautyResult.IsValid()) {
+                bloomStageFailed = true;
+            }
+        }
+
         PostProcessGraphPass::GraphContext postProcessContext{};
         postProcessContext.resources = postProcessResources;
-        postProcessContext.execute = std::move(executeContext);
+        postProcessContext.execute = executeContext;
         postProcessContext.status.failed = &bloomStageFailed;
         postProcessContext.status.stage = &postProcessGraphStageError;
         const RGResourceHandle postProcessResult =
@@ -500,6 +535,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         if (taaHandle.IsValid()) m_temporalScreenState.taaIntermediateState = m_services.renderGraph->GetResourceState(taaHandle);
         if (rtReflHandle.IsValid()) m_rtReflectionTargets.colorState = m_services.renderGraph->GetResourceState(rtReflHandle);
         if (rtReflHistHandle.IsValid()) m_rtReflectionTargets.historyState = m_services.renderGraph->GetResourceState(rtReflHistHandle);
+        if (candidateBeautyHandle.IsValid()) {
+            m_mainTargets.candidateBeautyV3.resources.state =
+                m_services.renderGraph->GetResourceState(candidateBeautyHandle);
+        }
         if (hzbHandle.IsValid() && (m_debugViewState.mode == 32u)) m_hzbResources.resources.resourceState = m_services.renderGraph->GetResourceState(hzbHandle);
         if (wantsFusedBloomThisFrame && !useFusedBloomTransients) {
             for (uint32_t level = 0; level < m_bloomResources.resources.activeLevels; ++level) {
@@ -528,13 +567,35 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         false,
                         nullptr,
                         true);
+        if (wantsCandidateBeautyThisFrame) {
+            RecordFramePass("FullSceneCandidateBeautyV3",
+                            true,
+                            result.ranCandidateBeauty,
+                            result.ranCandidateBeauty ? 1u : 0u,
+                            {"hdr_color", "ssao", "ssr_color", "bloom", "taa_history", "depth",
+                             inputs.frameNormalRoughnessResource,
+                             "vb_gbuffer_emissive_metallic", "vb_gbuffer_material_ext1",
+                             "vb_gbuffer_material_ext2", "velocity", "rt_reflection", "hzb"},
+                            {"candidate_ldr_cinematic_output"},
+                            false,
+                            nullptr,
+                            true);
+        }
     }
 
-    RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,
-                    {"depth", "hdr_color", "ssao", "ssr_color", "bloom", "taa_history",
-                     "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
-                     "vb_gbuffer_material_ext2", "hzb"},
-                    {"hzb", "back_buffer"});
+    if (wantsCandidateBeautyThisFrame) {
+        RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,
+                        {"depth", "hdr_color", "ssao", "ssr_color", "bloom", "taa_history",
+                         "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
+                         "vb_gbuffer_material_ext2", "hzb"},
+                        {"hzb", "back_buffer", "candidate_ldr_cinematic_output"});
+    } else {
+        RecordFramePass("RenderGraphEndFrame", true, true, result.ranPostProcess ? 1u : 0u,
+                        {"depth", "hdr_color", "ssao", "ssr_color", "bloom", "taa_history",
+                         "velocity", "rt_reflection", "vb_gbuffer_material_ext1",
+                         "vb_gbuffer_material_ext2", "hzb"},
+                        {"hzb", "back_buffer"});
+    }
 
     m_services.renderGraph->EndFrame();
     return result;

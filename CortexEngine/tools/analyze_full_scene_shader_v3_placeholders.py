@@ -239,6 +239,19 @@ def find_frame_pass(report: dict[str, Any], name: str) -> dict[str, Any] | None:
     return None
 
 
+def find_frame_resource(report: dict[str, Any], name: str) -> dict[str, Any] | None:
+    frame_contract = report.get("frame_contract")
+    if not isinstance(frame_contract, dict):
+        return None
+    resources = frame_contract.get("resources", [])
+    if not isinstance(resources, list):
+        return None
+    for resource in resources:
+        if isinstance(resource, dict) and resource.get("name") == name:
+            return resource
+    return None
+
+
 def analyze_report(
     path: pathlib.Path,
     *,
@@ -509,26 +522,40 @@ def analyze_report(
     candidate_requested = v3.get("candidate_beauty_requested") is True
     candidate_ready = v3.get("candidate_beauty_ready") is True
     if candidate_requested:
+        candidate_pass = find_frame_pass(report, "FullSceneCandidateBeautyV3")
+        candidate_resource = find_frame_resource(report, "candidate_ldr_cinematic_output")
         if not isinstance(candidate_domain, dict):
             failures.append("candidate_beauty_requested=true but candidate_beauty domain is missing")
         else:
-            if candidate_domain.get("producer") != "FullSceneCandidateBeautyV3Adapter":
-                failures.append("candidate beauty must currently be produced by FullSceneCandidateBeautyV3Adapter")
+            if candidate_domain.get("producer") != "FullSceneCandidateBeautyV3":
+                failures.append("candidate beauty must be produced by FullSceneCandidateBeautyV3")
             if candidate_domain.get("output_resource") != "candidate_ldr_cinematic_output":
                 failures.append("candidate beauty must output candidate_ldr_cinematic_output")
             if candidate_domain.get("debug_view") != "candidate_beauty_v3":
                 failures.append("candidate beauty must expose candidate_beauty_v3 debug view")
             if candidate_domain.get("default_beauty_affects") is not False:
                 failures.append("candidate beauty must not affect default beauty")
+        if not isinstance(candidate_resource, dict) or candidate_resource.get("valid") is not True:
+            failures.append("candidate beauty requested without valid candidate_ldr_cinematic_output resource")
+        elif candidate_resource.get("size_matches_contract") is not True:
+            failures.append("candidate_ldr_cinematic_output size does not match render contract")
+        if not isinstance(candidate_pass, dict):
+            failures.append("candidate beauty requested but FullSceneCandidateBeautyV3 pass is missing")
+        else:
+            if candidate_pass.get("executed") is not True:
+                failures.append("FullSceneCandidateBeautyV3 pass did not execute")
+            if "hdr_color" not in candidate_pass.get("reads", []):
+                failures.append("FullSceneCandidateBeautyV3 pass does not read hdr_color")
+            if "candidate_ldr_cinematic_output" not in candidate_pass.get("writes", []):
+                failures.append("FullSceneCandidateBeautyV3 pass does not write candidate_ldr_cinematic_output")
         if candidate_ready:
             for dependency in [
                 "composite_v3_ready",
                 "cinematic_post_v3_ready",
-                "ldr_cinematic_output_ready",
             ]:
                 if v3.get(dependency) is not True:
                     failures.append(f"candidate_beauty_ready=true before {dependency}")
-            if v3.get("candidate_beauty_producer") != "FullSceneCandidateBeautyV3Adapter":
+            if v3.get("candidate_beauty_producer") != "FullSceneCandidateBeautyV3":
                 failures.append("candidate_beauty_ready=true with wrong producer")
             if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
                 failures.append("candidate_beauty_ready=true with wrong output")

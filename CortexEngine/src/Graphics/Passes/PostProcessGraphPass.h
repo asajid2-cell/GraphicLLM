@@ -46,6 +46,7 @@ struct ExecuteContext {
 };
 
 struct GraphContext {
+    const char* passName = "PostProcess";
     ResourceHandles resources;
     ExecuteContext execute;
     GraphStatus status;

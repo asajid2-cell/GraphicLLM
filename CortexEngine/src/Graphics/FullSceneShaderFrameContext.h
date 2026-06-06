@@ -1790,14 +1790,23 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     postDomain.missingRequiredChannelCount =
         postDomain.requiredChannelCount - postDomain.readyChannelCount;
 
+    const bool candidateLdrOutputReady =
+        FullSceneShaderHasResource(contract, "candidate_ldr_cinematic_output") &&
+        FullSceneShaderPassWritesResource(
+            contract,
+            "FullSceneCandidateBeautyV3",
+            "candidate_ldr_cinematic_output");
+    const bool candidateReadsHdr =
+        FullSceneShaderPassReadsResource(contract, "FullSceneCandidateBeautyV3", "hdr_color");
     context.candidateBeautyReady =
         context.candidateBeautyRequested &&
         context.compositeV3Ready &&
         context.cinematicPostV3Ready &&
-        context.ldrCinematicOutputReady;
+        candidateLdrOutputReady &&
+        candidateReadsHdr;
     context.candidateBeautyProducer =
-        context.candidateBeautyReady ? "FullSceneCandidateBeautyV3Adapter" :
-        (context.candidateBeautyRequested ? "FullSceneCandidateBeautyV3Adapter" : "none");
+        context.candidateBeautyReady ? "FullSceneCandidateBeautyV3" :
+        (context.candidateBeautyRequested ? "FullSceneCandidateBeautyV3" : "none");
     context.candidateBeautyOutput =
         context.candidateBeautyRequested ? "candidate_ldr_cinematic_output" : "none";
 
@@ -1808,10 +1817,10 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             context.candidateBeautyOutput,
             "candidate_beauty_v3",
             context.candidateBeautyReady
-                ? "FullSceneCandidateBeautyV3Adapter is opt-in and backed by ready composite/post evidence without affecting default beauty"
+                ? "FullSceneCandidateBeautyV3 is opt-in and writes a real candidate LDR output without affecting default beauty"
                 : context.candidateBeautyRequested
-                ? "FullSceneCandidateBeautyV3Adapter was requested but upstream composite/post evidence is incomplete"
-                : "FullSceneCandidateBeautyV3Adapter is opt-in and was not requested this frame");
+                ? "FullSceneCandidateBeautyV3 was requested but its output resource, pass, or upstream composite/post evidence is incomplete"
+                : "FullSceneCandidateBeautyV3 is opt-in and was not requested this frame");
     candidateBeautyDomain.enabled = context.candidateBeautyRequested;
     candidateBeautyDomain.ready = context.candidateBeautyReady;
     candidateBeautyDomain.defaultBeautyAffects = false;
@@ -1820,6 +1829,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     candidateBeautyDomain.backingResources = {
         "hdr_scene_color",
         "ldr_cinematic_output",
+        "candidate_ldr_cinematic_output",
         "scene_local_environment",
         "reflection_radiance",
         "lighting_split",
@@ -1833,15 +1843,17 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         context.candidateBeautyRequested ? "candidate_requested" : "candidate_not_requested",
         context.compositeV3Ready ? "composite_ready" : "composite_missing",
         context.cinematicPostV3Ready ? "cinematic_post_ready" : "cinematic_post_missing",
-        context.ldrCinematicOutputReady ? "ldr_output_owned" : "ldr_output_missing",
+        candidateLdrOutputReady ? "candidate_ldr_output_owned" : "candidate_ldr_output_missing",
+        candidateReadsHdr ? "candidate_reads_hdr_color" : "candidate_hdr_input_missing",
         "default_beauty_unchanged",
     };
     candidateBeautyDomain.backingResourceCount =
         static_cast<uint32_t>(
             (context.compositeV3Ready ? 1u : 0u) +
             (context.cinematicPostV3Ready ? 1u : 0u) +
-            (context.ldrCinematicOutputReady ? 1u : 0u));
-    candidateBeautyDomain.requiredChannelCount = 4u;
+            (candidateLdrOutputReady ? 1u : 0u) +
+            (candidateReadsHdr ? 1u : 0u));
+    candidateBeautyDomain.requiredChannelCount = 5u;
     candidateBeautyDomain.readyChannelCount =
         context.candidateBeautyReady ? candidateBeautyDomain.requiredChannelCount : 0u;
     candidateBeautyDomain.missingRequiredChannelCount =

@@ -104,6 +104,26 @@ struct FullSceneLightingV3TargetDescriptors {
     }
 };
 
+struct FullSceneCandidateBeautyV3TargetResources {
+    ComPtr<ID3D12Resource> ldrOutput;
+    D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+
+    void Reset() {
+        ldrOutput.Reset();
+        state = D3D12_RESOURCE_STATE_COMMON;
+    }
+};
+
+struct FullSceneCandidateBeautyV3TargetDescriptors {
+    DescriptorHandle ldrOutputRTV;
+    DescriptorHandle ldrOutputSRV;
+
+    void Reset() {
+        ldrOutputRTV = {};
+        ldrOutputSRV = {};
+    }
+};
+
 struct HDRRenderTargetState {
     HDRRenderTargetResources resources;
     HDRRenderTargetDescriptors descriptors;
@@ -282,6 +302,91 @@ struct GBufferNormalRoughnessTargetState {
     }
 };
 
+struct FullSceneCandidateBeautyV3TargetState {
+    FullSceneCandidateBeautyV3TargetResources resources;
+    FullSceneCandidateBeautyV3TargetDescriptors descriptors;
+
+    [[nodiscard]] Result<void> CreateTarget(ID3D12Device* device,
+                                            DescriptorHeapManager* descriptorManager,
+                                            UINT width,
+                                            UINT height) {
+        if (!device || !descriptorManager || width == 0 || height == 0) {
+            return Result<void>::Err("Renderer not initialized for FullSceneCandidateBeautyV3 target creation");
+        }
+
+        resources.Reset();
+
+        D3D12_RESOURCE_DESC desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = desc.Format;
+        clearValue.Color[0] = 0.0f;
+        clearValue.Color[1] = 0.0f;
+        clearValue.Color[2] = 0.0f;
+        clearValue.Color[3] = 1.0f;
+
+        const auto heapProps = MainTargetDefaultHeapProperties();
+        const HRESULT hr = device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            &clearValue,
+            IID_PPV_ARGS(&resources.ldrOutput));
+        if (FAILED(hr)) {
+            resources.Reset();
+            return Result<void>::Err("Failed to create FullSceneCandidateBeautyV3 LDR target");
+        }
+
+        resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+        if (!descriptors.ldrOutputRTV.IsValid()) {
+            auto rtvResult = descriptorManager->AllocateRTV();
+            if (rtvResult.IsErr()) {
+                return Result<void>::Err(std::string("Failed to allocate RTV for FullSceneCandidateBeautyV3 target: ") +
+                                         rtvResult.Error());
+            }
+            descriptors.ldrOutputRTV = rtvResult.Value();
+        }
+
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = desc.Format;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(resources.ldrOutput.Get(), &rtvDesc, descriptors.ldrOutputRTV.cpu);
+
+        if (!descriptors.ldrOutputSRV.IsValid()) {
+            auto srvResult = descriptorManager->AllocateStagingCBV_SRV_UAV();
+            if (srvResult.IsErr()) {
+                return Result<void>::Err(std::string("Failed to allocate SRV for FullSceneCandidateBeautyV3 target: ") +
+                                         srvResult.Error());
+            }
+            descriptors.ldrOutputSRV = srvResult.Value();
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+        device->CreateShaderResourceView(resources.ldrOutput.Get(), &srvDesc, descriptors.ldrOutputSRV.cpu);
+
+        return Result<void>::Ok();
+    }
+
+    void Reset() {
+        resources.Reset();
+        descriptors.Reset();
+    }
+};
+
 struct FullSceneLightingV3TargetState {
     FullSceneLightingV3TargetResources resources;
     FullSceneLightingV3TargetDescriptors descriptors;
@@ -407,6 +512,7 @@ struct MainRenderTargetState {
     HDRRenderTargetState hdr;
     GBufferNormalRoughnessTargetState normalRoughness;
     FullSceneLightingV3TargetState lightingV3;
+    FullSceneCandidateBeautyV3TargetState candidateBeautyV3;
 
     void ResetHDR() {
         hdr.Reset();
@@ -420,10 +526,15 @@ struct MainRenderTargetState {
         lightingV3.Reset();
     }
 
+    void ResetCandidateBeautyV3() {
+        candidateBeautyV3.Reset();
+    }
+
     void ResetResources() {
         ResetHDR();
         ResetGBufferNormalRoughness();
         ResetLightingV3();
+        ResetCandidateBeautyV3();
     }
 };
 

@@ -77,6 +77,7 @@ struct PSOutput {
     float4 sourceId : SV_Target2;
     float4 rejectedSourceMask : SV_Target3;
     float4 temporalDelta : SV_Target4;
+    float4 ssrSourceSignal : SV_Target5;
 };
 
 static float Luma(float3 color) {
@@ -93,7 +94,10 @@ PSOutput PSMain(VSOutput input) {
     float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);
     float ssrRawConfidence = saturate(ssr.a);
     float ssrConfidence = smoothstep(0.55f, 0.86f, ssrRawConfidence);
-    ssrConfidence *= step(0.001f, Luma(ssrRadiance));
+    float ssrLuma = Luma(ssrRadiance);
+    ssrConfidence *= step(0.001f, ssrLuma);
+    float ssrRawActive = step(0.001f, ssrRawConfidence * ssrLuma);
+    float ssrForcedConfidence = max(ssrConfidence, saturate(ssrRawConfidence));
     float ssrActive = step(0.001f, ssrConfidence);
 
     float envEnabled = max(step(0.5f, g_EnvParams.z), step(0.5f, g_LocalProbeParams.z));
@@ -108,7 +112,7 @@ PSOutput PSMain(VSOutput input) {
     bool forceEnvironment = sourceOverride == 4u;
     bool forceNone = sourceOverride >= 255u;
 
-    bool chooseSSR = !forceNone && ((forceSSR && ssrActive > 0.0f) ||
+    bool chooseSSR = !forceNone && ((forceSSR && ssrRawActive > 0.0f) ||
                      (!forceLocal && !forceSSR && !forceEnvironment &&
                       ssrActive > 0.0f && ssrConfidence >= max(localConfidence + 0.18f, 0.72f)));
     bool chooseLocal = !forceNone && !chooseSSR &&
@@ -121,7 +125,7 @@ PSOutput PSMain(VSOutput input) {
 
     float sourceCode = chooseSSR ? 2.0f : (chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f));
     float3 radiance = chooseSSR ? ssrRadiance : (chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx));
-    float confidence = chooseSSR ? ssrConfidence : (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f));
+    float confidence = chooseSSR ? (forceSSR ? ssrForcedConfidence : ssrConfidence) : (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f));
     float active = step(0.001f, confidence + Luma(radiance));
 
     PSOutput output;
@@ -147,12 +151,19 @@ PSOutput PSMain(VSOutput input) {
     // was rejected instead of silently falling through.
     float forcedButUnavailable =
         (forceLocal && localActive <= 0.0f) ||
-        (forceSSR && ssrActive <= 0.0f) ||
+        (forceSSR && ssrRawActive <= 0.0f) ||
         (forceEnvironment && envActive <= 0.0f) ||
         forceNone
             ? 1.0f
             : 0.0f;
     float historyRequiredButMissing = chooseSSR ? (1.0f - step(0.5f, g_TAAParams.w)) : 0.0f;
     output.temporalDelta = float4(1.0f - active, forcedButUnavailable, historyRequiredButMissing, 1.0f);
+
+    // SSR source diagnostic: R = raw luma, G = raw SSR alpha/weight,
+    // B = admitted confidence after resolver shaping / forced raw admission,
+    // A = forced-SSR rejected.
+    output.ssrSourceSignal = float4(saturate(ssrLuma), ssrRawConfidence,
+                                    forceSSR ? ssrForcedConfidence : ssrConfidence,
+                                    forceSSR && ssrRawActive <= 0.0f ? 1.0f : 0.0f);
     return output;
 }

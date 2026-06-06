@@ -79,6 +79,7 @@ $views = @(
     [pscustomobject]@{ Name = "reflection_source_id"; DebugView = 70 },
     [pscustomobject]@{ Name = "reflection_rejected_source_mask"; DebugView = 71 },
     [pscustomobject]@{ Name = "reflection_temporal_delta"; DebugView = 72 },
+    [pscustomobject]@{ Name = "reflection_ssr_source_signal"; DebugView = 73 },
     [pscustomobject]@{ Name = "material_family"; DebugView = 50 },
     [pscustomobject]@{ Name = "reflection_policy"; DebugView = 51 },
     [pscustomobject]@{ Name = "temporal_policy"; DebugView = 52 },

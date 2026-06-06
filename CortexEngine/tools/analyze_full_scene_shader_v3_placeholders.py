@@ -18,6 +18,7 @@ REQUIRED_OUTPUTS = {
     "reflection_source_id",
     "reflection_rejected_source_mask",
     "reflection_temporal_delta",
+    "reflection_ssr_source_signal",
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
@@ -442,7 +443,7 @@ def analyze_report(
                 failures.append("reflection domain must expose reflection_confidence debug view")
             if reflection_domain.get("default_beauty_affects") is not False:
                 failures.append("reflection domain must not affect default beauty yet")
-            if reflection_domain.get("ready_channel_count", 0) < 5:
+            if reflection_domain.get("ready_channel_count", 0) < 6:
                 failures.append("reflection domain ready without all required channels")
             if reflection_domain.get("missing_required_channel_count", 1) != 0:
                 failures.append("reflection domain ready with missing required channels")
@@ -462,6 +463,7 @@ def analyze_report(
             "reflection_confidence_ready",
             "reflection_source_id_ready",
             "reflection_temporal_delta_ready",
+            "reflection_ssr_source_signal_ready",
         ]:
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
@@ -480,6 +482,7 @@ def analyze_report(
                 "reflection_source_id",
                 "reflection_rejected_source_mask",
                 "reflection_temporal_delta",
+                "reflection_ssr_source_signal",
             ]:
                 if resource not in reflection_pass.get("writes", []):
                     failures.append(f"FullSceneReflectionV3 pass does not write {resource}")
@@ -684,6 +687,7 @@ def analyze_report(
         "reflection_confidence_ready": v3.get("reflection_confidence_ready"),
         "reflection_source_id_ready": v3.get("reflection_source_id_ready"),
         "reflection_temporal_delta_ready": v3.get("reflection_temporal_delta_ready"),
+        "reflection_ssr_source_signal_ready": v3.get("reflection_ssr_source_signal_ready"),
         "reflection_v3_source_contract": v3.get("reflection_v3_source_contract"),
         "composite_v3_ready": v3.get("composite_v3_ready"),
         "hdr_scene_color_ready": v3.get("hdr_scene_color_ready"),

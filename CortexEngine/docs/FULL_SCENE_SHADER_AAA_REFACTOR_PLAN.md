@@ -1006,6 +1006,15 @@ Execution order:
    - Build a source packet that captures raw `ssr_color`, SSR confidence,
      normal/roughness/depth inputs, rejection reasons, and resolver output.
    - Fix why forced SSR is blank before allowing SSR to win more often.
+   - Current status, 2026-06-06:
+     - `reflection_ssr_source_signal` is now a real ReflectionV3 output and
+       debug view `73`.
+     - forced SSR no longer goes blank when raw SSR has nonzero signal below
+       the auto admission threshold.
+     - auto SSR remains strict and still falls back to scene-local radiance in
+       the gallery packet.
+     - next work is improving the SSR producer's hit coverage/confidence, not
+       loosening auto source selection.
 
 2. Material payload pass.
    - Replace ad hoc material interpretation with a V3 material resource and

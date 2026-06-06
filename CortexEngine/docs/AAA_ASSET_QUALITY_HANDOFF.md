@@ -5708,3 +5708,93 @@ Non-negotiable gates:
 - no fix can rely only on IBL blur, disabled reflections, hidden backgrounds,
   or changing the tested scene.
 - do not claim completion from a single attractive screenshot.
+
+### ReflectionV3 SSR Source Signal Diagnostic - 2026-06-06
+
+Implemented:
+
+- Added `reflection_ssr_source_signal` as a real ReflectionV3 render target.
+- `FullSceneReflectionV3` now writes six outputs:
+  `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
+  `reflection_rejected_source_mask`, `reflection_temporal_delta`, and
+  `reflection_ssr_source_signal`.
+- Debug view `73` displays `reflection_ssr_source_signal`.
+- Diagnostic channel meaning:
+  - R = raw SSR radiance luma.
+  - G = raw SSR alpha/weight.
+  - B = admitted SSR confidence.
+  - A = forced-SSR unavailable/rejected.
+- V3 required outputs increased from `14` to `15`.
+- `reflection_v3_channel_count` increased from `5` to `6`.
+- `run_full_scene_shader_pipeline_v3_packet.ps1` now captures the new view.
+- The motion analyzer now tracks `reflection_ssr_source_signal`.
+
+Root diagnosis and fix:
+
+- Forced SSR was blank because the resolver used the auto confidence gate for
+  forced/debug mode.
+- The raw SSR source had nonzero coverage, but raw alpha peaked around `0.455`,
+  below the old `smoothstep(0.55, 0.86)` admission floor.
+- Auto SSR remains strict.
+- Forced SSR now admits raw nonzero SSR signal for diagnostics instead of
+  silently returning black. This does not promote SSR dominance in auto policy.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_ssr_source_signal_auto_static_smoke3_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_ssr_source_signal_forced_ssr_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_ssr_source_signal_auto_motion_smoke1_20260606
+python tools\analyze_full_scene_shader_v3_lighting_motion.py --manifest build\captures\v3_reflection_ssr_source_signal_auto_motion_smoke1_20260606\manifest.json --output-json build\captures\v3_reflection_ssr_source_signal_auto_motion_smoke1_20260606\v3_lighting_motion.json --output-md build\captures\v3_reflection_ssr_source_signal_auto_motion_smoke1_20260606\v3_lighting_motion.md
+```
+
+Results:
+
+- V3 plan validator passed with `Required outputs: 15`.
+- Native build passed.
+- Auto static packet passed:
+  `build/captures/v3_reflection_ssr_source_signal_auto_static_smoke3_20260606`.
+- Forced SSR static packet passed:
+  `build/captures/v3_reflection_ssr_source_signal_forced_ssr_static_smoke1_20260606`.
+- Auto mouse-jitter packet passed:
+  `build/captures/v3_reflection_ssr_source_signal_auto_motion_smoke1_20260606`.
+- Motion analyzer measured `18` view sequences after adding
+  `reflection_ssr_source_signal`.
+
+Frame-report proof:
+
+- `required_outputs=15`.
+- `reflection_v3_channel_count=6`.
+- `reflection_ssr_source_signal_ready=true`.
+- `FullSceneReflectionV3.reads=local_reflection_radiance,ssr_color`.
+- `FullSceneReflectionV3.writes` includes `reflection_ssr_source_signal`.
+- `reflection_ssr_source_signal` resource valid at render resolution.
+
+Source signal metrics:
+
+- auto static:
+  - `reflection_ssr_source_signal.mean_luma=0.0064881`.
+  - `nonblack_ratio=0.0849750`.
+  - source contract remains `local_probe`.
+- forced SSR static:
+  - `reflection_radiance.mean_luma=0.0196873`,
+    `nonblack_ratio=0.0820681`.
+  - `reflection_confidence.mean_luma=0.0033247`,
+    `nonblack_ratio=0.0337229`.
+  - `reflection_ssr_source_signal.mean_luma=0.0067306`,
+    `nonblack_ratio=0.0849750`.
+  - source contract is `forced_screen_space_reflection`.
+- auto mouse-jitter:
+  - `reflection_ssr_source_signal.mean_abs_luma_delta=0.0012916`.
+  - `reflection_ssr_source_signal.mean_active_delta_ratio=0.0157010`.
+
+Remaining limitation:
+
+- SSR source coverage is still sparse and low-confidence in the gallery row.
+- The next rendering-quality pass should improve the SSR producer itself:
+  depth/normal intersection tolerance, roughness/material masks, HZB or depth
+  hierarchy use, edge fade, and confidence calibration.
+  Do not let SSR win more often in auto mode until source quality improves.

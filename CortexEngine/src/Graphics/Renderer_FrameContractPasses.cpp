@@ -81,6 +81,7 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "reflection_source_id") return resourceBytes(m_mainTargets.reflectionV3.resources.sourceId.Get());
         if (resource == "reflection_rejected_source_mask") return resourceBytes(m_mainTargets.reflectionV3.resources.rejectedSourceMask.Get());
         if (resource == "reflection_temporal_delta") return resourceBytes(m_mainTargets.reflectionV3.resources.temporalDelta.Get());
+        if (resource == "reflection_ssr_source_signal") return resourceBytes(m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get());
         if (resource == "ssao") return resourceBytes(m_ssaoResources.resources.texture.Get());
         if (resource == "ssr_color") return resourceBytes(m_ssrResources.resources.color.Get());
         if (resource == "velocity") return resourceBytes(m_temporalScreenState.velocityBuffer.Get());
@@ -116,7 +117,7 @@ void Renderer::RecordFramePass(const char* name,
                 write == "candidate_ldr_cinematic_output" ||
                 write == "reflection_radiance" || write == "reflection_confidence" ||
                 write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||
-                write == "reflection_temporal_delta" ||
+                write == "reflection_temporal_delta" || write == "reflection_ssr_source_signal" ||
                 write == "direct_lighting" || write == "direct_lighting_unshadowed" ||
                 write == "shadow_visibility" || write == "shadow_loss" || write == "indirect_lighting" ||
                 write == "gbuffer_normal_roughness" || write == "velocity" ||

@@ -818,6 +818,7 @@ Current evidence-domain implementation:
   - `reflection_confidence_ready`.
   - `reflection_source_id_ready`.
   - `reflection_temporal_delta_ready`.
+  - `reflection_ssr_source_signal_ready`.
   - `reflection_v3_source_contract`.
   - `reflection_v3_channel_count`.
   - `reflection_v3_source_count`.
@@ -832,7 +833,8 @@ Current evidence-domain implementation:
   `scene_local_environment`.
 - current readiness channels are:
   `reflection_radiance`, `reflection_confidence`, `reflection_source_id`,
-  `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+  `reflection_rejected_source_mask`, `reflection_temporal_delta`, and
+  `reflection_ssr_source_signal`.
 - current temporal-delta ownership is source-aware:
   - scene-local probe/environment reflection sources can own a deterministic
     `reflection_temporal_delta_scene_local_bound` channel without RT history.
@@ -886,6 +888,7 @@ Concrete resolver producer update, 2026-06-06:
   - mode `70`: `reflection_source_id`.
   - mode `71`: `reflection_rejected_source_mask`.
   - mode `72`: `reflection_temporal_delta`.
+  - mode `73`: `reflection_ssr_source_signal`.
 - the runtime required-output list now matches the machine contract and
   includes all five ReflectionV3 outputs.
 - static packet:
@@ -906,7 +909,8 @@ Concrete resolver producer update, 2026-06-06:
   - `FullSceneReflectionV3.reads=local_reflection_radiance`.
   - `FullSceneReflectionV3.writes=reflection_radiance`,
     `reflection_confidence`, `reflection_source_id`,
-    `reflection_rejected_source_mask`, and `reflection_temporal_delta`.
+  `reflection_rejected_source_mask`, `reflection_temporal_delta`, and
+  `reflection_ssr_source_signal`.
   - `FullSceneCompositeV3.reads=direct_lighting`, `indirect_lighting`,
     `shadow_visibility`, `hdr_color`, and `reflection_radiance`.
   - `FullSceneCompositeV3.writes=candidate_hdr_scene_color`.

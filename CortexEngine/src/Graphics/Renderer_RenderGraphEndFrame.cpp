@@ -51,6 +51,9 @@ struct FullSceneReflectionResolverV3Context {
     RGResourceHandle localReflectionRadiance;
     RGResourceHandle ssr;
     RGResourceHandle rtReflection;
+    RGResourceHandle historyPrevSourceId;
+    RGResourceHandle historyValidity;
+    RGResourceHandle historyRejection;
     RGResourceHandle radiance;
     RGResourceHandle confidence;
     RGResourceHandle sourceId;
@@ -252,6 +255,9 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.temporalDelta.IsValid() ||
         !context.ssrSourceSignal.IsValid() ||
         !context.rtSourceSignal.IsValid() ||
+        !context.historyPrevSourceId.IsValid() ||
+        !context.historyValidity.IsValid() ||
+        !context.historyRejection.IsValid() ||
         !context.device ||
         !context.descriptorManager ||
         !context.commandList ||
@@ -282,6 +288,9 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             if (context.rtReflection.IsValid()) {
                 builder.Read(context.rtReflection, RGResourceUsage::ShaderResource);
             }
+            builder.Read(context.historyPrevSourceId, RGResourceUsage::ShaderResource);
+            builder.Read(context.historyValidity, RGResourceUsage::ShaderResource);
+            builder.Read(context.historyRejection, RGResourceUsage::ShaderResource);
             builder.Write(context.radiance, RGResourceUsage::RenderTarget);
             builder.Write(context.confidence, RGResourceUsage::RenderTarget);
             builder.Write(context.sourceId, RGResourceUsage::RenderTarget);
@@ -291,7 +300,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.rtSourceSignal, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
-            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(3);
+            auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(6);
             if (srvResult.IsErr()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_descriptor");
                 return;
@@ -300,7 +309,17 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             const DescriptorHandle inputSRV = srvResult.Value();
             const DescriptorHandle ssrSRV = context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 1u);
             const DescriptorHandle rtReflectionSRV = context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 2u);
-            if (!ssrSRV.IsValid() || !rtReflectionSRV.IsValid()) {
+            const DescriptorHandle historyPrevSourceIdSRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 3u);
+            const DescriptorHandle historyValiditySRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 4u);
+            const DescriptorHandle historyRejectionSRV =
+                context.descriptorManager->GetCBV_SRV_UAVHandle(inputSRV.index + 5u);
+            if (!ssrSRV.IsValid() ||
+                !rtReflectionSRV.IsValid() ||
+                !historyPrevSourceIdSRV.IsValid() ||
+                !historyValiditySRV.IsValid() ||
+                !historyRejectionSRV.IsValid()) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_source_descriptors");
                 return;
             }
@@ -333,6 +352,24 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
                     rtReflection,
                     DXGI_FORMAT_R16G16B16A16_FLOAT)) {
                 FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_rt_srv");
+                return;
+            }
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    historyPrevSourceIdSRV,
+                    graph.GetResource(context.historyPrevSourceId),
+                    DXGI_FORMAT_R16G16B16A16_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    historyValiditySRV,
+                    graph.GetResource(context.historyValidity),
+                    DXGI_FORMAT_R16G16B16A16_FLOAT) ||
+                !DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    historyRejectionSRV,
+                    graph.GetResource(context.historyRejection),
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneReflectionResolverV3(context, "full_scene_reflection_resolver_v3_history_srv");
                 return;
             }
 
@@ -702,6 +739,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.resources.temporalDelta &&
         m_mainTargets.reflectionV3.resources.ssrSourceSignal &&
         m_mainTargets.reflectionV3.resources.rtSourceSignal &&
+        m_mainTargets.reflectionV3.resources.historyPrevSourceId &&
+        m_mainTargets.reflectionV3.resources.historyValidity &&
+        m_mainTargets.reflectionV3.resources.historyRejection &&
         m_mainTargets.reflectionV3.descriptors.radianceRTV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.radianceSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.confidenceRTV.IsValid() &&
@@ -715,7 +755,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.descriptors.ssrSourceSignalRTV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.ssrSourceSignalSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.rtSourceSignalRTV.IsValid() &&
-        m_mainTargets.reflectionV3.descriptors.rtSourceSignalSRV.IsValid();
+        m_mainTargets.reflectionV3.descriptors.rtSourceSignalSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.historyPrevSourceIdSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.historyValiditySRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.historyRejectionSRV.IsValid();
     const bool wantsReflectionHistoryV3ThisFrame =
         wantsReflectionResolverV3ThisFrame &&
         m_pipelineState.fullSceneReflectionHistoryV3 &&
@@ -1105,6 +1148,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             reflectionContext.localReflectionRadiance = localReflRadianceHandle;
             reflectionContext.ssr = ssrHandle;
             reflectionContext.rtReflection = rtReflHandle;
+            reflectionContext.historyPrevSourceId = reflectionHistoryPrevSourceIdHandle;
+            reflectionContext.historyValidity = reflectionHistoryValidityHandle;
+            reflectionContext.historyRejection = reflectionHistoryRejectionHandle;
             reflectionContext.radiance = reflectionRadianceHandle;
             reflectionContext.confidence = reflectionConfidenceHandle;
             reflectionContext.sourceId = reflectionSourceIdHandle;
@@ -1665,7 +1711,9 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                             true,
                             ranReflectionResolverV3,
                             ranReflectionResolverV3 ? 1u : 0u,
-                            {"local_reflection_radiance", "ssr_color", "rt_reflection"},
+                            {"local_reflection_radiance", "ssr_color", "rt_reflection",
+                             "reflection_history_v3_prev_source_id", "reflection_history_v3_validity",
+                             "reflection_history_v3_rejection"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta",
                              "reflection_ssr_source_signal", "reflection_rt_source_signal"},

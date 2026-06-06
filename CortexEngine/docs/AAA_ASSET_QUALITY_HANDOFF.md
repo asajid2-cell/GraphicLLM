@@ -6512,3 +6512,93 @@ Current limitation:
 - Next aligned pass is source-fusion admission: use validity plus rejection
   lanes to bound when SSR/RT/local-probe sources may win on smooth/metallic
   surfaces.
+
+### ReflectionV3 History-Aware Source Admission - 2026-06-06
+
+Implemented:
+
+- `FullSceneReflectionV3` now reads prior-frame history signals before source
+  admission:
+  - `reflection_history_v3_prev_source_id`.
+  - `reflection_history_v3_validity`.
+  - `reflection_history_v3_rejection`.
+- `FullSceneReflectionResolverV3.hlsl` samples those resources at `t3-t5`.
+- Auto SSR/RT admission now applies a bounded source-switch penalty when prior
+  history reports low reusable history, rejection debt, or recent source
+  switching.
+- Forced SSR/RT/local/environment debug source modes still bypass the
+  hysteresis gate so source packets remain inspectable.
+- `reflection_rejected_source_mask.a` now reports auto SSR/RT suppression by
+  source-history hysteresis.
+- Runtime readiness now requires `FullSceneReflectionV3` to read the three
+  history inputs.
+- The V3 JSON contract has `reflection.required_resolver_inputs` for:
+  `local_reflection_radiance`, `ssr_color`, `rt_reflection`,
+  `reflection_history_v3_prev_source_id`,
+  `reflection_history_v3_validity`, and
+  `reflection_history_v3_rejection`.
+- The V3 analyzer and plan validator enforce those resolver inputs.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionResolverV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionResolverV3.hlsl -Force
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_source_fusion_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_source_fusion_motion_smoke1_20260606
+python tools\analyze_full_scene_shader_v3_lighting_motion.py --manifest build\captures\v3_reflection_source_fusion_motion_smoke1_20260606\manifest.json --output-json build\captures\v3_reflection_source_fusion_motion_smoke1_20260606\v3_lighting_motion.json --output-md build\captures\v3_reflection_source_fusion_motion_smoke1_20260606\v3_lighting_motion.md --min-sequence-count 2
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_reflection_source_fusion_motion_smoke1_20260606 --output-json build\captures\v3_reflection_source_fusion_motion_smoke1_20260606\promotion_decision.json --output-md build\captures\v3_reflection_source_fusion_motion_smoke1_20260606\promotion_decision.md --allow-subset-review
+```
+
+Results:
+
+- Static packet passed:
+  `build/captures/v3_reflection_source_fusion_static_smoke1_20260606`.
+- Mouse-jitter render/analyzer packet produced complete frame reports and
+  `v3_signal`/`v3_stability`, then hit the outer command timeout before final
+  motion/promotion analyzers.
+- Final motion analyzer and promotion analyzer were run directly on the
+  generated motion packet artifacts and passed.
+- Motion packet promotion result:
+  `review_packet_passed`, `default beauty promotable=false`.
+- Motion packet frame-report proof from
+  `gallery/reflection_history_v3_rejection/frame_report_shutdown.json`:
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=12`.
+  - `default_beauty_affects=false`.
+  - status remains `planned_not_promoted`.
+- `FullSceneReflectionV3.reads`:
+  `local_reflection_radiance`, `ssr_color`, `rt_reflection`,
+  `reflection_history_v3_prev_source_id`,
+  `reflection_history_v3_validity`, and
+  `reflection_history_v3_rejection`.
+- `FullSceneReflectionV3.writes`:
+  `reflection_radiance`, `reflection_confidence`,
+  `reflection_source_id`, `reflection_rejected_source_mask`,
+  `reflection_temporal_delta`, `reflection_ssr_source_signal`, and
+  `reflection_rt_source_signal`.
+- Mouse-jitter metrics from
+  `build/captures/v3_reflection_source_fusion_motion_smoke1_20260606/v3_lighting_motion.md`:
+  - `reflection_radiance.delta=0.00506397`, active `0.03371419`.
+  - `reflection_source_id.delta=0.00790327`, active `0.03199653`.
+  - `reflection_rejected_source_mask.delta=0.00052600`, active
+    `0.00758572`.
+  - `reflection_ssr_source_signal.delta=0.00584656`, active
+    `0.05169488`.
+  - `reflection_rt_source_signal.delta=0.00482639`, active `0.02688911`.
+  - `reflection_history_v3_validity.delta=0.00639759`, active
+    `0.05067166`.
+  - `reflection_history_v3_rejection.delta=0.02947639`, active
+    `0.11044271`.
+
+Current limitation:
+
+- This is the first admission-control slice, not final source fusion.
+- It only penalizes auto SSR/RT on history/source-switch debt. It does not yet
+  blend sources, add per-material roughness weighting, or promote candidate
+  beauty.
+- Next aligned pass: add material/roughness-aware reflection source weighting
+  and verify on glossy/metal/glass closeups, then run broader family packets.

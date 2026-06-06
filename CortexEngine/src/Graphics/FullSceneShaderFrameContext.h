@@ -1639,6 +1639,9 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "local_reflection_radiance") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "ssr_color") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "rt_reflection") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "reflection_history_v3_prev_source_id") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "reflection_history_v3_validity") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneReflectionV3", "reflection_history_v3_rejection") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_radiance") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_confidence") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneReflectionV3", "reflection_source_id") &&

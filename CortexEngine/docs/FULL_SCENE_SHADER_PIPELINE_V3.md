@@ -244,6 +244,9 @@ Admission gates:
 - source switches and disocclusion are visible in
   `reflection_history_v3_rejection` before source fusion is allowed to consume
   history validity.
+- auto SSR/RT admission reads previous source ID, history validity, and history
+  rejection so smooth/metallic pixels do not flip sources on marginal
+  confidence while forced debug source modes remain inspectable.
 
 ### Scene Local Environment V3
 

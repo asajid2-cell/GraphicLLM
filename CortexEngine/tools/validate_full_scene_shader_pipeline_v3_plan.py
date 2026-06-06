@@ -193,6 +193,22 @@ def main() -> int:
         require(gate in validation_gates, errors, f"V3 validation missing gate: {gate}")
 
     reflection_contract = domains.get("reflection", {})
+    reflection_resolver_inputs = set(reflection_contract.get("required_resolver_inputs", []))
+    for resource in [
+        "local_reflection_radiance",
+        "ssr_color",
+        "rt_reflection",
+        "reflection_history_v3_prev_source_id",
+        "reflection_history_v3_validity",
+        "reflection_history_v3_rejection",
+    ]:
+        require(
+            resource in reflection_resolver_inputs,
+            errors,
+            f"V3 reflection contract missing resolver input: {resource}",
+        )
+        require(resource in runtime_surface, errors, f"V3 runtime placeholder missing resolver input: {resource}")
+
     reflection_history_inputs = set(reflection_contract.get("required_history_inputs", []))
     for resource in [
         "reflection_radiance",

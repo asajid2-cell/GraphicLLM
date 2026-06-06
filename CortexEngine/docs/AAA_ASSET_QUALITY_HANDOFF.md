@@ -6291,3 +6291,60 @@ Interpretation:
   motion-sensitive than the scene-local auto path.
 - Auto policy should remain local-probe-first until SSR gets temporal
   stabilization/history-aware confidence or an RT/ray-query fallback blend.
+
+### Full AAA Scene Shader Refactor Execution Plan - 2026-06-06
+
+User pivot:
+
+- Move from isolated reflection/flicker patches to a full scene shader plan for
+  high-end, Unreal-style visuals.
+- Plan the entire refactor before completing the goal feature.
+- Keep default beauty unchanged until candidate evidence and user review pass.
+
+Durable plan update:
+
+- Updated `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` with
+  `2026-06-06 Full AAA Scene Shader Refactor Execution Plan`.
+- The plan defines the V3 north star:
+  visibility/depth/motion -> material payload -> scene-local environment ->
+  lighting/shadow -> reflection/transparency/media -> candidate HDR composite
+  -> cinematic post -> candidate LDR beauty.
+- The plan locks the ownership ladder for every feature:
+  contract name, render-graph resource, producer, consumer, debug view,
+  frame-report proof, packet metrics, contact sheet, and promotion gate.
+
+Current architecture boundary:
+
+- Build on:
+  - real `FullSceneReflectionV3` source-aware outputs.
+  - `reflection_ssr_source_signal`.
+  - refined `SSR.hlsl` source coverage.
+  - `FullSceneReflectionHistoryV3` current/previous/validity resources.
+  - existing V3 packet tooling.
+- Still incomplete:
+  - Composite V3 and Cinematic Post V3 are still adapter-like.
+  - Material payload is not yet a complete concrete PBR resource set.
+  - Lighting is not yet split into stable direct/shadow/indirect/emissive
+    resources.
+  - Scene-local environment is not yet a complete texture-backed
+    irradiance/specular/background system.
+  - SSR remains too motion-sensitive to dominate auto source policy.
+
+Implementation order chosen:
+
+1. finish ReflectionHistoryV3 reprojection validity.
+2. add RT/ray-query reflection source signal and source-fusion diagnostics.
+3. convert Composite V3 from adapter to real `candidate_hdr_scene_color`.
+4. promote material payload from aggregate contract to concrete PBR resources.
+5. make SceneLocalEnvironmentV3 texture-backed for enclosed rooms.
+6. split Lighting V3 into direct/shadow/indirect/emissive resources.
+7. build CinematicPostV3 on top of candidate HDR.
+8. run the cross-family matrix and iterate only on failing gates.
+
+Do not drift:
+
+- Do not chase a single prettier screenshot.
+- Do not hide reflection or shadow issues with IBL blur, source disabling, or
+  scene/camera changes.
+- Do not promote default beauty before candidate resources, debug views,
+  frame-report fields, packet metrics, contact sheets, and user review pass.

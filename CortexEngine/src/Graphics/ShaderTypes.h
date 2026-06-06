@@ -176,7 +176,7 @@ struct FrameConstants {
       glm::vec4 cinematicExposureParams;
       // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
       // z = scene-local probe radiance enabled (>0.5),
-      // w = ReflectionV3 source override (0 auto, 1 local, 4 environment, 255 none).
+      // w = ReflectionV3 source override (0 auto, 1 local, 2 SSR, 4 environment, 255 none).
       glm::vec4 localProbeParams;
 };
 

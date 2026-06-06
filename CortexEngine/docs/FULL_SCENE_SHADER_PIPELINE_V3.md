@@ -975,10 +975,54 @@ Source-policy admission update, 2026-06-06:
   - `reflection_temporal_delta`: mean abs luma delta `0.0`,
     active delta ratio `0.0`.
 
+SSR input admission update, 2026-06-06:
+
+- `FullSceneReflectionV3` now reads `ssr_color` alongside
+  `local_reflection_radiance`.
+- `FullSceneReflectionResolverV3` samples `g_SSRReflection : t1`.
+- `FrameConstants.localProbeParams.w` supports a screen-space override:
+  `0` auto, `1` local, `2` SSR, `4` environment, `255` none.
+- `CORTEX_V3_REFLECTION_SOURCE_OVERRIDE` supports:
+  `auto`, `local`, `ssr`, `screen_space`, `environment`, and `none`.
+- frame reports can now name `forced_screen_space_reflection`.
+- the V3 analyzer fails if `FullSceneReflectionV3` stops reading `ssr_color`.
+- auto policy admits SSR only when it has nonzero radiance and confidence high
+  enough to beat scene-local radiance; otherwise local radiance and
+  environment remain the stable fallback path.
+- auto static packet:
+  `build/captures/v3_reflection_ssr_input_auto_static_smoke1_20260606`.
+  - reports: `23`.
+  - promotion status: `review_packet_passed`.
+- auto mouse-jitter packet:
+  `build/captures/v3_reflection_ssr_input_auto_motion_smoke1_20260606`.
+  - reports: `23`.
+  - V3 lighting/reflection motion measured `17` view sequences.
+  - promotion status: `review_packet_passed`.
+- direct report proof:
+  - `SSR.executed=true`.
+  - `SSR.writes=ssr_color`.
+  - `FullSceneReflectionV3.reads=local_reflection_radiance` and `ssr_color`.
+  - `FullSceneCompositeV3.reads=reflection_radiance`.
+
+Forced-SSR limitation:
+
+- forced SSR stress packet:
+  `build/captures/v3_reflection_source_policy_ssr_stress_static_smoke1_20260606`.
+- the packet proved SSR pass execution and resolver consumption, but failed
+  signal gates because forced SSR produced blank `reflection_radiance` and
+  `reflection_confidence` in that stress view.
+- Treat this as remaining SSR source-quality debt. Do not promote SSR as a
+  visually reliable reflection source until its source packet produces stable
+  nonblank radiance/confidence.
+
 Remaining limitation:
 
-- SSR and RT/ray-query reflection are not yet resolver inputs. They remain
-  explicit rejected-source debt until the next source-fusion slice.
+- SSR is now a real resolver input, but it is not yet reliable enough to force
+  as the selected reflection source in the current stress row.
+- RT/ray-query reflection is still not a resolver input.
+  Remaining source-fusion work should improve SSR coverage/admission first,
+  then add RT/ray-query ownership with the same source-ID, confidence,
+  rejection-mask, and temporal-history evidence.
 
 ### L007 - Scene Local Environment V3
 

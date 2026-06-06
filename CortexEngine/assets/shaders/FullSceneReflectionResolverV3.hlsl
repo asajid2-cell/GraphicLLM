@@ -57,11 +57,13 @@ cbuffer FrameConstants : register(b1)
     // x = scene-local probe diffuse scale, y = scene-local probe specular scale,
     // z = scene-local probe radiance enabled (>0.5),
     // w = ReflectionV3 source override:
-    //     0 auto, 1 force scene-local, 4 force environment, 255 force none.
+    //     0 auto, 1 force scene-local, 2 force SSR,
+    //     4 force environment, 255 force none.
     float4   g_LocalProbeParams;
 };
 
 Texture2D<float4> g_LocalReflectionRadiance : register(t0);
+Texture2D<float4> g_SSRReflection : register(t1);
 SamplerState g_LinearClamp : register(s0);
 
 struct VSOutput {
@@ -87,6 +89,13 @@ PSOutput PSMain(VSOutput input) {
     float localConfidence = saturate(local.a);
     float localActive = step(0.001f, localConfidence + Luma(localRadiance));
 
+    float4 ssr = g_SSRReflection.Sample(g_LinearClamp, input.texCoord);
+    float3 ssrRadiance = max(ssr.rgb, 0.0f.xxx);
+    float ssrRawConfidence = saturate(ssr.a);
+    float ssrConfidence = smoothstep(0.55f, 0.86f, ssrRawConfidence);
+    ssrConfidence *= step(0.001f, Luma(ssrRadiance));
+    float ssrActive = step(0.001f, ssrConfidence);
+
     float envEnabled = max(step(0.5f, g_EnvParams.z), step(0.5f, g_LocalProbeParams.z));
     float envScale = max(max(g_EnvParams.x, g_EnvParams.y), g_LocalProbeParams.y);
     float3 envRadiance = max(g_AmbientColor.rgb, 0.0f.xxx) * max(envScale, 0.08f) * envEnabled;
@@ -95,18 +104,24 @@ PSOutput PSMain(VSOutput input) {
 
     uint sourceOverride = (uint)round(max(g_LocalProbeParams.w, 0.0f));
     bool forceLocal = sourceOverride == 1u;
+    bool forceSSR = sourceOverride == 2u;
     bool forceEnvironment = sourceOverride == 4u;
     bool forceNone = sourceOverride >= 255u;
 
-    bool chooseLocal = !forceNone && ((forceLocal && localActive > 0.0f) ||
-                       (!forceLocal && !forceEnvironment && localActive > 0.0f));
+    bool chooseSSR = !forceNone && ((forceSSR && ssrActive > 0.0f) ||
+                     (!forceLocal && !forceSSR && !forceEnvironment &&
+                      ssrActive > 0.0f && ssrConfidence >= max(localConfidence + 0.18f, 0.72f)));
+    bool chooseLocal = !forceNone && !chooseSSR &&
+                       ((forceLocal && localActive > 0.0f) ||
+                        (!forceLocal && !forceSSR && !forceEnvironment && localActive > 0.0f));
     bool chooseEnvironment = !forceNone && !chooseLocal &&
+                             !chooseSSR &&
                              ((forceEnvironment && envActive > 0.0f) ||
-                              (!forceLocal && envActive > 0.0f));
+                              (!forceLocal && !forceSSR && envActive > 0.0f));
 
-    float sourceCode = chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f);
-    float3 radiance = chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx);
-    float confidence = chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f);
+    float sourceCode = chooseSSR ? 2.0f : (chooseLocal ? 1.0f : (chooseEnvironment ? 4.0f : 0.0f));
+    float3 radiance = chooseSSR ? ssrRadiance : (chooseLocal ? localRadiance : (chooseEnvironment ? envRadiance : 0.0f.xxx));
+    float confidence = chooseSSR ? ssrConfidence : (chooseLocal ? localConfidence : (chooseEnvironment ? envConfidence : 0.0f));
     float active = step(0.001f, confidence + Luma(radiance));
 
     PSOutput output;
@@ -114,26 +129,30 @@ PSOutput PSMain(VSOutput input) {
     output.confidence = float4(confidence.xxx, 1.0f);
 
     // Encoded source ID: R = source class normalized by 4
-    // (0 none, 0.25 scene-local radiance, 1 scene-local environment),
+    // (0 none, 0.25 scene-local radiance, 0.5 SSR,
+    //  1 scene-local environment),
     // G = confidence, B = active override normalized for policy debugging.
     float overrideSignal = sourceOverride >= 255u ? 1.0f : saturate((float)sourceOverride / 4.0f);
     output.sourceId = float4(sourceCode * 0.25f, confidence, overrideSignal, 1.0f);
 
-    // Rejection mask: R = scene-local radiance rejected/missing, G =
-    // environment fallback rejected/missing, B = dynamic sources not admitted
-    // by this resolver slice (SSR/RT reserved until they are real inputs).
+    // Rejection mask: R = scene-local radiance rejected/missing,
+    // G = SSR rejected/missing, B = environment fallback rejected/missing.
     float localRejected = chooseLocal ? 0.0f : (1.0f - localActive);
+    float ssrRejected = chooseSSR ? 0.0f : (1.0f - ssrActive);
     float environmentRejected = chooseEnvironment ? 0.0f : (1.0f - envActive);
-    float dynamicSourceNotAdmitted = (chooseLocal || chooseEnvironment) ? 0.35f : 1.0f;
-    output.rejectedSourceMask = float4(localRejected, environmentRejected, dynamicSourceNotAdmitted, 1.0f);
+    output.rejectedSourceMask = float4(localRejected, ssrRejected, environmentRejected, 1.0f);
 
     // Stable scene-local sources do not require history. Forced policies that
     // cannot be satisfied are visible in G so packets can prove the override
     // was rejected instead of silently falling through.
     float forcedButUnavailable =
-        (forceLocal && localActive <= 0.0f) || (forceEnvironment && envActive <= 0.0f) || forceNone
+        (forceLocal && localActive <= 0.0f) ||
+        (forceSSR && ssrActive <= 0.0f) ||
+        (forceEnvironment && envActive <= 0.0f) ||
+        forceNone
             ? 1.0f
             : 0.0f;
-    output.temporalDelta = float4(1.0f - active, forcedButUnavailable, 0.0f, 1.0f);
+    float historyRequiredButMissing = chooseSSR ? (1.0f - step(0.5f, g_TAAParams.w)) : 0.0f;
+    output.temporalDelta = float4(1.0f - active, forcedButUnavailable, historyRequiredButMissing, 1.0f);
     return output;
 }

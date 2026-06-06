@@ -31,7 +31,15 @@ REQUIRED_DOMAINS = {
     "validation",
 }
 
-ALLOWED_READY_DOMAINS = {"material", "lighting", "environment", "reflection", "composite", "cinematic_post"}
+ALLOWED_READY_DOMAINS = {
+    "material",
+    "lighting",
+    "environment",
+    "reflection",
+    "composite",
+    "cinematic_post",
+    "candidate_beauty",
+}
 
 LIGHTING_SIGNAL_THRESHOLDS = {
     "direct_light": {"min_mean_luma": 0.02, "min_nonblack_ratio": 0.05},
@@ -274,6 +282,8 @@ def analyze_report(
         failures.append("V3 status must remain planned_not_promoted")
     if v3.get("default_beauty_affects") is not False:
         failures.append("V3 must not affect default beauty in placeholder mode")
+    if v3.get("candidate_beauty_requested") is True and v3.get("default_beauty_affects") is not False:
+        failures.append("candidate beauty must remain opt-in and must not affect default beauty")
     if v3.get("runtime_placeholders_ready") is not True:
         failures.append("runtime_placeholders_ready must be true")
     if v3.get("contract_grounded") is not True:
@@ -495,6 +505,34 @@ def analyze_report(
             if v3.get(key) is not True:
                 failures.append(f"cinematic_post_v3_ready=true but {key} is not true")
 
+    candidate_domain = domain_by_id.get("candidate_beauty")
+    candidate_requested = v3.get("candidate_beauty_requested") is True
+    candidate_ready = v3.get("candidate_beauty_ready") is True
+    if candidate_requested:
+        if not isinstance(candidate_domain, dict):
+            failures.append("candidate_beauty_requested=true but candidate_beauty domain is missing")
+        else:
+            if candidate_domain.get("producer") != "FullSceneCandidateBeautyV3Adapter":
+                failures.append("candidate beauty must currently be produced by FullSceneCandidateBeautyV3Adapter")
+            if candidate_domain.get("output_resource") != "candidate_ldr_cinematic_output":
+                failures.append("candidate beauty must output candidate_ldr_cinematic_output")
+            if candidate_domain.get("debug_view") != "candidate_beauty_v3":
+                failures.append("candidate beauty must expose candidate_beauty_v3 debug view")
+            if candidate_domain.get("default_beauty_affects") is not False:
+                failures.append("candidate beauty must not affect default beauty")
+        if candidate_ready:
+            for dependency in [
+                "composite_v3_ready",
+                "cinematic_post_v3_ready",
+                "ldr_cinematic_output_ready",
+            ]:
+                if v3.get(dependency) is not True:
+                    failures.append(f"candidate_beauty_ready=true before {dependency}")
+            if v3.get("candidate_beauty_producer") != "FullSceneCandidateBeautyV3Adapter":
+                failures.append("candidate_beauty_ready=true with wrong producer")
+            if v3.get("candidate_beauty_output") != "candidate_ldr_cinematic_output":
+                failures.append("candidate_beauty_ready=true with wrong output")
+
     return {
         "report": str(path),
         "status": "ok" if not failures else "failed",
@@ -502,6 +540,10 @@ def analyze_report(
         "v3_status": v3.get("status"),
         "beauty_output": v3.get("beauty_output"),
         "default_beauty_affects": v3.get("default_beauty_affects"),
+        "candidate_beauty_requested": v3.get("candidate_beauty_requested"),
+        "candidate_beauty_ready": v3.get("candidate_beauty_ready"),
+        "candidate_beauty_producer": v3.get("candidate_beauty_producer"),
+        "candidate_beauty_output": v3.get("candidate_beauty_output"),
         "runtime_placeholders_ready": v3.get("runtime_placeholders_ready"),
         "contract_grounded": v3.get("contract_grounded"),
         "packet_gate_ready": v3.get("packet_gate_ready"),

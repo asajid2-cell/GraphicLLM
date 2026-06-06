@@ -62,6 +62,14 @@ def find_ready_domains(signal: dict[str, Any]) -> dict[str, set[str]]:
     return ready
 
 
+def count_signal_flag(signal: dict[str, Any], field: str) -> int:
+    count = 0
+    for row in signal.get("rows", []):
+        if isinstance(row, dict) and row.get(field) is True:
+            count += 1
+    return count
+
+
 def make_decision(
     *,
     packet_root: pathlib.Path,
@@ -154,6 +162,11 @@ def make_decision(
         if missing:
             failures.append(f"{report} missing ready domains: {', '.join(missing)}")
 
+    candidate_beauty_requested_count = count_signal_flag(signal, "candidate_beauty_requested")
+    candidate_beauty_ready_count = count_signal_flag(signal, "candidate_beauty_ready")
+    if candidate_beauty_ready_count > candidate_beauty_requested_count:
+        failures.append("candidate beauty ready count exceeds requested count")
+
     families = captured_families(manifest)
     missing_families = sorted(set(required_families) - set(families))
     if missing_families:
@@ -217,6 +230,8 @@ def make_decision(
         "missing_motion_modes": missing_motion_modes,
         "capture_sequence_count": capture_sequence_count,
         "ready_domain_report_counts": domain_counts,
+        "candidate_beauty_requested_report_count": candidate_beauty_requested_count,
+        "candidate_beauty_ready_report_count": candidate_beauty_ready_count,
         "failures": failures,
         "warnings": warnings,
         "evidence": evidence,
@@ -232,6 +247,8 @@ def write_markdown(path: pathlib.Path, decision: dict[str, Any]) -> None:
         f"- default beauty promotable: `{str(decision.get('default_beauty_promotable')).lower()}`",
         f"- review packet passed: `{str(decision.get('review_packet_passed')).lower()}`",
         f"- report count: `{decision.get('report_count', 0)}`",
+        f"- candidate beauty requested reports: `{decision.get('candidate_beauty_requested_report_count', 0)}`",
+        f"- candidate beauty ready reports: `{decision.get('candidate_beauty_ready_report_count', 0)}`",
         f"- captured families: `{','.join(decision.get('captured_families', []))}`",
         f"- missing families: `{','.join(decision.get('missing_families', []))}`",
         f"- observed motion modes: `{','.join(decision.get('observed_motion_modes', []))}`",

@@ -4,6 +4,7 @@
 #include "Graphics/MaterialModel.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -1175,6 +1176,10 @@ struct FullSceneShaderPipelineV3FrameContext {
     std::string status = "planned_not_promoted";
     std::string beautyOutput = "v2_or_legacy_beauty";
     bool defaultBeautyAffects = false;
+    bool candidateBeautyRequested = false;
+    bool candidateBeautyReady = false;
+    std::string candidateBeautyProducer = "none";
+    std::string candidateBeautyOutput = "none";
     bool runtimePlaceholdersReady = true;
     bool contractGrounded = true;
     bool packetGateReady = false;
@@ -1282,6 +1287,8 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     FullSceneShaderPipelineV3FrameContext context;
     context.defaultBeautyAffects = false;
     context.beautyOutput = contract.sceneVisual.active ? "full_scene_shader_pipeline_v2" : "legacy_beauty";
+    context.candidateBeautyRequested =
+        std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr;
 
     const std::vector<std::string> materialBackingResources = {
         "vb_gbuffer_albedo",
@@ -1783,6 +1790,63 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     postDomain.missingRequiredChannelCount =
         postDomain.requiredChannelCount - postDomain.readyChannelCount;
 
+    context.candidateBeautyReady =
+        context.candidateBeautyRequested &&
+        context.compositeV3Ready &&
+        context.cinematicPostV3Ready &&
+        context.ldrCinematicOutputReady;
+    context.candidateBeautyProducer =
+        context.candidateBeautyReady ? "FullSceneCandidateBeautyV3Adapter" :
+        (context.candidateBeautyRequested ? "FullSceneCandidateBeautyV3Adapter" : "none");
+    context.candidateBeautyOutput =
+        context.candidateBeautyRequested ? "candidate_ldr_cinematic_output" : "none";
+
+    FullSceneShaderPipelineV3DomainEvidence candidateBeautyDomain =
+        MakeFullSceneShaderPipelineV3DomainEvidence(
+            "candidate_beauty",
+            context.candidateBeautyProducer,
+            context.candidateBeautyOutput,
+            "candidate_beauty_v3",
+            context.candidateBeautyReady
+                ? "FullSceneCandidateBeautyV3Adapter is opt-in and backed by ready composite/post evidence without affecting default beauty"
+                : context.candidateBeautyRequested
+                ? "FullSceneCandidateBeautyV3Adapter was requested but upstream composite/post evidence is incomplete"
+                : "FullSceneCandidateBeautyV3Adapter is opt-in and was not requested this frame");
+    candidateBeautyDomain.enabled = context.candidateBeautyRequested;
+    candidateBeautyDomain.ready = context.candidateBeautyReady;
+    candidateBeautyDomain.defaultBeautyAffects = false;
+    candidateBeautyDomain.promotionState =
+        context.candidateBeautyReady ? "candidate" : "planned";
+    candidateBeautyDomain.backingResources = {
+        "hdr_scene_color",
+        "ldr_cinematic_output",
+        "scene_local_environment",
+        "reflection_radiance",
+        "lighting_split",
+    };
+    candidateBeautyDomain.debugViews = {
+        "candidate_beauty_v3",
+        "hdr_scene_color",
+        "ldr_cinematic_output",
+    };
+    candidateBeautyDomain.channels = {
+        context.candidateBeautyRequested ? "candidate_requested" : "candidate_not_requested",
+        context.compositeV3Ready ? "composite_ready" : "composite_missing",
+        context.cinematicPostV3Ready ? "cinematic_post_ready" : "cinematic_post_missing",
+        context.ldrCinematicOutputReady ? "ldr_output_owned" : "ldr_output_missing",
+        "default_beauty_unchanged",
+    };
+    candidateBeautyDomain.backingResourceCount =
+        static_cast<uint32_t>(
+            (context.compositeV3Ready ? 1u : 0u) +
+            (context.cinematicPostV3Ready ? 1u : 0u) +
+            (context.ldrCinematicOutputReady ? 1u : 0u));
+    candidateBeautyDomain.requiredChannelCount = 4u;
+    candidateBeautyDomain.readyChannelCount =
+        context.candidateBeautyReady ? candidateBeautyDomain.requiredChannelCount : 0u;
+    candidateBeautyDomain.missingRequiredChannelCount =
+        candidateBeautyDomain.requiredChannelCount - candidateBeautyDomain.readyChannelCount;
+
     context.domains = {
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "render_graph",
@@ -1796,6 +1860,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         environmentDomain,
         compositeDomain,
         postDomain,
+        candidateBeautyDomain,
         MakeFullSceneShaderPipelineV3DomainEvidence(
             "validation",
             "FullSceneShaderPipelineV3PacketGate",

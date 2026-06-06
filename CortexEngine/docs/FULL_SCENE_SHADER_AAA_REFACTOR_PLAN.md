@@ -67,6 +67,19 @@ candidate beauty: FullSceneCandidateBeautyV3
 The engine should be able to show both, capture both, and compare both. The
 candidate path can fail without breaking public default rendering.
 
+Initial bridge:
+
+- `candidate_beauty_v3` is an opt-in packet view.
+- the view sets `CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3=1` only for that
+  capture row.
+- frame reports expose `candidate_beauty_requested`,
+  `candidate_beauty_ready`, `candidate_beauty_producer`, and
+  `candidate_beauty_output`.
+- the first producer is `FullSceneCandidateBeautyV3Adapter`, which is allowed
+  to reuse current ready composite/post evidence while the real candidate
+  composite shader is built.
+- `default_beauty_affects` must remain `false`.
+
 ## Phase 0 - Stabilize Before Beauty
 
 Objective:
@@ -397,4 +410,3 @@ Completion requires:
 - stability packets pass without device removal.
 - debug views explain the final image.
 - user accepts the candidate visuals as good enough to promote.
-

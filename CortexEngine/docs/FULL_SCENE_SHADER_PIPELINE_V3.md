@@ -77,7 +77,9 @@ Geometry / Visibility
   -> FullSceneReflectionHistoryV3
        -> reflection_history_v3_curr
        -> reflection_history_v3_prev
+       -> reflection_history_v3_prev_source_id
        -> reflection_history_v3_validity
+       -> reflection_history_v3_rejection
   -> SceneLocalEnvironmentV3
        -> scene_local_environment
        -> ambient_lighting
@@ -141,7 +143,9 @@ void RenderFrameV3(FrameInput input) {
     contract.RecordResource("reflection_rt_source_signal", reflections.rtSourceSignal);
     contract.RecordResource("reflection_history_v3_curr", reflections.historyCurr);
     contract.RecordResource("reflection_history_v3_prev", reflections.historyPrev);
+    contract.RecordResource("reflection_history_v3_prev_source_id", reflections.historyPrevSourceId);
     contract.RecordResource("reflection_history_v3_validity", reflections.historyValidity);
+    contract.RecordResource("reflection_history_v3_rejection", reflections.historyRejection);
 
     Texture hdr = FullSceneCompositeV3(
         material,
@@ -226,6 +230,10 @@ Deliverables:
 - temporal delta view.
 - rejected-source mask.
 - raw SSR and RT source-signal views.
+- history carryover for previous source ID so source switching is measurable
+  across frames.
+- history rejection view with source-switch, disocclusion, high-motion, and
+  missing-history/debt lanes.
 
 Admission gates:
 
@@ -233,6 +241,9 @@ Admission gates:
 - temporal delta is bounded under camera motion.
 - rough surfaces do not inherit sharp IBL detail.
 - enclosed rooms do not reflect unrelated exterior IBLs.
+- source switches and disocclusion are visible in
+  `reflection_history_v3_rejection` before source fusion is allowed to consume
+  history validity.
 
 ### Scene Local Environment V3
 
@@ -377,7 +388,7 @@ Each stage owns exactly one contract boundary:
 - `LightingV3` owns direct light, unshadowed light, shadow visibility, shadow
   loss, and diffuse indirect.
 - `ReflectionV3` owns reflection radiance, source ID, confidence, roughness
-  filtering, and temporal delta.
+  filtering, temporal delta, source-history carryover, and rejection reasons.
 - `CompositeV3` owns HDR energy combination and clamps only by explicit policy.
 - `CinematicPostV3` owns exposure, tone map, bloom, color grade, sharpen, and
   optional depth of field.
@@ -497,7 +508,7 @@ Required outputs for the next slice:
 ### P3 - Reflection Resolver
 
 - Replace review-only reflection candidate with `FullSceneReflectionV3`.
-- Add confidence/source/temporal debug outputs.
+- Add confidence/source/temporal/history-rejection debug outputs.
 - Run glossy, metallic, glass, and enclosed-room packets.
 
 ### P4 - Scene Local Environment

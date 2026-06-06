@@ -1563,7 +1563,8 @@ Already real enough to build on:
 - `reflection_ssr_source_signal` exposes raw/admitted SSR diagnostics.
 - `SSR.hlsl` now produces stronger source coverage and forced SSR no longer
   goes blank in the tested static packet.
-- `FullSceneReflectionHistoryV3` owns current/previous/validity resources.
+- `FullSceneReflectionHistoryV3` owns current/previous radiance,
+  previous-source-ID carryover, validity, and rejection diagnostics.
 - V3 packet tooling can capture resources, frame reports, motion metrics, and
   promotion decisions.
 
@@ -1592,9 +1593,10 @@ Purpose:
 Implementation:
 
 - finish `FullSceneReflectionHistoryV3` reprojection validity using velocity,
-  depth, and normal/roughness.
-- track history acceptance, rejection reason, bounds rejection, depth mismatch,
-  normal mismatch, and motion penalty.
+  depth, normal/roughness, and previous-source-ID history.
+- track history acceptance, source switches, disocclusion rejection,
+  high-motion rejection, bounds rejection, depth mismatch, normal mismatch,
+  and missing-history debt.
 - feed history validity into reflection confidence, but keep resolver source
   selection conservative until packets prove stability.
 - add RT/ray-query reflection as a first-class resolver source with its own
@@ -1609,7 +1611,8 @@ Acceptance:
 - forced SSR remains inspectable, but auto SSR only wins where history validity
   and confidence are strong.
 - frame reports prove Reflection V3 reads depth, velocity, normal/roughness,
-  current source signals, and previous history.
+  current source signals, previous radiance history, and previous source ID,
+  and writes a rejection diagnostic resource.
 
 ### Phase 2 - Material Payload V3
 
@@ -1800,7 +1803,7 @@ Promotion:
 
 The next work should proceed in this order:
 
-1. finish ReflectionHistoryV3 reprojection validity.
+1. finish ReflectionHistoryV3 reprojection validity and rejection diagnostics.
 2. add RT/ray-query reflection source signal and source fusion diagnostics.
 3. convert Composite V3 from adapter to real `candidate_hdr_scene_color`.
 4. promote material payload from aggregate contract to concrete PBR resources.

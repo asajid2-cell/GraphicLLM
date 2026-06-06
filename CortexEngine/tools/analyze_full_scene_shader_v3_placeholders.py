@@ -22,7 +22,9 @@ REQUIRED_OUTPUTS = {
     "reflection_rt_source_signal",
     "reflection_history_v3_curr",
     "reflection_history_v3_prev",
+    "reflection_history_v3_prev_source_id",
     "reflection_history_v3_validity",
+    "reflection_history_v3_rejection",
     "scene_local_environment",
     "hdr_scene_color",
     "candidate_hdr_scene_color",
@@ -472,7 +474,9 @@ def analyze_report(
             "reflection_rt_source_signal_ready",
             "reflection_history_v3_ready",
             "reflection_history_v3_prev_ready",
+            "reflection_history_v3_prev_source_id_ready",
             "reflection_history_v3_validity_ready",
+            "reflection_history_v3_rejection_ready",
         ]:
             if v3.get(key) is not True:
                 failures.append(f"reflection_v3_ready=true but {key} is not true")
@@ -514,6 +518,7 @@ def analyze_report(
                     "reflection_source_id",
                     "reflection_temporal_delta",
                     "reflection_history_v3_prev",
+                    "reflection_history_v3_prev_source_id",
                     "depth",
                     "velocity",
                 ]:
@@ -531,6 +536,7 @@ def analyze_report(
                 for resource in [
                     "reflection_history_v3_curr",
                     "reflection_history_v3_validity",
+                    "reflection_history_v3_rejection",
                 ]:
                     if resource not in history_pass.get("writes", []):
                         failures.append(f"FullSceneReflectionHistoryV3 pass does not write {resource}")
@@ -547,13 +553,22 @@ def analyze_report(
                         failures.append("FullSceneReflectionHistoryV3Copy pass did not execute")
                     if "reflection_history_v3_curr" not in history_copy_pass.get("reads", []):
                         failures.append("FullSceneReflectionHistoryV3Copy pass does not read reflection_history_v3_curr")
+                    if "reflection_source_id" not in history_copy_pass.get("reads", []):
+                        failures.append("FullSceneReflectionHistoryV3Copy pass does not read reflection_source_id")
                     if "reflection_history_v3_prev" not in history_copy_pass.get("writes", []):
                         failures.append("FullSceneReflectionHistoryV3Copy pass does not write reflection_history_v3_prev")
+                    if "reflection_history_v3_prev_source_id" not in history_copy_pass.get("writes", []):
+                        failures.append("FullSceneReflectionHistoryV3Copy pass does not write reflection_history_v3_prev_source_id")
                     history_prev_resource = find_frame_resource(report, "reflection_history_v3_prev")
                     if not isinstance(history_prev_resource, dict) or history_prev_resource.get("valid") is not True:
                         failures.append("FullSceneReflectionHistoryV3 ready without valid reflection_history_v3_prev resource")
                     elif history_prev_resource.get("size_matches_contract") is not True:
                         failures.append("reflection_history_v3_prev size does not match render contract")
+                    history_prev_source_id_resource = find_frame_resource(report, "reflection_history_v3_prev_source_id")
+                    if not isinstance(history_prev_source_id_resource, dict) or history_prev_source_id_resource.get("valid") is not True:
+                        failures.append("FullSceneReflectionHistoryV3 ready without valid reflection_history_v3_prev_source_id resource")
+                    elif history_prev_source_id_resource.get("size_matches_contract") is not True:
+                        failures.append("reflection_history_v3_prev_source_id size does not match render contract")
 
     composite_domain = domain_by_id.get("composite")
     composite_ready = v3.get("composite_v3_ready") is True
@@ -754,7 +769,9 @@ def analyze_report(
         "reflection_rt_source_signal_ready": v3.get("reflection_rt_source_signal_ready"),
         "reflection_history_v3_ready": v3.get("reflection_history_v3_ready"),
         "reflection_history_v3_prev_ready": v3.get("reflection_history_v3_prev_ready"),
+        "reflection_history_v3_prev_source_id_ready": v3.get("reflection_history_v3_prev_source_id_ready"),
         "reflection_history_v3_validity_ready": v3.get("reflection_history_v3_validity_ready"),
+        "reflection_history_v3_rejection_ready": v3.get("reflection_history_v3_rejection_ready"),
         "reflection_v3_source_contract": v3.get("reflection_v3_source_contract"),
         "composite_v3_ready": v3.get("composite_v3_ready"),
         "hdr_scene_color_ready": v3.get("hdr_scene_color_ready"),

@@ -28,6 +28,7 @@
         "reflection_ssr_source_signal",
         "reflection_rt_source_signal",
         "reflection_history_v3_curr",
+        "reflection_history_v3_prev",
         "reflection_history_v3_validity",
         "scene_local_environment",
         "hdr_scene_color",
@@ -137,6 +138,7 @@
         "reflection_ssr_source_signal",
         "reflection_rt_source_signal",
         "reflection_history_v3_curr",
+        "reflection_history_v3_prev",
         "reflection_history_v3_validity"
       ],
       "required_debug_views": [
@@ -148,6 +150,7 @@
         "reflection_ssr_source_signal",
         "reflection_rt_source_signal",
         "reflection_history_v3_curr",
+        "reflection_history_v3_prev",
         "reflection_history_v3_validity"
       ]
     },

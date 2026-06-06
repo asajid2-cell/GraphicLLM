@@ -344,6 +344,7 @@ FullSceneReflectionV3
     reflection_ssr_source_signal
     reflection_rt_source_signal
     reflection_history_v3_curr
+    reflection_history_v3_prev
     reflection_history_v3_validity
 
 EndFrame
@@ -408,10 +409,11 @@ Why this is better:
 
 Admission gates:
 
-- `reflection_history_v3_curr` and `reflection_history_v3_validity` exist as
-  concrete frame resources.
+- `reflection_history_v3_curr`, `reflection_history_v3_prev`, and
+  `reflection_history_v3_validity` exist as concrete frame resources.
 - Frame report exposes `reflection_history_v3_ready`,
-  `reflection_history_v3_validity_ready`, and source-switch counts.
+  `reflection_history_v3_prev_ready`, `reflection_history_v3_validity_ready`,
+  and source-switch counts.
 - Mouse-jitter packet must not increase `reflection_source_id` motion delta.
 - Smooth/metallic stress packet must reduce source-ID active delta and final
   reflection radiance delta without blanking raw SSR/RT source signals.
@@ -423,17 +425,33 @@ Seed implementation status, 2026-06-06:
 - The pass writes:
   - `reflection_history_v3_curr`.
   - `reflection_history_v3_validity`.
-- The seed pass is intentionally current-frame only. It does not yet perform
-  previous-history reprojection or source-ID hysteresis.
+- `FullSceneReflectionHistoryV3Copy` writes `reflection_history_v3_prev` from
+  current history after the history pass.
+- The seed pass now owns previous-history storage but does not yet perform
+  velocity/depth/normal reprojection or source-ID hysteresis.
 - The existing ReflectionV3 PSO target count was corrected from `5` to `7`.
-- Debug modes `75` and `76` expose the history resources.
+- Debug modes `75`, `76`, and `77` expose the history resources.
 - Static and mouse-jitter gallery packets passed with
-  `reflection_v3_channel_count=9`.
+  `reflection_v3_channel_count=9` before previous-history ownership.
 - Remaining required architecture:
-  - add `reflection_history_v3_prev` ping-pong ownership.
   - sample velocity/depth/normal/roughness for reprojected validity.
   - record source-switch counts and disocclusion invalidation.
   - use source-ID hysteresis to control SSR/RT/local-probe admission.
+
+Previous-history ownership status, 2026-06-06:
+
+- `reflection_history_v3_prev` now exists as a concrete persistent resource.
+- Debug mode `77` exposes `reflection_history_v3_prev`.
+- `FullSceneReflectionHistoryV3` reads previous history as an input.
+- `FullSceneReflectionHistoryV3Copy` copies current history to previous
+  history after the history pass.
+- Reflection V3 readiness now requires `10` channels.
+- Static and mouse-jitter gallery packets passed with
+  `reflection_v3_channel_count=10`.
+- Remaining required architecture:
+  - add velocity/depth/normal/roughness reprojection validity.
+  - add source-switch and disocclusion counters.
+  - only then allow history to affect SSR/RT/local-probe source admission.
 
 ## 2026-06-06 Refactor Plan Before Goal Feature Completion
 

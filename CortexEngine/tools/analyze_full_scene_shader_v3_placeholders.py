@@ -21,6 +21,7 @@ REQUIRED_OUTPUTS = {
     "reflection_ssr_source_signal",
     "reflection_rt_source_signal",
     "reflection_history_v3_curr",
+    "reflection_history_v3_prev",
     "reflection_history_v3_validity",
     "scene_local_environment",
     "hdr_scene_color",
@@ -470,6 +471,7 @@ def analyze_report(
             "reflection_ssr_source_signal_ready",
             "reflection_rt_source_signal_ready",
             "reflection_history_v3_ready",
+            "reflection_history_v3_prev_ready",
             "reflection_history_v3_validity_ready",
         ]:
             if v3.get(key) is not True:
@@ -511,6 +513,7 @@ def analyze_report(
                     "reflection_radiance",
                     "reflection_source_id",
                     "reflection_temporal_delta",
+                    "reflection_history_v3_prev",
                 ]:
                     if resource not in history_pass.get("reads", []):
                         failures.append(f"FullSceneReflectionHistoryV3 pass does not read {resource}")
@@ -525,6 +528,21 @@ def analyze_report(
                         failures.append(f"FullSceneReflectionHistoryV3 ready without valid {resource} resource")
                     elif history_resource.get("size_matches_contract") is not True:
                         failures.append(f"{resource} size does not match render contract")
+                history_copy_pass = find_frame_pass(report, "FullSceneReflectionHistoryV3Copy")
+                if not isinstance(history_copy_pass, dict):
+                    failures.append("reflection domain ready but FullSceneReflectionHistoryV3Copy pass is missing")
+                else:
+                    if history_copy_pass.get("executed") is not True:
+                        failures.append("FullSceneReflectionHistoryV3Copy pass did not execute")
+                    if "reflection_history_v3_curr" not in history_copy_pass.get("reads", []):
+                        failures.append("FullSceneReflectionHistoryV3Copy pass does not read reflection_history_v3_curr")
+                    if "reflection_history_v3_prev" not in history_copy_pass.get("writes", []):
+                        failures.append("FullSceneReflectionHistoryV3Copy pass does not write reflection_history_v3_prev")
+                    history_prev_resource = find_frame_resource(report, "reflection_history_v3_prev")
+                    if not isinstance(history_prev_resource, dict) or history_prev_resource.get("valid") is not True:
+                        failures.append("FullSceneReflectionHistoryV3 ready without valid reflection_history_v3_prev resource")
+                    elif history_prev_resource.get("size_matches_contract") is not True:
+                        failures.append("reflection_history_v3_prev size does not match render contract")
 
     composite_domain = domain_by_id.get("composite")
     composite_ready = v3.get("composite_v3_ready") is True
@@ -722,6 +740,10 @@ def analyze_report(
         "reflection_source_id_ready": v3.get("reflection_source_id_ready"),
         "reflection_temporal_delta_ready": v3.get("reflection_temporal_delta_ready"),
         "reflection_ssr_source_signal_ready": v3.get("reflection_ssr_source_signal_ready"),
+        "reflection_rt_source_signal_ready": v3.get("reflection_rt_source_signal_ready"),
+        "reflection_history_v3_ready": v3.get("reflection_history_v3_ready"),
+        "reflection_history_v3_prev_ready": v3.get("reflection_history_v3_prev_ready"),
+        "reflection_history_v3_validity_ready": v3.get("reflection_history_v3_validity_ready"),
         "reflection_v3_source_contract": v3.get("reflection_v3_source_contract"),
         "composite_v3_ready": v3.get("composite_v3_ready"),
         "hdr_scene_color_ready": v3.get("hdr_scene_color_ready"),

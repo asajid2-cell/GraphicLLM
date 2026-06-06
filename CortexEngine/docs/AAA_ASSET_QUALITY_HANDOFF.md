@@ -445,6 +445,84 @@ Current limitation:
 - The next slice should add ping-pong previous-history ownership and only then
   allow history to affect SSR/RT/local-probe source admission.
 
+### ReflectionHistoryV3 Previous-History Ownership - 2026-06-06
+
+Implemented:
+
+- Added persistent `reflection_history_v3_prev` resource, SRV, and debug mode
+  `77`.
+- Added per-resource D3D12 state tracking for all `ReflectionV3` targets so
+  current history, previous history, resolver outputs, and validity are no
+  longer forced through one shared state.
+- `FullSceneReflectionHistoryV3` now reads:
+  `reflection_radiance`, `reflection_source_id`, `reflection_temporal_delta`,
+  and `reflection_history_v3_prev`.
+- Added `FullSceneReflectionHistoryV3Copy`, a render-graph copy pass that
+  copies `reflection_history_v3_curr` into `reflection_history_v3_prev` after
+  the history pass.
+- Added frame-report field `reflection_history_v3_prev_ready`.
+- Reflection V3 readiness now requires `10` channels.
+- Packet view filters include `reflection_history_v3_prev`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\analyze_full_scene_shader_v3_lighting_motion.py tools\validate_full_scene_shader_pipeline_v3_plan.py tools\check_full_scene_shader_pipeline_v2_frame_report.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+Copy-Item -LiteralPath assets\shaders\FullSceneReflectionHistoryV3.hlsl -Destination build\bin\assets\shaders\FullSceneReflectionHistoryV3.hlsl -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_reflection_history_prev_static_smoke1_20260606
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_reflection_history_prev_motion_smoke1_20260606
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_reflection_history_prev_static_smoke1_20260606 --signal-output build\captures\v3_reflection_history_prev_static_smoke1_20260606\v3_signal.json --stability-output build\captures\v3_reflection_history_prev_static_smoke1_20260606\v3_stability.json --require-lighting-split-ready --require-lighting-signal-metrics
+python tools\analyze_full_scene_shader_v3_placeholders.py --input build\captures\v3_reflection_history_prev_motion_smoke1_20260606 --signal-output build\captures\v3_reflection_history_prev_motion_smoke1_20260606\v3_signal.json --stability-output build\captures\v3_reflection_history_prev_motion_smoke1_20260606\v3_stability.json --require-lighting-split-ready --require-lighting-signal-metrics
+```
+
+Results:
+
+- V3 plan validator passed with `Required outputs: 19`.
+- Native build passed.
+- Static gallery packet passed:
+  `build/captures/v3_reflection_history_prev_static_smoke1_20260606`.
+- Mouse-jitter gallery packet passed:
+  `build/captures/v3_reflection_history_prev_motion_smoke1_20260606`.
+- Motion analyzer measured `22` view sequences after adding previous history.
+
+Frame-report proof:
+
+- `reflection_v3_channel_count=10`.
+- `reflection_history_v3_ready=true`.
+- `reflection_history_v3_prev_ready=true`.
+- `reflection_history_v3_validity_ready=true`.
+- `FullSceneReflectionHistoryV3.reads=reflection_radiance,reflection_source_id,reflection_temporal_delta,reflection_history_v3_prev`.
+- `FullSceneReflectionHistoryV3.writes=reflection_history_v3_curr,reflection_history_v3_validity`.
+- `FullSceneReflectionHistoryV3Copy.reads=reflection_history_v3_curr`.
+- `FullSceneReflectionHistoryV3Copy.writes=reflection_history_v3_prev`.
+
+Metrics:
+
+- static:
+  - `reflection_history_v3_curr.mean_luma=0.0977650`,
+    `nonblack_ratio=0.9992958`.
+  - `reflection_history_v3_prev.mean_luma=0.0977650`,
+    `nonblack_ratio=0.9992958`.
+  - `reflection_history_v3_validity.mean_luma=0.6217951`,
+    `nonblack_ratio=1.0`.
+- mouse-jitter:
+  - `reflection_history_v3_curr.mean_abs_luma_delta=0.0048307`,
+    `mean_active_delta_ratio=0.0309180`.
+  - `reflection_history_v3_prev.mean_abs_luma_delta=0.0048307`,
+    `mean_active_delta_ratio=0.0309180`.
+  - `reflection_history_v3_validity.mean_abs_luma_delta=0.0018637`,
+    `mean_active_delta_ratio=0.0094575`.
+
+Current limitation:
+
+- Previous history is owned and sampled, but it is not yet reprojected through
+  velocity/depth/normal/roughness.
+- Source-ID hysteresis is still not admitted into reflection source selection.
+- Next slice should add reprojection validity and source-switch counters before
+  allowing history to alter SSR/RT/local-probe source admission.
+
 ### Local Reflection Into Composite V3 - 2026-06-06
 
 Implemented:

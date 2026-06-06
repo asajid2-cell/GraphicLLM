@@ -30,6 +30,7 @@ struct RendererDebugControlState {
     bool iblEnabled = false;
     bool fogEnabled = false;
     bool rayTracingEnabled = false;
+    bool fullSceneCandidateBeautyV3Enabled = false;
 };
 
 } // namespace Cortex::Graphics

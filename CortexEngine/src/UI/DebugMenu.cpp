@@ -34,6 +34,7 @@ enum ControlId : int {
     IDC_IBL           = 1107,
     IDC_FOG           = 1108,
     IDC_RAYTRACING    = 1109,
+    IDC_CANDIDATE_BEAUTY_V3 = 1110,
 
     IDC_RESET         = 1201,
     IDC_SCENE_TOGGLE  = 1202,
@@ -65,6 +66,7 @@ struct DebugMenuInternalState {
     HWND chkIBL = nullptr;
     HWND chkFog = nullptr;
     HWND chkRT = nullptr;
+    HWND chkCandidateBeautyV3 = nullptr;
     HWND btnReset = nullptr;
     HWND btnSceneToggle = nullptr;
 
@@ -130,6 +132,7 @@ Graphics::RendererDebugControlState ToRendererDebugControlState(const DebugMenuS
     controls.iblEnabled = state.iblEnabled;
     controls.fogEnabled = state.fogEnabled;
     controls.rayTracingEnabled = state.rayTracingEnabled;
+    controls.fullSceneCandidateBeautyV3Enabled = state.fullSceneCandidateBeautyV3Enabled;
     return controls;
 }
 
@@ -266,6 +269,9 @@ void RegisterDebugMenuClass() {
             state->chkFog = makeCheckbox(IDC_FOG, L"Height Fog", y);
             y += checkHeight + rowGap;
             state->chkRT = makeCheckbox(IDC_RAYTRACING, L"Ray Tracing (DXR)", y);
+            y += checkHeight + rowGap * 2;
+            state->chkCandidateBeautyV3 =
+                makeCheckbox(IDC_CANDIDATE_BEAUTY_V3, L"FullSceneCandidateBeautyV3", y);
             y += checkHeight + rowGap * 2;
 
             // Reset button
@@ -422,6 +428,9 @@ void RegisterDebugMenuClass() {
                 case IDC_RAYTRACING:
                     s.rayTracingEnabled = GetCheckbox(state->chkRT);
                     break;
+                case IDC_CANDIDATE_BEAUTY_V3:
+                    s.fullSceneCandidateBeautyV3Enabled = GetCheckbox(state->chkCandidateBeautyV3);
+                    break;
                 case IDC_SCENE_TOGGLE: {
                     // Toggle scene preset via the global engine pointer.
                     if (auto* engine = Cortex::ServiceLocator::GetEngine()) {
@@ -531,6 +540,7 @@ void RefreshControlsFromState() {
     SetCheckbox(g_state.chkIBL,       s.iblEnabled);
     SetCheckbox(g_state.chkFog,       s.fogEnabled);
     SetCheckbox(g_state.chkRT,        s.rayTracingEnabled);
+    SetCheckbox(g_state.chkCandidateBeautyV3, s.fullSceneCandidateBeautyV3Enabled);
 }
 
 } // namespace
@@ -620,6 +630,7 @@ void DebugMenu::ResetToDefaults() {
     g_state.current.ssaoEnabled = true;
     g_state.current.iblEnabled = true;
     g_state.current.fogEnabled = false;
+    g_state.current.fullSceneCandidateBeautyV3Enabled = false;
 
     ApplyStateToRenderer(g_state.current);
     RefreshControlsFromState();

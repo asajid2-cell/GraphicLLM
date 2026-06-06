@@ -19,6 +19,7 @@ enum class RendererFeatureToggle {
     TAA,
     FXAA,
     V2ReflectionCandidate,
+    FullSceneCandidateBeautyV3,
     SSR,
     SSAO,
     IBL,

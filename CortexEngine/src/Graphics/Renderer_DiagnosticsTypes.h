@@ -171,6 +171,7 @@ struct RendererFeatureState {
     bool taaEnabled = false;
     bool fxaaEnabled = false;
     bool v2ReflectionCandidateEnabled = false;
+    bool fullSceneCandidateBeautyV3Enabled = false;
     bool pcssEnabled = false;
     bool ssaoEnabled = false;
     float ssaoRadius = 0.25f;

@@ -22,6 +22,7 @@ struct RendererPostProcessState {
     bool motionBlurEnabled = true;
     bool depthOfFieldEnabled = true;
     bool v2ReflectionCandidateEnabled = false;
+    bool fullSceneCandidateBeautyV3Enabled = false;
     float motionBlur = 0.0f;
     float depthOfField = 0.0f;
     float dofFocusDistance = 18.0f;

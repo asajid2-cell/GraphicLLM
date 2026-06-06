@@ -39,7 +39,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_bloomResources.resources.texA[0] && m_bloomResources.resources.texB[0];
     const bool wantsCandidateBeautyThisFrame =
         wantsRgPostThisFrame &&
-        std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr &&
+        (m_postProcessState.fullSceneCandidateBeautyV3Enabled ||
+         std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr) &&
         m_mainTargets.candidateBeautyV3.resources.ldrOutput &&
         m_mainTargets.candidateBeautyV3.descriptors.ldrOutputRTV.IsValid();
     const bool useFusedBloomTransients =

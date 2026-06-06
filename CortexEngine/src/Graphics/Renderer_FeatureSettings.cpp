@@ -39,6 +39,10 @@ bool Renderer::IsV2ReflectionCandidateEnabled() const {
     return GetFeatureState().v2ReflectionCandidateEnabled;
 }
 
+bool Renderer::IsFullSceneCandidateBeautyV3Enabled() const {
+    return GetFeatureState().fullSceneCandidateBeautyV3Enabled;
+}
+
 bool Renderer::GetSSAOEnabled() const {
     return GetFeatureState().ssaoEnabled;
 }
@@ -141,6 +145,14 @@ void Renderer::SetV2ReflectionCandidateEnabled(bool enabled) {
     }
     m_postProcessState.v2ReflectionCandidateEnabled = enabled;
     spdlog::info("V2 reflection candidate beauty {}", enabled ? "ENABLED" : "DISABLED");
+}
+
+void Renderer::SetFullSceneCandidateBeautyV3Enabled(bool enabled) {
+    if (m_postProcessState.fullSceneCandidateBeautyV3Enabled == enabled) {
+        return;
+    }
+    m_postProcessState.fullSceneCandidateBeautyV3Enabled = enabled;
+    spdlog::info("FullSceneCandidateBeautyV3 {}", enabled ? "ENABLED" : "DISABLED");
 }
 
 bool Renderer::IsTAAEnabled() const {

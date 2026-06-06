@@ -84,6 +84,7 @@ void Engine::SyncDebugMenuFromRenderer() {
     dbg.iblEnabled       = features.iblEnabled;
     dbg.ssrEnabled       = features.ssrEnabled;
     dbg.fogEnabled       = features.fogEnabled;
+    dbg.fullSceneCandidateBeautyV3Enabled = features.fullSceneCandidateBeautyV3Enabled;
     dbg.rayTracingEnabled = rt.supported && rt.enabled;
 
     UI::DebugMenu::SyncFromState(dbg);

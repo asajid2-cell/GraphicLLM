@@ -513,7 +513,8 @@ void Engine::RenderHUD() {
             { L"[Environment] IBL",                state.iblEnabled ? 1.0f : 0.0f,       true,  11 },
             { L"[Environment] Fog",                state.fogEnabled ? 1.0f : 0.0f,       true,  12 },
             { L"[Camera] Base Speed",              state.cameraBaseSpeed,                false, 13 },
-            { L"[Advanced] Ray Tracing",           state.rayTracingEnabled ? 1.0f : 0.0f,true,  14 }
+            { L"[Advanced] Ray Tracing",           state.rayTracingEnabled ? 1.0f : 0.0f,true,  14 },
+            { L"[Advanced] Candidate Beauty V3",   state.fullSceneCandidateBeautyV3Enabled ? 1.0f : 0.0f, true, 15 }
         };
 
         const int rowCount = static_cast<int>(std::size(rows));

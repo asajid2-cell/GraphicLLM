@@ -230,6 +230,7 @@ public:
     void SetPCSS(bool enabled);
     void SetFXAAEnabled(bool enabled);
     void SetV2ReflectionCandidateEnabled(bool enabled);
+    void SetFullSceneCandidateBeautyV3Enabled(bool enabled);
     void SetTAAEnabled(bool enabled);
     [[nodiscard]] bool IsTAAEnabled() const;
     void ToggleTAA();
@@ -259,6 +260,7 @@ public:
     [[nodiscard]] bool IsPCSS() const;
     [[nodiscard]] bool IsFXAAEnabled() const;
     [[nodiscard]] bool IsV2ReflectionCandidateEnabled() const;
+    [[nodiscard]] bool IsFullSceneCandidateBeautyV3Enabled() const;
     [[nodiscard]] bool GetSSAOEnabled() const;
     [[nodiscard]] bool GetIBLEnabled() const;
     [[nodiscard]] bool GetSSREnabled() const;

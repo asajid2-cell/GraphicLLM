@@ -41,6 +41,7 @@ struct DebugMenuState {
     // environments can be enabled explicitly via the debug menu.
     bool iblEnabled = false;
     bool fogEnabled = false;
+    bool fullSceneCandidateBeautyV3Enabled = false;
 
     // Optional DXR ray tracing toggle persisted with other settings.
     bool rayTracingEnabled = false;

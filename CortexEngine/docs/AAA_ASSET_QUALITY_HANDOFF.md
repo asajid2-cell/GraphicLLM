@@ -4758,3 +4758,60 @@ Updated next safe pass:
    implementing candidate beauty.
 2. Begin the opt-in `FullSceneCandidateBeautyV3` switch and side-by-side
    capture support.
+
+### FullSceneCandidateBeautyV3 Adapter Switch - 2026-06-05
+
+Current slice:
+
+- added an opt-in `candidate_beauty_v3` packet view.
+- `candidate_beauty_v3` sets
+  `CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3=1` only for that capture row.
+- normal `beauty` rows explicitly clear the candidate env var.
+- frame reports now expose:
+  - `candidate_beauty_requested`.
+  - `candidate_beauty_ready`.
+  - `candidate_beauty_producer`.
+  - `candidate_beauty_output`.
+- `FullSceneShaderPipelineV3` now emits an optional `candidate_beauty` domain.
+- current producer is intentionally an adapter:
+  `FullSceneCandidateBeautyV3Adapter`.
+- current candidate output is:
+  `candidate_ldr_cinematic_output`.
+- default beauty still reports `default_beauty_affects=false`.
+
+Validation:
+
+```powershell
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\build_full_scene_shader_v3_promotion_decision.py
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_beauty_adapter_smoke1_20260605
+python tools\build_full_scene_shader_v3_promotion_decision.py --packet-root build\captures\v3_candidate_beauty_adapter_smoke1_20260605 --output-json build\captures\v3_candidate_beauty_adapter_smoke1_20260605\promotion_decision.json --output-md build\captures\v3_candidate_beauty_adapter_smoke1_20260605\promotion_decision.md --allow-subset-review
+```
+
+Result:
+
+- V3 plan validator passed.
+- Python compile passed.
+- native build passed.
+- gallery packet passed with `reports=17`.
+- promotion status: `review_packet_passed`.
+- default beauty promotable: `false`.
+- candidate beauty requested reports: `1`.
+- candidate beauty ready reports: `1`.
+- direct report check:
+  - `gallery/beauty`: `candidate_beauty_requested=false`,
+    `candidate_beauty_ready=false`, `default_beauty_affects=false`.
+  - `gallery/candidate_beauty_v3`: `candidate_beauty_requested=true`,
+    `candidate_beauty_ready=true`,
+    `candidate_beauty_producer=FullSceneCandidateBeautyV3Adapter`,
+    `candidate_beauty_output=candidate_ldr_cinematic_output`,
+    `default_beauty_affects=false`.
+
+Important limitation:
+
+- this is not the final Unreal-style shader composite.
+- it is the bridge that lets packets capture and rank an opt-in candidate path
+  separately from public default beauty.
+- next implementation should replace the adapter with a real
+  `FullSceneCandidateBeautyV3` composite/post resource path.

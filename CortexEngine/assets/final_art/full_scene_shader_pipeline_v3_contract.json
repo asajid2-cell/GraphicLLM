@@ -196,6 +196,27 @@
         "ldr_cinematic_output"
       ]
     },
+    "candidate_beauty": {
+      "producer": "FullSceneCandidateBeautyV3",
+      "adapter_producer": "FullSceneCandidateBeautyV3Adapter",
+      "status": "opt_in_not_default",
+      "required_inputs": [
+        "hdr_scene_color",
+        "ldr_cinematic_output",
+        "scene_local_environment",
+        "reflection_radiance",
+        "lighting_split"
+      ],
+      "required_outputs": [
+        "candidate_ldr_cinematic_output"
+      ],
+      "required_debug_views": [
+        "candidate_beauty_v3",
+        "hdr_scene_color",
+        "ldr_cinematic_output"
+      ],
+      "promotion_rule": "candidate_beauty may be captured and ranked only when default_beauty_affects remains false"
+    },
     "validation": {
       "required_artifacts": [
         "frame_report_shutdown.json",

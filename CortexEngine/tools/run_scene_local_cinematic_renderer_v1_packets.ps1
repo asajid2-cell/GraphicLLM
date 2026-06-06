@@ -50,6 +50,7 @@ New-Item -ItemType Directory -Force -Path $outRootAbs | Out-Null
 
 $views = @(
     [pscustomobject]@{ Name = "beauty"; DebugView = $null },
+    [pscustomobject]@{ Name = "candidate_beauty_v3"; DebugView = $null; CandidateBeautyV3 = $true },
     [pscustomobject]@{ Name = "roughness"; DebugView = 2 },
     [pscustomobject]@{ Name = "metallic"; DebugView = 3 },
     [pscustomobject]@{ Name = "surface_class"; DebugView = 41 },
@@ -198,6 +199,7 @@ $oldEnv = @{
     CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE = $env:CORTEX_CAMERA_MOUSE_JITTER_YAW_AMPLITUDE
     CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE = $env:CORTEX_CAMERA_MOUSE_JITTER_PITCH_AMPLITUDE
     CORTEX_CAMERA_MOUSE_JITTER_CYCLES = $env:CORTEX_CAMERA_MOUSE_JITTER_CYCLES
+    CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 = $env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3
 }
 
 function Restore-Env {
@@ -350,6 +352,11 @@ function Invoke-PacketCapture([string]$Family,
         Remove-Item Env:\CORTEX_DEBUG_VIEW -ErrorAction SilentlyContinue
     } else {
         $env:CORTEX_DEBUG_VIEW = [string]$View.DebugView
+    }
+    if ($View.PSObject.Properties.Name -contains "CandidateBeautyV3" -and $View.CandidateBeautyV3) {
+        $env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 = "1"
+    } else {
+        Remove-Item Env:\CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3 -ErrorAction SilentlyContinue
     }
     if ([string]::IsNullOrWhiteSpace($SeedPath)) {
         Remove-Item Env:\CORTEX_MODEL_AUTHORED_SCENE_SEED -ErrorAction SilentlyContinue

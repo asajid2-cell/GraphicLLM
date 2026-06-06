@@ -557,7 +557,7 @@ void Engine::ProcessInput() {
                         break;
                     }
                     if (key == SDLK_DOWN) {
-                        constexpr int kMaxSection = 14;
+                        constexpr int kMaxSection = 15;
                         m_settingsSection = std::min(kMaxSection, m_settingsSection + 1);
                         break;
                     }
@@ -617,6 +617,10 @@ void Engine::ProcessInput() {
                                 }
                                 break;
                             }
+                            case 15: // FullSceneCandidateBeautyV3
+                                state.fullSceneCandidateBeautyV3Enabled =
+                                    !state.fullSceneCandidateBeautyV3Enabled;
+                                break;
                             default:
                                 break;
                         }
@@ -645,6 +649,10 @@ void Engine::ProcessInput() {
                                 state.rayTracingEnabled = !state.rayTracingEnabled;
                                 UI::DebugMenu::SyncFromState(state);
                             }
+                        } else if (m_settingsSection == 15) {
+                            state.fullSceneCandidateBeautyV3Enabled =
+                                !state.fullSceneCandidateBeautyV3Enabled;
+                            UI::DebugMenu::SyncFromState(state);
                         }
                         break;
                     }

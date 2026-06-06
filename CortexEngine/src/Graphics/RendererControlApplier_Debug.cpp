@@ -35,6 +35,7 @@ void ApplyDebugControlState(Renderer& renderer, const RendererDebugControlState&
     renderer.SetSSAOEnabled(state.ssaoEnabled);
     renderer.SetIBLEnabled(state.iblEnabled);
     renderer.SetFogEnabled(state.fogEnabled);
+    renderer.SetFullSceneCandidateBeautyV3Enabled(state.fullSceneCandidateBeautyV3Enabled);
 
     renderer.SetRayTracingEnabled(state.rayTracingEnabled);
 }
@@ -49,6 +50,7 @@ void ApplyDebugControlReset(Renderer& renderer) {
     renderer.SetSSAOEnabled(true);
     renderer.SetIBLEnabled(true);
     renderer.SetFogEnabled(false);
+    renderer.SetFullSceneCandidateBeautyV3Enabled(false);
 }
 
 void ApplyShadowPCFRadiusDeltaControl(Renderer& renderer, float delta) {

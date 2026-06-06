@@ -4941,3 +4941,71 @@ Next safe pass:
    `FullSceneCompositeV3` and `CinematicPostV3` producers over V3 resources.
 3. Keep default beauty unchanged until cross-family evidence and user review
    approve candidate promotion.
+
+### FullSceneCandidateBeautyV3 Debug Toggle - 2026-06-06
+
+Implemented:
+
+- Added renderer state:
+  `RendererPostProcessState::fullSceneCandidateBeautyV3Enabled`.
+- Added renderer API:
+  - `SetFullSceneCandidateBeautyV3Enabled`.
+  - `IsFullSceneCandidateBeautyV3Enabled`.
+- Added feature-state reporting:
+  `RendererFeatureState::fullSceneCandidateBeautyV3Enabled`.
+- Added control-applier support:
+  `RendererFeatureToggle::FullSceneCandidateBeautyV3`.
+- `ExecuteEndFrameInRenderGraph` now schedules
+  `FullSceneCandidateBeautyV3` when either:
+  - `CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3` is set, or
+  - the renderer UI toggle is enabled.
+- V3 frame context treats an executed candidate pass as a candidate request, so
+  UI-driven runs report `candidate_beauty_requested=true` without requiring an
+  environment variable.
+- Added Win32 debug-menu checkbox:
+  `FullSceneCandidateBeautyV3`.
+- Added on-screen settings overlay row:
+  `[Advanced] Candidate Beauty V3`, row `15`.
+- Keyboard overlay controls now toggle row `15` with left/right or
+  space/enter.
+- Debug-menu reset disables candidate beauty again.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- src\Graphics\RendererPostProcessState.h src\Graphics\Renderer_DiagnosticsTypes.h src\Graphics\Renderer_Diagnostics.cpp src\Graphics\Renderer.h src\Graphics\Renderer_FeatureSettings.cpp src\Graphics\RendererControlTypes.h src\Graphics\RendererControlApplier.h src\Graphics\RendererControlApplier_Debug.cpp src\Graphics\RendererControlApplier_Runtime.cpp src\Graphics\Renderer_RenderGraphEndFrame.cpp src\Graphics\FullSceneShaderFrameContext.h src\UI\DebugMenu.h src\UI\DebugMenu.cpp src\Core\Engine.cpp src\Core\Engine_UI.cpp src\Core\Engine_Input.cpp
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_candidate_beauty_ui_toggle_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed.
+- focused `git diff --check` passed, with only existing CRLF warnings.
+- native build passed; first run timed out after link, immediate rerun reported
+  `ninja: no work to do`.
+- packet passed:
+  - artifact root:
+    `build/captures/v3_candidate_beauty_ui_toggle_smoke1_20260606`.
+  - reports: `17`.
+  - promotion status: `review_packet_passed`.
+- Direct report proof for `gallery/candidate_beauty_v3`:
+  - `candidate_beauty_requested=true`.
+  - `candidate_beauty_ready=true`.
+  - `candidate_beauty_producer=FullSceneCandidateBeautyV3`.
+  - `candidate_beauty_output=candidate_ldr_cinematic_output`.
+  - `default_beauty_affects=false`.
+  - valid candidate resource size `1088x612`.
+  - `FullSceneCandidateBeautyV3` reads `hdr_color`.
+  - `FullSceneCandidateBeautyV3` writes
+    `candidate_ldr_cinematic_output`.
+
+Remaining limitation:
+
+- The UI toggle requests/captures the offscreen candidate path, but the app
+  still presents normal default beauty to the swapchain.
+- A true visual compare mode still needs a blit/split-screen display path from
+  `candidate_ldr_cinematic_output` to the backbuffer.

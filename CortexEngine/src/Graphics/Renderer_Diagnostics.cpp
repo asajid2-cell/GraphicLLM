@@ -62,6 +62,7 @@ Renderer::FeatureState Renderer::GetFeatureState() const {
     state.taaEnabled = m_temporalAAState.enabled;
     state.fxaaEnabled = m_postProcessState.fxaaEnabled;
     state.v2ReflectionCandidateEnabled = m_postProcessState.v2ReflectionCandidateEnabled;
+    state.fullSceneCandidateBeautyV3Enabled = m_postProcessState.fullSceneCandidateBeautyV3Enabled;
     state.pcssEnabled = m_shadowResources.controls.pcssEnabled;
     state.ssaoEnabled = m_ssaoResources.controls.enabled;
     state.ssaoRadius = m_ssaoResources.controls.radius;

@@ -1288,7 +1288,11 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     context.defaultBeautyAffects = false;
     context.beautyOutput = contract.sceneVisual.active ? "full_scene_shader_pipeline_v2" : "legacy_beauty";
     context.candidateBeautyRequested =
-        std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr;
+        std::getenv("CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3") != nullptr ||
+        FullSceneShaderPassWritesResource(
+            contract,
+            "FullSceneCandidateBeautyV3",
+            "candidate_ldr_cinematic_output");
 
     const std::vector<std::string> materialBackingResources = {
         "vb_gbuffer_albedo",

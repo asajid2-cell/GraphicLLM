@@ -106,6 +106,9 @@ void ApplyFeatureToggleControl(Renderer& renderer, RendererFeatureToggle toggle,
     case RendererFeatureToggle::V2ReflectionCandidate:
         renderer.SetV2ReflectionCandidateEnabled(enabled);
         break;
+    case RendererFeatureToggle::FullSceneCandidateBeautyV3:
+        renderer.SetFullSceneCandidateBeautyV3Enabled(enabled);
+        break;
     case RendererFeatureToggle::SSR:
         renderer.SetSSREnabled(enabled);
         break;
@@ -157,6 +160,9 @@ bool ToggleFeatureControl(Renderer& renderer, RendererFeatureToggle toggle) {
         break;
     case RendererFeatureToggle::V2ReflectionCandidate:
         current = features.v2ReflectionCandidateEnabled;
+        break;
+    case RendererFeatureToggle::FullSceneCandidateBeautyV3:
+        current = features.fullSceneCandidateBeautyV3Enabled;
         break;
     case RendererFeatureToggle::SSR:
         current = features.ssrEnabled;

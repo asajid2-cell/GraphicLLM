@@ -28,6 +28,7 @@ CANDIDATE_COMPOSITE_VIEWS = [
     "reflection_rejected_source_mask",
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
+    "reflection_rt_source_signal",
 ]
 
 LEGACY_PAIRS = {

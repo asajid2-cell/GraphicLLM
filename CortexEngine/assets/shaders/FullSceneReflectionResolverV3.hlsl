@@ -79,6 +79,7 @@ struct PSOutput {
     float4 rejectedSourceMask : SV_Target3;
     float4 temporalDelta : SV_Target4;
     float4 ssrSourceSignal : SV_Target5;
+    float4 rtSourceSignal : SV_Target6;
 };
 
 static float Luma(float3 color) {
@@ -182,5 +183,12 @@ PSOutput PSMain(VSOutput input) {
     output.ssrSourceSignal = float4(saturate(ssrLuma), ssrRawConfidence,
                                     forceSSR ? ssrForcedConfidence : ssrConfidence,
                                     forceSSR && ssrRawActive <= 0.0f ? 1.0f : 0.0f);
+
+    // RT source diagnostic: R = raw RT luma, G = raw RT alpha/weight,
+    // B = admitted confidence after resolver shaping / forced raw admission,
+    // A = forced-RT rejected.
+    output.rtSourceSignal = float4(saturate(rtLuma), rtRawConfidence,
+                                   forceRT ? max(rtConfidence, rtRawConfidence) : rtConfidence,
+                                   forceRT && rtRawActive <= 0.0f ? 1.0f : 0.0f);
     return output;
 }

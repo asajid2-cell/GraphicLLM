@@ -416,6 +416,7 @@ void Renderer::UpdateFrameContractSnapshot(Scene::ECS_Registry* registry,
     addResource("reflection_rejected_source_mask", m_mainTargets.reflectionV3.resources.rejectedSourceMask.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_temporal_delta", m_mainTargets.reflectionV3.resources.temporalDelta.Get(), contract.renderWidth, contract.renderHeight);
     addResource("reflection_ssr_source_signal", m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get(), contract.renderWidth, contract.renderHeight);
+    addResource("reflection_rt_source_signal", m_mainTargets.reflectionV3.resources.rtSourceSignal.Get(), contract.renderWidth, contract.renderHeight);
     if (m_services.visibilityBuffer) {
         addResource("visibility_buffer", m_services.visibilityBuffer->GetVisibilityBuffer(), contract.renderWidth, contract.renderHeight);
         addResource("vb_gbuffer_albedo", m_services.visibilityBuffer->GetAlbedoBuffer(), contract.renderWidth, contract.renderHeight);

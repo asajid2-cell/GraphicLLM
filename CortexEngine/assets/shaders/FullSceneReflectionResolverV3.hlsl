@@ -85,6 +85,7 @@ struct PSOutput {
     float4 temporalDelta : SV_Target4;
     float4 ssrSourceSignal : SV_Target5;
     float4 rtSourceSignal : SV_Target6;
+    float4 sourceSuppression : SV_Target7;
 };
 
 static float Luma(float3 color) {
@@ -218,6 +219,10 @@ PSOutput PSMain(VSOutput input) {
                                        ssrRejected,
                                        max(rtRejected, environmentRejected),
                                        max(historySuppressedSource, materialSuppressedSource));
+    output.sourceSuppression = float4(historySuppressedSource,
+                                      materialSuppressedSource,
+                                      roughness,
+                                      metallic);
 
     // Stable scene-local sources do not require history. Forced policies that
     // cannot be satisfied are visible in G so packets can prove the override

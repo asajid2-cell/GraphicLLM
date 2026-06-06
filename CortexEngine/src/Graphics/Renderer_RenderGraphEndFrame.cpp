@@ -63,13 +63,14 @@ struct FullSceneReflectionResolverV3Context {
     RGResourceHandle temporalDelta;
     RGResourceHandle ssrSourceSignal;
     RGResourceHandle rtSourceSignal;
+    RGResourceHandle sourceSuppression;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
     ID3D12GraphicsCommandList* commandList = nullptr;
     DX12RootSignature* rootSignature = nullptr;
     DX12Pipeline* pipeline = nullptr;
     D3D12_GPU_VIRTUAL_ADDRESS frameConstants = 0;
-    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 7> outputRTVs{};
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 8> outputRTVs{};
     uint32_t width = 0;
     uint32_t height = 0;
     bool* ran = nullptr;
@@ -257,6 +258,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
         !context.temporalDelta.IsValid() ||
         !context.ssrSourceSignal.IsValid() ||
         !context.rtSourceSignal.IsValid() ||
+        !context.sourceSuppression.IsValid() ||
         !context.historyPrevSourceId.IsValid() ||
         !context.historyValidity.IsValid() ||
         !context.historyRejection.IsValid() ||
@@ -304,6 +306,7 @@ void FailFullSceneReflectionHistoryV3Copy(const FullSceneReflectionHistoryV3Copy
             builder.Write(context.temporalDelta, RGResourceUsage::RenderTarget);
             builder.Write(context.ssrSourceSignal, RGResourceUsage::RenderTarget);
             builder.Write(context.rtSourceSignal, RGResourceUsage::RenderTarget);
+            builder.Write(context.sourceSuppression, RGResourceUsage::RenderTarget);
         },
         [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
             auto srvResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(8);
@@ -762,6 +765,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.resources.temporalDelta &&
         m_mainTargets.reflectionV3.resources.ssrSourceSignal &&
         m_mainTargets.reflectionV3.resources.rtSourceSignal &&
+        m_mainTargets.reflectionV3.resources.sourceSuppression &&
         m_mainTargets.reflectionV3.resources.historyPrevSourceId &&
         m_mainTargets.reflectionV3.resources.historyValidity &&
         m_mainTargets.reflectionV3.resources.historyRejection &&
@@ -779,6 +783,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
         m_mainTargets.reflectionV3.descriptors.ssrSourceSignalSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.rtSourceSignalRTV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.rtSourceSignalSRV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.sourceSuppressionRTV.IsValid() &&
+        m_mainTargets.reflectionV3.descriptors.sourceSuppressionSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.historyPrevSourceIdSRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.historyValiditySRV.IsValid() &&
         m_mainTargets.reflectionV3.descriptors.historyRejectionSRV.IsValid();
@@ -801,7 +807,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     const bool wantsReflectionResolverV3DebugViewThisFrame =
         wantsReflectionResolverV3ThisFrame &&
         m_debugViewState.mode >= 68u &&
-        m_debugViewState.mode <= 78u &&
+        m_debugViewState.mode <= 79u &&
         m_pipelineState.candidateBeautyDisplay;
     const bool useFusedBloomTransients =
         wantsFusedBloomThisFrame &&
@@ -854,6 +860,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
     RGResourceHandle reflectionTemporalDeltaHandle{};
     RGResourceHandle reflectionSSRSourceSignalHandle{};
     RGResourceHandle reflectionRTSourceSignalHandle{};
+    RGResourceHandle reflectionSourceSuppressionHandle{};
     RGResourceHandle reflectionHistoryCurrHandle{};
     RGResourceHandle reflectionHistoryPrevHandle{};
     RGResourceHandle reflectionHistoryPrevSourceIdHandle{};
@@ -1083,6 +1090,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.reflectionV3.resources.rtSourceSignal.Get(),
                 m_mainTargets.reflectionV3.resources.rtSourceSignalState,
                 "ReflectionV3RTSourceSignal");
+            reflectionSourceSuppressionHandle = m_services.renderGraph->ImportResource(
+                m_mainTargets.reflectionV3.resources.sourceSuppression.Get(),
+                m_mainTargets.reflectionV3.resources.sourceSuppressionState,
+                "ReflectionV3SourceSuppression");
             if (wantsReflectionHistoryV3ThisFrame) {
                 reflectionHistoryCurrHandle = m_services.renderGraph->ImportResource(
                     m_mainTargets.reflectionV3.resources.historyCurr.Get(),
@@ -1183,6 +1194,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             reflectionContext.temporalDelta = reflectionTemporalDeltaHandle;
             reflectionContext.ssrSourceSignal = reflectionSSRSourceSignalHandle;
             reflectionContext.rtSourceSignal = reflectionRTSourceSignalHandle;
+            reflectionContext.sourceSuppression = reflectionSourceSuppressionHandle;
             reflectionContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             reflectionContext.descriptorManager = m_services.descriptorManager.get();
             reflectionContext.commandList = m_commandResources.graphicsList.Get();
@@ -1197,6 +1209,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_mainTargets.reflectionV3.descriptors.temporalDeltaRTV.cpu,
                 m_mainTargets.reflectionV3.descriptors.ssrSourceSignalRTV.cpu,
                 m_mainTargets.reflectionV3.descriptors.rtSourceSignalRTV.cpu,
+                m_mainTargets.reflectionV3.descriptors.sourceSuppressionRTV.cpu,
             };
             reflectionContext.width = GetInternalRenderWidth();
             reflectionContext.height = GetInternalRenderHeight();
@@ -1530,6 +1543,11 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 debugSRV = m_mainTargets.reflectionV3.descriptors.historyRejectionSRV;
                 debugPassName = "FullSceneReflectionHistoryV3RejectionDebugView";
                 break;
+            case 79u:
+                debugSource = reflectionSourceSuppressionHandle;
+                debugSRV = m_mainTargets.reflectionV3.descriptors.sourceSuppressionSRV;
+                debugPassName = "FullSceneReflectionV3SourceSuppressionDebugView";
+                break;
             default:
                 break;
             }
@@ -1692,6 +1710,10 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             m_mainTargets.reflectionV3.resources.rtSourceSignalState =
                 m_services.renderGraph->GetResourceState(reflectionRTSourceSignalHandle);
         }
+        if (reflectionSourceSuppressionHandle.IsValid()) {
+            m_mainTargets.reflectionV3.resources.sourceSuppressionState =
+                m_services.renderGraph->GetResourceState(reflectionSourceSuppressionHandle);
+        }
         if (reflectionHistoryCurrHandle.IsValid()) {
             m_mainTargets.reflectionV3.resources.historyCurrState =
                 m_services.renderGraph->GetResourceState(reflectionHistoryCurrHandle);
@@ -1742,7 +1764,8 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                              "vb_gbuffer_emissive_metallic"},
                             {"reflection_radiance", "reflection_confidence", "reflection_source_id",
                              "reflection_rejected_source_mask", "reflection_temporal_delta",
-                             "reflection_ssr_source_signal", "reflection_rt_source_signal"},
+                             "reflection_ssr_source_signal", "reflection_rt_source_signal",
+                             "reflection_source_suppression"},
                             false,
                             nullptr,
                             true);
@@ -1865,6 +1888,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                 m_debugViewState.mode == 76u ? "reflection_history_v3_validity" :
                 m_debugViewState.mode == 77u ? "reflection_history_v3_prev" :
                 m_debugViewState.mode == 78u ? "reflection_history_v3_rejection" :
+                m_debugViewState.mode == 79u ? "reflection_source_suppression" :
                 "reflection_radiance";
             RecordFramePass("FullSceneReflectionV3DebugView",
                             true,

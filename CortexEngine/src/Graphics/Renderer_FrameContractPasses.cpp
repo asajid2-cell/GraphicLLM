@@ -83,6 +83,7 @@ void Renderer::RecordFramePass(const char* name,
         if (resource == "reflection_temporal_delta") return resourceBytes(m_mainTargets.reflectionV3.resources.temporalDelta.Get());
         if (resource == "reflection_ssr_source_signal") return resourceBytes(m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get());
         if (resource == "reflection_rt_source_signal") return resourceBytes(m_mainTargets.reflectionV3.resources.rtSourceSignal.Get());
+        if (resource == "reflection_source_suppression") return resourceBytes(m_mainTargets.reflectionV3.resources.sourceSuppression.Get());
         if (resource == "reflection_history_v3_curr") return resourceBytes(m_mainTargets.reflectionV3.resources.historyCurr.Get());
         if (resource == "reflection_history_v3_prev") return resourceBytes(m_mainTargets.reflectionV3.resources.historyPrev.Get());
         if (resource == "reflection_history_v3_prev_source_id") return resourceBytes(m_mainTargets.reflectionV3.resources.historyPrevSourceId.Get());
@@ -124,7 +125,8 @@ void Renderer::RecordFramePass(const char* name,
                 write == "reflection_radiance" || write == "reflection_confidence" ||
                 write == "reflection_source_id" || write == "reflection_rejected_source_mask" ||
                 write == "reflection_temporal_delta" || write == "reflection_ssr_source_signal" ||
-                write == "reflection_rt_source_signal" || write == "reflection_history_v3_curr" ||
+                write == "reflection_rt_source_signal" || write == "reflection_source_suppression" ||
+                write == "reflection_history_v3_curr" ||
                 write == "reflection_history_v3_prev" ||
                 write == "reflection_history_v3_prev_source_id" ||
                 write == "reflection_history_v3_validity" ||

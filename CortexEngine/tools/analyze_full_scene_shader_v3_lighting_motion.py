@@ -29,6 +29,7 @@ CANDIDATE_COMPOSITE_VIEWS = [
     "reflection_temporal_delta",
     "reflection_ssr_source_signal",
     "reflection_rt_source_signal",
+    "reflection_source_suppression",
     "reflection_history_v3_curr",
     "reflection_history_v3_prev",
     "reflection_history_v3_validity",

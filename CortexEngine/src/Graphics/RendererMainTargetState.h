@@ -152,6 +152,7 @@ struct FullSceneReflectionV3TargetResources {
     ComPtr<ID3D12Resource> temporalDelta;
     ComPtr<ID3D12Resource> ssrSourceSignal;
     ComPtr<ID3D12Resource> rtSourceSignal;
+    ComPtr<ID3D12Resource> sourceSuppression;
     ComPtr<ID3D12Resource> historyCurr;
     ComPtr<ID3D12Resource> historyPrev;
     ComPtr<ID3D12Resource> historyPrevSourceId;
@@ -165,6 +166,7 @@ struct FullSceneReflectionV3TargetResources {
     D3D12_RESOURCE_STATES temporalDeltaState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES ssrSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES sourceSuppressionState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyCurrState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyPrevState = D3D12_RESOURCE_STATE_COMMON;
     D3D12_RESOURCE_STATES historyPrevSourceIdState = D3D12_RESOURCE_STATE_COMMON;
@@ -179,6 +181,7 @@ struct FullSceneReflectionV3TargetResources {
         temporalDelta.Reset();
         ssrSourceSignal.Reset();
         rtSourceSignal.Reset();
+        sourceSuppression.Reset();
         historyCurr.Reset();
         historyPrev.Reset();
         historyPrevSourceId.Reset();
@@ -192,6 +195,7 @@ struct FullSceneReflectionV3TargetResources {
         temporalDeltaState = D3D12_RESOURCE_STATE_COMMON;
         ssrSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
         rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+        sourceSuppressionState = D3D12_RESOURCE_STATE_COMMON;
         historyCurrState = D3D12_RESOURCE_STATE_COMMON;
         historyPrevState = D3D12_RESOURCE_STATE_COMMON;
         historyPrevSourceIdState = D3D12_RESOURCE_STATE_COMMON;
@@ -215,6 +219,8 @@ struct FullSceneReflectionV3TargetDescriptors {
     DescriptorHandle ssrSourceSignalSRV;
     DescriptorHandle rtSourceSignalRTV;
     DescriptorHandle rtSourceSignalSRV;
+    DescriptorHandle sourceSuppressionRTV;
+    DescriptorHandle sourceSuppressionSRV;
     DescriptorHandle historyCurrRTV;
     DescriptorHandle historyCurrSRV;
     DescriptorHandle historyPrevRTV;
@@ -241,6 +247,8 @@ struct FullSceneReflectionV3TargetDescriptors {
         ssrSourceSignalSRV = {};
         rtSourceSignalRTV = {};
         rtSourceSignalSRV = {};
+        sourceSuppressionRTV = {};
+        sourceSuppressionSRV = {};
         historyCurrRTV = {};
         historyCurrSRV = {};
         historyPrevRTV = {};
@@ -725,6 +733,12 @@ struct FullSceneReflectionV3TargetState {
                                      descriptors.rtSourceSignalSRV);
         if (rtSignal.IsErr()) return rtSignal;
 
+        auto sourceSuppression = createTarget("reflection_source_suppression",
+                                              resources.sourceSuppression,
+                                              descriptors.sourceSuppressionRTV,
+                                              descriptors.sourceSuppressionSRV);
+        if (sourceSuppression.IsErr()) return sourceSuppression;
+
         auto historyCurr = createTarget("reflection_history_v3_curr",
                                         resources.historyCurr,
                                         descriptors.historyCurrRTV,
@@ -763,6 +777,7 @@ struct FullSceneReflectionV3TargetState {
         resources.temporalDeltaState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.ssrSourceSignalState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.rtSourceSignalState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.sourceSuppressionState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyCurrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyPrevState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         resources.historyPrevSourceIdState = D3D12_RESOURCE_STATE_RENDER_TARGET;

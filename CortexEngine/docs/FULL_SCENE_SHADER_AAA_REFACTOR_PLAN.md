@@ -131,6 +131,7 @@ FullSceneReflectionV3
     reflection_history_validity
     reflection_ssr_source_signal
     reflection_rt_source_signal
+    reflection_source_suppression
 
 TransparencyMediaV3
   reads: material payload, depth, lighting, reflection, atmosphere
@@ -179,6 +180,8 @@ Phase 1: stabilize reflection as a real domain.
 - Keep SSR, RT, local probe, and environment visible as separate source IDs.
 - Add source confidence, rejection reason, temporal delta, and history
   validity views.
+- Split source suppression into a dedicated view so temporal/history rejection
+  and material-policy rejection are independently measurable.
 - Fix glossy/smooth jitter at the source level before increasing reflection
   influence in the composite.
 
@@ -343,6 +346,7 @@ FullSceneReflectionV3
     reflection_temporal_delta
     reflection_ssr_source_signal
     reflection_rt_source_signal
+    reflection_source_suppression
     reflection_history_v3_curr
     reflection_history_v3_prev
     reflection_history_v3_validity

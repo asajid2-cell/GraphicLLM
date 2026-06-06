@@ -55,7 +55,7 @@ Result<void> Renderer::CreateScreenSpacePipelineStates(const RendererCompiledSha
         PipelineDesc reflectionResolverV3Desc = postDesc;
         reflectionResolverV3Desc.pixelShader = *shaders.fullSceneReflectionResolverV3PS;
         reflectionResolverV3Desc.rtvFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        reflectionResolverV3Desc.numRenderTargets = 7;
+        reflectionResolverV3Desc.numRenderTargets = 8;
 
         auto reflectionResolverPipelineResult = m_pipelineState.fullSceneReflectionResolverV3->Initialize(
             m_services.device->GetDevice(),

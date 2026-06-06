@@ -74,6 +74,7 @@ Geometry / Visibility
        -> reflection_temporal_delta
        -> reflection_ssr_source_signal
        -> reflection_rt_source_signal
+       -> reflection_source_suppression
   -> FullSceneReflectionHistoryV3
        -> reflection_history_v3_curr
        -> reflection_history_v3_prev
@@ -141,6 +142,7 @@ void RenderFrameV3(FrameInput input) {
     contract.RecordResource("reflection_radiance", reflections.radiance);
     contract.RecordResource("reflection_confidence", reflections.confidence);
     contract.RecordResource("reflection_rt_source_signal", reflections.rtSourceSignal);
+    contract.RecordResource("reflection_source_suppression", reflections.sourceSuppression);
     contract.RecordResource("reflection_history_v3_curr", reflections.historyCurr);
     contract.RecordResource("reflection_history_v3_prev", reflections.historyPrev);
     contract.RecordResource("reflection_history_v3_prev_source_id", reflections.historyPrevSourceId);
@@ -230,6 +232,8 @@ Deliverables:
 - temporal delta view.
 - rejected-source mask.
 - raw SSR and RT source-signal views.
+- source-suppression view that separates history suppression, material
+  suppression, roughness, and metallic.
 - history carryover for previous source ID so source switching is measurable
   across frames.
 - history rejection view with source-switch, disocclusion, high-motion, and
@@ -250,6 +254,8 @@ Admission gates:
 - auto SSR/RT admission reads material normal/roughness and emissive/metallic
   so rough surfaces damp sharp reflection sources while smooth/metallic
   surfaces keep stronger source eligibility.
+- auto SSR/RT admission writes `reflection_source_suppression` so packets can
+  distinguish history-driven rejection from material-policy rejection.
 
 ### Scene Local Environment V3
 
@@ -394,7 +400,8 @@ Each stage owns exactly one contract boundary:
 - `LightingV3` owns direct light, unshadowed light, shadow visibility, shadow
   loss, and diffuse indirect.
 - `ReflectionV3` owns reflection radiance, source ID, confidence, roughness
-  filtering, temporal delta, source-history carryover, and rejection reasons.
+  filtering, temporal delta, source-history carryover, source-suppression
+  diagnostics, and rejection reasons.
 - `CompositeV3` owns HDR energy combination and clamps only by explicit policy.
 - `CinematicPostV3` owns exposure, tone map, bloom, color grade, sharpen, and
   optional depth of field.
@@ -1061,6 +1068,28 @@ Remaining limitation:
   the current local reflection radiance source. SSR/RT/environment source
   competition, roughness-aware source selection, and real temporal history
   admission remain future ReflectionV3 work.
+- Default beauty remains unchanged and not promoted.
+
+Source-suppression diagnostic update, 2026-06-06:
+
+- Added `reflection_source_suppression` as a concrete ReflectionV3 output.
+- Added debug mode `79`, `FullSceneReflectionV3SourceSuppression`.
+- The resource stores history/source-switch suppression in `R`,
+  material/roughness suppression in `G`, roughness in `B`, and metallic in
+  `A`.
+- Reflection readiness now requires `13` channels including the new
+  suppression resource.
+- Frame reports now expose `reflection_source_suppression_ready`.
+- Static packet:
+  `build/captures/v3_reflection_source_suppression_static_smoke1_20260606`.
+- Mouse-jitter packet:
+  `build/captures/v3_reflection_source_suppression_motion_smoke1_20260606`.
+- Motion packet proof:
+  - `reflection_v3_ready=true`.
+  - `reflection_v3_channel_count=13`.
+  - `reflection_source_suppression_ready=true`.
+  - `FullSceneReflectionV3.writes` includes
+    `reflection_source_suppression`.
 - Default beauty remains unchanged and not promoted.
 
 Source-policy admission update, 2026-06-06:

@@ -111,6 +111,7 @@ Renderer::VRAMBreakdown Renderer::GetEstimatedVRAMBreakdown() const {
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.temporalDelta.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.ssrSourceSignal.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.rtSourceSignal.Get());
+    addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.sourceSuppression.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.historyCurr.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.historyPrev.Get());
     addResource(breakdown.renderTargetBytes, m_mainTargets.reflectionV3.resources.historyPrevSourceId.Get());

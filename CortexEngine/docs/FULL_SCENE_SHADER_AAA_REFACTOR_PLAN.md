@@ -192,6 +192,28 @@ changing default beauty. It also gives us a concrete place to detect the
 remaining metallic/smooth jitter as reflection-resource instability rather than
 as a vague final-image defect.
 
+Implementation status, 2026-06-06:
+
+- `local_reflection_radiance` is now wired into `FullSceneCompositeV3`.
+- The shader samples `g_LocalReflectionRadiance : t4`.
+- The frame context and analyzer require the reflection read before treating
+  `FullSceneCompositeV3` as a real composite producer.
+- Python/static plan checks pass.
+- Native build passes. If Ninja graph evaluation stalls, run
+  `ninja -C build -t recompact` before retrying.
+- Static and mouse-jitter gallery candidate HDR packets pass:
+  - `build/captures/v3_composite_reflection_input_static_smoke1_20260606`.
+  - `build/captures/v3_composite_reflection_input_motion_smoke1_20260606`.
+- Motion packet proof:
+  `FullSceneCompositeV3` executed, read `direct_lighting`,
+  `indirect_lighting`, `shadow_visibility`, `hdr_color`, and
+  `local_reflection_radiance`, then wrote `candidate_hdr_scene_color`.
+
+This completes Slice 1 as an opt-in candidate-path refactor. It does not
+complete final reflection quality. The next implementation slice is a concrete
+`ReflectionResolverV3` producer with source ID, confidence, rejected-source, and
+temporal-delta resources.
+
 ### Non-Negotiable Gates
 
 - Do not promote default beauty during these slices.

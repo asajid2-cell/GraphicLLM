@@ -3,6 +3,7 @@
 #include "Debug/GPUProfiler.h"
 #include "Passes/BloomGraphPass.h"
 #include "Passes/BloomPass.h"
+#include "Passes/DescriptorTable.h"
 #include "Passes/FullscreenPass.h"
 #include "Passes/LocalReflectionRadiancePass.h"
 #include "Passes/PostProcessGraphPass.h"
@@ -25,6 +26,7 @@ struct FullSceneCompositeV3Context {
     RGResourceHandle indirectLighting;
     RGResourceHandle shadowVisibility;
     RGResourceHandle legacyHdr;
+    RGResourceHandle localReflectionRadiance;
     RGResourceHandle output;
     ID3D12Device* device = nullptr;
     DescriptorHeapManager* descriptorManager = nullptr;
@@ -86,21 +88,25 @@ void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const 
             builder.Read(context.indirectLighting, RGResourceUsage::ShaderResource);
             builder.Read(context.shadowVisibility, RGResourceUsage::ShaderResource);
             builder.Read(context.legacyHdr, RGResourceUsage::ShaderResource);
+            if (context.localReflectionRadiance.IsValid()) {
+                builder.Read(context.localReflectionRadiance, RGResourceUsage::ShaderResource);
+            }
             builder.Write(context.output, RGResourceUsage::RenderTarget);
         },
-        [context](ID3D12GraphicsCommandList*, const RenderGraph&) {
-            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(4);
+        [context](ID3D12GraphicsCommandList*, const RenderGraph& graph) {
+            auto tableResult = context.descriptorManager->AllocateTransientCBV_SRV_UAVRange(5);
             if (tableResult.IsErr()) {
                 FailFullSceneCompositeV3(context, "full_scene_composite_v3_descriptor");
                 return;
             }
 
             const DescriptorHandle base = tableResult.Value();
-            const DescriptorHandle table[4] = {
+            const DescriptorHandle table[5] = {
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 0u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 1u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 2u),
                 context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 3u),
+                context.descriptorManager->GetCBV_SRV_UAVHandle(base.index + 4u),
             };
             for (const DescriptorHandle& handle : table) {
                 if (!handle.IsValid()) {
@@ -113,6 +119,17 @@ void FailFullSceneCompositeV3(const FullSceneCompositeV3Context& context, const 
             context.device->CopyDescriptorsSimple(1, table[1].cpu, context.indirectLightingSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             context.device->CopyDescriptorsSimple(1, table[2].cpu, context.shadowVisibilitySRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             context.device->CopyDescriptorsSimple(1, table[3].cpu, context.legacyHdrSRV.cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            ID3D12Resource* reflectionRadiance = context.localReflectionRadiance.IsValid()
+                ? graph.GetResource(context.localReflectionRadiance)
+                : nullptr;
+            if (!DescriptorTable::WriteTexture2DSRV(
+                    context.device,
+                    table[4],
+                    reflectionRadiance,
+                    DXGI_FORMAT_R16G16B16A16_FLOAT)) {
+                FailFullSceneCompositeV3(context, "full_scene_composite_v3_reflection_srv");
+                return;
+            }
 
             context.commandList->OMSetRenderTargets(1, &context.outputRTV, FALSE, nullptr);
             FullscreenPass::SetViewportAndScissor(context.commandList, context.width, context.height);
@@ -671,6 +688,7 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
             compositeContext.indirectLighting = v3IndirectLightingHandle;
             compositeContext.shadowVisibility = v3ShadowVisibilityHandle;
             compositeContext.legacyHdr = hdrHandle;
+            compositeContext.localReflectionRadiance = localReflRadianceHandle;
             compositeContext.output = candidateHdrSceneColorHandle;
             compositeContext.device = m_services.device ? m_services.device->GetDevice() : nullptr;
             compositeContext.descriptorManager = m_services.descriptorManager.get();
@@ -915,15 +933,28 @@ Renderer::ExecuteEndFrameInRenderGraph(const EndFrameGraphInputs& inputs) {
                         nullptr,
                         true);
         if (wantsCompositeV3ThisFrame) {
-            RecordFramePass("FullSceneCompositeV3",
-                            true,
-                            result.ranCompositeV3,
-                            result.ranCompositeV3 ? 1u : 0u,
-                            {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"},
-                            {"candidate_hdr_scene_color"},
-                            false,
-                            nullptr,
-                            true);
+            if (localReflRadianceHandle.IsValid()) {
+                RecordFramePass("FullSceneCompositeV3",
+                                true,
+                                result.ranCompositeV3,
+                                result.ranCompositeV3 ? 1u : 0u,
+                                {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color",
+                                 "local_reflection_radiance"},
+                                {"candidate_hdr_scene_color"},
+                                false,
+                                nullptr,
+                                true);
+            } else {
+                RecordFramePass("FullSceneCompositeV3",
+                                true,
+                                result.ranCompositeV3,
+                                result.ranCompositeV3 ? 1u : 0u,
+                                {"direct_lighting", "indirect_lighting", "shadow_visibility", "hdr_color"},
+                                {"candidate_hdr_scene_color"},
+                                false,
+                                nullptr,
+                                true);
+            }
         }
         if (wantsCandidateBeautyThisFrame) {
             const bool usedCandidateHdr = wantsCompositeV3ThisFrame && result.ranCompositeV3;

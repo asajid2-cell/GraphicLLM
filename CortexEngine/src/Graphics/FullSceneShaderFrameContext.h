@@ -1674,12 +1674,13 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     const bool candidateHdrSceneColorReady =
         FullSceneShaderHasResource(contract, "candidate_hdr_scene_color") &&
         FullSceneShaderPassWritesResource(contract, "FullSceneCompositeV3", "candidate_hdr_scene_color");
-    const bool compositeReadsV3Lighting =
+    const bool compositeReadsV3Inputs =
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "direct_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "indirect_lighting") &&
         FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "shadow_visibility") &&
-        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color");
-    const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Lighting;
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "hdr_color") &&
+        FullSceneShaderPassReadsResource(contract, "FullSceneCompositeV3", "local_reflection_radiance");
+    const bool realCompositeV3ProducerReady = candidateHdrSceneColorReady && compositeReadsV3Inputs;
     context.hdrSceneColorReady = candidateHdrSceneColorReady || legacyHdrSceneColorReady;
     context.compositeInputsReady =
         materialResolveReady &&
@@ -1716,7 +1717,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
             realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_scene_color",
             context.compositeV3Ready
                 ? (realCompositeV3ProducerReady
-                       ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 direct, indirect, and shadow visibility resources"
+                       ? "FullSceneCompositeV3 writes candidate HDR scene color from V3 lighting and local reflection radiance resources"
                        : "FullSceneCompositeV3 adapter maps current HDR output to named HDR scene color and owns energy/overbright policy evidence")
                 : "FullSceneCompositeV3 is missing HDR output, input, energy, or overbright ownership evidence");
     compositeDomain.enabled = contract.sceneVisual.active;
@@ -1728,6 +1729,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
     compositeDomain.backingResources = {
         realCompositeV3ProducerReady ? "candidate_hdr_scene_color" : "hdr_color",
         "hdr_color",
+        "local_reflection_radiance",
         "material_attributes",
         "lighting_split",
         "reflection_radiance",
@@ -1743,7 +1745,7 @@ inline FullSceneShaderPipelineV3FrameContext BuildFullSceneShaderPipelineV3Frame
         realCompositeV3ProducerReady
             ? "candidate_hdr_scene_color_owned_by_full_scene_composite_v3"
             : (context.hdrSceneColorReady ? "hdr_scene_color_owned" : "hdr_scene_color_missing"),
-        compositeReadsV3Lighting ? "v3_lighting_inputs_read" : "v3_lighting_inputs_missing",
+        compositeReadsV3Inputs ? "v3_lighting_and_reflection_inputs_read" : "v3_lighting_and_reflection_inputs_missing",
         context.compositeInputsReady ? "composite_inputs_owned" : "composite_inputs_missing",
         context.compositeEnergyPolicyReady ? "energy_clamp_policy_owned" : "energy_clamp_policy_missing",
         context.compositeOverbrightDiagnosticsReady ? "overbright_diagnostics_owned" : "overbright_diagnostics_missing",

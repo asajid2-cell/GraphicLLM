@@ -116,6 +116,89 @@ The detailed plan and gates are in
 `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` under
 `2026-06-06 Refactor Plan Before Goal Feature Completion`.
 
+### Local Reflection Into Composite V3 - 2026-06-06
+
+Implemented:
+
+- `FullSceneCompositeV3` now accepts the render-graph
+  `localReflectionRadiance` handle.
+- The composite graph pass reads `local_reflection_radiance` when the
+  `LocalReflectionRadiance` pass produced it.
+- The pass allocates a fifth transient SRV slot and binds either the graph
+  reflection radiance texture or a null `R16G16B16A16_FLOAT` SRV.
+- `assets/shaders/FullSceneCompositeV3.hlsl` now samples
+  `g_LocalReflectionRadiance : t4` and blends it conservatively into
+  `candidate_hdr_scene_color`.
+- The V3 frame context no longer calls `FullSceneCompositeV3` a real producer
+  unless its frame pass reads `local_reflection_radiance`.
+- The placeholder analyzer now requires the real composite pass to read
+  `local_reflection_radiance`.
+- The static V3 validator token was updated from `v3_lighting_inputs_read` to
+  `v3_lighting_and_reflection_inputs_read`.
+
+Validation:
+
+```powershell
+python -m py_compile tools\analyze_full_scene_shader_v3_placeholders.py tools\validate_full_scene_shader_pipeline_v3_plan.py
+python tools\validate_full_scene_shader_pipeline_v3_plan.py
+git diff --check -- CortexEngine/src/Graphics/Renderer_RenderGraphEndFrame.cpp CortexEngine/src/Graphics/FullSceneShaderFrameContext.h CortexEngine/tools/analyze_full_scene_shader_v3_placeholders.py CortexEngine/tools/validate_full_scene_shader_pipeline_v3_plan.py CortexEngine/assets/shaders/FullSceneCompositeV3.hlsl
+& 'C:\Program Files\Ninja\ninja.exe' -C build -t recompact
+& 'C:\Program Files\Ninja\ninja.exe' -C build -n CortexEngine
+cmd.exe /d /c "call ""C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 >nul && set ""CORTEX_SKIP_ASSET_SYNC=1"" && ""C:\Program Files\Ninja\ninja.exe"" -C build CortexEngine -j 8"
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 24 -CaptureFrame 12 -CaptureSequenceCount 1 -StabilityMotionMode static -OutputRoot build\captures\v3_composite_reflection_input_static_smoke1_20260606
+$env:CORTEX_ENABLE_FULL_SCENE_CANDIDATE_BEAUTY_V3='1'; powershell -NoProfile -ExecutionPolicy Bypass -File tools\run_full_scene_shader_pipeline_v3_packet.ps1 -NoBuild -SkipSceneAnalyzers -NoStressScene -FamilyFilter gallery -SmokeFrames 36 -CaptureFrame 18 -CaptureSequenceCount 2 -StabilityMotionMode mouse_jitter -OutputRoot build\captures\v3_composite_reflection_input_motion_smoke1_20260606
+```
+
+Results:
+
+- Python compile passed.
+- V3 plan validator passed.
+- Focused `git diff --check` passed with only existing CRLF warnings.
+- Native build passed after `ninja -t recompact` fixed slow graph evaluation.
+  The dry-run then reported no work after the build completed.
+- Static packet passed:
+  `build/captures/v3_composite_reflection_input_static_smoke1_20260606`.
+  - reports: `18`.
+  - promotion status: `review_packet_passed`.
+- Mouse-jitter packet passed:
+  `build/captures/v3_composite_reflection_input_motion_smoke1_20260606`.
+  - reports: `18`.
+  - V3 lighting motion measured `12` view sequences.
+  - promotion status: `review_packet_passed`.
+
+Direct frame-report proof from the motion packet:
+
+- `composite_v3_producer=FullSceneCompositeV3`.
+- `composite_v3_ready=true`.
+- `candidate_beauty_ready=true`.
+- `default_beauty_affects=false`.
+- `FullSceneCompositeV3` executed.
+- `FullSceneCompositeV3` reads:
+  `direct_lighting`, `indirect_lighting`, `shadow_visibility`, `hdr_color`,
+  and `local_reflection_radiance`.
+- `FullSceneCompositeV3` writes `candidate_hdr_scene_color`.
+
+Candidate HDR motion row:
+
+- `mean_abs_luma_delta=0.0089636365`.
+- `mean_active_delta_ratio=0.0618576389`.
+
+Remaining limitation:
+
+- The reflection input is now consumed by the composite, but this is not yet a
+  full `ReflectionResolverV3`. Source ID, confidence, rejected-source masks,
+  and temporal-delta debug resources are still contract/evidence work rather
+  than a concrete resolver shader.
+
+Next renderer slice:
+
+1. Turn `FullSceneReflectionV3` from evidence-domain into a real producer:
+   `reflection_radiance`, `reflection_confidence`,
+   `reflection_source_id`, and `reflection_rejected_source_mask`.
+2. Add debug views and packets for those reflection resources.
+3. Use metallic/smooth object motion packets to find the remaining jitter at
+   the reflection-source level instead of in final beauty.
+
 Latest V3 motion-harness checkpoint:
 
 - Added `tools/analyze_full_scene_shader_v3_lighting_motion.py`.

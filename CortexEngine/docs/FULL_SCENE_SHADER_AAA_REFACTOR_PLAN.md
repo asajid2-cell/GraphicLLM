@@ -1504,3 +1504,307 @@ Promotion rule:
 - Candidate beauty can be default-promoted only after the V3 pipeline produces
   stable multiview evidence and the user accepts the visual result. Until then
   all work stays opt-in and explicitly reported as candidate renderer progress.
+
+## 2026-06-06 Full AAA Scene Shader Refactor Execution Plan
+
+This is the implementation map for moving from evidence slices to a real
+candidate renderer. The goal is a full-scene shader stack that can produce
+high-end, Unreal-style visual quality while staying debuggable enough to fix
+root causes instead of hiding artifacts with blur, scene changes, or disabled
+sources.
+
+### North Star
+
+Build an opt-in renderer path where final pixels come from owned V3 resources:
+
+```text
+Visibility / Motion / Depth
+  -> Material Payload V3
+  -> Scene-Local Environment V3
+  -> Lighting and Shadow V3
+  -> Reflection / Transparency / Media V3
+  -> Candidate HDR Composite V3
+  -> Cinematic Post V3
+  -> Candidate LDR Beauty
+```
+
+Default beauty remains a comparison target. It is not replaced until the
+candidate path passes cross-family packet gates and user review.
+
+### Refactor Principle
+
+Every visual term must pass the same ownership ladder:
+
+```text
+contract name
+  -> render-graph resource
+  -> producer shader/pass
+  -> consumer shader/pass
+  -> debug view
+  -> frame-report proof
+  -> packet metrics
+  -> contact sheet
+  -> promotion gate
+```
+
+A feature that only exists as a report field, adapter alias, post tweak, or
+scene-specific workaround is not allowed into candidate beauty.
+
+### Current Architecture Boundary
+
+Already real enough to build on:
+
+- `FullSceneReflectionV3` owns source-aware reflection outputs.
+- `reflection_ssr_source_signal` exposes raw/admitted SSR diagnostics.
+- `SSR.hlsl` now produces stronger source coverage and forced SSR no longer
+  goes blank in the tested static packet.
+- `FullSceneReflectionHistoryV3` owns current/previous/validity resources.
+- V3 packet tooling can capture resources, frame reports, motion metrics, and
+  promotion decisions.
+
+Still adapter or incomplete:
+
+- `FullSceneCompositeV3` still depends on current HDR output instead of owning
+  final scene assembly from V3 terms.
+- `CinematicPostV3` still wraps current post behavior instead of owning a full
+  filmic output chain.
+- material data is not yet a complete V3 PBR payload with range/missing-channel
+  diagnostics.
+- lighting is not yet split into stable direct, shadow, indirect, emissive, and
+  atmosphere resources.
+- scene-local environment is mostly a contract/profile layer, not a complete
+  texture-backed irradiance/specular/background system.
+- SSR is improved but still motion-sensitive; it should not dominate auto
+  reflections until history-aware confidence is in place.
+
+### Phase 1 - Reflection Stability and Source Fusion
+
+Purpose:
+
+- Make glossy and metallic surfaces stable enough that later beauty work has a
+  solid reflection base.
+
+Implementation:
+
+- finish `FullSceneReflectionHistoryV3` reprojection validity using velocity,
+  depth, and normal/roughness.
+- track history acceptance, rejection reason, bounds rejection, depth mismatch,
+  normal mismatch, and motion penalty.
+- feed history validity into reflection confidence, but keep resolver source
+  selection conservative until packets prove stability.
+- add RT/ray-query reflection as a first-class resolver source with its own
+  source signal, confidence, rejection mask, and debug view.
+- keep source IDs explicit: local probe, SSR, RT/ray-query, planar/hero probe,
+  scene-local environment, forced debug sources, and unavailable.
+
+Acceptance:
+
+- static, mouse-jitter, and reflective-object orbit packets show no large
+  unexpected luma jumps on smooth/metallic objects.
+- forced SSR remains inspectable, but auto SSR only wins where history validity
+  and confidence are strong.
+- frame reports prove Reflection V3 reads depth, velocity, normal/roughness,
+  current source signals, and previous history.
+
+### Phase 2 - Material Payload V3
+
+Purpose:
+
+- Stop treating material quality as an accidental byproduct of imported texture
+  data or legacy shader assumptions.
+
+Implementation:
+
+- create real material payload resources or a packed material target set:
+  base color, normal world/view, roughness, metallic, specular, AO, emissive,
+  opacity, transmission, clearcoat, sheen, anisotropy, IOR, thickness,
+  material class, and missing-channel mask.
+- normalize material ranges at the boundary, not inside each consumer.
+- add material-class policies for wall paint, tile, wood, metal, glass, water,
+  plastic, fabric, skin/organic, emissive, ceramic, concrete, and vegetation.
+- emit material debt when fallback values are used.
+
+Acceptance:
+
+- close-surface packets for tile, metal, glass, water, wood, cloth, plastic,
+  painted wall, emissive sign, and rough concrete.
+- material debug views are nonblank and stable under camera motion.
+- invalid ranges fail the candidate gate instead of silently producing
+  plastic/chalk/mirror artifacts.
+
+### Phase 3 - Scene-Local Environment V3
+
+Purpose:
+
+- Preserve useful IBL lighting while removing inappropriate panorama leakage
+  from enclosed rooms, concert halls, gyms, and galleries.
+
+Implementation:
+
+- split environment into visible background, diffuse irradiance, specular
+  prefilter, reflection background, local probe rig, atmosphere/media, and
+  ownership mask.
+- define environment profiles:
+  enclosed room, neutral gallery/lab, kitchen/interior daylight, gym overhead,
+  stage/concert, red room, exterior street, exterior stadium.
+- add local reflection/probe resources for enclosed scenes.
+- allow old-office IBL and other HDRIs to be lighting inputs only when the
+  scene profile admits them.
+
+Acceptance:
+
+- enclosed scenes show no visible or reflected outdoor/office panorama leaks
+  unless explicitly requested.
+- old-office-IBL test conditions stay enabled and pass without blur-only fixes.
+- reflection-background and visible-background debug views explain what the
+  scene is using.
+
+### Phase 4 - Lighting and Shadow V3
+
+Purpose:
+
+- Make scene lighting artistic and stable before post processing tries to make
+  it impressive.
+
+Implementation:
+
+- produce direct lighting, unshadowed direct lighting, shadow visibility,
+  shadow loss, indirect diffuse, emissive indirect, atmosphere/media lighting,
+  and lighting energy budget.
+- stabilize cascaded shadows, contact shadows, and screen-space/RT shadow
+  terms under mouse jitter.
+- add semantic light rigs:
+  daylight window, warm interior practicals, gym overhead rows, neon strips,
+  stage spot/rim/fill, red-room low key, exterior sun/sky.
+- lock exposure for lighting/shadow validation packets.
+
+Acceptance:
+
+- static floor/wall pixels do not flicker in locked-exposure motion packets.
+- shadow visibility explains every major darkening term.
+- direct/indirect/emissive channels are independently inspectable and nonzero
+  in the families where they are expected.
+
+### Phase 5 - Transparency, Water, Glass, Decals, and Media
+
+Purpose:
+
+- Stop forcing all smooth, transparent, or layered materials through one opaque
+  reflection path.
+
+Implementation:
+
+- add separate resources for glass radiance, water radiance, transparent
+  accumulation, transmission mask, volumetric inscatter, volumetric
+  transmittance, decal albedo/normal/material contribution, and particle
+  lighting.
+- route material classes to the correct domain before composite.
+- add ordering/weight diagnostics so transparent terms cannot double-light or
+  fight opaque reflections.
+
+Acceptance:
+
+- glass and water closeups remain stable under camera motion.
+- decals and particles do not corrupt material payload ranges.
+- transparent terms are visible in debug resources before entering composite.
+
+### Phase 6 - Candidate HDR Composite V3
+
+Purpose:
+
+- Replace the adapter over legacy `hdr_color` with an actual V3 scene
+  assembly shader.
+
+Implementation:
+
+- build `candidate_hdr_scene_color` from material payload, direct lighting,
+  indirect lighting, shadow loss, reflection radiance/confidence, transparency,
+  water/glass, emissive, decals, atmosphere, and environment terms.
+- keep legacy `hdr_color` as a named comparison/reference input, not the
+  candidate owner.
+- output overbright mask, underlit mask, invalid-energy mask, and composition
+  debug.
+- add split-screen default/candidate debug modes.
+
+Acceptance:
+
+- candidate HDR is nonblank and explainable without reading legacy `hdr_color`
+  as its main source.
+- channel isolation proves each term contributes in expected scene families.
+- energy diagnostics catch clipped, underlit, or double-lit pixels.
+
+### Phase 7 - Cinematic Post V3
+
+Purpose:
+
+- Make the final image cinematic without using post to hide upstream
+  instability.
+
+Implementation:
+
+- own exposure meter, locked/manual exposure, bounded auto exposure, bloom
+  extract/resolve, glare, filmic tone map, color grade, sharpening, vignette,
+  depth of field, and candidate LDR output.
+- source bloom from overbright/emissive HDR terms, not arbitrary LDR
+  brightness.
+- add bypass modes: raw HDR, HDR without reflections, HDR without indirect,
+  post without bloom, post without grade, final candidate.
+
+Acceptance:
+
+- locked exposure packets pass before auto exposure is evaluated.
+- bloom/glare is stable under camera motion and tied to real HDR sources.
+- candidate LDR output has contact sheets for default, raw HDR, and final post.
+
+### Phase 8 - Cross-Family Art and Stability Matrix
+
+Purpose:
+
+- Prove the renderer works beyond one pretty screenshot.
+
+Required families:
+
+- gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+  bathroom, bedroom, workshop, store, street, exterior water/vegetation.
+
+Required motion rows:
+
+- static.
+- mouse jitter.
+- camera sweep.
+- close-surface orbit.
+- reflective-object orbit.
+- high-contrast light sweep.
+
+Required packet outputs:
+
+- frame report shutdown JSON.
+- debug resource metrics.
+- motion/stability JSON and markdown.
+- contact sheet.
+- promotion decision.
+- failure report with resource owners and first failing gate.
+
+Promotion:
+
+- only candidate beauty can be promoted.
+- default beauty remains unchanged until the full matrix passes and user review
+  accepts the result.
+
+### Near-Term Implementation Order
+
+The next work should proceed in this order:
+
+1. finish ReflectionHistoryV3 reprojection validity.
+2. add RT/ray-query reflection source signal and source fusion diagnostics.
+3. convert Composite V3 from adapter to real `candidate_hdr_scene_color`.
+4. promote material payload from aggregate contract to concrete PBR resources.
+5. make SceneLocalEnvironmentV3 texture-backed for enclosed rooms.
+6. split Lighting V3 into direct/shadow/indirect/emissive resources.
+7. build CinematicPostV3 on top of candidate HDR.
+8. run the full cross-family matrix and iterate only on failing gates.
+
+This order keeps the known user-visible issues in scope: smooth/metal jitter,
+shadow flicker, IBL leakage, flat materials, weak lighting, and adapter-based
+beauty. It also prevents the old failure pattern where one scene becomes less
+bad while the renderer remains unexplainable.

@@ -114,7 +114,52 @@ Immediate next implementation slice:
 
 The detailed plan and gates are in
 `docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` under
+`2026-06-06 Full Scene Shader Refactor Blueprint` and
 `2026-06-06 Refactor Plan Before Goal Feature Completion`.
+
+### Full Scene Shader Blueprint Checkpoint - 2026-06-06
+
+Current planning decision:
+
+- The renderer target is an opt-in candidate beauty path, not default-beauty
+  mutation.
+- Final pixels must be assembled from named V3 resources:
+  material payload, scene-local environment, direct/indirect lighting, shadows,
+  reflection resolver, transparency/media, HDR composite, and cinematic post.
+- Every stage needs a producer resource, debug view, frame-report ownership,
+  analyzer/packet gate, and promotion evidence before it can be trusted.
+- Do not use IBL blur, disabled reflections, scene switching, or post effects
+  as fixes for root renderer instability.
+
+Refactor tracks:
+
+1. Renderer resource ownership:
+   turn V3 adapter domains into real render-graph producers.
+2. Physically useful shading inputs:
+   complete PBR material payloads, light splits, source-aware reflections, and
+   scene-local environment textures.
+3. Cinematic composition:
+   real HDR composition followed by owned exposure, bloom, tone map, color
+   grade, and LDR output.
+4. Verification and promotion:
+   static, mouse-jitter, camera-sweep, close-surface, reflective-object, and
+   cross-family packets before any default promotion.
+
+Next feature boundary:
+
+- Continue the current `FullSceneReflectionV3` source work by finishing the
+  RT/ray-query input wiring and packet evidence.
+- Do not jump to stronger post or prettier lighting until the reflection
+  domain can explain local, SSR, RT, and environment source choices under
+  motion.
+- Current uncommitted RT slice may already contain code changes. Before
+  modifying more code, inspect `git diff` for:
+  `FullSceneReflectionResolverV3.hlsl`,
+  `Renderer_RenderGraphEndFrame.cpp`,
+  `Renderer_FramePostConstants.cpp`,
+  `ShaderTypes.h`,
+  `FullSceneShaderFrameContext.h`, and
+  `tools/analyze_full_scene_shader_v3_placeholders.py`.
 
 ### Local Reflection Into Composite V3 - 2026-06-06
 

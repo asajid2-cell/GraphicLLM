@@ -76,6 +76,7 @@ Geometry / Visibility
        -> reflection_rt_source_signal
   -> FullSceneReflectionHistoryV3
        -> reflection_history_v3_curr
+       -> reflection_history_v3_prev
        -> reflection_history_v3_validity
   -> SceneLocalEnvironmentV3
        -> scene_local_environment
@@ -139,6 +140,7 @@ void RenderFrameV3(FrameInput input) {
     contract.RecordResource("reflection_confidence", reflections.confidence);
     contract.RecordResource("reflection_rt_source_signal", reflections.rtSourceSignal);
     contract.RecordResource("reflection_history_v3_curr", reflections.historyCurr);
+    contract.RecordResource("reflection_history_v3_prev", reflections.historyPrev);
     contract.RecordResource("reflection_history_v3_validity", reflections.historyValidity);
 
     Texture hdr = FullSceneCompositeV3(
@@ -957,18 +959,22 @@ Interpretation:
   the PSO matches the seven resolver MRT outputs.
 - Added concrete history resources:
   - `reflection_history_v3_curr`.
+  - `reflection_history_v3_prev`.
   - `reflection_history_v3_validity`.
 - Added debug modes:
   - mode `75`: `FullSceneReflectionHistoryV3Curr`.
   - mode `76`: `FullSceneReflectionHistoryV3Validity`.
+  - mode `77`: `FullSceneReflectionHistoryV3Prev`.
 - Added V3 frame-report flags:
   - `reflection_history_v3_ready`.
+  - `reflection_history_v3_prev_ready`.
   - `reflection_history_v3_validity_ready`.
-- Reflection readiness now requires nine channels: the seven resolver outputs
-  plus current history and history validity.
-- This seed pass does not yet use previous-frame history for admission. It
-  establishes the named resources and packet-visible contract needed for the
-  next source-ID hysteresis/reprojection slice.
+- Reflection readiness now requires ten channels: the seven resolver outputs
+  plus current history, previous history, and history validity.
+- `FullSceneReflectionHistoryV3Copy` copies current history into previous
+  history after the history pass so the next frame has a stable read target.
+- This seed pass samples previous-frame history only as an availability signal.
+  It does not yet use velocity/depth/normal reprojection for source admission.
 
 Concrete resolver producer update, 2026-06-06:
 

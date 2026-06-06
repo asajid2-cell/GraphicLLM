@@ -153,8 +153,19 @@ struct FullSceneReflectionV3TargetResources {
     ComPtr<ID3D12Resource> ssrSourceSignal;
     ComPtr<ID3D12Resource> rtSourceSignal;
     ComPtr<ID3D12Resource> historyCurr;
+    ComPtr<ID3D12Resource> historyPrev;
     ComPtr<ID3D12Resource> historyValidity;
     D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES radianceState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES confidenceState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES sourceIdState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES rejectedSourceMaskState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES temporalDeltaState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES ssrSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES historyCurrState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES historyPrevState = D3D12_RESOURCE_STATE_COMMON;
+    D3D12_RESOURCE_STATES historyValidityState = D3D12_RESOURCE_STATE_COMMON;
 
     void Reset() {
         radiance.Reset();
@@ -165,8 +176,19 @@ struct FullSceneReflectionV3TargetResources {
         ssrSourceSignal.Reset();
         rtSourceSignal.Reset();
         historyCurr.Reset();
+        historyPrev.Reset();
         historyValidity.Reset();
         state = D3D12_RESOURCE_STATE_COMMON;
+        radianceState = D3D12_RESOURCE_STATE_COMMON;
+        confidenceState = D3D12_RESOURCE_STATE_COMMON;
+        sourceIdState = D3D12_RESOURCE_STATE_COMMON;
+        rejectedSourceMaskState = D3D12_RESOURCE_STATE_COMMON;
+        temporalDeltaState = D3D12_RESOURCE_STATE_COMMON;
+        ssrSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+        rtSourceSignalState = D3D12_RESOURCE_STATE_COMMON;
+        historyCurrState = D3D12_RESOURCE_STATE_COMMON;
+        historyPrevState = D3D12_RESOURCE_STATE_COMMON;
+        historyValidityState = D3D12_RESOURCE_STATE_COMMON;
     }
 };
 
@@ -187,6 +209,8 @@ struct FullSceneReflectionV3TargetDescriptors {
     DescriptorHandle rtSourceSignalSRV;
     DescriptorHandle historyCurrRTV;
     DescriptorHandle historyCurrSRV;
+    DescriptorHandle historyPrevRTV;
+    DescriptorHandle historyPrevSRV;
     DescriptorHandle historyValidityRTV;
     DescriptorHandle historyValiditySRV;
 
@@ -207,6 +231,8 @@ struct FullSceneReflectionV3TargetDescriptors {
         rtSourceSignalSRV = {};
         historyCurrRTV = {};
         historyCurrSRV = {};
+        historyPrevRTV = {};
+        historyPrevSRV = {};
         historyValidityRTV = {};
         historyValiditySRV = {};
     }
@@ -689,6 +715,12 @@ struct FullSceneReflectionV3TargetState {
                                         descriptors.historyCurrSRV);
         if (historyCurr.IsErr()) return historyCurr;
 
+        auto historyPrev = createTarget("reflection_history_v3_prev",
+                                        resources.historyPrev,
+                                        descriptors.historyPrevRTV,
+                                        descriptors.historyPrevSRV);
+        if (historyPrev.IsErr()) return historyPrev;
+
         auto historyValidity = createTarget("reflection_history_v3_validity",
                                             resources.historyValidity,
                                             descriptors.historyValidityRTV,
@@ -696,6 +728,16 @@ struct FullSceneReflectionV3TargetState {
         if (historyValidity.IsErr()) return historyValidity;
 
         resources.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.radianceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.confidenceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.sourceIdState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.rejectedSourceMaskState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.temporalDeltaState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.ssrSourceSignalState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.rtSourceSignalState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.historyCurrState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.historyPrevState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        resources.historyValidityState = D3D12_RESOURCE_STATE_RENDER_TARGET;
         return Result<void>::Ok();
     }
 

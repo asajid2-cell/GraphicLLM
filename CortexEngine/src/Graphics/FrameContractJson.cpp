@@ -388,6 +388,7 @@ json FullSceneShaderPipelineV3ToJson(const FrameContract& contract) {
         {"reflection_ssr_source_signal_ready", context.reflectionSSRSourceSignalReady},
         {"reflection_rt_source_signal_ready", context.reflectionRTSourceSignalReady},
         {"reflection_history_v3_ready", context.reflectionHistoryV3Ready},
+        {"reflection_history_v3_prev_ready", context.reflectionHistoryV3PrevReady},
         {"reflection_history_v3_validity_ready", context.reflectionHistoryV3ValidityReady},
         {"reflection_v3_source_contract", context.reflectionV3SourceContract},
         {"composite_v3_ready", context.compositeV3Ready},

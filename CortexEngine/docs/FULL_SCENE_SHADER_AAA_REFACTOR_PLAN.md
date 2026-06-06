@@ -938,3 +938,105 @@ Completion requires:
 - stability packets pass without device removal.
 - debug views explain the final image.
 - user accepts the candidate visuals as good enough to promote.
+
+## Next Refactor Direction - Full Scene Shader Renderer
+
+Target:
+
+- Build an opt-in `FullSceneCandidateBeautyV3` renderer that can plausibly
+  reach high-end real-time scene quality without destabilizing current default
+  beauty.
+- Keep the renderer evidence-driven: every visual feature must produce named
+  render-graph resources, frame-report ownership, debug views, and packet
+  gates before it is allowed to affect the candidate composite.
+- Do not treat IBL blur, hidden backgrounds, disabled reflections, or scene
+  switching as fixes. The same scene must pass with the relevant source enabled
+  and inspected.
+
+Architectural shape:
+
+1. Material payload V3.
+   - Normalize asset/material data into a stable PBR payload:
+     base color, normal, roughness, metallic, specular, emissive, opacity,
+     AO, height/parallax, clearcoat, sheen, anisotropy, and material class.
+   - Add material-class debug and range gates so tiny wrong parameters cannot
+     silently produce plastic, chalky, or mirror-like surfaces.
+   - Treat missing texture channels as explicit fallback debt in reports.
+
+2. Lighting V3.
+   - Split direct lighting, shadow visibility, indirect lighting, emissive
+     lighting, volumetric/fog contribution, and exposure pre-tonemap energy.
+   - Refactor shadows toward stable cascades/contact shadows with motion
+     stability tests on floors and walls.
+   - Add light-family contracts: room fill/key/rim, daylight window, stage
+     lighting, neon/emissive, outdoor sun/sky.
+
+3. Reflection V3.
+   - Continue the resolver architecture already started:
+     local radiance, SSR, RT/ray query, planar/hero probes, and
+     scene-local environment are separate sources.
+   - Each source must expose radiance, confidence, source ID, rejection mask,
+     and temporal-history debt.
+   - Next blocker is SSR source quality: it is wired but forced SSR is blank
+     in the current stress packet.
+
+4. Scene-local environment V3.
+   - Separate visible background from lighting/reflection environment.
+   - Enclosed scenes get local ambient/specular/probe contracts rather than
+     visible outdoor/office IBL reflections leaking into every room.
+   - Exterior scenes can still use visible sky/IBL, but through an explicit
+     scene environment profile.
+
+5. Composite V3.
+   - Build a true `candidate_hdr_scene_color` from V3 material, lighting,
+     reflection, environment, transparency, water/glass, decals, and effects.
+   - Keep legacy `hdr_color` as an input/reference until the candidate path
+     owns enough terms to stand alone.
+   - Add split-screen and channel-isolation debug modes.
+
+6. Cinematic post V3.
+   - Add controlled exposure, bloom, tone mapping, color grade, glare, depth of
+     field, motion/TAA history diagnostics, and LDR output ownership.
+   - Lock exposure for stability tests so camera motion cannot hide flicker as
+     adaptation.
+
+Execution order:
+
+1. SSR source-quality pass.
+   - Build a source packet that captures raw `ssr_color`, SSR confidence,
+     normal/roughness/depth inputs, rejection reasons, and resolver output.
+   - Fix why forced SSR is blank before allowing SSR to win more often.
+
+2. Material payload pass.
+   - Replace ad hoc material interpretation with a V3 material resource and
+     material-class debug gates.
+   - Validate gallery, kitchen, office, gym, and concert closeups.
+
+3. Shadow and lighting stability pass.
+   - Reproduce floor/wall camera-motion tests under locked exposure and fixed
+     scene-local lighting.
+   - Add shadow debug resources and reject candidate rows with moving static
+     shadows on stationary geometry.
+
+4. Scene-local environment pass.
+   - Create room-local environment resources and reflection-safe backgrounds.
+   - Prove old-office IBL can remain enabled without leaking inappropriate
+     visible/reflection content into enclosed scenes.
+
+5. Candidate composite pass.
+   - Move from adapter ownership to actual candidate compositing over V3
+     resources.
+   - Compare candidate vs default beauty with contact sheets and per-channel
+     diagnostics.
+
+6. Cross-family art packet.
+   - Run gallery, kitchen, office, gym, classroom, concert, red room, stadium,
+     bathroom, bedroom, workshop, store, street.
+   - Require static, mouse jitter, camera sweep, close-surface orbit, and
+     reflective-object orbit rows.
+
+Promotion rule:
+
+- Candidate beauty can be default-promoted only after the V3 pipeline produces
+  stable multiview evidence and the user accepts the visual result. Until then
+  all work stays opt-in and explicitly reported as candidate renderer progress.

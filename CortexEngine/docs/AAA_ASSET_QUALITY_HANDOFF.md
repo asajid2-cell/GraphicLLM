@@ -73,6 +73,49 @@ Next renderer slice:
 Do not promote V3 domains into default beauty until the packet/promotion gate
 has motion and cross-family evidence.
 
+## 2026-06-06 Full Scene Shader Refactor Resume Position
+
+The current direction is full scene shaders for Unreal-like visuals, but the
+work must stay architectural:
+
+- Do not return to individual scene polishing.
+- Do not hide artifacts by changing IBL blur, disabling reflection paths, or
+  switching scenes.
+- Do not treat a nice screenshot as renderer readiness.
+- Build candidate beauty as a separate opt-in path until user review approves
+  promotion.
+
+Current V3 candidate state:
+
+- `FullSceneCompositeV3` exists and writes `candidate_hdr_scene_color`.
+- `CinematicPostV3` exists and writes `candidate_ldr_cinematic_output`.
+- `candidate_hdr_scene_color` has debug mode `67` and packet coverage.
+- Default beauty remains unchanged.
+- The composite is still incomplete: it consumes V3 direct, indirect, shadow
+  visibility, and legacy `hdr_color` fallback, but not yet first-class
+  reflection/environment/material/media/post resources.
+
+Immediate next implementation slice:
+
+1. Feed `local_reflection_radiance` into `FullSceneCompositeV3`.
+   - Add render-graph read ownership.
+   - Add SRV binding and HLSL sample.
+   - Add frame-report/analyzer evidence that the composite pass reads the
+     reflection input.
+   - Run static and mouse-jitter V3 packets.
+   - Keep the blend conservative; this is an ownership and diagnostic slice,
+     not a visual cheat.
+2. After that, build `ReflectionResolverV3` as a real producer:
+   `reflection_radiance`, `reflection_confidence`, `reflection_source_id`, and
+   `reflection_rejected_source_mask`.
+3. Then build real scene-local environment textures, material payload resources,
+   emissive/GI/media, composite diagnostics, and real cinematic post in that
+   order.
+
+The detailed plan and gates are in
+`docs/FULL_SCENE_SHADER_AAA_REFACTOR_PLAN.md` under
+`2026-06-06 Refactor Plan Before Goal Feature Completion`.
+
 Latest V3 motion-harness checkpoint:
 
 - Added `tools/analyze_full_scene_shader_v3_lighting_motion.py`.
